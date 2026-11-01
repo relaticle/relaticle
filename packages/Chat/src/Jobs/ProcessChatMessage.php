@@ -41,6 +41,7 @@ use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Enums\EmailReach;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Enums\WebAccess;
 use Relaticle\Chat\Events\ChatStreamFailed;
 use Relaticle\Chat\Events\ChatStreamRetrying;
 use Relaticle\Chat\Events\ConversationResolved;
@@ -230,7 +231,7 @@ final class ProcessChatMessage implements ShouldQueue
                 'capabilities' => array_column($this->user->workspaceCapabilities($this->workspace->getKey()), 'value'),
             ]);
             $agent->withModel($this->modelLabel(), $this->resolved['source'] === 'auto');
-            $agent->withEmailReach(EmailReach::for($this->user, $this->workspace));
+            $agent->withEmailReach(EmailReach::for($this->user, $this->workspace))->withWebAccess($this->webAccess());
             $agent->withMentions($this->mentions);
             $agent->withPageContext($this->pageContext);
             $agent->withContextLedger($this->contextLedger());
@@ -1131,6 +1132,13 @@ final class ProcessChatMessage implements ShouldQueue
     private function resolutionKey(): string
     {
         return 'resolve-'.$this->turnId;
+    }
+
+    private function webAccess(): WebAccess
+    {
+        $model = resolve(ModelRegistry::class)->find((string) ($this->resolved['id'] ?? ''));
+
+        return WebAccess::for($this->user, $this->workspace, $model, $this->resumesTurnId);
     }
 
     private function modelLabel(): ?string
