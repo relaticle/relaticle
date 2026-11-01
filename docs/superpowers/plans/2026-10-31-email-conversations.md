@@ -137,7 +137,7 @@ this table in the same PR.
 
 | Owner PR | Class | Contract |
 |---|---|---|
-| 2 | `Relaticle\EmailIntegration\Services\ConversationKeyResolver` | `resolve(FetchedEmailData $data, ConnectedAccount $account): string`, `resolveStored(Email $email): string` (app sends, backfill), `keysToMerge(Email $email)` |
+| 2 | `Relaticle\EmailIntegration\Services\ConversationKeyResolver` | `resolve(FetchedEmailData $data, ConnectedAccount $account): string`, `resolveStored(Email $email): string` (app sends, backfill), `keysToMerge(Email $email): list<string>` |
 | 2, 4 | `email:backfill-*` commands | take `--chunk=` and re-queue themselves within the 300 s `imports` limit; registered outside the feature flag (`EmailIntegrationServiceProvider.php:215-218`) |
 | 3 | `Email::isLinkedToRecord()`, scope `Email::withRecordLinkState()` | linked-only rule without one query per row |
 | 3 | linked-only condition | on the default branch only (`VisibleEmailScope.php:106-120`, `PrivacyService.php:58-65`); explicit shares and the viewer's own copy stay visible |
@@ -145,7 +145,7 @@ this table in the same PR.
 | 2 | `Relaticle\EmailIntegration\Actions\RefreshConversationSummary` | `execute(string $workspaceId, string $conversationKey): void`, idempotent |
 | 2 | `Relaticle\EmailIntegration\Jobs\MergeConversations` | `(string $workspaceId, string $emailId)`, unique per workspace and email until processing; merges every key linked to the email into the oldest |
 | 2 | `Relaticle\EmailIntegration\Models\EmailConversation` | model over `email_conversations`, no text columns |
-| 2 | `email:backfill-conversations` | command, `--force`, `--workspace=` |
+| 2 | `email:backfill-conversations` | command, `--force`, `--workspace=`, `--chunk=5000` (emails keyed plus summaries rebuilt per run) |
 | 4 | `Relaticle\EmailIntegration\Enums\AutomatedReason` | cases `List`, `AutoSubmitted`, `Bulk`, `RoleSender`, `ProviderCategory` |
 | 4 | `Relaticle\EmailIntegration\Services\AutomatedMailDetector` | `detect(FetchedEmailData $data, string $workspaceId): ?AutomatedReason` |
 | 4 | `email:backfill-automated-reasons` | command |
