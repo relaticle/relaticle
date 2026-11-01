@@ -16,6 +16,7 @@ use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManag
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
+use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailRead;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
@@ -554,7 +555,7 @@ describe('subject privacy enforcement', function (): void {
             ->assertDontSee('The discount is forty percent');
     });
 
-    it('shows the opening of the message in the reader to a viewer with full access', function (): void {
+    it('shows the snippet in the list row only, not again under the reader subject', function (): void {
         $this->actingAs($this->viewer);
 
         $email = Email::factory()->create([
@@ -565,6 +566,31 @@ describe('subject privacy enforcement', function (): void {
             'snippet' => 'The discount is forty percent',
             'privacy_tier' => EmailPrivacyTier::FULL,
         ]);
+        EmailBody::create(['email_id' => $email->id, 'body_html' => '<p>Full body</p>', 'body_text' => 'Full body']);
+
+        $this->person->emails()->attach($email->getKey());
+
+        $html = livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->call('selectEmail', $email->getKey())
+            ->assertSee('Renewal terms')
+            ->html();
+
+        expect(substr_count($html, 'The discount is forty percent'))->toBe(1);
+    });
+
+    it('renders a text-only body in the app theme without a frame', function (): void {
+        $this->actingAs($this->viewer);
+
+        $email = Email::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'privacy_tier' => EmailPrivacyTier::FULL,
+        ]);
+        EmailBody::create(['email_id' => $email->id, 'body_html' => null, 'body_text' => 'Plain hello from Brian']);
 
         $this->person->emails()->attach($email->getKey());
 
@@ -573,7 +599,8 @@ describe('subject privacy enforcement', function (): void {
             'pageClass' => ViewPeople::class,
         ])
             ->call('selectEmail', $email->getKey())
-            ->assertSee('The discount is forty percent');
+            ->assertSee('Plain hello from Brian')
+            ->assertDontSeeHtml('<iframe');
     });
 
     it('does not match a guessed subject when the viewer cannot view the subject', function (): void {

@@ -6,15 +6,19 @@ use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\TextColumn;
+use Illuminate\Translation\Translator;
+use Livewire\Livewire;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Enums\OutboxTab;
 use Relaticle\EmailIntegration\Livewire\OutboxTable;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 
-mutates(OutboxTable::class);
+mutates(OutboxTable::class, OutboxTab::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -105,7 +109,7 @@ it('keeps a later send on the scheduled tab instead of queued', function (): voi
     livewire(OutboxTable::class)
         ->assertCanSeeTableRecords([$undoWindow])
         ->assertCanNotSeeTableRecords([$later])
-        ->filterTable('status_tab', 'scheduled')
+        ->call('setStatusTab', 'scheduled')
         ->assertCanSeeTableRecords([$later])
         ->assertCanNotSeeTableRecords([$undoWindow]);
 });
@@ -117,7 +121,7 @@ it('failed tab filters to failed emails', function (): void {
     ]);
 
     livewire(OutboxTable::class)
-        ->filterTable('status_tab', 'failed')
+        ->call('setStatusTab', 'failed')
         ->assertCanSeeTableRecords([$failed])
         ->assertCanNotSeeTableRecords([$queued]);
 });
@@ -155,7 +159,7 @@ it('locked failed mode lists every failed email owned by the user', function ():
         ->assertCanNotSeeTableRecords([$queued, $teammateFailure, $otherTeamFailure])
         ->assertTableColumnVisible('last_error');
 
-    expect($component->instance()->getTable()->getFilter('status_tab'))->toBeNull();
+    expect($component->instance()->segments())->toBe([]);
 });
 
 it('locked failed mode has a dedicated empty state', function (): void {
@@ -168,30 +172,148 @@ it('locked failed mode has a dedicated empty state', function (): void {
 });
 
 it('uses an outlined clock for the outbox empty state', function (): void {
-    $component = livewire(OutboxTable::class, ['includeFailedFilter' => false])
-        ->assertSee(__('filament/pages/email-inbox.outbox.empty.heading'))
-        ->assertSee(__('filament/pages/email-inbox.outbox.empty.description'));
+    $component = livewire(OutboxTable::class, ['includeFailedFilter' => false]);
 
     expect($component->instance()->getTable()->getEmptyStateIcon())
         ->toBe(Heroicon::OutlinedClock);
 });
 
-it('can exclude failed from the status filter without changing standalone outbox', function (): void {
-    $emailPageOptions = livewire(OutboxTable::class, ['includeFailedFilter' => false])
-        ->instance()
-        ->getTable()
-        ->getFilter('status_tab')
-        ?->getOptions();
+it('gives each empty segment its own heading and description', function (OutboxTab $segment): void {
+    overrideOutboxLines([
+        "empty.{$segment->value}.heading" => "Empty heading for {$segment->value}",
+        "empty.{$segment->value}.description" => "Empty description for {$segment->value}",
+    ]);
 
-    $standaloneOptions = livewire(OutboxTable::class)
-        ->instance()
-        ->getTable()
-        ->getFilter('status_tab')
-        ?->getOptions();
+    livewire(OutboxTable::class, ['includeFailedFilter' => false])
+        ->call('setStatusTab', $segment->value)
+        ->assertSee("Empty heading for {$segment->value}")
+        ->assertSee("Empty description for {$segment->value}");
+})->with([
+    'queued' => [OutboxTab::QUEUED],
+    'scheduled' => [OutboxTab::SCHEDULED],
+    'sending' => [OutboxTab::SENDING],
+    'sent' => [OutboxTab::SENT],
+]);
 
-    expect($emailPageOptions)
-        ->not->toHaveKey('failed')
-        ->and($standaloneOptions)->toHaveKey('failed');
+it('can exclude failed from the segments without changing standalone outbox', function (): void {
+    $emailPageSegments = livewire(OutboxTable::class, ['includeFailedFilter' => false])->instance()->segments();
+    $standaloneSegments = livewire(OutboxTable::class)->instance()->segments();
+
+    expect($emailPageSegments)
+        ->not->toContain(OutboxTab::FAILED)
+        ->and($standaloneSegments)->toContain(OutboxTab::FAILED);
+});
+
+function overrideOutboxLines(array $lines): void
+{
+    __('filament/pages/email-outbox.title');
+
+    resolve(Translator::class)->addLines(collect($lines)
+        ->mapWithKeys(fn (string $line, string $key): array => ["filament/pages/email-outbox.{$key}" => $line])
+        ->all(), 'en');
+}
+
+it('shows statuses as labelled segments, not as a removable filter chip', function (): void {
+    overrideOutboxLines([
+        'tabs.scheduled' => 'Segment later sends',
+        'columns.subject' => 'Column subject line',
+        'columns.status' => 'Column delivery state',
+        'columns.last_error' => 'Column provider error',
+    ]);
+
+    $component = livewire(OutboxTable::class);
+
+    expect($component->instance()->getTable()->getFilter('status_tab'))->toBeNull();
+
+    $component->assertDontSee('Status tab')
+        ->assertSee('Segment later sends')
+        ->assertSee('Column subject line')
+        ->assertSee('Column delivery state')
+        ->assertTableColumnExists('last_error', fn (TextColumn $column): bool => $column->getLabel() === 'Column provider error');
+});
+
+it('labels every row action', function (): void {
+    overrideOutboxLines([
+        'actions.cancel' => 'Stop this send',
+        'actions.reschedule' => 'Pick another time',
+        'actions.retry' => 'Send it again',
+    ]);
+
+    $queued = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED);
+    $failed = makeOutboxEmail($this->user, $this->account, EmailStatus::FAILED);
+
+    livewire(OutboxTable::class)
+        ->assertActionHasLabel(TestAction::make('cancel')->table($queued), 'Stop this send')
+        ->assertActionHasLabel(TestAction::make('reschedule')->table($queued), 'Pick another time')
+        ->call('setStatusTab', 'failed')
+        ->assertActionHasLabel(TestAction::make('retry')->table($failed), 'Send it again');
+});
+
+it('falls back to the queued segment for an unknown status in the URL', function (): void {
+    $queued = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED);
+    $failed = makeOutboxEmail($this->user, $this->account, EmailStatus::FAILED);
+
+    Livewire::withQueryParams(['status' => 'bogus'])
+        ->test(OutboxTable::class)
+        ->assertOk()
+        ->assertCanSeeTableRecords([$queued])
+        ->assertCanNotSeeTableRecords([$failed]);
+});
+
+it('falls back to the queued segment when the URL names the failed status the outbox does not show', function (): void {
+    $queued = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED);
+    $failed = makeOutboxEmail($this->user, $this->account, EmailStatus::FAILED);
+
+    Livewire::withQueryParams(['status' => 'failed'])
+        ->test(OutboxTable::class, ['includeFailedFilter' => false])
+        ->assertCanSeeTableRecords([$queued])
+        ->assertCanNotSeeTableRecords([$failed]);
+});
+
+it('falls back to the queued segment for an unknown status', function (): void {
+    $queued = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED);
+    $failed = makeOutboxEmail($this->user, $this->account, EmailStatus::FAILED);
+
+    livewire(OutboxTable::class)
+        ->call('setStatusTab', 'failed')
+        ->call('setStatusTab', 'bogus')
+        ->assertCanSeeTableRecords([$queued])
+        ->assertCanNotSeeTableRecords([$failed]);
+});
+
+it('lists scheduled sends soonest first', function (): void {
+    $this->travelTo(now()->startOfSecond());
+
+    $later = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED, ['scheduled_for' => now()->addHours(3)]);
+    $soonest = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED, ['scheduled_for' => now()->addHour()]);
+    $middle = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED, ['scheduled_for' => now()->addHours(2)]);
+
+    livewire(OutboxTable::class)
+        ->call('setStatusTab', 'scheduled')
+        ->assertCanSeeTableRecords([$soonest, $middle, $later], inOrder: true);
+});
+
+it('lists queued sends with no send time first, then soonest first', function (): void {
+    $this->travelTo(now()->startOfSecond());
+
+    $later = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED, ['scheduled_for' => now()->addSeconds(5)]);
+    $unscheduled = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED, ['scheduled_for' => null]);
+    $soonest = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED, ['scheduled_for' => now()->addSeconds(2)]);
+
+    livewire(OutboxTable::class)
+        ->assertCanSeeTableRecords([$unscheduled, $soonest, $later], inOrder: true);
+});
+
+it('lists sent emails newest first', function (): void {
+    $this->travelTo(now()->startOfSecond());
+
+    $oldest = makeOutboxEmail($this->user, $this->account, EmailStatus::SENT, ['sent_at' => now()->subHours(3)]);
+    $newest = makeOutboxEmail($this->user, $this->account, EmailStatus::SENT, ['sent_at' => now()->subHour()]);
+    $middle = makeOutboxEmail($this->user, $this->account, EmailStatus::SENT, ['sent_at' => now()->subHours(2)]);
+
+    livewire(OutboxTable::class)
+        ->call('setStatusTab', 'sent')
+        ->assertCanSeeTableRecords([$newest, $middle, $oldest], inOrder: true);
 });
 
 it('cancel row action moves a queued email to CANCELLED', function (): void {
@@ -209,7 +331,7 @@ it('cancel row action is hidden for non-queued emails', function (): void {
     $failed = makeOutboxEmail($this->user, $this->account, EmailStatus::FAILED);
 
     livewire(OutboxTable::class)
-        ->filterTable('status_tab', 'failed')
+        ->call('setStatusTab', 'failed')
         ->assertActionHidden(TestAction::make('cancel')->table($failed));
 });
 
@@ -223,7 +345,8 @@ it('reschedule row action updates scheduled_for', function (): void {
             TestAction::make('reschedule')->table($email),
             data: ['scheduled_for' => $target->toDateTimeString()],
         )
-        ->assertNotified();
+        ->assertNotified()
+        ->assertDispatched('outbox:changed');
 
     expect($email->refresh()->scheduled_for?->timestamp)->toBe($target->timestamp);
 });
@@ -235,7 +358,7 @@ it('retry row action re-queues a failed email', function (): void {
     ]);
 
     livewire(OutboxTable::class)
-        ->filterTable('status_tab', 'failed')
+        ->call('setStatusTab', 'failed')
         ->assertCanSeeTableRecords([$email])
         ->callAction([['name' => 'retry', 'context' => ['table' => true, 'recordKey' => $email->getKey()]]])
         ->assertNotified()

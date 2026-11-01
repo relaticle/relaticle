@@ -29,7 +29,7 @@ enum EmailCategory: string implements HasColor, HasIcon, HasLabel
 
     public function getLabel(): string
     {
-        return $this->value;
+        return __('filament/pages/email-inbox.categories.'.strtolower($this->value));
     }
 
     public function getColor(): string

@@ -366,6 +366,10 @@ final class AppPanelProvider extends PanelProvider
                 $this->inviteMembersModal(...),
             )
             ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn (): View|Factory => view('filament.app.active-tab-into-view'),
+            )
+            ->renderHook(
                 PanelsRenderHook::PAGE_START,
                 fn (): string => Blade::render('@livewire(\App\Livewire\App\Workspaces\PendingInvitationsForUser::class)'),
             )
