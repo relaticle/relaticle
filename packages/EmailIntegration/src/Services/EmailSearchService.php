@@ -118,6 +118,9 @@ final readonly class EmailSearchService
                 ->orWhere(function (Builder $byDefault) use ($viewerId, $tiers): void {
                     $byDefault
                         ->whereIn('privacy_tier', $tiers)
+                        ->whereExists(fn (BaseBuilder $link): BaseBuilder => $link
+                            ->from('emailables')
+                            ->whereColumn('emailables.email_id', 'emails.id'))
                         ->whereDoesntHave('shares', fn (Builder $shareQuery): Builder => $shareQuery
                             ->where('shared_with', $viewerId))
                         ->whereNotExists(fn (BaseBuilder $shareQuery): BaseBuilder => $this->crossMessageShareExists(

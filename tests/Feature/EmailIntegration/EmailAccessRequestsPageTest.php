@@ -690,6 +690,37 @@ describe('subject privacy', function (): void {
             ->assertCanSeeTableRecords([$request]);
     });
 
+    it('does not match the subject of an unlinked teammate email when searching outgoing requests', function (): void {
+        $owner = User::factory()->create(['current_workspace_id' => $this->workspace->id, 'name' => 'Pat Owner']);
+
+        $ownerAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $owner->id,
+        ]));
+
+        $email = Email::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $owner->id,
+            'connected_account_id' => $ownerAccount->getKey(),
+            'privacy_tier' => EmailPrivacyTier::SUBJECT,
+            'subject' => 'Unlinked forecast secret',
+        ]);
+
+        $request = EmailAccessRequest::factory()->pending()->forTier(EmailPrivacyTier::FULL)->create([
+            'owner_id' => $owner->id,
+            'requester_id' => $this->user->id,
+            'email_id' => $email->getKey(),
+        ]);
+
+        livewire(AccessRequestsTable::class)
+            ->call('setTab', 'outgoing')
+            ->assertTableColumnStateSet('email.subject', __('filament/pages/email-inbox.subject.hidden'), $request)
+            ->searchTable('Unlinked forecast secret')
+            ->assertCanNotSeeTableRecords([$request])
+            ->searchTable('Pat Owner')
+            ->assertCanSeeTableRecords([$request]);
+    });
+
     it('matches the subject when searching incoming requests as the owner', function (): void {
         $requester = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
 
