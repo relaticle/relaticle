@@ -119,3 +119,87 @@ it('denies a teammate every view ability on an email no record links to', functi
 
     expect($teammate->can('viewBody', $this->email->fresh()))->toBeTrue();
 });
+
+it('lets a teammate read an unlinked email the owner shared with them directly', function (): void {
+    $this->email->update(['privacy_tier' => EmailPrivacyTier::METADATA_ONLY]);
+    $teammate = User::factory()->create();
+    $teammate->workspaces()->attach($this->workspace);
+    $teammate->forceFill(['current_workspace_id' => $this->workspace->id])->save();
+
+    EmailShare::factory()->tier(EmailPrivacyTier::SUBJECT)->create([
+        'email_id' => $this->email->getKey(),
+        'shared_by' => $this->owner->id,
+        'shared_with' => $teammate->id,
+    ]);
+
+    expect($teammate->can('viewSubject', $this->email))->toBeTrue()
+        ->and($teammate->can('viewBody', $this->email))->toBeFalse();
+});
+
+it('lets a teammate read an unlinked email they also hold in their own mailbox', function (): void {
+    $this->email->update(['privacy_tier' => EmailPrivacyTier::METADATA_ONLY]);
+    $teammate = User::factory()->create();
+    $teammate->workspaces()->attach($this->workspace);
+    $teammate->forceFill(['current_workspace_id' => $this->workspace->id])->save();
+    $teammateAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $teammate->id,
+    ]));
+    Email::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateAccount->getKey(),
+        'rfc_message_id' => $this->email->rfc_message_id,
+    ]);
+
+    expect($teammate->can('viewSubject', $this->email))->toBeTrue()
+        ->and($teammate->can('viewBody', $this->email))->toBeTrue();
+});
+
+it('lets a teammate read an unlinked email through a share on another copy of the message', function (): void {
+    $this->email->update(['privacy_tier' => EmailPrivacyTier::METADATA_ONLY]);
+    $teammate = User::factory()->create();
+    $teammate->workspaces()->attach($this->workspace);
+    $teammate->forceFill(['current_workspace_id' => $this->workspace->id])->save();
+    $secondAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->owner->id,
+    ]));
+    $otherCopy = Email::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->owner->id,
+        'connected_account_id' => $secondAccount->getKey(),
+        'rfc_message_id' => $this->email->rfc_message_id,
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+    ]);
+    EmailShare::factory()->tier(EmailPrivacyTier::SUBJECT)->create([
+        'email_id' => $otherCopy->getKey(),
+        'shared_by' => $this->owner->id,
+        'shared_with' => $teammate->id,
+    ]);
+
+    expect($teammate->can('viewSubject', $this->email))->toBeTrue()
+        ->and($teammate->can('viewBody', $this->email))->toBeFalse();
+});
+
+it('does not count a copy in the teammate\'s disconnected mailbox as their own', function (): void {
+    $this->email->update(['privacy_tier' => EmailPrivacyTier::METADATA_ONLY]);
+    $teammate = User::factory()->create();
+    $teammate->workspaces()->attach($this->workspace);
+    $teammate->forceFill(['current_workspace_id' => $this->workspace->id])->save();
+    $teammateAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $teammate->id,
+    ]));
+    Email::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateAccount->getKey(),
+        'rfc_message_id' => $this->email->rfc_message_id,
+    ]);
+
+    $teammateAccount->delete();
+
+    expect($teammate->can('view', $this->email))->toBeFalse()
+        ->and($teammate->can('viewBody', $this->email))->toBeFalse();
+});
