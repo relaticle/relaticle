@@ -59,7 +59,9 @@ it('updates the team default_email_sharing_tier on save', function (): void {
     expect($this->workspace->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::SUBJECT);
 });
 
-it('retroactively updates non-customized emails when the workspace sharing default changes', function (): void {
+it('retroactively narrows non-customized emails when the workspace sharing default drops', function (): void {
+    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT]);
+
     $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'workspace_id' => $this->workspace->id,
         'user_id' => $this->user->id,
@@ -69,7 +71,7 @@ it('retroactively updates non-customized emails when the workspace sharing defau
         'workspace_id' => $this->workspace->id,
         'user_id' => $this->user->id,
         'connected_account_id' => $account->getKey(),
-        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        'privacy_tier' => EmailPrivacyTier::SUBJECT,
         'privacy_tier_customized' => false,
     ]);
 
@@ -77,17 +79,17 @@ it('retroactively updates non-customized emails when the workspace sharing defau
         'workspace_id' => $this->workspace->id,
         'user_id' => $this->user->id,
         'connected_account_id' => $account->getKey(),
-        'privacy_tier' => EmailPrivacyTier::PRIVATE,
+        'privacy_tier' => EmailPrivacyTier::FULL,
         'privacy_tier_customized' => true,
     ]);
 
     livewire(EmailPrivacySettingsPage::class)
         ->call('setTab', 'sharing')
-        ->set('default_email_sharing_tier', EmailPrivacyTier::SUBJECT->value)
+        ->set('default_email_sharing_tier', EmailPrivacyTier::METADATA_ONLY->value)
         ->callAction('save');
 
-    expect($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::SUBJECT)
-        ->and($customized->fresh()->privacy_tier)->toBe(EmailPrivacyTier::PRIVATE);
+    expect($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::METADATA_ONLY)
+        ->and($customized->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
 });
 
 it('requires confirmation when changing the workspace sharing tier to private', function (): void {

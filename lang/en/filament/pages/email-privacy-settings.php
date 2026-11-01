@@ -16,7 +16,7 @@ return [
     ],
     'workspace_default' => [
         'heading' => 'Workspace default sharing tier',
-        'description' => 'Applied to mailboxes that follow the workspace default. Existing emails update when you save, except emails a member changed individually. Full access is set on each mailbox, never here.',
+        'description' => 'Applied to mailboxes that follow the workspace default. A more open level applies to mail synced from now on. A more private level also applies to existing emails, except emails a member changed individually. Full access is set on each mailbox, never here.',
         'tier_label' => 'Default sharing tier for connected email accounts',
     ],
     'visibility' => [
