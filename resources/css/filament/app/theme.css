@@ -5,6 +5,9 @@
 /* EmailIntegration package styles */
 @import '../../../../packages/EmailIntegration/resources/css/email-integration.css';
 
+@import './resizable-columns.css';
+@import './table-layouts.css';
+
 @plugin "@tailwindcss/typography";
 
 @source not '../../../../vendor/laravel/horizon';
@@ -1411,15 +1414,8 @@ html.fi-record-stacked .fi-record-layout {
 
 /* Dropdowns */
 
-/* asmit/resized-column lifts the table toolbar (`.fi-ta-header-ctn`) to
-   z-index 21 so its own dropdowns clear the sticky table head at 19. That also
-   puts it above a page-header action dropdown, whose panel is Filament's
-   default z-index 20, so the panel renders *behind* the search field and
-   filter/column triggers. Row ⋮ menus teleport to body at the same default,
-   so they paint under + New / Attach and the column-reorder grip sits on
-   Detach. 22 clears the toolbar and stays under Filament chrome (30). */
 .fi-dropdown-panel {
-    @apply z-[22] rounded-xl p-1;
+    @apply rounded-xl p-1;
 }
 
 .fi-dropdown-list {

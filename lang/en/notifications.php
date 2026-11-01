@@ -46,6 +46,21 @@ return [
             'title_without_actor' => 'You have a new task',
             'action' => 'View task',
         ],
+        'table_layout_changed' => [
+            'deleted_title' => ':actor deleted your layout ":name"',
+            'deleted_title_without_actor' => 'Your layout ":name" was deleted',
+            'deleted_body' => 'It was on the :table table. Members who used it keep what their table shows.',
+            'unshared_title' => ':actor stopped sharing your layout ":name"',
+            'unshared_title_without_actor' => 'Your layout ":name" is no longer shared',
+            'unshared_body' => 'It is private to you again on the :table table.',
+            'renamed_title' => ':actor renamed your layout ":previous" to ":name"',
+            'renamed_title_without_actor' => 'Your layout ":previous" is now called ":name"',
+            'renamed_body' => 'It is still shared on the :table table.',
+            'updated_title' => ':actor changed your layout ":name"',
+            'updated_title_without_actor' => 'Your layout ":name" was changed',
+            'updated_body' => 'Its columns, sort or filters changed on the :table table. Open it to see the new version.',
+            'action' => 'Open :table',
+        ],
     ],
 
     'panel' => [
