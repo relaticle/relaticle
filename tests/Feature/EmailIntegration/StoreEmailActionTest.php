@@ -21,9 +21,10 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailThread;
+use Relaticle\EmailIntegration\Services\ConversationKeyResolver;
 use Relaticle\EmailIntegration\Services\EmailClassifier;
 
-mutates(StoreEmailAction::class, AutoCreatePersonAction::class);
+mutates(StoreEmailAction::class, AutoCreatePersonAction::class, ConversationKeyResolver::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -867,4 +868,131 @@ it('stores the References header on the email', function (): void {
     ]));
 
     expect($email->refresh()->references)->toBe('<root@acme.example> <parent@acme.example>');
+});
+
+function secondMailbox(Workspace $workspace): ConnectedAccount
+{
+    $teammate = User::factory()->create();
+    $workspace->users()->attach($teammate, ['role' => 'admin']);
+
+    return ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $teammate->getKey(),
+    ]));
+}
+
+it('gives a reply the conversation key of its stored parent', function (): void {
+    $parent = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'p', 'rfcMessageId' => '<p@acme.example>', 'threadId' => 't1',
+    ]));
+
+    $reply = resolve(StoreEmailAction::class)->execute(secondMailbox($this->workspace), makeFetchedEmailData([
+        'providerMessageId' => 'r', 'rfcMessageId' => '<r@acme.example>', 'threadId' => 't2',
+        'inReplyTo' => '<p@acme.example>',
+    ]));
+
+    expect($reply->conversation_key)->toBe($parent->conversation_key)->toHaveLength(64);
+});
+
+it('joins a reply that arrived before its parent once the parent is stored', function (): void {
+    $reply = resolve(StoreEmailAction::class)->execute(secondMailbox($this->workspace), makeFetchedEmailData([
+        'providerMessageId' => 'r', 'rfcMessageId' => '<r@acme.example>', 'threadId' => 'tb',
+        'inReplyTo' => '<p@acme.example>', 'references' => '<root@acme.example> <p@acme.example>',
+    ]));
+
+    $parent = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'p', 'rfcMessageId' => '<p@acme.example>', 'threadId' => 'ta',
+        'inReplyTo' => '<root@acme.example>', 'references' => '<root@acme.example>',
+    ]));
+
+    expect($parent->conversation_key)
+        ->toBe($reply->conversation_key)
+        ->toBe(ConversationKeyResolver::keyFor($this->workspace->getKey(), '<root@acme.example>'));
+});
+
+it('follows References to a stored ancestor when In-Reply-To is missing', function (): void {
+    $first = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'f', 'rfcMessageId' => '<first@acme.example>', 'threadId' => 'ta',
+    ]));
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'root', 'rfcMessageId' => '<root@acme.example>', 'threadId' => 'ta',
+    ]));
+
+    $reply = resolve(StoreEmailAction::class)->execute(secondMailbox($this->workspace), makeFetchedEmailData([
+        'providerMessageId' => 'r', 'rfcMessageId' => '<r@acme.example>', 'threadId' => 'tb',
+        'inReplyTo' => null, 'references' => '<root@acme.example> <unseen@acme.example>',
+    ]));
+
+    expect($reply->conversation_key)
+        ->toBe($first->conversation_key)
+        ->not->toBe(ConversationKeyResolver::keyFor($this->workspace->getKey(), '<root@acme.example>'));
+});
+
+it('keeps two messages apart when they only share a subject', function (): void {
+    $one = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => '1', 'rfcMessageId' => '<1@acme.example>', 'threadId' => 't1', 'subject' => 'Pricing',
+    ]));
+    $two = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => '2', 'rfcMessageId' => '<2@acme.example>', 'threadId' => 't2', 'subject' => 'Re: Pricing',
+    ]));
+
+    expect($two->conversation_key)->not->toBe($one->conversation_key);
+});
+
+it('never joins a conversation in another workspace on a shared Message-ID', function (): void {
+    $foreign = Email::factory()->create([
+        'workspace_id' => User::factory()->withWorkspace()->create()->currentWorkspace->getKey(),
+        'rfc_message_id' => '<shared@acme.example>',
+        'conversation_key' => str_repeat('f', 64),
+    ]);
+
+    $reply = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'inReplyTo' => '<shared@acme.example>',
+    ]));
+
+    expect($reply->conversation_key)
+        ->not->toBe($foreign->conversation_key)
+        ->toBe(ConversationKeyResolver::keyFor($this->workspace->getKey(), '<shared@acme.example>'));
+});
+
+it('takes the key of a parent hidden in a disconnected mailbox', function (): void {
+    $mailbox = secondMailbox($this->workspace);
+    $first = resolve(StoreEmailAction::class)->execute($mailbox, makeFetchedEmailData([
+        'providerMessageId' => 'f', 'rfcMessageId' => '<first@acme.example>', 'threadId' => 'ta',
+    ]));
+    $parent = resolve(StoreEmailAction::class)->execute($mailbox, makeFetchedEmailData([
+        'providerMessageId' => 'p', 'rfcMessageId' => '<p@acme.example>', 'threadId' => 'ta',
+    ]));
+    $parent->delete();
+    $mailbox->delete();
+
+    $reply = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'r', 'rfcMessageId' => '<r@acme.example>', 'threadId' => 'tb',
+        'inReplyTo' => '<p@acme.example>',
+    ]));
+
+    expect(Email::query()->whereKey($parent->getKey())->exists())->toBeFalse()
+        ->and($reply->conversation_key)
+        ->toBe($first->conversation_key)
+        ->not->toBe(ConversationKeyResolver::keyFor($this->workspace->getKey(), '<p@acme.example>'));
+});
+
+it('prefers the In-Reply-To parent over the provider thread', function (): void {
+    $onThread = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'a', 'rfcMessageId' => '<a@acme.example>', 'threadId' => 't1',
+    ]));
+    $earlier = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'z', 'rfcMessageId' => '<z@acme.example>', 'threadId' => 't2',
+    ]));
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'p', 'rfcMessageId' => '<p@acme.example>', 'threadId' => 't2',
+    ]));
+
+    $reply = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'r', 'rfcMessageId' => '<r@acme.example>', 'threadId' => 't1',
+        'inReplyTo' => '<p@acme.example>',
+    ]));
+
+    expect($onThread->conversation_key)->not->toBe($earlier->conversation_key)
+        ->and($reply->conversation_key)->toBe($earlier->conversation_key);
 });

@@ -20,6 +20,7 @@ use Relaticle\EmailIntegration\Models\EmailLabel;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailRead;
 use Relaticle\EmailIntegration\Models\EmailThread;
+use Relaticle\EmailIntegration\Services\ConversationKeyResolver;
 use Relaticle\EmailIntegration\Services\EmailClassifier;
 use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 use Relaticle\EmailIntegration\Services\MicrosoftGraphMailService;
@@ -59,21 +60,7 @@ final readonly class StoreEmailAction
 
         try {
             $email = DB::transaction(function () use ($connectedAccount, $data, &$storedInlinePaths): Email {
-                $email = $connectedAccount->emails()->chaperone()->create([
-                    'workspace_id' => $connectedAccount->workspace_id,
-                    'user_id' => $connectedAccount->user_id,
-                    'rfc_message_id' => $data->rfcMessageId,
-                    'provider_message_id' => $data->providerMessageId,
-                    'thread_id' => $data->threadId,
-                    'in_reply_to' => $data->inReplyTo,
-                    'references' => $data->references,
-                    'subject' => $data->subject,
-                    'snippet' => $data->snippet,
-                    'sent_at' => $data->sentAt,
-                    'direction' => $data->direction,
-                    'folder' => $data->folder,
-                    'has_attachments' => $data->hasAttachments,
-                ]);
+                $email = $this->createEmail($connectedAccount, $data);
 
                 // Read state is per-viewer; the provider's "already read" flag reflects
                 // the owner's mailbox, so seed only the owner's read row.
@@ -156,6 +143,26 @@ final readonly class StoreEmailAction
 
             throw $exception;
         }
+    }
+
+    private function createEmail(ConnectedAccount $connectedAccount, FetchedEmailData $data): Email
+    {
+        return $connectedAccount->emails()->chaperone()->create([
+            'workspace_id' => $connectedAccount->workspace_id,
+            'user_id' => $connectedAccount->user_id,
+            'rfc_message_id' => $data->rfcMessageId,
+            'provider_message_id' => $data->providerMessageId,
+            'thread_id' => $data->threadId,
+            'in_reply_to' => $data->inReplyTo,
+            'references' => $data->references,
+            'conversation_key' => resolve(ConversationKeyResolver::class)->resolve($data, $connectedAccount),
+            'subject' => $data->subject,
+            'snippet' => $data->snippet,
+            'sent_at' => $data->sentAt,
+            'direction' => $data->direction,
+            'folder' => $data->folder,
+            'has_attachments' => $data->hasAttachments,
+        ]);
     }
 
     private function storeParticipants(Email $email, FetchedEmailData $data): void
