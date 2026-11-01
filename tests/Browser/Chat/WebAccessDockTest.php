@@ -18,6 +18,7 @@ mutates(ProposalCard::class);
 /** @return array{page: mixed, request: PendingAction} */
 function openWebAccessRequest(): array
 {
+    withHostedBilling();
     Queue::fake();
 
     $user = User::factory()->withWorkspace()->create();

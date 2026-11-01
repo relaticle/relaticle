@@ -41,7 +41,7 @@ return [
                 'Relaticle\Chat\Http\Controllers\ChatController::supersedeMessages' => 62,
                 'Relaticle\Chat\Jobs\ProcessChatMessage::process' => 135,
                 'Relaticle\Chat\Jobs\ProcessChatMessage::persistFailedTurn' => 69,
-                'Relaticle\Chat\Jobs\ProcessChatMessage::streamTurn' => 218,
+                'Relaticle\Chat\Jobs\ProcessChatMessage::streamTurn' => 208,
                 'Relaticle\Chat\Livewire\Chat\ProposalCard::createCurrent' => 80,
                 'Relaticle\Chat\Services\ChatContextService::getContextForUrl' => 64,
                 'Relaticle\Chat\Services\CreditService::deduct' => 63,

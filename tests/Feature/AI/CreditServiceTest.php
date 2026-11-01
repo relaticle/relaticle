@@ -145,6 +145,16 @@ it('adds tool call bonus to credit calculation', function (): void {
     expect($credits)->toBe(3);
 });
 
+it('adds web search cost after rounding the model and tool cost', function (): void {
+    $credits = $this->service->calculateCredits(
+        model: 'claude-sonnet-4-6',
+        toolCallsCount: 1,
+        webSearchCount: 2,
+    );
+
+    expect($credits)->toBe(6);
+});
+
 it('resets period credits', function (): void {
     withHostedBilling();
     $this->service = resolve(CreditService::class);

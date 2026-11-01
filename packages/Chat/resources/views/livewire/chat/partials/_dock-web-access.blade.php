@@ -1,4 +1,4 @@
-{{-- The web access request: the whole dock while it is the only step. Expects $step and $proposal.
+{{-- The web access request: the whole dock while it is the only step. Expects $step, $proposal and $metersCredits.
      Cmd/Ctrl+Enter allows it here only; the plan shortcut never approves an own-approval step. --}}
 @php
     $reason = is_string($proposal->display_data['reason'] ?? null) ? $proposal->display_data['reason'] : '';
@@ -21,8 +21,11 @@
                 <span class="font-semibold">{{ __('Search web:') }}</span>
                 <span data-web-access-query>{{ $step['summary'] }}</span>
             </p>
-            <p class="mt-0.5 text-xs text-gray-600 dark:text-gray-300">
-                {{ __(':name wants to search the web for this. Each search uses :count credits.', ['name' => config('chat.assistant_name'), 'count' => config('chat.web_search_credit_cost', 2)]) }}
+            <p class="mt-0.5 text-xs text-gray-600 dark:text-gray-300" data-web-access-note>
+                {{ __(':name wants to search the web for this.', ['name' => config('chat.assistant_name')]) }}
+                @if ($metersCredits)
+                    {{ __('Each search uses :count credits.', ['count' => config('chat.web_search_credit_cost')]) }}
+                @endif
             </p>
             @if ($reason !== '')
                 <p class="mt-1 text-xs text-gray-400 dark:text-gray-500" data-web-access-reason>{{ $reason }}</p>

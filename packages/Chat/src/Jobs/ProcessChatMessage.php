@@ -63,6 +63,7 @@ use Relaticle\Chat\Support\ProviderStreamError;
 use Relaticle\Chat\Support\StoredSteps;
 use Relaticle\Chat\Support\StreamEventBroadcaster;
 use Relaticle\Chat\Support\TurnPresence;
+use Relaticle\Chat\Support\WebSearchCount;
 use Throwable;
 
 #[Timeout(self::TIMEOUT_SECONDS)]
@@ -363,17 +364,7 @@ final class ProcessChatMessage implements ShouldQueue
                 ));
 
                 if (! $refundedBlankTurn) {
-                    $creditService->settleReservation(
-                        workspace: $this->workspace,
-                        user: $this->user,
-                        type: AiCreditType::Chat,
-                        model: $this->resolved['model'] ?? $streamedResponse->meta->model ?? 'unknown',
-                        inputTokens: $streamedResponse->usage->uncachedInputTokens(),
-                        outputTokens: $streamedResponse->usage->outputTokens,
-                        toolCallsCount: $streamedResponse->toolCalls->count(),
-                        conversationId: $streamedResponse->conversationId,
-                        resolutionKey: $this->resolutionKey(),
-                    );
+                    $this->settleTurn($streamedResponse, $creditService);
                 }
 
                 $this->persistMentions($streamedResponse->userMessageId);
@@ -935,6 +926,22 @@ final class ProcessChatMessage implements ShouldQueue
                 'document' => json_encode($document, JSON_THROW_ON_ERROR),
                 'meta' => json_encode($meta, JSON_THROW_ON_ERROR),
             ]);
+    }
+
+    private function settleTurn(StreamedAgentResponse $streamedResponse, CreditService $creditService): void
+    {
+        $creditService->settleReservation(
+            workspace: $this->workspace,
+            user: $this->user,
+            type: AiCreditType::Chat,
+            model: $this->resolved['model'] ?? $streamedResponse->meta->model ?? 'unknown',
+            inputTokens: $streamedResponse->usage->uncachedInputTokens(),
+            outputTokens: $streamedResponse->usage->outputTokens,
+            toolCallsCount: $streamedResponse->toolCalls->count(),
+            webSearchCount: WebSearchCount::in($streamedResponse->events),
+            conversationId: $streamedResponse->conversationId,
+            resolutionKey: $this->resolutionKey(),
+        );
     }
 
     private function settleBlankTurn(StreamedAgentResponse $streamedResponse, CreditService $creditService): bool
