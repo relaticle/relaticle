@@ -828,7 +828,8 @@ it('defers web access to the per-turn line and treats web pages as untrusted sou
 
 it('resumes a decided web access request without reporting it as a write', function (): void {
     expect(resolve(CrmAssistant::class)->staticInstructions())
-        ->toContain('- A web access request is not a write, and the two rules above do not apply to it. APPROVED means you may use the web now: do the research for the original request in this turn. REJECTED means answer the original request from the workspace data and say you did not use the web.');
+        ->toContain('- ALLOWED and DENIED mark a web access request, which is not a write. The APPROVED, REJECTED and EXPIRED, "nothing is outstanding" and "rejected everything" rules above do not apply to it. ALLOWED means you may use the web now: do the research for the original request in this turn. DENIED means answer the original request from the workspace data and say you did not use the web.')
+        ->toContain('A web access request (ALLOWED or DENIED) is the exception: its answer covered only the turn it resumed, so it never stops you from calling RequestWebAccessTool again on a later turn whose request needs the web.');
 });
 
 it('lets the model cite a web source page without linking a company to its own domain', function (): void {

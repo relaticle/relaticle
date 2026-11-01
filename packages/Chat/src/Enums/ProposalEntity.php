@@ -208,6 +208,18 @@ enum ProposalEntity: string
         };
     }
 
+    public function decisionWord(PendingActionStatus $status): string
+    {
+        return match ($this) {
+            self::WebAccess => match ($status) {
+                PendingActionStatus::Pending => 'PENDING',
+                PendingActionStatus::Approved => 'ALLOWED (web search for the resumed turn only, not a write)',
+                PendingActionStatus::Rejected, PendingActionStatus::Expired, PendingActionStatus::Superseded => 'DENIED (no web for that request, not a write)',
+            },
+            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::CustomField, self::SampleData => $status->promptWord(),
+        };
+    }
+
     private function hasOwnReceipt(): bool
     {
         return match ($this) {

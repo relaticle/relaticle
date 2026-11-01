@@ -438,7 +438,7 @@ When the <onboarding> block carries `setup_mode: true`, this is the workspace's 
 A <superseded_proposals> block lists proposals auto-cancelled when the user sent a new message: their cards are gone for good. Never tell the user to approve or reject one. If the new message is unrelated, just handle it. If it asks to continue, resume, or confirm ("continue", "yes", "go ahead", "next"), re-issue the write tool for a FRESH proposal and ask them to approve the new card.
 PROMPT."\n\n".$this->resumingInstructions()."\n\n".<<<'PROMPT'
 ## Resolved Actions
-A <resolved_actions> block lists every proposal decided in this conversation. Entries marked JUST DECIDED belong to the current resumed turn (see Resuming); the rest were decided on earlier turns and may be called already done. All of them are final: NEVER describe a decided proposal as pending, awaiting approval, or "shown above", and do not re-propose one on your own initiative. But when the user explicitly asks for the action again (including after rejecting it), call the tool to create a FRESH proposal. Use an approved record's id to continue a multi-step request and its url to link it by name.
+A <resolved_actions> block lists every proposal decided in this conversation. Entries marked JUST DECIDED belong to the current resumed turn (see Resuming); the rest were decided on earlier turns and may be called already done. All of them are final: NEVER describe a decided proposal as pending, awaiting approval, or "shown above", and do not re-propose one on your own initiative. A web access request (ALLOWED or DENIED) is the exception: its answer covered only the turn it resumed, so it never stops you from calling RequestWebAccessTool again on a later turn whose request needs the web. But when the user explicitly asks for the action again (including after rejecting it), call the tool to create a FRESH proposal. Use an approved record's id to continue a multi-step request and its url to link it by name.
 
 ## Citations
 Read tool results and <resolved_actions> include a `url` per record. When you name a record in prose, render it as a markdown link using that url: `[Record Name](url)`.
@@ -463,7 +463,7 @@ On a resumed turn:
 - If a step of the request is still outstanding and you can act on it now, do it in the same turn.
 - If nothing is outstanding, say the request is done and stop. Do not invent more work, and never re-propose anything in <resolved_actions>.
 - When the user rejected everything, ask in one sentence what they want instead.
-- A web access request is not a write, and the two rules above do not apply to it. APPROVED means you may use the web now: do the research for the original request in this turn. REJECTED means answer the original request from the workspace data and say you did not use the web. Never report either as a write, as created, updated or done, and never link it.
+- ALLOWED and DENIED mark a web access request, which is not a write. The APPROVED, REJECTED and EXPIRED, "nothing is outstanding" and "rejected everything" rules above do not apply to it. ALLOWED means you may use the web now: do the research for the original request in this turn. DENIED means answer the original request from the workspace data and say you did not use the web. Never report either as a write, as created, updated or done, and never link it.
 PROMPT;
     }
 
@@ -787,7 +787,7 @@ PROMPT;
         $lines = [
             '',
             '<resolved_actions>',
-            'Proposals the user has decided; their approval cards are gone. APPROVED (written) means the write ran. REJECTED and EXPIRED (nothing was written) mean nothing changed.',
+            'Proposals the user has decided; their approval cards are gone. APPROVED (written) means the write ran. REJECTED and EXPIRED (nothing was written) mean nothing changed. ALLOWED and DENIED answer a web access request for the turn it resumed; neither is a write.',
             'JUST DECIDED marks the decision that started this turn (see Resuming); the other entries were decided on earlier turns.',
             'A tool result earlier in this conversation that still claims type pending_action is STALE for any proposal listed here: this block is the truth about its status.',
         ];

@@ -19,6 +19,7 @@ use Livewire\Livewire;
 use Relaticle\Chat\Actions\GrantWebAccess;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\MessageOrigin;
+use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Enums\WebAccess;
@@ -322,7 +323,7 @@ it('answers without the web after Deny', function (): void {
 
     expect($request->fresh()->status)->toBe(PendingActionStatus::Rejected)
         ->and(webToolClasses($resumed))->toBe([RequestWebAccessTool::class])
-        ->and($resumed->dynamicInstructions())->toContain('REJECTED (nothing was written): search the web for "filaforms.com company overview"');
+        ->and($resumed->dynamicInstructions())->toContain('JUST DECIDED, DENIED (no web for that request, not a write): search the web for "filaforms.com company overview"');
 });
 
 it('refuses the grant when the workspace turned web search off between request and approval', function (): void {
@@ -393,4 +394,85 @@ it('ignores the shortcut on a lone web access request', function (): void {
     openWebAccessDock($request)->dispatch('proposal:create-current', context: 'conversation');
 
     expect($request->fresh()->status)->toBe(PendingActionStatus::Pending);
+});
+
+it('keeps asking for the web on a later typed turn after an allowed request', function (): void {
+    $user = webAccessUser();
+    Queue::fake();
+    $request = requestWebAccess($user, (string) str()->ulid());
+
+    openWebAccessDock($request)->call('approveStep', (string) $request->getKey())->assertHasNoErrors();
+    runQueuedResume();
+
+    $later = typedWebTurn($user);
+
+    expect(webToolClasses($later))->toBe([RequestWebAccessTool::class])
+        ->and($later->instructions())->toContain('Web: only when answering needs the web')
+        ->not->toContain('Web: you can search the web and read pages on this turn')
+        ->and($later->dynamicInstructions())->toContain('- ALLOWED (web search for the resumed turn only, not a write): search the web for "filaforms.com company overview"')
+        ->not->toContain('JUST DECIDED, ALLOWED');
+});
+
+it('does not open the web for a resume whose only approval was a note', function (): void {
+    $user = webAccessUser();
+    Queue::fake();
+    $turnId = (string) str()->ulid();
+
+    $note = resolve(CreateNoteTool::class);
+    $note->setConversationId('conv-web');
+    $note->setTurnId($turnId);
+    $note->handle(new ToolRequest(['records' => [['title' => 'Filaforms brief']]]));
+    $noteStep = PendingAction::query()->where('entity_type', ProposalEntity::Note)->sole();
+
+    openWebAccessDock($noteStep)->call('approveStep', (string) $noteStep->getKey())->assertHasNoErrors();
+
+    expect(webToolClasses(runQueuedResume()))->toBe([RequestWebAccessTool::class]);
+});
+
+it('does not open the web from another user\'s allowed request on the same turn', function (): void {
+    $user = webAccessUser();
+    Queue::fake();
+    $turnId = (string) str()->ulid();
+
+    $note = resolve(CreateNoteTool::class);
+    $note->setConversationId('conv-web');
+    $note->setTurnId($turnId);
+    $note->handle(new ToolRequest(['records' => [['title' => 'Filaforms brief']]]));
+    $noteStep = PendingAction::query()->where('entity_type', ProposalEntity::Note)->sole();
+
+    PendingAction::query()->create([
+        'workspace_id' => $user->currentWorkspace->getKey(),
+        'user_id' => User::factory()->create()->getKey(),
+        'conversation_id' => null,
+        'turn_id' => $turnId,
+        'action_class' => GrantWebAccess::class,
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => ProposalEntity::WebAccess,
+        'action_data' => ['query' => 'filaforms.com'],
+        'display_data' => ['title' => 'Search web', 'summary' => 'filaforms.com'],
+        'status' => PendingActionStatus::Approved,
+        'resolved_at' => now(),
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    openWebAccessDock($noteStep)->call('approveStep', (string) $noteStep->getKey())->assertHasNoErrors();
+
+    expect(webToolClasses(runQueuedResume()))->toBe([RequestWebAccessTool::class]);
+});
+
+it('refuses the grant when the user turned web search off between request and approval', function (): void {
+    $user = webAccessUser();
+    Queue::fake();
+    $request = requestWebAccess($user, (string) str()->ulid());
+
+    $user->update(['ai_preferences' => ['web_search' => 'deny']]);
+
+    openWebAccessDock($request)
+        ->call('approveStep', (string) $request->getKey())
+        ->assertHasErrors('resolve')
+        ->assertDispatched('proposal:resolve-failed', fn (string $event, array $params): bool => $params['message'] === 'You turned web search off in your settings.');
+
+    expect($request->fresh()->status)->toBe(PendingActionStatus::Pending);
+
+    Queue::assertNotPushed(ProcessChatMessage::class);
 });

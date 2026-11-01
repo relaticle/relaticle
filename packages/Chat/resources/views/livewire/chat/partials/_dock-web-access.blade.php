@@ -8,8 +8,17 @@
     class="px-4 pb-2 pt-3"
     wire:key="web-access-{{ $step['id'] }}"
     data-web-access-dock
-    x-data
-    x-on:keydown.window="if (($event.metaKey || $event.ctrlKey) && $event.key === 'Enter' && ! $event.repeat && $el.offsetParent !== null) { $event.preventDefault(); $event.stopImmediatePropagation(); $wire.approveStep(@js($step['id'])) }"
+    x-data="{
+        allowsFromKeyboard(event) {
+            if (! ((event.metaKey || event.ctrlKey) && event.key === 'Enter') || event.repeat || this.$el.offsetParent === null) return false;
+
+            const root = this.$el.closest('[x-data^=chatInterface]');
+            const chat = root ? Alpine.$data(root) : null;
+
+            return chat !== null && ! chat.isStreaming && chat.visiblePendingActions().length === 1 && chat.input.trim().length === 0;
+        },
+    }"
+    x-on:keydown.window="if (allowsFromKeyboard($event)) { $event.preventDefault(); $event.stopImmediatePropagation(); $wire.approveStep(@js($step['id'])) }"
 >
     <div class="flex items-start gap-2.5">
         <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400" aria-hidden="true">
