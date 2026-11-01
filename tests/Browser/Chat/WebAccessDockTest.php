@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\Plan;
 use App\Models\User;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -23,6 +24,7 @@ function openWebAccessRequest(): array
 
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
+    $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(14)])->save();
     $conversationId = (string) Str::uuid7();
     ChatBrowser::seedConversation($user, $workspace->getKey(), 'web research', $conversationId);
 

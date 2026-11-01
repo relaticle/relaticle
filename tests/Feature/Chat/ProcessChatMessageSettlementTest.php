@@ -629,12 +629,12 @@ it('charges one OpenAI web search once', function (): void {
         'https://filaforms.com',
         'Filaforms',
     ));
-    $modelCost = (int) ceil(resolve(ModelRegistry::class)->multiplierFor('gpt-5.5'));
+    $modelAndFetchCost = (int) ceil(resolve(ModelRegistry::class)->multiplierFor('gpt-5.5') + config('chat.tool_call_credit_bonus'));
 
     $resolution = settleWebResearchTurn('openai', 'gpt-5.5', 'c-web-2', '01TURNWEBOPENAIAAAAAAAAAAA');
 
-    expect($modelCost)->toBe(2)
-        ->and($resolution->credits_charged)->toBe($modelCost + 2)
+    expect($modelAndFetchCost)->toBe(2)
+        ->and($resolution->credits_charged)->toBe($modelAndFetchCost + 2)
         ->and($resolution->metadata['web_searches_count'])->toBe(1);
 });
 
@@ -649,8 +649,41 @@ it('does not charge a web fetch as a search', function (): void {
 
     $resolution = settleWebResearchTurn('anthropic', 'claude-sonnet-5', 'c-web-3', '01TURNWEBFETCHAAAAAAAAAAAA');
 
-    expect($resolution->credits_charged)->toBe(3)
+    expect($resolution->credits_charged)->toBe(4)
+        ->and($resolution->metadata['web_searches_count'])->toBe(1)
+        ->and($resolution->metadata['tool_calls_count'])->toBe(2);
+});
+
+it('charges an OpenAI search once when both of its completions carry the action', function (): void {
+    OpenAiSse::fake(OpenAiSse::webResearchReply(
+        [['type' => 'search', 'value' => 'filaforms']],
+        'Filaforms builds forms for Filament.',
+        'https://filaforms.com',
+        'Filaforms',
+        actionOnEveryCompletion: true,
+    ));
+    $modelCost = (int) ceil(resolve(ModelRegistry::class)->multiplierFor('gpt-5.5'));
+
+    $resolution = settleWebResearchTurn('openai', 'gpt-5.5', 'c-web-4', '01TURNWEBDEDUPEAAAAAAAAAAA');
+
+    expect($resolution->credits_charged)->toBe($modelCost + 2)
         ->and($resolution->metadata['web_searches_count'])->toBe(1);
+});
+
+it('bills web research that stopped before writing any text', function (): void {
+    AnthropicSse::fake(AnthropicSse::webResearchReply(
+        ['filaforms', 'filaforms pricing'],
+        '',
+        'https://filaforms.com',
+        'Filaforms',
+        stopReason: 'max_tokens',
+    ));
+
+    $resolution = settleWebResearchTurn('anthropic', 'claude-sonnet-5', 'c-web-5', '01TURNWEBBLANKAAAAAAAAAAAA');
+
+    expect($resolution->type)->toBe(AiCreditType::Chat)
+        ->and($resolution->credits_charged)->toBe(5)
+        ->and($resolution->metadata['web_searches_count'])->toBe(2);
 });
 
 it('refunds a blank turn and stores copy chosen by how the model stopped', function (string $reply, string $stopReason, string $expected): void {

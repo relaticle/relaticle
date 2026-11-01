@@ -17,7 +17,7 @@ final class OpenAiSse
     /**
      * @param  list<array{type: 'search'|'open_page', value: string}>  $calls
      */
-    public static function webResearchReply(array $calls, string $text, string $citedUrl, string $citedTitle, string $model = 'gpt-5.5'): string
+    public static function webResearchReply(array $calls, string $text, string $citedUrl, string $citedTitle, string $model = 'gpt-5.5', bool $actionOnEveryCompletion = false): string
     {
         $events = [['type' => 'response.created', 'response' => ['id' => 'resp_1', 'status' => 'in_progress', 'model' => $model, 'output' => []]]];
         $output = [];
@@ -29,7 +29,7 @@ final class OpenAiSse
 
             $events[] = ['type' => 'response.output_item.added', 'output_index' => $position, 'item' => ['id' => $item['id'], 'type' => 'web_search_call', 'status' => 'in_progress']];
             $events[] = ['type' => 'response.web_search_call.in_progress', 'output_index' => $position, 'item_id' => $item['id']];
-            $events[] = ['type' => 'response.web_search_call.completed', 'output_index' => $position, 'item_id' => $item['id']];
+            $events[] = ['type' => 'response.web_search_call.completed', 'output_index' => $position, 'item_id' => $item['id'], ...($actionOnEveryCompletion ? ['action' => $item['action']] : [])];
             $events[] = ['type' => 'response.output_item.done', 'output_index' => $position, 'item' => $item];
             $output[] = $item;
         }

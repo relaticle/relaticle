@@ -31,6 +31,7 @@ use Laravel\Ai\Responses\Data\FinishReason;
 use Laravel\Ai\Responses\Data\ToolCall as ToolCallData;
 use Laravel\Ai\Responses\StreamedAgentResponse;
 use Laravel\Ai\Streaming\Events\Error;
+use Laravel\Ai\Streaming\Events\ProviderToolEvent;
 use Laravel\Ai\Streaming\Events\StreamEnd;
 use Laravel\Ai\Streaming\Events\StreamEvent;
 use Laravel\Ai\Streaming\Events\TextDelta;
@@ -937,7 +938,7 @@ final class ProcessChatMessage implements ShouldQueue
             model: $this->resolved['model'] ?? $streamedResponse->meta->model ?? 'unknown',
             inputTokens: $streamedResponse->usage->uncachedInputTokens(),
             outputTokens: $streamedResponse->usage->outputTokens,
-            toolCallsCount: $streamedResponse->toolCalls->count(),
+            toolCallsCount: $streamedResponse->toolCalls->count() + WebSearchCount::fetchesIn($streamedResponse->events),
             webSearchCount: WebSearchCount::in($streamedResponse->events),
             conversationId: $streamedResponse->conversationId,
             resolutionKey: $this->resolutionKey(),
@@ -946,7 +947,7 @@ final class ProcessChatMessage implements ShouldQueue
 
     private function settleBlankTurn(StreamedAgentResponse $streamedResponse, CreditService $creditService): bool
     {
-        if ($this->sawToolCall) {
+        if ($this->sawToolCall || $this->ranProviderTool($streamedResponse)) {
             return false;
         }
 
@@ -969,6 +970,13 @@ final class ProcessChatMessage implements ShouldQueue
         ChatTelemetry::breadcrumb('stream.blank_reply', ['model' => $this->resolved['model'] ?? null]);
 
         return true;
+    }
+
+    private function ranProviderTool(StreamedAgentResponse $streamedResponse): bool
+    {
+        return $streamedResponse->events->contains(
+            fn (StreamEvent $event): bool => $event instanceof ProviderToolEvent && $event->status === 'completed',
+        );
     }
 
     private function blankTurnMessage(StreamedAgentResponse $streamedResponse): ?string

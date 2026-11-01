@@ -93,7 +93,7 @@ final class AnthropicSse
      * @param  list<string>  $queries
      * @param  list<string>  $fetchUrls
      */
-    public static function webResearchReply(array $queries, string $text, string $citedUrl, string $citedTitle, array $fetchUrls = [], string $model = 'claude-sonnet-5'): string
+    public static function webResearchReply(array $queries, string $text, string $citedUrl, string $citedTitle, array $fetchUrls = [], string $model = 'claude-sonnet-5', string $stopReason = 'end_turn'): string
     {
         $frames = 'data: {"type":"message_start","message":{"model":'.json_encode($model, JSON_THROW_ON_ERROR).',"usage":{"input_tokens":40}}}'."\n\n";
         $index = 0;
@@ -121,7 +121,7 @@ final class AnthropicSse
             .'data: {"type":"content_block_delta","index":'.$index.',"delta":{"type":"citations_delta","citation":'.json_encode($citation, JSON_THROW_ON_ERROR).'}}'."\n\n"
             .'data: {"type":"content_block_delta","index":'.$index.',"delta":{"type":"text_delta","text":'.json_encode($text, JSON_THROW_ON_ERROR).'}}'."\n\n"
             .'data: {"type":"content_block_stop","index":'.$index.'}'."\n\n"
-            ."data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":12}}\n\n"
+            .'data: {"type":"message_delta","delta":{"stop_reason":'.json_encode($stopReason, JSON_THROW_ON_ERROR).'},"usage":{"output_tokens":12}}'."\n\n"
             ."data: {\"type\":\"message_stop\"}\n\n";
     }
 
