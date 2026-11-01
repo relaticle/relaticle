@@ -123,3 +123,29 @@ it('removes the summary of a conversation only the deleted member held', functio
 
     expect(EmailConversation::query()->where('conversation_key', $email->conversation_key)->exists())->toBeFalse();
 });
+
+it('recounts a conversation a teammate still holds when a member is deleted', function (): void {
+    $key = str_repeat('b', 64);
+
+    $ownerAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->owner->id,
+    ]));
+
+    foreach ([[$this->member, $this->account], [$this->owner, $ownerAccount]] as [$user, $account]) {
+        Email::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $user->id,
+            'connected_account_id' => $account->getKey(),
+            'conversation_key' => $key,
+        ]);
+    }
+
+    resolve(RefreshConversationSummary::class)->execute($this->workspace->id, $key);
+
+    expect(EmailConversation::query()->where('conversation_key', $key)->sole()->message_count)->toBe(2);
+
+    resolve(DeletesUsers::class)->delete($this->member);
+
+    expect(EmailConversation::query()->where('conversation_key', $key)->sole()->message_count)->toBe(1);
+});
