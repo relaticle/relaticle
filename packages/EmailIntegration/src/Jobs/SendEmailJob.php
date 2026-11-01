@@ -21,6 +21,7 @@ use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Jobs\Concerns\ReleasesOnProviderRateLimit;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\Scopes\ActiveAccountScope;
+use Relaticle\EmailIntegration\Services\ConversationKeyResolver;
 use Relaticle\EmailIntegration\Services\EmailSendingService;
 use Throwable;
 
@@ -100,6 +101,8 @@ final class SendEmailJob implements ShouldQueue
         if ($email->conversation_key !== null) {
             resolve(RefreshConversationSummary::class)->execute($email->workspace_id, $email->conversation_key);
         }
+
+        MergeConversations::dispatchIf(resolve(ConversationKeyResolver::class)->keysToMerge($email) !== [], $email->workspace_id, $email->getKey());
 
         $this->syncBatchCounters($email->batch_id);
     }

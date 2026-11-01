@@ -38,10 +38,41 @@ final readonly class ConversationKeyResolver
         );
     }
 
-    /** @return list<string> keys held by this message's other copies, its stored parents, or stored replies to it */
+    /** @return list<string> keys held by this message's other copies, its stored parents, stored replies to it, or its provider thread */
     public function keysToMerge(Email $email): array
     {
-        if ($email->rfc_message_id === null || $email->conversation_key === null) {
+        if ($email->conversation_key === null) {
+            return [];
+        }
+
+        $keys = [...$this->linkedKeys($email), $this->joinedKey($email)];
+
+        return array_values(array_unique(array_filter(
+            $keys,
+            fn (?string $key): bool => $key !== null && $key !== $email->conversation_key,
+        )));
+    }
+
+    public static function keyFor(string $workspaceId, string $root): string
+    {
+        return hash('sha256', $workspaceId.$root);
+    }
+
+    /** @param  list<string>  $parents */
+    private function resolveFor(string $workspaceId, string $accountId, string $threadId, ?string $rfcMessageId, array $parents, string $root, ?string $exceptId): string
+    {
+        $keyed = fn (): Builder => $this->keyed($workspaceId, $exceptId)->orderBy('conversation_key');
+
+        return $this->keyOfParent($keyed(), $parents)
+            ?? ($threadId === '' ? null : $keyed()->where('connected_account_id', $accountId)->where('thread_id', $threadId)->value('conversation_key'))
+            ?? ($rfcMessageId === null ? null : $keyed()->where('rfc_message_id', $rfcMessageId)->value('conversation_key'))
+            ?? self::keyFor($workspaceId, $root);
+    }
+
+    /** @return list<string> */
+    private function linkedKeys(Email $email): array
+    {
+        if ($email->rfc_message_id === null) {
             return [];
         }
 
@@ -59,20 +90,23 @@ final readonly class ConversationKeyResolver
         return array_values(array_map(strval(...), $keys));
     }
 
-    public static function keyFor(string $workspaceId, string $root): string
+    private function joinedKey(Email $email): ?string
     {
-        return hash('sha256', $workspaceId.$root);
-    }
+        // A stored parent outranks the provider thread, as it does in resolveFor().
+        $keyed = fn (): Builder => $this->keyed($email->workspace_id, $email->getKey())->orderBy('conversation_key');
+        $parentKey = $this->keyOfParent($keyed(), MessageIdList::parents($email->in_reply_to, $email->references));
 
-    /** @param  list<string>  $parents */
-    private function resolveFor(string $workspaceId, string $accountId, string $threadId, ?string $rfcMessageId, array $parents, string $root, ?string $exceptId): string
-    {
-        $keyed = fn (): Builder => $this->keyed($workspaceId, $exceptId)->orderBy('conversation_key');
+        if ($parentKey !== null || blank($email->thread_id)) {
+            return $parentKey;
+        }
 
-        return $this->keyOfParent($keyed(), $parents)
-            ?? ($threadId === '' ? null : $keyed()->where('connected_account_id', $accountId)->where('thread_id', $threadId)->value('conversation_key'))
-            ?? ($rfcMessageId === null ? null : $keyed()->where('rfc_message_id', $rfcMessageId)->value('conversation_key'))
-            ?? self::keyFor($workspaceId, $root);
+        $threadKey = $keyed()
+            ->where('connected_account_id', $email->connected_account_id)
+            ->where('thread_id', $email->thread_id)
+            ->where('conversation_key', '!=', $email->conversation_key)
+            ->value('conversation_key');
+
+        return is_string($threadKey) ? $threadKey : null;
     }
 
     /**

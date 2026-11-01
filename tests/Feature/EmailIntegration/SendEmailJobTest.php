@@ -18,6 +18,7 @@ use Relaticle\EmailIntegration\Actions\LinkEmailAction;
 use Relaticle\EmailIntegration\Actions\MarkEmailsSendFailedAction;
 use Relaticle\EmailIntegration\Actions\RetryFailedEmailAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
+use Relaticle\EmailIntegration\Actions\StoreEmailAction;
 use Relaticle\EmailIntegration\Actions\SyncEmailBatchCountersAction;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Data\MailBackfillPage;
@@ -25,6 +26,7 @@ use Relaticle\EmailIntegration\Data\MailDeltaResult;
 use Relaticle\EmailIntegration\Enums\EmailBatchStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Enums\SendFailureRemedy;
@@ -925,4 +927,56 @@ it('summarises the conversation of an app send once the job delivers it', functi
         ->message_count->toBe(1)
         ->last_member_outbound_at->not->toBeNull()
         ->last_external_inbound_at->toBeNull();
+});
+
+it('joins a teammate copy stored under the provider Message-ID once the job delivers the send', function (): void {
+    $teammate = User::factory()->create();
+    $this->workspace->users()->attach($teammate, ['role' => 'admin']);
+    $teammateMailbox = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $teammate->id,
+    ]));
+    $teammateCopy = resolve(StoreEmailAction::class)->execute($teammateMailbox, new FetchedEmailData(
+        providerMessageId: 'teammate-copy',
+        rfcMessageId: '<provider-intro@acme.example>',
+        threadId: 'teammate-thread',
+        inReplyTo: null,
+        subject: 'Intro',
+        snippet: 'Hi',
+        sentAt: now(),
+        direction: EmailDirection::INBOUND,
+        folder: EmailFolder::Inbox,
+        hasAttachments: false,
+        isRead: false,
+        bodyText: 'Hi',
+        bodyHtml: '<p>Hi</p>',
+        participants: [['email_address' => $this->account->email_address, 'name' => null, 'role' => 'from']],
+        attachments: [],
+    ));
+
+    $email = resolve(SendEmailAction::class)->execute($this->user, [
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Intro',
+        'body_html' => '<p>Hi</p>',
+        'to' => [['email' => $teammateMailbox->email_address, 'name' => null]],
+        'creation_source' => EmailCreationSource::COMPOSE,
+    ]);
+    $email->update(['status' => EmailStatus::SENDING]);
+
+    expect($email->conversation_key)->not->toBe($teammateCopy->conversation_key);
+
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('sendMessage')->once()->andReturn([
+        'provider_message_id' => 'provider-intro',
+        'thread_id' => 'thread-intro',
+        'rfc_message_id' => '<provider-intro@acme.example>',
+    ]);
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->andReturn($service);
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    (new SendEmailJob($email->getKey()))->handle(resolve(EmailSendingService::class), resolve(LinkEmailAction::class));
+
+    expect(Email::query()->where('workspace_id', $this->workspace->id)->distinct()->pluck('conversation_key')->all())->toHaveCount(1)
+        ->and(EmailConversation::query()->where('workspace_id', $this->workspace->id)->sole()->message_count)->toBe(1);
 });

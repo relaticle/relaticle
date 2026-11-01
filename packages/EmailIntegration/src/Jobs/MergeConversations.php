@@ -35,12 +35,13 @@ final class MergeConversations implements ShouldBeUniqueUntilProcessing, ShouldQ
 
     public function handle(CurrentWorkspace $currentWorkspace, ConversationKeyResolver $resolver, RefreshConversationSummary $refresh): void
     {
+        // One transaction, so a failed refresh rolls the rewrite back and the retry merges again.
         $currentWorkspace->within($this->workspaceId, function () use ($resolver, $refresh): void {
-            $keys = DB::transaction(fn (): array => $this->mergeLinkedKeys($resolver));
-
-            foreach ($keys as $key) {
-                $refresh->execute($this->workspaceId, $key);
-            }
+            DB::transaction(function () use ($resolver, $refresh): void {
+                foreach ($this->mergeLinkedKeys($resolver) as $key) {
+                    $refresh->execute($this->workspaceId, $key);
+                }
+            });
         });
     }
 
@@ -59,7 +60,7 @@ final class MergeConversations implements ShouldBeUniqueUntilProcessing, ShouldQ
             return [];
         }
 
-        $keys = array_values(array_unique([$email->conversation_key, ...$resolver->keysToMerge($email)]));
+        $keys = [$email->conversation_key, ...$resolver->keysToMerge($email)];
 
         if (count($keys) < 2) {
             return [];
