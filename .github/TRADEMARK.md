@@ -34,7 +34,8 @@ The AGPL-3.0 lets you do this. The Marks stay behind:
 
 1. Give your service or version your own name and logo.
 2. Remove our logo, and remove "Relaticle" as a product name from the interface, the marketing pages, and outgoing emails.
-3. You may state the origin factually, including in the interface, for example: "Based on Relaticle, an open source CRM. Not affiliated with or endorsed by Relaticle, Inc."
+3. Until Relaticle lets you change its product name through configuration, you may leave the name where unmodified Relaticle displays it on its own, such as in its emails. Your service name, domain, and logo must still be your own.
+4. You may state the origin factually, including in the interface, for example: "Based on Relaticle, an open source CRM. Not affiliated with or endorsed by Relaticle, Inc."
 
 Removing the Marks never means removing a legal notice. Keep every copyright notice, license notice, and author attribution, including any Appropriate Legal Notices under the AGPL-3.0. A notice such as "© Relaticle, Inc." or "Based on Relaticle" is not a use of the Marks under this policy.
 
