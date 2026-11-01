@@ -142,7 +142,7 @@ Visit our [documentation](https://relaticle.com/docs) for guides on business usa
 Relaticle is open-source software licensed under the [AGPL-3.0 license](LICENSE). The one exception is [`packages/Cloud`](packages/Cloud), the code behind relaticle.com, which [its own license](packages/Cloud/LICENSE) governs. Everything else stays AGPL-3.0.
 
 - Software that talks to Relaticle only through its REST API or MCP server can use any license, including a proprietary one. See the [Integration Exception](INTEGRATION-EXCEPTION.md).
-- The Relaticle name and logo are trademarks of Relaticle Inc. If you host Relaticle for others or ship a modified version, use your own name. See the [Trademark Policy](.github/TRADEMARK.md).
+- The Relaticle name and logo are trademarks of Relaticle, Inc. If you host Relaticle for others or ship a modified version, use your own name. See the [Trademark Policy](.github/TRADEMARK.md).
 - Contributors sign a [Contributor License Agreement](.github/CLA.md) on their first pull request.
 
 # Star History

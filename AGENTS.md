@@ -53,8 +53,9 @@ anatomy mirrors a Laravel app: `src/`, `config/`, `routes/`, `resources/`,
 business half of the sysadmin panel (Overview, revenue, subscriptions, AI credits, trial and
 managed-plan actions), the marketing site, the docs and help website, and the blog: its pages,
 its authoring in the sysadmin panel and its `/mcp/blog` endpoint. Its own `LICENSE` allows
-development and testing use, and production use only under an agreement. The root `LICENSE` opens
-by naming that split, the shape GitLab, PostHog and Metabase use. The self-hosted build is this
+development and testing use, and production use only under an agreement. The root `LICENSE` stays
+the verbatim AGPL text, so GitHub still detects the repository as AGPL-3.0, and the README names the
+split. Plausible keeps its proprietary directory the same way. The self-hosted build is this
 repository without it.
 
 - Core never references it. `tests/Arch/ArchTest.php` fails a core layer that uses
