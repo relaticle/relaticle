@@ -8,6 +8,7 @@ paths:
   - 'resources/views/livewire/app/notifications/**'
   - 'packages/*/src/Notifications/**'
   - 'packages/*/src/Inbox/**'
+  - 'packages/Cloud/src/**/Notifications/**'
 ---
 
 # Notifications and requests

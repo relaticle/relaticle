@@ -32,12 +32,11 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Livewire\Component;
 use Livewire\Livewire;
 use Livewire\Mechanisms\HandleComponents\ComponentContext;
-use Relaticle\Ink\InkPlugin;
 use Relaticle\Ink\Models\Category;
 use Relaticle\Ink\Models\Post;
 use Relaticle\SystemAdmin\Auth\RequiredAppAuthentication;
 use Relaticle\SystemAdmin\Filament\Pages\Auth\EditProfile;
-use Relaticle\SystemAdmin\Filament\Pages\Overview;
+use Relaticle\SystemAdmin\Filament\Pages\Dashboard;
 use Relaticle\SystemAdmin\Http\Controllers\PasskeyLoginController;
 use Relaticle\SystemAdmin\Http\Controllers\PasskeyRegistrationController;
 use Relaticle\SystemAdmin\Http\Middleware\DenySearchIndexing;
@@ -208,24 +207,9 @@ final class SystemAdminPanelProvider extends PanelProvider
             ->maxContentWidth('full')
             ->sidebarCollapsibleOnDesktop()
             ->pages([
-                Overview::class,
+                Dashboard::class,
             ])
             ->widgets([])
-            /**
-             * The blog is Relaticle's own marketing content, not tenant data, so it is
-             * administered here rather than in the customer panel. This panel has no
-             * tenancy, which means the Ink resources need no scopeToTenant() opt-out.
-             * That call writes a static shared by every Filament resource and would
-             * disable tenant scoping app-wide.
-             *
-             * Staff always have the authoring surface; the Blog feature flag gates the
-             * PUBLIC side (routes, marketing nav, sitemap), so posts can be written
-             * before launch. Post::getUrl() already falls back to '#' when the public
-             * routes are not registered.
-             */
-            ->plugins([
-                InkPlugin::make(),
-            ])
             ->databaseNotifications()
             // Reverb admits the app panel's origin only, and nothing here streams.
             ->broadcasting(false)

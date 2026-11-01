@@ -16,6 +16,7 @@ declare(strict_types=1);
 
 use App\Enums\Notifications\NotificationReason;
 use App\Enums\WorkspaceSetupStep;
+use App\Features\Billing;
 use App\Filament\Pages\CreateWorkspace;
 use App\Filament\Pages\SetupWorkspace;
 use App\Models\Notification as NotificationRow;
@@ -38,6 +39,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Passport\AccessToken;
 use Laravel\Passport\Client;
+use Laravel\Pennant\Feature;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Pest\Browser\Api\AwaitableWebpage;
@@ -61,7 +63,7 @@ PestTiaRuntime::configure(dirname(__DIR__), array_slice($_SERVER['argv'], 1));
 
 pest()->extend(TestCase::class)
     ->use(LazilyRefreshDatabase::class)
-    ->in('Feature', 'Smoke', 'Browser');
+    ->in('Feature', 'Smoke', 'Browser', '../packages/Cloud/tests');
 
 if (class_exists(Playwright::class)) {
     Playwright::setTimeout(30_000);
@@ -503,4 +505,14 @@ function useProFirstAutoChain(): void
         ChatCatalog::entry(),
     ]);
     app()->forgetInstance(ModelRegistry::class);
+}
+
+function withHostedBilling(): void
+{
+    if (! class_exists('Relaticle\Cloud\CloudServiceProvider')) {
+        test()->markTestSkipped('Hosted billing needs the cloud package.');
+    }
+
+    Feature::define(Billing::class, true);
+    Feature::purge(Billing::class);
 }

@@ -3,19 +3,15 @@
 declare(strict_types=1);
 
 use App\Enums\Plan;
-use App\Features\Billing;
 use App\Models\User;
-use Laravel\Pennant\Feature;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditService;
 
 mutates(CreditService::class);
 
-beforeEach(function (): void {
-    Feature::define(Billing::class, true);
-});
-
 it('lazy-creates a free balance when hasCredits is called on a workspace with no row', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->delete();
@@ -27,6 +23,8 @@ it('lazy-creates a free balance when hasCredits is called on a workspace with no
 });
 
 it('lazy-init grants the free plan allowance when the workspace has no balance row', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->delete();
@@ -38,6 +36,8 @@ it('lazy-init grants the free plan allowance when the workspace has no balance r
 });
 
 it('lazy-creates and successfully reserves a credit when reserveCredit is called on a workspace with no row', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->delete();

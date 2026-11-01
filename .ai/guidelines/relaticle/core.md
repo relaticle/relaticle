@@ -199,3 +199,4 @@ is the exception that admits the code could not.
 ## Scheduling
 
 - All scheduled commands go in `bootstrap/app.php` via `withSchedule()`, not in `routes/console.php`
+- A package the self-hosted build deletes schedules its own commands from its provider with `callAfterResolving(Schedule::class, ...)`, as `CloudServiceProvider` does. No test reads for this

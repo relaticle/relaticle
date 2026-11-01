@@ -16,7 +16,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 $mcpDomain = config('app.mcp_domain');
 $mcpPath = $mcpDomain ? '/' : '/mcp';
-$mcpMiddleware = [ValidateMcpOrigin::class, 'auth:sanctum,api', 'throttle:mcp', SetApiWorkspaceContext::class, EnsureHostedWorkspaceAccess::class];
+$mcpMiddleware = [ValidateMcpOrigin::class, 'auth:sanctum,api', SetApiWorkspaceContext::class, 'throttle:mcp', EnsureHostedWorkspaceAccess::class];
 
 Route::middleware('throttle:mcp-oauth')->group(static fn () => Mcp::oauthRoutes());
 

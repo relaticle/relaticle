@@ -305,11 +305,13 @@ it('rejects a saved staff page snapshot on the customer host after staff logout'
     ])->assertStatus(419);
 })->with([
     'model catalog' => ['/ai-models', 'ManageAiSettings'],
-    'dashboard' => ['/', '\\Pages\\Overview'],
-    'lazy widget' => ['/', 'ValueStats'],
-    'shared global search' => ['/', 'GlobalSearch'],
-    'shared notifications' => ['/', 'DatabaseNotifications'],
-    'shared topbar' => ['/', 'Topbar'],
+    'dashboard' => ['/instance', '\\Pages\\Dashboard'],
+    'widget' => ['/instance', 'InstanceStats'],
+    'shared notifications' => ['/instance', 'DatabaseNotifications'],
+    'shared topbar' => ['/instance', 'Topbar'],
+    ...(class_exists('Relaticle\\Cloud\\CloudServiceProvider') ? [
+        'shared global search' => ['/instance', 'GlobalSearch'],
+    ] : []),
 ]);
 
 it('keeps the customer signed in through staff login and logout with identical account ids', function (): void {
@@ -374,13 +376,12 @@ it('serves staff blog previews while still requiring a valid signature', functio
     expect(parse_url($url, PHP_URL_HOST))->toBe('staff.example.test');
     isolatedAuthRequest($cookies, 'GET', $url)->assertOk()->assertSee($post->title)->assertSee('Edit Post');
     isolatedAuthRequest($cookies, 'GET', $url.'&changed=1')->assertForbidden();
-});
+})->skip(fn (): bool => ! class_exists('Relaticle\\Cloud\\CloudServiceProvider'), 'The blog front end needs the cloud package.');
 
 it('ignores staff authentication retained in a legacy customer session', function (): void {
     $cookies = [];
     $customer = User::factory()->withWorkspace()->create();
     $administrator = SystemAdministrator::factory()->create();
-    $post = Post::factory()->draft()->create();
     $response = isolatedAuthRequest($cookies, 'POST', 'https://app.example.test/login', [
         'email' => $customer->email,
         'password' => 'password',
@@ -390,7 +391,7 @@ it('ignores staff authentication retained in a legacy customer session', functio
     $payload[Auth::guard('sysadmin')->getName()] = $administrator->id;
     DB::table('sessions')->where('id', $id)->update(['payload' => base64_encode(serialize($payload))]);
 
-    isolatedAuthRequest($cookies, 'GET', $post->getUrl())->assertOk()->assertDontSee('Edit Post');
+    isolatedAuthRequest($cookies, 'GET', 'https://app.example.test/passkeys/confirm/options')->assertOk();
     $this->assertGuest('sysadmin');
     $stored = unserialize(base64_decode(DB::table('sessions')->where('id', $id)->value('payload')));
     expect($stored)->not->toHaveKey(Auth::guard('sysadmin')->getName());
@@ -405,7 +406,7 @@ it('redirects staff published blog links to the public hostname', function (): v
 
     isolatedAuthRequest($cookies, 'GET', $post->getUrl())
         ->assertStatus(301)->assertRedirect('https://example.test/blog/'.$post->slug);
-});
+})->skip(fn (): bool => ! class_exists('Relaticle\\Cloud\\CloudServiceProvider'), 'The blog front end needs the cloud package.');
 
 it('redirects public navigation from the staff hostname', function (string $route, array $parameters): void {
     $cookies = [];
@@ -414,11 +415,14 @@ it('redirects public navigation from the staff hostname', function (string $rout
     isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test'.$path)
         ->assertStatus(301)->assertRedirect('https://example.test'.$path);
 })->with([
-    'pricing' => ['pricing', []],
-    'blog' => ['blog.index', []],
-    'category' => ['blog.category', ['slug' => 'announcements']],
-    'documentation' => ['documentation.index', []],
-    'help' => ['help.index', []],
+    'security.txt' => ['securityTxt', []],
+    ...(class_exists('Relaticle\\Cloud\\CloudServiceProvider') ? [
+        'pricing' => ['pricing', []],
+        'blog' => ['blog.index', []],
+        'category' => ['blog.category', ['slug' => 'announcements']],
+        'documentation' => ['documentation.index', []],
+        'help' => ['help.index', []],
+    ] : []),
 ]);
 
 it('limits the staff development login link to the local environment', function (string $environment): void {
@@ -597,7 +601,7 @@ it('requires the native staff password and MFA challenge while keeping the custo
             'calls' => [['path' => '', 'method' => 'authenticate', 'params' => []]],
         ]],
     ])->assertOk()->assertJsonPath('components.0.effects.redirect', 'https://staff.example.test');
-    isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test')->assertOk()->assertSee('Dashboard');
+    isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/instance')->assertOk()->assertSee('Dashboard');
     isolatedAuthRequest($cookies, 'GET', 'https://app.example.test/passkeys/confirm/options')->assertOk();
     expect(DB::table('system_administrator_sessions')->where('user_id', $administrator->id)->exists())->toBeTrue();
 });
@@ -627,7 +631,7 @@ it('loads staff lazy widgets normally and rejects their signed mount parameters 
     $cookies = [];
     $administrator = SystemAdministrator::factory()->create();
     signInIsolatedStaff($cookies, $administrator);
-    $page = isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/')->assertOk();
+    $page = isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/instance')->assertOk();
     $html = html_entity_decode($page->getContent(), ENT_QUOTES);
     $matched = preg_match("/__lazyLoad\\('([^']+)'\\)/", $html, $lazy);
     expect($matched)->toBe(1);
@@ -678,7 +682,7 @@ it('removes foreign authentication from protected panel requests', function (str
         'password' => 'password',
     ])->assertOk();
     signInIsolatedStaff($cookies, $administrator);
-    $staffResponse = isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/')->assertOk();
+    $staffResponse = isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/instance')->assertOk();
     $isStaff = $context === 'sysadmin';
     $response = $isStaff ? $staffResponse : $customerResponse;
     $cookie = $isStaff ? '__Host-'.config('system-admin.session.cookie') : config('session.cookie');
@@ -690,7 +694,7 @@ it('removes foreign authentication from protected panel requests', function (str
     DB::table($table)->where('id', $id)->update(['payload' => base64_encode(serialize($payload))]);
 
     isolatedAuthRequest($cookies, 'GET', $isStaff
-        ? 'https://staff.example.test/'
+        ? 'https://staff.example.test/instance'
         : 'https://app.example.test/'.$customer->currentWorkspace->slug.'/companies')->assertOk();
 
     $this->assertGuest($foreignGuard);
@@ -702,11 +706,11 @@ it('requires second factor enrollment on an existing staff Livewire page', funct
     $cookies = [];
     $administrator = SystemAdministrator::factory()->create();
     signInIsolatedStaff($cookies, $administrator);
-    $page = isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/')->assertOk();
+    $page = isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/instance')->assertOk();
     preg_match_all('/wire:snapshot="([^"]+)"/', $page->getContent(), $matches);
     $snapshot = collect($matches[1])
         ->map(fn (string $value): string => html_entity_decode($value, ENT_QUOTES))
-        ->first(fn (string $value): bool => str_contains(json_decode($value, true, flags: JSON_THROW_ON_ERROR)['memo']['name'], 'Overview'));
+        ->first(fn (string $value): bool => str_contains(json_decode($value, true, flags: JSON_THROW_ON_ERROR)['memo']['name'], '\\Pages\\Dashboard'));
     expect($snapshot)->not->toBeNull();
     $administrator->update(['app_authentication_secret' => null]);
 

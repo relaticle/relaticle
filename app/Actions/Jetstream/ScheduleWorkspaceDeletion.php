@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Jetstream;
 
-use App\Actions\Billing\CancelWorkspaceSubscription;
+use App\Contracts\Billing;
 use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use App\Models\Workspace;
@@ -15,7 +15,7 @@ use Illuminate\Validation\ValidationException;
 
 final readonly class ScheduleWorkspaceDeletion
 {
-    public function __construct(private CancelWorkspaceSubscription $cancelSubscription) {}
+    public function __construct(private Billing $billing) {}
 
     public function schedule(User $user, Workspace $workspace): void
     {
@@ -27,7 +27,7 @@ final readonly class ScheduleWorkspaceDeletion
             ]);
         }
 
-        if ($workspace->hasOpenManagedSubscription()) {
+        if ($this->billing->blocksDeletion($workspace)) {
             throw ValidationException::withMessages([
                 'workspace' => [__('workspaces.validation.managed_plan_before_deleting')],
             ]);
@@ -39,7 +39,7 @@ final readonly class ScheduleWorkspaceDeletion
             $workspace->workspaceInvitations()->delete();
         });
 
-        $this->cancelSubscription->execute($workspace);
+        $this->billing->cancelForDeletion($workspace, immediately: false);
 
         /** @var User $owner */
         $owner = $workspace->owner;

@@ -2,10 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Features\Billing;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
-use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Console\Commands\IncrementalEmailSyncCommand;
 use Relaticle\EmailIntegration\Controllers\CalendarPushWebhookController;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
@@ -103,7 +101,7 @@ it('dispatches calendar sync when microsoft sends a valid notification', functio
 });
 
 it('does not sync a calendar from push notifications while its workspace is paused', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
     Bus::fake([IncrementalCalendarSyncJob::class]);
 
     ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([

@@ -2,13 +2,11 @@
 
 declare(strict_types=1);
 
-use App\Features\Billing;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
@@ -16,11 +14,9 @@ use Relaticle\Chat\Services\CreditService;
 
 mutates(CreditService::class);
 
-beforeEach(function (): void {
-    Feature::define(Billing::class, true);
-});
-
 it('does not double-charge when settle is called twice with the same idempotency key', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $service = app(CreditService::class);
@@ -89,6 +85,8 @@ it('requires a non-null idempotency_key', function (): void {
 });
 
 it('settles a reservation exactly once even when called twice with the same key', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $service = resolve(CreditService::class);
@@ -113,6 +111,8 @@ it('settles a reservation exactly once even when called twice with the same key'
 });
 
 it('makes settle and refund mutually exclusive for one resolution key', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $service = resolve(CreditService::class);

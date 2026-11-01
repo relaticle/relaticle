@@ -16,7 +16,6 @@ use App\Models\TableLayout;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Notifications\ManagedInvoiceOverdueNotification;
 use App\Notifications\TableLayoutChangedNotification;
 use App\Support\CanonicalRecordUrl;
 use App\Support\CurrentWorkspace;
@@ -31,6 +30,7 @@ use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
+use Relaticle\Cloud\Billing\Notifications\ManagedInvoiceOverdueNotification;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -653,9 +653,11 @@ it('shows a layout notice whose actor has since been deleted', function (): void
 });
 
 it('renders managed invoice rows without per-row queries', function (): void {
+    withHostedBilling();
+
     $overdueWorkspaces = function (int $count): void {
         Workspace::factory()->count($count)->create(['user_id' => $this->user->getKey(), 'personal_workspace' => false])
-            ->each(fn (Workspace $workspace) => $this->user->notify(new ManagedInvoiceOverdueNotification($workspace, Plan::Concierge)));
+            ->each(fn (Workspace $workspace) => $this->user->notify(new ManagedInvoiceOverdueNotification($workspace, Plan::Enterprise)));
     };
     $queriesPerRender = function (): int {
         $component = Livewire::actingAs($this->user)->test(AppDatabaseNotifications::class);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Casts\AsCanonicalEmail;
+use App\Contracts\Billing;
 use App\Data\NotificationPreferences;
 use App\Enums\EmailGrant;
 use App\Enums\Notifications\NotificationChannel;
@@ -230,10 +231,12 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
 
     public function ensureCanBeDeleted(): void
     {
+        $billing = resolve(Billing::class);
+
         $managedWorkspaces = $this->ownedWorkspaces()
             ->with('subscriptions')
             ->get()
-            ->filter(fn (Workspace $workspace): bool => $workspace->hasOpenManagedSubscription())
+            ->filter(fn (Workspace $workspace): bool => $billing->blocksDeletion($workspace))
             ->pluck('name');
 
         if ($managedWorkspaces->isNotEmpty()) {

@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Features\Billing as BillingFeature;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -52,7 +51,7 @@ it('broadcasts a stream.failed event when the job fails', function (): void {
 });
 
 it('refunds the reservation when the job fails without ever streaming', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
@@ -91,7 +90,7 @@ it('binds auth context so tool classes can resolve the current user', function (
 });
 
 it('refunds the reservation and stops when hosted access expires in the queue', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
     Event::fake();
 
     $user = User::factory()->withPersonalWorkspace()->create();

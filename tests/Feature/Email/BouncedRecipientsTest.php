@@ -6,8 +6,6 @@ use App\Data\DigestPayload;
 use App\Enums\Plan;
 use App\Listeners\Email\DropBouncedRecipientsListener;
 use App\Listeners\Email\ParkInactiveRecipientsListener;
-use App\Mail\ProEndedMail;
-use App\Mail\ProTrialEndingSoonMail;
 use App\Mail\SetupNudgeMail;
 use App\Mail\TaskAssignedMail;
 use App\Mail\TaskDigestMail;
@@ -21,6 +19,8 @@ use Illuminate\Mail\Message;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
+use Relaticle\Cloud\Billing\Mail\ProEndedMail;
+use Relaticle\Cloud\Billing\Mail\ProTrialEndingSoonMail;
 use Spatie\MailcoachMailer\Exceptions\InvalidMailerConfig;
 use Spatie\MailcoachMailer\MailcoachApiTransport;
 use Symfony\Component\HttpClient\Exception\TransportException;
@@ -73,6 +73,8 @@ it('keeps the recipient when the provider cannot be reached', function (): void 
 });
 
 it('parks the owner when the trial notice bounces', function (): void {
+    withHostedBilling();
+
     $owner = User::factory()->create();
     $workspace = Workspace::factory()->create(['user_id' => $owner->id, 'trial_ends_at' => now()->addDays(3)]);
     useMailcoachAnswering(new MockHttpClient(new MockResponse('', ['http_code' => 406])));
@@ -119,9 +121,21 @@ it('delivers again once the user changes their email', function (): void {
 });
 
 dataset('non-essential mailables', [
-    'trial ended' => fn (User $user, Workspace $workspace): Mailable => ProEndedMail::afterTrial($workspace),
-    'subscription ended' => fn (User $user, Workspace $workspace): Mailable => ProEndedMail::afterSubscription($workspace),
-    'managed plan ended' => fn (User $user, Workspace $workspace): Mailable => ProEndedMail::afterManagedPlan($workspace, Plan::Concierge),
+    'trial ended' => function (User $user, Workspace $workspace): Mailable {
+        withHostedBilling();
+
+        return ProEndedMail::afterTrial($workspace);
+    },
+    'subscription ended' => function (User $user, Workspace $workspace): Mailable {
+        withHostedBilling();
+
+        return ProEndedMail::afterSubscription($workspace);
+    },
+    'managed plan ended' => function (User $user, Workspace $workspace): Mailable {
+        withHostedBilling();
+
+        return ProEndedMail::afterManagedPlan($workspace, Plan::Enterprise);
+    },
     'setup nudge' => fn (User $user, Workspace $workspace): Mailable => new SetupNudgeMail($user, $workspace, 'first_record', 'https://relaticle.test/chat'),
     'task assigned' => fn (User $user, Workspace $workspace): Mailable => new TaskAssignedMail('Call back', 'https://relaticle.test/tasks', $workspace->name),
 ]);
@@ -144,6 +158,8 @@ it('parks the recipient when any non-essential mailable bounces', function (Clos
 })->with('non-essential mailables');
 
 it('does not send the trial ended notice to an owner parked by the trial reminder', function (): void {
+    withHostedBilling();
+
     $owner = User::factory()->withPersonalWorkspace()->create(['email_bounced_at' => now()]);
     $owner->currentWorkspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subHour()])->save();
 

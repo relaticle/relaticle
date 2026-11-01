@@ -81,10 +81,7 @@
     {{-- Footer --}}
     <div class="flex items-center justify-center gap-x-1 py-6 text-xs text-gray-400 dark:text-gray-500">
         <span>&copy; {{ date('Y') }} Relaticle</span>
-        <span>&middot;</span>
-        <a href="{{ url('/privacy-policy') }}" class="transition hover:text-gray-600 dark:hover:text-gray-300">Privacy Policy</a>
-        <span>&middot;</span>
-        <a href="{{ url('/terms-of-service') }}" class="transition hover:text-gray-600 dark:hover:text-gray-300">Terms</a>
+        <x-legal-links class="transition hover:text-gray-600 dark:hover:text-gray-300" />
     </div>
 
     <x-filament-actions::modals />

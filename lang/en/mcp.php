@@ -22,7 +22,7 @@ return [
             'aria_label' => 'Workspace selection',
             'personal' => 'Personal',
             'paused' => 'Paused. Subscribe to connect',
-            'all_paused' => 'Every workspace on this account is paused. Subscribe to Cloud Pro before connecting. A connector authorized against a paused workspace cannot read or write any data.',
+            'all_paused' => 'Every workspace on this account is paused. Subscribe to a Cloud plan before connecting. A connector authorized against a paused workspace cannot read or write any data.',
             'none' => [
                 'heading' => 'You do not belong to any workspaces.',
                 'description' => 'Create or join a workspace in Relaticle before authorizing this connector.',

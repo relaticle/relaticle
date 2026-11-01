@@ -2,7 +2,7 @@
 title: Self-Hosting Guide
 description: Get Docker Compose, Coolify, Dokploy and Laravel Cloud deployment steps for Relaticle, with PostgreSQL, Redis and Ollama setup.
 order: 1
-updated: "2026-10-29"
+updated: "2026-10-31"
 ---
 
 Deploy Relaticle on your own infrastructure with Docker or manually.
@@ -141,6 +141,17 @@ When the websocket is unreachable, the chat still works. Each reply appears a fe
 | `SENTRY_LARAVEL_DSN` | Sentry DSN for error tracking. |
 | `FATHOM_ANALYTICS_SITE_ID` | Fathom Analytics site ID. |
 
+### Legal and help links
+
+A self-hosted install ships no legal pages, and relaticle.com's policies do not cover your install. Point the first three settings at your own pages. An unset setting shows no link. Only `DOCUMENTATION_PUBLIC_URL` defaults to relaticle.com.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RELATICLE_PRIVACY_URL` | (empty) | Your privacy policy. Linked from the footer of the sign-in pages, the onboarding screens, the scheduled-deletion page, and the email accounts page. Unset means no link. |
+| `RELATICLE_TERMS_URL` | (empty) | Your terms of service. Linked from the sign-in footer, the onboarding screens, and the scheduled-deletion page. Unset means no link. |
+| `RELATICLE_CONTACT_URL` | (empty) | Your contact or support page. Linked from the sign-in footer. Unset means no link. |
+| `DOCUMENTATION_PUBLIC_URL` | `https://relaticle.com` | The site that serves the help centre and the developer guides. Rela and the panel's help links point here. Set it to your own mirror if you host one. |
+
 ### Email and calendar
 
 Email and calendar sync is off by default. Turn it on with `RELATICLE_FEATURE_EMAIL_INTEGRATION=true`. Members can then connect Google accounts, and Microsoft accounts once you configure a Microsoft client.
@@ -207,9 +218,13 @@ Toggle features on or off. All are enabled by default unless noted. Useful for f
 |----------|---------|-------------|
 | `RELATICLE_FEATURE_ONBOARD_SEED` | `true` | Seed demo data (sample companies, people, tasks) when a new workspace is created. Set to `false` to start with an empty workspace. |
 | `RELATICLE_FEATURE_SOCIAL_AUTH` | `true` | Enable Google and Microsoft social login. Set to `false` to use only email, password, and passkey sign-in. |
-| `RELATICLE_FEATURE_DOCUMENTATION` | `true` | Enable the `/developers` and `/help` documentation module. Set to `false` to remove documentation routes and navigation links. |
+| `RELATICLE_FEATURE_DOCUMENTATION` | `true` | Serve the OpenAPI spec at `/openapi.json` and `/openapi.yaml`, and show the MCP guide link on the access tokens page. Set to `false` to remove both. The spec exists only after `php artisan scribe:generate` writes it. The Docker image and the manual steps do not run that command, and the Laravel Cloud build does. The API reference at `/developers/api` is relaticle.com's docs page and loads the same spec. |
 | `RELATICLE_FEATURE_EMAIL_INTEGRATION` | `false` | Enable email and calendar sync for Google and Microsoft accounts, the email composer, and the Email & calendar help pages. Requires `GMAIL_CLIENT_ID` and `GMAIL_CLIENT_SECRET`. Microsoft accounts also need `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`. |
 | `RELATICLE_FEATURE_SIGNUP_CHALLENGE` | `false` | Ask new sign-ups to pass a Cloudflare Turnstile check. Stays hidden for normal browsers and shows a checkbox only when Cloudflare needs one. Requires `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`. The flag also refuses sign-ups from Tor exit relays, which needs no keys. It checks the Tor Project's exit list, refreshed every hour. Sign-in over Tor still works. |
+
+`RELATICLE_FEATURE_BLOG` does nothing on a self-hosted install. It switches on the blog pages, which live in the cloud package. The Docker image leaves that package out, along with the marketing site and the help and developer guide pages.
+
+Leave `RELATICLE_FEATURE_BILLING` unset, because nothing in a self-hosted install can start a subscription. With it on, every workspace created after your install ran its July 2026 billing migration resolves to Free or Trial ended. On a new install, that is every workspace. Both deny access, so email sending, mailbox sync and calendar sync stop for those workspaces. Mail already queued for them is marked failed and is not resent when you turn the flag off. The access tokens page also gains a web-form help link.
 
 ---
 
@@ -259,6 +274,8 @@ The `sysadmin` panel at `{APP_URL}/sysadmin` is a separate, instance-wide admin 
 ```bash
 docker compose exec app php artisan sysadmin:create
 ```
+
+The panel opens on the **Instance** dashboard at `{APP_URL}/sysadmin/instance`, and `{APP_URL}/sysadmin` redirects there. It counts the users, workspaces, companies, people, and opportunities across every workspace on your installation. The revenue, subscription, and AI credit pages that relaticle.com's staff panel shows belong to the cloud package and do not exist here.
 
 ---
 
@@ -501,6 +518,8 @@ Deploy command:
 php artisan migrate --force
 ```
 
+A fork contains `packages/Cloud`, relaticle.com's own code. It stays out of the app while `RELATICLE_CLOUD` is unset, so leave that variable out of the environment.
+
 Cloud restarts Horizon on every deployment, so no `horizon:terminate` step is needed.
 
 ### 4. Queue Workers and Scheduler
@@ -617,11 +636,10 @@ git clone https://github.com/Relaticle/relaticle.git /var/www/relaticle
 cd /var/www/relaticle
 ```
 
-2. Install dependencies:
+2. Install PHP dependencies:
 
 ```bash
 composer install --no-dev --optimize-autoloader
-pnpm install --frozen-lockfile && pnpm run build
 ```
 
 3. Configure the environment:
@@ -633,25 +651,52 @@ php artisan key:generate
 
 Edit `.env` with your database credentials, mail settings, and `APP_URL`. Set `APP_ENV=production` and `APP_DEBUG=false`. The example file ships `local` and `true`, and debug pages in production expose your configuration.
 
-4. Set up the database:
+Leave `RELATICLE_CLOUD` unset. `packages/Cloud` is relaticle.com's own billing, marketing site, and hosted admin pages. The Docker image leaves it out, and a clone contains it. With the switch unset it stays out of the app and out of the frontend build, so your install never serves relaticle.com's marketing site at `/`. Its license allows development and testing use, so the directory stays on disk and `git pull` keeps working.
+
+4. Build the frontend:
+
+```bash
+pnpm install --frozen-lockfile && pnpm run build
+```
+
+5. Set up the database:
 
 ```bash
 php artisan migrate --force
 php artisan storage:link
 ```
 
-5. Set permissions:
+6. Set permissions:
 
 ```bash
 chown -R www-data:www-data storage bootstrap/cache
 chmod -R 775 storage bootstrap/cache
 ```
 
-6. Create your admin user:
+7. Create your admin user:
 
 ```bash
 php artisan make:filament-user
 ```
+
+### Updating a Manual Install
+
+```bash
+cd /var/www/relaticle
+php artisan down
+git pull
+composer install --no-dev --optimize-autoloader
+pnpm install --frozen-lockfile && pnpm run build
+php artisan migrate --force
+php artisan optimize
+php artisan up
+php artisan horizon:terminate
+php artisan reverb:restart
+```
+
+`php artisan optimize` rebuilds the config and route caches, which still name routes the previous release served. If you cache components with `php artisan filament:optimize`, run it again after `php artisan up`. If PHP-FPM runs with `opcache.validate_timestamps=0`, reload it as well.
+
+Supervisor restarts Horizon after `horizon:terminate`. Check the [release notes](https://github.com/Relaticle/relaticle/releases) before you update.
 
 ### Nginx Configuration
 
@@ -793,6 +838,10 @@ Since October 2026 a reply appears a few seconds after it is saved even with no 
 3. Check every container shares the cache: `docker compose exec horizon php artisan config:show cache.default` prints `redis`.
 
 To see whether replies stream live, open the browser's Network tab, filter by WS, and look for a `/reverb/app/...` request with status 101. With no such request, the `reverb` container is missing or your reverse proxy drops the `Upgrade` header.
+
+### The homepage shows the Relaticle marketing site
+
+The cloud package is loaded, because `RELATICLE_CLOUD` is set in `.env` or in the server environment. A self-hosted install redirects `/` to the app. Remove the variable, run `php artisan config:clear` (and `php artisan optimize` again if you cache configuration), then rebuild the frontend with `pnpm run build`.
 
 ### Horizon not processing jobs
 

@@ -10,10 +10,11 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Models/** | .ai/rules/boost/models.md |
 | tests/** | .ai/rules/boost/tests.md |
 | packages/Chat/** | .ai/rules/chat.md |
+| packages/Cloud/** | .ai/rules/cloud.md |
 | packages/EmailIntegration/** | .ai/rules/email-integration.md |
 | app/Jobs/Email/**, app/Support/Email/** | .ai/rules/email.md |
-| app/Filament/**, app/Livewire/**, app/Support/Media/**, app/Actions/Upload/**, app/Mcp/Tools/**, app/Http/Controllers/Media/**, app/Observers/**, app/Jobs/FetchFaviconForCompany.php, app/Services/Favicon/**, app/Console/Commands/**, packages/Chat/src/**, packages/ImportWizard/src/**, packages/EmailIntegration/src/Livewire/**, packages/EmailIntegration/src/Services/EmailTemplateRenderService.php | .ai/rules/file-uploads.md |
+| app/Filament/**, app/Livewire/**, app/Support/Media/**, app/Actions/Upload/**, app/Mcp/Tools/**, app/Http/Controllers/Media/**, app/Observers/**, app/Jobs/FetchFaviconForCompany.php, app/Services/Favicon/**, app/Console/Commands/**, packages/Chat/src/**, packages/ImportWizard/src/**, packages/EmailIntegration/src/Livewire/**, packages/EmailIntegration/src/Services/EmailTemplateRenderService.php, packages/Cloud/src/**/Filament/**, packages/Cloud/src/**/Livewire/**, packages/Cloud/src/**/Commands/** | .ai/rules/file-uploads.md |
 | app/Models/**, app/Casts/** | .ai/rules/models.md |
-| app/Notifications/**, app/Livewire/App/AppDatabaseNotifications.php, app/Contracts/Inbox/**, app/Support/Inbox/**, resources/views/livewire/app/database-notifications.blade.php, resources/views/livewire/app/notifications/**, packages/*/src/Notifications/**, packages/*/src/Inbox/** | .ai/rules/notifications.md |
-| resources/views/filament/**, app/Filament/**, packages/*/src/Filament/**, packages/*/resources/views/** | .ai/rules/panel-links.md |
+| app/Notifications/**, app/Livewire/App/AppDatabaseNotifications.php, app/Contracts/Inbox/**, app/Support/Inbox/**, resources/views/livewire/app/database-notifications.blade.php, resources/views/livewire/app/notifications/**, packages/*/src/Notifications/**, packages/*/src/Inbox/**, packages/Cloud/src/**/Notifications/** | .ai/rules/notifications.md |
+| resources/views/filament/**, app/Filament/**, packages/*/src/Filament/**, packages/*/resources/views/**, packages/Cloud/src/**/Filament/** | .ai/rules/panel-links.md |
 | app/Queries/**, app/Data/ListQuery.php, app/Mcp/Tools/BaseListTool.php, packages/Chat/src/Tools/BaseReadListTool.php, packages/*/src/Queries/** | .ai/rules/queries.md |

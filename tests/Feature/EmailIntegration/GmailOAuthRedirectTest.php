@@ -6,8 +6,11 @@ use App\Enums\Plan;
 use App\Features\Billing;
 use App\Models\User;
 use App\Models\Workspace;
+use Filament\Notifications\Notification;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Controllers\RedirectController;
+use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 
 mutates(RedirectController::class);
@@ -110,7 +113,7 @@ it('rejects a return page that was not signed with the connect url', function ()
 });
 
 it('refuses to start a mailbox connect for a workspace whose hosted access is paused', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
     $user = User::factory()->withWorkspace()->create();
     $user->currentWorkspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subMinute()])->save();
     $this->actingAs($user);
@@ -119,4 +122,81 @@ it('refuses to start a mailbox connect for a workspace whose hosted access is pa
 
     expect((string) $response->headers->get('Location'))->not->toContain('accounts.google.com')
         ->and(session(RedirectController::WORKSPACE_SESSION_KEY))->toBeNull();
+});
+
+it('does not start consent when the workspace has reached its mailbox limit', function (): void {
+    withHostedBilling();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro])->save();
+    ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->count(10)->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $user->getKey(),
+    ]));
+    $this->actingAs($user);
+
+    $this->get(MailboxOAuthWorkspace::redirectUrl('gmail', $workspace))
+        ->assertRedirect(EmailAccountsPage::getUrl(['tenant' => $workspace->slug], panel: 'app'));
+
+    Notification::assertNotified(
+        Notification::make()->title('The Pro plan allows 10 connected mailboxes in a workspace. Upgrade to connect more.')->danger(),
+    );
+
+    expect(session()->has(RedirectController::WORKSPACE_SESSION_KEY))->toBeFalse();
+});
+
+it('starts consent past every plan limit on a self-hosted install', function (): void {
+    Feature::define(Billing::class, false);
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Free])->save();
+    ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->count(60)->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $user->getKey(),
+    ]));
+    $this->actingAs($user);
+
+    $location = (string) $this->get(MailboxOAuthWorkspace::redirectUrl('gmail', $workspace))
+        ->headers->get('Location');
+
+    expect($location)->toContain('accounts.google.com')
+        ->and(session(RedirectController::WORKSPACE_SESSION_KEY))->toBe($workspace->getKey());
+});
+
+it('starts consent at the same mailbox count on a plan with a higher limit', function (): void {
+    withHostedBilling();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Scale])->save();
+    ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->count(10)->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $user->getKey(),
+    ]));
+    $this->actingAs($user);
+
+    $location = (string) $this->get(MailboxOAuthWorkspace::redirectUrl('gmail', $workspace))
+        ->headers->get('Location');
+
+    expect($location)->toContain('accounts.google.com')
+        ->and(session(RedirectController::WORKSPACE_SESSION_KEY))->toBe($workspace->getKey());
+});
+
+it('does not count disconnected mailboxes against the limit', function (): void {
+    withHostedBilling();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro])->save();
+    ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->count(10)->disconnected()->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $user->getKey(),
+    ]));
+    $this->actingAs($user);
+
+    $location = (string) $this->get(MailboxOAuthWorkspace::redirectUrl('gmail', $workspace))
+        ->headers->get('Location');
+
+    expect($location)->toContain('accounts.google.com');
 });
