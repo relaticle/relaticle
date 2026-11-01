@@ -26,7 +26,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           # A signer agrees to the text at this commit. A new CLA version gets a new commit, sentence and signatures file.
-          path-to-document: https://github.com/relaticle/relaticle/blob/1f221dc40b71d2601e87d1634374162507b11457/.github/CLA.md
+          path-to-document: https://github.com/relaticle/relaticle/blob/2b5cbc809833d00109f4cb99a2f42229fbdf33dd/.github/CLA.md
           custom-pr-sign-comment: I have read the Relaticle CLA version 1.0 and I agree to it
           path-to-signatures: signatures/v1.0/cla.json
           # main is protected, so signatures live on their own unprotected branch.
