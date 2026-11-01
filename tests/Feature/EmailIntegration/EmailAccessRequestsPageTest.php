@@ -14,7 +14,9 @@ use Relaticle\EmailIntegration\Livewire\Concerns\InteractsWithEmailAccessRequest
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
+use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailShare;
+use Relaticle\EmailIntegration\Models\WorkspaceEmailBlocklist;
 use Relaticle\EmailIntegration\Services\EmailSearchService;
 
 mutates(AccessRequestsTable::class, EmailAccessRequestsPage::class, InteractsWithEmailAccessRequests::class, EmailSearchService::class);
@@ -716,6 +718,77 @@ describe('subject privacy', function (): void {
             ->call('setTab', 'outgoing')
             ->assertTableColumnStateSet('email.subject', __('filament/pages/email-inbox.subject.hidden'), $request)
             ->searchTable('Unlinked forecast secret')
+            ->assertCanNotSeeTableRecords([$request])
+            ->searchTable('Pat Owner')
+            ->assertCanSeeTableRecords([$request]);
+    });
+
+    it('does not match the subject of a linked internal teammate email when searching outgoing requests', function (): void {
+        $owner = User::factory()->create(['current_workspace_id' => $this->workspace->id, 'name' => 'Pat Owner']);
+
+        $ownerAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $owner->id,
+        ]));
+
+        $email = Email::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $owner->id,
+            'connected_account_id' => $ownerAccount->getKey(),
+            'privacy_tier' => EmailPrivacyTier::SUBJECT,
+            'subject' => 'Internal forecast secret',
+            'is_internal' => true,
+        ]);
+        Company::factory()->create(['workspace_id' => $this->workspace->id])->emails()->attach($email->id);
+
+        $request = EmailAccessRequest::factory()->pending()->forTier(EmailPrivacyTier::FULL)->create([
+            'owner_id' => $owner->id,
+            'requester_id' => $this->user->id,
+            'email_id' => $email->getKey(),
+        ]);
+
+        livewire(AccessRequestsTable::class)
+            ->call('setTab', 'outgoing')
+            ->assertTableColumnStateSet('email.subject', __('filament/pages/email-inbox.subject.hidden'), $request)
+            ->searchTable('Internal forecast secret')
+            ->assertCanNotSeeTableRecords([$request])
+            ->searchTable('Pat Owner')
+            ->assertCanSeeTableRecords([$request]);
+    });
+
+    it('does not match the subject of a linked teammate email whose participants are all protected when searching outgoing requests', function (): void {
+        $owner = User::factory()->create(['current_workspace_id' => $this->workspace->id, 'name' => 'Pat Owner']);
+
+        $ownerAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $owner->id,
+        ]));
+
+        $email = Email::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $owner->id,
+            'connected_account_id' => $ownerAccount->getKey(),
+            'privacy_tier' => EmailPrivacyTier::SUBJECT,
+            'subject' => 'Protected forecast secret',
+            'is_internal' => false,
+        ]);
+        EmailParticipant::factory()->from()->create(['email_id' => $email->id, 'email_address' => 'vip@client.test']);
+        Company::factory()->create(['workspace_id' => $this->workspace->id])->emails()->attach($email->id);
+        WorkspaceEmailBlocklist::factory()->protected()->email('vip@client.test')->create([
+            'workspace_id' => $this->workspace->id,
+            'created_by' => $owner->id,
+        ]);
+
+        $request = EmailAccessRequest::factory()->pending()->forTier(EmailPrivacyTier::FULL)->create([
+            'owner_id' => $owner->id,
+            'requester_id' => $this->user->id,
+            'email_id' => $email->getKey(),
+        ]);
+
+        livewire(AccessRequestsTable::class)
+            ->call('setTab', 'outgoing')
+            ->assertTableColumnStateSet('email.subject', __('filament/pages/email-inbox.subject.hidden'), $request)
+            ->searchTable('Protected forecast secret')
             ->assertCanNotSeeTableRecords([$request])
             ->searchTable('Pat Owner')
             ->assertCanSeeTableRecords([$request]);

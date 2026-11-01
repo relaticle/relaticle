@@ -11,6 +11,7 @@ use Illuminate\Database\Query\Builder as BaseBuilder;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 
 final readonly class EmailSearchService
 {
@@ -26,7 +27,7 @@ final readonly class EmailSearchService
         $needle = '%'.$search.'%';
         $viewerId = $viewer->getKey();
 
-        return $query->where(function (Builder $outer) use ($needle, $viewerId): void {
+        return $query->where(function (Builder $outer) use ($needle, $viewerId, $viewer): void {
             $outer->whereHas('participants', function (Builder $participantQuery) use ($needle, $viewerId): void {
                 $participantQuery
                     ->where(function (Builder $roleGate) use ($viewerId): void {
@@ -43,16 +44,16 @@ final readonly class EmailSearchService
                     });
             });
 
-            $outer->orWhere(function (Builder $subjectQuery) use ($needle, $viewerId): void {
+            $outer->orWhere(function (Builder $subjectQuery) use ($needle, $viewer): void {
                 $subjectQuery
                     ->where('subject', 'ilike', $needle)
-                    ->where(fn (Builder $access): Builder => $this->whereViewerCanSeeSubject($access, $viewerId));
+                    ->where(fn (Builder $access): Builder => $this->whereViewerCanSeeSubject($access, $viewer));
             });
 
-            $outer->orWhere(function (Builder $snippetQuery) use ($needle, $viewerId): void {
+            $outer->orWhere(function (Builder $snippetQuery) use ($needle, $viewer): void {
                 $snippetQuery
                     ->where('snippet', 'ilike', $needle)
-                    ->where(fn (Builder $access): Builder => $this->whereViewerCanSeeBody($access, $viewerId));
+                    ->where(fn (Builder $access): Builder => $this->whereViewerCanSeeBody($access, $viewer));
             });
         });
     }
@@ -63,16 +64,16 @@ final readonly class EmailSearchService
      */
     public function whereSubjectVisibleTo(Builder $query, User $viewer): Builder
     {
-        return $this->whereViewerCanSeeSubject($query, $viewer->getKey());
+        return $this->whereViewerCanSeeSubject($query, $viewer);
     }
 
     /**
      * @param  Builder<Email>  $query
      * @return Builder<Email>
      */
-    private function whereViewerCanSeeSubject(Builder $query, string $viewerId): Builder
+    private function whereViewerCanSeeSubject(Builder $query, User $viewer): Builder
     {
-        return $this->whereViewerHasAccessAtTiers($query, $viewerId, [
+        return $this->whereViewerHasAccessAtTiers($query, $viewer, [
             EmailPrivacyTier::SUBJECT->value,
             EmailPrivacyTier::FULL->value,
         ]);
@@ -82,9 +83,9 @@ final readonly class EmailSearchService
      * @param  Builder<Email>  $query
      * @return Builder<Email>
      */
-    private function whereViewerCanSeeBody(Builder $query, string $viewerId): Builder
+    private function whereViewerCanSeeBody(Builder $query, User $viewer): Builder
     {
-        return $this->whereViewerHasAccessAtTiers($query, $viewerId, [
+        return $this->whereViewerHasAccessAtTiers($query, $viewer, [
             EmailPrivacyTier::FULL->value,
         ]);
     }
@@ -96,9 +97,12 @@ final readonly class EmailSearchService
      * @param  list<string>  $tiers
      * @return Builder<Email>
      */
-    private function whereViewerHasAccessAtTiers(Builder $query, string $viewerId, array $tiers): Builder
+    private function whereViewerHasAccessAtTiers(Builder $query, User $viewer, array $tiers): Builder
     {
-        return $query->where(function (Builder $access) use ($viewerId, $tiers): void {
+        $viewerId = $viewer->getKey();
+        $workspaceId = $viewer->current_workspace_id;
+
+        return $query->where(function (Builder $access) use ($viewerId, $workspaceId, $tiers): void {
             $access
                 ->where('user_id', $viewerId)
                 ->orWhereExists(fn (BaseBuilder $copyQuery): BaseBuilder => $this->syncedCopyExists($copyQuery, $viewerId))
@@ -115,8 +119,9 @@ final readonly class EmailSearchService
                             $tiers,
                         ));
                 })
-                ->orWhere(function (Builder $byDefault) use ($viewerId, $tiers): void {
+                ->orWhere(function (Builder $byDefault) use ($viewerId, $workspaceId, $tiers): void {
                     $byDefault
+                        ->where(fn (Builder $publicGate): Builder => VisibleEmailScope::wherePublicToTeammates($publicGate, $workspaceId))
                         ->whereIn('privacy_tier', $tiers)
                         ->whereExists(fn (BaseBuilder $link): BaseBuilder => $link
                             ->from('emailables')
