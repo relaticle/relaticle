@@ -11,6 +11,7 @@ use App\Models\CustomFieldSection;
 use App\Models\CustomFieldValue;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\CurrentWorkspace;
 use App\Support\Media\MediaLookup;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -28,6 +29,7 @@ beforeEach(function (): void {
         ->where('entity_type', 'task')
         ->where('code', 'status')
         ->firstOrFail();
+    resolve(CurrentWorkspace::class)->set($this->workspace);
     Sanctum::actingAs($this->user, ['*']);
 });
 
@@ -154,12 +156,10 @@ it('resolves record names with a constant number of lookups, not one per row', f
 
     RecordFieldFixture::pointAt($field, 'company');
 
-    $link = function (int $count) use ($field): void {
-        Company::factory()->count($count)->create(['workspace_id' => $this->workspace->getKey()])
-            ->each(fn (Company $company) => Task::factory()
-                ->create(['workspace_id' => $this->workspace->getKey()])
-                ->saveCustomFieldValue($field, [$company->getKey()]));
-    };
+    $link = fn (int $count): mixed => resolve(CurrentWorkspace::class)->within($this->workspace, fn (): mixed => Company::factory()->count($count)->create(['workspace_id' => $this->workspace->getKey()])
+        ->each(fn (Company $company) => Task::factory()
+            ->create(['workspace_id' => $this->workspace->getKey()])
+            ->saveCustomFieldValue($field, [$company->getKey()])));
 
     $listLookups = function () use (&$response): int {
         DB::flushQueryLog();

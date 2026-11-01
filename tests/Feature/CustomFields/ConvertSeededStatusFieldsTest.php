@@ -82,6 +82,26 @@ it('converts a 3.x seeded workspace to the status type and categorises its optio
         ->and(json_decode((string) $lost->settings, true)['category'])->toBe(OptionCategory::Cancelled->value);
 });
 
+it('categorises a preset pipeline and leaves a status field of another type alone', function (): void {
+    $workspace = seedThreeXStatusFields();
+
+    DB::table('custom_field_options')
+        ->where('id', statusOption($workspace, 'opportunity', 'stage', 'Closed Won')->id)
+        ->update(['name' => 'Hired']);
+
+    DB::table('custom_fields')
+        ->where('tenant_id', $workspace->id)
+        ->where('entity_type', 'task')
+        ->where('code', 'status')
+        ->update(['type' => 'record']);
+
+    runConvertSeededStatusFieldsMigration();
+
+    expect(json_decode((string) statusOption($workspace, 'opportunity', 'stage', 'Hired')->settings, true)['category'])->toBe(OptionCategory::Completed->value)
+        ->and(fieldType($workspace, 'task', 'status'))->toBe('record')
+        ->and(json_decode((string) statusOption($workspace, 'task', 'status', 'Done')->settings, true))->not->toHaveKey('category');
+});
+
 it('leaves an already converted workspace untouched', function (): void {
     $workspace = seedThreeXStatusFields();
 

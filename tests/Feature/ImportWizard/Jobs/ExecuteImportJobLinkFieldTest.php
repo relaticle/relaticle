@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\Company;
 use App\Models\CustomFieldLink;
 use App\Models\People;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Event;
@@ -59,7 +60,7 @@ it('links a record through a relationship column and stamps the import as its so
 
     ImportExecutionFixture::run($this);
 
-    $person = People::query()->where('workspace_id', $this->workspace->id)->where('name', 'Alice Doe')->firstOrFail();
+    $person = People::query()->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $this->workspace->id)->where('name', 'Alice Doe')->firstOrFail();
     $link = CustomFieldLink::query()->sole();
 
     expect($link->from_entity_id)->toBe($person->getKey())

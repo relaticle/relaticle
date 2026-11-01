@@ -8,6 +8,7 @@ use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Models\Company;
 use App\Models\People;
 use App\Models\User;
+use App\Support\CurrentWorkspace;
 use Illuminate\Support\Facades\Cache;
 use Laravel\Sanctum\Sanctum;
 use Relaticle\CustomFields\Enums\RelationshipCardinality;
@@ -21,6 +22,7 @@ beforeEach(function (): void {
     $this->workspace = $this->user->personalWorkspace();
 
     TenantContextService::setTenantId($this->workspace->getKey());
+    resolve(CurrentWorkspace::class)->set($this->workspace);
     Cache::flush();
 
     $this->field = RecordFieldFixture::record($this->workspace, 'people', 'company', 'vendor', RelationshipCardinality::ManyToOne);

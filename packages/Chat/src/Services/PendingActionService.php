@@ -243,7 +243,7 @@ final readonly class PendingActionService
 
         $excludedFields = $this->sanitizedExclusions($pendingAction, $excludedFields);
 
-        $resolved = $this->asLinkActor($pendingAction, $user, fn (): PendingAction => resolve(CurrentWorkspace::class)->within($workspace, fn (): PendingAction => DB::transaction(function () use ($pendingAction, $user, $excludedFields): PendingAction {
+        $resolved = resolve(CurrentWorkspace::class)->within($workspace, fn (): PendingAction => DB::transaction(function () use ($pendingAction, $user, $excludedFields): PendingAction {
             /** @var PendingAction $pendingAction */
             $pendingAction = PendingAction::query()
                 ->lockForUpdate()
@@ -262,7 +262,7 @@ final readonly class PendingActionService
                 'Batch proposals resolve per item via approveItem()/rejectItem(), not approve().',
             );
 
-            $result = CurrentSource::during(CreationSource::CHAT, fn (): mixed => $this->executeAction($pendingAction, $user, $excludedFields));
+            $result = CurrentSource::during(CreationSource::CHAT, fn (): mixed => $this->asLinkActor($pendingAction, $user, fn (): mixed => $this->executeAction($pendingAction, $user, $excludedFields)));
 
             $resultData = $result instanceof Model
                 ? ['id' => $result->getKey(), 'type' => $result->getMorphClass()]
@@ -282,7 +282,7 @@ final readonly class PendingActionService
             ]);
 
             return $pendingAction->refresh();
-        })));
+        }));
 
         $this->broadcastResolution($resolved, PendingActionStatus::Approved->value, null, true);
 
@@ -378,7 +378,7 @@ final readonly class PendingActionService
 
         $excludedFields = $this->sanitizedExclusions($pendingAction, $excludedFields);
 
-        [$finalized, $record, $itemStatus] = $this->asLinkActor($pendingAction, $user, fn (): array => resolve(CurrentWorkspace::class)->within($workspace, fn (): array => DB::transaction(function () use ($pendingAction, $user, $index, $excludedFields): array {
+        [$finalized, $record, $itemStatus] = resolve(CurrentWorkspace::class)->within($workspace, fn (): array => DB::transaction(function () use ($pendingAction, $user, $index, $excludedFields): array {
             /** @var PendingAction $locked */
             $locked = PendingAction::query()->lockForUpdate()->findOrFail($pendingAction->getKey());
 
@@ -397,7 +397,7 @@ final readonly class PendingActionService
                 return [$progress->isComplete(), null, $progress->statusOf($index, 'approved')];
             }
 
-            $model = CurrentSource::during(CreationSource::CHAT, fn (): Model => $this->executeBatchItem($locked, $user, $this->withoutExcludedFields($records[$index], $excludedFields, $locked->entity_type)));
+            $model = CurrentSource::during(CreationSource::CHAT, fn (): Model => $this->asLinkActor($locked, $user, fn (): Model => $this->executeBatchItem($locked, $user, $this->withoutExcludedFields($records[$index], $excludedFields, $locked->entity_type))));
 
             // A failure remembered from an earlier attempt is history the
             // moment an item commits; leaving it would report a stale error
@@ -418,7 +418,7 @@ final readonly class PendingActionService
             $finalized = $this->finalizeBatchIfComplete($locked, $items, $records, $resultData);
 
             return [$finalized, $model, 'approved'];
-        })));
+        }));
 
         $this->broadcastResolution($pendingAction, $itemStatus, $index, $finalized);
 

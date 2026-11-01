@@ -17,12 +17,14 @@ use App\Mcp\Tools\Task\UpdateTaskTool;
 use App\Mcp\Tools\UploadFileTool;
 use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\CustomFieldLink;
 use App\Models\CustomFieldOption;
 use App\Models\Note;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Rules\ValidCustomFields;
+use App\Support\CurrentWorkspace;
 use App\Support\CustomFields\CustomFieldInput;
 use App\Support\CustomFields\CustomFieldOptionMap;
 use App\Support\CustomFields\RecordNameResolver;
@@ -48,6 +50,7 @@ beforeEach(function (): void {
         ->where('code', 'status')
         ->firstOrFail();
     TenantContextService::setTenantId($this->workspace->getKey());
+    resolve(CurrentWorkspace::class)->set($this->workspace);
 });
 
 afterEach(function (): void {
@@ -430,7 +433,17 @@ it('reads a foreign-workspace record value as a null name', function (): void {
     $otherWorkspace = User::factory()->withPersonalWorkspace()->create()->personalWorkspace();
     $foreign = Company::factory()->create(['workspace_id' => $otherWorkspace->getKey(), 'name' => 'Initech']);
     $task = Task::factory()->create(['workspace_id' => $this->workspace->getKey()]);
-    $task->saveCustomFieldValue($field, [$foreign->getKey()]);
+    CustomFieldLink::query()->create([
+        'tenant_id' => $this->workspace->getKey(),
+        'relationship_id' => $field->relationshipDefinition()->getKey(),
+        'from_entity_type' => 'task',
+        'from_entity_id' => $task->getKey(),
+        'to_entity_type' => 'company',
+        'to_entity_id' => $foreign->getKey(),
+        'sort_order' => 0,
+        'active_from' => now(),
+        'source' => CustomFieldLink::SOURCE_MIGRATION,
+    ]);
 
     $response = RelaticleServer::actingAs($this->user)
         ->tool(GetTaskTool::class, ['id' => $task->getKey()])

@@ -7,6 +7,8 @@ namespace App\Actions\CustomFields;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\OpportunityField as OpportunityCustomField;
 use App\Enums\CustomFields\TaskField as TaskCustomField;
+use App\Enums\CustomFieldType;
+use App\Enums\OnboardingUseCase;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use Illuminate\Database\Eloquent\Collection;
@@ -150,6 +152,7 @@ final readonly class ConvertSeededStatusFields
             ->where('tenant_id', $tenantId)
             ->whereIn('entity_type', self::ENTITY_TYPES)
             ->whereIn('code', self::CODES)
+            ->whereIn('type', [CustomFieldType::SELECT->value, StatusFieldType::KEY])
             ->with(['options' => fn (Relation $query): Relation => $query->withoutGlobalScopes()])
             ->get();
     }
@@ -179,7 +182,10 @@ final readonly class ConvertSeededStatusFields
     {
         return match ([$field->entity_type, $field->code]) {
             [CrmEntity::Task->value, TaskCustomField::STATUS->value] => TaskCustomField::STATUS->getOptionCategories(),
-            [CrmEntity::Opportunity->value, OpportunityCustomField::STAGE->value] => OpportunityCustomField::STAGE->getOptionCategories(),
+            [CrmEntity::Opportunity->value, OpportunityCustomField::STAGE->value] => array_merge(...array_map(
+                fn (OnboardingUseCase $useCase): array => $useCase->stageCategories(),
+                OnboardingUseCase::cases(),
+            )),
             default => null,
         };
     }

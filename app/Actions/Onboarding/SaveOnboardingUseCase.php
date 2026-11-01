@@ -58,7 +58,7 @@ final readonly class SaveOnboardingUseCase
             $preset = $useCase->stagePreset();
 
             if ($preset !== null) {
-                $this->applyStagePreset->execute($locked, $preset);
+                $this->applyStagePreset->execute($locked, $preset, $useCase->stageCategories());
             }
 
             return true;

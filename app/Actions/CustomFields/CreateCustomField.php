@@ -68,7 +68,7 @@ final readonly class CreateCustomField
                 }
 
                 if (is_string($validated['lookup_type'] ?? null)) {
-                    $this->linkToRecords($created, $validated['lookup_type'], ($attributes['settings']['allow_multiple'] ?? false) === true);
+                    $this->linkToRecords($created, $validated['lookup_type'], $attributes['settings']->allow_multiple);
                 }
 
                 return $created;
