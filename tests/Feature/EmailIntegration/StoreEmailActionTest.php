@@ -1256,3 +1256,26 @@ it('joins a teammate copy stored under the provider Message-ID once the send is 
         ->toBe([$sent->conversation_key])
         ->and(EmailConversation::query()->where('workspace_id', $this->workspace->getKey())->sole()->message_count)->toBe(1);
 });
+
+it('joins a thread mate left on another conversation key when the next message in the thread arrives', function (): void {
+    $first = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'a', 'rfcMessageId' => '<a@acme.example>', 'threadId' => 'ta', 'sentAt' => now()->subDays(2),
+    ]));
+    Email::factory()->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'user_id' => $this->user->getKey(),
+        'connected_account_id' => $this->account->getKey(),
+        'rfc_message_id' => '<late@acme.example>',
+        'thread_id' => 'ta',
+        'sent_at' => now()->subDay(),
+        'conversation_key' => str_repeat('b', 64),
+    ]);
+
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'n', 'rfcMessageId' => '<n@acme.example>', 'threadId' => 'ta',
+    ]));
+
+    expect(Email::query()->where('workspace_id', $this->workspace->getKey())->distinct()->pluck('conversation_key')->all())
+        ->toBe([$first->conversation_key])
+        ->and(EmailConversation::query()->where('workspace_id', $this->workspace->getKey())->sole()->message_count)->toBe(3);
+});
