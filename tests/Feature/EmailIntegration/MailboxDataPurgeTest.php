@@ -7,13 +7,15 @@ use Illuminate\Support\Facades\Storage;
 use Laravel\Jetstream\Contracts\DeletesTeams;
 use Laravel\Jetstream\Contracts\DeletesUsers;
 use Relaticle\EmailIntegration\Actions\PurgeStoredMailboxData;
+use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
 use Relaticle\EmailIntegration\Models\AiSummary;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
+use Relaticle\EmailIntegration\Models\EmailConversation;
 use Relaticle\EmailIntegration\Models\EmailThread;
 
-mutates(PurgeStoredMailboxData::class);
+mutates(PurgeStoredMailboxData::class, RefreshConversationSummary::class);
 
 beforeEach(function (): void {
     Storage::fake(EmailAttachment::DISK);
@@ -104,4 +106,46 @@ it('keeps a teammate\'s stored attachment files and thread summaries when anothe
     expect(Storage::disk(EmailAttachment::DISK)->exists($departingPath))->toBeFalse()
         ->and(Storage::disk(EmailAttachment::DISK)->exists($this->path))->toBeTrue()
         ->and(AiSummary::query()->where('summarizable_id', $this->thread->getKey())->count())->toBe(1);
+});
+
+it('removes the summary of a conversation only the deleted member held', function (): void {
+    $email = Email::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->member->id,
+        'connected_account_id' => $this->account->getKey(),
+        'conversation_key' => str_repeat('a', 64),
+    ]);
+    resolve(RefreshConversationSummary::class)->execute($this->workspace->id, $email->conversation_key);
+
+    expect(EmailConversation::query()->where('conversation_key', $email->conversation_key)->exists())->toBeTrue();
+
+    resolve(DeletesUsers::class)->delete($this->member);
+
+    expect(EmailConversation::query()->where('conversation_key', $email->conversation_key)->exists())->toBeFalse();
+});
+
+it('recounts a conversation a teammate still holds when a member is deleted', function (): void {
+    $key = str_repeat('b', 64);
+
+    $ownerAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->owner->id,
+    ]));
+
+    foreach ([[$this->member, $this->account], [$this->owner, $ownerAccount]] as [$user, $account]) {
+        Email::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $user->id,
+            'connected_account_id' => $account->getKey(),
+            'conversation_key' => $key,
+        ]);
+    }
+
+    resolve(RefreshConversationSummary::class)->execute($this->workspace->id, $key);
+
+    expect(EmailConversation::query()->where('conversation_key', $key)->sole()->message_count)->toBe(2);
+
+    resolve(DeletesUsers::class)->delete($this->member);
+
+    expect(EmailConversation::query()->where('conversation_key', $key)->sole()->message_count)->toBe(1);
 });

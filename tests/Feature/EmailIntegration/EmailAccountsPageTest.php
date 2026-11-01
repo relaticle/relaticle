@@ -5,12 +5,14 @@ declare(strict_types=1);
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Illuminate\Foundation\Console\QueuedCommand;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Queue;
 use Relaticle\EmailIntegration\Actions\ConnectAccountAction;
 use Relaticle\EmailIntegration\Actions\DisconnectConnectedAccountAction;
 use Relaticle\EmailIntegration\Data\ConnectAccountData;
@@ -221,6 +223,19 @@ it('clears microsoft tokens on disconnect without calling a revoke endpoint', fu
 
     Http::assertNothingSent();
     expect(ConnectedAccount::withTrashed()->findOrFail($this->account->id)->refresh_token)->toBeNull();
+});
+
+it('queues a conversation rebuild for the workspace on disconnect', function (): void {
+    Http::fake(['https://oauth2.googleapis.com/revoke' => Http::response()]);
+    Queue::fake();
+
+    livewire(EmailAccountsPage::class)
+        ->callAction('disconnect', arguments: ['account_id' => $this->account->id]);
+
+    Queue::assertPushedOn('imports', QueuedCommand::class, fn (QueuedCommand $job): bool => (fn (): array => $this->data)->call($job) === [
+        'email:backfill-conversations',
+        ['--force' => true, '--workspace' => $this->workspace->id],
+    ]);
 });
 
 it('deletes dependent signatures and refreshes the listing on disconnect', function (): void {

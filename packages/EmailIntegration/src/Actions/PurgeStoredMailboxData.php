@@ -29,11 +29,14 @@ final readonly class PurgeStoredMailboxData
             ->pluck('storage_path')
             ->all();
 
+        $conversations = [];
+
         if ($owner instanceof User) {
+            $conversations = $this->conversations($owner);
             $this->deleteThreadSummaries($owner);
         }
 
-        DB::afterCommit(function () use ($owner, $paths): void {
+        DB::afterCommit(function () use ($owner, $paths, $conversations): void {
             $disk = Storage::disk(EmailAttachment::DISK);
 
             foreach (array_chunk($paths, self::FILES_PER_DELETE) as $chunk) {
@@ -42,6 +45,10 @@ final readonly class PurgeStoredMailboxData
 
             if ($owner instanceof Workspace) {
                 $disk->deleteDirectory(EmailAttachment::composeImagesDirectory((string) $owner->getKey()));
+            }
+
+            foreach ($conversations as $conversation) {
+                resolve(RefreshConversationSummary::class)->execute($conversation->workspace_id, $conversation->conversation_key);
             }
         });
     }
@@ -58,6 +65,18 @@ final readonly class PurgeStoredMailboxData
         return $emails->where(fn (Builder $query) => $query
             ->where('user_id', $owner->getKey())
             ->orWhereIn('connected_account_id', $this->mailboxes($owner)->select('id')));
+    }
+
+    /** @return list<object{workspace_id: string, conversation_key: string}> */
+    private function conversations(User $user): array
+    {
+        /** @var list<object{workspace_id: string, conversation_key: string}> */
+        return $this->emails($user)
+            ->whereNotNull('conversation_key')
+            ->toBase()
+            ->distinct()
+            ->get(['workspace_id', 'conversation_key'])
+            ->all();
     }
 
     private function deleteThreadSummaries(User $user): void

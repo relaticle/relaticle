@@ -23,6 +23,7 @@ use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
+use Relaticle\EmailIntegration\Services\ConversationKeyResolver;
 use Relaticle\EmailIntegration\Services\EmailInlineImageEmbedder;
 use Relaticle\EmailIntegration\Services\EmailSendingService;
 use Relaticle\EmailIntegration\Services\ForwardAttachmentCopyService;
@@ -778,4 +779,44 @@ it('queues from the mailbox of the user it is given, not the signed-in one', fun
 
     expect($email->user_id)->toBe($this->user->id)
         ->and($email->connected_account_id)->toBe($this->account->id);
+});
+
+it('gives a queued reply the conversation key of the email it answers', function (): void {
+    $teammate = User::factory()->create();
+    $this->workspace->users()->attach($teammate, ['role' => 'admin']);
+    $teammateMailbox = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $teammate->id,
+    ]));
+    $original = Email::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateMailbox->id,
+        'thread_id' => null,
+        'conversation_key' => str_repeat('a', 64),
+    ]);
+
+    $reply = app(SendEmailAction::class)->execute($this->user, [
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Re: Pricing',
+        'body_html' => '<p>Thanks</p>',
+        'to' => [['email' => 'ana@acme.example', 'name' => null]],
+        'in_reply_to_email_id' => $original->id,
+        'creation_source' => EmailCreationSource::COMPOSE,
+    ]);
+
+    expect($reply->thread_id)->toBeNull()
+        ->and($reply->conversation_key)->toBe(str_repeat('a', 64));
+});
+
+it('starts a new conversation for a new queued email', function (): void {
+    $email = app(SendEmailAction::class)->execute($this->user, [
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Intro',
+        'body_html' => '<p>Hi</p>',
+        'to' => [['email' => 'ana@acme.example', 'name' => null]],
+        'creation_source' => EmailCreationSource::COMPOSE,
+    ]);
+
+    expect($email->conversation_key)->toBe(ConversationKeyResolver::keyFor($this->workspace->id, $email->rfc_message_id));
 });

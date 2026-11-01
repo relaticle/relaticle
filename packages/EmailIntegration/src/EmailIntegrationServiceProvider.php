@@ -24,6 +24,7 @@ use Laravel\Socialite\Two\AbstractProvider;
 use Laravel\Socialite\Two\GoogleProvider;
 use Livewire\Livewire;
 use Relaticle\EmailIntegration\Actions\PurgeStoredMailboxData;
+use Relaticle\EmailIntegration\Console\Commands\BackfillConversationsCommand;
 use Relaticle\EmailIntegration\Console\Commands\BackfillEmailThreadsCommand;
 use Relaticle\EmailIntegration\Console\Commands\DisconnectFormerMemberMailboxesCommand;
 use Relaticle\EmailIntegration\Console\Commands\DispatchOutboxCommand;
@@ -213,6 +214,7 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
 
         if ($this->app->runningInConsole()) {
             $this->commands([
+                BackfillConversationsCommand::class,
                 DisconnectFormerMemberMailboxesCommand::class,
                 RemoveOwnDomainRecordsCommand::class,
             ]);

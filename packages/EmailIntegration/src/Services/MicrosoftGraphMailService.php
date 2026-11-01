@@ -19,6 +19,7 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 use Relaticle\EmailIntegration\Services\Factories\MicrosoftGraphClientFactory;
 use Relaticle\EmailIntegration\Support\EmailAddressHeaderParser;
+use Relaticle\EmailIntegration\Support\MessageIdList;
 use RuntimeException;
 
 final class MicrosoftGraphMailService implements MailServiceInterface
@@ -149,7 +150,7 @@ final class MicrosoftGraphMailService implements MailServiceInterface
             providerMessageId: (string) $message['id'],
             rfcMessageId: $message['internetMessageId'] ?? null,
             threadId: (string) ($message['conversationId'] ?? ''),
-            inReplyTo: null,
+            inReplyTo: MessageIdList::first($this->headerValue($message, 'in-reply-to')),
             subject: $message['subject'] ?? null,
             snippet: mb_substr(strip_tags((string) ($message['bodyPreview'] ?? '')), 0, 255),
             sentAt: $sentAt,
@@ -163,7 +164,22 @@ final class MicrosoftGraphMailService implements MailServiceInterface
             attachments: $this->mapInboundAttachments($message['attachments'] ?? []),
             reconciliationMessageId: $this->reconciliationMessageId($message),
             isBulkMail: ! $isOutbound && $this->hasBulkMailHeaders($message),
+            references: MessageIdList::references($this->headerValue($message, 'references')),
         );
+    }
+
+    /** @param  array<string, mixed>  $message */
+    private function headerValue(array $message, string $name): ?string
+    {
+        $value = null;
+
+        foreach ($message['internetMessageHeaders'] ?? [] as $header) {
+            if (Str::lower((string) ($header['name'] ?? '')) === $name) {
+                $value = (string) ($header['value'] ?? '');
+            }
+        }
+
+        return $value;
     }
 
     /**

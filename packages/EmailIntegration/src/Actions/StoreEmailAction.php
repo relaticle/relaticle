@@ -6,6 +6,7 @@ namespace Relaticle\EmailIntegration\Actions;
 
 use App\Models\Workspace;
 use App\Support\CurrentWorkspace;
+use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Jobs\MergeConversations;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
@@ -20,6 +22,7 @@ use Relaticle\EmailIntegration\Models\EmailLabel;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailRead;
 use Relaticle\EmailIntegration\Models\EmailThread;
+use Relaticle\EmailIntegration\Services\ConversationKeyResolver;
 use Relaticle\EmailIntegration\Services\EmailClassifier;
 use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 use Relaticle\EmailIntegration\Services\MicrosoftGraphMailService;
@@ -59,20 +62,7 @@ final readonly class StoreEmailAction
 
         try {
             $email = DB::transaction(function () use ($connectedAccount, $data, &$storedInlinePaths): Email {
-                $email = $connectedAccount->emails()->chaperone()->create([
-                    'workspace_id' => $connectedAccount->workspace_id,
-                    'user_id' => $connectedAccount->user_id,
-                    'rfc_message_id' => $data->rfcMessageId,
-                    'provider_message_id' => $data->providerMessageId,
-                    'thread_id' => $data->threadId,
-                    'in_reply_to' => $data->inReplyTo,
-                    'subject' => $data->subject,
-                    'snippet' => $data->snippet,
-                    'sent_at' => $data->sentAt,
-                    'direction' => $data->direction,
-                    'folder' => $data->folder,
-                    'has_attachments' => $data->hasAttachments,
-                ]);
+                $email = $this->createEmail($connectedAccount, $data);
 
                 // Read state is per-viewer; the provider's "already read" flag reflects
                 // the owner's mailbox, so seed only the owner's read row.
@@ -89,14 +79,7 @@ final readonly class StoreEmailAction
                     'body_html' => $data->bodyHtml,
                 ]);
 
-                foreach ($data->participants as $participant) {
-                    EmailParticipant::query()->create([
-                        'email_id' => $email->getKey(),
-                        'email_address' => $participant['email_address'],
-                        'name' => $participant['name'] ?? null,
-                        'role' => $participant['role'],
-                    ]);
-                }
+                $this->storeParticipants($email, $data);
 
                 foreach ($data->attachments as $attachment) {
                     EmailAttachment::query()->create([
@@ -141,7 +124,7 @@ final readonly class StoreEmailAction
                     'created_at' => now(),
                 ]);
 
-                resolve(SyncEmailThreadAction::class)->execute($connectedAccount, $email->thread_id);
+                $this->syncThreadAndConversation($connectedAccount, $email);
 
                 resolve(LinkEmailAction::class)->execute($email);
 
@@ -161,6 +144,76 @@ final readonly class StoreEmailAction
             }
 
             throw $exception;
+        }
+    }
+
+    private function syncThreadAndConversation(ConnectedAccount $connectedAccount, Email $email): void
+    {
+        resolve(SyncEmailThreadAction::class)->execute($connectedAccount, $email->thread_id);
+
+        // After commit, so a copy or a parent another mailbox stored at the same moment is visible.
+        $this->afterCommit(function () use ($email): void {
+            $this->refreshConversation($email);
+        });
+    }
+
+    private function afterCommit(Closure $callback): void
+    {
+        // The email is committed by then: a throw here would reach the catch that deletes its inline files.
+        DB::afterCommit(function () use ($callback): void {
+            try {
+                $callback();
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+        });
+    }
+
+    private function refreshConversation(Email $email): void
+    {
+        if ($email->conversation_key !== null) {
+            resolve(RefreshConversationSummary::class)->execute($email->workspace_id, $email->conversation_key);
+        }
+
+        if (resolve(ConversationKeyResolver::class)->keysToMerge($email) !== []) {
+            dispatch(new MergeConversations($email->workspace_id, $email->getKey()));
+        }
+    }
+
+    private function createEmail(ConnectedAccount $connectedAccount, FetchedEmailData $data): Email
+    {
+        if ($data->threadId !== '') {
+            // Serialises stores in one mailbox thread, so the second message reads the first one's key.
+            DB::select('select pg_advisory_xact_lock(hashtext(?))', ["{$connectedAccount->getKey()}:{$data->threadId}"]);
+        }
+
+        return $connectedAccount->emails()->chaperone()->create([
+            'workspace_id' => $connectedAccount->workspace_id,
+            'user_id' => $connectedAccount->user_id,
+            'rfc_message_id' => $data->rfcMessageId,
+            'provider_message_id' => $data->providerMessageId,
+            'thread_id' => $data->threadId,
+            'in_reply_to' => $data->inReplyTo,
+            'references' => $data->references,
+            'conversation_key' => resolve(ConversationKeyResolver::class)->resolve($data, $connectedAccount),
+            'subject' => $data->subject,
+            'snippet' => $data->snippet,
+            'sent_at' => $data->sentAt,
+            'direction' => $data->direction,
+            'folder' => $data->folder,
+            'has_attachments' => $data->hasAttachments,
+        ]);
+    }
+
+    private function storeParticipants(Email $email, FetchedEmailData $data): void
+    {
+        foreach ($data->participants as $participant) {
+            EmailParticipant::query()->create([
+                'email_id' => $email->getKey(),
+                'email_address' => $participant['email_address'],
+                'name' => $participant['name'] ?? null,
+                'role' => $participant['role'],
+            ]);
         }
     }
 
@@ -275,6 +328,10 @@ final readonly class StoreEmailAction
             }
 
             $this->forgetPendingThread($connectedAccount, $previousThreadId, $threadId);
+
+            $this->afterCommit(function () use ($pending): void {
+                $this->refreshConversation($pending);
+            });
 
             return $pending->refresh();
         });
