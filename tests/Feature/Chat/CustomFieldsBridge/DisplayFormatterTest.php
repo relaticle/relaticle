@@ -9,6 +9,7 @@ use App\Models\CustomFieldSection;
 use App\Models\Task;
 use App\Models\User;
 use App\Support\ChecklistHtml;
+use App\Support\CurrentWorkspace;
 use App\Support\PlainText;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
@@ -194,6 +195,7 @@ it('returns an empty array when no custom_fields are submitted', function (): vo
 
 it('renders a record custom field on the proposal card as the record name, not its id', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
+    resolve(CurrentWorkspace::class)->set($user->currentWorkspace);
     $company = Company::factory()->create(['workspace_id' => $user->currentWorkspace->getKey(), 'name' => 'Globex']);
 
     $section = CustomFieldSection::query()->create([
@@ -236,6 +238,7 @@ it('renders a record custom field on the proposal card as the record name, not i
 
 it('names the record on a stored record card, not its id', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
+    resolve(CurrentWorkspace::class)->set($user->currentWorkspace);
     $company = Company::factory()->create(['workspace_id' => $user->currentWorkspace->getKey(), 'name' => 'Initech']);
 
     $section = CustomFieldSection::query()->create([

@@ -11,6 +11,7 @@ use App\Models\Opportunity;
 use App\Models\Workspace;
 use App\Onboarding\FieldOptionRows;
 use Illuminate\Support\Facades\DB;
+use Relaticle\CustomFields\Enums\OptionCategory;
 use Relaticle\CustomFields\Facades\Entities;
 use Relaticle\CustomFields\Services\Visibility\BackendVisibilityService;
 
@@ -18,8 +19,9 @@ final readonly class ApplyStagePreset
 {
     /**
      * @param  array<string, string>  $preset
+     * @param  array<string, OptionCategory>  $categories
      */
-    public function execute(Workspace $workspace, array $preset): void
+    public function execute(Workspace $workspace, array $preset, array $categories): void
     {
         $entityType = Entities::getEntity(Opportunity::class)?->getAlias() ?? Opportunity::class;
 
@@ -39,7 +41,7 @@ final readonly class ApplyStagePreset
         }
 
         // insert() and a builder delete fire no model events: a preset is a default, not an edit.
-        DB::transaction(function () use ($workspace, $stage, $preset): void {
+        DB::transaction(function () use ($workspace, $stage, $preset, $categories): void {
             CustomFieldOption::query()->withoutGlobalScopes()->where('custom_field_id', $stage->getKey())->delete();
 
             CustomFieldOption::query()->insert(FieldOptionRows::build(
@@ -48,7 +50,7 @@ final readonly class ApplyStagePreset
                 (string) $stage->getRawOriginal('type'),
                 array_keys($preset),
                 $preset,
-                [],
+                $categories,
                 now(),
             ));
         });

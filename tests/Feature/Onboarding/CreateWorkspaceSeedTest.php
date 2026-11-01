@@ -342,6 +342,29 @@ it('creates the stage preset for the chosen use case', function (OnboardingUseCa
     'investing shares the fundraising list' => [OnboardingUseCase::Investing, ['Target', 'Intro', 'First meeting', 'Partner meeting', 'Term sheet', 'Closed', 'Passed']],
 ]);
 
+it('marks the won and lost stages of each preset', function (OnboardingUseCase $useCase, string $won, string $lost): void {
+    $user = User::factory()->create();
+
+    onboardWorkspace($user, ['name' => "Categorised {$useCase->value}"], [
+        'onboarding_use_case' => $useCase->value,
+        'onboarding_context' => [array_key_first($useCase->getSubOptions())],
+    ]);
+
+    $stageField = CustomField::withoutGlobalScopes()
+        ->where('tenant_id', $user->fresh()->personalWorkspace()->id)
+        ->forEntity(Opportunity::class)
+        ->where('code', 'stage')
+        ->sole();
+
+    expect($stageField->optionsInCategory(OptionCategory::Completed)->pluck('name')->all())->toBe([$won])
+        ->and($stageField->optionsInCategory(OptionCategory::Cancelled)->pluck('name')->all())->toBe([$lost])
+        ->and($stageField->optionsInCategory(OptionCategory::Unstarted))->toHaveCount(1);
+})->with([
+    'customer success' => [OnboardingUseCase::CustomerSuccess, 'Renewed', 'Churned'],
+    'recruiting' => [OnboardingUseCase::Recruiting, 'Hired', 'Declined'],
+    'fundraising' => [OnboardingUseCase::Fundraising, 'Closed', 'Passed'],
+]);
+
 it('colours the preset stages', function (): void {
     $user = User::factory()->create();
 

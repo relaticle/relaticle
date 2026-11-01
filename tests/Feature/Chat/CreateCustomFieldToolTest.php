@@ -17,6 +17,7 @@ use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Tools\CustomField\CreateCustomFieldTool;
+use Relaticle\CustomFields\Enums\RelationshipCardinality;
 use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
 use Relaticle\CustomFields\Services\TenantContextService;
 
@@ -263,7 +264,8 @@ it('creates a record field linked to the requested record type', function (): vo
     $field = approveSoleFieldProposal($pending, $this->owner);
 
     expect($field->type)->toBe('record')
-        ->and($field->lookup_type)->toBe('company');
+        ->and($field->relationshipDefinition()?->to_entity_type)->toBe('company')
+        ->and($field->relationshipDefinition()?->cardinality)->toBe(RelationshipCardinality::ManyToOne);
 });
 
 it('refuses a record field without a lookup type', function (): void {

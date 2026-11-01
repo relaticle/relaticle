@@ -35,7 +35,7 @@ use Illuminate\Support\Str;
 use LogicException;
 use Relaticle\CustomFields\CustomFields;
 use Relaticle\CustomFields\Enums\FieldDataType;
-use Relaticle\CustomFields\Exceptions\UniqueCustomFieldValueTaken;
+use Relaticle\CustomFields\Exceptions\UniqueCustomFieldValueTakenException;
 use Relaticle\CustomFields\Filament\Integration\Support\Imports\ImportDataStorage;
 use Relaticle\CustomFields\Models\CustomFieldOption;
 use Relaticle\CustomFields\Models\CustomFieldRelationship;
@@ -644,7 +644,7 @@ final class ExecuteImportJob implements ShouldQueue
 
                 throw_if(
                     $this->claimedByAnotherRecord($recordId, $cf, $spellings) || $this->storedOnAnotherRecord($recordId, $cf, $spellings, $candidate),
-                    UniqueCustomFieldValueTaken::class,
+                    UniqueCustomFieldValueTakenException::class,
                     $record,
                     $cf,
                     (string) $candidate,
