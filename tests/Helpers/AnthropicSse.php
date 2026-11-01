@@ -85,6 +85,62 @@ final class AnthropicSse
             ."data: {\"type\":\"message_stop\"}\n\n";
     }
 
+    /**
+     * A research reply recorded from claude-sonnet-5 on 2026-11-01 and trimmed: one
+     * server-side web_search per query, one web_fetch per url, then a text block
+     * citing the first search result.
+     *
+     * @param  list<string>  $queries
+     * @param  list<string>  $fetchUrls
+     */
+    public static function webResearchReply(array $queries, string $text, string $citedUrl, string $citedTitle, array $fetchUrls = [], string $model = 'claude-sonnet-5'): string
+    {
+        $frames = 'data: {"type":"message_start","message":{"model":'.json_encode($model, JSON_THROW_ON_ERROR).',"usage":{"input_tokens":40}}}'."\n\n";
+        $index = 0;
+
+        foreach ($queries as $query) {
+            $frames .= self::serverToolFrames($index, 'web_search', ['query' => $query], [
+                'type' => 'web_search_tool_result',
+                'content' => [['type' => 'web_search_result', 'title' => $citedTitle, 'url' => $citedUrl, 'encrypted_content' => 'x']],
+            ]);
+            $index += 2;
+        }
+
+        foreach ($fetchUrls as $url) {
+            $frames .= self::serverToolFrames($index, 'web_fetch', ['url' => $url], [
+                'type' => 'web_fetch_tool_result',
+                'content' => ['type' => 'web_fetch_result', 'url' => $url, 'content' => ['type' => 'document', 'title' => null]],
+            ]);
+            $index += 2;
+        }
+
+        $citation = ['type' => 'web_search_result_location', 'cited_text' => $text, 'url' => $citedUrl, 'title' => $citedTitle, 'encrypted_index' => 'x'];
+
+        return $frames
+            .'data: {"type":"content_block_start","index":'.$index.',"content_block":{"citations":[],"type":"text","text":""}}'."\n\n"
+            .'data: {"type":"content_block_delta","index":'.$index.',"delta":{"type":"citations_delta","citation":'.json_encode($citation, JSON_THROW_ON_ERROR).'}}'."\n\n"
+            .'data: {"type":"content_block_delta","index":'.$index.',"delta":{"type":"text_delta","text":'.json_encode($text, JSON_THROW_ON_ERROR).'}}'."\n\n"
+            .'data: {"type":"content_block_stop","index":'.$index.'}'."\n\n"
+            ."data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":12}}\n\n"
+            ."data: {\"type\":\"message_stop\"}\n\n";
+    }
+
+    /**
+     * @param  array<string, string>  $input
+     * @param  array<string, mixed>  $result
+     */
+    private static function serverToolFrames(int $index, string $name, array $input, array $result): string
+    {
+        $id = "srvtoolu_{$name}_{$index}";
+        $resultIndex = $index + 1;
+
+        return 'data: {"type":"content_block_start","index":'.$index.',"content_block":{"type":"server_tool_use","id":"'.$id.'","name":"'.$name.'","input":{}}}'."\n\n"
+            .'data: {"type":"content_block_delta","index":'.$index.',"delta":{"type":"input_json_delta","partial_json":'.json_encode(json_encode($input, JSON_THROW_ON_ERROR), JSON_THROW_ON_ERROR).'}}'."\n\n"
+            .'data: {"type":"content_block_stop","index":'.$index.'}'."\n\n"
+            .'data: {"type":"content_block_start","index":'.$resultIndex.',"content_block":'.json_encode(['tool_use_id' => $id, ...$result], JSON_THROW_ON_ERROR).'}'."\n\n"
+            .'data: {"type":"content_block_stop","index":'.$resultIndex.'}'."\n\n";
+    }
+
     public static function fake(string $body): void
     {
         Http::fake([
