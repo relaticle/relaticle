@@ -32,4 +32,4 @@ jobs:
           # main is protected, so signatures live on their own unprotected branch.
           branch: cla-signatures
           allowlist: ManukMinasyan,dependabot[bot],github-actions[bot]
-          lock-pullrequest-aftermerge: true
+          lock-pullrequest-aftermerge: ${{ github.event.pull_request.merged == true }}
