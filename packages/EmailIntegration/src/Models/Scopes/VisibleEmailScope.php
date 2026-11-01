@@ -105,11 +105,7 @@ final readonly class VisibleEmailScope implements Scope
                 })
                 ->orWhere(function (Builder $byDefault) use ($viewerId, $workspaceId, $visibleTiers): void {
                     $byDefault
-                        ->where(function (Builder $publicGate) use ($workspaceId): void {
-                            $publicGate->where('is_internal', false);
-
-                            $this->excludeTeammateHiddenEmails($publicGate, $workspaceId);
-                        })
+                        ->where(fn (Builder $publicGate): Builder => self::wherePublicToTeammates($publicGate, $workspaceId))
                         ->whereIn('privacy_tier', $visibleTiers)
                         ->whereExists(fn (BaseBuilder $link): BaseBuilder => $link
                             ->from('emailables')
@@ -157,13 +153,27 @@ final readonly class VisibleEmailScope implements Scope
     }
 
     /**
-     * @param  Builder<covariant TModel>  $builder
+     * @template TBuilder of Builder<covariant Model>
+     *
+     * @param  TBuilder  $builder
+     * @return TBuilder
      */
-    private function excludeTeammateHiddenEmails(Builder $builder, ?string $workspaceId): void
+    public static function wherePublicToTeammates(Builder $builder, ?string $workspaceId): Builder
     {
-        if ($workspaceId === null) {
-            return;
+        $builder->where($builder->qualifyColumn('is_internal'), false);
+
+        if ($workspaceId !== null) {
+            self::excludeTeammateHiddenEmails($builder, $workspaceId);
         }
+
+        return $builder;
+    }
+
+    /**
+     * @param  Builder<covariant Model>  $builder
+     */
+    private static function excludeTeammateHiddenEmails(Builder $builder, string $workspaceId): void
+    {
 
         $visibility = resolve(EmailVisibilityService::class);
         $workspace = $visibility->workspace($workspaceId);
@@ -175,7 +185,7 @@ final readonly class VisibleEmailScope implements Scope
         $memberEmails = $visibility->memberEmailsForWorkspace($workspace);
         $protectedDomains = $visibility->workspaceDomains($workspace);
 
-        $this->excludeEmailsWhereAllParticipantsAreProtected($builder, $workspaceId, $memberEmails, $protectedDomains);
+        self::excludeEmailsWhereAllParticipantsAreProtected($builder, $workspaceId, $memberEmails, $protectedDomains);
     }
 
     private function workspaceHasMailboxBlocklist(string $workspaceId): bool
@@ -250,9 +260,9 @@ final readonly class VisibleEmailScope implements Scope
     /**
      * @param  array<int, lowercase-string>  $memberEmails
      * @param  array<int, lowercase-string>  $protectedDomains
-     * @param  Builder<covariant TModel>  $builder
+     * @param  Builder<covariant Model>  $builder
      */
-    private function excludeEmailsWhereAllParticipantsAreProtected(
+    private static function excludeEmailsWhereAllParticipantsAreProtected(
         Builder $builder,
         string $workspaceId,
         array $memberEmails,
