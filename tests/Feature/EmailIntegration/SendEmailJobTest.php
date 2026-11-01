@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Notification;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
 use Relaticle\EmailIntegration\Actions\MarkEmailsSendFailedAction;
 use Relaticle\EmailIntegration\Actions\RetryFailedEmailAction;
+use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Actions\SyncEmailBatchCountersAction;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Data\MailBackfillPage;
@@ -31,6 +32,7 @@ use Relaticle\EmailIntegration\Jobs\SendEmailJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBatch;
+use Relaticle\EmailIntegration\Models\EmailConversation;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Notifications\EmailSendFailedNotification;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
@@ -894,4 +896,33 @@ JSON, 403);
         ->and(ProviderRateLimit::remainingSeconds((string) $this->account->getKey()))->not->toBeNull();
 
     Notification::assertNothingSent();
+});
+
+it('summarises the conversation of an app send once the job delivers it', function (): void {
+    $email = resolve(SendEmailAction::class)->execute($this->user, [
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Intro',
+        'body_html' => '<p>Hi</p>',
+        'to' => [['email' => 'ana@acme.example', 'name' => null]],
+        'creation_source' => EmailCreationSource::COMPOSE,
+    ]);
+    $email->update(['status' => EmailStatus::SENDING]);
+
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('sendMessage')->once()->andReturn([
+        'provider_message_id' => 'provider-intro',
+        'thread_id' => 'thread-intro',
+        'rfc_message_id' => (string) $email->rfc_message_id,
+    ]);
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->andReturn($service);
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    (new SendEmailJob($email->getKey()))->handle(resolve(EmailSendingService::class), resolve(LinkEmailAction::class));
+
+    expect(EmailConversation::query()->where('workspace_id', $this->workspace->id)->sole())
+        ->conversation_key->toBe($email->refresh()->conversation_key)
+        ->message_count->toBe(1)
+        ->last_member_outbound_at->not->toBeNull()
+        ->last_external_inbound_at->toBeNull();
 });

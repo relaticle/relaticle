@@ -154,10 +154,6 @@ final readonly class StoreEmailAction
         // After commit, so a copy or a parent another mailbox stored at the same moment is visible.
         $this->afterCommit(function () use ($email): void {
             $this->refreshConversation($email);
-
-            if (resolve(ConversationKeyResolver::class)->keysToMerge($email) !== []) {
-                MergeConversations::dispatch($email->workspace_id, $email->getKey());
-            }
         });
     }
 
@@ -177,6 +173,10 @@ final readonly class StoreEmailAction
     {
         if ($email->conversation_key !== null) {
             resolve(RefreshConversationSummary::class)->execute($email->workspace_id, $email->conversation_key);
+        }
+
+        if (resolve(ConversationKeyResolver::class)->keysToMerge($email) !== []) {
+            MergeConversations::dispatch($email->workspace_id, $email->getKey());
         }
     }
 

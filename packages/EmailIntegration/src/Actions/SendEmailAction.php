@@ -26,6 +26,7 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
+use Relaticle\EmailIntegration\Services\ConversationKeyResolver;
 use Relaticle\EmailIntegration\Services\EmailInlineImageEmbedder;
 use Relaticle\EmailIntegration\Services\ForwardAttachmentCopyService;
 
@@ -34,6 +35,7 @@ final readonly class SendEmailAction
     public function __construct(
         private EmailInlineImageEmbedder $inlineImageEmbedder,
         private ForwardAttachmentCopyService $attachments,
+        private ConversationKeyResolver $resolver,
     ) {}
 
     /**
@@ -154,29 +156,15 @@ final readonly class SendEmailAction
                 'attempts' => 0,
             ]);
 
+            $email->updateQuietly(['conversation_key' => $this->resolver->resolveStored($email)]);
+
             EmailBody::query()->create([
                 'email_id' => $email->getKey(),
                 'body_html' => $data['body_html'],
                 'body_text' => strip_tags((string) $data['body_html']),
             ]);
 
-            EmailParticipant::query()->create([
-                'email_id' => $email->getKey(),
-                'email_address' => $account->email_address,
-                'name' => $account->display_name,
-                'role' => 'from',
-            ]);
-
-            foreach (['to', 'cc', 'bcc'] as $role) {
-                foreach ($data[$role] ?? [] as $recipient) {
-                    EmailParticipant::query()->create([
-                        'email_id' => $email->getKey(),
-                        'email_address' => $recipient['email'],
-                        'name' => $recipient['name'] ?? null,
-                        'role' => $role,
-                    ]);
-                }
-            }
+            $this->storeParticipants($email, $account, $data);
 
             $this->storeAttachments($email, $attachmentPaths, $attachmentFileNames, $attachmentAttributes);
 
@@ -196,6 +184,30 @@ final readonly class SendEmailAction
 
             return $email;
         });
+    }
+
+    /**
+     * @param  array{to: array<array{email: string, name: ?string}>, cc?: array<array{email: string, name: ?string}>, bcc?: array<array{email: string, name: ?string}>}  $data
+     */
+    private function storeParticipants(Email $email, ConnectedAccount $account, array $data): void
+    {
+        EmailParticipant::query()->create([
+            'email_id' => $email->getKey(),
+            'email_address' => $account->email_address,
+            'name' => $account->display_name,
+            'role' => 'from',
+        ]);
+
+        foreach (['to', 'cc', 'bcc'] as $role) {
+            foreach ($data[$role] ?? [] as $recipient) {
+                EmailParticipant::query()->create([
+                    'email_id' => $email->getKey(),
+                    'email_address' => $recipient['email'],
+                    'name' => $recipient['name'] ?? null,
+                    'role' => $role,
+                ]);
+            }
+        }
     }
 
     /**
