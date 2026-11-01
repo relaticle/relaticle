@@ -148,6 +148,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             'search_docs' => __('Searching the documentation…'),
             'guide_to_page' => __('Finding the right page…'),
             'get_credit_balance' => __('Checking your AI credits…'),
+            'request_web_access' => __('Asking to search the web…'),
             'create_company' => __('Drafting a company…'),
             'update_company' => __('Preparing company changes…'),
             'delete_company' => __('Preparing company deletion…'),

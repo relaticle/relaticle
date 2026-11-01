@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Livewire\Chat;
 
+use App\Contracts\Entitlements;
 use App\Livewire\BaseLivewireComponent;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DateTimePicker;
@@ -19,9 +20,11 @@ use Illuminate\Database\QueryException;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
+use Relaticle\Chat\Actions\SetWebSearchPreference;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Enums\ProposalEntity;
+use Relaticle\Chat\Enums\WebSearchPreference;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\ProposalEditor;
@@ -999,6 +1002,21 @@ final class ProposalCard extends BaseLivewireComponent
         $this->settleAfterResolution($step);
     }
 
+    public function approveAlways(string $stepId, ProposalPlanService $plan, SetWebSearchPreference $preference): void
+    {
+        $step = $this->loadStep($stepId);
+
+        if (! $step instanceof PendingAction || $step->entity_type !== ProposalEntity::WebAccess) {
+            return;
+        }
+
+        $this->approveStep($stepId, $plan);
+
+        if ($step->refresh()->status === PendingActionStatus::Approved) {
+            $preference->execute($this->authUser(), WebSearchPreference::Allow);
+        }
+    }
+
     /**
      * Reject one step and cancel whatever depended on it.
      */
@@ -1797,6 +1815,7 @@ final class ProposalCard extends BaseLivewireComponent
             'hasOwnApprovalSteps' => $approveAllCount < count($steps),
             'recordCount' => $proposal instanceof PendingAction ? $this->recordCountOf($proposal) : 0,
             'remainingCount' => $proposal instanceof PendingAction ? $this->remainingCountOf($proposal) : 0,
+            'metersCredits' => resolve(Entitlements::class)->metersCredits($this->authUser()->currentWorkspace),
         ]);
     }
 }

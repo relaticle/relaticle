@@ -31,6 +31,7 @@ use Laravel\Ai\Responses\Data\FinishReason;
 use Laravel\Ai\Responses\Data\ToolCall as ToolCallData;
 use Laravel\Ai\Responses\StreamedAgentResponse;
 use Laravel\Ai\Streaming\Events\Error;
+use Laravel\Ai\Streaming\Events\ProviderToolEvent;
 use Laravel\Ai\Streaming\Events\StreamEnd;
 use Laravel\Ai\Streaming\Events\StreamEvent;
 use Laravel\Ai\Streaming\Events\TextDelta;
@@ -41,6 +42,7 @@ use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Enums\EmailReach;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Enums\WebAccess;
 use Relaticle\Chat\Events\ChatStreamFailed;
 use Relaticle\Chat\Events\ChatStreamRetrying;
 use Relaticle\Chat\Events\ConversationResolved;
@@ -62,6 +64,7 @@ use Relaticle\Chat\Support\ProviderStreamError;
 use Relaticle\Chat\Support\StoredSteps;
 use Relaticle\Chat\Support\StreamEventBroadcaster;
 use Relaticle\Chat\Support\TurnPresence;
+use Relaticle\Chat\Support\WebSearchCount;
 use Throwable;
 
 #[Timeout(self::TIMEOUT_SECONDS)]
@@ -230,7 +233,7 @@ final class ProcessChatMessage implements ShouldQueue
                 'capabilities' => array_column($this->user->workspaceCapabilities($this->workspace->getKey()), 'value'),
             ]);
             $agent->withModel($this->modelLabel(), $this->resolved['source'] === 'auto');
-            $agent->withEmailReach(EmailReach::for($this->user, $this->workspace));
+            $agent->withEmailReach(EmailReach::for($this->user, $this->workspace))->withWebAccess($this->webAccess());
             $agent->withMentions($this->mentions);
             $agent->withPageContext($this->pageContext);
             $agent->withContextLedger($this->contextLedger());
@@ -362,17 +365,7 @@ final class ProcessChatMessage implements ShouldQueue
                 ));
 
                 if (! $refundedBlankTurn) {
-                    $creditService->settleReservation(
-                        workspace: $this->workspace,
-                        user: $this->user,
-                        type: AiCreditType::Chat,
-                        model: $this->resolved['model'] ?? $streamedResponse->meta->model ?? 'unknown',
-                        inputTokens: $streamedResponse->usage->uncachedInputTokens(),
-                        outputTokens: $streamedResponse->usage->outputTokens,
-                        toolCallsCount: $streamedResponse->toolCalls->count(),
-                        conversationId: $streamedResponse->conversationId,
-                        resolutionKey: $this->resolutionKey(),
-                    );
+                    $this->settleTurn($streamedResponse, $creditService);
                 }
 
                 $this->persistMentions($streamedResponse->userMessageId);
@@ -936,9 +929,25 @@ final class ProcessChatMessage implements ShouldQueue
             ]);
     }
 
+    private function settleTurn(StreamedAgentResponse $streamedResponse, CreditService $creditService): void
+    {
+        $creditService->settleReservation(
+            workspace: $this->workspace,
+            user: $this->user,
+            type: AiCreditType::Chat,
+            model: $this->resolved['model'] ?? $streamedResponse->meta->model ?? 'unknown',
+            inputTokens: $streamedResponse->usage->uncachedInputTokens(),
+            outputTokens: $streamedResponse->usage->outputTokens,
+            toolCallsCount: $streamedResponse->toolCalls->count() + WebSearchCount::fetchesIn($streamedResponse->events),
+            webSearchCount: WebSearchCount::in($streamedResponse->events),
+            conversationId: $streamedResponse->conversationId,
+            resolutionKey: $this->resolutionKey(),
+        );
+    }
+
     private function settleBlankTurn(StreamedAgentResponse $streamedResponse, CreditService $creditService): bool
     {
-        if ($this->sawToolCall) {
+        if ($this->sawToolCall || $this->ranProviderTool($streamedResponse)) {
             return false;
         }
 
@@ -961,6 +970,13 @@ final class ProcessChatMessage implements ShouldQueue
         ChatTelemetry::breadcrumb('stream.blank_reply', ['model' => $this->resolved['model'] ?? null]);
 
         return true;
+    }
+
+    private function ranProviderTool(StreamedAgentResponse $streamedResponse): bool
+    {
+        return $streamedResponse->events->contains(
+            fn (StreamEvent $event): bool => $event instanceof ProviderToolEvent && $event->status === 'completed',
+        );
     }
 
     private function blankTurnMessage(StreamedAgentResponse $streamedResponse): ?string
@@ -1131,6 +1147,13 @@ final class ProcessChatMessage implements ShouldQueue
     private function resolutionKey(): string
     {
         return 'resolve-'.$this->turnId;
+    }
+
+    private function webAccess(): WebAccess
+    {
+        $model = resolve(ModelRegistry::class)->find((string) ($this->resolved['id'] ?? ''));
+
+        return WebAccess::for($this->user, $this->workspace, $model, $this->resumesTurnId);
     }
 
     private function modelLabel(): ?string
