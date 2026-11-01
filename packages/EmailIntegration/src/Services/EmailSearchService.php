@@ -102,38 +102,40 @@ final readonly class EmailSearchService
         $viewerId = $viewer->getKey();
         $workspaceId = $viewer->current_workspace_id;
 
-        return $query->where(function (Builder $access) use ($viewerId, $workspaceId, $tiers): void {
-            $access
-                ->where('user_id', $viewerId)
-                ->orWhereExists(fn (BaseBuilder $copyQuery): BaseBuilder => $this->syncedCopyExists($copyQuery, $viewerId))
-                ->orWhereHas('shares', fn (Builder $shareQuery): Builder => $shareQuery
-                    ->where('shared_with', $viewerId)
-                    ->whereIn('tier', $tiers))
-                ->orWhere(function (Builder $crossShare) use ($viewerId, $tiers): void {
-                    $crossShare
-                        ->whereDoesntHave('shares', fn (Builder $shareQuery): Builder => $shareQuery
-                            ->where('shared_with', $viewerId))
-                        ->whereExists(fn (BaseBuilder $shareQuery): BaseBuilder => $this->crossMessageShareExists(
-                            $shareQuery,
-                            $viewerId,
-                            $tiers,
-                        ));
-                })
-                ->orWhere(function (Builder $byDefault) use ($viewerId, $workspaceId, $tiers): void {
-                    $byDefault
-                        ->where(fn (Builder $publicGate): Builder => VisibleEmailScope::wherePublicToTeammates($publicGate, $workspaceId))
-                        ->whereIn('privacy_tier', $tiers)
-                        ->whereExists(fn (BaseBuilder $link): BaseBuilder => $link
-                            ->from('emailables')
-                            ->whereColumn('emailables.email_id', 'emails.id'))
-                        ->whereDoesntHave('shares', fn (Builder $shareQuery): Builder => $shareQuery
-                            ->where('shared_with', $viewerId))
-                        ->whereNotExists(fn (BaseBuilder $shareQuery): BaseBuilder => $this->crossMessageShareExists(
-                            $shareQuery,
-                            $viewerId,
-                        ));
-                });
-        });
+        return $query
+            ->where(fn (Builder $unblocked): Builder => VisibleEmailScope::whereNotBlocked($unblocked, $workspaceId))
+            ->where(function (Builder $access) use ($viewerId, $workspaceId, $tiers): void {
+                $access
+                    ->where('user_id', $viewerId)
+                    ->orWhereExists(fn (BaseBuilder $copyQuery): BaseBuilder => $this->syncedCopyExists($copyQuery, $viewerId))
+                    ->orWhereHas('shares', fn (Builder $shareQuery): Builder => $shareQuery
+                        ->where('shared_with', $viewerId)
+                        ->whereIn('tier', $tiers))
+                    ->orWhere(function (Builder $crossShare) use ($viewerId, $tiers): void {
+                        $crossShare
+                            ->whereDoesntHave('shares', fn (Builder $shareQuery): Builder => $shareQuery
+                                ->where('shared_with', $viewerId))
+                            ->whereExists(fn (BaseBuilder $shareQuery): BaseBuilder => $this->crossMessageShareExists(
+                                $shareQuery,
+                                $viewerId,
+                                $tiers,
+                            ));
+                    })
+                    ->orWhere(function (Builder $byDefault) use ($viewerId, $workspaceId, $tiers): void {
+                        $byDefault
+                            ->where(fn (Builder $publicGate): Builder => VisibleEmailScope::wherePublicToTeammates($publicGate, $workspaceId))
+                            ->whereIn('privacy_tier', $tiers)
+                            ->whereExists(fn (BaseBuilder $link): BaseBuilder => $link
+                                ->from('emailables')
+                                ->whereColumn('emailables.email_id', 'emails.id'))
+                            ->whereDoesntHave('shares', fn (Builder $shareQuery): Builder => $shareQuery
+                                ->where('shared_with', $viewerId))
+                            ->whereNotExists(fn (BaseBuilder $shareQuery): BaseBuilder => $this->crossMessageShareExists(
+                                $shareQuery,
+                                $viewerId,
+                            ));
+                    });
+            });
     }
 
     private function syncedCopyExists(BaseBuilder $query, string $viewerId): BaseBuilder
