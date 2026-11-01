@@ -176,12 +176,17 @@ final readonly class StoreEmailAction
         }
 
         if (resolve(ConversationKeyResolver::class)->keysToMerge($email) !== []) {
-            MergeConversations::dispatch($email->workspace_id, $email->getKey());
+            dispatch(new MergeConversations($email->workspace_id, $email->getKey()));
         }
     }
 
     private function createEmail(ConnectedAccount $connectedAccount, FetchedEmailData $data): Email
     {
+        if ($data->threadId !== '') {
+            // Serialises stores in one mailbox thread, so the second message reads the first one's key.
+            DB::select('select pg_advisory_xact_lock(hashtext(?))', ["{$connectedAccount->getKey()}:{$data->threadId}"]);
+        }
+
         return $connectedAccount->emails()->chaperone()->create([
             'workspace_id' => $connectedAccount->workspace_id,
             'user_id' => $connectedAccount->user_id,
