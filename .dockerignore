@@ -46,6 +46,7 @@ Makefile
 # Documentation
 *.md
 !README.md
+!INTEGRATION-EXCEPTION.md
 CLAUDE.md
 
 # Cache and logs

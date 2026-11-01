@@ -20,14 +20,16 @@ jobs:
     steps:
       # Pinned by SHA: this job holds a write token on pull_request_target.
       - name: CLA Assistant
-        if: github.event_name == 'pull_request_target' || github.event.comment.body == 'recheck' || github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA'
+        if: github.event_name == 'pull_request_target' || (github.event.issue.pull_request && (github.event.comment.body == 'recheck' || contains(github.event.comment.body, 'I have read the Relaticle CLA version 1.0')))
         uses: contributor-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08 # v2.6.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          path-to-document: https://github.com/relaticle/relaticle/blob/main/.github/CLA.md
-          path-to-signatures: signatures/cla.json
+          # A signer agrees to the text at this commit. A new CLA version gets a new commit, sentence and signatures file.
+          path-to-document: https://github.com/relaticle/relaticle/blob/2b5cbc809833d00109f4cb99a2f42229fbdf33dd/.github/CLA.md
+          custom-pr-sign-comment: I have read the Relaticle CLA version 1.0 and I agree to it
+          path-to-signatures: signatures/v1.0/cla.json
           # main is protected, so signatures live on their own unprotected branch.
           branch: cla-signatures
           allowlist: ManukMinasyan,dependabot[bot],github-actions[bot]
-          lock-pullrequest-aftermerge: false
+          lock-pullrequest-aftermerge: ${{ github.event.pull_request.merged == true }}
