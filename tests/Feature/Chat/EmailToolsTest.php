@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\WorkspaceRole;
+use App\Models\Company;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
@@ -84,7 +85,9 @@ beforeEach(function (): void {
         'user_id' => $this->coworker->id,
     ]));
 
-    $this->emailFrom = function (User $owner, array $attributes = [], string $sender = 'client@acme.test'): Email {
+    $this->anchor = Company::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    $this->emailFrom = function (User $owner, array $attributes = [], string $sender = 'client@acme.test', bool $linked = true): Email {
         $email = Email::factory()->create([
             'workspace_id' => $this->workspace->id,
             'user_id' => $owner->id,
@@ -99,6 +102,10 @@ beforeEach(function (): void {
             'name' => 'Acme Client',
             'role' => EmailParticipantRole::FROM,
         ]);
+
+        if ($linked && $owner->is($this->coworker)) {
+            $this->anchor->emails()->attach($email->id);
+        }
 
         return $email;
     };
@@ -1963,4 +1970,13 @@ describe('a saved draft or a queued email', function (): void {
         expect($task->fresh()->status)->toBe(PendingActionStatus::Approved)
             ->and($step->fresh()->status)->toBe(PendingActionStatus::Pending);
     })->with([SendEmailDraftTool::class, CancelEmailTool::class]);
+});
+
+it('keeps a teammate email no record links to away from the assistant', function (): void {
+    $linked = ($this->emailFrom)($this->coworker, ['privacy_tier' => EmailPrivacyTier::FULL]);
+    $unlinked = ($this->emailFrom)($this->coworker, ['privacy_tier' => EmailPrivacyTier::FULL], linked: false);
+
+    expect(array_column(chatEmailTool($this->viewer, ListEmailsTool::class)['items'], 'id'))->toBe([$linked->id])
+        ->and(chatEmailTool($this->viewer, GetEmailTool::class, ['id' => $unlinked->id]))->toBe(['error' => 'Email not found.'])
+        ->and(chatEmailTool($this->coworker, ListEmailsTool::class)['items'])->toHaveCount(2);
 });
