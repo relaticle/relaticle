@@ -122,7 +122,7 @@ final readonly class StoreEmailAction
                     'created_at' => now(),
                 ]);
 
-                resolve(SyncEmailThreadAction::class)->execute($connectedAccount, $email->thread_id);
+                $this->syncThreadAndConversation($connectedAccount, $email);
 
                 resolve(LinkEmailAction::class)->execute($email);
 
@@ -142,6 +142,20 @@ final readonly class StoreEmailAction
             }
 
             throw $exception;
+        }
+    }
+
+    private function syncThreadAndConversation(ConnectedAccount $connectedAccount, Email $email): void
+    {
+        resolve(SyncEmailThreadAction::class)->execute($connectedAccount, $email->thread_id);
+
+        $this->refreshConversation($email);
+    }
+
+    private function refreshConversation(Email $email): void
+    {
+        if ($email->conversation_key !== null) {
+            resolve(RefreshConversationSummary::class)->execute($email->workspace_id, $email->conversation_key);
         }
     }
 
@@ -288,6 +302,8 @@ final readonly class StoreEmailAction
             }
 
             $this->forgetPendingThread($connectedAccount, $previousThreadId, $threadId);
+
+            $this->refreshConversation($pending);
 
             return $pending->refresh();
         });
