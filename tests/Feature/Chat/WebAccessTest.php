@@ -212,7 +212,15 @@ function runQueuedResume(): CrmAssistant
     CrmAssistant::fake(['ok']);
     $resume->handle(resolve(CreditService::class));
 
-    return promptedAgent();
+    $agent = null;
+
+    CrmAssistant::assertPrompted(function ($prompt) use (&$agent, $resume): bool {
+        $agent = $prompt->agent;
+
+        return $prompt->prompt === $resume->message;
+    });
+
+    return $agent;
 }
 
 function typedWebTurn(User $user): CrmAssistant
@@ -475,4 +483,36 @@ it('refuses the grant when the user turned web search off between request and ap
     expect($request->fresh()->status)->toBe(PendingActionStatus::Pending);
 
     Queue::assertNotPushed(ProcessChatMessage::class);
+});
+
+it('grants the web only to the turn whose request was allowed, not a later resume', function (): void {
+    $user = webAccessUser();
+    Queue::fake();
+    $request = requestWebAccess($user, (string) str()->ulid());
+
+    openWebAccessDock($request)->call('approveStep', (string) $request->getKey())->assertHasNoErrors();
+    runQueuedResume();
+    Queue::fake();
+    test()->actingAs($user);
+    Filament::setTenant($user->currentWorkspace);
+
+    $note = resolve(CreateNoteTool::class);
+    $note->setConversationId('conv-web');
+    $note->setTurnId((string) str()->ulid());
+    $note->handle(new ToolRequest(['records' => [['title' => 'Filaforms brief']]]));
+    $noteStep = PendingAction::query()->where('entity_type', ProposalEntity::Note)->sole();
+
+    openWebAccessDock($noteStep)->call('approveStep', (string) $noteStep->getKey())->assertHasNoErrors();
+
+    expect(webToolClasses(runQueuedResume()))->toBe([RequestWebAccessTool::class]);
+});
+
+it('tells the model an expired web request went unanswered, not declined', function (): void {
+    $user = webAccessUser();
+    $request = requestWebAccess($user, (string) str()->ulid());
+    $request->forceFill(['status' => PendingActionStatus::Expired, 'resolved_at' => now()])->save();
+
+    expect(typedWebTurn($user)->dynamicInstructions())
+        ->toContain('- EXPIRED (no answer, no web for that request, not a write): search the web for "filaforms.com company overview"')
+        ->not->toContain('DENIED (no web for that request');
 });
