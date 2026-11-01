@@ -31,7 +31,7 @@ final class SalesLeads extends TableWidget
     {
         return $table
             ->query(fn (): Builder => SalesLeadsQuery::make($this->stage))
-            ->heading(HelpLabel::make('Who should I talk to next?', 'Workspaces that use the product but do not pay: they have records of their own and no paid or Enterprise plan. Your own workspaces are left out. Pick a stage: trials about to end, trials that just ended, or free workspaces. Log outreach in the Relaticle HQ workspace.'))
+            ->heading(HelpLabel::make('Who should I talk to next?', 'Workspaces that use the product but do not pay: they have records of their own or typed to Rela, the built-in AI assistant, on two or more days, and no paid or Enterprise plan. Your own workspaces are left out. Pick a stage: trials about to end, trials that just ended, or free workspaces. Log outreach in the Relaticle HQ workspace.'))
             ->description(fn (): string => $this->stage->getHelp())
             ->headerActions(array_map($this->stageAction(...), LeadStage::cases()))
             ->paginated([10])
@@ -113,10 +113,15 @@ final class SalesLeads extends TableWidget
         $teammates = max(0, (int) $record->getAttribute('users_count'));
         $sources = explode(',', (string) $record->getAttribute('sources'));
 
-        $parts = [
-            number_format($records).' '.Str::plural('record', $records).(in_array('import', $sources, true) ? ' (imported)' : ''),
-            number_format($activeDays).' active '.Str::plural('day', $activeDays),
-        ];
+        $parts = [number_format($records).' '.Str::plural('record', $records).(in_array('import', $sources, true) ? ' (imported)' : '')];
+
+        if ($records === 0) {
+            $messages = (int) $record->getAttribute('chat_messages');
+            $chatDays = (int) $record->getAttribute('chat_days');
+            $parts[] = number_format($messages).' chat '.Str::plural('message', $messages)." on {$chatDays} ".Str::plural('day', $chatDays);
+        }
+
+        $parts[] = number_format($activeDays).' active '.Str::plural('day', $activeDays);
 
         if ($credits > 0) {
             $parts[] = number_format($credits).' chat '.Str::plural('credit', $credits).' used';
