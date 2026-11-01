@@ -37,15 +37,42 @@ final class MergeConversations implements ShouldBeUniqueUntilProcessing, ShouldQ
     {
         // One transaction, so a failed refresh rolls the rewrite back and the retry merges again.
         $currentWorkspace->within($this->workspaceId, function () use ($resolver, $refresh): void {
-            DB::transaction(function () use ($resolver, $refresh): void {
-                foreach ($this->mergeLinkedKeys($resolver) as $key) {
+            $keys = DB::transaction(function () use ($resolver, $refresh): array {
+                $keys = $this->mergeLinkedKeys($resolver);
+
+                foreach ($keys as $key) {
                     $refresh->execute($this->workspaceId, $key);
                 }
+
+                return $keys;
             });
+
+            $this->mergeStrandedCopy(array_slice($keys, 1));
         });
     }
 
-    /** @return list<string> */
+    /**
+     * Stores take no workspace lock, so a row committed during the merge may still hold an absorbed key.
+     *
+     * @param  list<string>  $absorbed
+     */
+    private function mergeStrandedCopy(array $absorbed): void
+    {
+        if ($absorbed === []) {
+            return;
+        }
+
+        $stranded = Email::query()->withoutGlobalScopes()
+            ->where('workspace_id', $this->workspaceId)
+            ->whereIn('conversation_key', $absorbed)
+            ->value('id');
+
+        if (is_string($stranded)) {
+            dispatch(new self($this->workspaceId, $stranded));
+        }
+    }
+
+    /** @return list<string> the surviving key first, then the keys it absorbed */
     private function mergeLinkedKeys(ConversationKeyResolver $resolver): array
     {
         // One merge per workspace at a time, so each run reads the keys the previous one left.
@@ -67,14 +94,15 @@ final class MergeConversations implements ShouldBeUniqueUntilProcessing, ShouldQ
         }
 
         $survivor = $this->oldest($keys);
+        $absorbed = array_values(array_diff($keys, [$survivor]));
 
         Email::query()->withoutGlobalScopes()
             ->where('workspace_id', $this->workspaceId)
-            ->whereIn('conversation_key', array_values(array_diff($keys, [$survivor])))
+            ->whereIn('conversation_key', $absorbed)
             ->toBase()
             ->update(['conversation_key' => $survivor]);
 
-        return $keys;
+        return [$survivor, ...$absorbed];
     }
 
     /** @param  non-empty-list<string>  $keys */
