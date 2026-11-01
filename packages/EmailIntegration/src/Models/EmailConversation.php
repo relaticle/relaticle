@@ -6,6 +6,7 @@ namespace Relaticle\EmailIntegration\Models;
 
 use App\Models\Concerns\HasWorkspace;
 use Carbon\CarbonImmutable;
+use Database\Factories\EmailConversationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -38,8 +39,15 @@ use Illuminate\Database\Eloquent\Model;
 ])]
 final class EmailConversation extends Model
 {
-    use HasFactory;
-    use HasUlids, HasWorkspace;
+    /**
+     * @use HasFactory<EmailConversationFactory>
+     */
+    use HasFactory, HasUlids, HasWorkspace;
+
+    protected static function newFactory(): EmailConversationFactory
+    {
+        return EmailConversationFactory::new();
+    }
 
     /**
      * @return array<string, string>
