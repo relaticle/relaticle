@@ -17,6 +17,7 @@ use App\Mcp\Tools\Email\RetryEmailTool;
 use App\Mcp\Tools\Email\SendEmailDraftTool;
 use App\Mcp\Tools\Email\SendEmailTool;
 use App\Mcp\Tools\Email\UpdateEmailDraftTool;
+use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Notification;
 use App\Models\People;
@@ -90,7 +91,9 @@ beforeEach(function (): void {
         'user_id' => $this->coworker->id,
     ]));
 
-    $this->emailFrom = function (User $owner, array $attributes = [], string $sender = 'client@acme.test'): Email {
+    $this->anchor = Company::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    $this->emailFrom = function (User $owner, array $attributes = [], string $sender = 'client@acme.test', bool $linked = true): Email {
         $email = Email::factory()->create([
             'workspace_id' => $this->workspace->id,
             'user_id' => $owner->id,
@@ -105,6 +108,10 @@ beforeEach(function (): void {
             'name' => 'Acme Client',
             'role' => EmailParticipantRole::FROM,
         ]);
+
+        if ($linked && $owner->is($this->coworker)) {
+            $this->anchor->emails()->attach($email->id);
+        }
 
         return $email;
     };
@@ -2037,4 +2044,20 @@ it('names the date in the notice for a send scheduled past the hour', function (
     expect(EmailSendHeldNotification::present($this->viewer->notifications()->sole())->getBody())
         ->toContain('on October 31, 2026 2:30 PM.')
         ->not->toContain('minutes');
+});
+
+it('leaves a teammate email no record links to out of the list and the read', function (): void {
+    $linked = ($this->emailFrom)($this->coworker, ['privacy_tier' => EmailPrivacyTier::FULL]);
+    $unlinked = ($this->emailFrom)($this->coworker, ['privacy_tier' => EmailPrivacyTier::FULL], linked: false);
+    $own = ($this->emailFrom)($this->viewer);
+
+    expect(array_column(listedEmails($this->viewer), 'id'))->toEqualCanonicalizing([$linked->id, $own->id]);
+
+    RelaticleServer::actingAs($this->viewer)
+        ->tool(GetEmailTool::class, ['id' => $unlinked->id])
+        ->assertHasErrors(["Email with ID [{$unlinked->id}] not found."]);
+
+    RelaticleServer::actingAs($this->viewer)
+        ->tool(GetEmailTool::class, ['id' => $linked->id])
+        ->assertOk();
 });
