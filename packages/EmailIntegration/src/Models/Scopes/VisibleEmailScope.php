@@ -38,8 +38,8 @@ final readonly class VisibleEmailScope implements Scope
     {
         $workspaceId = $viewer->current_workspace_id;
 
-        $this->appliesMailboxBlocklist = $workspaceId === null || $this->workspaceHasMailboxBlocklist($workspaceId);
-        $this->appliesWorkspaceBlocklist = $workspaceId !== null && $this->workspaceHasBlockedEntry($workspaceId);
+        $this->appliesMailboxBlocklist = self::appliesMailboxBlocklist($workspaceId);
+        $this->appliesWorkspaceBlocklist = self::appliesWorkspaceBlocklist($workspaceId);
     }
 
     /**
@@ -53,14 +53,7 @@ final readonly class VisibleEmailScope implements Scope
         $builder
             ->where('workspace_id', $workspaceId)
             ->where(function (Builder $visibilityQuery) use ($viewerId, $workspaceId): void {
-                // Both anti-joins scan every participant row, so they run only when a rule exists.
-                if ($this->appliesMailboxBlocklist) {
-                    $this->excludeEmailsMatchingMailboxBlocklist($visibilityQuery);
-                }
-
-                if ($workspaceId !== null && $this->appliesWorkspaceBlocklist) {
-                    $this->excludeEmailsWithBlockedParticipant($visibilityQuery, $workspaceId);
-                }
+                self::excludeBlockedEmails($visibilityQuery, $workspaceId, $this->appliesMailboxBlocklist, $this->appliesWorkspaceBlocklist);
 
                 // Owner sees their own emails unless a Blocked or mailbox-only rule applies above.
                 $visibilityQuery->where(function (Builder $ownerOrShared) use ($viewerId, $workspaceId): void {
@@ -188,14 +181,59 @@ final readonly class VisibleEmailScope implements Scope
         self::excludeEmailsWhereAllParticipantsAreProtected($builder, $workspaceId, $memberEmails, $protectedDomains);
     }
 
-    private function workspaceHasMailboxBlocklist(string $workspaceId): bool
+    /**
+     * Mail from a workspace Blocked entry or the mailbox's own blocklist reaches nobody, the owner included.
+     *
+     * @template TBuilder of Builder<covariant Model>
+     *
+     * @param  TBuilder  $builder
+     * @return TBuilder
+     */
+    public static function whereNotBlocked(Builder $builder, ?string $workspaceId): Builder
+    {
+        self::excludeBlockedEmails(
+            $builder,
+            $workspaceId,
+            self::appliesMailboxBlocklist($workspaceId),
+            self::appliesWorkspaceBlocklist($workspaceId),
+        );
+
+        return $builder;
+    }
+
+    /**
+     * @param  Builder<covariant Model>  $builder
+     */
+    private static function excludeBlockedEmails(Builder $builder, ?string $workspaceId, bool $mailboxRules, bool $workspaceRules): void
+    {
+        // Both anti-joins scan every participant row, so they run only when a rule exists.
+        if ($mailboxRules) {
+            self::excludeEmailsMatchingMailboxBlocklist($builder);
+        }
+
+        if ($workspaceId !== null && $workspaceRules) {
+            self::excludeEmailsWithBlockedParticipant($builder, $workspaceId);
+        }
+    }
+
+    private static function appliesMailboxBlocklist(?string $workspaceId): bool
+    {
+        return $workspaceId === null || self::workspaceHasMailboxBlocklist($workspaceId);
+    }
+
+    private static function appliesWorkspaceBlocklist(?string $workspaceId): bool
+    {
+        return $workspaceId !== null && self::workspaceHasBlockedEntry($workspaceId);
+    }
+
+    private static function workspaceHasMailboxBlocklist(string $workspaceId): bool
     {
         return EmailBlocklist::query()
             ->whereIn('connected_account_id', ConnectedAccount::withTrashed()->where('workspace_id', $workspaceId)->select('id'))
             ->exists();
     }
 
-    private function workspaceHasBlockedEntry(string $workspaceId): bool
+    private static function workspaceHasBlockedEntry(string $workspaceId): bool
     {
         return WorkspaceEmailBlocklist::query()
             ->where('workspace_id', $workspaceId)
@@ -204,9 +242,9 @@ final readonly class VisibleEmailScope implements Scope
     }
 
     /**
-     * @param  Builder<covariant TModel>  $builder
+     * @param  Builder<covariant Model>  $builder
      */
-    private function excludeEmailsMatchingMailboxBlocklist(Builder $builder): void
+    private static function excludeEmailsMatchingMailboxBlocklist(Builder $builder): void
     {
         $builder->whereDoesntHave('participants', function (Builder $participantQuery): void {
             $participantQuery->where(function (Builder $match): void {
@@ -230,9 +268,9 @@ final readonly class VisibleEmailScope implements Scope
     }
 
     /**
-     * @param  Builder<covariant TModel>  $builder
+     * @param  Builder<covariant Model>  $builder
      */
-    private function excludeEmailsWithBlockedParticipant(Builder $builder, string $workspaceId): void
+    private static function excludeEmailsWithBlockedParticipant(Builder $builder, string $workspaceId): void
     {
         $builder->whereDoesntHave('participants', function (Builder $participantQuery) use ($workspaceId): void {
             $participantQuery->where(function (Builder $match) use ($workspaceId): void {

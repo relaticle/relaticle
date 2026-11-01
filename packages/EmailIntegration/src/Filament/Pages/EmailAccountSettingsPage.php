@@ -553,7 +553,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
             ->label(__('filament/pages/email-account-settings.actions.save'))
             ->requiresConfirmation(fn (): bool => $this->accountSharingTierChanged())
             ->modalHeading(fn (): ?string => $this->accountSharingTierChanged()
-                ? SharingTierChangeConfirmation::modalHeading()
+                ? SharingTierChangeConfirmation::mailboxModalHeading()
                 : null)
             ->modalDescription(fn (): ?string => $this->accountSharingTierChanged()
                 ? SharingTierChangeConfirmation::mailboxModalDescription($this->resolvedAccountSharingTier())
