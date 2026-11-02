@@ -33,6 +33,7 @@
     @include('cloud::marketing.home.partials.hero')
     @include('cloud::marketing.home.partials.works-with')
     @include('cloud::marketing.home.partials.features')
+    @include('cloud::marketing.home.partials.story')
     @if($emailIntegrationActive)
         @include('cloud::marketing.home.partials.email')
     @endif

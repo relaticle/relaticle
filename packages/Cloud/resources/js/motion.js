@@ -116,14 +116,11 @@ function playStory() {
     }
 
     const steps = [...story.querySelectorAll("[data-story-step]")]
-    const line = story.querySelector("[data-story-line]")
 
     hide(steps)
-    line.style.clipPath = "inset(0 100% 0 0)"
 
-    once(story.querySelector("ol"), 0.5, () => {
-        animate(line, { clipPath: ["inset(0 100% 0 0)", "inset(0 0% 0 0)"] }, { duration: 0.9, ease: EASE })
-        animate(steps, rise(10), { duration: BASE, delay: stagger(0.18), ease: EASE }).then(() => settle(steps))
+    once(story.querySelector("ol"), 0.4, () => {
+        animate(steps, rise(10), { duration: BASE, delay: stagger(0.15), ease: EASE }).then(() => settle(steps))
     })
 }
 

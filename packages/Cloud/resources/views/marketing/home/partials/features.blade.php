@@ -9,11 +9,11 @@
     </x-cloud::marketing.frame-header>
 
     <div class="bg-rail grid gap-px">
-        <x-cloud::marketing.showcase data-feature-row :label="__('01 · In the app')" :lead="__('A pipeline you read at a glance.')">
+        <x-cloud::marketing.showcase data-feature-row :label="__('01 · In the app')" :lead="__('A pipeline you read at a glance.')" :figure="__('Fig 01 · Opportunities board')">
             {{ __('Each opportunity shows its company, amount and close date, in the stages you define.') }}
 
             <x-slot:visual>
-                <x-cloud::marketing.window class="absolute left-6 top-8 w-[74rem] md:left-10 md:top-10">
+                <x-cloud::marketing.window class="absolute left-6 top-14 w-[74rem] md:left-10 md:top-14">
                     <x-cloud::marketing.theme-image
                         name="app-pipeline-preview"
                         :alt="__('Relaticle opportunities board grouped into pipeline stages, showing amount and close date')"
@@ -28,6 +28,7 @@
             data-feature-row
             :label="__('02 · :name', ['name' => $assistantName])"
             :lead="__('Ask in plain words.')"
+            :figure="__('Fig 02 · A proposal waiting for you')"
             :link-label="__('Meet :name', ['name' => $assistantName])"
             :link-href="route('ai')"
         >
@@ -97,6 +98,7 @@
             data-feature-row
             :label="__('03 · Your agents')"
             :lead="__('Work from Claude or ChatGPT.')"
+            :figure="__('Fig 03 · Claude, connected')"
             :link-label="__('Relaticle for Claude')"
             :link-href="route(\Relaticle\Cloud\Marketing\Enums\ConnectableAssistant::Claude->routeName())"
         >
@@ -153,34 +155,5 @@
                 </div>
             </x-slot:visual>
         </x-cloud::marketing.showcase>
-        <div class="bg-surface p-6 md:p-10" data-story>
-            <x-cloud::marketing.eyebrow class="mb-4">{{ __('04 · One record') }}</x-cloud::marketing.eyebrow>
-            <h3 class="type-lead max-w-2xl">
-                <span class="text-gray-950 dark:text-white">{{ __('Four hands, one opportunity.') }}</span>
-                <span class="text-gray-500 dark:text-gray-400">{{ __('Your inbox, you, your agent and :name all work on the same record.', ['name' => $assistantName]) }}</span>
-            </h3>
-
-            <ol class="relative mt-10 grid grid-cols-1 gap-8 md:grid-cols-4 md:gap-6">
-                <span data-story-line class="absolute left-0 right-0 top-3 hidden h-px bg-rail md:block" aria-hidden="true"></span>
-                @foreach([
-                    ['mailbox', __('Monday'), __('Adds Lena Ortiz and Northwind after your first email.')],
-                    ['you', __('Tuesday'), __('Moves Northwind renewal to Negotiation on the board.')],
-                    ['claude', __('Wednesday'), __('Creates a follow-up task for Thursday from a chat in Claude.')],
-                    ['rela', __('Friday'), __('Marks the opportunity as won after you approve the change.')],
-                ] as [$actor, $day, $action])
-                    <li data-story-step class="relative">
-                        <x-cloud::marketing.actor :as="$actor" class="relative"/>
-                        <p class="type-label mt-5 text-gray-500 dark:text-gray-400">{{ $day }}</p>
-                        <p class="mt-1.5 text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ $action }}</p>
-                        @if($actor === 'rela')
-                            <p class="mt-3 inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                                <x-ri-checkbox-circle-fill class="h-3.5 w-3.5"/>
-                                {{ __('Approved by you') }}
-                            </p>
-                        @endif
-                    </li>
-                @endforeach
-            </ol>
-        </div>
     </div>
 </x-cloud::marketing.frame>

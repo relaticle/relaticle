@@ -12,7 +12,7 @@
     </x-cloud::marketing.frame-header>
 
     <div class="bg-rail grid grid-cols-1 gap-px lg:grid-cols-12">
-        <div class="bg-tint feat-card flex items-center justify-center p-4 sm:p-8 md:p-12 lg:col-span-8">
+        <div class="bg-tint bg-warm feat-card flex items-center justify-center p-4 sm:p-8 md:p-12 lg:col-span-8">
             <x-cloud::marketing.record-emails-mock class="w-full max-w-xl"/>
         </div>
 

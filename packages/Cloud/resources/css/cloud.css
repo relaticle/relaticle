@@ -23,6 +23,25 @@
     --color-tint: var(--color-gray-900);
 }
 
+/* A section that stays dark in both themes; on a dark page it lifts one step so it still reads as a band. */
+.dark .spotlight {
+    --color-surface: var(--color-gray-900);
+}
+
+@utility bg-warm {
+    background-image:
+        radial-gradient(45% 60% at 15% 10%, var(--color-primary-100), transparent 70%),
+        radial-gradient(40% 55% at 85% 20%, var(--color-amber-50), transparent 70%),
+        radial-gradient(50% 60% at 50% 100%, var(--color-emerald-50), transparent 70%);
+
+    &:where(.dark, .dark *) {
+        background-image:
+            radial-gradient(45% 60% at 15% 10%, rgb(124 58 237 / 0.14), transparent 70%),
+            radial-gradient(40% 55% at 85% 20%, rgb(245 158 11 / 0.07), transparent 70%),
+            radial-gradient(50% 60% at 50% 100%, rgb(16 185 129 / 0.07), transparent 70%);
+    }
+}
+
 @utility type-display {
     font-family: var(--font-display);
     font-size: 2.25rem;
