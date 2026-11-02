@@ -1,6 +1,5 @@
 <x-cloud::marketing.frame>
-    <div class="relative overflow-hidden px-6 py-24 text-center md:py-32">
-        <div class="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,rgb(0_0_0/0.06)_1px,transparent_0)] bg-[size:20px_20px] [mask-image:radial-gradient(ellipse_60%_80%_at_50%_50%,black_10%,transparent_100%)] dark:bg-[radial-gradient(circle_at_1px_1px,rgb(255_255_255/0.07)_1px,transparent_0)]" aria-hidden="true"></div>
+    <div class="bg-warm relative overflow-hidden px-6 py-24 text-center md:py-32">
 
         <div class="relative mx-auto max-w-2xl">
             <h2 class="type-title md:text-5xl">
