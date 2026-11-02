@@ -70,6 +70,7 @@ final class ManageTasks extends ManageRecords
                 ->color('gray')
                 ->button()
                 ->label(__('filament/resources/task.pages.list.actions.import_export.label'))
+                ->labeledFrom('sm')
                 ->size(Size::Small),
             CreateTaskAction::make()->icon('heroicon-o-plus')->size(Size::Small)->slideOver(),
         ];

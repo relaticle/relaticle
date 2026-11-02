@@ -46,6 +46,7 @@ final class ListCompanies extends ListRecords
                 ->color('gray')
                 ->button()
                 ->label(__('filament/resources/company.pages.list.actions.import_export.label'))
+                ->labeledFrom('sm')
                 ->size(Size::Small),
             CreateAction::make()->icon('heroicon-o-plus')->size(Size::Small),
         ];
