@@ -264,3 +264,31 @@ it('fits the selection toolbar inside a mobile viewport in both themes', functio
         ->and($geometry['right'])->toBeLessThanOrEqual($geometry['contentRight'])
         ->and($geometry['pageOverflow'])->toBeFalse();
 });
+
+it('spaces paragraphs apart in the note editor', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/notes")
+        ->press('New note')
+        ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
+        ->assertNoJavaScriptErrors();
+
+    $gap = $page->script(<<<'JS'
+        (() => {
+            const root = document.querySelector('.fi-fo-rich-editor-seamless');
+            const editorRoot = root.querySelector('[x-data^="richEditorFormComponent"]');
+            const editor = Alpine.$data(editorRoot).getEditor();
+
+            editor.commands.setContent('<p>Agenda</p><p>Next steps</p>');
+
+            const [first, second] = editor.view.dom.querySelectorAll(':scope > p');
+
+            return second.getBoundingClientRect().top - first.getBoundingClientRect().bottom;
+        })();
+    JS);
+
+    expect($gap)->toBeGreaterThan(0);
+});

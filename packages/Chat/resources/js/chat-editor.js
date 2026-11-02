@@ -82,7 +82,7 @@ export function chatEditor({ placeholder, onSubmit, onChange, onArrowUp, autofoc
                 content: { type: 'doc', content: [{ type: 'paragraph' }] },
                 editorProps: {
                     attributes: {
-                        class: 'prose prose-sm max-w-none focus:outline-none min-h-[64px] max-h-[40vh] overflow-y-auto px-4 pt-3 pb-2 text-sm leading-6',
+                        class: 'chat-editor prose prose-sm max-w-none focus:outline-none min-h-[64px] max-h-[40vh] overflow-y-auto px-4 pt-3 pb-2 text-sm leading-6',
                     },
                     handleKeyDown: (view, event) => {
                         if (event.key === 'Enter' && !event.shiftKey) {
