@@ -263,6 +263,7 @@ it('sends a plain-text part that keeps paragraphs, lists, links and quotes reada
         'subject' => 'Partner program',
         'body_html' => '<p>Hi Kai,</p><p>I&#039;m Manuk &amp; I build Relaticle.<br>Two things:</p>'
             .'<ul><li><p>Pricing</p></li><li><p>The <a href="https://relaticle.com/docs">setup guide</a></p></li></ul>'
+            .'<ol><li>Call</li><li>Demo</li></ol><div>On Monday Kai wrote:</div><div>See you</div>'
             .'<p>Manuk</p><blockquote><p>Can we talk?</p><p>Kai</p></blockquote>',
         'to' => [['email' => 'kai@example.com', 'name' => null]],
     ]);
@@ -275,6 +276,12 @@ it('sends a plain-text part that keeps paragraphs, lists, links and quotes reada
         '',
         '- Pricing',
         '- The setup guide (https://relaticle.com/docs)',
+        '',
+        '1. Call',
+        '2. Demo',
+        '',
+        'On Monday Kai wrote:',
+        'See you',
         '',
         'Manuk',
         '',

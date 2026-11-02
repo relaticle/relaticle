@@ -26,6 +26,11 @@ final readonly class PlainText
 
     private const array CELL_ELEMENTS = ['td', 'th'];
 
+    // Boundary markers resolved in tidy(): adjacent line blocks must not add up to a blank line.
+    private const string LINE_BREAK = "\x1F";
+
+    private const string PARAGRAPH_BREAK = "\x1E";
+
     private const array HIDDEN_ELEMENTS = ['title', 'style', 'script', 'template', 'noscript'];
 
     public static function fromHtml(string $html): string
@@ -59,7 +64,7 @@ final readonly class PlainText
         foreach ($parent->childNodes as $child) {
             $text .= match (true) {
                 // Not \s: under a UTF-8 locale PCRE counts byte 0xA0 as space and splits letters such as à.
-                $child instanceof Text => (string) preg_replace('/[\t\n\f\r ]+/', ' ', str_replace("\u{00A0}", ' ', $child->data)),
+                $child instanceof Text => (string) preg_replace('/[\t\n\f\r ]+/', ' ', str_replace([self::LINE_BREAK, self::PARAGRAPH_BREAK, "\u{00A0}"], ['', '', ' '], $child->data)),
                 $child instanceof Element => self::elementText($child),
                 default => '',
             };
@@ -76,11 +81,11 @@ final readonly class PlainText
             in_array($name, self::HIDDEN_ELEMENTS, true) => '',
             $name === 'br' => "\n",
             $name === 'a' => self::linkText($element),
-            in_array($name, ['ul', 'ol'], true) => "\n\n".self::listText($element)."\n\n",
-            $name === 'blockquote' => "\n\n".self::quoted(self::tidy(self::textOf($element)))."\n\n",
+            in_array($name, ['ul', 'ol'], true) => self::PARAGRAPH_BREAK.self::listText($element).self::PARAGRAPH_BREAK,
+            $name === 'blockquote' => self::PARAGRAPH_BREAK.self::quoted(self::tidy(self::textOf($element))).self::PARAGRAPH_BREAK,
             in_array($name, self::CELL_ELEMENTS, true) => self::textOf($element).' ',
-            in_array($name, self::PARAGRAPH_ELEMENTS, true) => "\n\n".self::textOf($element)."\n\n",
-            in_array($name, self::LINE_ELEMENTS, true) => "\n".self::textOf($element)."\n",
+            in_array($name, self::PARAGRAPH_ELEMENTS, true) => self::PARAGRAPH_BREAK.self::textOf($element).self::PARAGRAPH_BREAK,
+            in_array($name, self::LINE_ELEMENTS, true) => self::LINE_BREAK.self::textOf($element).self::LINE_BREAK,
             default => self::textOf($element),
         };
     }
@@ -135,6 +140,11 @@ final readonly class PlainText
 
     private static function tidy(string $text): string
     {
+        $text = (string) preg_replace_callback(
+            '/[ \t]*[\x1E\x1F][\x1E\x1F \t]*/',
+            fn (array $breaks): string => str_contains($breaks[0], self::PARAGRAPH_BREAK) ? "\n\n" : "\n",
+            $text,
+        );
         $text = (string) preg_replace('/[ \t]*\n[ \t]*/', "\n", $text);
 
         return trim((string) preg_replace('/\n{3,}/', "\n\n", $text));
