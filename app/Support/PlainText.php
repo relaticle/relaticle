@@ -56,7 +56,7 @@ final readonly class PlainText
 
         foreach ($parent->childNodes as $child) {
             $text .= match (true) {
-                $child instanceof Text => (string) preg_replace('/\s+/', ' ', str_replace("\u{00A0}", ' ', $child->data)),
+                $child instanceof Text => (string) preg_replace('/[\t\n\f\r ]+/', ' ', str_replace("\u{00A0}", ' ', $child->data)),
                 $child instanceof Element => self::elementText($child),
                 default => '',
             };

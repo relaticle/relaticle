@@ -298,6 +298,31 @@ it('encodes both alternative parts as quoted-printable within the RFC 5322 line 
         ->and(alternativePart($raw, 'text/plain'))->toBe(trim($paragraph));
 });
 
+it('keeps accented letters in the plain-text part under a UTF-8 locale', function (): void {
+    $previousLocale = setlocale(LC_CTYPE, '0');
+
+    if (setlocale(LC_CTYPE, 'en_US.UTF-8', 'C.UTF-8') === false) {
+        $this->markTestSkipped('No UTF-8 locale is installed.');
+    }
+
+    $captured = null;
+    $gmail = fakeGmail(function (Message $message) use (&$captured): void {
+        $captured = $message;
+    });
+
+    try {
+        new GmailService(ConnectedAccount::factory()->make(), $gmail)->sendMessage([
+            'subject' => 'Déjà vu',
+            'body_html' => '<p>Voilà, déjà vu à Görgeshausen.</p>',
+            'to' => [['email' => 'kai@example.com', 'name' => null]],
+        ]);
+    } finally {
+        setlocale(LC_CTYPE, (string) $previousLocale);
+    }
+
+    expect(alternativePart(decodeRaw($captured), 'text/plain'))->toBe('Voilà, déjà vu à Görgeshausen.');
+});
+
 it('threads a same-mailbox reply with the provider thread id', function (): void {
     $account = ConnectedAccount::factory()->make([
         'email_address' => 'sender@example.com',
