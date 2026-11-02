@@ -24,7 +24,9 @@ final readonly class PlainText
 
     private const array LINE_ELEMENTS = ['div', 'tr', 'dt', 'dd', 'section', 'article', 'header', 'footer', 'address', 'center', 'main', 'aside', 'nav', 'caption'];
 
-    private const array HIDDEN_ELEMENTS = ['head', 'title', 'style', 'script', 'template', 'noscript', 'img'];
+    private const array CELL_ELEMENTS = ['td', 'th'];
+
+    private const array HIDDEN_ELEMENTS = ['title', 'style', 'script', 'template', 'noscript'];
 
     public static function fromHtml(string $html): string
     {
@@ -56,6 +58,7 @@ final readonly class PlainText
 
         foreach ($parent->childNodes as $child) {
             $text .= match (true) {
+                // Not \s: under a UTF-8 locale PCRE counts byte 0xA0 as space and splits letters such as à.
                 $child instanceof Text => (string) preg_replace('/[\t\n\f\r ]+/', ' ', str_replace("\u{00A0}", ' ', $child->data)),
                 $child instanceof Element => self::elementText($child),
                 default => '',
@@ -67,16 +70,15 @@ final readonly class PlainText
 
     private static function elementText(Element $element): string
     {
-        $name = strtolower($element->localName);
+        $name = $element->localName;
 
         return match (true) {
             in_array($name, self::HIDDEN_ELEMENTS, true) => '',
             $name === 'br' => "\n",
             $name === 'a' => self::linkText($element),
-            in_array($name, ['ul', 'ol'], true) => "\n\n".self::lines(self::textOf($element))."\n\n",
-            $name === 'li' => "\n".self::listMarker($element).self::lines(self::textOf($element))."\n",
+            in_array($name, ['ul', 'ol'], true) => "\n\n".self::listText($element)."\n\n",
             $name === 'blockquote' => "\n\n".self::quoted(self::tidy(self::textOf($element)))."\n\n",
-            in_array($name, ['td', 'th'], true) => self::textOf($element).' ',
+            in_array($name, self::CELL_ELEMENTS, true) => self::textOf($element).' ',
             in_array($name, self::PARAGRAPH_ELEMENTS, true) => "\n\n".self::textOf($element)."\n\n",
             in_array($name, self::LINE_ELEMENTS, true) => "\n".self::textOf($element)."\n",
             default => self::textOf($element),
@@ -101,19 +103,22 @@ final readonly class PlainText
         return str_contains($label, $target) ? $label : "{$label} ({$target})";
     }
 
-    private static function listMarker(Element $item): string
+    private static function listText(Element $list): string
     {
-        if (strtolower((string) $item->parentElement?->localName) !== 'ol') {
-            return '- ';
+        $items = [];
+
+        foreach ($list->children as $child) {
+            if ($child->localName !== 'li') {
+                $items[] = self::lines(self::elementText($child));
+
+                continue;
+            }
+
+            $marker = $list->localName === 'ol' ? (count($items) + 1).'. ' : '- ';
+            $items[] = $marker.self::lines(self::textOf($child));
         }
 
-        $position = 1;
-
-        for ($sibling = $item->previousElementSibling; $sibling instanceof Element; $sibling = $sibling->previousElementSibling) {
-            $position++;
-        }
-
-        return "{$position}. ";
+        return implode("\n", array_filter($items, fn (string $item): bool => $item !== ''));
     }
 
     private static function quoted(string $text): string
