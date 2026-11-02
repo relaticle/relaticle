@@ -298,6 +298,21 @@ it('encodes both alternative parts as quoted-printable within the RFC 5322 line 
         ->and(alternativePart($raw, 'text/plain'))->toBe(trim($paragraph));
 });
 
+it('leaves no unencoded whitespace at the end of an encoded line', function (): void {
+    $captured = null;
+    $gmail = fakeGmail(function (Message $message) use (&$captured): void {
+        $captured = $message;
+    });
+
+    new GmailService(ConnectedAccount::factory()->make(), $gmail)->sendMessage([
+        'subject' => 'Trailing space',
+        'body_html' => "<p>Hi Kai,</p>\n<p>Thanks</p> ",
+        'to' => [['email' => 'kai@example.com', 'name' => null]],
+    ]);
+
+    expect(decodeRaw($captured))->not->toMatch('/[ \t]\r\n/');
+});
+
 it('keeps accented letters in the plain-text part under a UTF-8 locale', function (): void {
     $previousLocale = setlocale(LC_CTYPE, '0');
 

@@ -24,6 +24,7 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 use Relaticle\EmailIntegration\Support\EmailAddressHeaderParser;
 use Relaticle\EmailIntegration\Support\PublicSuffixList;
+use Symfony\Component\Mime\Encoder\QpContentEncoder;
 
 final readonly class GmailService implements MailServiceInterface
 {
@@ -373,7 +374,7 @@ final readonly class GmailService implements MailServiceInterface
     {
         return "Content-Type: {$mimeType}; charset=UTF-8\r\n"
             ."Content-Transfer-Encoding: quoted-printable\r\n\r\n"
-            .quoted_printable_encode((string) preg_replace('/\r\n|\r|\n/', "\r\n", $content))."\r\n\r\n";
+            .new QpContentEncoder()->encodeString($content)."\r\n\r\n";
     }
 
     private function rootContentTypeHeader(bool $hasInline, bool $hasFiles): string
