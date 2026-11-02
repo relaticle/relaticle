@@ -75,11 +75,7 @@ it('stores a readable text copy and snippet of the queued email', function (): v
         'subject' => 'Partner program',
         'body_html' => '<p>Hi Kai,</p><p>I&#039;m Manuk &amp; I build Relaticle.</p>',
         'to' => [['email' => 'recipient@example.com', 'name' => 'Recipient']],
-        'cc' => [],
-        'bcc' => [],
-        'in_reply_to_email_id' => null,
         'creation_source' => EmailCreationSource::COMPOSE,
-        'batch_id' => null,
     ]);
 
     expect($email->body->body_text)->toBe("Hi Kai,\n\nI'm Manuk & I build Relaticle.")

@@ -334,7 +334,7 @@ final readonly class GmailService implements MailServiceInterface
             $headers[] = 'References: '.$inReplyTo;
         }
 
-        $bodyHtml = $data['body_html'] ?? '';
+        $bodyHtml = $data['body_html'];
 
         $alternative = "--boundary_relaticle\r\n"
             .$this->quotedPrintablePart('text/plain', PlainText::paragraphsFromHtml($bodyHtml))
