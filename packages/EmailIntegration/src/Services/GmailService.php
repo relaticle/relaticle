@@ -149,7 +149,7 @@ final readonly class GmailService implements MailServiceInterface
             threadId: $message->getThreadId(),
             inReplyTo: $headers->get('in-reply-to')?->getValue(),
             subject: $headers->get('subject')?->getValue(),
-            snippet: mb_substr(strip_tags((string) $message->getSnippet()), 0, 255),
+            snippet: mb_substr(PlainText::fromHtml((string) $message->getSnippet()), 0, 255),
             sentAt: now()->setTimestamp((int) ($message->getInternalDate() / 1000)),
             direction: in_array('SENT', $labelIds) ? EmailDirection::OUTBOUND : EmailDirection::INBOUND,
             folder: $this->resolveFolder($labelIds),

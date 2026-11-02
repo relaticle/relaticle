@@ -62,7 +62,7 @@ function alternativePart(string $raw, string $mimeType): string
  * @param  list<string>  $labelIds
  * @param  array<string, string>  $extraHeaders
  */
-function fetchGmailMessageFromHeader(string $from, array $labelIds = ['INBOX'], array $extraHeaders = []): FetchedEmailData
+function fetchGmailMessageFromHeader(string $from, array $labelIds = ['INBOX'], array $extraHeaders = [], string $snippet = 'Hello'): FetchedEmailData
 {
     $account = ConnectedAccount::factory()->make();
 
@@ -89,7 +89,7 @@ function fetchGmailMessageFromHeader(string $from, array $labelIds = ['INBOX'], 
         'threadId' => 'gmail-thread-from',
         'internalDate' => (string) (now()->timestamp * 1000),
         'labelIds' => $labelIds,
-        'snippet' => 'Hello',
+        'snippet' => $snippet,
     ]);
     $message->setPayload($payload);
 
@@ -321,6 +321,12 @@ it('keeps accented letters in the plain-text part under a UTF-8 locale', functio
     }
 
     expect(alternativePart(decodeRaw($captured), 'text/plain'))->toBe('Voilà, déjà vu à Görgeshausen.');
+});
+
+it('decodes the html entities gmail puts in a message snippet', function (): void {
+    $fetched = fetchGmailMessageFromHeader('Kai <kai@example.test>', snippet: 'I&#39;m in &amp; ready, see &lt;agenda&gt;');
+
+    expect($fetched->snippet)->toBe("I'm in & ready, see <agenda>");
 });
 
 it('threads a same-mailbox reply with the provider thread id', function (): void {
