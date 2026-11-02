@@ -52,10 +52,34 @@ function decodeRaw(Message $message): string
 }
 
 /**
+ * @param  array<string, mixed>  $data
+ */
+function sentRaw(array $data): string
+{
+    $captured = null;
+    $gmail = fakeGmail(function (Message $message) use (&$captured): void {
+        $captured = $message;
+    });
+
+    new GmailService(ConnectedAccount::factory()->make(['email_address' => 'sender@example.com']), $gmail)->sendMessage($data);
+
+    return decodeRaw($captured);
+}
+
+function alternativePart(string $raw, string $mimeType): string
+{
+    expect($raw)->toMatch($pattern = '/Content-Type: '.preg_quote($mimeType, '/').'; charset=UTF-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n(.*?)\r\n\r\n--boundary_relaticle/s');
+
+    preg_match($pattern, $raw, $matches);
+
+    return quoted_printable_decode($matches[1]);
+}
+
+/**
  * @param  list<string>  $labelIds
  * @param  array<string, string>  $extraHeaders
  */
-function fetchGmailMessageFromHeader(string $from, array $labelIds = ['INBOX'], array $extraHeaders = []): FetchedEmailData
+function fetchGmailMessageFromHeader(string $from, array $labelIds = ['INBOX'], array $extraHeaders = [], string $snippet = 'Hello'): FetchedEmailData
 {
     $account = ConnectedAccount::factory()->make();
 
@@ -82,7 +106,7 @@ function fetchGmailMessageFromHeader(string $from, array $labelIds = ['INBOX'], 
         'threadId' => 'gmail-thread-from',
         'internalDate' => (string) (now()->timestamp * 1000),
         'labelIds' => $labelIds,
-        'snippet' => 'Hello',
+        'snippet' => $snippet,
     ]);
     $message->setPayload($payload);
 
@@ -232,6 +256,90 @@ it('sends a plain multipart/alternative message when there are no attachments', 
 
     expect($raw)->toContain('Content-Type: multipart/alternative; boundary="boundary_relaticle"')
         ->and($raw)->not->toContain('multipart/mixed');
+});
+
+it('sends a plain-text part that keeps paragraphs, lists, links and quotes readable', function (): void {
+    $raw = sentRaw([
+        'subject' => 'Partner program',
+        'body_html' => '<p>Hi Kai,</p><p>I&#039;m Manuk &amp; I build Relaticle.<br>Two things:</p>'
+            .'<ul><li><p>Pricing</p></li><li><p>The <a href="https://relaticle.com/docs">setup guide</a></p></li></ul>'
+            .'<ol><li>Call</li><li>Demo</li></ol><div>On Monday Kai wrote:</div><div>See you</div>'
+            .'<p>Manuk</p><blockquote><p>Can we talk?</p><p>Kai</p></blockquote>',
+        'to' => [['email' => 'kai@example.com', 'name' => null]],
+    ]);
+
+    expect(alternativePart($raw, 'text/plain'))->toBe(implode("\r\n", [
+        'Hi Kai,',
+        '',
+        "I'm Manuk & I build Relaticle.",
+        'Two things:',
+        '',
+        '- Pricing',
+        '- The setup guide (https://relaticle.com/docs)',
+        '',
+        '1. Call',
+        '2. Demo',
+        '',
+        'On Monday Kai wrote:',
+        'See you',
+        '',
+        'Manuk',
+        '',
+        '> Can we talk?',
+        '>',
+        '> Kai',
+    ]));
+});
+
+it('encodes both alternative parts as quoted-printable within the RFC 5322 line limit', function (): void {
+    $paragraph = str_repeat('Grüße aus Görgeshausen, wir melden uns zur Partnerschaft. ', 30);
+
+    $raw = sentRaw([
+        'subject' => 'Partnerschaft',
+        'body_html' => "<p>{$paragraph}</p>",
+        'to' => [['email' => 'kai@example.com', 'name' => null]],
+    ]);
+
+    expect(substr_count($raw, "Content-Transfer-Encoding: quoted-printable\r\n"))->toBe(2)
+        ->and(max(array_map(strlen(...), explode("\r\n", $raw))))->toBeLessThanOrEqual(76)
+        ->and(alternativePart($raw, 'text/html'))->toBe('<p>'.$paragraph.'</p>')
+        ->and(alternativePart($raw, 'text/plain'))->toBe(trim($paragraph));
+});
+
+it('leaves no unencoded whitespace at the end of an encoded line', function (): void {
+    $raw = sentRaw([
+        'subject' => 'Trailing space',
+        'body_html' => "<p>Hi Kai,</p>\n<p>Thanks</p> ",
+        'to' => [['email' => 'kai@example.com', 'name' => null]],
+    ]);
+
+    expect($raw)->not->toMatch('/[ \t]\r\n/');
+});
+
+it('keeps accented letters in the plain-text part under a UTF-8 locale', function (): void {
+    $previousLocale = setlocale(LC_CTYPE, '0');
+
+    if (setlocale(LC_CTYPE, 'en_US.UTF-8', 'C.UTF-8') === false) {
+        $this->markTestSkipped('No UTF-8 locale is installed.');
+    }
+
+    try {
+        $raw = sentRaw([
+            'subject' => 'Déjà vu',
+            'body_html' => '<p>Voilà, déjà vu à Görgeshausen.</p>',
+            'to' => [['email' => 'kai@example.com', 'name' => null]],
+        ]);
+    } finally {
+        setlocale(LC_CTYPE, (string) $previousLocale);
+    }
+
+    expect(alternativePart($raw, 'text/plain'))->toBe('Voilà, déjà vu à Görgeshausen.');
+});
+
+it('decodes the html entities gmail puts in a message snippet', function (): void {
+    $fetched = fetchGmailMessageFromHeader('Kai <kai@example.test>', snippet: 'I&#39;m in &amp; ready, see &lt;agenda&gt;');
+
+    expect($fetched->snippet)->toBe("I'm in & ready, see <agenda>");
 });
 
 it('threads a same-mailbox reply with the provider thread id', function (): void {

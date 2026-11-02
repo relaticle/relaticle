@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
+use App\Support\PlainText;
 use Carbon\CarbonInterface;
 use DateTimeInterface;
 use Illuminate\Support\Facades\Config;
@@ -140,7 +141,7 @@ final readonly class SendEmailAction
                     : null,
                 'in_reply_to' => $inReplyTo?->rfc_message_id,
                 'subject' => $data['subject'],
-                'snippet' => mb_substr(strip_tags((string) $data['body_html']), 0, 255),
+                'snippet' => mb_substr(PlainText::fromHtml((string) $data['body_html']), 0, 255),
                 'sent_at' => null,
                 'scheduled_for' => $scheduledFor,
                 'direction' => EmailDirection::OUTBOUND,
@@ -157,7 +158,7 @@ final readonly class SendEmailAction
             EmailBody::query()->create([
                 'email_id' => $email->getKey(),
                 'body_html' => $data['body_html'],
-                'body_text' => strip_tags((string) $data['body_html']),
+                'body_text' => PlainText::paragraphsFromHtml((string) $data['body_html']),
             ]);
 
             EmailParticipant::query()->create([
