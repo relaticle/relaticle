@@ -124,6 +124,7 @@ final class ActivityResource extends Resource
                     'opportunity' => 'Opportunity',
                     'task' => 'Task',
                     'note' => 'Note',
+                    'workspace' => 'Workspace',
                 ]),
             SelectFilter::make('event')
                 ->options([
