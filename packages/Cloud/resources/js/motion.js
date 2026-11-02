@@ -1,39 +1,148 @@
 import { animate } from "motion/mini"
 import { inView, spring, stagger } from "motion"
-import { initAgentNetwork } from "./agent-network"
 
 const EASE = [0.22, 1, 0.36, 1]
-
-function from(transform) {
-    return { transform: [transform, "none"] }
-}
-
-function reveal(trigger, amount, play) {
-    inView(trigger, () => { play() }, { amount })
-}
+const FAST = 0.2
+const BASE = 0.3
+const SLOW = 0.45
 
 window.animate = animate
 window.spring = spring
 window.dispatchEvent(new CustomEvent("motion-ready"))
 
-document.querySelectorAll("[data-agent-network]").forEach(initAgentNetwork)
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
 
-reveal("#features > div > .grid", 0.1, () => {
-    animate(".feat-card", from("translateY(32px)"), { delay: stagger(0.07), duration: 0.6, ease: EASE })
-})
-reveal("#card-builtin-ai", 0.4, () => {
-    animate("#card-builtin-ai .ai-fill", { width: ["0%", "100%"] }, { delay: stagger(0.18, { startDelay: 0.3 }), duration: 0.6, ease: EASE })
-    animate("#ai-sparkle", { transform: ["scale(1)", "scale(1.2)", "none"] }, { duration: 0.5, delay: 0.2, ease: EASE })
-})
-reveal("#card-data", 0.4, () => {
-    animate("#card-data .field-row", from("translateX(-16px)"), { delay: stagger(0.1, { startDelay: 0.3 }), duration: 0.4, ease: EASE })
-})
-reveal("#card-sales", 0.4, () => {
-    animate(".pipe-seg", from("scaleX(0)"), { delay: stagger(0.12, { startDelay: 0.3 }), duration: 0.6, ease: EASE })
-})
-reveal("#card-tasks", 0.3, () => {
-    animate(".task-row", from("translateX(20px)"), { delay: stagger(0.15, { startDelay: 0.2 }), duration: 0.45, ease: EASE })
-})
-reveal("#faq .divide-y", 0.15, () => {
-    animate(".faq-item", from("translateY(20px)"), { delay: stagger(0.08), duration: 0.5, ease: EASE })
-})
+function rise(distance = 16) {
+    return { opacity: [0, 1], transform: [`translateY(${distance}px)`, "none"] }
+}
+
+function settle(elements) {
+    [elements].flat().forEach((element) => {
+        element.style.opacity = ""
+        element.style.transform = ""
+    })
+}
+
+function hide(elements) {
+    elements.forEach((element) => {
+        element.style.opacity = "0"
+    })
+}
+
+function once(target, amount, play) {
+    inView(target, (element) => {
+        play(element)
+    }, { amount })
+}
+
+function revealShowcases() {
+    document.querySelectorAll("[data-feature-row] .feat-card").forEach((cell) => {
+        const visual = cell.firstElementChild
+
+        hide([visual])
+        once(cell, 0.25, () => {
+            animate(visual, rise(), { duration: SLOW, ease: EASE }).then(() => settle(visual))
+        })
+    })
+}
+
+function playApproval() {
+    const demo = document.querySelector("[data-approval]")
+
+    if (! demo) {
+        return
+    }
+
+    const ask = demo.querySelector("[data-approval-ask]")
+    const card = demo.querySelector("[data-approval-card]")
+    const pending = demo.querySelector("[data-approval-pending]")
+    const done = demo.querySelector("[data-approval-done]")
+    const button = demo.querySelector("[data-approval-button]")
+    const cursor = demo.querySelector("[data-approval-cursor]")
+
+    hide([ask, card])
+
+    once(demo, 0.6, async () => {
+        await animate(ask, rise(8), { duration: BASE, ease: EASE })
+        await animate(card, rise(12), { duration: SLOW, ease: EASE })
+        settle([ask, card])
+
+        const demoBox = demo.getBoundingClientRect()
+        const target = button.getBoundingClientRect()
+        const x = target.left - demoBox.left + target.width / 2
+        const y = target.top - demoBox.top + target.height / 2
+
+        await animate(cursor, {
+            opacity: [0, 1, 1],
+            transform: [`translate(${x + 90}px, ${y + 70}px)`, `translate(${x + 40}px, ${y + 30}px)`, `translate(${x}px, ${y}px)`],
+        }, { duration: 0.7, delay: 0.5, ease: EASE })
+
+        await animate(button, { transform: ["none", "translateY(1px)", "none"] }, { duration: FAST })
+
+        done.classList.remove("invisible")
+        done.removeAttribute("aria-hidden")
+        pending.setAttribute("aria-hidden", "true")
+
+        animate(pending, { opacity: [1, 0] }, { duration: FAST }).then(() => pending.classList.add("invisible"))
+        animate(done, { opacity: [0, 1], transform: ["translateY(4px)", "none"] }, { duration: BASE, delay: 0.1, ease: EASE })
+        animate(cursor, { opacity: [1, 0] }, { duration: BASE, delay: 0.4 })
+    })
+}
+
+function playAgent() {
+    const demo = document.querySelector("[data-agent-demo]")
+
+    if (! demo) {
+        return
+    }
+
+    const steps = [...demo.querySelectorAll("[data-agent-step]")]
+    const task = demo.querySelector("[data-agent-task]")
+
+    hide([...steps, task])
+
+    once(demo, 0.6, async () => {
+        await animate(steps, rise(6), { duration: BASE, delay: stagger(0.35, { startDelay: 0.3 }), ease: EASE })
+        await animate(task, rise(12), { duration: SLOW, delay: 0.2, ease: EASE })
+        settle([...steps, task])
+    })
+}
+
+function playStory() {
+    const story = document.querySelector("[data-story]")
+
+    if (! story) {
+        return
+    }
+
+    const steps = [...story.querySelectorAll("[data-story-step]")]
+    const line = story.querySelector("[data-story-line]")
+
+    hide(steps)
+    line.style.clipPath = "inset(0 100% 0 0)"
+
+    once(story.querySelector("ol"), 0.5, () => {
+        animate(line, { clipPath: ["inset(0 100% 0 0)", "inset(0 0% 0 0)"] }, { duration: 0.9, ease: EASE })
+        animate(steps, rise(10), { duration: BASE, delay: stagger(0.18), ease: EASE }).then(() => settle(steps))
+    })
+}
+
+function playMailRows() {
+    new Set([...document.querySelectorAll("[data-mail-row]")].map((row) => row.parentElement)).forEach((list) => {
+        const rows = [...list.querySelectorAll("[data-mail-row]")]
+
+        hide(rows)
+
+        once(list, 0.1, () => {
+            animate(rows, rise(8), { duration: BASE, delay: stagger(0.08), ease: EASE }).then(() => settle(rows))
+        })
+    })
+}
+
+if (! reducedMotion) {
+    revealShowcases()
+    playApproval()
+    playAgent()
+    playStory()
+    playMailRows()
+}

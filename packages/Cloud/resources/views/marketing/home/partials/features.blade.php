@@ -1,214 +1,186 @@
 @php
-    $cardBase = 'group feat-card rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] transition-all duration-300 hover:border-gray-300 dark:hover:border-white/[0.10] hover:shadow-sm';
-    $cardTitle = 'font-display text-lg font-medium text-gray-900 dark:text-white mb-2';
-    $cardDesc = 'text-[13px] leading-relaxed text-gray-500 dark:text-gray-400';
+    $assistantName = (string) config('chat.assistant_name');
+    $opportunityIcon = \Relaticle\Chat\Support\RecordChipRenderer::iconPath('opportunity');
 @endphp
 
-<section id="features" class="py-24 md:py-32 bg-gray-50 dark:bg-gray-950 relative overflow-hidden">
-    <div class="max-w-6xl mx-auto px-6 lg:px-8 relative">
+<x-cloud::marketing.frame id="features">
+    <x-cloud::marketing.frame-header :label="__('Features')" :lead="__('One CRM, three ways to work.')">
+        {{ __('Click, ask :name, or let your agent do it.', ['name' => $assistantName]) }}
+    </x-cloud::marketing.frame-header>
 
-        <div class="max-w-2xl mx-auto text-center mb-16 md:mb-20">
-            <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-gray-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-white/[0.03] backdrop-blur-sm mb-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-                <span class="uppercase tracking-wider text-[10px] font-medium text-gray-500 dark:text-gray-400">Features</span>
-            </div>
-            <h2 class="font-display text-3xl sm:text-4xl md:text-[2.75rem] font-bold text-gray-950 dark:text-white tracking-[-0.02em] leading-[1.15]">
-                One CRM. Three ways to work.
-            </h2>
-            <p class="mt-5 text-base md:text-lg text-gray-500 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
-                Work in the app, <a href="{{ route('ai') }}" class="text-gray-700 dark:text-gray-300 underline decoration-gray-300 dark:decoration-gray-600 underline-offset-4 hover:text-primary dark:hover:text-primary-400 hover:decoration-primary transition-colors">ask {{ config('chat.assistant_name') }} in chat</a>, or connect your agents. Every company and next step stays in one place.
-            </p>
-        </div>
+    <div class="bg-rail grid gap-px">
+        <x-cloud::marketing.showcase data-feature-row :label="__('01 · In the app')" :lead="__('A pipeline you read at a glance.')">
+            {{ __('Each opportunity shows its company, amount and close date, in the stages you define.') }}
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-2">
+            <x-slot:visual>
+                <x-cloud::marketing.window class="absolute left-6 top-8 w-[74rem] md:left-10 md:top-10">
+                    <x-cloud::marketing.theme-image
+                        name="app-pipeline-preview"
+                        :alt="__('Relaticle opportunities board grouped into pipeline stages, showing amount and close date')"
+                        sizes="1440px"
+                        class="-ml-[262px] block w-[1440px] max-w-none"
+                    />
+                </x-cloud::marketing.window>
+            </x-slot:visual>
+        </x-cloud::marketing.showcase>
 
-            {{-- Agent-Native Infrastructure, 2col 2row: external agents (MCP / REST) --}}
-            <div class="{{ $cardBase }} p-6 md:col-span-2 lg:col-span-2 lg:row-span-2 overflow-hidden flex flex-col">
-                <h3 class="font-display text-xl font-semibold text-gray-900 dark:text-white mb-2 inline-flex items-start gap-2">
-                    <x-ri-git-merge-line class="mt-1.5 w-4 h-4 shrink-0 text-primary dark:text-primary-400"/>
-                    Connect your AI agents
-                </h3>
-                <p class="{{ $cardDesc }} max-w-md">
-                    Connect Claude, ChatGPT, or your own agent. They read and update the same records you do.
-                </p>
+        <x-cloud::marketing.showcase
+            data-feature-row
+            :label="__('02 · :name', ['name' => $assistantName])"
+            :lead="__('Ask in plain words.')"
+            :link-label="__('Meet :name', ['name' => $assistantName])"
+            :link-href="route('ai')"
+        >
+            {{ __(':name finds records and drafts changes. You approve each one before it is saved.', ['name' => $assistantName]) }}
 
-                @include('cloud::marketing.home.partials.agent-network')
-            </div>
-
-            {{-- The built-in assistant: the in-app conversational agent --}}
-            <div id="card-builtin-ai" class="{{ $cardBase }} p-6 overflow-hidden">
-                <h3 class="{{ $cardTitle }} inline-flex items-center gap-2">
-                    <x-ri-chat-smile-3-line id="ai-sparkle" class="w-3.5 h-3.5 text-primary dark:text-primary-400"/>
-                    {{ config('chat.assistant_name') }}, the built-in AI assistant
-                </h3>
-                <p class="{{ $cardDesc }}">
-                    Ask {{ config('chat.assistant_name') }} about your CRM and make changes through chat. Review every proposed change before it runs.
-                </p>
-                {{-- Mini chat-bubble preview (uses ai-fill for staggered width animation) --}}
-                <div class="mt-4 space-y-2">
-                    <div class="flex items-start gap-2">
-                        <div class="w-4 h-4 rounded-full bg-gray-200 dark:bg-white/[0.1] shrink-0 mt-px"></div>
-                        <div class="ai-line h-3 rounded-md bg-gray-100 dark:bg-white/[0.04] w-3/5 overflow-hidden"><div class="ai-fill h-full rounded-md bg-gray-300/60 dark:bg-white/[0.12] w-0"></div></div>
-                    </div>
-                    <div class="flex items-start gap-2 justify-end">
-                        <div class="ai-line h-3 rounded-md bg-primary/[0.08] dark:bg-primary/[0.12] w-3/4 overflow-hidden"><div class="ai-fill h-full rounded-md bg-primary/30 dark:bg-primary/40 w-0"></div></div>
-                        <div class="w-4 h-4 rounded-full bg-gray-900 dark:bg-white/[0.18] shrink-0 mt-px flex items-center justify-center">
-                            <x-ri-sparkling-2-fill class="w-2 h-2 text-white dark:text-gray-200"/>
+            <x-slot:visual>
+                <div class="flex min-h-[inherit] items-center justify-center p-6 md:p-12">
+                    <div class="relative w-full max-w-md space-y-3" data-approval>
+                        <div class="flex justify-end" data-approval-ask>
+                            <p class="max-w-[85%] rounded-2xl rounded-br-md bg-gray-900 px-3.5 py-2.5 text-sm leading-relaxed text-white dark:bg-white/10 dark:text-gray-100">
+                                {{ __('Mark the Northwind renewal as won and set the close date to today') }}
+                            </p>
                         </div>
-                    </div>
-                    <div class="ml-6 ai-line h-2 rounded-full bg-primary/[0.07] dark:bg-primary/[0.12] w-1/2 overflow-hidden"><div class="ai-fill h-full rounded-full bg-primary/15 dark:bg-primary/25 w-0"></div></div>
-                </div>
 
-                {{-- A text link, not a clickable card: no other card in this grid is an
-                     anchor, and making one of them one breaks the grid's contract. --}}
-                <a href="{{ route('ai') }}"
-                   class="group mt-4 inline-flex items-center gap-1 text-xs font-medium text-primary dark:text-primary-400 hover:gap-1.5 transition-all">
-                    Meet {{ config('chat.assistant_name') }}
-                    <x-ri-arrow-right-line class="w-3 h-3"/>
-                </a>
-            </div>
-
-            {{-- Customizable Data Model --}}
-            <div id="card-data" class="{{ $cardBase }} p-6 overflow-hidden">
-                <h3 class="{{ $cardTitle }} inline-flex items-center gap-2">
-                    <x-ri-stack-line class="w-3.5 h-3.5 text-primary dark:text-primary-400"/>
-                    Custom fields
-                </h3>
-                <p class="{{ $cardDesc }}">
-                    Capture the details that matter to your business. Add custom fields and connect related records.
-                </p>
-                <div class="mt-4 rounded-lg bg-gray-50 dark:bg-gray-800 p-3 space-y-2">
-                    @foreach([['Text', 'Company name...', false], ['Select', 'Industry', true]] as [$label, $placeholder, $hasArrow])
-                        <div class="field-row flex items-center gap-2">
-                            <div class="w-14 text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ $label }}</div>
-                            <div class="flex-1 h-6 rounded bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 px-2 flex items-center {{ $hasArrow ? 'justify-between' : '' }} text-[10px] text-gray-500 dark:text-gray-400">
-                                <span>{{ $placeholder }}</span>
-                                @if($hasArrow)<x-ri-arrow-down-s-line class="w-3 h-3"/>@endif
+                        <x-cloud::marketing.window class="ring-[3px] ring-primary-100 dark:ring-primary-400/10" data-approval-card>
+                            <div class="flex items-center justify-between gap-3 px-4 pt-3">
+                                <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ __('Update Opportunity') }}</p>
+                                <x-cloud::marketing.actor as="rela"/>
                             </div>
-                        </div>
-                    @endforeach
-                    <div class="field-row flex items-center gap-2">
-                        <div class="w-14 text-[10px] text-gray-500 dark:text-gray-400 shrink-0">Toggle</div>
-                        <div class="w-8 h-4 rounded-full bg-primary relative">
-                            <div class="absolute right-0.5 top-0.5 w-3 h-3 rounded-full bg-white shadow-sm"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            {{-- Company Management --}}
-            <div class="relative {{ $cardBase }} p-6 overflow-hidden">
-                <div class="absolute w-32 h-32 bg-primary/10 dark:bg-primary/15 rounded-full blur-2xl" style="top: -2rem; left: -2rem;"></div>
-                <div class="relative">
-                    <h3 class="{{ $cardTitle }} inline-flex items-center gap-2">
-                        <x-ri-building-2-line class="w-3.5 h-3.5 text-primary dark:text-primary-400"/>
-                        Company profiles
-                    </h3>
-                    <p class="{{ $cardDesc }}">See every company in context. Keep its details, people, and deals together so you can prepare for the next conversation.</p>
-                </div>
-            </div>
+                            <div class="flex min-w-0 items-center gap-2.5 px-4 pb-3 pt-1.5">
+                                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-500 text-white" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="{{ $opportunityIcon }}"/>
+                                    </svg>
+                                </span>
+                                <p class="min-w-0 truncate text-sm font-semibold text-gray-900 dark:text-white">{{ __('Northwind renewal') }}</p>
+                            </div>
 
-            {{-- People Management --}}
-            <div class="{{ $cardBase }} p-6">
-                <h3 class="{{ $cardTitle }} inline-flex items-center gap-2">
-                    <x-ri-user-star-line class="w-3.5 h-3.5 text-primary dark:text-primary-400"/>
-                    People profiles
-                </h3>
-                <p class="{{ $cardDesc }}">Know who you're talking to. Connect people to their companies, keep relationship notes, and find the right person with filters.</p>
-            </div>
+                            <dl class="divide-y divide-gray-100 border-t border-gray-100 dark:divide-white/5 dark:border-white/5">
+                                @foreach([
+                                    [__('Stage'), __('Negotiation'), __('Won')],
+                                    [__('Close date'), __('Not set'), __('Today')],
+                                ] as [$field, $before, $after])
+                                    <div class="flex items-center gap-3 px-4 py-2.5 text-sm">
+                                        <dt class="w-24 shrink-0 text-gray-500 dark:text-gray-400">{{ $field }}</dt>
+                                        <dd class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5">
+                                            <span class="text-gray-400 line-through dark:text-gray-500">{{ $before }}</span>
+                                            <x-ri-arrow-right-line class="h-3 w-3 shrink-0 text-gray-300 dark:text-gray-600"/>
+                                            <span class="font-medium text-gray-900 dark:text-white">{{ $after }}</span>
+                                        </dd>
+                                    </div>
+                                @endforeach
+                            </dl>
 
-            {{-- Sales Opportunities --}}
-            <div id="card-sales" class="{{ $cardBase }} p-6 md:col-span-2 lg:col-span-1 overflow-hidden">
-                <h3 class="{{ $cardTitle }} inline-flex items-center gap-2">
-                    <x-ri-funds-line class="w-3.5 h-3.5 text-primary dark:text-primary-400"/>
-                    Sales pipeline
-                </h3>
-                <p class="{{ $cardDesc }}">
-                    Follow every deal from first contact to close. Move deals through custom stages on a visual board that matches your sales process.
-                </p>
-                <div class="mt-4 flex gap-1 h-2 rounded-full overflow-hidden">
-                    <div class="pipe-seg flex-[3] bg-primary/70 rounded-l-full origin-left"></div>
-                    <div class="pipe-seg flex-[2] bg-primary/45 origin-left"></div>
-                    <div class="pipe-seg flex-[2] bg-primary/25 origin-left"></div>
-                    <div class="pipe-seg flex-[1] bg-gray-200 dark:bg-gray-700 rounded-r-full origin-left"></div>
-                </div>
-                <div class="mt-1.5 flex justify-between text-[10px] text-gray-500 dark:text-gray-500">
-                    @foreach(['Prospecting', 'Qualification', 'Proposal', 'Closed Won'] as $stage)
-                        <span>{{ $stage }}</span>
-                    @endforeach
-                </div>
-            </div>
-
-            {{-- Task Management, 2col --}}
-            <div id="card-tasks" class="{{ $cardBase }} p-6 md:col-span-2 lg:col-span-2 overflow-hidden">
-                <div class="flex flex-col md:flex-row md:gap-6">
-                    <div class="md:flex-1">
-                        <h3 class="font-display text-xl font-semibold text-gray-900 dark:text-white mb-2 inline-flex items-center gap-2">
-                            <x-ri-layout-masonry-line class="w-4 h-4 text-primary dark:text-primary-400"/>
-                            Task management
-                        </h3>
-                        <p class="{{ $cardDesc }}">
-                            Turn follow-ups into clear next steps. Assign tasks, set due dates, and link them to people, companies, or opportunities.
-                        </p>
-                    </div>
-                    <div class="mt-4 md:mt-0 md:flex-1 rounded-lg bg-gray-50 dark:bg-gray-800 p-4 space-y-3">
-                        @foreach([
-                            [true, 'Send proposal to', '@Acme', 'bg-primary/10 text-primary-700 dark:text-primary-300'],
-                            [false, 'Follow up with', '@Sarah', 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'],
-                            [false, 'Review Q4 pipeline', 'Due today', 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'],
-                        ] as [$done, $text, $badge, $badgeClass])
-                            <div class="task-row flex items-center gap-3">
-                                <div class="w-4 h-4 rounded-full border-2 {{ $done ? 'border-green-500 bg-green-500/20' : 'border-gray-300 dark:border-gray-600' }} flex items-center justify-center shrink-0">
-                                    @if($done)<x-ri-check-line class="w-2.5 h-2.5 text-green-600 dark:text-green-400"/>@endif
+                            <div class="grid border-t border-gray-100 dark:border-white/5">
+                                <div class="col-start-1 row-start-1 flex items-center justify-end gap-2 px-4 py-2.5" data-approval-pending>
+                                    <span class="inline-flex h-7 items-center rounded-md px-2.5 text-xs font-medium text-gray-600 dark:text-gray-300">{{ __('Discard') }}</span>
+                                    <span class="inline-flex h-7 items-center rounded-md bg-primary-600 px-2.5 text-xs font-medium text-white shadow-sm" data-approval-button>{{ __('Save changes') }}</span>
                                 </div>
-                                <span class="text-sm {{ $done ? 'text-gray-500 dark:text-gray-500 line-through' : 'text-gray-700 dark:text-gray-300' }}">{{ $text }}</span>
-                                <span class="text-[10px] {{ $badgeClass }} px-2 py-0.5 rounded-full shrink-0">{{ $badge }}</span>
+                                <div class="invisible col-start-1 row-start-1 flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium text-emerald-700 opacity-0 dark:text-emerald-400" data-approval-done aria-hidden="true">
+                                    <x-ri-checkbox-circle-fill class="h-4 w-4"/>
+                                    {{ __('Approved by you. Saved to Northwind renewal.') }}
+                                </div>
                             </div>
-                        @endforeach
+                        </x-cloud::marketing.window>
+
+                        <svg data-approval-cursor class="pointer-events-none absolute left-0 top-0 h-5 w-5 opacity-0 drop-shadow" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M4 2.5l15 9.2-6.6 1.3 3.8 7.3-2.6 1.3-3.8-7.3L4 19z" fill="#111827" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
+                        </svg>
                     </div>
                 </div>
-            </div>
+            </x-slot:visual>
+        </x-cloud::marketing.showcase>
 
-            {{-- Simple feature cards row 2 --}}
-            @foreach([
-                ['ri-team-line', 'Team collaboration', 'Work from shared customer records. Organize teams in separate workspaces and use roles to control who can view or change data.'],
-                ['ri-download-cloud-2-line', 'Import and export', 'Bring your records into Relaticle with CSV imports. Map columns, review validation errors, and export your data when you need it.'],
-            ] as [$icon, $title, $desc])
-                <div class="{{ $cardBase }} p-6">
-                    <h3 class="{{ $cardTitle }} inline-flex items-center gap-2">
-                        <x-dynamic-component :component="$icon" class="w-3.5 h-3.5 text-primary dark:text-primary-400"/>
-                        {{ $title }}
-                    </h3>
-                    <p class="{{ $cardDesc }}">{{ $desc }}</p>
-                </div>
-            @endforeach
+        <x-cloud::marketing.showcase
+            data-feature-row
+            :label="__('03 · Your agents')"
+            :lead="__('Work from Claude or ChatGPT.')"
+            :link-label="__('Relaticle for Claude')"
+            :link-href="route(\Relaticle\Cloud\Marketing\Enums\ConnectableAssistant::Claude->routeName())"
+        >
+            {{ __('Your agent reads and updates the same records you do, with your permissions.') }}
 
-            {{-- Notes & Activity Log, spanning full width on tablet to avoid an orphan gap --}}
-            <div class="{{ $cardBase }} p-6 md:col-span-2 lg:col-span-1">
-                <h3 class="{{ $cardTitle }} inline-flex items-center gap-2">
-                    <x-ri-quill-pen-line class="w-3.5 h-3.5 text-primary dark:text-primary-400"/>
-                    Notes and activity
-                </h3>
-                <p class="{{ $cardDesc }}">Keep customer context close to the records it belongs to. Add linked notes and review the activity history to see what changed.</p>
-            </div>
+            <x-slot:visual>
+                <div class="flex min-h-[inherit] items-center justify-center p-4 sm:p-8 md:p-12">
+                    <div class="relative w-full max-w-md" data-agent-demo>
+                        <x-cloud::marketing.window>
+                            <div class="flex items-center gap-2 border-b border-gray-100 px-4 py-3 dark:border-white/[0.06]">
+                                <x-ri-claude-fill class="h-4 w-4 text-anthropic"/>
+                                <span class="text-sm font-medium text-gray-900 dark:text-white">Claude</span>
+                                <span class="ml-auto inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                                    {{ __('Relaticle connected') }}
+                                </span>
+                            </div>
+                            <div class="space-y-3 px-4 pb-10 pt-4">
+                                <div class="flex justify-end">
+                                    <p class="max-w-[85%] rounded-2xl rounded-br-md bg-gray-100 px-3.5 py-2.5 text-sm leading-relaxed text-gray-900 dark:bg-white/10 dark:text-gray-100">
+                                        {{ __('Add a follow-up with Lena at Northwind for Thursday') }}
+                                    </p>
+                                </div>
+                                <p class="inline-flex items-center gap-1.5 rounded-md border border-gray-200/80 bg-gray-50 px-2 py-1 text-xs text-gray-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-gray-400" data-agent-step>
+                                    <x-ri-plug-line class="h-3.5 w-3.5 shrink-0 text-primary dark:text-primary-400"/>
+                                    {{ __('Relaticle') }}
+                                    <span aria-hidden="true">·</span>
+                                    {{ __('Create task') }}
+                                    <x-ri-check-line class="h-3.5 w-3.5 shrink-0 text-emerald-500"/>
+                                </p>
+                                <p class="text-sm leading-relaxed text-gray-700 dark:text-gray-300" data-agent-step>
+                                    {{ __('Done. The task is due Thursday and linked to Lena Ortiz and the Northwind renewal.') }}
+                                </p>
+                            </div>
+                        </x-cloud::marketing.window>
 
-            {{-- CTA Card --}}
-            <div class="relative {{ $cardBase }} p-6 flex flex-col justify-between md:col-span-2 lg:col-span-1 overflow-hidden">
-                <div class="absolute -bottom-8 -right-8 w-32 h-32 bg-primary/10 dark:bg-primary/15 rounded-full blur-2xl"></div>
-                <div class="relative">
-                    <h3 class="{{ $cardTitle }}">Ready to start?</h3>
-                    <p class="{{ $cardDesc }}">Put your companies, deals, and agents in one CRM.</p>
-                </div>
-                <div class="relative mt-5">
-                    <x-cloud::marketing.button size="sm" href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="page">
-                        Start for free
-                    </x-cloud::marketing.button>
-                    <div class="mt-3 flex items-center gap-3 text-[10px] text-gray-500 dark:text-gray-500">
-                        <span>No credit card</span><span>&middot;</span><span>Unlimited users</span><span>&middot;</span><span>Open source</span>
+                        <x-cloud::marketing.window class="relative z-10 -mt-6 ml-auto w-[88%]" data-agent-task>
+                            <div class="flex items-start gap-3 px-4 py-3.5">
+                                <span class="mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 border-gray-300 dark:border-white/20" aria-hidden="true"></span>
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-sm font-medium text-gray-900 dark:text-white">{{ __('Follow up with Lena Ortiz') }}</p>
+                                    <div class="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+                                        <span class="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 font-medium text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+                                            <x-ri-calendar-line class="h-3 w-3"/>{{ __('Thursday') }}
+                                        </span>
+                                        <span class="rounded-md bg-gray-100 px-1.5 py-0.5 text-gray-600 dark:bg-white/[0.06] dark:text-gray-300">Lena Ortiz</span>
+                                        <span class="rounded-md bg-gray-100 px-1.5 py-0.5 text-gray-600 dark:bg-white/[0.06] dark:text-gray-300">{{ __('Northwind renewal') }}</span>
+                                    </div>
+                                </div>
+                                <x-cloud::marketing.actor as="claude"/>
+                            </div>
+                        </x-cloud::marketing.window>
                     </div>
                 </div>
-            </div>
+            </x-slot:visual>
+        </x-cloud::marketing.showcase>
+        <div class="bg-surface p-6 md:p-10" data-story>
+            <x-cloud::marketing.eyebrow class="mb-4">{{ __('04 · One record') }}</x-cloud::marketing.eyebrow>
+            <h3 class="type-lead max-w-2xl">
+                <span class="text-gray-950 dark:text-white">{{ __('Four hands, one opportunity.') }}</span>
+                <span class="text-gray-500 dark:text-gray-400">{{ __('Your inbox, you, your agent and :name all work on the same record.', ['name' => $assistantName]) }}</span>
+            </h3>
 
+            <ol class="relative mt-10 grid grid-cols-1 gap-8 md:grid-cols-4 md:gap-6">
+                <span data-story-line class="absolute left-0 right-0 top-3 hidden h-px bg-rail md:block" aria-hidden="true"></span>
+                @foreach([
+                    ['mailbox', __('Monday'), __('Adds Lena Ortiz and Northwind after your first email.')],
+                    ['you', __('Tuesday'), __('Moves Northwind renewal to Negotiation on the board.')],
+                    ['claude', __('Wednesday'), __('Creates a follow-up task for Thursday from a chat in Claude.')],
+                    ['rela', __('Friday'), __('Marks the opportunity as won after you approve the change.')],
+                ] as [$actor, $day, $action])
+                    <li data-story-step class="relative">
+                        <x-cloud::marketing.actor :as="$actor" class="relative"/>
+                        <p class="type-label mt-5 text-gray-500 dark:text-gray-400">{{ $day }}</p>
+                        <p class="mt-1.5 text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ $action }}</p>
+                        @if($actor === 'rela')
+                            <p class="mt-3 inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                                <x-ri-checkbox-circle-fill class="h-3.5 w-3.5"/>
+                                {{ __('Approved by you') }}
+                            </p>
+                        @endif
+                    </li>
+                @endforeach
+            </ol>
         </div>
-
     </div>
-</section>
+</x-cloud::marketing.frame>

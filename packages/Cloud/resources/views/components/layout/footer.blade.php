@@ -1,10 +1,21 @@
-<!-- Minimalist Footer -->
-<footer class="py-12 md:py-16 border-t border-gray-100 dark:border-gray-900 bg-white dark:bg-gray-950">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div
-            class="grid grid-cols-1 md:grid-cols-12 gap-10 md:gap-8 pb-10 border-b border-gray-100 dark:border-gray-900">
-            <!-- Company Info -->
-            <div class="md:col-span-4 space-y-5">
+@props([
+    'framed' => false,
+])
+
+<footer @class([
+    'bg-surface' => $framed,
+    'py-12 md:py-16 border-t border-gray-100 dark:border-gray-900 bg-white dark:bg-gray-950' => ! $framed,
+])>
+    <div @class([
+        'mx-auto max-w-6xl border-rail sm:border-x' => $framed,
+        'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8' => ! $framed,
+    ])>
+        <div @class([
+            'grid grid-cols-1 md:grid-cols-12',
+            'gap-px bg-rail' => $framed,
+            'gap-10 md:gap-8 pb-10 border-b border-gray-100 dark:border-gray-900' => ! $framed,
+        ])>
+            <div @class(['md:col-span-4 space-y-5', 'bg-surface p-6 md:p-10' => $framed])>
                 <a href="{{ url('/') }}" class="inline-flex w-fit" aria-label="Relaticle Home">
                     <x-brand.logo-lockup size="md" class="text-black dark:text-white" />
                 </a>
@@ -12,7 +23,6 @@
                     The open-source AI CRM for selling without a sales team. Run it yourself or on Relaticle Cloud, with no per-seat pricing.
                 </p>
 
-                <!-- Social links - Simplified -->
                 <div class="flex space-x-4">
                     <a href="https://github.com/relaticle/relaticle" target="_blank" rel="noopener noreferrer"
                        class="text-gray-400 hover:text-primary dark:hover:text-primary-400 transition-colors"
@@ -37,15 +47,15 @@
 
             @php($columns = app(\Relaticle\Cloud\Marketing\Support\MarketingNavigation::class)->footer())
 
-            <nav aria-label="{{ __('Footer') }}" class="md:col-span-8 grid grid-cols-2 md:grid-cols-4 gap-8">
+            <nav aria-label="{{ __('Footer') }}" @class(['md:col-span-8 grid grid-cols-2 md:grid-cols-4', 'gap-px bg-rail' => $framed, 'gap-8' => ! $framed])>
                 {{-- The column labels are list labels, not document sections: as
                      headings they appended four <h3>s to every page's outline,
                      nested under whichever <h2> the page happened to end on.
                      `aria-labelledby` keeps each list named without that. --}}
                 @foreach($columns as $column)
                     @php($columnId = 'footer-'.\Illuminate\Support\Str::slug($column->label))
-                    <div>
-                        <p id="{{ $columnId }}" class="font-medium text-xs text-black dark:text-white uppercase tracking-wider mb-4">
+                    <div @class(['bg-surface p-6 md:p-8' => $framed])>
+                        <p id="{{ $columnId }}" @class(['mb-4', 'type-label text-gray-500 dark:text-gray-400' => $framed, 'font-medium text-xs text-black dark:text-white uppercase tracking-wider' => ! $framed])>
                             {{ $column->label }}
                         </p>
                         <ul aria-labelledby="{{ $columnId }}" class="space-y-3">
@@ -65,8 +75,7 @@
             </nav>
         </div>
 
-        <!-- Copyright section -->
-        <div class="mt-8 flex flex-col md:flex-row md:justify-between items-center gap-4">
+        <div @class(['flex flex-col md:flex-row md:justify-between items-center gap-4', 'border-t border-rail px-6 py-5 md:px-10' => $framed, 'mt-8' => ! $framed])>
             <div class="flex items-center gap-4">
                 <p class="text-gray-500 dark:text-gray-400 text-xs">&copy; {{ date('Y') }} Relaticle. All rights
                     reserved.</p>

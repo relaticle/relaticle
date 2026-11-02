@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Features\Blog;
+use App\Features\EmailIntegration;
 use GuzzleHttp\HandlerStack;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
@@ -57,6 +58,14 @@ it('leaves the blog out of the sitemap when the feature is off', function (): vo
 
     expect(Storage::disk('public')->get('sitemap.xml'))->not->toContain(route('blog.show', $post->slug));
 });
+
+it('lists the email and calendar page only while email integration is on', function (bool $active): void {
+    Feature::for(null)->{$active ? 'activate' : 'deactivate'}(EmailIntegration::class);
+
+    $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+    expect(str_contains((string) Storage::disk('public')->get('sitemap.xml'), '<loc>'.route('emailAndCalendar').'</loc>'))->toBe($active);
+})->with([true, false]);
 
 it('adds help urls to the sitemap with lastmod from front matter', function (): void {
     $this->artisan('app:generate-sitemap')->assertSuccessful();
