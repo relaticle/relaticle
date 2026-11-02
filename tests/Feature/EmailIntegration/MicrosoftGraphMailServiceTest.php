@@ -1043,6 +1043,20 @@ it('stores Graph inline cid images so the reader can rewrite them', function ():
         ->not->toContain('cid:logo@example.test');
 });
 
+it('keeps angle brackets in the plain-text body preview', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        ...graphWellKnownFolderFakes(),
+        'https://graph.microsoft.com/v1.0/me/messages/MSG1*' => Http::response(graphMessagePayload([
+            'bodyPreview' => 'Jane <jane@example.com> wrote: a<b &amp; ready',
+        ])),
+    ]);
+
+    $fetched = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->fetchMessage('MSG1');
+
+    expect($fetched->snippet)->toBe('Jane <jane@example.com> wrote: a<b &amp; ready');
+});
+
 it('fetches a stored rest id after a folder move by translating it to an immutable id', function (): void {
     Http::preventStrayRequests();
     Http::fake([

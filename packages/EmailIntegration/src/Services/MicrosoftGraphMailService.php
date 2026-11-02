@@ -151,7 +151,7 @@ final class MicrosoftGraphMailService implements MailServiceInterface
             threadId: (string) ($message['conversationId'] ?? ''),
             inReplyTo: null,
             subject: $message['subject'] ?? null,
-            snippet: mb_substr(strip_tags((string) ($message['bodyPreview'] ?? '')), 0, 255),
+            snippet: mb_substr(Str::squish((string) ($message['bodyPreview'] ?? '')), 0, 255),
             sentAt: $sentAt,
             direction: $isOutbound ? EmailDirection::OUTBOUND : EmailDirection::INBOUND,
             folder: $folder,
