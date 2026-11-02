@@ -760,6 +760,17 @@ it('saves a private draft and sends nothing', function (): void {
         ->and(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(0);
 });
 
+it('stores a readable text copy and snippet of a draft', function (): void {
+    $data = emailToolData($this->viewer, CreateEmailDraftTool::class, draftArguments($this->viewerAccount, [
+        'body' => "Hi Dana,\n\nI'm sending the plan & the timeline.",
+    ]));
+
+    $draft = Email::query()->with('body')->findOrFail($data['id']);
+
+    expect($draft->body->body_text)->toBe("Hi Dana,\n\nI'm sending the plan & the timeline.")
+        ->and($draft->snippet)->toBe("Hi Dana, I'm sending the plan & the timeline.");
+});
+
 it('escapes raw html in a draft body', function (): void {
     $data = emailToolData($this->viewer, CreateEmailDraftTool::class, draftArguments($this->viewerAccount, [
         'body' => 'Hi <script>alert(1)</script> <img src=x onerror=alert(1)> **safe**',

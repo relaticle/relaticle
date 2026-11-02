@@ -69,6 +69,23 @@ it('persists a queued Email row for the outbox', function (): void {
         ->and($email->rfc_message_id)->toMatch('/^<[0-9A-Za-z]+@.+>$/');
 });
 
+it('stores a readable text copy and snippet of the queued email', function (): void {
+    $email = app(SendEmailAction::class)->execute($this->user, [
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Partner program',
+        'body_html' => '<p>Hi Kai,</p><p>I&#039;m Manuk &amp; I build Relaticle.</p>',
+        'to' => [['email' => 'recipient@example.com', 'name' => 'Recipient']],
+        'cc' => [],
+        'bcc' => [],
+        'in_reply_to_email_id' => null,
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'batch_id' => null,
+    ]);
+
+    expect($email->body->body_text)->toBe("Hi Kai,\n\nI'm Manuk & I build Relaticle.")
+        ->and($email->snippet)->toBe("Hi Kai, I'm Manuk & I build Relaticle.");
+});
+
 it('forbids queuing mail when the mailbox cannot send', function (): void {
     $this->account->update([
         'capabilities' => [

@@ -842,7 +842,6 @@ it('POSTs to /me/sendMail and returns provider ids', function (): void {
     $result = $service->sendMessage([
         'subject' => 'Hi',
         'body_html' => '<p>Hi</p>',
-        'body_text' => 'Hi',
         'to' => [['email' => 'b@example.com', 'name' => 'B']],
         'rfc_message_id' => '<local-id@example.com>',
     ]);

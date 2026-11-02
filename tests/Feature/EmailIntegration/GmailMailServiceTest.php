@@ -51,6 +51,13 @@ function decodeRaw(Message $message): string
     return base64_decode(strtr($message->getRaw(), '-_', '+/'));
 }
 
+function alternativePart(string $raw, string $mimeType): string
+{
+    preg_match('/Content-Type: '.preg_quote($mimeType, '/').'; charset=UTF-8\r\n(?:Content-Transfer-Encoding: quoted-printable\r\n)?\r\n(.*?)\r\n\r\n--boundary_relaticle/s', $raw, $matches);
+
+    return quoted_printable_decode($matches[1] ?? '');
+}
+
 /**
  * @param  list<string>  $labelIds
  * @param  array<string, string>  $extraHeaders
@@ -232,6 +239,63 @@ it('sends a plain multipart/alternative message when there are no attachments', 
 
     expect($raw)->toContain('Content-Type: multipart/alternative; boundary="boundary_relaticle"')
         ->and($raw)->not->toContain('multipart/mixed');
+});
+
+it('sends a plain-text part that keeps paragraphs, lists, links and quotes readable', function (): void {
+    $account = ConnectedAccount::factory()->make(['email_address' => 'sender@example.com']);
+
+    $captured = null;
+    $gmail = fakeGmail(function (Message $message) use (&$captured): void {
+        $captured = $message;
+    });
+
+    new GmailService($account, $gmail)->sendMessage([
+        'subject' => 'Partner program',
+        'body_html' => '<p>Hi Kai,</p><p>I&#039;m Manuk &amp; I build Relaticle.<br>Two things:</p>'
+            .'<ul><li><p>Pricing</p></li><li><p>The <a href="https://relaticle.com/docs">setup guide</a></p></li></ul>'
+            .'<p>Manuk</p><blockquote><p>Can we talk?</p><p>Kai</p></blockquote>',
+        'to' => [['email' => 'kai@example.com', 'name' => null]],
+    ]);
+
+    expect(alternativePart(decodeRaw($captured), 'text/plain'))->toBe(implode("\r\n", [
+        'Hi Kai,',
+        '',
+        "I'm Manuk & I build Relaticle.",
+        'Two things:',
+        '',
+        '- Pricing',
+        '- The setup guide (https://relaticle.com/docs)',
+        '',
+        'Manuk',
+        '',
+        '> Can we talk?',
+        '>',
+        '> Kai',
+    ]));
+});
+
+it('encodes both alternative parts as quoted-printable within the RFC 5322 line limit', function (): void {
+    $account = ConnectedAccount::factory()->make(['email_address' => 'sender@example.com']);
+
+    $captured = null;
+    $gmail = fakeGmail(function (Message $message) use (&$captured): void {
+        $captured = $message;
+    });
+
+    $paragraph = str_repeat('Grüße aus Görgeshausen, wir melden uns zur Partnerschaft. ', 30);
+
+    new GmailService($account, $gmail)->sendMessage([
+        'subject' => 'Partnerschaft',
+        'body_html' => "<p>{$paragraph}</p>",
+        'to' => [['email' => 'kai@example.com', 'name' => null]],
+    ]);
+
+    $raw = decodeRaw($captured);
+
+    expect(substr_count($raw, "Content-Transfer-Encoding: quoted-printable\r\n"))->toBe(2)
+        ->and(max(array_map(strlen(...), explode("\r\n", $raw))))->toBeLessThanOrEqual(76)
+        ->and(alternativePart($raw, 'text/html'))->toBe('<p>'.$paragraph.'</p>')
+        ->and(alternativePart($raw, 'text/plain'))->toBe(trim($paragraph));
 });
 
 it('threads a same-mailbox reply with the provider thread id', function (): void {

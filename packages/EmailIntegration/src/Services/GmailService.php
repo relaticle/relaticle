@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
+use App\Support\PlainText;
 use Google\Service\Exception as GoogleServiceException;
 use Google\Service\Gmail;
 use Google\Service\Gmail\Message;
@@ -216,7 +217,6 @@ final readonly class GmailService implements MailServiceInterface
      * @param array{
      *     subject: string,
      *     body_html: string,
-     *     body_text?: string,
      *     to: array<int, array{email: string, name: ?string}>,
      *     cc?: array<int, array{email: string, name: ?string}>,
      *     bcc?: array<int, array{email: string, name: ?string}>,
@@ -333,14 +333,12 @@ final readonly class GmailService implements MailServiceInterface
             $headers[] = 'References: '.$inReplyTo;
         }
 
-        $bodyText = $data['body_text'] ?? strip_tags($data['body_html'] ?? '');
+        $bodyHtml = $data['body_html'] ?? '';
 
         $alternative = "--boundary_relaticle\r\n"
-            ."Content-Type: text/plain; charset=UTF-8\r\n\r\n"
-            .$bodyText."\r\n\r\n"
+            .$this->quotedPrintablePart('text/plain', PlainText::paragraphsFromHtml($bodyHtml))
             ."--boundary_relaticle\r\n"
-            ."Content-Type: text/html; charset=UTF-8\r\n\r\n"
-            .($data['body_html'] ?? '')."\r\n\r\n"
+            .$this->quotedPrintablePart('text/html', $bodyHtml)
             .'--boundary_relaticle--';
 
         if ($inlineAttachments === [] && $fileAttachments === []) {
@@ -367,6 +365,15 @@ final readonly class GmailService implements MailServiceInterface
         }
 
         return $raw.'--mixed_relaticle--';
+    }
+
+    // RFC 2045 assumes 7bit without a transfer encoding: ASCII only, lines of 998
+    // octets at most. Quoted-printable carries UTF-8 and wraps lines at 76.
+    private function quotedPrintablePart(string $mimeType, string $content): string
+    {
+        return "Content-Type: {$mimeType}; charset=UTF-8\r\n"
+            ."Content-Transfer-Encoding: quoted-printable\r\n\r\n"
+            .quoted_printable_encode((string) preg_replace('/\r\n|\r|\n/', "\r\n", $content))."\r\n\r\n";
     }
 
     private function rootContentTypeHeader(bool $hasInline, bool $hasFiles): string
