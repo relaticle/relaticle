@@ -31,4 +31,13 @@ final class CustomFields extends CustomFieldsManagementPage
     {
         return null;
     }
+
+    /** @return array<string> */
+    public function getPageClasses(): array
+    {
+        return [
+            ...parent::getPageClasses(),
+            'fi-custom-fields-page',
+        ];
+    }
 }
