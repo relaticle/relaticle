@@ -71,6 +71,8 @@ return [
         'ended' => 'Trial ended',
         'end_trials' => 'End trials now',
         'trial_ends' => 'Trial ends',
+        'latest_end' => 'At most :days days from today.',
+        'must_end_in_future' => 'The trial must end in the future.',
         'extend' => 'Extend trial',
         'extend_heading' => 'Extend this trial?',
         'extend_description' => 'The trial runs until the date below. Credits refill when the current period ends. The owner is not emailed.',
