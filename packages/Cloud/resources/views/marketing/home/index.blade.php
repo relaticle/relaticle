@@ -24,7 +24,8 @@
     :title="config('app.name') . ' - ' . __('Open-Source AI CRM for Claude and ChatGPT')"
     :description="'Open-source AI CRM for people who sell without a sales team. Work from Claude or ChatGPT, or ask '.$assistantName.', the built-in assistant. Free to self-host.'"
     :ogTitle="config('app.name') . ' - ' . __('Open-Source AI CRM for Claude and ChatGPT')"
-    :ogDescription="'The open-source AI CRM for selling without a sales team. Work from Claude or ChatGPT, or ask '.$assistantName.', the built-in assistant.'">
+    :ogDescription="'The open-source AI CRM for selling without a sales team. Work from Claude or ChatGPT, or ask '.$assistantName.', the built-in assistant.'"
+    framed>
     @push('header')
         @vite('packages/Cloud/resources/js/motion.js')
     @endpush
@@ -32,6 +33,10 @@
     @include('cloud::marketing.home.partials.hero')
     @include('cloud::marketing.home.partials.works-with')
     @include('cloud::marketing.home.partials.features')
+    @if($emailIntegrationActive)
+        @include('cloud::marketing.home.partials.email')
+    @endif
+    @include('cloud::marketing.home.partials.capabilities')
     @include('cloud::marketing.home.partials.community')
     @include('cloud::marketing.home.partials.faq')
     @include('cloud::marketing.home.partials.start-building')

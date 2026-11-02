@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Features\EmailIntegration;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Marketing\Enums\ConnectableAssistant;
 use Relaticle\Cloud\Marketing\Http\Controllers\AlternativesController;
 use Relaticle\Cloud\Marketing\Http\Controllers\AssistantPagesController;
@@ -47,6 +49,13 @@ Route::middleware([ProvideMarkdownResponse::class, AddVaryAcceptHeader::class])-
     }
 
     Route::get('/security', fn (): View => view('cloud::marketing.security'))->name('security');
+
+    Route::get('/email-and-calendar', function (): View {
+        abort_unless(Feature::active(EmailIntegration::class), 404);
+
+        return view('cloud::marketing.email-and-calendar');
+    })->name('emailAndCalendar');
+
     Route::get('/compare/relaticle-vs-{competitor}', [ComparisonController::class, 'show'])->name('compare.show');
     Route::get('/alternatives/{competitor}', [AlternativesController::class, 'show'])->name('alternatives.show');
     Route::get('/contact', [ContactController::class, 'show'])->name('contact');

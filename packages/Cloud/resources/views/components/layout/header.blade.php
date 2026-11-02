@@ -1,3 +1,7 @@
+@props([
+    'framed' => false,
+])
+
 {{-- The mobile overlay is `fixed inset-0`, which does not stop the page behind it
      from scrolling, and does not stop Tab from walking into the page behind it
      either. `bodyLock` handles the first, `trapTab` the second.
@@ -38,8 +42,16 @@
         @resize.window="if (window.innerWidth >= 768) mobileMenu = false">
     <div
         id="main-header"
-        class="fixed w-full top-0 z-50 bg-white/80 dark:bg-gray-950/90 backdrop-blur-md border-b border-gray-200/60 dark:border-white/[0.06]">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        @class([
+            'fixed w-full top-0 z-50 bg-white/80 dark:bg-gray-950/90 backdrop-blur-md border-b',
+            'border-rail' => $framed,
+            'border-gray-200/60 dark:border-white/[0.06]' => ! $framed,
+        ])>
+        <div @class([
+            'mx-auto',
+            'max-w-6xl border-rail px-6 sm:border-x md:px-10' => $framed,
+            'max-w-7xl px-4 sm:px-6 lg:px-8' => ! $framed,
+        ])>
             <div class="flex items-center justify-between h-16">
 
                 <div class="flex flex-1 items-center">

@@ -7,18 +7,16 @@
     ];
 @endphp
 
-<section aria-label="{{ __('Works with') }}" class="relative bg-white dark:bg-gray-950 border-y border-gray-200 dark:border-white/[0.08]">
-    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="grid grid-cols-2 md:grid-cols-[2fr_repeat(4,1fr)_1.5fr] divide-x divide-y md:divide-y-0 divide-gray-200 dark:divide-white/[0.08] border-x border-gray-200 dark:border-white/[0.08]">
+<section aria-label="{{ __('Works with') }}" class="bg-surface border-rail relative border-y">
+    <div class="mx-auto max-w-6xl">
+        <div class="divide-rail border-rail grid grid-cols-2 md:grid-cols-[2fr_repeat(4,1fr)_1.5fr] divide-x divide-y md:divide-y-0 sm:border-x">
             <div class="col-span-2 md:col-span-1 flex items-center px-5 py-4 md:py-6">
-                <p class="font-mono uppercase tracking-[0.14em] text-[10px] leading-relaxed text-gray-500 dark:text-gray-400">
-                    {{ __('Works with the AI you already use') }}
-                </p>
+                <x-cloud::marketing.eyebrow>{{ __('Works with the AI you already use') }}</x-cloud::marketing.eyebrow>
             </div>
 
             @foreach($clients as [$icon, $color, $name, $assistant])
                 @if($assistant)
-                    <a href="{{ route($assistant->routeName()) }}" class="flex items-center justify-center gap-2.5 px-4 py-5 md:py-6 transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.03]">
+                    <a href="{{ route($assistant->routeName()) }}" class="flex items-center justify-center gap-2.5 px-4 py-5 md:py-6 hover:bg-tint transition-colors">
                         <x-dynamic-component :component="$icon" class="w-5 h-5 shrink-0 {{ $color }}"/>
                         <span class="text-sm font-semibold tracking-tight text-gray-800 dark:text-gray-200">{{ $name }}</span>
                     </a>
@@ -43,7 +41,7 @@
         </div>
 
         @if($formattedDockerPulls !== null)
-            <p class="border-x border-t border-gray-200 dark:border-white/[0.08] px-5 py-3 text-center text-xs text-gray-500 dark:text-gray-400">
+            <p class="border-rail border-t sm:border-x px-5 py-3 text-center text-xs text-gray-500 dark:text-gray-400">
                 <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $formattedDockerPulls }}</span> {{ __('Docker pulls') }}
                 <span class="mx-2 text-gray-300 dark:text-gray-600">/</span>{{ __('self-hosted and open source, shipping weekly') }}
             </p>

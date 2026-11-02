@@ -10,6 +10,65 @@
 @source "../views/overrides";
 @source "../js";
 
+/* Marketing surfaces: hairline rails between flat cells, depth from the surface ladder, not shadows. */
+@theme {
+    --color-rail: var(--color-gray-200);
+    --color-surface: var(--color-white);
+    --color-tint: var(--color-gray-50);
+}
+
+.dark {
+    --color-rail: rgb(255 255 255 / 0.1);
+    --color-surface: var(--color-gray-950);
+    --color-tint: var(--color-gray-900);
+}
+
+@utility type-display {
+    font-family: var(--font-display);
+    font-size: 2.25rem;
+    font-weight: 600;
+    line-height: 1.08;
+    letter-spacing: -0.03em;
+    text-wrap: balance;
+
+    @media (width >= 48rem) {
+        font-size: 3.75rem;
+    }
+}
+
+@utility type-title {
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+
+    @media (width >= 48rem) {
+        font-size: 2.5rem;
+    }
+}
+
+@utility type-lead {
+    font-size: 1.125rem;
+    font-weight: 500;
+    line-height: 1.4;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+
+    @media (width >= 48rem) {
+        font-size: 1.25rem;
+    }
+}
+
+@utility type-label {
+    font-family: var(--font-mono);
+    font-size: var(--text-pico);
+    line-height: 1.6;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
 /* The hero mock mirrors the app panel, whose gray is zinc. This bundle's gray is Tailwind's cool gray. */
 .hero-agent-preview {
     --color-gray-50: var(--color-zinc-50);

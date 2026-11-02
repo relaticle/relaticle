@@ -6,6 +6,7 @@ namespace Relaticle\Cloud\Marketing\Support;
 
 use App\Features\Blog;
 use App\Features\Documentation;
+use App\Features\EmailIntegration;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Marketing\Enums\ConnectableAssistant;
 
@@ -17,7 +18,7 @@ final readonly class MarketingNavigation
     public function header(): array
     {
         return [
-            new NavItem(__('Product'), children: array_filter([
+            new NavItem(__('Product'), children: array_values(array_filter([
                 new NavItem(
                     (string) config('chat.assistant_name'),
                     route('ai'),
@@ -30,6 +31,12 @@ final readonly class MarketingNavigation
                     icon: 'features',
                     description: __('Records, pipelines, and custom fields'),
                 ),
+                Feature::active(EmailIntegration::class) ? new NavItem(
+                    __('Email and calendar'),
+                    route('emailAndCalendar'),
+                    icon: 'email',
+                    description: __('Gmail and Outlook on every record'),
+                ) : null,
                 new NavItem(
                     __('Self-hosted'),
                     route('selfHosted'),
@@ -42,7 +49,7 @@ final readonly class MarketingNavigation
                     icon: 'api',
                     description: __('Drive Relaticle from your own tools'),
                 ) : null,
-            ])),
+            ]))),
             new NavItem(__('Resources'), children: $this->groups([
                 new NavItem(__('Learn'), children: $this->resourceItems(withDetail: true)),
                 new NavItem(__('Compare'), children: $this->comparisonItems()),
@@ -76,9 +83,10 @@ final readonly class MarketingNavigation
     public function footer(): array
     {
         return [
-            new NavItem(__('Product'), children: [
+            new NavItem(__('Product'), children: array_values(array_filter([
                 new NavItem((string) config('chat.assistant_name'), route('ai')),
                 new NavItem(__('Features'), url('/#features')),
+                Feature::active(EmailIntegration::class) ? new NavItem(__('Email and calendar'), route('emailAndCalendar')) : null,
                 new NavItem(__('Pricing'), route('pricing')),
                 new NavItem(__('Self-hosted'), route('selfHosted')),
                 ...array_map(
@@ -88,7 +96,7 @@ final readonly class MarketingNavigation
                     ),
                     ConnectableAssistant::cases(),
                 ),
-            ]),
+            ]))),
             new NavItem(__('Resources'), children: [
                 ...$this->resourceItems(),
                 new NavItem(__('Press kit'), route('press')),
