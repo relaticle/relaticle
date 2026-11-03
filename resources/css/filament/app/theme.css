@@ -1133,9 +1133,10 @@ html.fi-record-stacked .fi-record-layout {
         @apply isolate rounded-none bg-transparent shadow-none ring-0 dark:bg-transparent;
     }
 
-    /* One row: heading, then search and filters, then the header actions at the end. */
+    /* One row: heading, then search and filters, then the header actions at the end.
+       Below sm the heading keeps its actions on the first line and search takes the second. */
     .fi-ta-header-ctn {
-        @apply flex flex-wrap items-center gap-x-3 gap-y-2 px-6 py-2.5;
+        @apply flex flex-wrap items-center gap-x-3 gap-y-2 px-6 py-2.5 max-sm:px-0;
     }
 
     .fi-ta-header {
@@ -1146,12 +1147,29 @@ html.fi-record-stacked .fi-record-layout {
         }
 
         & > .fi-ta-actions {
-            @apply order-2;
+            @apply order-2 max-sm:order-1;
         }
     }
 
     .fi-ta-header-toolbar {
-        @apply order-1 border-b-0 p-0;
+        @apply order-1 border-b-0 p-0 max-sm:order-2 max-sm:basis-full max-sm:gap-x-0;
+
+        & > :has(> .fi-ta-search-field) {
+            @apply max-sm:ms-0 max-sm:flex-1;
+
+            & > .fi-ta-search-field {
+                @apply max-sm:w-full max-sm:max-w-none;
+            }
+        }
+
+        /* Bulk actions show only with a selection, so they space themselves rather than through a gap. */
+        & > .fi-ta-actions {
+            @apply max-sm:order-last;
+
+            & > .fi-dropdown {
+                @apply max-sm:ms-3;
+            }
+        }
     }
 
     /* A modal mounted in the pane keeps its sections as cards, as it has them everywhere else. */
