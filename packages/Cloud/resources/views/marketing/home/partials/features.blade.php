@@ -1,6 +1,7 @@
 @php
     $assistantName = (string) config('chat.assistant_name');
     $opportunityIcon = \Relaticle\Chat\Support\RecordChipRenderer::iconPath('opportunity');
+    $quotes = collect(config('marketing.testimonials'))->keyBy(fn (array $t): string => $t['slot'] ?? '')->all();
 @endphp
 
 <x-cloud::marketing.frame id="features">
@@ -13,12 +14,12 @@
             data-feature-row
             :label="__('01 · In the app')"
             :lead="__('A pipeline you read at a glance.')"
-            :figure="__('Fig 01 · Opportunities board')"
             :facts="[__('Board or list, your pick'), __('Drag a card to the next stage'), __('Rename, recolor or reorder the stages')]"
             :link-label="__('Track a deal through the pipeline')"
             :link-href="route('help.show', ['category' => 'getting-started', 'slug' => 'track-a-deal-through-the-pipeline'])"
+            :quote="$quotes['board'] ?? null"
         >
-            {{ __('Each opportunity shows its company, amount and close date, in the stages you define.') }}
+            {{ __('Company, amount and close date, in the stages you define.') }}
 
             <x-slot:visual>
                 <x-cloud::marketing.window class="absolute left-6 top-14 w-[74rem] md:left-10 md:top-14">
@@ -36,15 +37,15 @@
             data-feature-row
             :label="__('02 · :name', ['name' => $assistantName])"
             :lead="__('Ask in plain words.')"
-            :figure="__('Fig 02 · A proposal waiting for you')"
             :facts="[__('Type @ to point it at any record'), __('Every create, update and delete waits for your approval'), __('Fix a field on the card before you approve')]"
             :link-label="__('Meet :name', ['name' => $assistantName])"
             :link-href="route('ai')"
+            :quote="$quotes['rela'] ?? null"
         >
-            {{ __(':name finds records and drafts changes. You approve each one before it is saved.', ['name' => $assistantName]) }}
+            {{ __(':name drafts the change. You approve it before it is saved.', ['name' => $assistantName]) }}
 
             <x-slot:visual>
-                <div class="flex min-h-[inherit] items-center justify-center px-6 pb-6 pt-14 md:p-12">
+                <div class="flex min-h-[inherit] items-center justify-center p-6 md:p-12">
                     <div class="relative w-full max-w-md space-y-3" data-approval>
                         <div class="flex justify-end" data-approval-ask>
                             <p class="max-w-[85%] rounded-2xl rounded-br-md bg-gray-900 px-3.5 py-2.5 text-sm leading-relaxed text-white dark:bg-white/10 dark:text-gray-100">
@@ -107,15 +108,15 @@
             data-feature-row
             :label="__('03 · Your agents')"
             :lead="__('Work from Claude or ChatGPT.')"
-            :figure="__('Fig 03 · Claude, connected')"
             :facts="[__('One consent screen, no API keys'), __('Acts as you, in the one workspace you approved'), __('Any MCP client with a personal access token')]"
             :link-label="__('Relaticle for Claude')"
             :link-href="route(\Relaticle\Cloud\Marketing\Enums\ConnectableAssistant::Claude->routeName())"
+            :quote="$quotes['agents'] ?? null"
         >
-            {{ __('Your agent reads and updates the same records you do, with your permissions.') }}
+            {{ __('It reads and updates the same records you do, with your permissions.') }}
 
             <x-slot:visual>
-                <div class="flex min-h-[inherit] items-center justify-center px-4 pb-4 pt-14 sm:px-8 sm:pb-8 md:p-12">
+                <div class="flex min-h-[inherit] items-center justify-center p-4 sm:p-8 md:p-12">
                     <div class="relative w-full max-w-md" data-agent-demo>
                         <x-cloud::marketing.window>
                             <div class="flex items-center gap-2 border-b border-gray-100 px-4 py-3 dark:border-white/[0.06]">

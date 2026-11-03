@@ -1,17 +1,9 @@
-<section x-data="heroTabs()" x-init="init()" @hero-chat-state.window="chatState = $event.detail" class="bg-surface pt-16">
-    <div class="border-rail mx-auto max-w-6xl sm:border-x">
-        <div class="flex flex-col items-center px-6 pb-14 pt-16 text-center md:px-10 md:pb-16 md:pt-24">
-            <a href="https://github.com/relaticle/relaticle" target="_blank" rel="noopener"
-               aria-label="{{ __('Open Source, :count+ GitHub stars', ['count' => $formattedGithubStars]) }}"
-               class="type-label border-rail inline-flex items-center gap-2 rounded-full border py-1 pl-3 pr-2.5 text-gray-500 transition-colors hover:border-gray-300 hover:text-gray-950 dark:text-gray-400 dark:hover:border-white/20 dark:hover:text-white">
-                <x-ri-github-fill class="h-3.5 w-3.5"/>
-                {{ __('Open source') }}
-                <span class="bg-rail h-3 w-px" aria-hidden="true"></span>
-                <span class="whitespace-nowrap text-gray-950 dark:text-white">{{ __(':count+ stars', ['count' => $formattedGithubStars]) }}</span>
-                <x-ri-arrow-right-up-line class="h-3 w-3"/>
-            </a>
+<section x-data="heroTabs()" x-init="init()" @hero-chat-state.window="chatState = $event.detail" class="bg-surface relative overflow-hidden pt-16">
+    <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]" aria-hidden="true"></div>
 
-            <h1 class="type-display mt-8 max-w-3xl">
+    <div class="border-rail relative mx-auto max-w-6xl sm:border-x">
+        <div class="flex flex-col items-center px-6 pb-14 pt-20 text-center md:px-10 md:pb-16 md:pt-28">
+            <h1 class="type-display max-w-3xl">
                 <span class="block font-normal text-gray-500">{{ __('The AI CRM for selling') }}</span>
                 <span class="block text-gray-950 dark:text-white">{{ __('without a sales team') }}</span>
             </h1>
@@ -31,6 +23,8 @@
                 </x-cloud::marketing.button>
             </div>
 
+            <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">{{ __(':days-day trial, no card, unlimited users.', ['days' => \App\Models\Workspace::PRO_TRIAL_DAYS]) }}</p>
+
             @if(file_exists(public_path('videos/hero-demo.mp4')))
                 <button
                     type="button"
@@ -45,6 +39,7 @@
 
                 @include('cloud::marketing.home.partials.hero-demo-modal')
             @endif
+
         </div>
 
         @php
@@ -56,7 +51,7 @@
             ];
         @endphp
 
-        <div id="hero-tabs" role="tablist" class="bg-rail border-rail grid grid-cols-4 gap-px border-t">
+        <div id="hero-tabs" role="tablist" class="border-rail divide-rail grid grid-cols-4 divide-x border-t">
             @foreach($heroTabs as $id => [$short, $long])
                 <button type="button"
                         id="tab-{{ $id }}"
@@ -67,7 +62,7 @@
                         x-ref="tab-{{ $id }}"
                         x-on:click="switchTab('{{ $id }}')"
                         x-on:keydown="handleTabKeydown($event)"
-                        :class="activeTab === '{{ $id }}' ? 'bg-tint text-gray-950 dark:text-white' : 'bg-surface text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'"
+                        :class="activeTab === '{{ $id }}' ? 'bg-tint/70 text-gray-950 dark:text-white' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'"
                         class="relative cursor-pointer py-3.5 text-xs font-medium transition-colors sm:text-sm">
                     <span class="sm:hidden">{{ $short }}</span><span class="hidden sm:inline">{{ $long }}</span>
                     <span class="absolute inset-x-0 bottom-0 h-px bg-primary" x-show="activeTab === '{{ $id }}'" aria-hidden="true"></span>
@@ -75,8 +70,7 @@
             @endforeach
         </div>
 
-        <div class="bg-tint border-rail relative border-t px-6 pb-6 pt-14 sm:px-8 sm:pb-8 md:px-10 md:pb-10">
-            <x-cloud::marketing.eyebrow class="pointer-events-none absolute left-6 top-5 z-10" x-text="'{{ __('Fig 00') }} · ' + tabLabels[activeTab]">{{ __('Fig 00') }} · {{ $heroTabs['ai-agent'][1] }}</x-cloud::marketing.eyebrow>
+        <div class="bg-tint/60 border-rail relative border-t p-6 sm:p-8 md:p-10">
 
             <div class="mx-auto w-full max-w-[52rem]">
                 <x-cloud::marketing.window class="relative">
@@ -96,7 +90,7 @@
                                         x-show="activeTab === 'ai-agent' && !reducedMotion"
                                         @click="$dispatch(chatState === 'done' ? 'hero-chat-animate' : 'hero-chat-skip')"
                                         :aria-label="chatState === 'done' ? @js(__('Replay the demo')) : @js(__('Skip to the end of the demo'))"
-                                        class="inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[11px] font-medium text-gray-500 transition-colors hover:bg-black/[0.04] hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-white">
+                                        class="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-[11px] font-medium text-gray-500 transition-colors hover:bg-black/[0.04] hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-white">
                                     <x-ri-restart-line x-show="chatState === 'done'" class="h-3.5 w-3.5"/>
                                     <x-ri-skip-forward-line x-show="chatState !== 'done'" class="h-3.5 w-3.5"/>
                                     <span x-text="chatState === 'done' ? @js(__('Replay')) : @js(__('Skip'))"></span>
@@ -175,7 +169,6 @@
         return {
             activeTab: 'ai-agent',
             tabOrder: ['ai-agent', 'pipeline', 'companies', 'custom-fields'],
-            tabLabels: @js(array_map(static fn (array $labels): string => $labels[1], $heroTabs)),
             reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
             ease: [0.16, 1, 0.3, 1],
             duration: 0.35,

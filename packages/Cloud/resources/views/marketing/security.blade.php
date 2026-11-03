@@ -185,7 +185,7 @@
     <section class="bg-white dark:bg-gray-950 pb-8 md:pb-12">
         <div class="max-w-5xl mx-auto px-6 lg:px-8">
             @foreach($sections as [$id, $heading, $lead, $items, $link])
-                <div id="{{ $id }}" class="grid scroll-mt-24 grid-cols-1 gap-x-12 gap-y-8 border-t border-gray-200/80 py-12 md:grid-cols-3 md:py-16 dark:border-white/[0.06]">
+                <div id="{{ $id }}" class="grid grid-cols-1 gap-x-12 gap-y-8 border-t border-gray-200/80 py-12 md:grid-cols-3 md:py-16 dark:border-white/[0.06]">
                     <div>
                         <h2 class="text-balance font-display text-xl sm:text-2xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">{{ $heading }}</h2>
                         <p class="mt-3 text-sm text-gray-500 dark:text-gray-400 leading-relaxed">{{ $lead }}</p>

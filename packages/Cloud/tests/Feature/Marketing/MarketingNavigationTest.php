@@ -211,11 +211,17 @@ it('renders the works-with strip on the homepage with links to the assistant pag
     expect($strip)->not->toBeEmpty()
         ->and($strip)->toContain('Claude', 'ChatGPT', 'Cursor', 'Gemini', '+ any MCP client')
         ->and($strip)->toContain('href="'.route('documentation.index').'"')
-        ->and($strip)->toContain('21,000+');
+        ->and($strip)->toContain('How approval works', 'See pricing');
 
     foreach (ConnectableAssistant::cases() as $assistant) {
         expect($strip)->toContain('href="'.route($assistant->routeName()).'"');
     }
+
+    preg_match('/<section[^>]*id="community"[^>]*>.*?<\/section>/s', $html, $communityMatches);
+    $community = $communityMatches[0] ?? '';
+
+    expect($community)->not->toBeEmpty()
+        ->and($community)->toContain('21,000+');
 });
 
 it('renders the homepage without the product hunt launch badge', function (): void {

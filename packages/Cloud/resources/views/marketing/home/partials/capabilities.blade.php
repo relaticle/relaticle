@@ -18,7 +18,7 @@
         @foreach($capabilities as [$title, $description])
             <div class="border-rail border-t pt-5">
                 <h3 class="text-base font-medium text-gray-950 dark:text-white">{{ $title }}</h3>
-                <p class="mt-1.5 text-sm leading-relaxed text-gray-500 dark:text-gray-400">{{ $description }}</p>
+                <p class="type-prose mt-1.5 text-gray-500 dark:text-gray-400">{{ $description }}</p>
             </div>
         @endforeach
     </div>

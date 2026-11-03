@@ -36,31 +36,68 @@ token is `tint`.
 | Display | `type-display` | the page's `h1` |
 | Title | `type-title` | section headings, through `frame-header` |
 | Lead | `type-lead` | the sentence that opens a showcase or a cell |
-| Label | `type-label` | mono uppercase labels, through `eyebrow` |
+| Label | `type-label` | mono uppercase labels at 11px, through `eyebrow` |
+| Prose | `type-prose` | marketing sentences in a text cell: showcase facts, step and capability descriptions, FAQ answers |
 
-A heading is two-tone: the claim in `gray-950`, the continuation in `gray-500`. `gray-400` on white
-is about 2.5:1 and fails WCAG 1.4.3 even for large text; keep the continuation at `gray-500` or darker.
+`type-label` is 11px, Apple's HIG minimum; a label is never large text, so it needs 4.5:1.
+`type-prose` is 16px at 1.6 with a `66ch` cap (USWDS 16px floor, Baymard's 50 to 75 characters,
+WCAG 1.4.12). A `text-sm` sentence in a text cell is the drift a reviewer reads for. Small print
+under a button stays `text-sm`.
+
+A heading is two-tone: the claim in `gray-950`, the continuation in `text-gray-500 dark:text-gray-400`.
+Keep the continuation to one short clause.
+
+## Colour and contrast
+
+Text meets 4.5:1, large text (24px, or 18.7px bold) 3:1, and control edges and states 3:1 (WCAG 1.4.3,
+1.4.11). In light mode body text is `gray-700` or darker and secondary text `gray-500` or darker:
+`gray-400` on white is about 2.5:1 and never carries marketing copy. In dark mode body text is
+`gray-200` and secondary text `gray-400`: `gray-500` on `gray-950` is about 4.2:1 and fails under
+24px. Icons may stay `gray-400`. Product mocks mirror the app at 1:1 and keep its grays, so this rule
+does not reach them, but WCAG does. No test reads contrast, so a reviewer measures it in both themes.
+
+## Header offset
+
+`--header-height` in `cloud.css` is the fixed header's `h-16`. Pages that render `#main-header`
+get `scroll-padding-top` of the header plus `1.5rem` on `html`, so an anchor jump or a focused element
+never lands under the header (WCAG 2.4.11). Anchored sections carry no `scroll-mt` of their own, or the
+two offsets add up. The docs shell has its own sticky header and its own margin, and the rule does not
+reach it. Change the header height and the token together. `html` also carries `bg-surface` and
+`color-scheme`, so overscroll and form controls follow the theme.
 
 ## Components (`components/marketing`)
 
 - `hero`: the split hero for inner pages. The `h1` on the left, the subline and CTAs on the right,
   then the page's visual below in a `tint` cell. The homepage hero is centered but built from the same
   parts, inside the frame: a `type-label` pill, a two-tone `type-display` headline, the subline, two
-  buttons, a row of tab cells on the rails, and the demo in a `tint` cell under a `Fig 00` caption that
-  names the active tab. The demo plays once; a Skip and Replay control sits in its browser chrome.
+  buttons, a row of tab cells on the rails, and the demo in a `tint` cell. The demo plays once; a Skip and Replay control sits in its browser chrome.
 - `frame`: a section with rails. Everything below the hero sits in one.
 - `frame-header`: label plus two-tone title, left-aligned. Copy stays under two lines at 1440px.
 - `showcase`: a text cell (label, lead, one link) beside a `tint` cell holding product UI, with an
-  optional `figure` caption (`Fig 01 · Opportunities board`) at the cell's top left. `facts` takes up
+  optional `figure` caption at the cell's top left, unused on the homepage. `facts` takes up
   to three short lines, rendered as hairline rows under the lead; each names something the help docs
-  describe. A visual slot that carries its own padding keeps `pt-14` below `md`, so the caption and
-  the visual never meet.
+  describe.
 - `window`: the frame around a product fragment.
 - `theme-image`: a light and a dark WebP of a real app screenshot. It loads only the current
   theme's file and swaps on theme change.
 - `actor`: the You, Rela, Claude and Mailbox chips. They are the site's signature: every place that
   shows who did something uses them, and nothing else uses those colors.
 - `record-emails-mock`: the Emails tab of a record, mirroring the shipped UI.
+- `quote`: a named customer quote in a `figure`, with name, role and company in the caption. The
+  name links to a public source when one exists.
+- `logo-wall`: customer logos on the rails. It renders nothing when it gets no logos.
+- `copy-line`: one command or URL in mono with a Copy button. The value stays readable text and an
+  optional plain link follows it, so the step works without JavaScript.
+- `stat`: one number in `type-title` over a `type-label`, linked to the page that proves it.
+- Customer proof: `packages/Cloud/config/marketing.php` holds it, read as `config('marketing.testimonials')`
+  and `config('marketing.logos')`. A testimonial is `['quote' => string, 'name' => string, 'role' =>
+  string, 'company' => string, 'url' => ?string, 'avatar' => ?string]`. A logo is `['name' => string,
+  'src' => string, 'url' => ?string]`. `src` and `avatar` take a public URL or a path from the
+  repository root such as `resources/images/customers/acme.svg`, which `Vite::asset()` resolves. Add
+  an entry only with the customer's permission; both lists stay empty until then, and the
+  customer-voices section renders nothing.
+  A testimonial with an optional `'slot' => 'board'`, `'rela'` or `'agents'` also renders beside the
+  matching homepage feature showcase, through the showcase's `quote` prop. A `src` or `avatar` that is not a URL must live under `resources/images/`, which `app.js` globs into the Vite manifest, and needs `pnpm run build` before it renders; any other path throws a manifest error and breaks the page. Public URLs need no build.
 
 ## Header and footer
 

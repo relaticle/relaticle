@@ -230,7 +230,7 @@
         </div>
     </section>
 
-    <section id="pricing-faq" class="scroll-mt-24 bg-white py-20 dark:bg-gray-950 md:py-28">
+    <section id="pricing-faq" class="bg-white py-20 dark:bg-gray-950 md:py-28">
         <div class="mx-auto max-w-3xl px-6 lg:px-8">
             <div class="mb-10 text-center">
                 <h2 class="font-display text-2xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white sm:text-3xl">

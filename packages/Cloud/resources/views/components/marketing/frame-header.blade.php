@@ -10,7 +10,7 @@
     <{{ $tag }} class="type-title max-w-3xl">
         <span class="text-gray-950 dark:text-white">{{ $lead }}</span>
         @if($slot->isNotEmpty())
-            <span class="text-gray-500">{{ $slot }}</span>
+            <span class="text-gray-500 dark:text-gray-400">{{ $slot }}</span>
         @endif
     </{{ $tag }}>
 </div>
