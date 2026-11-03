@@ -4,6 +4,7 @@
     'linkLabel' => null,
     'linkHref' => null,
     'figure' => null,
+    'facts' => [],
 ])
 
 <div {{ $attributes->class('bg-rail grid grid-cols-1 gap-px lg:grid-cols-12') }}>
@@ -14,6 +15,14 @@
                 <span class="text-gray-950 dark:text-white">{{ $lead }}</span>
                 <span class="text-gray-500 dark:text-gray-400">{{ $slot }}</span>
             </h3>
+
+            @if($facts !== [])
+                <ul class="divide-rail border-rail mt-6 divide-y border-y text-sm text-gray-700 dark:text-gray-300">
+                    @foreach($facts as $fact)
+                        <li class="py-2.5">{{ $fact }}</li>
+                    @endforeach
+                </ul>
+            @endif
         </div>
 
         @if($linkHref)
@@ -26,7 +35,7 @@
 
     <div class="bg-tint feat-card relative min-h-[22rem] overflow-hidden md:min-h-[26rem] lg:col-span-8">
         @if($figure)
-            <p class="type-label pointer-events-none absolute left-6 top-5 z-10 text-gray-400 dark:text-gray-500">{{ $figure }}</p>
+            <x-cloud::marketing.eyebrow class="pointer-events-none absolute left-6 top-5 z-10">{{ $figure }}</x-cloud::marketing.eyebrow>
         @endif
 
         {{ $visual }}

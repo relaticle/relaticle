@@ -1,4 +1,13 @@
 @php
+    $assistantName = (string) config('chat.assistant_name');
+
+    $proof = array_values(array_filter([
+        $githubStars > 0 ? [__(':count+', ['count' => $formattedGithubStars]), __('GitHub stars')] : null,
+        $formattedDockerPulls !== null ? [$formattedDockerPulls, __('Docker pulls')] : null,
+        [__('AGPL-3.0'), __('Open source, free to self-host')],
+        [__('You approve'), __(':name proposes, you decide', ['name' => $assistantName])],
+    ]));
+
     $clients = [
         ['ri-claude-fill', 'text-[#D4763C]', 'Claude', \Relaticle\Cloud\Marketing\Enums\ConnectableAssistant::Claude],
         ['ri-openai-fill', 'text-gray-900 dark:text-gray-200', 'ChatGPT', \Relaticle\Cloud\Marketing\Enums\ConnectableAssistant::ChatGPT],
@@ -40,11 +49,13 @@
             @endif
         </div>
 
-        @if($formattedDockerPulls !== null)
-            <p class="border-rail border-t sm:border-x px-5 py-3 text-center text-xs text-gray-500 dark:text-gray-400">
-                <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $formattedDockerPulls }}</span> {{ __('Docker pulls') }}
-                <span class="mx-2 text-gray-300 dark:text-gray-600">/</span>{{ __('self-hosted and open source, shipping weekly') }}
-            </p>
-        @endif
+        <dl class="bg-rail border-rail grid grid-cols-2 gap-px border-t sm:border-x md:grid-cols-[repeat(auto-fit,minmax(0,1fr))]">
+            @foreach($proof as [$value, $label])
+                <div class="bg-surface flex flex-col px-5 py-5 md:px-6">
+                    <dt class="order-2 mt-1 text-sm text-gray-500 dark:text-gray-400">{{ $label }}</dt>
+                    <dd class="order-1 text-base font-medium text-gray-950 dark:text-white">{{ $value }}</dd>
+                </div>
+            @endforeach
+        </dl>
     </div>
 </section>

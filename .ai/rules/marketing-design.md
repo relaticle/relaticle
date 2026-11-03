@@ -44,12 +44,17 @@ is about 2.5:1 and fails WCAG 1.4.3 even for large text; keep the continuation a
 ## Components (`components/marketing`)
 
 - `hero`: the split hero for inner pages. The `h1` on the left, the subline and CTAs on the right,
-  then the page's visual below in a `tint` cell. The homepage keeps its own centered hero, with the
-  rails drawn over it.
+  then the page's visual below in a `tint` cell. The homepage hero is centered but built from the same
+  parts, inside the frame: a `type-label` pill, a two-tone `type-display` headline, the subline, two
+  buttons, a row of tab cells on the rails, and the demo in a `tint` cell under a `Fig 00` caption that
+  names the active tab. The demo plays once; a Skip and Replay control sits in its browser chrome.
 - `frame`: a section with rails. Everything below the hero sits in one.
 - `frame-header`: label plus two-tone title, left-aligned. Copy stays under two lines at 1440px.
 - `showcase`: a text cell (label, lead, one link) beside a `tint` cell holding product UI, with an
-  optional `figure` caption (`Fig 01 · Opportunities board`) at the cell's top left.
+  optional `figure` caption (`Fig 01 · Opportunities board`) at the cell's top left. `facts` takes up
+  to three short lines, rendered as hairline rows under the lead; each names something the help docs
+  describe. A visual slot that carries its own padding keeps `pt-14` below `md`, so the caption and
+  the visual never meet.
 - `window`: the frame around a product fragment.
 - `theme-image`: a light and a dark WebP of a real app screenshot. It loads only the current
   theme's file and swaps on theme change.
