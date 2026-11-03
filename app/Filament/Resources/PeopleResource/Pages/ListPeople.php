@@ -43,6 +43,7 @@ final class ListPeople extends ListRecords
                 ->button()
                 ->label(__('filament/resources/person.pages.list.actions.import_export.label'))
                 ->labeledFrom('sm')
+                ->dropdownPlacement('bottom')
                 ->size(Size::Small),
             CreateAction::make()->icon('heroicon-o-plus')->size(Size::Small),
         ];

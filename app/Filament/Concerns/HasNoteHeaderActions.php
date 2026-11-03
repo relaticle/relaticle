@@ -34,6 +34,7 @@ trait HasNoteHeaderActions
                 ->button()
                 ->label(__('filament/resources/note.pages.list.actions.import_export.label'))
                 ->labeledFrom('sm')
+                ->dropdownPlacement('bottom')
                 ->size(Size::Small),
             CreateAction::make()->icon('heroicon-o-plus')->size(Size::Small),
         ];
