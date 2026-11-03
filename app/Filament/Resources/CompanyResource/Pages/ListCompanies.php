@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\CompanyResource\Pages;
 
-use App\Filament\Components\ImportExportIcon;
 use App\Filament\Concerns\HasCustomFieldColumns;
 use App\Filament\Exports\CompanyExporter;
 use App\Filament\Resources\CompanyResource;
@@ -43,7 +42,7 @@ final class ListCompanies extends ListRecords
                     ->visible(ImportCompanies::canAccess(...)),
                 ExportAction::make()->exporter(CompanyExporter::class)->authorize('exportAny', Company::class),
             ])
-                ->icon(ImportExportIcon::make())
+                ->icon('heroicon-o-arrows-up-down')
                 ->color('gray')
                 ->button()
                 ->label(__('filament/resources/company.pages.list.actions.import_export.label'))

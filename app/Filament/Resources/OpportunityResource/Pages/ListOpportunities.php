@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\OpportunityResource\Pages;
 
-use App\Filament\Components\ImportExportIcon;
 use App\Filament\Concerns\HasCustomFieldColumns;
 use App\Filament\Concerns\HasViewSwitcher;
 use App\Filament\Exports\OpportunityExporter;
@@ -41,7 +40,7 @@ final class ListOpportunities extends ListRecords
                     ->visible(ImportOpportunities::canAccess(...)),
                 ExportAction::make()->exporter(OpportunityExporter::class)->authorize('exportAny', Opportunity::class),
             ])
-                ->icon(ImportExportIcon::make())
+                ->icon('heroicon-o-arrows-up-down')
                 ->color('gray')
                 ->button()
                 ->label(__('filament/resources/opportunity.pages.list.actions.import_export.label'))
