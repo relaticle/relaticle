@@ -192,4 +192,11 @@ return [
             'label' => 'Signature',
         ],
     ],
+    'automated_reasons' => [
+        'list' => 'Mailing list',
+        'auto_submitted' => 'Automatic reply',
+        'bulk' => 'Bulk mail',
+        'role_sender' => 'Sent from a no-reply address',
+        'provider_category' => 'Filed as promotions by Gmail',
+    ],
 ];
