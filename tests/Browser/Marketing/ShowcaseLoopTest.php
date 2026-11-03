@@ -81,3 +81,32 @@ it('pauses a showcase demo in its finished state and plays it again on the next 
 
     $page->assertNoJavaScriptErrors();
 });
+
+it('leaves the board card in the next stage when the demo is paused', function (): void {
+    $page = $this->visit('/');
+
+    $page->script("document.querySelector('[data-board]').closest('.feat-card').scrollIntoView({ block: 'center' })");
+    $page->wait(1)
+        ->click('[data-feature-row]:nth-of-type(1) [data-loop-toggle]')
+        ->wait(0.5);
+
+    $state = $page->script(<<<'JS'
+        (() => {
+            const board = document.querySelector('[data-board]');
+            const counts = [...board.querySelectorAll('[data-board-count]')]
+                .map((count) => [...count.children].find((span) => ! span.classList.contains('invisible')).textContent.trim());
+
+            return {
+                state: board.dataset.loopState,
+                moved: board.querySelector('[data-board-card]').style.transform !== '',
+                counts,
+            };
+        })()
+    JS);
+
+    expect($state['state'])->toBe('paused')
+        ->and($state['moved'])->toBeTrue()
+        ->and($state['counts'])->toBe(['1', '2']);
+
+    $page->assertNoJavaScriptErrors();
+});

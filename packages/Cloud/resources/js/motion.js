@@ -255,6 +255,90 @@ function loopAgent() {
     })
 }
 
+function loopBoard() {
+    const board = document.querySelector("[data-board]")
+
+    if (! board) {
+        return
+    }
+
+    const card = board.querySelector("[data-board-card]")
+    const slot = board.querySelector("[data-board-slot]")
+    const cursor = board.querySelector("[data-board-cursor]")
+    const counts = [...board.querySelectorAll("[data-board-count]")]
+    const lifted = ["relative", "z-20", "shadow-lg"]
+
+    const showCounts = (moved) => {
+        counts.forEach((count) => {
+            count.querySelector("[data-count-before]").classList.toggle("invisible", moved)
+            count.querySelector("[data-count-after]").classList.toggle("invisible", ! moved)
+        })
+    }
+
+    const travel = () => {
+        card.style.transform = ""
+
+        const from = card.getBoundingClientRect()
+        const to = slot.getBoundingClientRect()
+        const origin = board.getBoundingClientRect()
+
+        return {
+            x: to.left - from.left,
+            y: to.top - from.top,
+            grabX: from.left - origin.left + from.width * 0.4,
+            grabY: from.top - origin.top + from.height * 0.5,
+        }
+    }
+
+    loop(board, 0.5, {
+        reset: () => {
+            settle([card])
+            card.classList.remove(...lifted)
+            hide([cursor, slot])
+            showCounts(false)
+        },
+        finish: () => {
+            const { x, y } = travel()
+
+            card.style.transform = `translate(${x}px, ${y}px)`
+            card.classList.remove(...lifted)
+            hide([cursor, slot])
+            showCounts(true)
+        },
+        cycle: async (step) => {
+            const { x, y, grabX, grabY } = travel()
+            const at = (dx, dy) => `translate(${grabX + dx}px, ${grabY + dy}px)`
+            const held = "scale(1.02) rotate(2.5deg)"
+
+            await step(animate(cursor, {
+                opacity: [0, 1, 1],
+                transform: [at(90, 70), at(40, 30), at(0, 0)],
+            }, { duration: 0.7, delay: 0.4, ease: EASE }))
+
+            card.classList.add(...lifted)
+
+            await Promise.all([
+                step(animate(card, { transform: ["none", held] }, { duration: FAST })),
+                step(animate(slot, { opacity: [0, 1] }, { duration: FAST })),
+            ])
+
+            await Promise.all([
+                step(animate(card, { transform: [held, `translate(${x}px, ${y}px) ${held}`] }, { duration: 0.8, ease: EASE })),
+                step(animate(cursor, { transform: [at(0, 0), at(x, y)] }, { duration: 0.8, ease: EASE })),
+            ])
+
+            card.classList.remove("shadow-lg")
+            showCounts(true)
+
+            await Promise.all([
+                step(animate(card, { transform: [`translate(${x}px, ${y}px) ${held}`, `translate(${x}px, ${y}px)`] }, { duration: FAST })),
+                step(animate(slot, { opacity: [1, 0] }, { duration: BASE })),
+                step(animate(cursor, { opacity: [1, 0] }, { duration: BASE, delay: 0.4 })),
+            ])
+        },
+    })
+}
+
 function playStory() {
     const story = document.querySelector("[data-story]")
 
@@ -285,6 +369,7 @@ function playMailRows() {
 
 if (! reducedMotion) {
     revealShowcases()
+    loopBoard()
     loopApproval()
     loopAgent()
     playStory()

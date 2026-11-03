@@ -18,18 +18,12 @@
             :link-label="__('Track a deal through the pipeline')"
             :link-href="route('help.show', ['category' => 'getting-started', 'slug' => 'track-a-deal-through-the-pipeline'])"
             :quote="$quotes['board'] ?? null"
+            looping
         >
             {{ __('Company, amount and close date, in the stages you define.') }}
 
             <x-slot:visual>
-                <x-cloud::marketing.window class="absolute left-6 top-14 w-[74rem] md:left-10 md:top-14">
-                    <x-cloud::marketing.theme-image
-                        name="app-pipeline-preview"
-                        :alt="__('Relaticle opportunities board grouped into pipeline stages, showing amount and close date')"
-                        sizes="1440px"
-                        class="-ml-[262px] block w-[1440px] max-w-none"
-                    />
-                </x-cloud::marketing.window>
+                @include('cloud::marketing.home.partials.board-mock')
             </x-slot:visual>
         </x-cloud::marketing.showcase>
 
