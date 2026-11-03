@@ -6,6 +6,7 @@ namespace Relaticle\EmailIntegration\Services;
 
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use JsonException;
@@ -138,6 +139,7 @@ final class MicrosoftGraphMailService implements MailServiceInterface
             ...$this->mapAddresses('reply_to', array_column($message['replyTo'] ?? [], 'emailAddress')),
         ];
 
+        $headers = $this->headersByName($message['internetMessageHeaders'] ?? []);
         $sentAt = Date::parse((string) ($message['receivedDateTime'] ?? $message['sentDateTime'] ?? now()->toIso8601String()));
         $folder = $this->resolveFolder((string) ($message['parentFolderId'] ?? ''));
         $isOutbound = $folder === EmailFolder::Sent
@@ -150,7 +152,7 @@ final class MicrosoftGraphMailService implements MailServiceInterface
             providerMessageId: (string) $message['id'],
             rfcMessageId: $message['internetMessageId'] ?? null,
             threadId: (string) ($message['conversationId'] ?? ''),
-            inReplyTo: MessageIdList::first($this->headerValue($message, 'in-reply-to')),
+            inReplyTo: MessageIdList::first($headers['in-reply-to'] ?? null),
             subject: $message['subject'] ?? null,
             snippet: mb_substr(Str::squish((string) ($message['bodyPreview'] ?? '')), 0, 255),
             sentAt: $sentAt,
@@ -164,22 +166,20 @@ final class MicrosoftGraphMailService implements MailServiceInterface
             attachments: $this->mapInboundAttachments($message['attachments'] ?? []),
             reconciliationMessageId: $this->reconciliationMessageId($message),
             isBulkMail: ! $isOutbound && $this->hasBulkMailHeaders($message),
-            references: MessageIdList::references($this->headerValue($message, 'references')),
+            references: MessageIdList::references($headers['references'] ?? null),
+            headers: Arr::only($headers, FetchedEmailData::KEPT_HEADERS),
         );
     }
 
-    /** @param  array<string, mixed>  $message */
-    private function headerValue(array $message, string $name): ?string
+    /**
+     * @param  array<int, array<string, mixed>>  $headers
+     * @return array<string, string>
+     */
+    private function headersByName(array $headers): array
     {
-        $value = null;
-
-        foreach ($message['internetMessageHeaders'] ?? [] as $header) {
-            if (Str::lower((string) ($header['name'] ?? '')) === $name) {
-                $value = (string) ($header['value'] ?? '');
-            }
-        }
-
-        return $value;
+        return collect($headers)
+            ->mapWithKeys(fn (array $header): array => [Str::lower((string) ($header['name'] ?? '')) => (string) ($header['value'] ?? '')])
+            ->all();
     }
 
     /**
