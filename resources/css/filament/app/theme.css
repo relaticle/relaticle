@@ -912,6 +912,47 @@ a.fi-linked-records-chip {
     @apply dark:border-white/5;
 }
 
+/* Below sm a stacked row is a card: the first column heads it, then one label and value per line. */
+.fi-ta-table-stacked-on-mobile > tbody > tr.fi-ta-row {
+    @apply max-sm:py-3;
+
+    & > td {
+        @apply max-sm:border-0!;
+    }
+
+    & > td.fi-ta-cell:not(.fi-ta-selection-cell, :has(.fi-ta-actions)) {
+        @apply max-sm:grid max-sm:grid-cols-[8.5rem_minmax(0,1fr)] max-sm:items-center max-sm:gap-x-3 max-sm:py-1;
+
+        & > .fi-ta-cell-label {
+            @apply max-sm:truncate max-sm:pt-0 max-sm:font-normal;
+        }
+    }
+
+    & > td:is(.fi-ta-selection-cell + td, :first-child:not(.fi-ta-selection-cell)) {
+        @apply max-sm:block max-sm:pe-24 max-sm:pb-2;
+
+        & > .fi-ta-cell-label {
+            @apply max-sm:hidden;
+        }
+
+        & :is(.fi-ta-text-item, .fi-record-chip) {
+            @apply max-sm:font-semibold;
+        }
+    }
+
+    & > td:has(.fi-ta-actions) {
+        @apply max-sm:absolute max-sm:end-12 max-sm:top-2 max-sm:p-0;
+    }
+
+    &:not(:has(.fi-ta-selection-cell)) > td:has(.fi-ta-actions) {
+        @apply max-sm:end-4;
+    }
+}
+
+.fi-ta-table-stacked-on-mobile .fi-ta-cell-content > .fi-ta-col > * {
+    @apply max-sm:p-0;
+}
+
 /* The head cells already rule off an empty table. */
 .fi-ta-ctn .fi-ta-empty-state {
     @apply border-t-0;
