@@ -250,14 +250,24 @@ function playStory() {
     })
 }
 
-function playMailRows() {
-    new Set([...document.querySelectorAll("[data-mail-row]")].map((row) => row.parentElement)).forEach((list) => {
-        const rows = [...list.querySelectorAll("[data-mail-row]")]
+function playEmail() {
+    document.querySelectorAll("[data-mail-demo]").forEach((demo) => {
+        const intro = [...demo.querySelectorAll("[data-mail-caption]")]
+        const rows = [...demo.querySelectorAll("[data-mail-row]")]
+        const locks = [...demo.querySelectorAll("[data-mail-lock]")]
 
-        hide(rows)
+        playOnEntry(demo, 0.5, {
+            target: demo.closest(".feat-card"),
+            reset: () => hide([...intro, ...rows, ...locks]),
+            cycle: async (step) => {
+                if (intro.length) {
+                    await step(animate(intro, rise(8), { duration: BASE, delay: 0.2, ease: EASE }))
+                }
 
-        once(list, 0.1, () => {
-            animate(rows, rise(8), { duration: BASE, delay: stagger(0.08), ease: EASE }).then(() => settle(rows))
+                await step(animate(rows, rise(8), { duration: BASE, delay: stagger(0.12, { startDelay: 0.2 }), ease: EASE }))
+                await step(animate(locks, { opacity: [0, 1], transform: ["scale(0.9)", "none"] }, { duration: BASE, delay: stagger(0.15, { startDelay: 0.3 }), ease: EASE }))
+                settle([...intro, ...rows, ...locks])
+            },
         })
     })
 }
@@ -268,5 +278,5 @@ if (! reducedMotion) {
     playApproval()
     playAgent()
     playStory()
-    playMailRows()
+    playEmail()
 }

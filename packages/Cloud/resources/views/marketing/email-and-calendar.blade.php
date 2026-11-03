@@ -106,7 +106,7 @@
         </x-slot:aside>
 
         <div class="feat-card bg-tint bg-warm border-rail flex justify-center border-t px-4 py-10 sm:px-8 md:py-16">
-            <x-cloud::marketing.record-emails-mock class="w-full max-w-2xl"/>
+            <x-cloud::marketing.record-emails-mock class="w-full max-w-2xl" data-mail-demo/>
         </div>
     </x-cloud::marketing.hero>
 

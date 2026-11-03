@@ -1,34 +1,29 @@
-@php
-    $steps = [
-        [__('Connect your inbox'), __('Link a Google or Microsoft account. Relaticle never changes or deletes a message in your mailbox.')],
-        [__('Records fill in'), __('People you email are added for you, and their company comes from the email domain. Nothing you create by hand is touched.')],
-        [__('You choose who sees what'), __('Share who you talked to and when, the subject, or the full email. A teammate can ask for more.')],
-    ];
-@endphp
-
 <x-cloud::marketing.frame id="email">
     <x-cloud::marketing.frame-header :label="__('Email and calendar')" :lead="__('Your inbox fills in your CRM.')">
-        {{ __('Every email and meeting lands on the record it involves.') }}
+        {{ __('No typing, no copy and paste.') }}
     </x-cloud::marketing.frame-header>
 
-    <div class="bg-rail grid grid-cols-1 gap-px lg:grid-cols-12">
-        <div class="bg-tint bg-warm feat-card flex items-center justify-center p-4 sm:p-8 md:p-12 lg:col-span-8">
-            <x-cloud::marketing.record-emails-mock class="w-full max-w-xl"/>
-        </div>
+    <x-cloud::marketing.showcase
+        data-feature-row
+        :label="__('Gmail and Outlook')"
+        :lead="__('Every email and meeting on the record.')"
+        :facts="[__('Connect a Google or Microsoft account'), __('Relaticle never changes or deletes a message'), __('Share who you talked to, the subject, or the full email')]"
+        :link-label="__('How email works in Relaticle')"
+        :link-href="route('emailAndCalendar')"
+    >
+        {{ __('People and companies fill in from your inbox.') }}
 
-        <div class="bg-rail grid gap-px lg:col-span-4">
-            @foreach($steps as $index => [$title, $description])
-                <div class="bg-surface p-6 md:p-8">
-                    <x-cloud::marketing.eyebrow class="mb-3">{{ sprintf('%02d', $index + 1) }}</x-cloud::marketing.eyebrow>
-                    <h3 class="text-base font-medium text-gray-950 dark:text-white">{{ $title }}</h3>
-                    <p class="type-prose mt-1.5 text-gray-500 dark:text-gray-400">{{ $description }}</p>
+        <x-slot:visual>
+            <div class="bg-warm flex min-h-[inherit] items-center justify-center p-4 sm:p-8 md:p-12">
+                <div class="w-full max-w-xl space-y-3" data-mail-demo>
+                    <p class="flex w-fit max-w-full items-center gap-2 rounded-full bg-white/80 py-1 pl-1 pr-3 text-xs text-gray-700 ring-1 ring-gray-950/5 backdrop-blur-sm dark:bg-white/[0.06] dark:text-gray-200 dark:ring-white/10" data-mail-caption>
+                        <x-cloud::marketing.actor as="mailbox" class="shrink-0"/>
+                        <span class="truncate">{{ __('Added Lena Ortiz and Northwind after your first email') }}</span>
+                    </p>
+
+                    <x-cloud::marketing.record-emails-mock/>
                 </div>
-            @endforeach
-
-            <a href="{{ route('emailAndCalendar') }}" class="bg-surface hover:bg-tint group flex items-center justify-between px-6 py-5 text-sm font-medium text-gray-950 transition-colors md:px-8 dark:text-white">
-                {{ __('How email works in Relaticle') }}
-                <x-ri-arrow-right-line class="h-4 w-4 transition-transform group-hover:translate-x-0.5"/>
-            </a>
-        </div>
-    </div>
+            </div>
+        </x-slot:visual>
+    </x-cloud::marketing.showcase>
 </x-cloud::marketing.frame>
