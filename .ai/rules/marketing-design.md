@@ -76,7 +76,10 @@ reach it. Change the header height and the token together. `html` also carries `
 - `showcase`: a text cell (label, lead, one link) beside a `tint` cell holding product UI, with an
   optional `figure` caption at the cell's top left, unused on the homepage. `facts` takes up
   to three short lines, rendered as hairline rows under the lead; each names something the help docs
-  describe.
+  describe. `looping` adds the Pause control for a visual that `motion.js` loops. The prop is not
+  named `loop`, because Blade's own `$loop` overwrites it after the facts `@foreach`.
+- `board-mock`: the opportunities board built from the live board's markup, with a card that
+  `motion.js` drags to the next stage. The hero tab and the press page keep the screenshot.
 - `window`: the frame around a product fragment.
 - `theme-image`: a light and a dark WebP of a real app screenshot. It loads only the current
   theme's file and swaps on theme change.
@@ -109,9 +112,19 @@ every page is framed.
 ## Motion (`packages/Cloud/resources/js/motion.js`)
 
 - Animate opacity, transform and clip-path only. Never a heading or body text.
-- Each piece plays once, when it scrolls into view. Durations are 0.2s, 0.3s and 0.45s, with the
+- A reveal plays once, when it scrolls into view. Durations are 0.2s, 0.3s and 0.45s, with the
   ease `[0.22, 1, 0.36, 1]`. A sequence ends inside 5 seconds, or it needs a pause control (WCAG 2.2.2).
-- `prefers-reduced-motion: reduce` skips the whole layer, and every element renders in its final state.
+- A showcase demo loops through `loop()`: it starts when the cell is in view, holds 2.5s on the
+  finished state, fades, resets and plays again, stops and resets when the cell leaves the viewport,
+  and restarts on re-entry. The showcase's `looping` prop renders the Pause control in the `tint`
+  cell. Pause jumps to the finished state and stays paused across leave and re-entry. The root carries
+  `data-loop-state` (`idle`, `playing`, `paused`), and `tests/Browser/Marketing/ShowcaseLoopTest.php`
+  pins the three states in Chromium and WebKit.
+- A sequence awaits each `animate()` through the `step` it receives. A raw `await animate()` outlives
+  a leave or a pause and commits its mid-flight value over the reset.
+- `prefers-reduced-motion: reduce` skips the whole layer, loops included, every element renders in its
+  final state, and the Pause controls stay hidden. The browser plugin cannot emulate it, so that pass
+  is manual: `agent-browser set media light reduced-motion`.
 - Never animate an element out of `display: none`. Stack the two states in one grid cell and toggle
   `invisible` (WebKit skips or flashes the first frame otherwise).
 
