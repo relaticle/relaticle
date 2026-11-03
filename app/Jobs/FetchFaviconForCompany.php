@@ -12,7 +12,6 @@ use App\Support\Http\SsrfGuard;
 use AshAllenDesign\FaviconFetcher\Exceptions\ConnectionException;
 use AshAllenDesign\FaviconFetcher\Facades\Favicon;
 use Carbon\CarbonImmutable;
-use finfo;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Builder;
@@ -87,7 +86,7 @@ final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $extension = Company::LOGO_MIME_TYPES[new finfo(FILEINFO_MIME_TYPE)->buffer($body)] ?? null;
+        $extension = Company::logoExtensionFor($body);
 
         if ($extension === null) {
             return;
