@@ -35,10 +35,8 @@ final readonly class FetchedEmailData
         public array $participants,
         public array $attachments,
         /**
-         * Provider-native category, mapped to our vocabulary during fetch.
-         * When set, the email is already classified and AI classification is
-         * skipped. Null means the provider gave no confident hint, so fall
-         * back to AI.
+         * Provider-native category, mapped to our vocabulary during fetch. The
+         * classifier uses it only when none of its own rules match.
          */
         public ?EmailCategory $providerCategory = null,
         public ?string $reconciliationMessageId = null,

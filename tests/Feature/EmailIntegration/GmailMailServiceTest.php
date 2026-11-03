@@ -1111,12 +1111,17 @@ it('keeps the root Message-ID when References holds more than fifty ids', functi
         ->and(end($kept))->toBe('<m60@acme.example>');
 });
 
-it('keeps the headers that mark automated mail', function (): void {
-    $data = fetchGmailMessageFromHeader('Ana <ana@acme.example>', extraHeaders: [
-        'List-Id' => '<sales.acme.example>',
-        'Auto-Submitted' => 'auto-replied',
-        'X-Mailer' => 'Outlook',
-    ]);
+it('keeps the headers that mark automated mail', function (array $extraHeaders, array $kept): void {
+    $data = fetchGmailMessageFromHeader('Ana <ana@acme.example>', extraHeaders: $extraHeaders);
 
-    expect($data->headers)->toBe(['list-id' => '<sales.acme.example>', 'auto-submitted' => 'auto-replied']);
-});
+    expect($data->headers)->toBe($kept);
+})->with([
+    'kept and dropped headers' => [
+        ['List-Id' => '<sales.acme.example>', 'Auto-Submitted' => 'auto-replied', 'X-Mailer' => 'Outlook'],
+        ['list-id' => '<sales.acme.example>', 'auto-submitted' => 'auto-replied'],
+    ],
+    'a repeated header and an empty one' => [
+        ['Precedence' => 'bulk', 'precedence' => 'list', 'List-Unsubscribe' => ''],
+        ['precedence' => 'list', 'list-unsubscribe' => ''],
+    ],
+]);

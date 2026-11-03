@@ -1385,3 +1385,12 @@ it('honours only this workspace marking a sender as a person', function (): void
     expect($founder->refresh()->automated_reason)->toBeNull()
         ->and($stripe->refresh()->automated_reason)->toBe(AutomatedReason::RoleSender);
 });
+
+it('lets a pricing subject beat the Gmail primary hint', function (): void {
+    $email = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'subject' => 'Pricing for 40 seats',
+        'providerCategory' => EmailCategory::Personal,
+    ]));
+
+    $this->assertDatabaseHas('email_labels', ['email_id' => $email->getKey(), 'label' => EmailCategory::Sales->value]);
+});
