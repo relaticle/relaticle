@@ -32,6 +32,7 @@ final readonly class RefreshConversationSummary
             ->selectRaw('count(distinct coalesce(rfc_message_id, id::text)) as message_count')
             ->selectRaw('min(sent_at) as first_message_at, max(sent_at) as last_message_at')
             ->selectRaw('coalesce(bool_or(has_attachments), false) as has_attachments')
+            ->selectRaw('bool_and(automated_reason is not null) as is_automated')
             ->first();
 
         if ((int) ($totals->message_count ?? 0) === 0) {
@@ -52,7 +53,7 @@ final readonly class RefreshConversationSummary
             'last_external_inbound_at' => $this->externalInbound($workspaceId, $conversationKey, $members)->max('sent_at'),
             'last_member_outbound_at' => $this->memberMessages($workspaceId, $conversationKey, $members)->max('sent_at'),
             'has_attachments' => (bool) $totals->has_attachments,
-            'is_automated' => false,
+            'is_automated' => (bool) $totals->is_automated,
             'created_at' => now(),
             'updated_at' => now(),
         ]], ['workspace_id', 'conversation_key'], [
@@ -79,6 +80,7 @@ final readonly class RefreshConversationSummary
     {
         return $this->messages($workspaceId, $conversationKey)
             ->where('direction', EmailDirection::INBOUND)
+            ->whereNull('automated_reason')
             ->whereDoesntHave('participants', fn (Builder $query): Builder => $this->sentBy($query, $members));
     }
 

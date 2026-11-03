@@ -8,6 +8,7 @@ use Illuminate\Foundation\Console\QueuedCommand;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Relaticle\EmailIntegration\Console\Commands\BackfillConversationsCommand;
+use Relaticle\EmailIntegration\Enums\AutomatedReason;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -142,6 +143,18 @@ it('rebuilds a summary when a disconnect moves only its first message', function
     $this->artisan('email:backfill-conversations', ['--force' => true])->assertSuccessful();
 
     expect(EmailConversation::query()->sole()->first_message_at->toDateString())->toBe(now()->subDay()->toDateString());
+});
+
+it('rebuilds a summary whose automated flag no longer matches its mail', function (): void {
+    $email = ($this->email)(($this->mailbox)(), ['automated_reason' => AutomatedReason::List]);
+    $this->artisan('email:backfill-conversations', ['--force' => true])->assertSuccessful();
+    EmailConversation::query()->update(['is_automated' => false]);
+
+    $this->artisan('email:backfill-conversations', ['--force' => true])
+        ->expectsOutputToContain('0 email(s) keyed, 1 summary(ies) rebuilt')
+        ->assertSuccessful();
+
+    expect(EmailConversation::query()->where('conversation_key', $email->refresh()->conversation_key)->sole()->is_automated)->toBeTrue();
 });
 
 it('queues the rest on the imports lane when a run reaches its chunk', function (): void {

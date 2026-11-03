@@ -1394,3 +1394,24 @@ it('lets a pricing subject beat the Gmail primary hint', function (): void {
 
     $this->assertDatabaseHas('email_labels', ['email_id' => $email->getKey(), 'label' => EmailCategory::Sales->value]);
 });
+
+it('keeps automated replies out of the external inbound time', function (): void {
+    $this->travelTo(now()->startOfHour());
+    $person = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'p', 'rfcMessageId' => '<p@acme.example>', 'sentAt' => now()->subHour(),
+    ]));
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'a', 'rfcMessageId' => '<a@acme.example>', 'inReplyTo' => '<p@acme.example>',
+        'headers' => ['auto-submitted' => 'auto-replied'], 'sentAt' => now(),
+    ]));
+
+    expect(EmailConversation::query()->where('conversation_key', $person->conversation_key)->sole())
+        ->last_external_inbound_at->equalTo(now()->subHour())->toBeTrue()
+        ->is_automated->toBeFalse();
+});
+
+it('marks a conversation automated when every message in it is', function (): void {
+    $email = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData(['headers' => ['list-id' => '<news>']]));
+
+    expect(EmailConversation::query()->where('conversation_key', $email->conversation_key)->sole()->is_automated)->toBeTrue();
+});

@@ -144,7 +144,8 @@ final class BackfillConversationsCommand extends Command
             ->select('workspace_id', 'conversation_key')
             ->selectRaw('count(distinct coalesce(rfc_message_id, id::text)) as message_count')
             ->selectRaw('min(sent_at) as first_message_at, max(sent_at) as last_message_at')
-            ->selectRaw('coalesce(bool_or(has_attachments), false) as has_attachments');
+            ->selectRaw('coalesce(bool_or(has_attachments), false) as has_attachments')
+            ->selectRaw('bool_and(automated_reason is not null) as is_automated');
 
         $stale = DB::query()->fromSub($live, 'live')
             ->leftJoin('email_conversations as summary', fn (JoinClause $join): JoinClause => $join
@@ -155,7 +156,8 @@ final class BackfillConversationsCommand extends Command
                 ->orWhereColumn('summary.message_count', '!=', 'live.message_count')
                 ->orWhereColumn('summary.first_message_at', '!=', 'live.first_message_at')
                 ->orWhereColumn('summary.last_message_at', '!=', 'live.last_message_at')
-                ->orWhereColumn('summary.has_attachments', '!=', 'live.has_attachments'))
+                ->orWhereColumn('summary.has_attachments', '!=', 'live.has_attachments')
+                ->orWhereColumn('summary.is_automated', '!=', 'live.is_automated'))
             ->select('live.workspace_id', 'live.conversation_key');
 
         $orphans = EmailConversation::query()->toBase()
