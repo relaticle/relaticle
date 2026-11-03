@@ -2,8 +2,37 @@
     <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]" aria-hidden="true"></div>
 
     <div class="border-rail relative mx-auto max-w-6xl sm:border-x">
-        <div class="flex flex-col items-center px-6 pb-14 pt-20 text-center md:px-10 md:pb-16 md:pt-28">
-            <h1 class="type-display max-w-3xl">
+        <div class="flex flex-col items-center px-6 pb-14 pt-16 text-center md:px-10 md:pb-16 md:pt-24">
+            <a href="https://github.com/relaticle/relaticle" target="_blank" rel="noopener"
+               aria-label="{{ __('Open Source, :count+ GitHub stars', ['count' => $formattedGithubStars]) }}"
+               class="group inline-flex items-center gap-2 rounded-full border border-gray-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200 hover:border-gray-300 dark:hover:border-white/[0.15]">
+                <x-ri-github-fill class="h-3.5 w-3.5"/>
+                <span>{{ __('Open Source') }}</span>
+                <span class="w-px h-3 bg-gray-200 dark:bg-white/10"></span>
+                <span class="inline-flex items-center whitespace-nowrap text-gray-900 dark:text-white font-semibold leading-none">
+                    <span x-ref="githubStars" class="relative inline-grid tabular-nums" aria-hidden="true">
+                        <span class="invisible col-start-1 row-start-1">{{ $formattedGithubStars }}</span>
+                        <span class="col-start-1 row-start-1 inline-flex justify-self-end">
+                            @foreach(str_split($formattedGithubStars) as $character)
+                                @if(ctype_digit($character))
+                                    <span class="inline-block h-[1em] w-[1ch] overflow-hidden">
+                                        <span data-github-star-digit="{{ $character }}" class="flex flex-col text-center leading-none" style="transform: translateY(-{{ (int) $character }}em)">
+                                            @for($digit = 0; $digit <= (int) $character; $digit++)
+                                                <span class="block h-[1em] leading-none">{{ $digit }}</span>
+                                            @endfor
+                                        </span>
+                                    </span>
+                                @else
+                                    <span>{{ $character }}</span>
+                                @endif
+                            @endforeach
+                        </span>
+                    </span>+ stars
+                </span>
+                <x-ri-arrow-right-up-line class="h-3 w-3 text-gray-400 dark:text-gray-500"/>
+            </a>
+
+            <h1 class="type-display mt-8 max-w-3xl md:mt-10">
                 <span class="block font-normal text-gray-500">{{ __('The AI CRM for selling') }}</span>
                 <span class="block text-gray-950 dark:text-white">{{ __('without a sales team') }}</span>
             </h1>
@@ -72,83 +101,58 @@
 
         <div class="bg-tint/60 border-rail relative border-t p-6 sm:p-8 md:p-10">
 
-            <div class="mx-auto w-full max-w-[52rem]">
-                <x-cloud::marketing.window class="relative">
-                    {{-- Browser chrome --}}
-                        <div class="bg-gray-50 dark:bg-neutral-900 border-b border-gray-200/60 dark:border-white/[0.06] px-4 py-2.5 flex items-center justify-between">
-                            <div class="flex gap-1.5">
-                                <div class="w-2.5 h-2.5 rounded-full bg-gray-300/80 dark:bg-white/[0.08]"></div>
-                                <div class="w-2.5 h-2.5 rounded-full bg-gray-300/80 dark:bg-white/[0.08]"></div>
-                                <div class="w-2.5 h-2.5 rounded-full bg-gray-300/80 dark:bg-white/[0.08]"></div>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <div class="bg-white/60 dark:bg-white/[0.04] rounded-md px-3 py-1 text-[11px] text-gray-500 dark:text-gray-400">
-                                    app.relaticle.com
-                                </div>
-                            </div>
+            <div class="rounded-2xl border border-gray-200 bg-gray-100 p-1.5 pt-0 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_16px_40px_-16px_rgba(0,0,0,0.14)] dark:border-white/[0.1] dark:bg-gray-900 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_16px_40px_-16px_rgba(0,0,0,0.6)]">
+                <div class="flex h-9 items-center gap-1.5 px-2.5" aria-hidden="true">
+                    <span class="size-3 rounded-full bg-[#ff5c5a]"></span>
+                    <span class="size-3 rounded-full bg-[#f5b902]"></span>
+                    <span class="size-3 rounded-full bg-[#10c27b]"></span>
+                </div>
+
+                <div class="relative overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.06] dark:bg-gray-950">
+                    {{-- The frame keeps the chat panel's height on every tab, so the screenshots cover it from
+                         their top-left corner and crop the rest instead of resizing the frame. --}}
+                    <div class="relative h-[520px] sm:h-[580px] md:h-[640px]">
+                        <div id="panel-ai-agent" role="tabpanel" aria-labelledby="tab-ai-agent" x-ref="panel-ai-agent" class="absolute inset-0">
+                            @include('cloud::marketing.home.partials.hero-agent-preview')
                         </div>
 
-                        {{-- Tab panels use grid stacking for a Safari-smooth crossfade.
-                             min-height matches the live chat panel so switching to an
-                             image tab can't collapse the mockup frame.
+                        @php
+                            $heroScreenshots = [
+                                'pipeline' => ['widths' => [380, 640, 832, 1652], 'alt' => __('Relaticle opportunities board grouped into pipeline stages, showing amount and close date')],
+                                'companies' => ['widths' => [1652], 'alt' => __('Relaticle companies list showing account owner, ICP status, and website domain for each company')],
+                                'custom-fields' => ['widths' => [1652], 'alt' => __('Relaticle custom fields settings showing field name, type, constraints, and properties for Opportunities')],
+                            ];
 
-                             The image tabs FILL that frame (object-cover) rather than
-                             sitting in it at their own aspect: the frame is a constant
-                             826x640 from `lg` up, so the screenshots are captured at
-                             that ratio and land pixel-exact there. Below `lg` the frame
-                             narrows and finally turns portrait, and cover crops the
-                             right edge instead of leaving the dead band under the
-                             image that a plain `h-auto` used to (measured: 124px at
-                             desktop, over half the frame on a phone). object-left-top
-                             keeps the crop predictable -- you always see the app from
-                             its top-left corner, which is what the alt text
-                             describes. --}}
-                        <div class="relative grid overflow-hidden min-h-[520px] sm:min-h-[580px] md:min-h-[640px]">
-                            {{-- AI Agent tab (default, featured) --}}
-                            {{-- min-w-0: a grid item defaults to min-width:auto, so the
-                                 chat panel's own table would size the column to its
-                                 intrinsic width and push the transcript past the frame. --}}
-                            <div id="panel-ai-agent" role="tabpanel" aria-labelledby="tab-ai-agent" x-ref="panel-ai-agent" class="col-start-1 row-start-1 min-w-0">
-                                @include('cloud::marketing.home.partials.hero-agent-preview')
+                            // 1652w fills the 1056px desktop frame at 1x; a 2x display takes the 2880w original.
+                            $heroSrcset = static fn (string $id, string $theme, array $widths): string => collect($widths)
+                                ->map(fn (int $width): string => Vite::asset("resources/images/app-{$id}-preview{$theme}-{$width}w.webp")." {$width}w")
+                                ->push(Vite::asset("resources/images/app-{$id}-preview{$theme}.webp").' 2880w')
+                                ->implode(', ');
+                        @endphp
+
+                        @foreach($heroScreenshots as $id => $screenshot)
+                            <div id="panel-{{ $id }}" role="tabpanel" aria-labelledby="tab-{{ $id }}" x-ref="panel-{{ $id }}" class="invisible absolute inset-0">
+                                <picture class="block h-full w-full">
+                                    <source data-light-srcset="{{ $heroSrcset($id, '', $screenshot['widths']) }}"
+                                            data-dark-srcset="{{ $heroSrcset($id, '-dark', $screenshot['widths']) }}"
+                                            srcset="{{ $heroSrcset($id, '', $screenshot['widths']) }}"
+                                            sizes="(max-width: 640px) 750px, (max-width: 1151px) calc(100vw - 96px), 1056px"
+                                            type="image/webp">
+                                    <img data-light-src="{{ Vite::asset("resources/images/app-{$id}-preview.png") }}"
+                                         data-dark-src="{{ Vite::asset("resources/images/app-{$id}-preview-dark.png") }}"
+                                         src="{{ Vite::asset("resources/images/app-{$id}-preview.png") }}"
+                                         alt="{{ $screenshot['alt'] }}"
+                                         class="hero-preview-image h-full w-full object-cover object-left-top"
+                                         width="1440"
+                                         height="1116"
+                                         loading="lazy">
+                                </picture>
                             </div>
-
-                            @php
-                                $heroScreenshots = [
-                                    'pipeline' => ['widths' => [380, 640, 832, 1652], 'alt' => __('Relaticle opportunities board grouped into pipeline stages, showing amount and close date')],
-                                    'companies' => ['widths' => [1652], 'alt' => __('Relaticle companies list showing account owner, ICP status, and website domain for each company')],
-                                    'custom-fields' => ['widths' => [1652], 'alt' => __('Relaticle custom fields settings showing field name, type, constraints, and properties for Opportunities')],
-                                ];
-
-                                // 1652w is rendered at the frame's own pixel size on a 2x display, so the browser draws it without resampling.
-                                $heroSrcset = static fn (string $id, string $theme, array $widths): string => collect($widths)
-                                    ->map(fn (int $width): string => Vite::asset("resources/images/app-{$id}-preview{$theme}-{$width}w.webp")." {$width}w")
-                                    ->push(Vite::asset("resources/images/app-{$id}-preview{$theme}.webp").' 2880w')
-                                    ->implode(', ');
-                            @endphp
-
-                            @foreach($heroScreenshots as $id => $screenshot)
-                                <div id="panel-{{ $id }}" role="tabpanel" aria-labelledby="tab-{{ $id }}" x-ref="panel-{{ $id }}" class="col-start-1 row-start-1 invisible absolute inset-0 w-full">
-                                    <picture class="block h-full w-full">
-                                        <source data-light-srcset="{{ $heroSrcset($id, '', $screenshot['widths']) }}"
-                                                data-dark-srcset="{{ $heroSrcset($id, '-dark', $screenshot['widths']) }}"
-                                                srcset="{{ $heroSrcset($id, '', $screenshot['widths']) }}"
-                                                sizes="(max-width: 640px) 750px, (max-width: 1023px) 842px, 826px"
-                                                type="image/webp">
-                                        <img data-light-src="{{ Vite::asset("resources/images/app-{$id}-preview.png") }}"
-                                             data-dark-src="{{ Vite::asset("resources/images/app-{$id}-preview-dark.png") }}"
-                                             src="{{ Vite::asset("resources/images/app-{$id}-preview.png") }}"
-                                             alt="{{ $screenshot['alt'] }}"
-                                             class="hero-preview-image h-full w-full object-cover object-left-top"
-                                             width="1440"
-                                             height="1116"
-                                             loading="lazy">
-                                    </picture>
-                                </div>
-                            @endforeach
-                            {{-- Bottom fade overlay --}}
-                            <div class="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white/60 via-white/20 to-transparent dark:from-gray-950/60 dark:via-gray-950/20 dark:to-transparent pointer-events-none"></div>
-                        </div>
-                </x-cloud::marketing.window>
+                        @endforeach
+                        {{-- Bottom fade overlay --}}
+                        <div class="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white/60 via-white/20 to-transparent dark:from-gray-950/60 dark:via-gray-950/20 dark:to-transparent pointer-events-none"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -163,25 +167,76 @@
             ease: [0.16, 1, 0.3, 1],
             duration: 0.35,
             slideDistance: 40,
+            githubStarsAnimationState: 'idle',
+            githubStarsAnimationRequestedAt: null,
 
             init() {
                 this.updateImages();
                 this.observeDarkMode();
+                this.animateGithubStars();
                 if (this.activeTab === 'ai-agent') {
                     var self = this;
                     setTimeout(function() { self.$dispatch('hero-chat-animate'); }, 50);
                 }
             },
 
+            animateGithubStars() {
+                if (this.githubStarsAnimationState === 'complete') return;
+
+                var element = this.$refs.githubStars;
+                if (!element) {
+                    this.githubStarsAnimationState = 'complete';
+                    return;
+                }
+
+                if (this.githubStarsAnimationRequestedAt === null) {
+                    this.githubStarsAnimationRequestedAt = performance.now();
+                }
+
+                if (this.reducedMotion || document.visibilityState !== 'visible') {
+                    this.githubStarsAnimationState = 'complete';
+                    return;
+                }
+
+                if (typeof window.animate !== 'function') {
+                    if (this.githubStarsAnimationState === 'waiting') return;
+
+                    this.githubStarsAnimationState = 'waiting';
+                    window.addEventListener('motion-ready', () => {
+                        if (performance.now() - this.githubStarsAnimationRequestedAt > 250) {
+                            this.githubStarsAnimationState = 'complete';
+                            return;
+                        }
+
+                        this.githubStarsAnimationState = 'idle';
+                        this.animateGithubStars();
+                    }, { once: true });
+                    return;
+                }
+
+                this.githubStarsAnimationState = 'complete';
+                element.querySelectorAll('[data-github-star-digit]').forEach(function(reel, index) {
+                    var digit = Number(reel.dataset.githubStarDigit);
+                    if (digit === 0) return;
+
+                    window.animate(reel, {
+                        transform: ['translateY(0em)', 'translateY(-' + digit + 'em)'],
+                    }, {
+                        type: window.spring,
+                        visualDuration: 0.48,
+                        bounce: 0,
+                        delay: index * 0.03,
+                    });
+                });
+            },
+
             showPanel(panel) {
-                panel.classList.remove('invisible', 'absolute', 'inset-0');
-                panel.style.position = 'relative';
+                panel.classList.remove('invisible');
                 panel.style.zIndex = '1';
             },
 
             hidePanel(panel) {
-                panel.classList.add('invisible', 'absolute', 'inset-0');
-                panel.style.position = '';
+                panel.classList.add('invisible');
                 panel.style.opacity = '';
                 panel.style.transform = '';
                 panel.style.willChange = '';
