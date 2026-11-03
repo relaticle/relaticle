@@ -18,7 +18,7 @@
     ];
 @endphp
 
-<x-cloud::marketing.window class="absolute left-6 top-14 w-[74rem] md:left-10" data-board>
+<x-cloud::marketing.window class="absolute left-4 top-14 w-[74rem] md:left-10" data-board>
     <div class="flex items-center gap-3 border-b border-gray-200/60 px-4 py-2.5 dark:border-white/[0.06]">
         <span class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-gray-200 px-2.5 text-sm font-medium text-gray-900 dark:border-white/10 dark:text-white">
             <x-ri-layout-column-line class="h-4 w-4 text-gray-500 dark:text-gray-400"/>
@@ -32,9 +32,9 @@
         <x-ri-filter-3-line class="ml-auto h-4 w-4 text-gray-400"/>
     </div>
 
-    <div class="flex gap-5 p-4">
+    <div class="flex gap-3 p-3 md:gap-5 md:p-4">
         @foreach($columns as $column)
-            <div class="w-[300px] shrink-0">
+            <div class="w-[232px] shrink-0 md:w-[300px]">
                 <div class="flex items-center justify-between gap-2 px-1 pb-2">
                     <div class="flex items-center gap-2">
                         <h4 class="text-sm font-medium text-gray-900 dark:text-white">{{ $column['label'] }}</h4>
@@ -73,7 +73,7 @@
                     @endforeach
 
                     @if($column['slot'] ?? false)
-                        <div class="h-[5.75rem] rounded-xl opacity-0 outline-dashed outline-[1.5px] -outline-offset-[1.5px] outline-primary-500" data-board-slot aria-hidden="true"></div>
+                        <div class="rounded-xl opacity-0 outline-dashed outline-[1.5px] -outline-offset-[1.5px] outline-primary-500" data-board-slot aria-hidden="true"></div>
                     @endif
                 </div>
             </div>

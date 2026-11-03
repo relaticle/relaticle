@@ -58,7 +58,7 @@ function swapToggle(toggle, paused) {
     toggle.querySelector('[data-loop-icon="play"]').toggleAttribute("hidden", ! paused)
 }
 
-function loop(root, amount, { cycle, reset, finish }) {
+function loop(root, amount, { cycle, reset, finish, target = root }) {
     const toggle = root.closest(".feat-card")?.querySelector("[data-loop-toggle]")
     const running = new Set()
     let controller = null
@@ -113,7 +113,7 @@ function loop(root, amount, { cycle, reset, finish }) {
     reset()
     setState("idle")
 
-    inView(root, () => {
+    inView(target, () => {
         visible = true
 
         if (! paused) {
@@ -291,8 +291,10 @@ function loopBoard() {
     }
 
     loop(board, 0.5, {
+        target: board.closest(".feat-card"),
         reset: () => {
             settle([card])
+            slot.style.height = `${card.offsetHeight}px`
             card.classList.remove(...lifted)
             hide([cursor, slot])
             showCounts(false)
