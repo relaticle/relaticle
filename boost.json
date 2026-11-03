@@ -38,6 +38,7 @@
         "echo-development",
         "tailwindcss-development",
         "filament-development",
+        "activitylog-development",
         "medialibrary-development",
         "laravel-query-builder",
         "sluggable-development",
