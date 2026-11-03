@@ -18,11 +18,6 @@
     $isOwner        = $record->user_id === $authUser->getKey();
 
     $senderName = $from?->name ?: $from?->email_address ?: '?';
-    $initials   = collect(explode(' ', trim($senderName)))
-        ->filter()
-        ->take(2)
-        ->map(fn (string $word): string => mb_strtoupper(mb_substr($word, 0, 1)))
-        ->implode('');
 
     $participantDisplay = static function (?EmailParticipant $participant): ?array {
         if (! $participant instanceof EmailParticipant) {
@@ -191,9 +186,7 @@
         class="relative z-10 shrink-0 border-b border-gray-100 dark:border-gray-800 px-4 py-3 sm:px-6"
     >
         <div class="flex items-start gap-3">
-            <div class="flex h-8 w-8 aspect-square shrink-0 select-none items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/40 text-xs font-semibold text-primary-700 dark:text-primary-300">
-                {{ $initials ?: '?' }}
-            </div>
+            <x-email-integration::person-avatar :src="$record->senderMemberAvatarUrl()" :alt="$senderName" />
 
             <div
                 x-data="{ detailsOpen: false }"

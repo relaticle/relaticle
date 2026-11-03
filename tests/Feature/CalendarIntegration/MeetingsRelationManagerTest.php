@@ -235,7 +235,7 @@ it('shows attendee avatars and overflow in the attendees column', function (): v
         'ownerRecord' => $person,
         'pageClass' => ViewPeople::class,
     ])
-        ->assertSee('attendee-avatar-initials', escape: false)
+        ->assertSee('person-silhouette', escape: false)
         ->assertSee(__('filament/pages/dashboard.meetings.more_participants', ['count' => 1]));
 });
 
