@@ -44,6 +44,24 @@ function waitForShowcase(mixed $page, string $condition): mixed
     JS);
 }
 
+function approvalOutcome(mixed $page): mixed
+{
+    return $page->script(<<<'JS'
+        (() => {
+            const demo = document.querySelector('[data-approval]');
+            const visibility = (selector) => getComputedStyle(demo.querySelector(selector)).visibility;
+
+            return {
+                decision: demo.dataset.decision,
+                pending: visibility('[data-approval-pending]'),
+                done: visibility('[data-approval-done]'),
+                discarded: visibility('[data-approval-discarded]'),
+                followup: visibility('[data-approval-followup]'),
+            };
+        })()
+    JS);
+}
+
 it('plays a showcase demo when it scrolls into view and resets it off screen', function (): void {
     $page = $this->visit('/');
 
@@ -65,22 +83,79 @@ it('plays a showcase demo when it scrolls into view and resets it off screen', f
     $page->assertNoJavaScriptErrors();
 });
 
-it('plays the approval through to the saved state', function (): void {
+it('docks the proposal and waits for the visitor to decide', function (): void {
     $page = $this->visit('/');
 
     scrollShowcaseIntoView($page, '[data-approval]');
 
-    $saved = waitForShowcase($page, <<<'JS'
+    $docked = waitForShowcase($page, <<<'JS'
         (() => {
-            const done = document.querySelector('[data-approval-done]');
-            const pending = document.querySelector('[data-approval-pending]');
+            const demo = document.querySelector('[data-approval]');
+            const card = demo.querySelector('[data-approval-card]');
 
-            return ! done.classList.contains('invisible') && getComputedStyle(done).opacity === '1' && pending.classList.contains('invisible');
+            return demo.dataset.demoState === 'done' && getComputedStyle(card).opacity === '1';
         })()
     JS);
 
-    expect($saved)->toBeTrue()
-        ->and(showcaseDemoState($page, '[data-approval]')['state'])->toBe('done');
+    expect($docked)->toBeTrue()
+        ->and(approvalOutcome($page))->toBe(['decision' => 'pending', 'pending' => 'visible', 'done' => 'hidden', 'discarded' => 'hidden', 'followup' => 'hidden']);
+
+    $page->assertNoJavaScriptErrors();
+});
+
+it('saves the change when the visitor approves it and Rela confirms', function (): void {
+    $page = $this->visit('/');
+
+    scrollShowcaseIntoView($page, '[data-approval]');
+    $page->click('[data-approval-button]');
+
+    expect(approvalOutcome($page))->toBe(['decision' => 'approved', 'pending' => 'hidden', 'done' => 'visible', 'discarded' => 'hidden', 'followup' => 'visible'])
+        ->and($page->script("document.querySelector('[data-approval-followup]').textContent"))->toStartWith('Done. Northwind renewal is Won, closing');
+
+    $page->assertNoJavaScriptErrors();
+});
+
+it('writes nothing when the visitor discards the proposal', function (): void {
+    $page = $this->visit('/');
+
+    scrollShowcaseIntoView($page, '[data-approval]');
+    $page->click('[data-approval-pending] button:first-child');
+
+    expect(approvalOutcome($page))->toBe(['decision' => 'discarded', 'pending' => 'hidden', 'done' => 'hidden', 'discarded' => 'visible', 'followup' => 'visible'])
+        ->and($page->script("document.querySelector('[data-approval-followup]').textContent"))->toBe('Okay, I left Northwind renewal as it was.');
+
+    $page->assertNoJavaScriptErrors();
+});
+
+it('saves an edited close date and leaves an unticked field out', function (): void {
+    $page = $this->visit('/');
+
+    scrollShowcaseIntoView($page, '[data-approval]');
+    $page->click('[aria-label="Edit Close date"]');
+    $page->fill('[data-approval] input[type="date"]', '2026-11-20');
+    $page->click('[data-approval-field="closeIncluded"] button:text-is("Save")');
+    $page->click('[aria-label="Include Stage"]');
+    $page->click('[data-approval-button]');
+
+    expect($page->script("document.querySelector('[data-approval-close-date]').textContent"))->toBe('Nov 20, 2026')
+        ->and($page->script("document.querySelector('[data-approval-followup]').textContent"))->toBe('Done. Northwind renewal now closes Nov 20, 2026. The stage stays Negotiation.');
+
+    $page->assertNoJavaScriptErrors();
+});
+
+it('switches the agent conversation between Claude and ChatGPT', function (): void {
+    $page = $this->visit('/');
+
+    $actors = <<<'JS'
+        [...document.querySelectorAll('[data-agent-actor] > span')].map((chip) => `${chip.textContent.trim()}:${getComputedStyle(chip).visibility}`)
+    JS;
+
+    expect($page->script($actors))->toBe(['Claude:visible', 'ChatGPT:hidden']);
+
+    $page->click('#agent-tab-chatgpt');
+
+    expect($page->script($actors))->toBe(['Claude:hidden', 'ChatGPT:visible'])
+        ->and($page->script("document.querySelector('#agent-tab-chatgpt').getAttribute('aria-selected')"))->toBe('true');
 
     $page->assertNoJavaScriptErrors();
 });
