@@ -85,7 +85,7 @@
             role="tabpanel"
             aria-labelledby="{{ $tabId }}-emails"
             x-bind:class="{ 'invisible': tab !== 'emails' }"
-            class="col-start-1 row-start-1 divide-y divide-gray-100 dark:divide-white/[0.06]"
+            class="col-start-1 row-start-1 min-w-0 divide-y divide-gray-100 dark:divide-white/[0.06]"
         >
             @foreach($emails as [$senderAvatar, $subject, $participants, $preview, $mailbox, $time, $restricted])
                 <li class="flex gap-3 px-4 py-3 sm:px-5" data-mail-row>
@@ -124,7 +124,7 @@
             role="tabpanel"
             aria-labelledby="{{ $tabId }}-meetings"
             x-bind:class="{ 'invisible': tab !== 'meetings' }"
-            class="invisible col-start-1 row-start-1 divide-y divide-gray-100 self-start dark:divide-white/[0.06]"
+            class="invisible col-start-1 row-start-1 min-w-0 divide-y divide-gray-100 self-start dark:divide-white/[0.06]"
         >
             @foreach($meetings as [$meetingTitle, $startsAt, $duration, $attendees, $response, $responseClasses])
                 <li class="flex gap-3 px-4 py-3 sm:px-5">

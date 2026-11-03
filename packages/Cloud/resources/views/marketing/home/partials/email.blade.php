@@ -16,9 +16,9 @@
         <x-slot:visual>
             <div class="bg-warm flex min-h-[inherit] items-center justify-center p-4 sm:p-8 md:p-12">
                 <div class="w-full max-w-xl space-y-3" data-mail-demo>
-                    <p class="flex w-fit max-w-full items-center gap-2 rounded-full bg-white/80 py-1 pl-1 pr-3 text-xs text-gray-700 ring-1 ring-gray-950/5 backdrop-blur-sm dark:bg-white/[0.06] dark:text-gray-200 dark:ring-white/10" data-mail-caption>
+                    <p class="flex w-fit max-w-full items-center gap-2 rounded-2xl bg-white/80 py-1 pl-1 pr-3 text-xs text-gray-700 ring-1 ring-gray-950/5 backdrop-blur-sm dark:bg-white/[0.06] dark:text-gray-200 dark:ring-white/10" data-mail-caption>
                         <x-cloud::marketing.actor as="mailbox" class="shrink-0"/>
-                        <span class="truncate">{{ __('Added Lena Ortiz and Northwind after your first email') }}</span>
+                        <span class="py-0.5 sm:truncate">{{ __('Added Lena Ortiz and Northwind after your first email') }}</span>
                     </p>
 
                     <x-cloud::marketing.record-emails-mock/>
