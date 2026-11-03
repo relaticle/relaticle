@@ -83,8 +83,9 @@ reach it. Change the header height and the token together. `html` also carries `
 - `window`: the frame around a product fragment.
 - `theme-image`: a light and a dark WebP of a real app screenshot. It loads only the current
   theme's file and swaps on theme change.
-- `actor`: the You, Rela, Claude and Mailbox chips. They are the site's signature: every place that
-  shows who did something uses them, and nothing else uses those colors.
+- `actor`: the You, Rela, Claude, ChatGPT and Mailbox chips. They are the site's signature: every place
+  that shows who did something uses them, and nothing else uses those colors. ChatGPT stays neutral
+  gray, as the works-with strip draws it, and differs from You by its icon.
 - `record-emails-mock`: a record's Emails and Meetings tabs, mirroring the shipped UI. The two tabs are
   real tabs a visitor can switch; meeting dates are computed from today, so the mock never goes stale.
 - `quote`: a named customer quote in a `figure`, with name, role and company in the caption. The

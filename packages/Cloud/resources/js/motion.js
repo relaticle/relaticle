@@ -118,37 +118,31 @@ function playApproval() {
     }
 
     const ask = demo.querySelector("[data-approval-ask]")
+    const tool = demo.querySelector("[data-approval-tool]")
+    const reply = demo.querySelector("[data-approval-reply]")
     const card = demo.querySelector("[data-approval-card]")
-    const pending = demo.querySelector("[data-approval-pending]")
-    const done = demo.querySelector("[data-approval-done]")
     const button = demo.querySelector("[data-approval-button]")
 
     playOnEntry(demo, 0.6, {
         reset: () => {
-            hide([ask, card])
-            settle([button, pending, done])
-            done.classList.add("invisible")
-            done.setAttribute("aria-hidden", "true")
-            pending.classList.remove("invisible")
-            pending.removeAttribute("aria-hidden")
+            hide([ask, reply, card])
+            settle([button])
+            tool.classList.add("invisible")
+            demo.dispatchEvent(new CustomEvent("demo-reset"))
         },
         cycle: async (step) => {
             await step(animate(ask, rise(8), { duration: BASE, ease: EASE }))
+
+            tool.classList.remove("invisible")
+            await step(animate(tool, { opacity: [0, 1] }, { duration: FAST, delay: 0.2 }))
+            await step(animate(tool, { opacity: [1, 0] }, { duration: FAST, delay: 0.7 }))
+            tool.classList.add("invisible")
+
+            await step(animate(reply, rise(6), { duration: BASE, ease: EASE }))
             await step(animate(card, rise(12), { duration: SLOW, ease: EASE }))
-            settle([ask, card])
+            settle([ask, reply, card])
 
-            await step(animate(button, { transform: ["none", "translateY(1px)", "none"] }, { duration: FAST, delay: 0.9 }))
-
-            done.classList.remove("invisible")
-            done.removeAttribute("aria-hidden")
-            pending.setAttribute("aria-hidden", "true")
-
-            await Promise.all([
-                step(animate(pending, { opacity: [1, 0] }, { duration: FAST })),
-                step(animate(done, { opacity: [0, 1], transform: ["translateY(4px)", "none"] }, { duration: BASE, delay: 0.1, ease: EASE })),
-            ])
-
-            pending.classList.add("invisible")
+            await step(animate(button, { transform: ["none", "scale(1.06)", "none"] }, { duration: SLOW, delay: 0.3, ease: EASE }))
         },
     })
 }
