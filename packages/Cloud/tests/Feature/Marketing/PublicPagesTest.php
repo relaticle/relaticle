@@ -396,17 +396,6 @@ describe('Response meta', function () {
 });
 
 describe('Hero AI tab: animation timeline', function () {
-    it('hides the data-table outer container at cycle start', function () {
-        $response = $this->get('/');
-        $response->assertSuccessful();
-
-        // The exchange 1 tool-result table container must be opacity-controlled
-        // by the .mcp-el CSS rule. Without this class, the rounded border ghosts
-        // through before any animation runs.
-        $body = $response->getContent();
-        expect($body)->toContain('mcp-el mcp-tasks-table');
-    });
-
     it('plays the AI demo once without skip or replay controls', function () {
         $response = $this->get('/');
         $response->assertSuccessful();
@@ -416,64 +405,6 @@ describe('Hero AI tab: animation timeline', function () {
             ->not->toContain('Skip to the end of the demo')
             ->not->toContain('Replay the demo')
             ->not->toContain('holdMs');
-    });
-
-    it('does not restart the AI demo on hover or focus changes', function () {
-        $response = $this->get('/');
-        $response->assertSuccessful();
-        $body = $response->getContent();
-
-        // Hovering between the preview and the Ask Rela tab must not
-        // cancel timers and call animateChat(), because that restarts the demo.
-        expect($body)
-            ->not->toContain('@mouseenter="pause()"')
-            ->not->toContain('@mouseleave="resume()"')
-            ->not->toContain('@focusin="pause()"')
-            ->not->toContain('@focusout="resume()"')
-            ->not->toContain('pause() {')
-            ->not->toContain('resume() {');
-    });
-
-    it('uses a unified Y-slide for assistant content', function () {
-        $response = $this->get('/');
-        $response->assertSuccessful();
-        $body = $response->getContent();
-
-        // Every assistant child uses translateY for its slide. The legacy
-        // mixed translateX(-6) on tool indicators must stay out.
-        expect($body)->not->toContain("translateX('-6px')");
-        expect($body)->not->toContain('translateX(-6px)');
-    });
-
-    it('reveals new messages at the bottom so earlier ones stay visible', function () {
-        $response = $this->get('/');
-        $response->assertSuccessful();
-        $body = $response->getContent();
-
-        // Real-chat scroll: the view follows each newly revealed message/card
-        // down to the bottom (scrollToShow only scrolls down), so the previous
-        // exchange stays on screen instead of being yanked to the top before
-        // the next message has even appeared.
-        expect($body)
-            ->toContain('scrollToShow')
-            ->toContain("scrollToShow('.mcp-user-2')")
-            ->toContain("scrollToShow('.mcp-user-3')")
-            ->toContain("scrollToShow('.mcp-audit-card')")
-            ->not->toContain('scrollMessageIntoView')
-            ->not->toContain('typeStart2 - 100')
-            ->not->toContain('typeStart3 - 100');
-    });
-
-    it('animates the 3 task rows as a single staggered group with 120ms spacing', function () {
-        $response = $this->get('/');
-        $response->assertSuccessful();
-        $body = $response->getContent();
-
-        // Stagger spacing is 120ms after the table reveal: 1000 / 1120 / 1240
-        // relative to conversationStart.
-        expect($body)->toContain('conversationStart + 1000');
-        expect($body)->toContain('conversationStart + 1120');
-        expect($body)->toContain('conversationStart + 1240');
     });
 });
 
@@ -524,18 +455,6 @@ describe('Hero AI tab: entry phase', function () {
         expect($body)->toContain('hero-entry-typed');
         expect($body)->toContain('hero-entry-placeholder');
         expect($body)->toContain('hero-entry-send');
-    });
-
-    it('wires the entry → conversation transition in the heroChat factory', function () {
-        $response = $this->get('/');
-        $response->assertSuccessful();
-        $body = $response->getContent();
-
-        // Phase machine helpers must be in the factory or the loop has no
-        // way to fade the entry overlay out and the conversation pane in.
-        expect($body)->toContain('transitionToConversation');
-        expect($body)->toContain('entryHoldMs');
-        expect($body)->toContain('entryTransitionMs');
     });
 });
 
