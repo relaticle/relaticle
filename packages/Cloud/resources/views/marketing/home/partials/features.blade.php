@@ -41,6 +41,7 @@
             :link-label="__('Meet :name', ['name' => $assistantName])"
             :link-href="route('ai')"
             :quote="$quotes['rela'] ?? null"
+            looping
         >
             {{ __(':name drafts the change. You approve it before it is saved.', ['name' => $assistantName]) }}
 
@@ -89,7 +90,7 @@
                                     <span class="inline-flex h-7 items-center rounded-md px-2.5 text-xs font-medium text-gray-600 dark:text-gray-300">{{ __('Discard') }}</span>
                                     <span class="inline-flex h-7 items-center rounded-md bg-primary-600 px-2.5 text-xs font-medium text-white shadow-sm" data-approval-button>{{ __('Save changes') }}</span>
                                 </div>
-                                <div class="invisible col-start-1 row-start-1 flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium text-emerald-700 opacity-0 dark:text-emerald-400" data-approval-done aria-hidden="true">
+                                <div class="invisible col-start-1 row-start-1 flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium text-emerald-700 dark:text-emerald-400" data-approval-done aria-hidden="true">
                                     <x-ri-checkbox-circle-fill class="h-4 w-4"/>
                                     {{ __('Approved by you. Saved to Northwind renewal.') }}
                                 </div>
@@ -112,6 +113,7 @@
             :link-label="__('Relaticle for Claude')"
             :link-href="route(\Relaticle\Cloud\Marketing\Enums\ConnectableAssistant::Claude->routeName())"
             :quote="$quotes['agents'] ?? null"
+            looping
         >
             {{ __('It reads and updates the same records you do, with your permissions.') }}
 

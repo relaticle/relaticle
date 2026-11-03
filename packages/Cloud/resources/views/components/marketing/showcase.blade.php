@@ -6,6 +6,7 @@
     'figure' => null,
     'facts' => [],
     'quote' => null,
+    'looping' => false,
 ])
 
 <div {{ $attributes->class('bg-rail grid grid-cols-1 gap-px lg:grid-cols-12') }}>
@@ -52,5 +53,23 @@
         @endif
 
         {{ $visual }}
+
+        @if($looping)
+            <button
+                type="button"
+                hidden
+                data-loop-toggle
+                data-pause-label="{{ __('Pause the demo') }}"
+                data-play-label="{{ __('Play the demo') }}"
+                data-pause-text="{{ __('Pause') }}"
+                data-play-text="{{ __('Play') }}"
+                aria-label="{{ __('Pause the demo') }}"
+                class="bg-surface border-rail absolute right-4 top-4 z-10 inline-flex h-7 items-center gap-1 rounded-md border px-1.5 text-[11px] font-medium text-gray-500 transition-colors hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-gray-400 dark:hover:text-white"
+            >
+                <x-ri-pause-line data-loop-icon="pause" class="h-3.5 w-3.5"/>
+                <x-ri-play-line data-loop-icon="play" class="h-3.5 w-3.5" hidden/>
+                <span data-loop-label>{{ __('Pause') }}</span>
+            </button>
+        @endif
     </div>
 </div>
