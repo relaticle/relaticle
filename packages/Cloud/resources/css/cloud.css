@@ -56,6 +56,13 @@ html:has(#main-header) {
     }
 }
 
+@utility mask-top-corners {
+    mask-image:
+        radial-gradient(ellipse 30% 75% at 0% 0%, #000 35%, transparent),
+        radial-gradient(ellipse 30% 75% at 100% 0%, #000 35%, transparent),
+        linear-gradient(to bottom, rgb(0 0 0 / 0.5), transparent 22%);
+}
+
 @utility type-display {
     font-family: var(--font-display);
     font-size: 2.25rem;
