@@ -18,14 +18,14 @@
     ];
 
     $variants = [
-        'primary' => 'bg-primary font-semibold text-white shadow-[0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.1)] hover:brightness-110',
-        'secondary' => 'border border-gray-200 bg-white text-gray-700 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:border-gray-300 hover:shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-white dark:hover:bg-white/[0.06] dark:hover:border-white/[0.15]',
+        'primary' => 'bg-primary font-semibold text-white shadow-[0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.1)] hover:bg-primary-700',
+        'secondary' => 'border border-gray-200 bg-white font-medium text-gray-700 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:border-gray-300 hover:shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-white dark:hover:bg-white/[0.06] dark:hover:border-white/[0.15]',
     ];
 @endphp
 
 <{{ $tag }} {{ $attributes
     ->class([
-        'inline-flex items-center justify-center gap-2 cursor-pointer font-medium transition-all duration-200',
+        'inline-flex items-center justify-center gap-2 cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
         $sizes[$size] ?? $sizes['base'],
         $variants[$variant] ?? $variants['primary'],
     ])
