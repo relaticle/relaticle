@@ -267,6 +267,10 @@
 
                 this.activeTab = target;
 
+                if (previousTab === 'ai-agent') {
+                    this.$dispatch('hero-chat-stop');
+                }
+
                 if (target === 'ai-agent') {
                     this.$dispatch('hero-chat-reset');
                 }
