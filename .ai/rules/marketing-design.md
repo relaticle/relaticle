@@ -85,7 +85,8 @@ reach it. Change the header height and the token together. `html` also carries `
   theme's file and swaps on theme change.
 - `actor`: the You, Rela, Claude and Mailbox chips. They are the site's signature: every place that
   shows who did something uses them, and nothing else uses those colors.
-- `record-emails-mock`: the Emails tab of a record, mirroring the shipped UI.
+- `record-emails-mock`: a record's Emails and Meetings tabs, mirroring the shipped UI. The two tabs are
+  real tabs a visitor can switch; meeting dates are computed from today, so the mock never goes stale.
 - `quote`: a named customer quote in a `figure`, with name, role and company in the caption. The
   name links to a public source when one exists.
 - `logo-wall`: customer logos on the rails. It renders nothing when it gets no logos.

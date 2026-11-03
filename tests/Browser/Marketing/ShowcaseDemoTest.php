@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Features\EmailIntegration;
+use Laravel\Pennant\Feature;
+
 beforeEach(function (): void {
     $this->withVite();
 });
@@ -98,6 +101,48 @@ it('moves the board card into the next stage and updates both counts', function 
     JS);
 
     expect($moved)->toBeTrue();
+
+    $page->assertNoJavaScriptErrors();
+});
+
+it('fills the record from the mailbox and lands the sharing locks last', function (): void {
+    Feature::for(null)->activate(EmailIntegration::class);
+
+    $page = $this->visit('/');
+
+    expect(showcaseDemoState($page, '#email [data-mail-demo]')['state'])->toBe('idle');
+
+    scrollShowcaseIntoView($page, '#email [data-mail-demo]');
+
+    $filled = waitForShowcase($page, <<<'JS'
+        (() => {
+            const demo = document.querySelector('#email [data-mail-demo]');
+            const parts = [...demo.querySelectorAll('[data-mail-caption], [data-mail-row], [data-mail-lock]')];
+
+            return demo.dataset.demoState === 'done' && parts.length === 7 && parts.every((part) => getComputedStyle(part).opacity === '1');
+        })()
+    JS);
+
+    expect($filled)->toBeTrue();
+
+    $page->assertNoJavaScriptErrors();
+});
+
+it('switches the record between its emails and its meetings', function (): void {
+    Feature::for(null)->activate(EmailIntegration::class);
+
+    $page = $this->visit('/');
+
+    $panels = <<<'JS'
+        [...document.querySelectorAll('#email [role="tabpanel"]')].map((panel) => getComputedStyle(panel).visibility)
+    JS;
+
+    expect($page->script($panels))->toBe(['visible', 'hidden']);
+
+    $page->click('#email [role="tab"][aria-controls$="-meetings-panel"]');
+
+    expect($page->script($panels))->toBe(['hidden', 'visible'])
+        ->and($page->script('document.querySelector(\'#email [role="tab"][aria-selected="true"]\').textContent.trim()'))->toStartWith('Meetings');
 
     $page->assertNoJavaScriptErrors();
 });
