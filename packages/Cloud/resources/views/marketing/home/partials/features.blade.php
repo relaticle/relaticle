@@ -2,6 +2,7 @@
     $assistantName = (string) config('chat.assistant_name');
     $opportunityIcon = \Relaticle\Chat\Support\RecordChipRenderer::iconPath('opportunity');
     $quotes = collect(config('marketing.testimonials'))->keyBy(fn (array $t): string => $t['slot'] ?? '')->all();
+    $documentationActive = \Laravel\Pennant\Feature::active(\App\Features\Documentation::class);
 @endphp
 
 <x-cloud::marketing.frame id="features">
@@ -16,7 +17,7 @@
             :lead="__('A pipeline you read at a glance.')"
             :facts="[__('Board or list, your pick'), __('Drag a card to the next stage'), __('Rename, recolor or reorder the stages')]"
             :link-label="__('Track a deal through the pipeline')"
-            :link-href="route('help.show', ['category' => 'getting-started', 'slug' => 'track-a-deal-through-the-pipeline'])"
+            :link-href="$documentationActive ? route('help.show', ['category' => 'getting-started', 'slug' => 'track-a-deal-through-the-pipeline']) : null"
             :quote="$quotes['board'] ?? null"
             looping
         >
