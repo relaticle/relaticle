@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\PeopleResource\Pages;
 
+use App\Filament\Components\ImportExportIcon;
 use App\Filament\Concerns\HasCustomFieldColumns;
 use App\Filament\Exports\PeopleExporter;
 use App\Filament\Resources\PeopleResource;
@@ -38,7 +39,7 @@ final class ListPeople extends ListRecords
                     ->visible(ImportPeople::canAccess(...)),
                 ExportAction::make()->exporter(PeopleExporter::class)->authorize('exportAny', People::class),
             ])
-                ->icon('heroicon-o-arrows-up-down')
+                ->icon(ImportExportIcon::make())
                 ->color('gray')
                 ->button()
                 ->label(__('filament/resources/person.pages.list.actions.import_export.label'))

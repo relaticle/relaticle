@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Concerns;
 
+use App\Filament\Components\ImportExportIcon;
 use App\Filament\Exports\NoteExporter;
 use App\Models\Note;
 use Filament\Actions\Action;
@@ -29,7 +30,7 @@ trait HasNoteHeaderActions
                     ->visible(ImportNotes::canAccess(...)),
                 ExportAction::make()->exporter(NoteExporter::class)->authorize('exportAny', Note::class),
             ])
-                ->icon('heroicon-o-arrows-up-down')
+                ->icon(ImportExportIcon::make())
                 ->color('gray')
                 ->button()
                 ->label(__('filament/resources/note.pages.list.actions.import_export.label'))

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources\TaskResource\Pages;
 
 use App\Filament\Actions\CreateTaskAction;
+use App\Filament\Components\ImportExportIcon;
 use App\Filament\Concerns\HasCustomFieldColumns;
 use App\Filament\Concerns\HasViewSwitcher;
 use App\Filament\Concerns\KeepsOpenTaskInUrl;
@@ -66,7 +67,7 @@ final class ManageTasks extends ManageRecords
                     ->visible(ImportTasks::canAccess(...)),
                 ExportAction::make()->exporter(TaskExporter::class)->authorize('exportAny', Task::class),
             ])
-                ->icon('heroicon-o-arrows-up-down')
+                ->icon(ImportExportIcon::make())
                 ->color('gray')
                 ->button()
                 ->label(__('filament/resources/task.pages.list.actions.import_export.label'))
