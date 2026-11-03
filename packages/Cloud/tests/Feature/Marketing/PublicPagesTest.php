@@ -407,14 +407,14 @@ describe('Hero AI tab: animation timeline', function () {
         expect($body)->toContain('mcp-el mcp-tasks-table');
     });
 
-    it('plays the AI demo once and offers skip and replay controls', function () {
+    it('plays the AI demo once without skip or replay controls', function () {
         $response = $this->get('/');
         $response->assertSuccessful();
         $body = $response->getContent();
 
         expect($body)
-            ->toContain('Skip to the end of the demo')
-            ->toContain('Replay the demo')
+            ->not->toContain('Skip to the end of the demo')
+            ->not->toContain('Replay the demo')
             ->not->toContain('holdMs');
     });
 
