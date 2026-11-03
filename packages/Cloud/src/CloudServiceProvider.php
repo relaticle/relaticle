@@ -78,6 +78,7 @@ final class CloudServiceProvider extends ServiceProvider
 
         $this->mergeConfigFrom(__DIR__.'/../config/comparisons.php', 'comparisons');
         $this->mergeConfigFrom(__DIR__.'/../config/analytics.php', 'analytics');
+        $this->mergeConfigFrom(__DIR__.'/../config/marketing.php', 'marketing');
 
         $this->configureBlog();
 
@@ -267,7 +268,7 @@ final class CloudServiceProvider extends ServiceProvider
 
     private function registerCommunityCounts(): void
     {
-        View::composer(['cloud::components.layout.community-links', 'cloud::marketing.home.partials.hero', 'cloud::marketing.home.partials.works-with', 'cloud::marketing.press'], static function (ViewContract $view): void {
+        View::composer(['cloud::components.layout.community-links', 'cloud::marketing.home.partials.hero', 'cloud::marketing.home.partials.works-with', 'cloud::marketing.home.partials.community', 'cloud::marketing.press'], static function (ViewContract $view): void {
             $gitHubService = resolve(GitHubService::class);
 
             $view->with([
@@ -276,11 +277,11 @@ final class CloudServiceProvider extends ServiceProvider
             ]);
         });
 
-        View::composer('cloud::components.layout.community-links', static function (ViewContract $view): void {
+        View::composer(['cloud::components.layout.community-links', 'cloud::marketing.home.partials.community'], static function (ViewContract $view): void {
             $view->with('formattedDiscordMembers', resolve(DiscordService::class)->getFormattedMemberCount());
         });
 
-        View::composer('cloud::marketing.home.partials.works-with', static function (ViewContract $view): void {
+        View::composer(['cloud::marketing.home.partials.works-with', 'cloud::marketing.home.partials.community'], static function (ViewContract $view): void {
             $view->with('formattedDockerPulls', resolve(DockerHubService::class)->getFormattedPullCount());
         });
     }

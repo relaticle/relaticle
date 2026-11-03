@@ -46,7 +46,7 @@
                 @endforeach
             </nav>
 
-            <section id="logos" aria-labelledby="logos-title" class="scroll-mt-24 pt-14 sm:pt-16">
+            <section id="logos" aria-labelledby="logos-title" class="pt-14 sm:pt-16">
                 <h2 id="logos-title" class="font-display text-2xl font-bold tracking-tight sm:text-3xl">{{ __('The logo') }}</h2>
                 <p class="mt-3 max-w-2xl text-sm leading-relaxed text-gray-600 dark:text-gray-400">{{ __('Use the full logo when space allows. Choose the symbol for compact placements. All files have transparent backgrounds.') }}</p>
                 <div class="mt-7 grid gap-5 sm:grid-cols-2">
@@ -80,7 +80,7 @@
                 </div>
             </section>
 
-            <section id="social" aria-labelledby="social-title" class="scroll-mt-24 pt-16 sm:pt-20">
+            <section id="social" aria-labelledby="social-title" class="pt-16 sm:pt-20">
                 <h2 id="social-title" class="font-display text-2xl font-bold tracking-tight sm:text-3xl">{{ __('One identity. Every channel.') }}</h2>
                 <p class="mt-3 max-w-2xl text-sm leading-relaxed text-gray-600 dark:text-gray-400">{{ __('Purple is the primary avatar. Upload the full square image and let the platform apply its crop. Keep one color across accounts.') }}</p>
                 <div class="mt-7 grid gap-5 sm:grid-cols-3">
@@ -143,7 +143,7 @@
                 </div>
             </section>
 
-            <section id="screenshots" aria-labelledby="screenshots-title" class="scroll-mt-24 pt-16 sm:pt-20">
+            <section id="screenshots" aria-labelledby="screenshots-title" class="pt-16 sm:pt-20">
                 <h2 id="screenshots-title" class="font-display text-2xl font-bold tracking-tight sm:text-3xl">{{ __('Inside Relaticle') }}</h2>
                 <p class="mt-3 text-sm leading-relaxed text-gray-600 dark:text-gray-400">{{ __('Product screenshots in light and dark themes. Download the original PNGs for articles, presentations, and reviews.') }}</p>
                 <div class="mt-7 grid gap-5 sm:grid-cols-3">
@@ -164,7 +164,7 @@
                 </div>
             </section>
 
-            <section id="facts" aria-labelledby="facts-title" class="scroll-mt-24 pt-16 sm:pt-20">
+            <section id="facts" aria-labelledby="facts-title" class="pt-16 sm:pt-20">
                 <div class="grid gap-8 lg:grid-cols-3 lg:gap-12">
                     <div>
                         <h2 id="facts-title" class="font-display text-2xl font-bold tracking-tight sm:text-3xl">{{ __('About Relaticle') }}</h2>
@@ -187,7 +187,7 @@
                 </div>
             </section>
 
-            <section id="contact" aria-labelledby="contact-title" class="mt-16 scroll-mt-24 rounded-2xl border border-gray-200 bg-gray-50 p-7 dark:border-gray-800 dark:bg-gray-900/50 sm:mt-20 sm:p-10">
+            <section id="contact" aria-labelledby="contact-title" class="mt-16 rounded-2xl border border-gray-200 bg-gray-50 p-7 dark:border-gray-800 dark:bg-gray-900/50 sm:mt-20 sm:p-10">
                 <div class="flex flex-wrap items-center justify-between gap-6">
                     <div class="max-w-xl"><h2 id="contact-title" class="font-display text-2xl font-bold tracking-tight">{{ __('Working on a story?') }}</h2><p class="mt-3 text-sm leading-relaxed text-gray-600 dark:text-gray-400">{{ __('Get in touch for interviews, product questions, or help finding the right assets.') }}</p></div>
                     <a href="{{ route('contact') }}" class="{{ $downloadClass }}">{{ __('Contact the team') }}<x-ri-arrow-right-line class="size-4" aria-hidden="true"/></a>

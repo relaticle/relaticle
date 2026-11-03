@@ -4,7 +4,7 @@
         <div class="relative mx-auto max-w-2xl">
             <h2 class="type-title md:text-5xl">
                 <span class="text-gray-950 dark:text-white">{{ __('Your CRM, your rules.') }}</span>
-                <span class="text-gray-500">{{ __('Start free, self-host whenever you like.') }}</span>
+                <span class="text-gray-500 dark:text-gray-400">{{ __('Start free, self-host whenever you like.') }}</span>
             </h2>
 
             <div class="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -17,8 +17,8 @@
                 </x-cloud::marketing.button>
             </div>
 
-            <p class="mt-5 text-xs text-gray-500 dark:text-gray-400">
-                {{ __('No credit card. Unlimited users. Open source.') }}
+            <p class="mt-5 text-sm text-gray-500 dark:text-gray-400">
+                {{ __(':days-day trial, no card, unlimited users.', ['days' => \App\Models\Workspace::PRO_TRIAL_DAYS]) }}
             </p>
         </div>
     </div>

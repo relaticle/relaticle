@@ -17,7 +17,7 @@
                 </span>
                 <x-ri-arrow-down-s-line class="h-5 w-5 shrink-0 text-gray-400 transition-transform duration-200" ::class="open === {{ $index }} ? 'rotate-180' : ''"/>
             </button>
-            <div id="{{ $idPrefix }}-answer-{{ $index }}" role="region" aria-labelledby="{{ $idPrefix }}-question-{{ $index }}" x-show="open === {{ $index }}" x-collapse x-cloak class="mt-3 text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+            <div id="{{ $idPrefix }}-answer-{{ $index }}" role="region" aria-labelledby="{{ $idPrefix }}-question-{{ $index }}" x-show="open === {{ $index }}" x-collapse x-cloak class="type-prose mt-3 text-gray-600 dark:text-gray-400">
                 {{ $answer }}
             </div>
         </div>

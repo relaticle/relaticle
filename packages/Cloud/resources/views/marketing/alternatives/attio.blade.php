@@ -99,7 +99,7 @@
             </div>
         </nav>
 
-        <section id="comparison" aria-labelledby="comparison-title" class="mx-auto max-w-6xl scroll-mt-24 px-6 py-16 sm:py-20 lg:px-8">
+        <section id="comparison" aria-labelledby="comparison-title" class="mx-auto max-w-6xl px-6 py-16 sm:py-20 lg:px-8">
             <div class="mb-8 max-w-2xl">
                 <p class="mb-3 text-xs font-semibold tracking-widest text-primary uppercase dark:text-primary-400">{{ __('The practical differences') }}</p>
                 <h2 id="comparison-title" class="font-display text-3xl font-bold tracking-tight sm:text-4xl">{{ __('How does Relaticle compare to Attio?') }}</h2>
@@ -166,7 +166,7 @@
             </div>
         </section>
 
-        <section id="migration" aria-labelledby="migration-title" class="mx-auto max-w-6xl scroll-mt-24 px-6 py-16 sm:py-20 lg:px-8">
+        <section id="migration" aria-labelledby="migration-title" class="mx-auto max-w-6xl px-6 py-16 sm:py-20 lg:px-8">
             <div class="grid gap-10 lg:grid-cols-5 lg:gap-16">
                 <div class="lg:col-span-2">
                     <p class="mb-3 text-xs font-semibold tracking-widest text-primary uppercase dark:text-primary-400">{{ __('A practical migration path') }}</p>
@@ -211,7 +211,7 @@
             </aside>
         </section>
 
-        <section id="attio-faq" aria-labelledby="faq-title" class="mx-auto max-w-6xl scroll-mt-24 border-t border-[var(--surface-card-border)] px-6 py-16 sm:py-20 lg:px-8">
+        <section id="attio-faq" aria-labelledby="faq-title" class="mx-auto max-w-6xl border-t border-[var(--surface-card-border)] px-6 py-16 sm:py-20 lg:px-8">
             <div class="grid gap-8 lg:grid-cols-5 lg:gap-16">
                 <div class="lg:col-span-2">
                     <h2 id="faq-title" class="font-display text-3xl font-bold tracking-tight sm:text-4xl">{{ __('Before you switch') }}</h2>

@@ -15,6 +15,20 @@
     --color-rail: var(--color-gray-200);
     --color-surface: var(--color-white);
     --color-tint: var(--color-gray-50);
+    --header-height: 4rem;
+}
+
+html {
+    background-color: var(--color-surface);
+    color-scheme: light;
+}
+
+html.dark {
+    color-scheme: dark;
+}
+
+html:has(#main-header) {
+    scroll-padding-top: calc(var(--header-height) + 1.5rem);
 }
 
 .dark {
@@ -82,10 +96,16 @@
 
 @utility type-label {
     font-family: var(--font-mono);
-    font-size: var(--text-pico);
+    font-size: var(--text-micro);
     line-height: 1.6;
     letter-spacing: 0.14em;
     text-transform: uppercase;
+}
+
+@utility type-prose {
+    font-size: 1rem;
+    line-height: 1.6;
+    max-width: 66ch;
 }
 
 /* The hero mock mirrors the app panel, whose gray is zinc. This bundle's gray is Tailwind's cool gray. */

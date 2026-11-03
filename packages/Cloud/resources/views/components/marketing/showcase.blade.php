@@ -5,6 +5,7 @@
     'linkHref' => null,
     'figure' => null,
     'facts' => [],
+    'quote' => null,
 ])
 
 <div {{ $attributes->class('bg-rail grid grid-cols-1 gap-px lg:grid-cols-12') }}>
@@ -17,11 +18,23 @@
             </h3>
 
             @if($facts !== [])
-                <ul class="divide-rail border-rail mt-6 divide-y border-y text-sm text-gray-700 dark:text-gray-300">
+                <ul class="divide-rail border-rail mt-6 divide-y border-y type-prose text-gray-700 dark:text-gray-300">
                     @foreach($facts as $fact)
                         <li class="py-2.5">{{ $fact }}</li>
                     @endforeach
                 </ul>
+            @endif
+
+            @if($quote)
+                <x-cloud::marketing.quote
+                    class="border-rail mt-6 border-t pt-5"
+                    :quote="$quote['quote']"
+                    :name="$quote['name']"
+                    :role="$quote['role']"
+                    :company="$quote['company']"
+                    :url="$quote['url'] ?? null"
+                    :avatar="$quote['avatar'] ?? null"
+                />
             @endif
         </div>
 

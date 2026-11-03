@@ -18,9 +18,8 @@
 
     <div class="bg-rail grid grid-cols-1 gap-px lg:grid-cols-12">
         <div class="bg-tint feat-card relative min-h-[22rem] overflow-hidden lg:col-span-7">
-            <x-cloud::marketing.eyebrow class="pointer-events-none absolute left-6 top-5 z-10">{{ __('Fig 04 · Northwind renewal') }}</x-cloud::marketing.eyebrow>
 
-            <div class="flex min-h-[inherit] items-center justify-center px-6 pb-6 pt-14 md:p-12">
+            <div class="flex min-h-[inherit] items-center justify-center p-6 md:p-12">
                 <x-cloud::marketing.window class="w-full max-w-md">
                     <div class="flex min-w-0 items-center gap-2.5 px-4 py-3">
                         <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-500 text-white" aria-hidden="true">

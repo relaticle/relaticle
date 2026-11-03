@@ -21,7 +21,7 @@
                 <div class="bg-surface p-6 md:p-8">
                     <x-cloud::marketing.eyebrow class="mb-3">{{ sprintf('%02d', $index + 1) }}</x-cloud::marketing.eyebrow>
                     <h3 class="text-base font-medium text-gray-950 dark:text-white">{{ $title }}</h3>
-                    <p class="mt-1.5 text-sm leading-relaxed text-gray-500 dark:text-gray-400">{{ $description }}</p>
+                    <p class="type-prose mt-1.5 text-gray-500 dark:text-gray-400">{{ $description }}</p>
                 </div>
             @endforeach
 
