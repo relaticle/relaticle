@@ -27,7 +27,6 @@
 <div x-data="heroChat()"
      @hero-chat-reset.window="cancelInflight(); resetChat()"
      @hero-chat-animate.window="animateChat()"
-     @hero-chat-skip.window="skipToEnd()"
      class="hero-agent-preview relative bg-white dark:bg-zinc-900 flex h-[520px] sm:h-[580px] md:h-[640px]">
 
     {{-- Non-interactive overlay: blocks clicks, right-click, and drag.
@@ -371,7 +370,6 @@
                 this.resetChat();
                 this.showAllImmediate();
                 this.scrollToShow('.mcp-next-steps');
-                this.$dispatch('hero-chat-state', 'done');
             },
 
             showAllImmediate() {
@@ -447,8 +445,6 @@
                     this.skipToEnd();
                     return;
                 }
-
-                this.$dispatch('hero-chat-state', 'playing');
 
                 // Prep the entry view for a fresh intro but leave any existing
                 // conversation on screen. runCycle() raises the entry "curtain"
@@ -599,7 +595,6 @@
 
                 this.nextCycleTimer = setTimeout(function() {
                     self.nextCycleTimer = null;
-                    self.$dispatch('hero-chat-state', 'done');
                 }, approve3At + 1800);
             }
         };

@@ -70,14 +70,14 @@ reach it. Change the header height and the token together. `html` also carries `
 - `hero`: the split hero for inner pages. The `h1` on the left, the subline and CTAs on the right,
   then the page's visual below in a `tint` cell. The homepage hero is centered but built from the same
   parts, inside the frame: a `type-label` pill, a two-tone `type-display` headline, the subline, two
-  buttons, a row of tab cells on the rails, and the demo in a `tint` cell. The demo plays once; a Skip and Replay control sits in its browser chrome.
+  buttons, a row of tab cells on the rails, and the demo in a `tint` cell. The demo plays once per visit and again on each return to its tab.
 - `frame`: a section with rails. Everything below the hero sits in one.
 - `frame-header`: label plus two-tone title, left-aligned. Copy stays under two lines at 1440px.
 - `showcase`: a text cell (label, lead, one link) beside a `tint` cell holding product UI, with an
   optional `figure` caption at the cell's top left, unused on the homepage. `facts` takes up
   to three short lines, rendered as hairline rows under the lead; each names something the help docs
-  describe. `looping` adds the Pause control for a visual that `motion.js` loops. The prop is not
-  named `loop`, because Blade's own `$loop` overwrites it after the facts `@foreach`.
+  describe. A prop is never named `loop`: Blade's own `$loop` overwrites it after the
+  facts `@foreach`.
 - `board-mock`: the opportunities board built from the live board's markup, with a card that
   `motion.js` drags to the next stage. The hero tab and the press page keep the screenshot.
 - `window`: the frame around a product fragment.
@@ -114,17 +114,20 @@ every page is framed.
 - Animate opacity, transform and clip-path only. Never a heading or body text.
 - A reveal plays once, when it scrolls into view. Durations are 0.2s, 0.3s and 0.45s, with the
   ease `[0.22, 1, 0.36, 1]`. A sequence ends inside 5 seconds, or it needs a pause control (WCAG 2.2.2).
-- A showcase demo loops through `loop()`: it starts when the cell is in view, holds 2.5s on the
-  finished state, fades, resets and plays again, stops and resets when the cell leaves the viewport,
-  and restarts on re-entry. The showcase's `looping` prop renders the Pause control in the `tint`
-  cell. Pause jumps to the finished state and stays paused across leave and re-entry. The root carries
-  `data-loop-state` (`idle`, `playing`, `paused`), and `tests/Browser/Marketing/ShowcaseLoopTest.php`
-  pins the three states in Chromium and WebKit.
+- A showcase demo plays once through `playOnEntry()`: it starts when the cell scrolls into view,
+  holds its end state, resets when the cell leaves the viewport, and plays again on the next entry.
+  It never repeats while the cell stays in view. The root carries `data-demo-state` (`idle`,
+  `playing`, `done`), and `tests/Browser/Marketing/ShowcaseDemoTest.php` pins the states and each
+  demo's end state in Chromium and WebKit. A demo observes its cell, not its root, when the root is
+  wider than the cell.
+- No demo draws a pointer cursor and none carries a pause, skip or replay control. That is a product
+  decision of 2026-11-03, and each demo ends inside 5 seconds, so WCAG 2.2.2 asks for no control. The
+  only stop is `prefers-reduced-motion`. A control comes back only with that decision reversed.
 - A sequence awaits each `animate()` through the `step` it receives. A raw `await animate()` outlives
-  a leave or a pause and commits its mid-flight value over the reset.
-- `prefers-reduced-motion: reduce` skips the whole layer, loops included, every element renders in its
-  final state, and the Pause controls stay hidden. The browser plugin cannot emulate it, so that pass
-  is manual: `agent-browser set media light reduced-motion`.
+  a leave and commits its mid-flight value over the reset.
+- `prefers-reduced-motion: reduce` skips the whole layer, demos included, and every element renders in
+  its final state. The browser plugin cannot emulate it, so that pass is manual:
+  `agent-browser set media light reduced-motion`.
 - Never animate an element out of `display: none`. Stack the two states in one grid cell and toggle
   `invisible` (WebKit skips or flashes the first frame otherwise).
 

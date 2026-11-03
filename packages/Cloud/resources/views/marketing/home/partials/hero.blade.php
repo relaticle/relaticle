@@ -1,4 +1,4 @@
-<section x-data="heroTabs()" x-init="init()" @hero-chat-state.window="chatState = $event.detail" class="bg-surface relative overflow-hidden pt-16">
+<section x-data="heroTabs()" x-init="init()" class="bg-surface relative overflow-hidden pt-16">
     <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]" aria-hidden="true"></div>
 
     <div class="border-rail relative mx-auto max-w-6xl sm:border-x">
@@ -85,16 +85,6 @@
                                 <div class="bg-white/60 dark:bg-white/[0.04] rounded-md px-3 py-1 text-[11px] text-gray-500 dark:text-gray-400">
                                     app.relaticle.com
                                 </div>
-                                <button type="button"
-                                        x-cloak
-                                        x-show="activeTab === 'ai-agent' && !reducedMotion"
-                                        @click="$dispatch(chatState === 'done' ? 'hero-chat-animate' : 'hero-chat-skip')"
-                                        :aria-label="chatState === 'done' ? @js(__('Replay the demo')) : @js(__('Skip to the end of the demo'))"
-                                        class="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-[11px] font-medium text-gray-500 transition-colors hover:bg-black/[0.04] hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-white">
-                                    <x-ri-restart-line x-show="chatState === 'done'" class="h-3.5 w-3.5"/>
-                                    <x-ri-skip-forward-line x-show="chatState !== 'done'" class="h-3.5 w-3.5"/>
-                                    <span x-text="chatState === 'done' ? @js(__('Replay')) : @js(__('Skip'))"></span>
-                                </button>
                             </div>
                         </div>
 
@@ -173,7 +163,6 @@
             ease: [0.16, 1, 0.3, 1],
             duration: 0.35,
             slideDistance: 40,
-            chatState: 'playing',
 
             init() {
                 this.updateImages();

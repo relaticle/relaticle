@@ -19,7 +19,6 @@
             :link-label="__('Track a deal through the pipeline')"
             :link-href="$documentationActive ? route('help.show', ['category' => 'getting-started', 'slug' => 'track-a-deal-through-the-pipeline']) : null"
             :quote="$quotes['board'] ?? null"
-            looping
         >
             {{ __('Company, amount and close date, in the stages you define.') }}
 
@@ -36,7 +35,6 @@
             :link-label="__('Meet :name', ['name' => $assistantName])"
             :link-href="route('ai')"
             :quote="$quotes['rela'] ?? null"
-            looping
         >
             {{ __(':name drafts the change. You approve it before it is saved.', ['name' => $assistantName]) }}
 
@@ -91,10 +89,6 @@
                                 </div>
                             </div>
                         </x-cloud::marketing.window>
-
-                        <svg data-approval-cursor class="pointer-events-none absolute left-0 top-0 h-5 w-5 opacity-0 drop-shadow" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M4 2.5l15 9.2-6.6 1.3 3.8 7.3-2.6 1.3-3.8-7.3L4 19z" fill="#111827" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
-                        </svg>
                     </div>
                 </div>
             </x-slot:visual>
@@ -108,7 +102,6 @@
             :link-label="__('Relaticle for Claude')"
             :link-href="route(\Relaticle\Cloud\Marketing\Enums\ConnectableAssistant::Claude->routeName())"
             :quote="$quotes['agents'] ?? null"
-            looping
         >
             {{ __('It reads and updates the same records you do, with your permissions.') }}
 
