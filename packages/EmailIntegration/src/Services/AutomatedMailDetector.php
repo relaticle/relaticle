@@ -24,20 +24,14 @@ final readonly class AutomatedMailDetector
 
     public function detect(FetchedEmailData $data, string $workspaceId): ?AutomatedReason
     {
-        $sender = $this->sender($data->participants);
-
-        if ($this->isOwnMail($data->direction, $data->folder) || $this->isPerson($workspaceId, $sender)) {
+        if ($this->isOwnMail($data->direction, $data->folder)) {
             return null;
         }
 
-        $headers = array_map(fn (string $value): string => Str::lower(trim($value)), $data->headers);
+        $sender = $this->sender($data->participants);
+        $reason = $this->byHeaders($data->headers) ?? $this->bySender($data->participants, $sender, $data->isBulkMail);
 
-        return match (true) {
-            isset($headers['list-unsubscribe']) || isset($headers['list-id']) => AutomatedReason::List,
-            isset($headers['auto-submitted']) && $headers['auto-submitted'] !== 'no' => AutomatedReason::AutoSubmitted,
-            in_array($headers['precedence'] ?? '', self::BULK_PRECEDENCE, true) => AutomatedReason::Bulk,
-            default => $this->bySender($data->participants, $sender, $data->isBulkMail),
-        };
+        return $this->unlessPerson($reason, $workspaceId, $sender);
     }
 
     public function detectStored(Email $email, bool $labelledMarketing): ?AutomatedReason
@@ -49,13 +43,15 @@ final readonly class AutomatedMailDetector
                 'role' => $participant->role->value,
             ])
             ->all();
-        $sender = $this->sender($participants);
 
-        if ($this->isOwnMail($email->direction, $email->folder) || $this->isPerson($email->workspace_id, $sender) || $this->relayed->matches($participants, false)) {
+        if ($this->isOwnMail($email->direction, $email->folder) || $this->relayed->matches($participants, false)) {
             return null;
         }
 
-        return $this->bySender($participants, $sender, false) ?? ($labelledMarketing ? AutomatedReason::RoleSender : null);
+        $sender = $this->sender($participants);
+        $reason = $this->bySender($participants, $sender, false) ?? ($labelledMarketing ? AutomatedReason::RoleSender : null);
+
+        return $this->unlessPerson($reason, $email->workspace_id, $sender);
     }
 
     private function isOwnMail(EmailDirection $direction, ?EmailFolder $folder): bool
@@ -74,12 +70,34 @@ final readonly class AutomatedMailDetector
         };
     }
 
-    private function isPerson(string $workspaceId, ?string $sender): bool
+    /** @param  array<string, string>  $headers */
+    private function byHeaders(array $headers): ?AutomatedReason
     {
-        return $sender !== null && AutomatedSenderOverride::query()
+        $headers = array_map(fn (string $value): string => Str::lower(trim($value)), $headers);
+        // RFC 3834 section 5: "no" may carry parameters or a comment, as in "no (manual)".
+        $autoSubmitted = $headers['auto-submitted'] ?? '';
+        $autoSubmitted = trim(substr($autoSubmitted, 0, strcspn($autoSubmitted, ';(')));
+
+        return match (true) {
+            filled($headers['list-unsubscribe'] ?? null) || filled($headers['list-id'] ?? null) => AutomatedReason::List,
+            $autoSubmitted !== '' && $autoSubmitted !== 'no' => AutomatedReason::AutoSubmitted,
+            in_array($headers['precedence'] ?? '', self::BULK_PRECEDENCE, true) => AutomatedReason::Bulk,
+            default => null,
+        };
+    }
+
+    private function unlessPerson(?AutomatedReason $reason, string $workspaceId, ?string $sender): ?AutomatedReason
+    {
+        if (! $reason instanceof AutomatedReason || $sender === null) {
+            return $reason;
+        }
+
+        $isPerson = AutomatedSenderOverride::query()
             ->where('workspace_id', $workspaceId)
             ->where('email_address', $sender)
             ->exists();
+
+        return $isPerson ? null : $reason;
     }
 
     /** @param  array<int, array{email_address: string, name: string|null, role: string}>  $participants */

@@ -196,7 +196,7 @@ return [
         'list' => 'Mailing list',
         'auto_submitted' => 'Automatic reply',
         'bulk' => 'Bulk mail',
-        'role_sender' => 'Sent from a no-reply address',
-        'provider_category' => 'Filed as promotions by Gmail',
+        'role_sender' => 'Sent from a role address like no-reply or marketing',
+        'provider_category' => 'Filed under a Gmail category',
     ],
 ];

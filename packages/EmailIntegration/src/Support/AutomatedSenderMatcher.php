@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Support;
 
 /**
- * Detects machine-sent addresses (no-reply@, notice@, bounce@, …) so email sync
- * doesn't auto-create a Company or Person for mail with no real contact behind it.
+ * Detects machine-sent addresses (no-reply@, notice@, bounce@, …). Email sync uses
+ * it to skip auto-creating a Company or Person for them, and AutomatedMailDetector
+ * to mark their mail as automated. Linking to existing records is unaffected.
  *
  * The local-part (before the @) is matched as a case-insensitive substring against
- * the configured list. Existing-record matching/linking is unaffected: this only
- * gates *creation*.
+ * the configured list.
  */
 final readonly class AutomatedSenderMatcher
 {

@@ -7,6 +7,8 @@ use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Relaticle\EmailIntegration\Actions\AutoCreatePersonAction;
@@ -1337,8 +1339,29 @@ it('stores why inbound mail is automated', function (array $overrides, ?Automate
     'role sender' => [['participants' => [['email_address' => 'noreply@stripe.example', 'name' => null, 'role' => 'from']]], AutomatedReason::RoleSender],
     'provider category' => [['isBulkMail' => true, 'participants' => [['email_address' => 'news@brand.example', 'name' => null, 'role' => 'from']]], AutomatedReason::ProviderCategory],
     'list beats role sender' => [['headers' => ['list-id' => '<x>'], 'participants' => [['email_address' => 'noreply@x.example', 'name' => null, 'role' => 'from']]], AutomatedReason::List],
+    'relayed with a list id' => [['headers' => ['list-id' => '<x>'], 'participants' => [
+        ['email_address' => 'noreply@forms.example', 'name' => null, 'role' => 'from'],
+        ['email_address' => 'polly@5forests.example', 'name' => null, 'role' => 'reply_to'],
+    ]], AutomatedReason::List],
+    'auto reply beats precedence' => [['headers' => ['auto-submitted' => 'auto-replied', 'precedence' => 'bulk']], AutomatedReason::AutoSubmitted],
+    'role sender beats provider category' => [['isBulkMail' => true, 'participants' => [['email_address' => 'noreply@x.example', 'name' => null, 'role' => 'from']]], AutomatedReason::RoleSender],
+    'precedence in capitals' => [['headers' => ['precedence' => 'JUNK']], AutomatedReason::Bulk],
+    'auto submitted no with a comment' => [['headers' => ['auto-submitted' => 'no (manual)']], null],
+    'auto submitted no with a parameter' => [['headers' => ['auto-submitted' => 'No; x=y']], null],
+    'empty list headers' => [['headers' => ['list-id' => '', 'list-unsubscribe' => ' ']], null],
     'a person' => [[], null],
 ]);
+
+it('looks up senders marked as a person only for mail a rule marks', function (): void {
+    $queries = [];
+    DB::listen(function (QueryExecuted $query) use (&$queries): void {
+        $queries[] = $query->sql;
+    });
+
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData());
+
+    expect(array_filter($queries, fn (string $sql): bool => str_contains($sql, 'automated_sender_overrides')))->toBeEmpty();
+});
 
 it('never marks mail the mailbox sent as automated', function (): void {
     $email = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
