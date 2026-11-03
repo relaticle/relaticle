@@ -27,6 +27,7 @@
 <div x-data="heroChat()"
      @hero-chat-reset.window="cancelInflight(); resetChat()"
      @hero-chat-animate.window="animateChat()"
+     @hero-chat-skip.window="skipToEnd()"
      class="hero-agent-preview relative bg-white dark:bg-zinc-900 flex h-[520px] sm:h-[580px] md:h-[640px]">
 
     {{-- Non-interactive overlay: blocks clicks, right-click, and drag.
@@ -81,8 +82,7 @@
             // Mirrors theme.css --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1)
             ease: [0.16, 1, 0.3, 1],
             // Per-prompt charMs / per-stream wordMs are tuned for an unhurried,
-            // readable pace. holdMs lets the viewer read the final record card
-            // before the loop restarts.
+            // readable pace.
             prompts: [
                 { text: "What's overdue this week?", charMs: 55 },
                 { text: 'Mark the Kovra demo as done.', charMs: 38 },
@@ -93,7 +93,6 @@
             // into the conversation view where exchanges 2 and 3 continue.
             entryHoldMs: 600,
             entryTransitionMs: 700,
-            holdMs: 1500,
             reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
             nextCycleTimer: null,
             pendingTimers: [],
@@ -367,6 +366,14 @@
                 this.pendingTimers = [];
             },
 
+            skipToEnd() {
+                this.cancelInflight();
+                this.resetChat();
+                this.showAllImmediate();
+                this.scrollToShow('.mcp-next-steps');
+                this.$dispatch('hero-chat-state', 'done');
+            },
+
             showAllImmediate() {
                 this.$root.querySelectorAll('.mcp-el').forEach(function(el) {
                     el.style.opacity = '1';
@@ -437,15 +444,16 @@
                 this.cancelInflight();
 
                 if (this.reducedMotion || typeof animate !== 'function') {
-                    this.resetChat();
-                    this.showAllImmediate();
+                    this.skipToEnd();
                     return;
                 }
+
+                this.$dispatch('hero-chat-state', 'playing');
 
                 // Prep the entry view for a fresh intro but leave any existing
                 // conversation on screen. runCycle() raises the entry "curtain"
                 // over the previous conversation (a cross-fade) and clears it
-                // underneath once covered, so the loop never hard-cuts to a
+                // underneath once covered, so a replay never hard-cuts to a
                 // blank panel. On first load there's nothing behind the curtain,
                 // so it simply fades in from the empty shell.
                 this.resetEntryOnly();
@@ -473,10 +481,10 @@
                 animate(root.querySelector('.mcp-entry-composer'),  { opacity: [0, 1], transform: ['translateY(12px)', 'translateY(0px)'] }, { duration: 0.4, delay: 0.22, ease: ease });
                 animate(root.querySelector('.mcp-entry-tasks'),     { opacity: [0, 1], transform: ['translateY(6px)', 'translateY(0px)'] }, { duration: 0.4, delay: 0.32, ease: ease });
 
-                // Loop restart: the entry curtain (above) has now faded in over
-                // the previous conversation. Clear that conversation underneath
-                // once the curtain is opaque so the next cycle starts clean with
-                // no blank-panel flash, and flip the shell chrome back to its
+                // Replay: the entry curtain (above) has now faded in over the
+                // previous conversation. Clear that conversation underneath once
+                // the curtain is opaque so the cycle starts clean with no
+                // blank-panel flash, and flip the shell chrome back to its
                 // dashboard state at the same "navigation" moment. No-op on
                 // first load.
                 this.pendingTimers.push(setTimeout(function() { self.resetConversationOnly(); self.restoreShellToDashboard(); }, 420));
@@ -589,11 +597,10 @@
                 animate(root.querySelector('.mcp-next-steps'), { opacity: [0, 1], transform: ['translateY(4px)', 'translateY(0px)'] }, { delay: (approve3At + 1300) / 1000, duration: 0.3, ease: ease });
                 this.pendingTimers.push(setTimeout(function() { self.scrollToShow('.mcp-next-steps'); }, approve3At + 1330));
 
-                var cycleEnd = approve3At + 1800;
-                var totalMs = cycleEnd + this.holdMs;
                 this.nextCycleTimer = setTimeout(function() {
-                    self.animateChat();
-                }, totalMs);
+                    self.nextCycleTimer = null;
+                    self.$dispatch('hero-chat-state', 'done');
+                }, approve3At + 1800);
             }
         };
     }

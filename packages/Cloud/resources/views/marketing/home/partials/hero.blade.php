@@ -1,138 +1,106 @@
-<section x-data="heroTabs()" x-init="init()" @resize.window="positionIndicator()" class="relative pt-32 pb-16 md:pt-40 md:pb-20 bg-white dark:bg-gray-950 overflow-hidden">
+<section x-data="heroTabs()" x-init="init()" @hero-chat-state.window="chatState = $event.detail" class="bg-surface pt-16">
+    <div class="border-rail mx-auto max-w-6xl sm:border-x">
+        <div class="flex flex-col items-center px-6 pb-14 pt-16 text-center md:px-10 md:pb-16 md:pt-24">
+            <a href="https://github.com/relaticle/relaticle" target="_blank" rel="noopener"
+               aria-label="{{ __('Open Source, :count+ GitHub stars', ['count' => $formattedGithubStars]) }}"
+               class="type-label border-rail inline-flex items-center gap-2 rounded-full border py-1 pl-3 pr-2.5 text-gray-500 transition-colors hover:border-gray-300 hover:text-gray-950 dark:text-gray-400 dark:hover:border-white/20 dark:hover:text-white">
+                <x-ri-github-fill class="h-3.5 w-3.5"/>
+                {{ __('Open source') }}
+                <span class="bg-rail h-3 w-px" aria-hidden="true"></span>
+                <span class="whitespace-nowrap text-gray-950 dark:text-white">{{ __(':count+ stars', ['count' => $formattedGithubStars]) }}</span>
+                <x-ri-arrow-right-up-line class="h-3 w-3"/>
+            </a>
 
-    {{-- Background system: layered depth --}}
-    <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]"></div>
+            <h1 class="type-display mt-8 max-w-3xl">
+                <span class="block font-normal text-gray-500">{{ __('The AI CRM for selling') }}</span>
+                <span class="block text-gray-950 dark:text-white">{{ __('without a sales team') }}</span>
+            </h1>
 
-    <div class="border-rail pointer-events-none absolute inset-y-0 left-1/2 w-full max-w-6xl -translate-x-1/2 sm:border-x" aria-hidden="true"></div>
+            <p class="mt-6 max-w-xl text-base leading-relaxed text-gray-500 sm:text-lg dark:text-gray-400">
+                {{ __('For people who sell to a named list of companies.') }}<br class="hidden sm:block"/>
+                {{ __('Work from Claude or ChatGPT, or ask :name, the built-in AI assistant.', ['name' => config('chat.assistant_name')]) }}
+            </p>
 
-    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-        <div class="flex flex-col items-center gap-8 md:gap-10">
-
-            {{-- ── Badge (GitHub) ── --}}
-            <div class="flex justify-center">
-                <a href="https://github.com/relaticle/relaticle" target="_blank" rel="noopener"
-                   aria-label="{{ __('Open Source, :count+ GitHub stars', ['count' => $formattedGithubStars]) }}"
-                   class="group inline-flex items-center gap-2 rounded-full border border-gray-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200 hover:border-gray-300 dark:hover:border-white/[0.15]">
-                    <x-ri-github-fill class="h-3.5 w-3.5"/>
-                    <span>Open Source</span>
-                    <span class="w-px h-3 bg-gray-200 dark:bg-white/10"></span>
-                    <span class="inline-flex items-center whitespace-nowrap text-gray-900 dark:text-white font-semibold leading-none">
-                        <span x-ref="githubStars" class="relative inline-grid tabular-nums" aria-hidden="true">
-                            <span class="invisible col-start-1 row-start-1">{{ $formattedGithubStars }}</span>
-                            <span class="col-start-1 row-start-1 inline-flex justify-self-end">
-                                @foreach(str_split($formattedGithubStars) as $character)
-                                    @if(ctype_digit($character))
-                                        <span class="inline-block h-[1em] w-[1ch] overflow-hidden">
-                                            <span data-github-star-digit="{{ $character }}" class="flex flex-col text-center leading-none" style="transform: translateY(-{{ (int) $character }}em)">
-                                                @for($digit = 0; $digit <= (int) $character; $digit++)
-                                                    <span class="block h-[1em] leading-none">{{ $digit }}</span>
-                                                @endfor
-                                            </span>
-                                        </span>
-                                    @else
-                                        <span>{{ $character }}</span>
-                                    @endif
-                                @endforeach
-                            </span>
-                        </span>+ stars
-                    </span>
-                    <x-ri-arrow-right-up-line class="h-3 w-3 text-gray-400 dark:text-gray-500"/>
-                </a>
-            </div>
-
-            {{-- ── Heading ── --}}
-            <div class="text-center max-w-3xl">
-                <h1 class="font-display leading-[1.08] tracking-[-0.035em] text-balance">
-                    <span class="block text-2xl sm:text-[2.5rem] md:text-[3rem] lg:text-[3.25rem] font-normal text-gray-500 dark:text-gray-400">The AI CRM for selling</span>
-                    <span class="block text-[2.25rem] sm:text-5xl md:text-[3.5rem] lg:text-[3.75rem] font-extrabold text-gray-950 dark:text-white mt-1.5 sm:mt-2">without a sales team</span>
-                </h1>
-
-                <p class="mt-6 sm:mt-7 text-[15px] sm:text-lg text-gray-500 dark:text-gray-400 max-w-xl mx-auto leading-relaxed tracking-[-0.01em]">
-                    For people who sell to a named list of companies.<br class="hidden sm:block"/>
-                    Work from Claude or ChatGPT, or ask {{ config('chat.assistant_name') }}, the built-in AI assistant.
-                </p>
-            </div>
-
-            {{-- ── CTA Buttons ── --}}
-            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto max-w-sm sm:max-w-none mx-auto -mt-2 px-2 sm:px-0">
-                <x-cloud::marketing.button href="{{ route('login') }}" class="group" data-analytics-intent="signup" data-analytics-placement="hero">
-                    Start for free
+            <div class="mt-8 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
+                <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="hero">
+                    {{ __('Start for free') }}
                 </x-cloud::marketing.button>
 
                 <x-cloud::marketing.button variant="secondary" href="{{ route('contact') }}">
-                    Get in touch
+                    {{ __('Get in touch') }}
                 </x-cloud::marketing.button>
             </div>
 
-            {{-- Watch demo CTA (only renders when video asset exists) --}}
             @if(file_exists(public_path('videos/hero-demo.mp4')))
                 <button
                     type="button"
                     x-data
                     @click="$dispatch('open-hero-demo')"
-                    class="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors -mt-1"
+                    class="mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 transition-colors hover:text-gray-950 dark:text-gray-400 dark:hover:text-white"
                 >
-                    <x-ri-play-circle-line class="w-4 h-4"/>
-                    Watch 30s demo
-                    <x-ri-arrow-right-up-line class="w-3 h-3"/>
+                    <x-ri-play-circle-line class="h-4 w-4"/>
+                    {{ __('Watch 30s demo') }}
+                    <x-ri-arrow-right-up-line class="h-3 w-3"/>
                 </button>
 
                 @include('cloud::marketing.home.partials.hero-demo-modal')
             @endif
+        </div>
 
-            {{-- ── App Preview with tabs ── --}}
-            <div class="relative w-full max-w-5xl mt-8 md:mt-12">
+        @php
+            $heroTabs = [
+                'ai-agent' => [__('Ask'), __('Ask :name', ['name' => (string) config('chat.assistant_name')])],
+                'pipeline' => [__('Pipeline'), __('Pipeline')],
+                'companies' => [__('Companies'), __('Companies')],
+                'custom-fields' => [__('Fields'), __('Custom fields')],
+            ];
+        @endphp
 
-                {{-- Multi-color glow behind mockup --}}
-                <div class="absolute -inset-6 md:-inset-12 -z-10 pointer-events-none" aria-hidden="true">
-                    <div class="absolute top-[0%] left-[15%] w-[70%] h-[60%] rounded-full bg-primary/[0.04] dark:bg-primary/[0.08] blur-[120px]"></div>
-                </div>
+        <div id="hero-tabs" role="tablist" class="bg-rail border-rail grid grid-cols-4 gap-px border-t">
+            @foreach($heroTabs as $id => [$short, $long])
+                <button type="button"
+                        id="tab-{{ $id }}"
+                        role="tab"
+                        :aria-selected="(activeTab === '{{ $id }}').toString()"
+                        :tabindex="activeTab === '{{ $id }}' ? 0 : -1"
+                        aria-controls="panel-{{ $id }}"
+                        x-ref="tab-{{ $id }}"
+                        x-on:click="switchTab('{{ $id }}')"
+                        x-on:keydown="handleTabKeydown($event)"
+                        :class="activeTab === '{{ $id }}' ? 'bg-tint text-gray-950 dark:text-white' : 'bg-surface text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'"
+                        class="relative cursor-pointer py-3.5 text-xs font-medium transition-colors sm:text-sm">
+                    <span class="sm:hidden">{{ $short }}</span><span class="hidden sm:inline">{{ $long }}</span>
+                    <span class="absolute inset-x-0 bottom-0 h-px bg-primary" x-show="activeTab === '{{ $id }}'" aria-hidden="true"></span>
+                </button>
+            @endforeach
+        </div>
 
-                {{-- ── Decorative framing lines ── --}}
-                <div class="hidden md:block absolute left-1/2 -translate-x-1/2 -top-10 w-px h-10 bg-gradient-to-b from-transparent via-gray-200/60 to-gray-200 dark:via-white/[0.04] dark:to-white/[0.08] pointer-events-none" aria-hidden="true"></div>
-                <div class="hidden md:block absolute top-0 left-1/2 -translate-x-1/2 w-[100vw] h-px bg-gray-200 dark:bg-white/[0.08] pointer-events-none" aria-hidden="true"></div>
+        <div class="bg-tint border-rail relative border-t px-6 pb-6 pt-14 sm:px-8 sm:pb-8 md:px-10 md:pb-10">
+            <x-cloud::marketing.eyebrow class="pointer-events-none absolute left-6 top-5 z-10" x-text="'{{ __('Fig 00') }} · ' + tabLabels[activeTab]">{{ __('Fig 00') }} · {{ $heroTabs['ai-agent'][1] }}</x-cloud::marketing.eyebrow>
 
-                {{-- Feature Tabs --}}
-                <div id="hero-tabs" role="tablist" class="relative z-10 flex items-stretch">
-                    <div class="absolute bottom-0 left-0 right-0 h-px bg-gray-200 dark:bg-white/[0.08] pointer-events-none" aria-hidden="true"></div>
-                    <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-[100vw] h-px pointer-events-none bg-[repeating-linear-gradient(to_right,theme(colors.gray.200)_0,theme(colors.gray.200)_10px,transparent_10px,transparent_18px)] dark:bg-[repeating-linear-gradient(to_right,rgba(255,255,255,0.08)_0,rgba(255,255,255,0.08)_10px,transparent_10px,transparent_18px)]" aria-hidden="true"></div>
-                    <div x-ref="indicator" class="absolute bottom-0 h-px bg-primary/80 rounded-full pointer-events-none transition-[left,width] duration-200" aria-hidden="true"></div>
-                    <button type="button" id="tab-ai-agent" role="tab" :aria-selected="(activeTab === 'ai-agent').toString()" :tabindex="activeTab === 'ai-agent' ? 0 : -1" aria-controls="panel-ai-agent" x-ref="tab-ai-agent" x-on:click="switchTab('ai-agent')" x-on:keydown="handleTabKeydown($event)" :class="tabClasses('ai-agent')" class="relative flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors duration-200 cursor-pointer">
-                        <span class="sm:hidden">{{ __('Ask') }}</span><span class="hidden sm:inline">{{ __('Ask :name', ['name' => (string) config('chat.assistant_name')]) }}</span>
-                    </button>
-                    <div class="w-px self-stretch my-0 bg-gray-200 dark:bg-white/[0.08]" aria-hidden="true"></div>
-                    <button type="button" id="tab-pipeline" role="tab" :aria-selected="(activeTab === 'pipeline').toString()" :tabindex="activeTab === 'pipeline' ? 0 : -1" aria-controls="panel-pipeline" x-ref="tab-pipeline" x-on:click="switchTab('pipeline')" x-on:keydown="handleTabKeydown($event)" :class="tabClasses('pipeline')" class="relative flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors duration-200 cursor-pointer">
-                        Pipeline
-                    </button>
-                    <div class="w-px self-stretch my-0 bg-gray-200 dark:bg-white/[0.08]" aria-hidden="true"></div>
-                    <button type="button" id="tab-companies" role="tab" :aria-selected="(activeTab === 'companies').toString()" :tabindex="activeTab === 'companies' ? 0 : -1" aria-controls="panel-companies" x-ref="tab-companies" x-on:click="switchTab('companies')" x-on:keydown="handleTabKeydown($event)" :class="tabClasses('companies')" class="relative flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors duration-200 cursor-pointer">
-                        Companies
-                    </button>
-                    <div class="w-px self-stretch my-0 bg-gray-200 dark:bg-white/[0.08]" aria-hidden="true"></div>
-                    <button type="button" id="tab-custom-fields" role="tab" :aria-selected="(activeTab === 'custom-fields').toString()" :tabindex="activeTab === 'custom-fields' ? 0 : -1" aria-controls="panel-custom-fields" x-ref="tab-custom-fields" x-on:click="switchTab('custom-fields')" x-on:keydown="handleTabKeydown($event)" :class="tabClasses('custom-fields')" class="relative flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors duration-200 cursor-pointer">
-                        <span class="sm:hidden">Fields</span><span class="hidden sm:inline">Custom Fields</span>
-                    </button>
-                </div>
-
-                {{-- Mockup with layered glow border --}}
-                <div class="relative z-10 mt-5 [perspective:2000px]">
-                    <div class="hidden md:block absolute -top-[110px] left-0 w-px h-[120px] bg-gradient-to-b from-transparent via-gray-200/60 to-gray-200 dark:via-white/[0.04] dark:to-white/[0.08] pointer-events-none" aria-hidden="true"></div>
-                    <div class="hidden md:block absolute -top-[110px] right-0 w-px h-[120px] bg-gradient-to-b from-transparent via-gray-200/60 to-gray-200 dark:via-white/[0.04] dark:to-white/[0.08] pointer-events-none" aria-hidden="true"></div>
-                    <div class="absolute -inset-3 rounded-3xl bg-gradient-to-b from-black/[0.03] via-black/[0.015] to-transparent dark:from-white/[0.04] dark:via-white/[0.02] dark:to-transparent blur-xl pointer-events-none" aria-hidden="true"></div>
-                    <div class="absolute -inset-[3px] rounded-[18px] bg-gradient-to-b from-gray-300/40 via-gray-200/20 to-gray-100/5 dark:from-white/[0.07] dark:via-white/[0.03] dark:to-transparent blur-[3px] pointer-events-none" aria-hidden="true"></div>
-                    <div class="absolute -inset-0.5 rounded-[18px] bg-gradient-to-b from-gray-300/50 via-gray-200/30 to-gray-200/10 dark:from-white/[0.12] dark:via-white/[0.06] dark:to-white/[0.02] pointer-events-none" aria-hidden="true"></div>
-
-                    <div class="relative rounded-2xl overflow-hidden border-[3px] border-gray-300/70 bg-white dark:border-white/[0.12] dark:bg-neutral-950 transform-gpu hover:[transform:rotateX(1deg)] transition-transform duration-700 ease-out">
-
-                        {{-- Browser chrome --}}
+            <div class="mx-auto w-full max-w-[52rem]">
+                <x-cloud::marketing.window class="relative">
+                    {{-- Browser chrome --}}
                         <div class="bg-gray-50 dark:bg-neutral-900 border-b border-gray-200/60 dark:border-white/[0.06] px-4 py-2.5 flex items-center justify-between">
                             <div class="flex gap-1.5">
                                 <div class="w-2.5 h-2.5 rounded-full bg-gray-300/80 dark:bg-white/[0.08]"></div>
                                 <div class="w-2.5 h-2.5 rounded-full bg-gray-300/80 dark:bg-white/[0.08]"></div>
                                 <div class="w-2.5 h-2.5 rounded-full bg-gray-300/80 dark:bg-white/[0.08]"></div>
                             </div>
-                            <div class="bg-white/60 dark:bg-white/[0.04] rounded-md px-3 py-1 text-[11px] text-gray-500 dark:text-gray-500">
-                                app.relaticle.com
+                            <div class="flex items-center gap-2">
+                                <div class="bg-white/60 dark:bg-white/[0.04] rounded-md px-3 py-1 text-[11px] text-gray-500 dark:text-gray-400">
+                                    app.relaticle.com
+                                </div>
+                                <button type="button"
+                                        x-cloak
+                                        x-show="activeTab === 'ai-agent' && !reducedMotion"
+                                        @click="$dispatch(chatState === 'done' ? 'hero-chat-animate' : 'hero-chat-skip')"
+                                        :aria-label="chatState === 'done' ? @js(__('Replay the demo')) : @js(__('Skip to the end of the demo'))"
+                                        class="inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[11px] font-medium text-gray-500 transition-colors hover:bg-black/[0.04] hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-white">
+                                    <x-ri-restart-line x-show="chatState === 'done'" class="h-3.5 w-3.5"/>
+                                    <x-ri-skip-forward-line x-show="chatState !== 'done'" class="h-3.5 w-3.5"/>
+                                    <span x-text="chatState === 'done' ? @js(__('Replay')) : @js(__('Skip'))"></span>
+                                </button>
                             </div>
                         </div>
 
@@ -196,11 +164,8 @@
                             {{-- Bottom fade overlay --}}
                             <div class="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white/60 via-white/20 to-transparent dark:from-gray-950/60 dark:via-gray-950/20 dark:to-transparent pointer-events-none"></div>
                         </div>
-                    </div>
-                </div>
+                </x-cloud::marketing.window>
             </div>
-
-
         </div>
     </div>
 </section>
@@ -210,80 +175,20 @@
         return {
             activeTab: 'ai-agent',
             tabOrder: ['ai-agent', 'pipeline', 'companies', 'custom-fields'],
+            tabLabels: @js(array_map(static fn (array $labels): string => $labels[1], $heroTabs)),
             reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
             ease: [0.16, 1, 0.3, 1],
             duration: 0.35,
             slideDistance: 40,
-            githubStarsAnimationState: 'idle',
-            githubStarsAnimationRequestedAt: null,
+            chatState: 'playing',
 
             init() {
-                this.positionIndicator();
                 this.updateImages();
                 this.observeDarkMode();
-                this.animateGithubStars();
                 if (this.activeTab === 'ai-agent') {
                     var self = this;
                     setTimeout(function() { self.$dispatch('hero-chat-animate'); }, 50);
                 }
-            },
-
-            animateGithubStars() {
-                if (this.githubStarsAnimationState === 'complete') return;
-
-                var element = this.$refs.githubStars;
-                if (!element) {
-                    this.githubStarsAnimationState = 'complete';
-                    return;
-                }
-
-                if (this.githubStarsAnimationRequestedAt === null) {
-                    this.githubStarsAnimationRequestedAt = performance.now();
-                }
-
-                if (this.reducedMotion || document.visibilityState !== 'visible') {
-                    this.githubStarsAnimationState = 'complete';
-                    return;
-                }
-
-                if (typeof window.animate !== 'function') {
-                    if (this.githubStarsAnimationState === 'waiting') return;
-
-                    this.githubStarsAnimationState = 'waiting';
-                    window.addEventListener('motion-ready', () => {
-                        if (performance.now() - this.githubStarsAnimationRequestedAt > 250) {
-                            this.githubStarsAnimationState = 'complete';
-                            return;
-                        }
-
-                        this.githubStarsAnimationState = 'idle';
-                        this.animateGithubStars();
-                    }, { once: true });
-                    return;
-                }
-
-                this.githubStarsAnimationState = 'complete';
-                element.querySelectorAll('[data-github-star-digit]').forEach(function(reel, index) {
-                    var digit = Number(reel.dataset.githubStarDigit);
-                    if (digit === 0) return;
-
-                    window.animate(reel, {
-                        transform: ['translateY(0em)', 'translateY(-' + digit + 'em)'],
-                    }, {
-                        type: window.spring,
-                        visualDuration: 0.48,
-                        bounce: 0,
-                        delay: index * 0.03,
-                    });
-                });
-            },
-
-            positionIndicator() {
-                var tab = this.$refs['tab-' + this.activeTab];
-                var indicator = this.$refs.indicator;
-                if (!tab || !indicator) return;
-                indicator.style.left = tab.offsetLeft + 'px';
-                indicator.style.width = tab.offsetWidth + 'px';
             },
 
             showPanel(panel) {
@@ -324,7 +229,6 @@
                 var self = this;
 
                 this.activeTab = target;
-                this.positionIndicator();
 
                 if (target === 'ai-agent') {
                     this.$dispatch('hero-chat-reset');
@@ -398,12 +302,6 @@
                     this.switchTab(this.tabOrder[next]);
                     this.$refs['tab-' + this.tabOrder[next]].focus();
                 }
-            },
-
-            tabClasses(tab) {
-                return this.activeTab === tab
-                    ? 'text-gray-800 dark:text-white'
-                    : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300';
             },
 
             updateImages() {

@@ -400,16 +400,15 @@ describe('Hero AI tab: animation timeline', function () {
         expect($body)->toContain('mcp-el mcp-tasks-table');
     });
 
-    it('keeps the post-exchange hold window at ~1.5s', function () {
+    it('plays the AI demo once and offers skip and replay controls', function () {
         $response = $this->get('/');
         $response->assertSuccessful();
         $body = $response->getContent();
 
-        // Hold is the read-time after exchange 3 settles before the loop
-        // restarts from the entry phase. cycleMs no longer exists as a
-        // single magic number. Timing is composed from entryHold +
-        // transition + exchange budgets.
-        expect($body)->toContain('holdMs: 1500');
+        expect($body)
+            ->toContain('Skip to the end of the demo')
+            ->toContain('Replay the demo')
+            ->not->toContain('holdMs');
     });
 
     it('does not restart the AI demo on hover or focus changes', function () {

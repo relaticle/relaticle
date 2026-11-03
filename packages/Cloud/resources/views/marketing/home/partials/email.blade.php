@@ -1,7 +1,7 @@
 @php
     $steps = [
         [__('Connect your inbox'), __('Link a Google or Microsoft account. Relaticle never changes or deletes a message in your mailbox.')],
-        [__('Records fill in'), __('People you email are added for you, with their companies. Each email and meeting lands on the record it involves.')],
+        [__('Records fill in'), __('People you email are added for you, and their company comes from the email domain. Nothing you create by hand is touched.')],
         [__('You choose who sees what'), __('Share who you talked to and when, the subject, or the full email. A teammate can ask for more.')],
     ];
 @endphp
