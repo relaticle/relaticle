@@ -780,8 +780,8 @@ it('names a linked contact in the home meeting slideover', function (): void {
         ->assertActionMounted('view')
         ->assertMountedActionModalSee('Maya Chen')
         ->assertMountedActionModalSee('maya@example.test')
-        ->assertMountedActionModalSee('attendee-avatar-initials', escape: false)
-        ->assertMountedActionModalDontSee('attendee-avatar-guest', escape: false);
+        ->assertMountedActionModalSee('person-silhouette', escape: false)
+        ->assertMountedActionModalDontSee('member-avatar', escape: false);
 });
 
 it('names a slideover guest from mailbox history without a person record', function (): void {
@@ -816,8 +816,8 @@ it('names a slideover guest from mailbox history without a person record', funct
         ->assertActionMounted('view')
         ->assertMountedActionModalSee('Asmit Nepali')
         ->assertMountedActionModalSee('mail2asmitnepali@gmail.com')
-        ->assertMountedActionModalSee('attendee-avatar-initials', escape: false)
-        ->assertMountedActionModalDontSee('attendee-avatar-guest', escape: false);
+        ->assertMountedActionModalSee('person-silhouette', escape: false)
+        ->assertMountedActionModalDontSee('member-avatar', escape: false);
 });
 
 it('names a slideover guest from the viewer own private email', function (): void {
@@ -1039,8 +1039,8 @@ it('shows a person icon in the slideover when the attendee has no name', functio
         ->call('openMeeting', $meeting->id)
         ->assertActionMounted('view')
         ->assertMountedActionModalSee('only@example.test')
-        ->assertMountedActionModalSee('attendee-avatar-guest', escape: false)
-        ->assertMountedActionModalDontSee('attendee-avatar-initials', escape: false);
+        ->assertMountedActionModalSee('person-silhouette', escape: false)
+        ->assertMountedActionModalDontSee('member-avatar', escape: false);
 });
 
 it('collapses duplicate guest emails in the home meeting slideover', function (): void {

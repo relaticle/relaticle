@@ -18,13 +18,12 @@
                     }"
                     class="inline-flex"
                 >
-                    @include('email-integration::filament.infolists.partials.meeting-attendee-avatar', [
-                        'src' => $avatar['src'],
-                        'alt' => $avatar['alt'],
-                        'hasName' => $avatar['has_name'],
-                        'size' => 'sm',
-                        'class' => 'ring-2 ring-white dark:ring-gray-900',
-                    ])
+                    <x-email-integration::person-avatar
+                        :src="$avatar['src']"
+                        :alt="$avatar['alt']"
+                        size="sm"
+                        class="ring-2 ring-white dark:ring-gray-900"
+                    />
                 </span>
             @endforeach
         </span>

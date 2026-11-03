@@ -16,12 +16,13 @@ use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManag
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
+use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailRead;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 
-mutates(BaseEmailsRelationManager::class, EmailVisibilityService::class);
+mutates(BaseEmailsRelationManager::class, EmailVisibilityService::class, Email::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withWorkspace()->create();
@@ -735,4 +736,70 @@ it('omits the emails tab badge when the viewer cannot see the linked mail', func
     $this->actingAs($this->viewer);
 
     expect(EmailsRelationManager::getBadge($this->person, ViewPeople::class))->toBeNull();
+});
+
+describe('sender avatar', function (): void {
+    it('shows the person silhouette for an email from outside the workspace', function (): void {
+        $email = Email::factory()->inbound()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+        ]);
+        EmailParticipant::factory()->from()->create([
+            'email_id' => $email->getKey(),
+            'email_address' => 'lena@northwind.test',
+            'name' => 'Lena Ortiz',
+        ]);
+        $this->person->emails()->attach($email->getKey());
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->assertSee('person-silhouette', escape: false)
+            ->assertDontSee('member-avatar', escape: false);
+    });
+
+    it('shows the mailbox owner avatar for an email the workspace sent', function (): void {
+        $email = Email::factory()->outbound()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+        ]);
+        EmailParticipant::factory()->from()->create([
+            'email_id' => $email->getKey(),
+            'email_address' => 'sales@owner-alias.test',
+            'name' => 'Sales',
+        ]);
+        $this->person->emails()->attach($email->getKey());
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->assertSee('member-avatar', escape: false)
+            ->assertSee($this->owner->profile_photo_url, escape: false)
+            ->assertDontSee('person-silhouette', escape: false);
+    });
+
+    it('shows the member avatar for an email a workspace member sent to the mailbox', function (): void {
+        $email = Email::factory()->inbound()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+        ]);
+        EmailParticipant::factory()->from()->create([
+            'email_id' => $email->getKey(),
+            'email_address' => mb_strtoupper($this->viewer->email),
+            'name' => $this->viewer->name,
+        ]);
+        $this->person->emails()->attach($email->getKey());
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->assertSee($this->viewer->profile_photo_url, escape: false)
+            ->assertDontSee('person-silhouette', escape: false);
+    });
 });

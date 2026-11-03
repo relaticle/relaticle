@@ -39,14 +39,6 @@
 
     $participantLine = $participantLine ?: $senderName;
 
-    $avatarColor = ['primary', 'success', 'warning', 'danger', 'info'][crc32(mb_strtolower($senderName)) % 5];
-
-    $initials = collect(explode(' ', trim($senderName)))
-        ->filter()
-        ->take(2)
-        ->map(fn (string $word): string => mb_strtoupper(mb_substr($word, 0, 1)))
-        ->implode('');
-
     $decode = fn (?string $text): string => html_entity_decode((string) $text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
     $subject = $decode($email->subject);
@@ -82,15 +74,7 @@
         </span>
     @endif
 
-    <span
-        @class([
-            'flex h-8 w-8 shrink-0 select-none items-center justify-center rounded-full text-[11px] font-semibold ring-1 ring-inset ring-white/60 dark:bg-gray-800 dark:text-gray-200 dark:ring-white/10',
-            '[background-color:color-mix(in_oklab,var(--color-500)_14%,transparent)] [color:var(--color-600)]',
-            'fi-color-'.$avatarColor,
-        ])
-    >
-        {{ $initials ?: '?' }}
-    </span>
+    <x-email-integration::person-avatar :src="$email->senderMemberAvatarUrl()" :alt="$senderName" />
 
     <span class="min-w-0 flex-1">
         <span class="flex items-center justify-between gap-3">

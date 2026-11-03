@@ -94,12 +94,12 @@ function mediaQueryCount(): int
         ->count();
 }
 
-it('renders the person avatar in the people list name column', function (): void {
-    $person = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Adam Clark']);
+it('renders the person icon in the people list name column', function (): void {
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Adam Clark']);
 
     livewire(ListPeople::class)
         ->assertSee('Adam Clark')
-        ->assertSee($person->avatar, escape: false);
+        ->assertSee(CrmEntity::People->iconPath(), escape: false);
 });
 
 it('renders the company entity icon in the people list company column', function (): void {
@@ -118,23 +118,21 @@ it('renders the company entity icon in the companies list name column', function
         ->assertSee(CrmEntity::Company->iconPath(), escape: false);
 });
 
-it('renders an avatar for every related person in a multi-record column', function (): void {
+it('renders the person icon for every related person in a multi-record column', function (): void {
     $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
     $people = People::factory(2)->recycle([$this->user, $this->workspace])->create();
     $note->people()->attach($people);
 
-    $rendered = livewire(ManageNotes::class);
+    $html = livewire(ManageNotes::class)->html();
 
-    foreach ($people as $person) {
-        $rendered->assertSee($person->avatar, escape: false);
-    }
+    expect(substr_count($html, CrmEntity::People->iconPath()))->toBeGreaterThanOrEqual(2);
 });
 
-it('renders the person avatar on the view page', function (): void {
+it('renders the person icon on the view page', function (): void {
     $person = People::factory()->recycle([$this->user, $this->workspace])->create();
 
     livewire(ViewPeople::class, ['record' => $person->getKey()])
-        ->assertSee($person->avatar, escape: false);
+        ->assertSee(CrmEntity::People->iconPath(), escape: false);
 });
 
 it('renders the company entity icon in a picker option label', function (): void {
@@ -224,13 +222,12 @@ it('gives two logoless companies the same icon, so colour only ever means a real
     expect(RecordChip::forRecord($acme)->iconPath)->toBe(RecordChip::forRecord($zeta)->iconPath);
 });
 
-it('still colours people by name so two of them stay distinguishable', function (): void {
-    $adam = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Adam Clark']);
-    $zoe = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Zoe Baker']);
+it('draws every person with the shared person icon, keeping initials for workspace members', function (): void {
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Adam Clark']);
 
-    expect($adam->avatar)->not->toBe($zoe->avatar)
-        ->and(RecordChip::forRecord($adam)->iconPath)->toBeNull()
-        ->and(RecordChip::forRecord($adam)->imageUrl)->toBe($adam->avatar);
+    expect(RecordChip::forRecord($person)->imageUrl)->toBeNull()
+        ->and(RecordChip::forRecord($person)->iconPath)->toBe(CrmEntity::People->iconPath())
+        ->and(RecordChip::forRecord($this->user)->imageUrl)->toBe($this->user->getFilamentAvatarUrl());
 });
 
 it('carries the avatar in a global search result title', function (): void {

@@ -15,7 +15,6 @@ use App\Models\Concerns\LogsRelationChanges;
 use App\Models\Pivots\Taskable;
 use App\Models\Scopes\WorkspaceScope;
 use App\Observers\PeopleObserver;
-use App\Services\AvatarService;
 use App\Support\Media\UploadAllowlist;
 use Carbon\CarbonImmutable;
 use Database\Factories\PeopleFactory;
@@ -23,7 +22,6 @@ use Filament\Models\Contracts\HasAvatar;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -92,17 +90,9 @@ final class People extends Model implements HasAvatar, HasCustomFields, HasMedia
         ];
     }
 
-    /**
-     * @return Attribute<string, never>
-     */
-    protected function avatar(): Attribute
+    public function getFilamentAvatarUrl(): ?string
     {
-        return Attribute::get(fn (): string => resolve(AvatarService::class)->generateAuto(name: $this->name, initialCount: 1));
-    }
-
-    public function getFilamentAvatarUrl(): string
-    {
-        return $this->avatar;
+        return null;
     }
 
     /**
