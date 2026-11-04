@@ -9,6 +9,7 @@ use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Relaticle\EmailIntegration\Jobs\RefreshConversationSummaries;
 use Relaticle\EmailIntegration\Models\AiSummary;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -18,6 +19,8 @@ use Relaticle\EmailIntegration\Models\EmailThread;
 final readonly class PurgeStoredMailboxData
 {
     private const int FILES_PER_DELETE = 500;
+
+    private const int CONVERSATIONS_PER_JOB = 200;
 
     // Mail rows leave through foreign-key cascades, which fire no model event,
     // so the files and summaries are gathered here before the owner is deleted.
@@ -47,8 +50,10 @@ final readonly class PurgeStoredMailboxData
                 $disk->deleteDirectory(EmailAttachment::composeImagesDirectory((string) $owner->getKey()));
             }
 
-            foreach ($conversations as $conversation) {
-                resolve(RefreshConversationSummary::class)->execute($conversation->workspace_id, $conversation->conversation_key);
+            foreach ($conversations as $workspaceId => $keys) {
+                foreach (array_chunk($keys, self::CONVERSATIONS_PER_JOB) as $chunk) {
+                    dispatch(new RefreshConversationSummaries((string) $workspaceId, $chunk));
+                }
             }
         });
     }
@@ -67,16 +72,17 @@ final readonly class PurgeStoredMailboxData
             ->orWhereIn('connected_account_id', $this->mailboxes($owner)->select('id')));
     }
 
-    /** @return list<object{workspace_id: string, conversation_key: string}> */
+    /** @return array<string, list<string>> conversation keys by workspace */
     private function conversations(User $user): array
     {
-        /** @var list<object{workspace_id: string, conversation_key: string}> */
-        return $this->emails($user)
-            ->whereNotNull('conversation_key')
-            ->toBase()
-            ->distinct()
-            ->get(['workspace_id', 'conversation_key'])
-            ->all();
+        $keys = [];
+
+        /** @var object{workspace_id: string, conversation_key: string} $conversation */
+        foreach ($this->emails($user)->whereNotNull('conversation_key')->toBase()->distinct()->get(['workspace_id', 'conversation_key']) as $conversation) {
+            $keys[$conversation->workspace_id][] = $conversation->conversation_key;
+        }
+
+        return $keys;
     }
 
     private function deleteThreadSummaries(User $user): void

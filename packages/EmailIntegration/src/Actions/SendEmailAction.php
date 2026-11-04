@@ -112,17 +112,7 @@ final readonly class SendEmailAction
         );
 
         return DB::transaction(function () use ($account, $data, $priority, $scheduledFor, $linkToType, $linkToId, $attachmentPaths, $attachmentAttributes, $attachmentFileNames, $hasDownloadableAttachments): Email {
-            // Scope the reply lookup to the sender's workspace. in_reply_to_email_id arrives
-            // from a client-controlled hidden field and Email has no workspace global scope,
-            // so an unscoped lookup would let a user thread their outbound mail onto
-            // another tenant's email and leak its thread_id / rfc_message_id.
-            /** @var Email|null $inReplyTo */
-            $inReplyTo = isset($data['in_reply_to_email_id'])
-                ? Email::query()
-                    ->where('workspace_id', $account->workspace_id)
-                    ->whereKey($data['in_reply_to_email_id'])
-                    ->first()
-                : null;
+            $inReplyTo = $this->lockedParent($account, $data['in_reply_to_email_id'] ?? null);
 
             /** @var Email $email */
             $email = $account->emails()->chaperone()->create([
@@ -138,7 +128,7 @@ final readonly class SendEmailAction
                 // mailbox that received the original. A reply from a shared
                 // inbox or a different connected account must not pass that
                 // foreign id to the sending mailbox.
-                'thread_id' => $inReplyTo !== null && $inReplyTo->connected_account_id === $account->getKey()
+                'thread_id' => $inReplyTo instanceof Email && $inReplyTo->connected_account_id === $account->getKey()
                     ? $inReplyTo->thread_id
                     : null,
                 'in_reply_to' => $inReplyTo?->rfc_message_id,
@@ -157,7 +147,7 @@ final readonly class SendEmailAction
                 'attempts' => 0,
             ]);
 
-            $email->updateQuietly(['conversation_key' => $this->resolver->resolveStored($email)]);
+            $email->updateQuietly(['conversation_key' => $inReplyTo->conversation_key ?? $this->resolver->resolveStored($email)]);
 
             EmailBody::query()->create([
                 'email_id' => $email->getKey(),
@@ -185,6 +175,25 @@ final readonly class SendEmailAction
 
             return $email;
         });
+    }
+
+    private function lockedParent(ConnectedAccount $account, ?string $parentId): ?Email
+    {
+        // Shared with other writers, exclusive in MergeConversations, so the parent's key is never absorbed mid-merge.
+        DB::select('select pg_advisory_xact_lock_shared(hashtext(?))', [$account->workspace_id]);
+
+        if ($parentId === null) {
+            return null;
+        }
+
+        // Scope the reply lookup to the sender's workspace. in_reply_to_email_id arrives
+        // from a client-controlled hidden field and Email has no workspace global scope,
+        // so an unscoped lookup would let a user thread their outbound mail onto
+        // another tenant's email and leak its thread_id / rfc_message_id.
+        return Email::query()
+            ->where('workspace_id', $account->workspace_id)
+            ->whereKey($parentId)
+            ->first();
     }
 
     /**

@@ -7,6 +7,7 @@ use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Relaticle\EmailIntegration\Actions\AutoCreatePersonAction;
 use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
@@ -21,6 +22,7 @@ use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Jobs\MergeConversations;
+use Relaticle\EmailIntegration\Jobs\SettleConversation;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
@@ -29,7 +31,7 @@ use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Services\ConversationKeyResolver;
 use Relaticle\EmailIntegration\Services\EmailClassifier;
 
-mutates(StoreEmailAction::class, AutoCreatePersonAction::class, ConversationKeyResolver::class, RefreshConversationSummary::class, MergeConversations::class);
+mutates(StoreEmailAction::class, AutoCreatePersonAction::class, ConversationKeyResolver::class, RefreshConversationSummary::class, MergeConversations::class, SettleConversation::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -47,7 +49,7 @@ function makeFetchedEmailData(array $overrides = []): FetchedEmailData
 {
     return new FetchedEmailData(
         providerMessageId: $overrides['providerMessageId'] ?? 'msg-001',
-        rfcMessageId: $overrides['rfcMessageId'] ?? '<msg-001@example.com>',
+        rfcMessageId: array_key_exists('rfcMessageId', $overrides) ? $overrides['rfcMessageId'] : '<msg-001@example.com>',
         threadId: $overrides['threadId'] ?? 'thread-001',
         inReplyTo: $overrides['inReplyTo'] ?? null,
         subject: $overrides['subject'] ?? 'Test Subject',
@@ -1085,6 +1087,44 @@ it('merges the conversations of two stored ancestors a reply links', function ()
     expect(Email::query()->where('workspace_id', $this->workspace->getKey())->distinct()->pluck('conversation_key')->all())
         ->toBe([$root->conversation_key])
         ->and(EmailConversation::query()->where('workspace_id', $this->workspace->getKey())->sole()->message_count)->toBe(3);
+});
+
+it('merges the conversations a reply with no Message-ID links through References', function (): void {
+    $first = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'a', 'rfcMessageId' => '<a@acme.example>', 'threadId' => 'ta', 'sentAt' => now()->subDays(2),
+    ]));
+    $second = resolve(StoreEmailAction::class)->execute(secondMailbox($this->workspace), makeFetchedEmailData([
+        'providerMessageId' => 'b', 'rfcMessageId' => '<b@acme.example>', 'threadId' => 'tb', 'sentAt' => now()->subDay(),
+    ]));
+
+    expect($second->conversation_key)->not->toBe($first->conversation_key);
+
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'r', 'rfcMessageId' => null, 'threadId' => 'tc',
+        'references' => '<a@acme.example> <b@acme.example>',
+    ]));
+
+    expect(Email::query()->where('workspace_id', $this->workspace->getKey())->distinct()->pluck('conversation_key')->all())
+        ->toBe([$first->conversation_key])
+        ->and(EmailConversation::query()->where('workspace_id', $this->workspace->getKey())->sole()->message_count)->toBe(3);
+});
+
+it('settles the conversation in a queued job that can run again', function (): void {
+    Queue::fake([SettleConversation::class]);
+
+    $email = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData());
+
+    expect(EmailConversation::query()->where('conversation_key', $email->conversation_key)->exists())->toBeFalse();
+
+    $job = Queue::pushed(SettleConversation::class)->sole();
+
+    expect($job->workspaceId)->toBe($this->workspace->getKey())
+        ->and($job->emailId)->toBe($email->getKey());
+
+    app()->call($job->handle(...));
+    app()->call($job->handle(...));
+
+    expect(EmailConversation::query()->where('conversation_key', $email->conversation_key)->sole()->message_count)->toBe(1);
 });
 
 it('leaves mail in a disconnected mailbox out of the conversation summary', function (): void {

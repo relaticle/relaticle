@@ -8,6 +8,7 @@ use Laravel\Jetstream\Contracts\DeletesTeams;
 use Laravel\Jetstream\Contracts\DeletesUsers;
 use Relaticle\EmailIntegration\Actions\PurgeStoredMailboxData;
 use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
+use Relaticle\EmailIntegration\Jobs\RefreshConversationSummaries;
 use Relaticle\EmailIntegration\Models\AiSummary;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -15,7 +16,7 @@ use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailConversation;
 use Relaticle\EmailIntegration\Models\EmailThread;
 
-mutates(PurgeStoredMailboxData::class, RefreshConversationSummary::class);
+mutates(PurgeStoredMailboxData::class, RefreshConversationSummary::class, RefreshConversationSummaries::class);
 
 beforeEach(function (): void {
     Storage::fake(EmailAttachment::DISK);

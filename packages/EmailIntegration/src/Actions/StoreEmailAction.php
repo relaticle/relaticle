@@ -6,7 +6,6 @@ namespace Relaticle\EmailIntegration\Actions;
 
 use App\Models\Workspace;
 use App\Support\CurrentWorkspace;
-use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +13,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
-use Relaticle\EmailIntegration\Jobs\MergeConversations;
+use Relaticle\EmailIntegration\Jobs\SettleConversation;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
@@ -151,37 +150,27 @@ final readonly class StoreEmailAction
     {
         resolve(SyncEmailThreadAction::class)->execute($connectedAccount, $email->thread_id);
 
-        // After commit, so a copy or a parent another mailbox stored at the same moment is visible.
-        $this->afterCommit(function () use ($email): void {
-            $this->refreshConversation($email);
-        });
+        $this->settleAfterCommit($email);
     }
 
-    private function afterCommit(Closure $callback): void
+    private function settleAfterCommit(Email $email): void
     {
-        // The email is committed by then: a throw here would reach the catch that deletes its inline files.
-        DB::afterCommit(function () use ($callback): void {
+        // After commit, so a copy or a parent another mailbox stored at the same moment is visible.
+        // A throw here would reach the catch that deletes the committed email's inline files.
+        DB::afterCommit(function () use ($email): void {
             try {
-                $callback();
+                dispatch(new SettleConversation($email->workspace_id, $email->getKey()));
             } catch (Throwable $exception) {
                 report($exception);
             }
         });
     }
 
-    private function refreshConversation(Email $email): void
-    {
-        if ($email->conversation_key !== null) {
-            resolve(RefreshConversationSummary::class)->execute($email->workspace_id, $email->conversation_key);
-        }
-
-        if (resolve(ConversationKeyResolver::class)->keysToMerge($email) !== []) {
-            dispatch(new MergeConversations($email->workspace_id, $email->getKey()));
-        }
-    }
-
     private function createEmail(ConnectedAccount $connectedAccount, FetchedEmailData $data): Email
     {
+        // Lock order: workspace (shared here, exclusive in MergeConversations), mailbox thread, conversation summary.
+        DB::select('select pg_advisory_xact_lock_shared(hashtext(?))', [$connectedAccount->workspace_id]);
+
         if ($data->threadId !== '') {
             // Serialises stores in one mailbox thread, so the second message reads the first one's key.
             DB::select('select pg_advisory_xact_lock(hashtext(?))', ["{$connectedAccount->getKey()}:{$data->threadId}"]);
@@ -329,9 +318,7 @@ final readonly class StoreEmailAction
 
             $this->forgetPendingThread($connectedAccount, $previousThreadId, $threadId);
 
-            $this->afterCommit(function () use ($pending): void {
-                $this->refreshConversation($pending);
-            });
+            $this->settleAfterCommit($pending);
 
             return $pending->refresh();
         });

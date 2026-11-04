@@ -54,7 +54,7 @@ final class MergeConversations implements ShouldBeUniqueUntilProcessing, ShouldQ
     }
 
     /**
-     * Stores take no workspace lock, so a row committed during the merge may still hold an absorbed key.
+     * A row keyed outside the workspace lock, such as by the backfill, may still hold an absorbed key.
      *
      * @param  list<string>  $absorbed
      */

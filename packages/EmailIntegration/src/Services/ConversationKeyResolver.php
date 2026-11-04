@@ -41,17 +41,21 @@ final readonly class ConversationKeyResolver
     /** @return list<string> keys held by this message's other copies, its stored parents, or stored replies to it */
     public function keysToMerge(Email $email): array
     {
-        if ($email->rfc_message_id === null || $email->conversation_key === null) {
+        $parents = MessageIdList::parents($email->in_reply_to, $email->references);
+        $own = $email->rfc_message_id;
+
+        if ($email->conversation_key === null || ($own === null && $parents === [])) {
             return [];
         }
 
         $keys = $this->keyed($email->workspace_id, $email->getKey())
             ->where('conversation_key', '!=', $email->conversation_key)
             ->where(fn (Builder $query): Builder => $query
-                ->where('rfc_message_id', $email->rfc_message_id)
-                ->orWhere('in_reply_to', $email->rfc_message_id)
-                ->orWhereRaw('string_to_array("references", \' \') @> array[?]::text[]', [$email->rfc_message_id])
-                ->orWhereIn('rfc_message_id', MessageIdList::parents($email->in_reply_to, $email->references)))
+                ->whereIn('rfc_message_id', $parents)
+                ->when($own !== null, fn (Builder $query): Builder => $query
+                    ->orWhere('rfc_message_id', $own)
+                    ->orWhere('in_reply_to', $own)
+                    ->orWhereRaw('string_to_array("references", \' \') @> array[?]::text[]', [$own])))
             ->distinct()
             ->pluck('conversation_key')
             ->all();

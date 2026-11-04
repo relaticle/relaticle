@@ -822,6 +822,35 @@ it('gives a queued reply the conversation key of the email it answers', function
         ->and($reply->conversation_key)->toBe(str_repeat('a', 64));
 });
 
+it('keeps a reply from another mailbox in the conversation of a parent with no Message-ID', function (): void {
+    $teammate = User::factory()->create();
+    $this->workspace->users()->attach($teammate, ['role' => 'admin']);
+    $teammateMailbox = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $teammate->id,
+    ]));
+    $original = Email::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateMailbox->id,
+        'rfc_message_id' => null,
+        'thread_id' => 'teammate-thread',
+        'conversation_key' => str_repeat('c', 64),
+    ]);
+
+    $reply = app(SendEmailAction::class)->execute($this->user, [
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Re: Pricing',
+        'body_html' => '<p>Thanks</p>',
+        'to' => [['email' => 'ana@acme.example', 'name' => null]],
+        'in_reply_to_email_id' => $original->id,
+        'creation_source' => EmailCreationSource::COMPOSE,
+    ]);
+
+    expect($reply->in_reply_to)->toBeNull()
+        ->and($reply->conversation_key)->toBe(str_repeat('c', 64));
+});
+
 it('starts a new conversation for a new queued email', function (): void {
     $email = app(SendEmailAction::class)->execute($this->user, [
         'connected_account_id' => $this->account->id,
