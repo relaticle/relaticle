@@ -43,7 +43,7 @@
                     <x-cloud::marketing.button :variant="$isScale ? 'primary' : 'secondary'" :href="route('login')" class="mt-8 w-full" data-analytics-intent="signup" data-analytics-placement="pricing">
                         {{ __('Start for free') }}
                     </x-cloud::marketing.button>
-                    <p class="mt-3 text-center text-sm text-gray-500 dark:text-gray-400">{{ __('14-day trial. No card required.') }}</p>
+                    <p class="mt-3 text-center text-sm text-gray-500 dark:text-gray-400">{{ __(':days-day Cloud Pro trial. No card required.', ['days' => \App\Models\Workspace::PRO_TRIAL_DAYS]) }}</p>
                 </div>
 
                 <div class="border-rail flex flex-1 flex-col border-t p-6 md:px-10">

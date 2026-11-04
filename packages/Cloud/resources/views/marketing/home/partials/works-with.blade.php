@@ -19,7 +19,7 @@
         ],
         [
             __('$:price a month, unlimited users', ['price' => \App\Enums\Plan::Pro->yearlyPricePerMonth()]),
-            __('One price per workspace, billed yearly, with unlimited users and records. Every workspace starts on a :days-day trial with no card.', ['days' => \App\Models\Workspace::PRO_TRIAL_DAYS]),
+            __('Priced per workspace, not per user, with unlimited users and records. Every workspace starts on a :days-day trial with no card.', ['days' => \App\Models\Workspace::PRO_TRIAL_DAYS]),
             __('See pricing'),
             route('pricing'),
         ],

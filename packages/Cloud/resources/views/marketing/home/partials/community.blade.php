@@ -8,7 +8,7 @@
     $links = [
         ['https://github.com/relaticle/relaticle', 'ri-github-fill', 'text-gray-900 dark:text-white', __('GitHub'), __('Star the repo, report issues, and read every line of code.'), true],
         [route('discord'), 'ri-discord-fill', 'text-[#5865F2]', __('Discord'), __('Talk with the team and other builders, and share ideas.'), true],
-        [route('selfHosted'), 'ri-server-line', 'text-gray-900 dark:text-white', __('Self-host'), __('Deploy with Docker Compose on your own server. Your data never leaves it.'), false],
+        [route('selfHosted'), 'ri-server-line', 'text-gray-900 dark:text-white', __('Self-host'), __('Deploy with Docker Compose on your own server. Your CRM database stays there.'), false],
     ];
 
     if (\Laravel\Pennant\Feature::active(\App\Features\Documentation::class)) {
@@ -30,7 +30,7 @@
     @endif
 
     <div class="bg-surface border-rail border-b px-6 py-5 md:px-8">
-        <p class="type-prose text-gray-700 dark:text-gray-300">{{ __('Everything a self-hosted install runs is AGPL-3.0. Only the code behind relaticle.com, the hosted business, is proprietary.') }}</p>
+        <p class="type-prose text-gray-700 dark:text-gray-300">{{ __('All Relaticle code in a self-hosted install is AGPL-3.0. Only the code behind relaticle.com, the hosted business, is proprietary.') }}</p>
     </div>
 
     <div class="bg-rail grid grid-cols-1 gap-px sm:grid-cols-2 md:grid-cols-[repeat(auto-fit,minmax(0,1fr))]">

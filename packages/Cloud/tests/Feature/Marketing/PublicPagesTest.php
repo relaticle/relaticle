@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Features\EmailIntegration;
 use App\Models\User;
 use App\Support\DetectsPublicMarkdownRequest;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Http;
+use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Marketing\Http\Controllers\HomeController;
 use Relaticle\Cloud\Marketing\Http\Controllers\PrivacyPolicyController;
 use Relaticle\Cloud\Marketing\Http\Controllers\TermsOfServiceController;
@@ -54,6 +56,23 @@ describe('Home page', function () {
         // sidebar the alt text describes is never the part that goes.
         expect(substr_count($html, 'object-cover object-left-top'))->toBe(3)
             ->and($html)->not->toContain('hero-preview-image w-full h-auto');
+    });
+
+    it('names only the providers whose models the assistant offers', function () {
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('runs on the Anthropic or OpenAI model you pick')
+            ->assertDontSee('Anthropic, OpenAI, or Google')
+            ->assertDontSee('stored only in your Relaticle database');
+    });
+
+    it('leaves the mailbox out of the record story when email integration is off', function () {
+        Feature::deactivate(EmailIntegration::class);
+
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('Three hands, one opportunity.')
+            ->assertDontSee('after your first email');
     });
 
     it('uses an existing raster logo in the organization json-ld', function () {
