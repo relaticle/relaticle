@@ -36,6 +36,7 @@ it('registers outbox and sync schedules when email integration is active', funct
         ->expectsOutputToContain('email:incremental-sync')
         ->expectsOutputToContain('calendar:incremental-sync')
         ->expectsOutputToContain('calendar:renew-push-channels')
+        ->expectsOutputToContain('email:check-mailbox-health')
         ->assertSuccessful();
 });
 
@@ -52,10 +53,11 @@ it('runs email sync and outbox schedules on a single server without overlapping'
             return str_contains($haystack, 'email:incremental-sync')
                 || str_contains($haystack, 'calendar:incremental-sync')
                 || str_contains($haystack, 'calendar:renew-push-channels')
-                || str_contains($haystack, 'email:dispatch-outbox');
+                || str_contains($haystack, 'email:dispatch-outbox')
+                || str_contains($haystack, 'email:check-mailbox-health');
         });
 
-    expect($events)->toHaveCount(4)
+    expect($events)->toHaveCount(5)
         ->and($events->every(fn (Event $event): bool => $event->onOneServer && $event->withoutOverlapping))->toBeTrue();
 });
 
@@ -70,6 +72,7 @@ it('does not register outbox or sync schedules when email integration is inactiv
         ->doesntExpectOutputToContain('email:incremental-sync')
         ->doesntExpectOutputToContain('calendar:incremental-sync')
         ->doesntExpectOutputToContain('calendar:renew-push-channels')
+        ->doesntExpectOutputToContain('email:check-mailbox-health')
         ->assertSuccessful();
 });
 
