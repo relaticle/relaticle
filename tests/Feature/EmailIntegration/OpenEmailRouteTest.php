@@ -165,7 +165,7 @@ it('renders one reader when the Emails page opens a resolved link', function ():
         ->and(substr_count($html, 'fi-email-reader-panel'))->toBe(0);
 });
 
-it('leaves a resolved link to the record Emails tab instead of the panel reader', function (bool $conversations, int $panelReaders): void {
+it('leaves a resolved link to the record Emails tab instead of the panel reader', function (bool $conversations, int $panelReaders, int $tabDrawers): void {
     $email = conversationsRouteMessage($this->ownerMailbox, 'conv-route', 'brian@airbnb.test');
     $this->company->emails()->attach($email->id);
     $relation = (string) array_search(CompanyEmailsRelationManager::class, CompanyResource::getRelations(), true);
@@ -174,14 +174,22 @@ it('leaves a resolved link to the record Emails tab instead of the panel reader'
         Feature::for($this->workspace)->deactivate(EmailConversations::class);
     }
 
-    $html = $this->get(CompanyResource::getUrl('view', ['record' => $this->company, 'relation' => $relation, 'email' => $email->id], tenant: $this->workspace))
+    $html = (string) $this->get(CompanyResource::getUrl('view', ['record' => $this->company, 'relation' => $relation, 'email' => $email->id], tenant: $this->workspace))
         ->assertOk()
         ->getContent();
 
-    expect(substr_count($html, 'fi-email-reader-panel'))->toBe($panelReaders);
+    Filament::setCurrentPanel(Filament::getPanel('app'));
+    Filament::setTenant($this->workspace);
+    $tab = Livewire::withQueryParams(['email' => $email->id])
+        ->test(CompanyEmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
+        ->html();
+
+    expect(substr_count($html, 'fi-email-reader-panel'))->toBe($panelReaders)
+        ->and(substr_count($html, 'fi-email-reader-drawer'))->toBe(0)
+        ->and(substr_count($tab, 'fi-email-reader-drawer'))->toBe($tabDrawers);
 })->with([
-    'conversations on' => [true, 0],
-    'conversations off' => [false, 1],
+    'conversations on' => [true, 0, 1],
+    'conversations off' => [false, 1, 0],
 ]);
 
 it('skips a linked record whose Emails tab hides the mailbox', function (): void {

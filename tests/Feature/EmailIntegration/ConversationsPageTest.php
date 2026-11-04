@@ -521,26 +521,33 @@ it('shows every visible message of the conversation oldest first and loads bodie
     $first = conversationsPageMessage($this->ownerMailbox, 'conv-thread', 'brian@airbnb.test', ['subject' => 'Pilot scope', 'snippet' => 'First pass at scope', 'sent_at' => now()->subHours(3)]);
     EmailBody::factory()->create(['email_id' => $first->id, 'body_html' => null, 'body_text' => 'Body of the first message']);
     $reply = conversationsPageMessage($this->ownerMailbox, 'conv-thread', 'ana@acme.test', ['subject' => 'Re: Pilot scope', 'snippet' => 'Looks good', 'sent_at' => now()->subHours(2)]);
-    EmailBody::factory()->create(['email_id' => $reply->id, 'body_html' => null, 'body_text' => 'Looks good']);
-    $last = conversationsPageMessage($this->ownerMailbox, 'conv-thread', 'brian@airbnb.test', ['subject' => 'Re: Pilot scope', 'snippet' => 'One more change', 'sent_at' => now()->subHour(), 'in_reply_to' => $reply->rfc_message_id]);
+    EmailBody::factory()->create(['email_id' => $reply->id, 'body_html' => null, 'body_text' => 'Body of the reply']);
+    $last = conversationsPageMessage($this->ownerMailbox, 'conv-thread', 'brian@airbnb.test', ['subject' => 'Re: Pilot scope', 'snippet' => 'One more change', 'sent_at' => now()->subHour(), 'in_reply_to' => $first->rfc_message_id]);
     EmailBody::factory()->create(['email_id' => $last->id, 'body_html' => null, 'body_text' => 'One more change']);
 
     livewire(EmailInboxPage::class)
         ->call('selectEmail', $last->id)
-        ->assertSet('expandedEmailIds', [$reply->id, $last->id])
-        ->assertSeeInOrder(['First pass at scope', 'Looks good', 'One more change'])
-        ->assertDontSee('Body of the first message')
-        ->call('expandMessage', $first->id)
-        ->assertSee('Body of the first message');
+        ->assertSet('expandedEmailIds', [$first->id, $last->id])
+        ->assertSeeInOrder(['Body of the first message', 'Looks good', 'One more change'])
+        ->assertDontSee('Body of the reply')
+        ->call('expandMessage', $reply->id)
+        ->assertSee('Body of the reply');
 });
 
 it('marks read only the messages the viewer can open', function (): void {
     $earlier = conversationsPageMessage($this->ownerMailbox, 'conv-mixed-tier', 'brian@airbnb.test', ['sent_at' => now()->subHours(2)]);
     $mine = conversationsPageMessage($this->ownerMailbox, 'conv-mixed-tier', 'brian@airbnb.test', ['sent_at' => now()->subHour()]);
-    $bens = conversationsPageMessage($this->teammateMailbox, 'conv-mixed-tier', 'olivia@airbnb.test', ['privacy_tier' => EmailPrivacyTier::METADATA_ONLY]);
+    $bens = conversationsPageMessage($this->teammateMailbox, 'conv-mixed-tier', 'olivia@airbnb.test', ['snippet' => 'Clause 7 is a blocker', 'privacy_tier' => EmailPrivacyTier::METADATA_ONLY]);
+    EmailBody::factory()->create(['email_id' => $bens->id, 'body_html' => null, 'body_text' => 'Clause 7 in full']);
     $this->company->emails()->attach([$mine->id, $bens->id]);
 
-    livewire(EmailInboxPage::class)->call('selectEmail', $bens->id);
+    $page = livewire(EmailInboxPage::class)
+        ->call('selectEmail', $bens->id)
+        ->assertDontSee('Clause 7 is a blocker')
+        ->set('expandedEmailIds', [$bens->id])
+        ->assertDontSee('Clause 7 in full');
+
+    expect($page->instance()->expandedBodies->keys()->all())->toBe([]);
 
     expect(EmailRead::query()->where('user_id', $this->owner->id)->pluck('email_id')->sort()->values()->all())
         ->toBe(collect([$earlier->id, $mine->id])->sort()->values()->all());
@@ -551,11 +558,15 @@ it('expands only messages of the open conversation', function (): void {
     $elsewhere = conversationsPageMessage($this->ownerMailbox, 'conv-elsewhere', 'kim@notion.test');
     EmailBody::factory()->create(['email_id' => $elsewhere->id, 'body_html' => null, 'body_text' => 'Another conversation body']);
 
-    livewire(EmailInboxPage::class)
+    $page = livewire(EmailInboxPage::class)
         ->call('selectEmail', $open->id)
         ->call('expandMessage', $elsewhere->id)
         ->assertSet('expandedEmailIds', [$open->id])
+        ->assertDontSee('Another conversation body')
+        ->set('expandedEmailIds', [$elsewhere->id])
         ->assertDontSee('Another conversation body');
+
+    expect($page->instance()->expandedBodies->keys()->all())->toBe([$open->id]);
 });
 
 it('shows the gate for a locked message expanded inside a readable conversation', function (): void {
@@ -570,8 +581,29 @@ it('shows the gate for a locked message expanded inside a readable conversation'
 
     livewire(EmailInboxPage::class)
         ->call('selectEmail', $mine->id)
+        ->assertSeeHtml("thread-row-{$bens->id}")
+        ->assertDontSee('Clause 7 is a blocker')
         ->assertDontSeeHtml("data-reader-gate=\"{$bens->id}\"")
         ->call('expandMessage', $bens->id)
         ->assertSeeHtml("data-reader-gate=\"{$bens->id}\"")
         ->assertDontSee('Clause 7 is a blocker');
+});
+
+it('expands and replies to the newest message the viewer can read when the newest is locked', function (): void {
+    $parent = conversationsPageMessage($this->ownerMailbox, 'conv-locked-newest', 'brian@airbnb.test', ['sent_at' => now()->subHours(3)]);
+    $middle = conversationsPageMessage($this->ownerMailbox, 'conv-locked-newest', 'kim@airbnb.test', ['sent_at' => now()->subHours(2)]);
+    $mine = conversationsPageMessage($this->ownerMailbox, 'conv-locked-newest', 'brian@airbnb.test', ['sent_at' => now()->subHour(), 'in_reply_to' => $parent->rfc_message_id]);
+    $bens = conversationsPageMessage($this->teammateMailbox, 'conv-locked-newest', 'olivia@airbnb.test', ['privacy_tier' => EmailPrivacyTier::METADATA_ONLY]);
+    $this->company->emails()->attach([$mine->id, $bens->id]);
+
+    livewire(EmailInboxPage::class)
+        ->call('selectEmail', $bens->id)
+        ->assertSet('expandedEmailIds', [$parent->id, $mine->id, $bens->id])
+        ->assertSeeHtml("thread-row-{$middle->id}")
+        ->assertSeeHtml("data-reader-action=\"reply\" x-on:click=\"\$dispatch('composer:reply', { emailId: '{$mine->id}'")
+        ->assertSeeHtmlInOrder([
+            "data-thread-message=\"{$mine->id}\"",
+            'wire:key="inline-reply-composer"',
+            "data-reader-gate=\"{$bens->id}\"",
+        ]);
 });

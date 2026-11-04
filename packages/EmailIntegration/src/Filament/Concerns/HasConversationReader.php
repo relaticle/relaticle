@@ -14,6 +14,7 @@ use Relaticle\EmailIntegration\Queries\ConversationsQuery;
 /**
  * The whole conversation behind the open email, for hosts that also use {@see HasEmailReaderActions}.
  *
+ * @property-read Email|null $selectedEmail
  * @property-read EloquentCollection<int, Email> $thread
  * @property-read EloquentCollection<string, Email> $expandedBodies
  * @property-read ConversationRow|null $selectedConversationRow
@@ -31,7 +32,7 @@ trait HasConversationReader
     #[Computed]
     public function thread(): EloquentCollection
     {
-        $selected = $this->selectedEmail();
+        $selected = $this->selectedEmail;
 
         if (! $selected instanceof Email) {
             return new EloquentCollection;
@@ -61,7 +62,7 @@ trait HasConversationReader
     #[Computed]
     public function selectedConversationRow(): ?ConversationRow
     {
-        $key = $this->selectedEmail()?->conversation_key;
+        $key = $this->selectedEmail?->conversation_key;
 
         return collect($this->conversationRows())->first(fn (ConversationRow $row): bool => $row->conversationKey === $key);
     }
@@ -70,7 +71,7 @@ trait HasConversationReader
     #[Computed]
     public function selectedEmailUnavailable(): bool
     {
-        return $this->selectedEmailId !== null && ! $this->selectedEmail() instanceof Email;
+        return $this->selectedEmailId !== null && ! $this->selectedEmail instanceof Email;
     }
 
     public function expandMessage(string $id): void
@@ -109,17 +110,14 @@ trait HasConversationReader
     /** @return list<string> */
     private function initiallyExpandedIds(): array
     {
-        $newest = $this->thread->last();
+        $user = $this->readerUser();
+        $newest = $this->thread->last(fn (Email $message): bool => $user->can('viewBody', $message));
 
-        if (! $newest instanceof Email) {
-            return [];
-        }
-
-        $repliedTo = $newest->in_reply_to === null
+        $repliedTo = $newest?->in_reply_to === null
             ? null
             : $this->thread->first(fn (Email $message): bool => $message->rfc_message_id === $newest->in_reply_to);
 
-        return array_values(array_filter([$repliedTo?->getKey(), $newest->getKey()]));
+        return array_values(array_unique(array_filter([$repliedTo?->getKey(), $newest?->getKey(), $this->selectedEmailId])));
     }
 
     private function markThreadRead(): void
