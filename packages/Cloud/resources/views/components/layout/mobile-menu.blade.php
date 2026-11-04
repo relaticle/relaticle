@@ -99,7 +99,7 @@
 
         @auth('web')
             <div class="grid mobile-nav-enter" style="--stagger: {{ count($mobileNavItems) }}">
-                <x-cloud::marketing.button icon-trailing="ri-arrow-right-line" :href="app(\App\Support\Auth\LoginDestination::class)->resolve(auth('web')->user(), null)" class="active:scale-[0.98]">
+                <x-cloud::marketing.button :href="app(\App\Support\Auth\LoginDestination::class)->resolve(auth('web')->user(), null)" class="active:scale-[0.98]">
                     {{ __('Open app') }}
                 </x-cloud::marketing.button>
             </div>

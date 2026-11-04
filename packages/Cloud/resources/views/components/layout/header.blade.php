@@ -310,7 +310,7 @@
                 <div class="flex flex-1 items-center justify-end gap-2 sm:gap-3">
                     <div class="hidden md:flex items-center gap-2">
                         @auth('web')
-                            <x-cloud::marketing.button size="sm" icon-trailing="ri-arrow-right-line" :href="app(\App\Support\Auth\LoginDestination::class)->resolve(auth('web')->user(), null)">
+                            <x-cloud::marketing.button size="sm" :href="app(\App\Support\Auth\LoginDestination::class)->resolve(auth('web')->user(), null)">
                                 {{ __('Open app') }}
                             </x-cloud::marketing.button>
                         @else
