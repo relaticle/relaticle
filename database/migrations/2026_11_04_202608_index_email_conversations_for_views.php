@@ -22,6 +22,9 @@ return new class extends Migration
 
             DB::statement("create index concurrently if not exists {$index} on email_conversations {$definition}");
         }
+
+        // A strict prefix of email_conversations_workspace_last_message_id_idx, kept only to slow summary upserts.
+        DB::statement('drop index concurrently if exists email_conversations_workspace_id_last_message_at_index');
     }
 
     // A failed concurrent build leaves an invalid index behind, and `if not exists` would skip it on the retry.
@@ -30,6 +33,7 @@ return new class extends Migration
         $isInvalid = DB::table('pg_index')
             ->join('pg_class', 'pg_class.oid', '=', 'pg_index.indexrelid')
             ->where('pg_class.relname', $index)
+            ->whereRaw("pg_class.relnamespace = 'public'::regnamespace")
             ->where('pg_index.indisvalid', false)
             ->exists();
 
