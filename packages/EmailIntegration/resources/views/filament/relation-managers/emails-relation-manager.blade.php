@@ -18,7 +18,7 @@
     @else
         <div @class([
             'flex flex-col',
-            'invisible' => $this->selectedEmail !== null,
+            'invisible' => ! $this->showsConversations && $this->selectedEmail !== null,
         ])>
             <x-email-integration::mailbox-health-banner :mailboxes="$this->unhealthyMailboxes" class="pb-0 sm:px-6" />
 
@@ -130,11 +130,18 @@
 
         {{-- A hand-rolled overlay rather than <x-filament::modal>: that component owns its
              open state in Alpine and races a Livewire response that renders and opens it at once. --}}
-        <x-email-integration::reader-overlay
-            :email="$this->selectedEmail"
-            :pending-access-requests="$this->pendingAccessRequests"
-            layer="z-50"
-        />
+        @if ($this->showsConversations)
+            <x-email-integration::reader-drawer
+                :email="$this->selectedEmail"
+                :pending-access-requests="$this->pendingAccessRequests"
+            />
+        @else
+            <x-email-integration::reader-overlay
+                :email="$this->selectedEmail"
+                :pending-access-requests="$this->pendingAccessRequests"
+                layer="z-50"
+            />
+        @endif
     @endif
 
     <x-filament-panels::unsaved-action-changes-alert />

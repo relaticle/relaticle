@@ -155,7 +155,7 @@ it('opens a conversation from the record tab through the viewer readable copy', 
         ->assertSet('selectedEmailId', null)
         ->call('selectEmail', $email->id)
         ->assertSet('selectedEmailId', $email->id)
-        ->assertSeeHtml('fi-email-reader-panel');
+        ->assertSeeHtml('fi-email-reader-drawer');
 });
 
 it('opens the reader from the email in the URL only while conversations are on', function (): void {
@@ -165,7 +165,7 @@ it('opens the reader from the email in the URL only while conversations are on',
     Livewire::withQueryParams(['email' => $email->id])
         ->test(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
         ->assertSet('selectedEmailId', $email->id)
-        ->assertSeeHtml('fi-email-reader-panel');
+        ->assertSeeHtml('fi-email-reader-drawer');
 
     Feature::for($this->workspace)->deactivate(EmailConversations::class);
 
@@ -223,10 +223,10 @@ it('opens the queued send on the record and drops an id it cannot open', functio
     livewire(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
         ->dispatch('composer:sent', emailId: $queued->id)
         ->assertSet('selectedEmailId', $queued->id)
-        ->assertSeeHtml('fi-email-reader-panel')
+        ->assertSeeHtml('fi-email-reader-drawer')
         ->dispatch('composer:sent', emailId: (string) Str::ulid())
         ->assertSet('selectedEmailId', null)
-        ->assertDontSeeHtml('fi-email-reader-panel');
+        ->assertDontSeeHtml('fi-email-reader-drawer');
 });
 
 it('opens only this record conversations from the email in the URL', function (): void {
@@ -235,5 +235,18 @@ it('opens only this record conversations from the email in the URL', function ()
     Livewire::withQueryParams(['email' => $elsewhere->id])
         ->test(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
         ->assertSet('selectedEmailId', null)
-        ->assertDontSeeHtml('fi-email-reader-panel');
+        ->assertDontSeeHtml('fi-email-reader-drawer');
+});
+
+it('keeps the list visible beside the open reader', function (): void {
+    $email = conversationsRecordMessage($this->ownerMailbox, 'conv-open', 'brian@airbnb.test', ['subject' => 'Kickoff agenda']);
+    $other = conversationsRecordMessage($this->ownerMailbox, 'conv-other', 'kim@airbnb.test', ['subject' => 'Invoice question']);
+    $this->company->emails()->attach([$email->id, $other->id]);
+
+    livewire(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
+        ->call('selectEmail', $email->id)
+        ->assertSeeHtml('fi-email-reader-drawer')
+        ->assertDontSeeHtml('fi-email-reader-backdrop')
+        ->assertSeeHtml('data-conversation="conv-other"')
+        ->assertDontSeeHtml('flex flex-col invisible');
 });
