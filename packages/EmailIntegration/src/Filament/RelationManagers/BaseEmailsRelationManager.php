@@ -20,24 +20,34 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
+use Relaticle\EmailIntegration\Data\ConversationFilters;
+use Relaticle\EmailIntegration\Data\ConversationPage;
+use Relaticle\EmailIntegration\Enums\ConversationView;
 use Relaticle\EmailIntegration\Filament\Actions\ConnectMailboxAction;
+use Relaticle\EmailIntegration\Filament\Concerns\HasConversationsFlag;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailComposeActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
+use Relaticle\EmailIntegration\Queries\ConversationsQuery;
 use Relaticle\EmailIntegration\Services\EmailSearchService;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
 
 /**
  * @property-read LengthAwarePaginator<int, Email&object{pivot: MorphPivot}> $emails
+ * @property-read ConversationPage $conversations
+ * @property-read int $automatedCount
+ * @property-read bool $showsConversations
  * @property-read Email|null $selectedEmail
  * @property-read Collection<int, EmailAccessRequest> $pendingAccessRequests
  */
 abstract class BaseEmailsRelationManager extends RelationManager
 {
+    use HasConversationsFlag;
     use HasEmailComposeActions;
     use HasEmailReaderActions;
 
@@ -51,9 +61,14 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
     protected string $view = 'email-integration::filament.relation-managers.emails-relation-manager';
 
+    #[Url(as: 'email')]
     public ?string $selectedEmailId = null;
 
     public string $search = '';
+
+    public bool $showAutomated = false;
+
+    public ?string $conversationsCursor = null;
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {
@@ -86,7 +101,59 @@ abstract class BaseEmailsRelationManager extends RelationManager
             $this->selectedEmailId = $emailId;
         }
 
-        unset($this->emails);
+        $this->conversationsCursor = null;
+        unset($this->emails, $this->conversations, $this->automatedCount);
+    }
+
+    #[Computed]
+    public function showsConversations(): bool
+    {
+        $workspace = filament()->getTenant();
+
+        return $this->conversationsEnabled($workspace instanceof Workspace ? $workspace : null);
+    }
+
+    #[Computed]
+    public function conversations(): ConversationPage
+    {
+        if ($this->hidesRecordMailbox()) {
+            return new ConversationPage([], null, null);
+        }
+
+        return resolve(ConversationsQuery::class)->paginate(
+            $this->authUser(),
+            $this->showAutomated ? ConversationView::Automated : ConversationView::All,
+            ConversationFilters::forRecord($this->ownerRecordWithEmails(), $this->search),
+            20,
+            $this->conversationsCursor,
+        );
+    }
+
+    #[Computed]
+    public function automatedCount(): int
+    {
+        if ($this->hidesRecordMailbox()) {
+            return 0;
+        }
+
+        return resolve(ConversationsQuery::class)
+            ->counts($this->authUser(), ConversationFilters::forRecord($this->ownerRecordWithEmails()))['automated'];
+    }
+
+    public function updatedShowAutomated(): void
+    {
+        $this->conversationsCursor = null;
+        unset($this->conversations);
+    }
+
+    public function nextConversationsPage(): void
+    {
+        $this->moveConversationsCursor($this->conversations->nextCursor);
+    }
+
+    public function previousConversationsPage(): void
+    {
+        $this->moveConversationsCursor($this->conversations->previousCursor);
     }
 
     /**
@@ -194,6 +261,10 @@ abstract class BaseEmailsRelationManager extends RelationManager
             return null;
         }
 
+        if ($this->showsConversations()) {
+            return $this->readableConversationCopy($this->selectedEmailId);
+        }
+
         /** @var Email|null $email */
         $email = $this->ownerRecordWithEmails()
             ->emails()
@@ -242,7 +313,18 @@ abstract class BaseEmailsRelationManager extends RelationManager
     public function updatedSearch(): void
     {
         $this->resetPage();
-        unset($this->emails);
+        $this->conversationsCursor = null;
+        unset($this->emails, $this->conversations);
+    }
+
+    private function moveConversationsCursor(?string $cursor): void
+    {
+        if ($cursor === null) {
+            return;
+        }
+
+        $this->conversationsCursor = $cursor;
+        unset($this->conversations);
     }
 
     private function ownerRecordWithEmails(): Company|Opportunity|People

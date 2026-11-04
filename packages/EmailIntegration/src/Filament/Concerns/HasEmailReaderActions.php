@@ -27,6 +27,7 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Models\EmailThread;
+use Relaticle\EmailIntegration\Queries\ConversationsQuery;
 use Relaticle\EmailIntegration\Services\EmailThreadSummaryService;
 
 /**
@@ -61,6 +62,30 @@ trait HasEmailReaderActions
         resolve(MarkEmailAsReadAction::class)->execute($id, $this->readerUser());
 
         return true;
+    }
+
+    /**
+     * The copy a conversation list may open: one of the viewer's preferred visible copies with a readable body.
+     */
+    protected function readableConversationCopy(string $emailId): ?Email
+    {
+        $user = $this->readerUser();
+        $conversationKey = Email::query()
+            ->forWorkspace($user->current_workspace_id)
+            ->whereKey($emailId)
+            ->value('conversation_key');
+
+        if (! is_string($conversationKey)) {
+            return null;
+        }
+
+        $email = resolve(ConversationsQuery::class)->messages($user, $conversationKey)->find($emailId);
+
+        if (! $email instanceof Email || $user->cannot('viewBody', $email)) {
+            return null;
+        }
+
+        return $email->loadMissing(['body', 'labels', 'attachments', 'from']);
     }
 
     /**

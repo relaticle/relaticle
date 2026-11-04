@@ -26,11 +26,12 @@ final readonly class ConversationFilters
         public ?string $search = null,
     ) {}
 
-    public static function forRecord(Company|People|Opportunity $record): self
+    public static function forRecord(Company|People|Opportunity $record, ?string $search = null): self
     {
         return new self(
             recordType: CrmEntity::from($record->getMorphClass()),
             recordId: (string) $record->getKey(),
+            search: filled($search) ? $search : null,
         );
     }
 }

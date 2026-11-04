@@ -27,49 +27,104 @@
                     <x-email-integration::search-bar :search="$search" :framed="false" />
                 </div>
 
-                {{ $this->composeEmailAction }}
-            </div>
+                <div class="flex items-center gap-3">
+                    @if ($this->showsConversations && ($showAutomated || $this->automatedCount > 0))
+                        <button
+                            type="button"
+                            wire:click="$toggle('showAutomated')"
+                            wire:loading.attr="disabled"
+                            @if ($showAutomated) aria-pressed="true" @else aria-pressed="false" @endif
+                            class="rounded px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                        >
+                            {{ $showAutomated
+                                ? __('filament/pages/record-emails.automated_toggle_hide')
+                                : trans_choice('filament/pages/record-emails.automated_toggle', $this->automatedCount, ['count' => $this->automatedCount]) }}
+                        </button>
+                    @endif
 
-            <div class="flex min-h-[20rem] flex-col divide-y divide-gray-100 border-t border-gray-200 dark:divide-white/5 dark:border-white/10">
-                @forelse ($this->emails as $email)
-                    <x-email-integration::list-row-wide :email="$email" wire:key="email-list-row-{{ $email->id }}" />
-                @empty
-                    <x-email-integration::list-empty
-                        class="flex-1"
-                        :search="$search"
-                        :can-compose="$this->hasActiveConnectedAccount"
-                    />
-                @endforelse
-            </div>
-
-            @if ($this->emails->hasPages())
-                <div class="flex items-center justify-between px-4 py-3 sm:px-6">
-                    <button
-                        wire:click="previousPage(@js($this->getTablePaginationPageName()))"
-                        wire:loading.attr="disabled"
-                        @disabled($this->emails->onFirstPage())
-                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
-                    >
-                        <x-heroicon-o-chevron-left class="h-3.5 w-3.5" />
-                        {{ __('filament/pages/email-inbox.pagination.previous') }}
-                    </button>
-                    <span class="text-xs text-gray-400 dark:text-gray-500">
-                        {{ __('filament/pages/email-inbox.pagination.range', [
-                            'first' => $this->emails->firstItem() ?? 0,
-                            'last' => $this->emails->lastItem() ?? 0,
-                            'total' => $this->emails->total(),
-                        ]) }}
-                    </span>
-                    <button
-                        wire:click="nextPage(@js($this->getTablePaginationPageName()))"
-                        wire:loading.attr="disabled"
-                        @disabled($this->emails->onLastPage())
-                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
-                    >
-                        {{ __('filament/pages/email-inbox.pagination.next') }}
-                        <x-heroicon-o-chevron-right class="h-3.5 w-3.5" />
-                    </button>
+                    {{ $this->composeEmailAction }}
                 </div>
+            </div>
+
+            @if ($this->showsConversations)
+                <div class="flex min-h-[20rem] flex-col divide-y divide-gray-100 border-t border-gray-200 dark:divide-white/5 dark:border-white/10">
+                    @forelse ($this->conversations->rows as $row)
+                        <x-email-integration::conversation-row :row="$row" selectable wire:key="record-conversation-{{ $row->conversationKey }}" />
+                    @empty
+                        <x-email-integration::list-empty
+                            class="flex-1"
+                            :search="$search"
+                            :can-compose="$this->hasActiveConnectedAccount"
+                        />
+                    @endforelse
+                </div>
+
+                @if ($this->conversations->previousCursor !== null || $this->conversations->nextCursor !== null)
+                    <div class="flex items-center justify-between px-4 py-3 sm:px-6">
+                        <button
+                            type="button"
+                            wire:click="previousConversationsPage"
+                            wire:loading.attr="disabled"
+                            @disabled($this->conversations->previousCursor === null)
+                            class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
+                        >
+                            <x-heroicon-o-chevron-left class="h-3.5 w-3.5" />
+                            {{ __('filament/pages/email-inbox.views.newer') }}
+                        </button>
+                        <button
+                            type="button"
+                            wire:click="nextConversationsPage"
+                            wire:loading.attr="disabled"
+                            @disabled($this->conversations->nextCursor === null)
+                            class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
+                        >
+                            {{ __('filament/pages/email-inbox.views.older') }}
+                            <x-heroicon-o-chevron-right class="h-3.5 w-3.5" />
+                        </button>
+                    </div>
+                @endif
+            @else
+                <div class="flex min-h-[20rem] flex-col divide-y divide-gray-100 border-t border-gray-200 dark:divide-white/5 dark:border-white/10">
+                    @forelse ($this->emails as $email)
+                        <x-email-integration::list-row-wide :email="$email" wire:key="email-list-row-{{ $email->id }}" />
+                    @empty
+                        <x-email-integration::list-empty
+                            class="flex-1"
+                            :search="$search"
+                            :can-compose="$this->hasActiveConnectedAccount"
+                        />
+                    @endforelse
+                </div>
+
+                @if ($this->emails->hasPages())
+                    <div class="flex items-center justify-between px-4 py-3 sm:px-6">
+                        <button
+                            wire:click="previousPage(@js($this->getTablePaginationPageName()))"
+                            wire:loading.attr="disabled"
+                            @disabled($this->emails->onFirstPage())
+                            class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
+                        >
+                            <x-heroicon-o-chevron-left class="h-3.5 w-3.5" />
+                            {{ __('filament/pages/email-inbox.pagination.previous') }}
+                        </button>
+                        <span class="text-xs text-gray-400 dark:text-gray-500">
+                            {{ __('filament/pages/email-inbox.pagination.range', [
+                                'first' => $this->emails->firstItem() ?? 0,
+                                'last' => $this->emails->lastItem() ?? 0,
+                                'total' => $this->emails->total(),
+                            ]) }}
+                        </span>
+                        <button
+                            wire:click="nextPage(@js($this->getTablePaginationPageName()))"
+                            wire:loading.attr="disabled"
+                            @disabled($this->emails->onLastPage())
+                            class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
+                        >
+                            {{ __('filament/pages/email-inbox.pagination.next') }}
+                            <x-heroicon-o-chevron-right class="h-3.5 w-3.5" />
+                        </button>
+                    </div>
+                @endif
             @endif
         </div>
 

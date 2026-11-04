@@ -215,23 +215,7 @@ final class EmailInboxPage extends Page
             return null;
         }
 
-        $user = $this->authUser();
-        $conversationKey = Email::query()
-            ->forWorkspace($user->current_workspace_id)
-            ->whereKey($this->selectedEmailId)
-            ->value('conversation_key');
-
-        if (! is_string($conversationKey)) {
-            return null;
-        }
-
-        $email = resolve(ConversationsQuery::class)->messages($user, $conversationKey)->find($this->selectedEmailId);
-
-        if (! $email instanceof Email || $user->cannot('viewBody', $email)) {
-            return null;
-        }
-
-        return $email->loadMissing(['body', 'labels', 'attachments', 'from']);
+        return $this->readableConversationCopy($this->selectedEmailId);
     }
 
     /** @return SupportCollection<int, EmailAccessRequest> */
