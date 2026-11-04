@@ -14,6 +14,7 @@ use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Livewire\EmailComposer;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 
 mutates(EmailComposer::class);
@@ -288,5 +289,57 @@ it('sets composer fields at 16px on a touch screen so iOS does not zoom into the
         ->waitForText(__('filament/emails/composer.title'))
         ->assertScript("getComputedStyle(document.querySelector('[role=\"combobox\"]')).fontSize", '16px')
         ->assertScript("getComputedStyle(document.querySelector('[contenteditable=\"true\"]')).fontSize", '16px')
+        ->assertNoJavaScriptErrors();
+});
+
+it('keeps the recipient suggestions under the field while a forwarded email scrolls', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'user_id' => $user->id,
+        'workspace_id' => $workspace->id,
+        'email_address' => 'olivia@acme.example',
+        'sync_cursor' => 'history-done',
+        'last_synced_at' => now(),
+    ]));
+    $email = Email::factory()->create([
+        'workspace_id' => $workspace->id,
+        'user_id' => $user->id,
+        'connected_account_id' => $account->id,
+        'status' => EmailStatus::SYNCED,
+        'sent_at' => now()->subHour(),
+        'privacy_tier' => EmailPrivacyTier::FULL,
+    ]);
+    EmailParticipant::factory()->create([
+        'email_id' => $email->id,
+        'email_address' => 'dana@globex.example',
+        'role' => EmailParticipantRole::FROM,
+    ]);
+    $requester = User::factory()->create(['current_workspace_id' => $workspace->id]);
+    $workspace->users()->attach($requester, ['role' => 'member']);
+    EmailAccessRequest::factory()->pending()->create([
+        'owner_id' => $user->id,
+        'requester_id' => $requester->id,
+        'email_id' => $email->id,
+    ]);
+
+    $suggestionsUnderField = '(() => { const field = document.querySelector(".fi-email-reader-panel [role=combobox]").getBoundingClientRect(); const list = [...document.querySelectorAll("[role=listbox]")].find((listbox) => listbox.checkVisibility()).getBoundingClientRect(); return Math.round(list.top - field.bottom); })()';
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(393, 852)
+        ->navigate("/app/{$workspace->slug}/workspace/email/access-requests")
+        ->click('button[wire\\:click*="openEmail"]')
+        ->assertVisible('.fi-email-reader-panel')
+        ->click('.fi-email-reader-panel button[aria-label="'.__('filament/pages/email-inbox.reply_forward.modal_headings.forward').'"]')
+        ->type('.fi-email-reader-panel [role="combobox"]', 'dana')
+        ->assertScript($suggestionsUnderField, 6);
+
+    $page->script('(() => { const region = document.querySelector("[data-email-scroll-region]"); region.scrollTo({ top: region.scrollHeight, behavior: "instant" }); })()');
+
+    $page->wait(0.3)
+        ->assertScript($suggestionsUnderField, 6)
         ->assertNoJavaScriptErrors();
 });

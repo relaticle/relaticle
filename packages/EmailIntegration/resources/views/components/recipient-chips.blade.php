@@ -254,7 +254,8 @@
     }"
     x-effect="if (isOpen) updatePopover()"
     x-on:resize.window="updatePopover()"
-    x-on:scroll.window="updatePopover()"
+    {{-- Capture: a reply or forward sits in the email's own scroll region, whose scroll never reaches the window. --}}
+    x-on:scroll.window.capture="updatePopover()"
     @if ($wireModel) wire:ignore @endif
     {{ $attributes->whereDoesntStartWith('wire:model')->merge(['class' => 'flex min-h-10 min-w-0 flex-wrap content-start items-center gap-2 py-2']) }}
 >
