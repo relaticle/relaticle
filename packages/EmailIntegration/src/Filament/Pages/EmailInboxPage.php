@@ -11,6 +11,7 @@ use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Collection as SupportCollection;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 use Relaticle\EmailIntegration\Data\ConversationFilters;
@@ -296,29 +297,35 @@ final class EmailInboxPage extends Page
         $user = $this->authUser();
         $workspaceId = $user->current_workspace_id;
 
-        return [
-            EmailPageTab::DRAFTS->value => Email::query()
+        $counts = DB::query()
+            ->selectSub(Email::query()
                 ->forWorkspace($workspaceId)
                 ->where('user_id', $user->getKey())
                 ->where('status', EmailStatus::DRAFT)
-                ->count(),
-            EmailPageTab::OUTBOX->value => OutboxTab::QUEUED->constrain(Email::query()
+                ->toBase()
+                ->selectRaw('count(*)'), EmailPageTab::DRAFTS->value)
+            ->selectSub(OutboxTab::QUEUED->constrain(Email::query()
                 ->forWorkspace($workspaceId)
                 ->where('user_id', $user->getKey())
                 ->where('direction', EmailDirection::OUTBOUND))
-                ->count(),
-            EmailPageTab::FAILED->value => Email::query()
+                ->toBase()
+                ->selectRaw('count(*)'), EmailPageTab::OUTBOX->value)
+            ->selectSub(Email::query()
                 ->forWorkspace($workspaceId)
                 ->where('user_id', $user->getKey())
                 ->where('status', EmailStatus::FAILED)
-                ->count(),
-            EmailPageTab::TEMPLATES->value => EmailTemplate::query()
+                ->toBase()
+                ->selectRaw('count(*)'), EmailPageTab::FAILED->value)
+            ->selectSub(EmailTemplate::query()
                 ->where('workspace_id', $workspaceId)
                 ->where(fn (Builder $q): Builder => $q
                     ->where('is_shared', true)
                     ->orWhere('created_by', $user->getKey()))
-                ->count(),
-        ];
+                ->toBase()
+                ->selectRaw('count(*)'), EmailPageTab::TEMPLATES->value)
+            ->first();
+
+        return array_map(intval(...), (array) $counts);
     }
 
     private function authUser(): User

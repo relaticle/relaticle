@@ -10,6 +10,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as BaseBuilder;
 use Illuminate\Pagination\Cursor;
 use Illuminate\Support\Collection;
@@ -46,14 +47,15 @@ final readonly class ConversationsQuery
     {
         Gate::forUser($viewer)->authorize('viewAny', Email::class);
 
-        $page = $this->conversations($viewer, $view, $filters)
+        $visible = new VisibleEmailScope($viewer);
+        $page = $this->conversations($viewer, $visible, $view, $filters)
             ->latest('last_message_at')
             ->orderByDesc('id')
             ->cursorPaginate($perPage, ['*'], 'cursor', $cursor === null ? null : Cursor::fromEncoded($cursor));
 
         // Cursors are read off the summary models, which carry the order columns the rows do not.
         return new ConversationPage(
-            rows: array_values($this->rows($viewer, $page->getCollection())->all()),
+            rows: array_values($this->rows($viewer, $visible, $page->getCollection())->all()),
             nextCursor: $page->nextCursor()?->encode(),
             previousCursor: $page->previousCursor()?->encode(),
         );
@@ -65,11 +67,19 @@ final readonly class ConversationsQuery
         Gate::forUser($viewer)->authorize('viewAny', Email::class);
 
         $filters ??= new ConversationFilters;
+        $visible = new VisibleEmailScope($viewer);
+        $counts = DB::query();
+
+        foreach ([ConversationView::NeedsReply, ConversationView::Unlinked, ConversationView::Automated] as $view) {
+            $counts->selectSub($this->conversations($viewer, $visible, $view, $filters)->toBase()->selectRaw('count(*)'), $view->value);
+        }
+
+        $row = (array) $counts->first();
 
         return [
-            'needs_reply' => $this->conversations($viewer, ConversationView::NeedsReply, $filters)->count(),
-            'unlinked' => $this->conversations($viewer, ConversationView::Unlinked, $filters)->count(),
-            'automated' => $this->conversations($viewer, ConversationView::Automated, $filters)->count(),
+            'needs_reply' => (int) $row[ConversationView::NeedsReply->value],
+            'unlinked' => (int) $row[ConversationView::Unlinked->value],
+            'automated' => (int) $row[ConversationView::Automated->value],
         ];
     }
 
@@ -90,30 +100,36 @@ final readonly class ConversationsQuery
             ->get();
     }
 
-    /** @return Builder<EmailConversation> */
-    private function conversations(User $viewer, ConversationView $view, ConversationFilters $filters): Builder
+    /**
+     * @param  VisibleEmailScope<Model>  $visible
+     * @return Builder<EmailConversation>
+     */
+    private function conversations(User $viewer, VisibleEmailScope $visible, ConversationView $view, ConversationFilters $filters): Builder
     {
         $query = EmailConversation::query()
             ->where('email_conversations.workspace_id', $viewer->current_workspace_id)
-            ->whereExists($this->visibleCopiesOf($viewer, $filters)
+            ->whereExists($this->visibleCopiesOf($viewer, $visible, $filters)
                 ->whereColumn('emails.conversation_key', 'email_conversations.conversation_key')
                 ->toBase())
             ->where('email_conversations.is_automated', $view->includesAutomated())
             ->when($view->requiresOwnCopy(), fn (Builder $conversations): Builder => $conversations
-                ->whereExists($this->ownCopies($viewer)->toBase()));
+                ->whereExists($this->ownCopies($viewer, $visible)->toBase()));
 
         return match ($view) {
             ConversationView::NeedsReply => $this->needsReply($query),
-            ConversationView::AwaitingReply => $this->awaitingReply($query, $viewer),
+            ConversationView::AwaitingReply => $this->awaitingReply($query, $viewer, $visible),
             ConversationView::Unlinked => $this->unlinked($query),
             ConversationView::All, ConversationView::Automated => $query,
         };
     }
 
-    /** @return Builder<Email> */
-    private function ownCopies(User $viewer): Builder
+    /**
+     * @param  VisibleEmailScope<Model>  $visible
+     * @return Builder<Email>
+     */
+    private function ownCopies(User $viewer, VisibleEmailScope $visible): Builder
     {
-        return VisibleEmailScope::whereNotBlocked($this->delivered(Email::query()), $viewer->current_workspace_id)
+        return $visible->excludeBlocked($this->delivered(Email::query()))
             ->whereColumn('emails.workspace_id', 'email_conversations.workspace_id')
             ->whereColumn('emails.conversation_key', 'email_conversations.conversation_key')
             ->where('emails.user_id', $viewer->getKey());
@@ -134,9 +150,10 @@ final readonly class ConversationsQuery
 
     /**
      * @param  Builder<EmailConversation>  $query
+     * @param  VisibleEmailScope<Model>  $visible
      * @return Builder<EmailConversation>
      */
-    private function awaitingReply(Builder $query, User $viewer): Builder
+    private function awaitingReply(Builder $query, User $viewer, VisibleEmailScope $visible): Builder
     {
         // Whole business days on the viewer's calendar; a weekend counts back from Friday, never as one.
         $today = now()->setTimezone($viewer->effectiveTimezone());
@@ -150,7 +167,7 @@ final readonly class ConversationsQuery
             ->where(fn (Builder $unanswered): Builder => $unanswered
                 ->whereNull('email_conversations.last_external_inbound_at')
                 ->orWhereColumn('email_conversations.last_external_inbound_at', '<', 'email_conversations.last_member_outbound_at'))
-            ->whereExists($this->ownCopies($viewer)
+            ->whereExists($this->ownCopies($viewer, $visible)
                 ->where('emails.direction', EmailDirection::OUTBOUND)
                 ->whereColumn('emails.sent_at', 'email_conversations.last_member_outbound_at')
                 ->toBase());
@@ -170,10 +187,13 @@ final readonly class ConversationsQuery
             ->whereColumn('emails.conversation_key', 'email_conversations.conversation_key'));
     }
 
-    /** @return Builder<Email> */
-    private function visibleCopiesOf(User $viewer, ConversationFilters $filters): Builder
+    /**
+     * @param  VisibleEmailScope<Model>  $visible
+     * @return Builder<Email>
+     */
+    private function visibleCopiesOf(User $viewer, VisibleEmailScope $visible, ConversationFilters $filters): Builder
     {
-        $query = $this->delivered(Email::query()->withGlobalScope('visible', new VisibleEmailScope($viewer)))
+        $query = $this->delivered(Email::query()->withGlobalScope('visible', $visible))
             ->when($filters->mailboxId, fn (Builder $copies, string $mailboxId): Builder => $copies->where('emails.connected_account_id', $mailboxId))
             ->when($filters->direction, fn (Builder $copies, EmailDirection $direction): Builder => $copies->where('emails.direction', $direction))
             ->when($filters->hasAttachment !== null, fn (Builder $copies): Builder => $copies->where('emails.has_attachments', $filters->hasAttachment))
@@ -211,9 +231,10 @@ final readonly class ConversationsQuery
 
     /**
      * @param  Collection<int, EmailConversation>  $conversations
+     * @param  VisibleEmailScope<Model>  $visible
      * @return Collection<int, ConversationRow>
      */
-    private function rows(User $viewer, Collection $conversations): Collection
+    private function rows(User $viewer, VisibleEmailScope $visible, Collection $conversations): Collection
     {
         $keys = array_values($conversations->map(fn (EmailConversation $conversation): string => $conversation->conversation_key)->all());
 
@@ -221,11 +242,11 @@ final readonly class ConversationsQuery
             return new Collection;
         }
 
-        $copies = $this->newestVisibleCopies($viewer, $keys)->keyBy('conversation_key');
-        $stats = $this->visibleMessageStats($viewer, $keys);
-        $senders = $this->senderNames($viewer, $keys);
-        $records = $this->linkedRecords($viewer, $keys);
-        $unread = array_flip($this->unreadKeys($viewer, $keys));
+        $copies = $this->newestVisibleCopies($viewer, $visible, $keys)->keyBy('conversation_key');
+        $stats = $this->visibleMessageStats($viewer, $visible, $keys);
+        $senders = $this->senderNames($viewer, $visible, $keys);
+        $records = $this->linkedRecords($viewer, $visible, $keys);
+        $unread = array_flip($this->unreadKeys($viewer, $visible, $keys));
 
         return $conversations
             ->map(function (EmailConversation $conversation) use ($viewer, $copies, $stats, $senders, $records, $unread): ?ConversationRow {
@@ -291,11 +312,12 @@ final readonly class ConversationsQuery
 
     /**
      * @param  list<string>  $keys
+     * @param  VisibleEmailScope<Model>  $visible
      * @return EloquentCollection<int, Email>
      */
-    private function newestVisibleCopies(User $viewer, array $keys): EloquentCollection
+    private function newestVisibleCopies(User $viewer, VisibleEmailScope $visible, array $keys): EloquentCollection
     {
-        return $this->visibleCopiesOf($viewer, new ConversationFilters)
+        return $this->visibleCopiesOf($viewer, $visible, new ConversationFilters)
             ->whereIn('emails.conversation_key', $keys)
             ->selectRaw('distinct on (emails.conversation_key) emails.*')
             ->withRecordLinkState()
@@ -346,12 +368,13 @@ final readonly class ConversationsQuery
 
     /**
      * @param  list<string>  $keys
+     * @param  VisibleEmailScope<Model>  $visible
      * @return Collection<string, object{message_count: int|string, last_message_at: string, has_attachments: bool}>
      */
-    private function visibleMessageStats(User $viewer, array $keys): Collection
+    private function visibleMessageStats(User $viewer, VisibleEmailScope $visible, array $keys): Collection
     {
         /** @var Collection<string, object{message_count: int|string, last_message_at: string, has_attachments: bool}> */
-        return $this->visibleCopiesOf($viewer, new ConversationFilters)
+        return $this->visibleCopiesOf($viewer, $visible, new ConversationFilters)
             ->whereIn('emails.conversation_key', $keys)
             ->toBase()
             ->select('emails.conversation_key')
@@ -365,25 +388,27 @@ final readonly class ConversationsQuery
 
     /**
      * @param  list<string>  $keys
+     * @param  VisibleEmailScope<Model>  $visible
      * @return Builder<Email>
      */
-    private function visibleCopyIds(User $viewer, array $keys): Builder
+    private function visibleCopyIds(User $viewer, VisibleEmailScope $visible, array $keys): Builder
     {
-        return $this->visibleCopiesOf($viewer, new ConversationFilters)
+        return $this->visibleCopiesOf($viewer, $visible, new ConversationFilters)
             ->whereIn('emails.conversation_key', $keys)
             ->select('emails.id');
     }
 
     /**
      * @param  list<string>  $keys
+     * @param  VisibleEmailScope<Model>  $visible
      * @return array<string, list<string>>
      */
-    private function senderNames(User $viewer, array $keys): array
+    private function senderNames(User $viewer, VisibleEmailScope $visible, array $keys): array
     {
         $ownAddresses = $this->ownAddresses($viewer);
         $senders = DB::table('email_participants')
             ->join('emails', 'emails.id', '=', 'email_participants.email_id')
-            ->whereIn('email_participants.email_id', $this->visibleCopyIds($viewer, $keys)->toBase())
+            ->whereIn('email_participants.email_id', $this->visibleCopyIds($viewer, $visible, $keys)->toBase())
             ->where('email_participants.role', EmailParticipantRole::FROM->value)
             ->select('emails.conversation_key', 'email_participants.name', 'email_participants.email_address')
             ->latest('emails.sent_at')
@@ -424,14 +449,15 @@ final readonly class ConversationsQuery
 
     /**
      * @param  list<string>  $keys
+     * @param  VisibleEmailScope<Model>  $visible
      * @return array<string, list<array{type: string, id: string, name: string}>>
      */
-    private function linkedRecords(User $viewer, array $keys): array
+    private function linkedRecords(User $viewer, VisibleEmailScope $visible, array $keys): array
     {
         $order = [CrmEntity::Company, CrmEntity::Opportunity, CrmEntity::People];
         $links = DB::table('emailables')
             ->join('emails', 'emails.id', '=', 'emailables.email_id')
-            ->whereIn('emailables.email_id', $this->visibleCopyIds($viewer, $keys)->toBase())
+            ->whereIn('emailables.email_id', $this->visibleCopyIds($viewer, $visible, $keys)->toBase())
             ->whereIn('emailables.emailable_type', array_map(fn (CrmEntity $entity): string => $entity->value, $order))
             ->distinct()
             ->get(['emails.conversation_key', 'emailables.emailable_type', 'emailables.emailable_id']);
@@ -481,11 +507,12 @@ final readonly class ConversationsQuery
 
     /**
      * @param  list<string>  $keys
+     * @param  VisibleEmailScope<Model>  $visible
      * @return list<string>
      */
-    private function unreadKeys(User $viewer, array $keys): array
+    private function unreadKeys(User $viewer, VisibleEmailScope $visible, array $keys): array
     {
-        return array_values($this->visibleCopiesOf($viewer, new ConversationFilters)
+        return array_values($this->visibleCopiesOf($viewer, $visible, new ConversationFilters)
             ->whereIn('emails.conversation_key', $keys)
             ->where('emails.direction', EmailDirection::INBOUND)
             ->where(fn (Builder $reached): Builder => $reached
