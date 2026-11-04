@@ -219,18 +219,23 @@ it('puts the caret on the recipient in a new email and on the message in an addr
         ->assertNoJavaScriptErrors();
 });
 
-it('opens the composer across a phone screen with every field on it', function (): void {
-    $this->withVite();
-
-    $user = User::factory()->withWorkspace()->create();
-    $workspace = $user->currentWorkspace;
+function connectSendingMailbox(User $user): void
+{
     ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
         'user_id' => $user->id,
-        'workspace_id' => $workspace->id,
+        'workspace_id' => $user->currentWorkspace->id,
         'email_address' => 'olivia@acme.example',
         'sync_cursor' => 'history-done',
         'last_synced_at' => now(),
     ]));
+}
+
+it('keeps mass sending in reach on a phone by leaving the composer full screen', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    connectSendingMailbox($user);
 
     loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")
@@ -238,8 +243,26 @@ it('opens the composer across a phone screen with every field on it', function (
         ->navigate("/app/{$workspace->slug}/email")
         ->click(__('filament/concerns/email-compose.actions.compose.label'))
         ->waitForText(__('filament/emails/composer.title'))
+        ->assertVisible('#composer-mass-send-toggle')
+        ->assertMissing('[aria-label="'.__('filament/emails/composer.actions.shrink').'"]')
+        ->assertNoJavaScriptErrors();
+});
+
+it('fits a shrunk composer onto a phone screen with every field on it', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    connectSendingMailbox($user);
+
+    loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/email")
+        ->click(__('filament/concerns/email-compose.actions.compose.label'))
+        ->waitForText(__('filament/emails/composer.title'))
         ->click('[aria-label="'.__('filament/emails/composer.actions.shrink').'"]')
         ->assertVisible('[aria-label="'.__('filament/emails/composer.actions.expand').'"]')
+        ->resize(393, 852)
         ->wait(0.5)
         ->assertScript("(() => { const field = document.querySelector('[role=\"combobox\"]').getBoundingClientRect(); return field.left >= 0 && field.right <= innerWidth; })()", true)
         ->assertNoJavaScriptErrors();

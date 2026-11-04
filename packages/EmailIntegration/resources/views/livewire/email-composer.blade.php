@@ -201,7 +201,8 @@
                                     wire:click="toggleExpand"
                                     aria-label="{{ $expandLabel }}"
                                     x-tooltip="{ content: @js($expandLabel), theme: $store.theme }"
-                                    class="{{ $chromeButton }}"
+                                    {{-- A phone shows both sizes full screen, so shrinking would only drop mass sending. --}}
+                                    class="{{ $chromeButton }} max-sm:hidden"
                                 >
                                     <x-dynamic-component
                                         :component="$isExpanded ? 'heroicon-m-arrows-pointing-in' : 'heroicon-m-arrows-pointing-out'"
