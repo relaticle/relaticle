@@ -1,9 +1,6 @@
 @props(['row', 'selectable' => false])
 
 @php
-    use App\Filament\Resources\CompanyResource;
-    use App\Filament\Resources\OpportunityResource;
-    use App\Filament\Resources\PeopleResource;
     use Filament\Support\Facades\FilamentTimezone;
 
     $opens = $selectable && $row->access->showsBody();
@@ -27,12 +24,6 @@
         ->take(2)
         ->map(fn (string $word): string => mb_strtoupper(mb_substr($word, 0, 1)))
         ->implode('');
-    $recordUrl = fn (array $record): string => match ($record['type']) {
-        'company' => CompanyResource::getUrl('view', ['record' => $record['id']]),
-        'opportunity' => OpportunityResource::getUrl('view', ['record' => $record['id']]),
-        'people' => PeopleResource::getUrl('view', ['record' => $record['id']]),
-    };
-    $chipClass = 'pointer-events-auto max-w-[9rem] items-center truncate rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium leading-4 text-gray-600 hover:bg-gray-200 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10';
 @endphp
 
 <div
@@ -101,10 +92,10 @@
             <span class="flex shrink-0 items-center gap-1">
                 @forelse ($row->records as $index => $record)
                     @if ($index < 2)
-                        <a
-                            href="{{ $recordUrl($record) }}"
-                            @class([$chipClass, 'inline-flex' => $index === 0, 'hidden sm:inline-flex' => $index === 1])
-                        >{{ $record['name'] }}</a>
+                        <x-email-integration::record-chip
+                            :record="$record"
+                            :class="\Illuminate\Support\Arr::toCssClasses(['pointer-events-auto', 'inline-flex' => $index === 0, 'hidden sm:inline-flex' => $index === 1])"
+                        />
                     @endif
                 @empty
                     <span class="inline-flex items-center rounded-md px-1.5 py-0.5 text-[11px] font-medium leading-4 text-gray-400 ring-1 ring-inset ring-gray-200 dark:text-gray-500 dark:ring-white/10">

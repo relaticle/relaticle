@@ -25,4 +25,8 @@ return [
         'unlinked' => 'Non liée',
         'more_records' => '+:count',
     ],
+    'drawer' => [
+        'reply' => 'Répondre',
+        'source' => 'Visible via la boîte mail de :name',
+    ],
 ];

@@ -19,10 +19,12 @@ use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPageTab;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Filament\Concerns\HasConversationReader;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBlocklist;
+use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailConversation;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailRead;
@@ -32,7 +34,7 @@ use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
 
 use function Pest\Laravel\actingAs;
 
-mutates(EmailInboxPage::class, ConversationsQuery::class, ConversationView::class, PreferredEmailCopyService::class);
+mutates(EmailInboxPage::class, HasConversationReader::class, ConversationsQuery::class, ConversationView::class, PreferredEmailCopyService::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withWorkspace()->create();
@@ -327,10 +329,10 @@ it('opens the reader only on a copy the viewer may see', function (): void {
         ->call('setView', ConversationView::All->value)
         ->call('selectEmail', $hidden->id)
         ->assertSet('selectedEmailId', null)
-        ->assertDontSeeHtml('fi-email-reader-panel')
+        ->assertDontSeeHtml('fi-email-reader-drawer')
         ->call('selectEmail', $own->id)
         ->assertSet('selectedEmailId', $own->id)
-        ->assertSeeHtml('fi-email-reader-panel');
+        ->assertSeeHtml('fi-email-reader-drawer');
 });
 
 it('keeps a conversation out of Needs reply when the viewer own copy is blocked by their mailbox', function (): void {
@@ -452,7 +454,7 @@ it('opens the viewer own copy when a teammate copy of the newest message synced 
 
     $page->call('selectEmail', $own->id)
         ->assertSet('selectedEmailId', $own->id)
-        ->assertSeeHtml('fi-email-reader-panel');
+        ->assertSeeHtml('fi-email-reader-drawer');
 });
 
 it('grants the most open share when copies of one message are shared at different levels', function (): void {
@@ -513,4 +515,45 @@ it('stops each view count at the cap and shows it as 99+', function (): void {
 
     expect($page->instance()->viewCounts['needs_reply'])->toBe(ConversationView::COUNT_CAP);
     $page->assertSeeHtml('>99+</span>');
+});
+
+it('shows every visible message of the conversation oldest first and loads bodies on expand', function (): void {
+    $first = conversationsPageMessage($this->ownerMailbox, 'conv-thread', 'brian@airbnb.test', ['subject' => 'Pilot scope', 'snippet' => 'First pass at scope', 'sent_at' => now()->subHours(3)]);
+    EmailBody::factory()->create(['email_id' => $first->id, 'body_html' => null, 'body_text' => 'Body of the first message']);
+    $reply = conversationsPageMessage($this->ownerMailbox, 'conv-thread', 'ana@acme.test', ['subject' => 'Re: Pilot scope', 'snippet' => 'Looks good', 'sent_at' => now()->subHours(2)]);
+    EmailBody::factory()->create(['email_id' => $reply->id, 'body_html' => null, 'body_text' => 'Looks good']);
+    $last = conversationsPageMessage($this->ownerMailbox, 'conv-thread', 'brian@airbnb.test', ['subject' => 'Re: Pilot scope', 'snippet' => 'One more change', 'sent_at' => now()->subHour(), 'in_reply_to' => $reply->rfc_message_id]);
+    EmailBody::factory()->create(['email_id' => $last->id, 'body_html' => null, 'body_text' => 'One more change']);
+
+    livewire(EmailInboxPage::class)
+        ->call('selectEmail', $last->id)
+        ->assertSet('expandedEmailIds', [$reply->id, $last->id])
+        ->assertSeeInOrder(['First pass at scope', 'Looks good', 'One more change'])
+        ->assertDontSee('Body of the first message')
+        ->call('expandMessage', $first->id)
+        ->assertSee('Body of the first message');
+});
+
+it('marks read only the messages the viewer can open', function (): void {
+    $earlier = conversationsPageMessage($this->ownerMailbox, 'conv-mixed-tier', 'brian@airbnb.test', ['sent_at' => now()->subHours(2)]);
+    $mine = conversationsPageMessage($this->ownerMailbox, 'conv-mixed-tier', 'brian@airbnb.test', ['sent_at' => now()->subHour()]);
+    $bens = conversationsPageMessage($this->teammateMailbox, 'conv-mixed-tier', 'olivia@airbnb.test', ['privacy_tier' => EmailPrivacyTier::METADATA_ONLY]);
+    $this->company->emails()->attach([$mine->id, $bens->id]);
+
+    livewire(EmailInboxPage::class)->call('selectEmail', $mine->id);
+
+    expect(EmailRead::query()->where('user_id', $this->owner->id)->pluck('email_id')->sort()->values()->all())
+        ->toBe(collect([$earlier->id, $mine->id])->sort()->values()->all());
+});
+
+it('expands only messages of the open conversation', function (): void {
+    $open = conversationsPageMessage($this->ownerMailbox, 'conv-open', 'brian@airbnb.test');
+    $elsewhere = conversationsPageMessage($this->ownerMailbox, 'conv-elsewhere', 'kim@notion.test');
+    EmailBody::factory()->create(['email_id' => $elsewhere->id, 'body_html' => null, 'body_text' => 'Another conversation body']);
+
+    livewire(EmailInboxPage::class)
+        ->call('selectEmail', $open->id)
+        ->call('expandMessage', $elsewhere->id)
+        ->assertSet('expandedEmailIds', [$open->id])
+        ->assertDontSee('Another conversation body');
 });

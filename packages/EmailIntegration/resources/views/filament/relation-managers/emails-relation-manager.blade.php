@@ -134,6 +134,9 @@
             <x-email-integration::reader-drawer
                 :email="$this->selectedEmail"
                 :pending-access-requests="$this->pendingAccessRequests"
+                :thread="$this->thread"
+                :bodies="$this->expandedBodies"
+                :row="$this->selectedConversationRow"
             />
         @else
             <x-email-integration::reader-overlay

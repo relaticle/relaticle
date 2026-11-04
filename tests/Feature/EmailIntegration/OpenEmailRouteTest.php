@@ -158,7 +158,8 @@ it('renders one reader when the Emails page opens a resolved link', function ():
 
     $html = $this->followingRedirects()->get(route('email.open', $email))->assertOk()->getContent();
 
-    expect(substr_count($html, 'fi-email-reader-panel'))->toBe(1);
+    expect(substr_count($html, 'fi-email-reader-drawer'))->toBe(1)
+        ->and(substr_count($html, 'fi-email-reader-panel'))->toBe(0);
 });
 
 it('leaves a resolved link to the record Emails tab instead of the panel reader', function (bool $conversations, int $panelReaders): void {

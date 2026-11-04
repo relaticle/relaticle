@@ -99,10 +99,12 @@
     @endif
 
     @if ($this->showsConversations)
-        <x-email-integration::reader-overlay
+        <x-email-integration::reader-drawer
             :email="$this->selectedEmail"
             :pending-access-requests="$this->pendingAccessRequests"
-            layer="z-50"
+            :thread="$this->thread"
+            :bodies="$this->expandedBodies"
+            :row="$this->selectedConversationRow"
         />
     @endif
 

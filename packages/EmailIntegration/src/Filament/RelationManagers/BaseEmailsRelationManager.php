@@ -23,9 +23,11 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Relaticle\EmailIntegration\Data\ConversationFilters;
 use Relaticle\EmailIntegration\Data\ConversationPage;
+use Relaticle\EmailIntegration\Data\ConversationRow;
 use Relaticle\EmailIntegration\Enums\ConversationView;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Actions\ConnectMailboxAction;
+use Relaticle\EmailIntegration\Filament\Concerns\HasConversationReader;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConversationsFlag;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailComposeActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
@@ -48,6 +50,7 @@ use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
  */
 abstract class BaseEmailsRelationManager extends RelationManager
 {
+    use HasConversationReader;
     use HasConversationsFlag;
     use HasEmailComposeActions;
     use HasEmailReaderActions;
@@ -104,7 +107,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
         parent::mount();
 
         if ($this->selectedEmailId !== null && $this->showsConversations()) {
-            $this->openEmailReader($this->selectedEmailId);
+            $this->openConversationReader($this->selectedEmailId);
         }
     }
 
@@ -136,7 +139,8 @@ abstract class BaseEmailsRelationManager extends RelationManager
         }
 
         $this->conversationsCursor = null;
-        unset($this->emails, $this->conversations, $this->automatedCount, $this->selectedEmail);
+        $this->expandedEmailIds = [];
+        unset($this->emails, $this->conversations, $this->automatedCount, $this->selectedEmail, $this->thread, $this->expandedBodies, $this->selectedConversationRow);
     }
 
     #[Computed]
@@ -353,6 +357,12 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
     public function selectEmail(string $id): void
     {
+        if ($this->showsConversations()) {
+            $this->openConversationReader($id);
+
+            return;
+        }
+
         $this->openEmailReader($id);
     }
 
@@ -371,6 +381,12 @@ abstract class BaseEmailsRelationManager extends RelationManager
         $this->resetPage();
         $this->conversationsCursor = null;
         unset($this->emails, $this->conversations);
+    }
+
+    /** @return list<ConversationRow> */
+    protected function conversationRows(): array
+    {
+        return $this->conversations->rows;
     }
 
     private function moveConversationsCursor(?string $cursor): void

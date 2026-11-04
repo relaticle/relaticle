@@ -225,4 +225,8 @@ return [
         'unlinked' => 'Unlinked',
         'more_records' => '+:count',
     ],
+    'drawer' => [
+        'reply' => 'Reply',
+        'source' => 'Visible through :name\'s mailbox',
+    ],
 ];

@@ -1,4 +1,4 @@
-@props(['record'])
+@props(['record', 'threaded' => false])
 
 @php
     use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -79,7 +79,7 @@
      not be held back behind it. --}}
 <div
     x-data="{ ready: @js($safeHtml === null) }"
-    class="flex min-h-0 flex-1 flex-col"
+    @class(['flex flex-col', 'min-h-0 flex-1' => ! $threaded])
 >
 
     {{-- ── Internal email banner ──────────────────────────────────────────── --}}
@@ -94,7 +94,8 @@
          Two quiet rows, subject then who and when, instead of one block that
          crams sender, address, date, badges and every recipient together. --}}
 
-    {{-- Subject row: title, category pill, and sharing actions. --}}
+    {{-- Subject row: title, category pill, and sharing actions. A thread shows them once, in the drawer header. --}}
+    @unless ($threaded)
     <div class="flex shrink-0 items-start gap-3 border-b border-gray-100 dark:border-gray-800 px-4 py-3 pr-12 sm:px-6 sm:pr-14">
         {{-- Back to the list on narrow viewports, where the two panes alternate.
              The relation-manager ViewAction has no selectedEmailId; hide the control there. --}}
@@ -133,6 +134,7 @@
             </div>
         </div>
     </div>
+    @endunless
 
     {{-- Sender, recipients and the reply actions --}}
     <div
@@ -303,7 +305,7 @@
     {{-- `motion-safe:scroll-smooth` is what animates the jump to a new draft: the
          scroll is a plain scrollTop assignment, which the browser eases when the
          element opts in, and the variant drops it for reduced-motion users. --}}
-    <div class="flex min-h-0 flex-1 flex-col overflow-y-auto motion-safe:scroll-smooth" data-email-scroll-region>
+    <div @class(['flex flex-col', 'min-h-0 flex-1 overflow-y-auto motion-safe:scroll-smooth' => ! $threaded]) @unless ($threaded) data-email-scroll-region @endunless>
 
     {{-- ── Attachments ─────────────────────────────────────────────────────── --}}
     @if ($canViewBody && $downloadAttachments->isNotEmpty())
@@ -481,7 +483,7 @@
          The real composer, docked under the message it answers rather than
          floating over it: same fields, toolbar, attachments, templates and
          signatures as Compose. The reply icons above open it. --}}
-    @if ($canViewBody)
+    @if ($canViewBody && ! $threaded)
         @livewire('email-integration.composer', ['dock' => 'inline'], key('inline-reply-composer'))
     @endif
 
