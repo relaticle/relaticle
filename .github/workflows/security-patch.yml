@@ -93,7 +93,9 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.token.outputs.token }}
         run: |
-          if [[ -n "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')" ]]; then
+          waiting="$(gh pr list --head "$BRANCH" --state open --json autoMergeRequest --jq '.[] | select(.autoMergeRequest == null) | "yes"')"
+
+          if [[ -n "$waiting" ]]; then
             gh pr merge "$BRANCH" --auto --merge
           fi
 

@@ -71,7 +71,7 @@ jobs:
         run: gh release create "$NEXT" --repo "$GITHUB_REPOSITORY" --target "$MERGE_SHA" --title "$NEXT" --generate-notes --latest
 
       - name: Explain the skipped release
-        if: steps.version.outputs.unreleased != '1'
+        if: fromJSON(steps.version.outputs.unreleased) > 1
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
