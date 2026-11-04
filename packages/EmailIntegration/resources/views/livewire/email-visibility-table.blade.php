@@ -7,7 +7,7 @@
     </div>
 
     <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
-        <table class="ei-visibility-table w-full table-auto divide-y divide-gray-200 text-sm dark:divide-white/10">
+        <table class="ei-stacked-table w-full table-auto divide-y divide-gray-200 text-sm dark:divide-white/10">
             <thead class="bg-gray-50 dark:bg-white/5">
                 <tr>
                     <th class="px-4 py-3 text-start font-medium text-gray-950 dark:text-white">
@@ -38,7 +38,7 @@
                             'bg-gray-50/70 dark:bg-white/[0.02]' => $row['is_system'],
                         ])
                     >
-                        <td class="ei-visibility-address px-4 py-3 font-medium text-gray-950 dark:text-white">
+                        <td class="ei-stacked-table-heading px-4 py-3 font-medium text-gray-950 dark:text-white">
                             {{ $row['address'] }}
                         </td>
                         <td
@@ -83,7 +83,7 @@
                         >
                             {{ $row['source'] }}
                         </td>
-                        <td class="ei-visibility-actions px-4 py-3 text-end">
+                        <td class="ei-stacked-table-actions px-4 py-3 text-end">
                             @if (! $row['is_system'])
                                 {{ ($this->deleteVisibilityEntryAction)(['entry_id' => $row['entry_id']]) }}
                             @endif

@@ -25,8 +25,8 @@ it('stacks each visibility entry into a card with a full-width search on a phone
         ->navigate("/app/{$workspace->slug}/workspace/email/privacy")
         ->waitForText('acme.example')
         ->assertScript('document.documentElement.scrollWidth <= innerWidth', true)
-        ->assertScript("getComputedStyle(document.querySelector('.ei-visibility-table > thead')).display", 'none')
-        ->assertScript("getComputedStyle(document.querySelector('.ei-visibility-table td[data-label]'), '::before').content !== 'none'", true)
+        ->assertScript("getComputedStyle(document.querySelector('.ei-stacked-table > thead')).display", 'none')
+        ->assertScript("getComputedStyle(document.querySelector('.ei-stacked-table td[data-label]'), '::before').content !== 'none'", true)
         ->assertScript("(() => { const field = document.querySelector('.ei-visibility-search .fi-ta-search-field').getBoundingClientRect(); return Math.round(field.width) === document.querySelector('.ei-visibility-search').clientWidth; })()", true)
         ->assertNoJavaScriptErrors();
 });

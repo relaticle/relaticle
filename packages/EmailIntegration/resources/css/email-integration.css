@@ -271,8 +271,8 @@
     @apply w-full max-w-xs max-sm:max-w-none;
 }
 
-/* Below sm a row is a card, as list tables stack: the address heads it, then one label and value per line. */
-.ei-visibility-table {
+/* Below sm a row is a card, as list tables stack: the heading cell heads it, then one label and value per line. */
+.ei-stacked-table {
     @apply max-sm:block;
 
     & > thead {
@@ -301,11 +301,11 @@
         }
     }
 
-    & .ei-visibility-address {
+    & .ei-stacked-table-heading {
         @apply max-sm:pe-14 max-sm:pb-2;
     }
 
-    & .ei-visibility-actions {
+    & .ei-stacked-table-actions {
         @apply max-sm:absolute max-sm:end-2 max-sm:top-2 max-sm:p-0;
     }
 }
@@ -381,4 +381,28 @@
 /* Empty picker copy is a caption. The same row style as a real choice reads as a signature or template named "No …". */
 .composer-picker-note {
     @apply px-2 py-1.5 text-start text-xs italic text-gray-400 dark:text-gray-500;
+}
+
+/* A mailbox's settings on a phone: its actions stay beside the address, and the tabs drop their own frame so the
+   blocklist and signatures are not boxed three deep. */
+.ei-account-settings {
+    & > .fi-section-header .fi-section-header-content {
+        @apply max-sm:flex-nowrap max-sm:items-start;
+
+        & > .fi-section-header-text-ctn {
+            @apply max-sm:min-w-0 max-sm:flex-1;
+        }
+    }
+
+    & > .fi-section-content-ctn > .fi-section-content {
+        @apply max-sm:p-4;
+    }
+
+    & .fi-sc-tabs.fi-contained {
+        @apply max-sm:rounded-none max-sm:bg-transparent max-sm:shadow-none max-sm:ring-0 dark:max-sm:bg-transparent;
+
+        & .fi-sc-tabs-tab.fi-active {
+            @apply max-sm:px-0 max-sm:pb-0;
+        }
+    }
 }
