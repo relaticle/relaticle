@@ -64,6 +64,7 @@ it('opens a row menu as a sheet along the bottom edge of a phone', function (): 
         ->wait(0.5)
         ->assertScript('(() => { const r = '.OPEN_SHEET.'.getBoundingClientRect(); return r.left === 0 && r.right === innerWidth && Math.round(r.bottom) === innerHeight; })()', true)
         ->assertScript(SHEET_HOLDS_BOTTOM_EDGE, true)
+        ->assertScript('getComputedStyle(document.documentElement).overflowY', 'hidden')
         ->assertNoJavaScriptErrors();
 });
 
