@@ -14,6 +14,7 @@ use Relaticle\EmailIntegration\Actions\RecordMailboxHealth;
 use Relaticle\EmailIntegration\Console\Commands\CheckMailboxHealthCommand;
 use Relaticle\EmailIntegration\Data\ConnectAccountData;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Enums\MailboxHealth;
 use Relaticle\EmailIntegration\Enums\SyncErrorReason;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
@@ -97,6 +98,7 @@ it('reports a mailbox in a workspace without paid access as paused, never stale'
 it('returns a reconnected mailbox to healthy at once', function (): void {
     $account = healthMailbox($this->owner, ['status' => EmailAccountStatus::REAUTH_REQUIRED, 'last_error' => SyncErrorReason::GoogleMailDisabled->value]);
     $this->artisan('email:check-mailbox-health');
+    $account->forceFill(['health_changed_at' => now()->subDay(), 'health_notified_at' => now()->subDay()])->save();
     Bus::fake();
 
     resolve(ConnectAccountAction::class)->execute(new ConnectAccountData(
@@ -108,7 +110,9 @@ it('returns a reconnected mailbox to healthy at once', function (): void {
     ));
 
     expect($account->fresh()->health)->toBe(MailboxHealth::Healthy)
-        ->and($account->fresh()->health_reason)->toBeNull();
+        ->and($account->fresh()->health_reason)->toBeNull()
+        ->and($account->fresh()->health_changed_at->equalTo(now()))->toBeTrue()
+        ->and($account->fresh()->health_notified_at)->toBeNull();
 });
 
 it('drops a disconnected mailbox from the watchdog and the attention list', function (): void {
@@ -227,3 +231,126 @@ it('gives a mailbox whose workspace regains access a full day to sync before cal
     expect($account->fresh()->health)->toBe(MailboxHealth::Stale);
     Notification::assertSentToTimes($workspace->owner, MailboxHealthNotification::class, 2);
 });
+
+function reconnect(User $owner, ConnectedAccount $account): void
+{
+    resolve(ConnectAccountAction::class)->execute(new ConnectAccountData(
+        userId: (string) $owner->id, workspaceId: (string) $account->workspace_id,
+        provider: $account->provider->value, emailAddress: $account->email_address,
+        displayName: $account->display_name, providerAccountId: $account->provider_account_id,
+        accessToken: 'new-access', refreshToken: 'new-refresh', tokenExpiresAt: now()->addHour(),
+        hasCalendar: false, hasSend: true,
+    ));
+}
+
+it('records a mailbox that was already failing before health tracking without telling anyone', function (): void {
+    Notification::fake();
+    $admin = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+    $this->workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
+    $account = healthMailbox($this->owner, ['status' => EmailAccountStatus::REAUTH_REQUIRED, 'health_changed_at' => null]);
+
+    $this->artisan('email:check-mailbox-health');
+
+    expect($account->fresh()->health)->toBe(MailboxHealth::ReauthRequired)
+        ->and($account->fresh()->health_changed_at)->toBeNull()
+        ->and($account->fresh()->health_notified_at->equalTo(now()))->toBeTrue();
+
+    $this->travel(73)->hours();
+    $this->artisan('email:check-mailbox-health');
+
+    Notification::assertNothingSent();
+});
+
+it('tells the owner when a mailbox connected after health tracking fails', function (): void {
+    Notification::fake();
+    Bus::fake();
+    resolve(ConnectAccountAction::class)->execute(new ConnectAccountData(
+        userId: (string) $this->owner->id, workspaceId: (string) $this->workspace->id,
+        provider: EmailProvider::GMAIL->value, emailAddress: 'fresh@acme.test', displayName: 'Fresh',
+        providerAccountId: 'fresh-id', accessToken: 'access', refreshToken: 'refresh', tokenExpiresAt: now()->addHour(),
+        hasCalendar: false, hasSend: true,
+    ));
+    $account = ConnectedAccount::query()->where('email_address', 'fresh@acme.test')->sole();
+
+    expect($account->health_changed_at?->equalTo(now()))->toBeTrue();
+
+    $account->update(['status' => EmailAccountStatus::ERROR]);
+    $this->artisan('email:check-mailbox-health');
+
+    Notification::assertSentToTimes($this->owner, MailboxHealthNotification::class, 1);
+});
+
+it('reads the mailbox status as it stands when the check reaches it', function (): void {
+    Notification::fake();
+    $first = healthMailbox($this->owner, ['status' => EmailAccountStatus::ERROR, 'email_address' => 'a@acme.test']);
+    $second = healthMailbox($this->owner, ['status' => EmailAccountStatus::ERROR, 'email_address' => 'b@acme.test']);
+    $recovered = null;
+    ConnectedAccount::saved(function (ConnectedAccount $saved) use ($first, $second, &$recovered): void {
+        if ($recovered !== null) {
+            return;
+        }
+
+        $recovered = $saved->is($first) ? $second : $first;
+        ConnectedAccount::query()->whereKey($recovered->id)->update(['status' => EmailAccountStatus::ACTIVE->value]);
+    });
+
+    $this->artisan('email:check-mailbox-health');
+
+    expect($recovered->fresh()->health)->toBe(MailboxHealth::Healthy);
+    Notification::assertSentToTimes($this->owner, MailboxHealthNotification::class, 1);
+});
+
+it('does not repeat the billing notices when the owner reconnects during a pause', function (): void {
+    Notification::fake();
+    Bus::fake();
+    withHostedBilling();
+    $workspace = BillingStatusFixture::workspace();
+    $admin = User::factory()->create(['current_workspace_id' => $workspace->id]);
+    $workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $workspace->id, 'user_id' => $workspace->user_id, 'sync_cursor' => 'cursor',
+    ]));
+    $this->artisan('email:check-mailbox-health');
+
+    reconnect($workspace->owner, $account);
+    $this->travel(15)->minutes();
+    $this->artisan('email:check-mailbox-health');
+
+    expect($account->fresh()->health)->toBe(MailboxHealth::PausedBilling);
+    Notification::assertSentToTimes($workspace->owner, MailboxHealthNotification::class, 1);
+    Notification::assertSentToTimes($admin, MailboxHealthNotification::class, 1);
+});
+
+it('keeps the health it was sent for when the mailbox recovers before delivery', function (): void {
+    $account = healthMailbox($this->owner, ['health' => MailboxHealth::Stale, 'email_address' => 'stale@acme.test']);
+    $notice = new MailboxHealthNotification($account, MailboxHealth::Stale, forAdmins: false);
+    ConnectedAccount::query()->whereKey($account->id)->update(['health' => MailboxHealth::Healthy->value]);
+
+    $this->owner->notify($notice);
+
+    expect(MailboxHealthNotification::present($this->owner->notifications()->sole())->getTitle())
+        ->toBe(__('filament/notifications/mailbox-health.stale.owner.title'));
+});
+
+it('writes names into the mail without escaping them twice', function (): void {
+    $this->owner->forceFill(['name' => "Liam O'Brien"])->save();
+    $account = healthMailbox($this->owner, ['health' => MailboxHealth::ReauthRequired]);
+    $admin = User::factory()->create(['name' => "Aoife O'Neill"]);
+
+    $mail = (new MailboxHealthNotification($account->fresh(), MailboxHealth::ReauthRequired, forAdmins: true))->toMail($admin);
+
+    expect(implode(' ', $mail->introLines))->toContain("Liam O'Brien")->not->toContain('&#039;')
+        ->and($mail->greeting)->toContain("Aoife O'Neill");
+});
+
+it('renders owner and admin copy for every unhealthy state', function (MailboxHealth $health, bool $forAdmins): void {
+    $account = healthMailbox($this->owner, ['health' => $health, 'email_address' => 'copy@acme.test']);
+
+    $this->owner->notify(new MailboxHealthNotification($account, $health, $forAdmins));
+    $notice = MailboxHealthNotification::present($this->owner->notifications()->sole());
+
+    expect($notice->getTitle())->not->toStartWith('filament/')
+        ->and($notice->getBody())->toContain('copy@acme.test')->not->toContain('filament/');
+})->with([
+    MailboxHealth::Stale, MailboxHealth::Error, MailboxHealth::ReauthRequired, MailboxHealth::PausedBilling,
+])->with(['owner' => false, 'admins' => true]);

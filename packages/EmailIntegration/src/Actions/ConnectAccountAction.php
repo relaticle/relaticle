@@ -81,7 +81,7 @@ final readonly class ConnectAccountAction
             $account = ConnectedAccount::withTrashed()->updateOrCreate($lookup, $values);
 
             if (! $importStillDraining) {
-                $this->recordMailboxHealth->execute($account, MailboxHealth::Healthy);
+                $this->recordHealthAfterConnect($account);
             }
 
             $needsHistoryImport = ! $importStillDraining
@@ -110,6 +110,14 @@ final readonly class ConnectAccountAction
         }
 
         return $account;
+    }
+
+    // A reconnect cannot lift a billing pause, so it keeps that state and its sent notices.
+    private function recordHealthAfterConnect(ConnectedAccount $account): void
+    {
+        $hasHostedAccess = ConnectedAccount::withTrashed()->whereKey($account->getKey())->inWorkspaceWithHostedAccess()->exists();
+
+        $this->recordMailboxHealth->execute($account, $hasHostedAccess ? MailboxHealth::Healthy : MailboxHealth::PausedBilling);
     }
 
     // The first account a user connects becomes their default. This also

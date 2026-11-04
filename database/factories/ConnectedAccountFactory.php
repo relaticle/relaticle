@@ -35,6 +35,7 @@ final class ConnectedAccountFactory extends Factory
             'access_token' => 'fake-token',
             'is_default' => false,
             'status' => EmailAccountStatus::ACTIVE,
+            'health_changed_at' => now()->subMonth(),
         ];
     }
 

@@ -22,6 +22,7 @@ final class MailboxHealthNotification extends InboxNotification
 
     public function __construct(
         private readonly ConnectedAccount $account,
+        private readonly MailboxHealth $health,
         private readonly bool $forAdmins,
     ) {}
 
@@ -54,7 +55,7 @@ final class MailboxHealthNotification extends InboxNotification
     public function facts(): array
     {
         return [
-            'health' => $this->account->health->value,
+            'health' => $this->health->value,
             'mailbox' => $this->account->email_address,
             'owner' => $this->account->user->name ?? '',
             'for_admins' => $this->forAdmins,
@@ -64,14 +65,14 @@ final class MailboxHealthNotification extends InboxNotification
     public function toMail(User $notifiable): MailMessage
     {
         $facts = $this->facts();
-        $url = self::remedyUrl($this->account->health, $this->forAdmins, $this->account->workspace);
+        $url = self::remedyUrl($this->health, $this->forAdmins, $this->account->workspace);
 
         $mail = (new MailMessage)
             ->subject(__(self::copyKey($facts, 'title')))
             ->greeting(__(self::LANG.'.mail.greeting', ['name' => $notifiable->name]))
             ->line(__(self::copyKey($facts, 'body'), self::replacements($facts)));
 
-        return $url === null ? $mail : $mail->action(__(self::actionKey($this->account->health)), $url);
+        return $url === null ? $mail : $mail->action(__(self::actionKey($this->health)), $url);
     }
 
     public static function present(NotificationRow $row): FilamentNotification
@@ -84,7 +85,7 @@ final class MailboxHealthNotification extends InboxNotification
         $notification = FilamentNotification::make((string) $row->getKey())
             ->icon(Heroicon::OutlinedExclamationTriangle)
             ->title(__(self::copyKey($facts, 'title')))
-            ->body(__(self::copyKey($facts, 'body'), self::replacements($facts)))
+            ->body(__(self::copyKey($facts, 'body'), array_map(e(...), self::replacements($facts))))
             ->actions($url === null ? [] : [
                 Action::make('fixMailbox')
                     ->label(__(self::actionKey($health)))
@@ -128,8 +129,8 @@ final class MailboxHealthNotification extends InboxNotification
     private static function replacements(array $facts): array
     {
         return [
-            'mailbox' => e((string) data_get($facts, 'mailbox')),
-            'owner' => e((string) data_get($facts, 'owner')),
+            'mailbox' => (string) data_get($facts, 'mailbox'),
+            'owner' => (string) data_get($facts, 'owner'),
         ];
     }
 }

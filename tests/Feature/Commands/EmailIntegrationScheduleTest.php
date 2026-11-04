@@ -61,6 +61,18 @@ it('runs email sync and outbox schedules on a single server without overlapping'
         ->and($events->every(fn (Event $event): bool => $event->onOneServer && $event->withoutOverlapping))->toBeTrue();
 });
 
+it('checks mailbox health every fifteen minutes', function (): void {
+    Feature::activate(EmailIntegration::class);
+    $this->app->forgetInstance(Schedule::class);
+
+    $this->artisan('schedule:list')->assertSuccessful();
+
+    $event = collect(app(Schedule::class)->events())
+        ->sole(fn (Event $event): bool => str_contains($event->command ?? '', 'email:check-mailbox-health'));
+
+    expect($event->expression)->toBe('*/15 * * * *');
+});
+
 it('does not register outbox or sync schedules when email integration is inactive', function (): void {
     config()->set('relaticle.features.email_integration', false);
     Feature::flushCache();

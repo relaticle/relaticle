@@ -13,6 +13,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Notification;
 use Relaticle\EmailIntegration\Actions\RecordMailboxHealth;
+use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\MailboxHealth;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Notifications\MailboxHealthNotification;
@@ -38,9 +39,14 @@ final class CheckMailboxHealthCommand extends Command
             ->chunkById(self::CHUNK, function (Collection $accounts) use ($recordMailboxHealth): void {
                 $this->rememberHostedAccess($accounts);
 
-                $accounts->each(function (ConnectedAccount $account) use ($recordMailboxHealth): void {
-                    $health = $account->assessedHealth($this->hostedAccessByWorkspace[$account->workspace_id]);
+                $accounts->each(function (ConnectedAccount $loaded) use ($recordMailboxHealth): void {
+                    $account = $this->currentStateOf($loaded);
 
+                    if (! $account instanceof ConnectedAccount) {
+                        return;
+                    }
+
+                    $health = $account->assessedHealth($this->hostedAccessByWorkspace[$account->workspace_id]);
                     $recordMailboxHealth->execute($account, $health, $account->healthReason($health));
                     $this->sendDueNotices($account);
                 });
@@ -65,6 +71,21 @@ final class CheckMailboxHealthCommand extends Command
         });
     }
 
+    // A sync job may have changed the row since the chunk loaded it, so a row whose
+    // health would change is read again before anything is written or sent.
+    private function currentStateOf(ConnectedAccount $account): ?ConnectedAccount
+    {
+        $health = $account->assessedHealth($this->hostedAccessByWorkspace[$account->workspace_id]);
+
+        if ($health === $account->health && $account->healthReason($health) === $account->health_reason) {
+            return $account;
+        }
+
+        $fresh = $account->fresh(['user', 'workspace']);
+
+        return $fresh instanceof ConnectedAccount && ! $fresh->trashed() && $fresh->status !== EmailAccountStatus::DISCONNECTED ? $fresh : null;
+    }
+
     private function sendDueNotices(ConnectedAccount $account): void
     {
         $changedAt = $account->health_changed_at;
@@ -81,11 +102,11 @@ final class CheckMailboxHealthCommand extends Command
                 && ($notifiedAt === null || $notifiedAt->lt($changedAt->addHours(self::ADMIN_NOTICE_AFTER_HOURS)));
 
         if ($ownerDue) {
-            $account->user->notify(new MailboxHealthNotification($account, forAdmins: false));
+            $account->user->notify(new MailboxHealthNotification($account, $account->health, forAdmins: false));
         }
 
         if ($adminsDue) {
-            Notification::send($this->adminsOf($account), new MailboxHealthNotification($account, forAdmins: true));
+            Notification::send($this->adminsOf($account), new MailboxHealthNotification($account, $account->health, forAdmins: true));
         }
 
         if ($ownerDue || $adminsDue) {
