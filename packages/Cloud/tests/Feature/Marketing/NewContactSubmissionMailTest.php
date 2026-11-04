@@ -58,11 +58,11 @@ it('names the inquiry in the subject and the reply subject', function (): void {
     $mail = new NewContactSubmissionMail([
         'name' => 'Ana Reyes',
         'email' => 'ana@example.com',
-        'message' => 'Set us up.',
-    ], ContactInquiry::Setup);
+        'message' => 'We want to discuss Enterprise.',
+    ], ContactInquiry::Enterprise);
 
-    $mail->assertHasSubject('New Guided setup inquiry: Ana Reyes');
-    $mail->assertSeeInText('mailto:ana@example.com?subject=Re%3A%20New%20Guided%20setup%20inquiry%3A%20Ana%20Reyes');
+    $mail->assertHasSubject('New Enterprise inquiry: Ana Reyes');
+    $mail->assertSeeInText('mailto:ana@example.com?subject=Re%3A%20New%20Enterprise%20inquiry%3A%20Ana%20Reyes');
 });
 
 it('keeps the submitter reply-to alongside the global one on contact mail', function (): void {

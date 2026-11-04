@@ -17,7 +17,7 @@ it('shows the legacy two-card page when billing is off', function (): void {
 
     $this->get('/pricing')
         ->assertOk()
-        ->assertSee('No per-seat pricing. Ever.')
+        ->assertSeeText('No per-seat pricing. Ever.')
         ->assertDontSee('Cloud Pro');
 });
 
@@ -26,7 +26,7 @@ it('shows the pro tier when billing is on', function (): void {
 
     $this->get('/pricing')
         ->assertOk()
-        ->assertSee('Pay per workspace. Never per seat.')
+        ->assertSeeText('Pay per workspace. Never per seat.')
         ->assertSee('$19')
         ->assertSee('$24')
         ->assertSee('$228 billed yearly')
@@ -159,7 +159,7 @@ it('compares hosted product access with scoped Enterprise services when billing 
         ->assertOk()
         ->assertSee(__('Choose how you get started'))
         ->assertSee('$19/mo per workspace ($228 billed yearly, or $24/mo billed monthly)')
-        ->assertSee(__('Guided setup as an add-on'))
+        ->assertSee(__('A scoped implementation project'))
         ->assertSee(__('Agreed deployment and maintenance'))
         ->assertDontSee(__('$0/mo per workspace'))
         ->assertDontSee(__('Zero-downtime updates and automatic daily backups, handled for you'));
@@ -202,7 +202,7 @@ it('keeps the Enterprise starting price consistent with its annual structured of
         ->and($offer['url'])->toBe(route('contact', ['plan' => 'enterprise']));
 });
 
-it('names Cloud Scale and guided setup in the meta description when billing is on', function (): void {
+it('names Cloud Scale and Enterprise in the meta description when billing is on', function (): void {
     withHostedBilling();
 
     $response = $this->get('/pricing')->assertOk();
@@ -211,8 +211,8 @@ it('names Cloud Scale and guided setup in the meta description when billing is o
         ->attr('content');
 
     expect($description)->toContain('Cloud Scale $49/mo')
-        ->toContain('Guided setup available at $708/year')
-        ->not->toContain('Concierge');
+        ->toContain('Enterprise from $')
+        ->not->toContain('Guided setup');
 });
 
 it('sells Cloud Scale as the highlighted self-serve plan', function (): void {
@@ -223,12 +223,12 @@ it('sells Cloud Scale as the highlighted self-serve plan', function (): void {
     $card = $crawler->filter('#scale-plan');
 
     expect($card->filter('a')->attr('href'))->toBe(route('login'))
-        ->and($card->text())->toContain('Most popular')
+        ->and($card->text())->toContain('Recommended')
         ->toContain('$49')
         ->toContain('$588 billed yearly')
         ->toContain(number_format(Plan::Scale->credits()).' AI credits / month')
         ->toContain('Up to '.Plan::Scale->connectedMailboxes().' connected mailboxes')
-        ->and($crawler->filter('#pro-plan')->text())->not->toContain('Most popular');
+        ->and($crawler->filter('#pro-plan')->text())->not->toContain('Recommended');
 
     $graph = json_decode($crawler->filter('script[type="application/ld+json"]')->text(), true, 512, JSON_THROW_ON_ERROR);
     $offer = collect(collect($graph['@graph'])->firstWhere('@type', 'Product')['offers'])->firstWhere('name', 'Cloud Scale');
@@ -237,28 +237,18 @@ it('sells Cloud Scale as the highlighted self-serve plan', function (): void {
         ->and($offer['description'])->toContain('$588/year');
 });
 
-it('sells guided setup as a service through a sales inquiry at its yearly price', function (): void {
+it('leaves the Enterprise AI allowance and API limits to the contract', function (): void {
     withHostedBilling();
-    config(['relaticle.guided_setup.price_yearly' => 1_200]);
 
-    $response = $this->get('/pricing')->assertOk();
-    $crawler = new Crawler((string) $response->getContent());
-    $strip = $crawler->filter('#guided-setup');
+    $crawler = new Crawler((string) $this->get('/pricing')->assertOk()->getContent());
+    $enterprise = $crawler->filter('#enterprise-plan')->text();
 
-    expect($crawler->filter('#pricing-plans section'))->toHaveCount(3)
-        ->and($strip->filter('a')->attr('href'))->toBe(route('contact', ['plan' => 'setup']))
-        ->and($strip->text())->toContain('Guided setup')
-        ->toContain('$1,200 / year')
-        ->toContain('Setup starts once the invoice is paid.');
-
-    $graph = json_decode($crawler->filter('script[type="application/ld+json"]')->text(), true, 512, JSON_THROW_ON_ERROR);
-    $offers = collect(collect($graph['@graph'])->firstWhere('@type', 'Product')['offers']);
-    $offer = $offers->firstWhere('name', 'Guided setup');
-
-    expect($offer['priceSpecification']['price'])->toBe(1_200)
-        ->and($offer['priceSpecification']['unitText'])->toBe('year')
-        ->and($offer['url'])->toBe(route('contact', ['plan' => 'setup']))
-        ->and($offers->pluck('name')->all())->not->toContain('Cloud Concierge');
+    expect($enterprise)->toContain('AI usage agreed in your contract')
+        ->toContain('API and MCP limits agreed in your contract')
+        ->not->toContain(number_format(Plan::Enterprise->credits()))
+        ->not->toContain(Plan::Enterprise->throughputMultiplier().'x')
+        ->and($crawler->filter('#compare')->text())->toContain('Agreed in your contract')
+        ->not->toContain(number_format(Plan::Enterprise->credits()).' credits');
 });
 
 it('emits accurate product json-ld offers when billing is off', function (): void {
@@ -401,7 +391,7 @@ it('offers Enterprise through a scoped sales inquiry with an annual starting pri
 
     expect($card->filter('a')->attr('href'))->toBe(route('contact', ['plan' => 'enterprise']))
         ->and($card->text())->toContain('Everything in Cloud Scale, plus')
-        ->toContain('Guided setup included');
+        ->toContain('A scoped implementation project');
 });
 
 it('does not claim an unconfirmed Enterprise tier is a purchasable offering when billing is off', function (): void {
@@ -559,7 +549,6 @@ it('keeps the plans help article in step with the pricing page', function (): vo
         number_format(Plan::Scale->credits()),
         Plan::Pro->connectedMailboxes().' connected mailboxes',
         Plan::Scale->connectedMailboxes().' connected mailboxes',
-        '$'.number_format(config('relaticle.guided_setup.price_yearly')),
         '$'.number_format(config('relaticle.enterprise.starting_price_yearly')),
     ];
 
