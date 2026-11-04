@@ -29,6 +29,8 @@ use Relaticle\EmailIntegration\Services\AutomatedMailDetector;
     {--chunk=10000 : Emails to read in one run before queueing the rest}')]
 final class BackfillAutomatedReasonsCommand extends Command
 {
+    private const int PAGE = 500;
+
     public function handle(AutomatedMailDetector $detector, RefreshConversationSummary $refresh, CurrentWorkspace $currentWorkspace): int
     {
         $write = (bool) $this->option('force');
@@ -44,7 +46,13 @@ final class BackfillAutomatedReasonsCommand extends Command
         /** @var array<string, array<string, true>> $touched */
         $touched = [];
 
-        foreach ($this->candidates()->lazyById(500) as $email) {
+        foreach ($this->candidates()->lazyById(self::PAGE) as $email) {
+            // Per page, so a run killed mid-chunk leaves no marked row behind a stale summary.
+            if ($read > 0 && $read % self::PAGE === 0) {
+                $this->refreshSummaries($touched, $refresh, $currentWorkspace);
+                $touched = [];
+            }
+
             if ($read === $budget) {
                 $this->refreshSummaries($touched, $refresh, $currentWorkspace);
 
@@ -85,7 +93,7 @@ final class BackfillAutomatedReasonsCommand extends Command
             ->whereNull('automated_reason')
             ->where('direction', EmailDirection::INBOUND)
             ->where('status', '!=', EmailStatus::DRAFT)
-            ->where('created_at', '<', Date::parse((string) ($this->option('before') ?? now()->toIso8601String())))
+            ->where('created_at', '<', Date::parse((string) ($this->option('before') ?? now()->toIso8601String()))->utc())
             ->when($this->option('after'), fn (Builder $query, string $id): Builder => $query->where('id', '>', $id))
             ->when($this->option('workspace'), fn (Builder $query, string $id): Builder => $query->where('workspace_id', $id));
     }

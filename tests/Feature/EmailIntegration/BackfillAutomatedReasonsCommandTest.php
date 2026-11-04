@@ -141,3 +141,25 @@ it('queues the rest after the last email it read when a run reaches its chunk', 
         ['--force' => true, '--before' => $before, '--after' => $first->getKey(), '--workspace' => $this->workspace->getKey(), '--chunk' => 1],
     ]);
 });
+
+it('resumes after the last email the queued run names', function (): void {
+    Queue::fake();
+    $person = ($this->history)('ana@acme.example');
+    $noreply = ($this->history)('noreply@stripe.example');
+
+    ($this->backfill)(['--chunk' => 1])->assertSuccessful();
+    $queued = [];
+    Queue::assertPushed(QueuedCommand::class, function (QueuedCommand $job) use (&$queued): bool {
+        $queued = (fn (): array => $this->data)->call($job);
+
+        return true;
+    });
+
+    expect($queued[1]['--after'])->toBe($person->getKey());
+
+    $this->artisan(...$queued)->assertSuccessful();
+
+    expect($noreply->refresh()->automated_reason)->toBe(AutomatedReason::RoleSender)
+        ->and($person->refresh()->automated_reason)->toBeNull();
+    Queue::assertPushed(QueuedCommand::class, 1);
+});

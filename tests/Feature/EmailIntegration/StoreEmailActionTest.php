@@ -1438,3 +1438,17 @@ it('marks a conversation automated when every message in it is', function (): vo
 
     expect(EmailConversation::query()->where('conversation_key', $email->conversation_key)->sole()->is_automated)->toBeTrue();
 });
+
+it('keeps a conversation with an outbound message out of automated', function (): void {
+    $sent = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'o', 'rfcMessageId' => '<o@acme.example>', 'direction' => EmailDirection::OUTBOUND, 'folder' => EmailFolder::Sent,
+    ]));
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'a', 'rfcMessageId' => '<a@acme.example>', 'inReplyTo' => '<o@acme.example>',
+        'headers' => ['auto-submitted' => 'auto-replied'],
+    ]));
+
+    expect(EmailConversation::query()->where('conversation_key', $sent->conversation_key)->sole())
+        ->message_count->toBe(2)
+        ->is_automated->toBeFalse();
+});
