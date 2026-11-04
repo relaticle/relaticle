@@ -55,7 +55,7 @@
     @if ($tab === null)
         <div class="divide-y divide-gray-200/60 dark:divide-white/10">
             @forelse ($this->conversations as $row)
-                <x-email-integration::conversation-row :row="$row" wire:key="conversation-{{ $row->conversationKey }}" />
+                <x-email-integration::conversation-row :row="$row" selectable wire:key="conversation-{{ $row->conversationKey }}" />
             @empty
                 <x-filament::empty-state
                     :heading="__('filament/pages/email-inbox.views.empty.'.$this->activeView->value)"
@@ -65,6 +65,12 @@
                 />
             @endforelse
         </div>
+
+        <x-email-integration::reader-overlay
+            :email="$this->selectedEmail"
+            :pending-access-requests="$this->pendingAccessRequests"
+            layer="z-50"
+        />
     @else
         @livewire($tab->livewireComponent(), $tab->livewireParameters(), key($tab->value.'-table'))
     @endif

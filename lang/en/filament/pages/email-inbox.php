@@ -217,4 +217,10 @@ return [
             'automated' => 'No automated mail.',
         ],
     ],
+    'conversation_row' => [
+        'me' => 'Me',
+        'unread' => 'Unread',
+        'unlinked' => 'Unlinked',
+        'more_records' => '+:count',
+    ],
 ];

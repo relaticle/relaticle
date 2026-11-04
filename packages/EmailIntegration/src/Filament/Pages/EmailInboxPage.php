@@ -11,6 +11,7 @@ use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\CursorPaginator;
+use Illuminate\Support\Collection as SupportCollection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 use Relaticle\EmailIntegration\Data\ConversationFilters;
@@ -23,19 +24,24 @@ use Relaticle\EmailIntegration\Enums\OutboxTab;
 use Relaticle\EmailIntegration\Filament\Actions\ConnectMailboxAction;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConversationsFlag;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
+use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Queries\ConversationsQuery;
 
 /**
  * @property-read ConversationView $activeView
  * @property-read array{needs_reply: int, unlinked: int, automated: int} $viewCounts
+ * @property-read Email|null $selectedEmail
+ * @property-read SupportCollection<int, EmailAccessRequest> $pendingAccessRequests
  */
 final class EmailInboxPage extends Page
 {
     use HasConversationsFlag;
     use HasEmailFeatureFlag;
+    use HasEmailReaderActions;
 
     protected string $view = 'email-integration::filament.pages.email-inbox';
 
@@ -97,6 +103,9 @@ final class EmailInboxPage extends Page
 
     #[Url(as: 'view')]
     public ?ConversationView $conversationView = null;
+
+    #[Url(as: 'email')]
+    public ?string $selectedEmailId = null;
 
     public function mount(): void
     {
@@ -174,6 +183,58 @@ final class EmailInboxPage extends Page
             $this->activeView,
             new ConversationFilters,
         );
+    }
+
+    #[Computed]
+    public function selectedEmail(): ?Email
+    {
+        if ($this->selectedEmailId === null || ! $this->showsConversations()) {
+            return null;
+        }
+
+        $user = $this->authUser();
+        $conversationKey = Email::query()
+            ->forWorkspace($user->current_workspace_id)
+            ->whereKey($this->selectedEmailId)
+            ->value('conversation_key');
+
+        if (! is_string($conversationKey)) {
+            return null;
+        }
+
+        $email = resolve(ConversationsQuery::class)->messages($user, $conversationKey)->find($this->selectedEmailId);
+
+        if (! $email instanceof Email || $user->cannot('viewBody', $email)) {
+            return null;
+        }
+
+        return $email->loadMissing(['body', 'labels', 'attachments', 'from']);
+    }
+
+    /** @return SupportCollection<int, EmailAccessRequest> */
+    #[Computed]
+    public function pendingAccessRequests(): SupportCollection
+    {
+        $email = $this->selectedEmail();
+
+        if (! $email instanceof Email) {
+            return collect();
+        }
+
+        return $this->pendingAccessRequestsFor($email);
+    }
+
+    public function selectEmail(string $id): void
+    {
+        $this->openEmailReader($id);
+    }
+
+    public function deselectEmail(): void
+    {
+        $this->selectedEmailId = null;
+        unset($this->selectedEmail);
+
+        $this->dispatch('composer:dismiss-inline');
     }
 
     #[Computed]

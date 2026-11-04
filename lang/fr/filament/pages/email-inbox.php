@@ -17,4 +17,10 @@ return [
             'automated' => 'Aucun e-mail automatique.',
         ],
     ],
+    'conversation_row' => [
+        'me' => 'Moi',
+        'unread' => 'Non lu',
+        'unlinked' => 'Non liée',
+        'more_records' => '+:count',
+    ],
 ];

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Queries;
 
 use App\Enums\CrmEntity;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -15,6 +16,7 @@ use Illuminate\Pagination\CursorPaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Data\ConversationFilters;
 use Relaticle\EmailIntegration\Data\ConversationRow;
 use Relaticle\EmailIntegration\Enums\ConversationView;
@@ -23,6 +25,7 @@ use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailConversation;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
@@ -215,46 +218,55 @@ final readonly class ConversationsQuery
 
         $copies = $this->newestVisibleCopies($viewer, $keys)->keyBy('conversation_key');
         $stats = $this->visibleMessageStats($viewer, $keys);
+        $senders = $this->senderNames($viewer, $keys);
+        $records = $this->linkedRecords($viewer, $keys);
+        $unread = array_flip($this->unreadKeys($viewer, $keys));
 
         return $conversations
-            ->map(function (EmailConversation $conversation) use ($viewer, $copies, $stats): ?ConversationRow {
-                $copy = $copies->get($conversation->conversation_key);
-                $copyStats = $stats->get($conversation->conversation_key);
+            ->map(function (EmailConversation $conversation) use ($viewer, $copies, $stats, $senders, $records, $unread): ?ConversationRow {
+                $key = $conversation->conversation_key;
+                $copy = $copies->get($key);
+                $copyStats = $stats->get($key);
                 $access = $copy instanceof Email ? $this->privacy->effectiveTier($copy, $viewer) : null;
 
                 if (! $copy instanceof Email || $copyStats === null || ! $access instanceof EmailPrivacyTier) {
                     return null;
                 }
 
-                return $this->row($viewer, $copy, $access, $copyStats);
+                return $this->row($viewer, $copy, $access, $copyStats, $senders[$key] ?? [], $records[$key] ?? [], isset($unread[$key]));
             })
             ->filter()
             ->values();
     }
 
-    /** @param  object{message_count: int|string, last_message_at: string, has_attachments: bool}  $stats */
-    private function row(User $viewer, Email $copy, EmailPrivacyTier $access, object $stats): ConversationRow
+    /**
+     * @param  object{message_count: int|string, last_message_at: string, has_attachments: bool}  $stats
+     * @param  list<string>  $senderNames
+     * @param  list<array{type: string, id: string, name: string}>  $records
+     */
+    private function row(User $viewer, Email $copy, EmailPrivacyTier $access, object $stats, array $senderNames, array $records, bool $isUnread): ConversationRow
     {
         $isTeammateCopy = $copy->user_id !== $viewer->getKey();
-        $senders = $copy->participants->where('role', EmailParticipantRole::FROM);
-        $recipients = $copy->participants->where('role', EmailParticipantRole::TO);
+        $roles = $isTeammateCopy
+            ? [EmailParticipantRole::FROM, EmailParticipantRole::TO]
+            : [EmailParticipantRole::FROM, EmailParticipantRole::TO, EmailParticipantRole::BCC];
 
         return new ConversationRow(
             conversationKey: (string) $copy->conversation_key,
             viewerCopyEmailId: $copy->getKey(),
             subject: $access->showsSubject() ? $copy->subject : null,
             snippet: $access->showsBody() ? $copy->snippet : null,
-            senderNames: $this->names($senders),
-            participants: $this->names($senders->concat($recipients)),
+            senderNames: $senderNames,
+            participants: $this->names($copy->participants->whereIn('role', $roles)),
             messageCount: (int) $stats->message_count,
             lastMessageAt: CarbonImmutable::parse($stats->last_message_at, 'UTC'),
             hasAttachments: (bool) $stats->has_attachments,
-            isUnread: false,
+            isUnread: $isUnread,
             ownerUserId: $isTeammateCopy ? $copy->user_id : null,
             ownerName: $isTeammateCopy ? $copy->user?->name : null,
             access: $access,
             viewerHasPendingRequest: (bool) $copy->getAttribute('viewer_has_pending_access_request'),
-            records: [],
+            records: $records,
             automatedReason: $copy->automated_reason,
         );
     }
@@ -325,5 +337,148 @@ final readonly class ConversationsQuery
             ->groupBy('emails.conversation_key')
             ->get()
             ->keyBy('conversation_key');
+    }
+
+    /**
+     * @param  list<string>  $keys
+     * @return Builder<Email>
+     */
+    private function visibleCopyIds(User $viewer, array $keys): Builder
+    {
+        return $this->visibleCopiesOf($viewer, new ConversationFilters)
+            ->whereIn('emails.conversation_key', $keys)
+            ->select('emails.id');
+    }
+
+    /**
+     * @param  list<string>  $keys
+     * @return array<string, list<string>>
+     */
+    private function senderNames(User $viewer, array $keys): array
+    {
+        $ownAddresses = $this->ownAddresses($viewer);
+        $senders = DB::table('email_participants')
+            ->join('emails', 'emails.id', '=', 'email_participants.email_id')
+            ->whereIn('email_participants.email_id', $this->visibleCopyIds($viewer, $keys)->toBase())
+            ->where('email_participants.role', EmailParticipantRole::FROM->value)
+            ->select('emails.conversation_key', 'email_participants.name', 'email_participants.email_address')
+            ->latest('emails.sent_at')
+            ->orderByDesc('emails.id')
+            ->get();
+
+        $names = [];
+        $seen = [];
+
+        foreach ($senders as $sender) {
+            $key = (string) $sender->conversation_key;
+            $address = Str::lower((string) $sender->email_address);
+
+            if (isset($seen[$key][$address]) || count($names[$key] ?? []) >= 3) {
+                continue;
+            }
+
+            $seen[$key][$address] = true;
+            $names[$key][] = in_array($address, $ownAddresses, true)
+                ? __('filament/pages/email-inbox.conversation_row.me')
+                : (string) ($sender->name ?: $sender->email_address);
+        }
+
+        return $names;
+    }
+
+    /** @return list<string> */
+    private function ownAddresses(User $viewer): array
+    {
+        return array_values(ConnectedAccount::query()
+            ->where('workspace_id', $viewer->current_workspace_id)
+            ->where('user_id', $viewer->getKey())
+            ->pluck('email_address')
+            ->push($viewer->email)
+            ->map(fn (string $address): string => Str::lower($address))
+            ->all());
+    }
+
+    /**
+     * @param  list<string>  $keys
+     * @return array<string, list<array{type: string, id: string, name: string}>>
+     */
+    private function linkedRecords(User $viewer, array $keys): array
+    {
+        $order = [CrmEntity::Company, CrmEntity::Opportunity, CrmEntity::People];
+        $links = DB::table('emailables')
+            ->join('emails', 'emails.id', '=', 'emailables.email_id')
+            ->whereIn('emailables.email_id', $this->visibleCopyIds($viewer, $keys)->toBase())
+            ->whereIn('emailables.emailable_type', array_map(fn (CrmEntity $entity): string => $entity->value, $order))
+            ->distinct()
+            ->get(['emails.conversation_key', 'emailables.emailable_type', 'emailables.emailable_id']);
+
+        $names = $this->recordNames($viewer, $links);
+        $records = [];
+
+        foreach ($links as $link) {
+            $name = $names[$link->emailable_type][$link->emailable_id] ?? null;
+
+            if ($name !== null) {
+                $records[(string) $link->conversation_key][] = ['type' => (string) $link->emailable_type, 'id' => (string) $link->emailable_id, 'name' => $name];
+            }
+        }
+
+        $rank = array_flip(array_map(fn (CrmEntity $entity): string => $entity->value, $order));
+
+        return array_map(fn (array $linked): array => array_slice(
+            collect($linked)->sortBy([fn (array $a, array $b): int => $rank[$a['type']] <=> $rank[$b['type']], fn (array $a, array $b): int => strcasecmp($a['name'], $b['name'])])->values()->all(),
+            0,
+            3,
+        ), $records);
+    }
+
+    /**
+     * @param  Collection<int, \stdClass>  $links
+     * @return array<string, array<string, string>>
+     */
+    private function recordNames(User $viewer, Collection $links): array
+    {
+        $names = [];
+
+        foreach ($links->groupBy('emailable_type') as $type => $typed) {
+            $entity = CrmEntity::from((string) $type);
+
+            $names[$entity->value] = $entity->model()::query()
+                ->withoutGlobalScope(WorkspaceScope::class)
+                ->where('workspace_id', $viewer->current_workspace_id)
+                ->whereKey($typed->pluck('emailable_id')->unique()->values()->all())
+                ->pluck($entity->titleColumn(), 'id')
+                ->map(fn (mixed $name): string => (string) $name)
+                ->all();
+        }
+
+        return $names;
+    }
+
+    /**
+     * @param  list<string>  $keys
+     * @return list<string>
+     */
+    private function unreadKeys(User $viewer, array $keys): array
+    {
+        return array_values($this->visibleCopiesOf($viewer, new ConversationFilters)
+            ->whereIn('emails.conversation_key', $keys)
+            ->where('emails.direction', EmailDirection::INBOUND)
+            ->where(fn (Builder $reached): Builder => $reached
+                ->where('emails.user_id', $viewer->getKey())
+                ->orWhereExists(fn (BaseBuilder $share): BaseBuilder => $share
+                    ->from('email_shares')
+                    ->whereColumn('email_shares.email_id', 'emails.id')
+                    ->where('email_shares.shared_with', $viewer->getKey())
+                    ->where('email_shares.tier', EmailPrivacyTier::FULL->value)))
+            ->whereNotExists(fn (BaseBuilder $read): BaseBuilder => $read
+                ->from('email_reads')
+                ->whereColumn('email_reads.email_id', 'emails.id')
+                ->where('email_reads.user_id', $viewer->getKey()))
+            ->toBase()
+            ->distinct()
+            ->pluck('emails.conversation_key')
+            ->map(fn (mixed $key): string => (string) $key)
+            ->all());
     }
 }

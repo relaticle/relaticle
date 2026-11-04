@@ -20,6 +20,8 @@ use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
+use Relaticle\EmailIntegration\Models\EmailRead;
+use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Queries\ConversationsQuery;
 use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
 
@@ -245,4 +247,73 @@ it('lists only the viewer own conversations that no record links in Unlinked', f
 
     expect(conversationsPageKeys($page->html()))->toBe(['conv-own-unlinked'])
         ->and($page->instance()->viewCounts['unlinked'])->toBe(1);
+});
+
+it('bolds only conversations whose unread mail reached the viewer', function (): void {
+    conversationsPageMessage($this->ownerMailbox, 'conv-own', 'brian@airbnb.test');
+    $bens = conversationsPageMessage($this->teammateMailbox, 'conv-ben', 'olivia@stripe.test');
+    $this->company->emails()->attach($bens->id);
+    $read = conversationsPageMessage($this->ownerMailbox, 'conv-read', 'kim@notion.test');
+    EmailRead::factory()->create(['email_id' => $read->id, 'user_id' => $this->owner->id, 'read_at' => now()]);
+    $shared = conversationsPageMessage($this->teammateMailbox, 'conv-shared', 'lee@linear.test');
+    $this->company->emails()->attach($shared->id);
+    EmailShare::factory()->create([
+        'email_id' => $shared->id,
+        'shared_by' => $this->teammate->id,
+        'shared_with' => $this->owner->id,
+        'tier' => EmailPrivacyTier::FULL->value,
+    ]);
+
+    livewire(EmailInboxPage::class)
+        ->call('setView', ConversationView::All->value)
+        ->assertSeeHtml('data-conversation="conv-own" data-unread="true"')
+        ->assertSeeHtml('data-conversation="conv-ben" data-unread="false"')
+        ->assertSeeHtml('data-conversation="conv-read" data-unread="false"')
+        ->assertSeeHtml('data-conversation="conv-shared" data-unread="true"');
+});
+
+it('renders a teammate row only at the tier the viewer holds', function (EmailPrivacyTier $tier, bool $showsSubject, bool $showsSnippet): void {
+    $email = conversationsPageMessage($this->teammateMailbox, 'conv-tier', 'olivia@stripe.test', [
+        'subject' => 'Security review findings',
+        'snippet' => 'Two critical issues remain open',
+        'privacy_tier' => $tier,
+    ]);
+    $this->company->emails()->attach($email->id);
+
+    $html = livewire(EmailInboxPage::class)->call('setView', ConversationView::All->value)->html();
+
+    expect(str_contains($html, 'Security review findings'))->toBe($showsSubject)
+        ->and(str_contains($html, 'Two critical issues remain open'))->toBe($showsSnippet)
+        ->and($html)->toContain('Airbnb')
+        ->and(str_contains($html, "selectEmail('{$email->id}')"))->toBe($tier === EmailPrivacyTier::FULL);
+})->with([
+    'metadata' => [EmailPrivacyTier::METADATA_ONLY, false, false],
+    'subject' => [EmailPrivacyTier::SUBJECT, true, false],
+    'full' => [EmailPrivacyTier::FULL, true, true],
+]);
+
+it('offers Request access on a locked teammate row', function (): void {
+    $email = conversationsPageMessage($this->teammateMailbox, 'conv-locked', 'olivia@stripe.test', [
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+    ]);
+    $this->company->emails()->attach($email->id);
+
+    livewire(EmailInboxPage::class)
+        ->call('setView', ConversationView::All->value)
+        ->assertSee(__('filament/pages/email-inbox.subject.hidden'))
+        ->assertActionVisible('requestAccess', ['emailId' => $email->id]);
+});
+
+it('opens the reader only on a copy the viewer may see', function (): void {
+    $own = conversationsPageMessage($this->ownerMailbox, 'conv-own', 'brian@airbnb.test', ['subject' => 'Pricing for 40 seats']);
+    $hidden = conversationsPageMessage($this->teammateMailbox, 'conv-hidden', 'olivia@stripe.test');
+
+    livewire(EmailInboxPage::class)
+        ->call('setView', ConversationView::All->value)
+        ->call('selectEmail', $hidden->id)
+        ->assertSet('selectedEmailId', null)
+        ->assertDontSeeHtml('fi-email-reader-panel')
+        ->call('selectEmail', $own->id)
+        ->assertSet('selectedEmailId', $own->id)
+        ->assertSeeHtml('fi-email-reader-panel');
 });
