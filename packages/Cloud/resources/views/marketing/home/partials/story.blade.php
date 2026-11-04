@@ -3,17 +3,21 @@
 
     $icon = static fn (string $type): ?string => \Relaticle\Chat\Support\RecordChipRenderer::iconPath($type);
 
-    $steps = [
-        ['mailbox', __('Mon 9:12'), __('Adds Lena Ortiz and Northwind after your first email.')],
+    $emailIntegrationActive = \Laravel\Pennant\Feature::active(\App\Features\EmailIntegration::class);
+
+    $steps = array_values(array_filter([
+        $emailIntegrationActive ? ['mailbox', __('Mon 9:12'), __('Adds Lena Ortiz and Northwind after your first email.')] : null,
         ['you', __('Tue 14:30'), __('Moves Northwind renewal to Negotiation on the board.')],
         ['claude', __('Wed 10:05'), __('Creates a follow-up task for Thursday from a chat in Claude.')],
         ['rela', __('Fri 16:48'), __('Marks the opportunity as won after you approve the change.')],
-    ];
+    ]));
 @endphp
 
 <x-cloud::marketing.frame class="spotlight dark" data-story>
-    <x-cloud::marketing.frame-header :label="__('One record')" :lead="__('Four hands, one opportunity.')">
-        {{ __('Your inbox, you, your agent and :name all work on the same record.', ['name' => $assistantName]) }}
+    <x-cloud::marketing.frame-header :label="__('One record')" :lead="$emailIntegrationActive ? __('Four hands, one opportunity.') : __('Three hands, one opportunity.')">
+        {{ $emailIntegrationActive
+            ? __('Your inbox, you, your agent and :name all work on the same record.', ['name' => $assistantName])
+            : __('You, your agent and :name all work on the same record.', ['name' => $assistantName]) }}
     </x-cloud::marketing.frame-header>
 
     <div class="bg-rail grid grid-cols-1 gap-px lg:grid-cols-12">

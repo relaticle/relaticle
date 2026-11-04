@@ -4,7 +4,7 @@
     $scalePlan = \App\Enums\Plan::Scale;
     $scaleCredits = number_format($scalePlan->credits());
     $enterprisePrice = number_format(config('relaticle.enterprise.starting_price_yearly'));
-    $pageTitle = __('Pricing - $:price/mo flat, unlimited users - Relaticle', ['price' => $proPlan->yearlyPricePerMonth()]);
+    $pageTitle = __('Pricing - from $:price/mo per workspace - Relaticle', ['price' => $proPlan->yearlyPricePerMonth()]);
 @endphp
 
 <x-cloud::guest-layout
@@ -32,10 +32,6 @@
             ->groupBy(fn (array $model): string => rtrim(rtrim(number_format($model['credit_multiplier'], 2, '.', ''), '0'), '.'))
             ->map(fn (\Illuminate\Support\Collection $group): string => $group->pluck('label')->join(', ', ' and '));
 
-        $multiplierClauses->put('1', $multiplierClauses->has('1')
-            ? __(':models and self-hosted models', ['models' => $multiplierClauses->get('1')])
-            : __('self-hosted models'));
-
         $creditMultiplierList = $multiplierClauses
             ->sortKeys(SORT_NUMERIC)
             ->map(fn (string $models, string $multiplier): string => __(':multiplierx for :models', ['multiplier' => $multiplier, 'models' => $models]))
@@ -46,7 +42,7 @@
         $dearestReplyCost = max(1, (int) ceil($dearestEntry['credit_multiplier'] + 1.0));
 
         $creditFaqAnswer = __(
-            'Credit cost is not flat. It depends on the model and on how much work a reply does. Each message costs its model\'s credit multiplier (:multipliers), plus 0.5 credits for every tool call the assistant makes while answering, such as searching, creating, or updating a record. The total rounds up to the next whole credit, with a 1-credit minimum. A simple reply from :cheapestModel with no tool calls costs 1 credit; a reply from :dearestModel that touches two records costs :dearestCost. Using the REST API or the MCP server directly, outside the built-in chat, never touches your credit balance.',
+            'Credit cost is not flat. It depends on the model and on how much work a reply does. Each assistant reply costs its model\'s credit multiplier (:multipliers), plus 0.5 credits for every tool call the assistant makes while answering, such as searching, creating, or updating a record. The total rounds up to the next whole credit, with a 1-credit minimum. The reply the assistant writes after you decide a proposal counts too. A simple reply from :cheapestModel with no tool calls costs 1 credit; a reply from :dearestModel that makes two tool calls costs :dearestCost. Using the REST API or the MCP server directly, outside the built-in chat, never touches your credit balance.',
             [
                 'multipliers' => $creditMultiplierList,
                 'cheapestModel' => $cheapestModel,
@@ -57,17 +53,20 @@
         $paidPlanLabel = __('Cloud Pro');
         $modelsUnlockAnswer = trim(implode(' ', array_filter([
             $freeCloudModels === ''
-                ? __('Every plan can use any self-hosted model you connect yourself.')
-                : __('Every plan can use :freeModels and any self-hosted model you connect yourself.', ['freeModels' => $freeCloudModels]),
-            $paidCloudModels === ''
                 ? ''
-                : __(':paidPlan additionally unlocks the higher-multiplier models: :paidModels.', ['paidModels' => $paidCloudModels, 'paidPlan' => $paidPlanLabel]),
+                : __('Every plan can use :freeModels.', ['freeModels' => $freeCloudModels]),
+            match (true) {
+                $paidCloudModels === '' => '',
+                $freeCloudModels === '' => __(':paidPlan unlocks :paidModels.', ['paidModels' => $paidCloudModels, 'paidPlan' => $paidPlanLabel]),
+                default => __(':paidPlan additionally unlocks the higher-multiplier models: :paidModels.', ['paidModels' => $paidCloudModels, 'paidPlan' => $paidPlanLabel]),
+            },
+            $paidCloudModels === '' ? '' : __('During the trial, they unlock once you add your first record.'),
         ])));
 
         $rateLimitAnswer = $billingActive
             ? __(
-                'Yes. A per-minute cap is shared across the whole workspace, not per person: :free messages/minute on Free, :pro/minute on Cloud Pro, :scale/minute on Cloud Scale. It exists to stop runaway usage, not to constrain normal work.',
-                ['free' => $freeRateLimit, 'pro' => $proRateLimit, 'scale' => $scalePlan->rateLimit()]
+                'Yes. A per-minute cap is shared across the whole workspace, not per person: :pro messages/minute on Cloud Pro and :scale/minute on Cloud Scale. It exists to stop runaway usage, not to constrain normal work.',
+                ['pro' => $proRateLimit, 'scale' => $scalePlan->rateLimit()]
             )
             : __(
                 'Yes. A per-minute cap is shared across the whole workspace, not per person: :free messages/minute on Free, :pro/minute on :paidPlan. It exists to stop runaway usage, not to constrain normal work.',
@@ -89,13 +88,14 @@
             ]);
             $hostedUpdatesCell = __('Managed by Relaticle. No self-hosted maintenance required');
             $hostedPlanAnswer = __(
-                'Cloud Pro is :price and includes unlimited users and records, every supported AI model from :cheapestModel up to :dearestModel, the REST API, the MCP server, and email support. Each workspace gets a :credits-credit monthly AI allowance; how far it goes depends on the model and how many tool calls each reply makes (see "What counts as an AI credit?" below). As a reference point, :credits credits covers roughly :credits simple :cheapestModel replies, or around :dearestReplies :dearestModel replies before tool calls. Cloud Scale raises the allowance to :scaleCredits credits, lifts the mailbox cap to :scaleMailboxes, and triples REST API and MCP throughput for $:scalePrice/mo billed yearly. New workspaces start on a :days-day trial automatically, with no card required.',
+                'Cloud Pro is :price and includes unlimited users and records, every offered AI model (:models), the REST API, the MCP server, and email support. Each workspace gets a :credits-credit monthly AI allowance; how far it goes depends on the model and how many tool calls each reply makes (see "What counts as an AI credit?" below). As a reference point, :credits credits covers roughly :credits simple :cheapestModel replies, or around :dearestReplies :dearestModel replies before tool calls. Cloud Scale raises the allowance to :scaleCredits credits, lifts the mailbox cap to :scaleMailboxes, and triples REST API and MCP throughput for $:scalePrice/mo billed yearly. New workspaces start on a :days-day trial automatically, with no card required.',
                 [
                     'price' => $hostedPriceCell,
                     'scaleCredits' => $scaleCredits,
                     'scaleMailboxes' => $scalePlan->connectedMailboxes(),
                     'scalePrice' => $scalePlan->yearlyPricePerMonth(),
                     'credits' => $proCredits,
+                    'models' => $toolCapableCloudModels->pluck('label')->join(', ', ' and '),
                     'cheapestModel' => $cheapestModel,
                     'dearestModel' => $dearestEntry['label'],
                     'dearestReplies' => number_format(intdiv((int) \App\Enums\Plan::Pro->credits(), max(1, (int) ceil($dearestEntry['credit_multiplier'])))),
@@ -103,7 +103,7 @@
                 ]
             );
             $planLimitAnswer = __(
-                'CRM data itself is never capped. Every plan supports unlimited users, companies, people, opportunities, tasks, and notes. The only metered resource is :name, the AI assistant: Cloud Pro\'s :credits credits a month and Cloud Scale\'s :scaleCredits reset each billing (or trial) period. Once they are used up, :name declines new chat requests until the next reset. Paid workspaces can buy a prepaid credit top-up instead of waiting. Nothing else in the CRM is affected.',
+                'CRM data itself is never capped. Every plan supports unlimited users, companies, people, opportunities, tasks, and notes. The only metered resource is :name, the AI assistant: Cloud Pro\'s :credits credits and Cloud Scale\'s :scaleCredits reset every month from your subscription start, and a trial gets one allowance for its length. Once they are used up, :name declines new chat requests until the next reset. You can buy a prepaid credit pack instead of waiting. Nothing else in the CRM is affected.',
                 ['credits' => $proCredits, 'scaleCredits' => $scaleCredits, 'name' => config('chat.assistant_name')]
             );
         } else {
@@ -121,7 +121,7 @@
         $trialFaq = [
             __('What happens after my trial ends?'),
             __(
-                'New workspaces start a :days-day trial automatically, with no card required. If a payment method isn\'t added before the trial ends, hosted access pauses and you\'re redirected to the billing page to subscribe. Self-hosting the same open-source CRM is always available as a fallback.',
+                'New workspaces start a :days-day trial automatically, with no card required. If a payment method isn\'t added before the trial ends, hosted access pauses and you\'re redirected to the billing page to subscribe. Your data stays and comes back when you subscribe. If you plan to self-host instead, export your records before the trial ends.',
                 ['days' => $trialDays]
             ),
         ];
@@ -130,7 +130,7 @@
             __('Plans and billing') => [
                 [
                     __('Do you charge per seat?'),
-                    __('No. Relaticle has never charged per seat. Every plan, self-hosted or hosted, is priced per workspace, so you can add as many teammates as you need without the bill changing.'),
+                    __('No. Relaticle has never charged per seat. Hosted plans are priced per workspace, and self-hosting is free, so you can add as many teammates as you need without the bill changing.'),
                 ],
                 [__("What's included in the hosted plan?"), $hostedPlanAnswer],
                 ...($billingActive ? [$trialFaq] : []),
@@ -147,11 +147,11 @@
             __('Self-hosting') => [
                 [
                     __('Is Relaticle really free to self-host?'),
-                    __('Yes. Self-hosting is fully open source under the AGPL-3.0 license, with unlimited users and unlimited records and no credit card required. Deploy it yourself with the published Docker Compose file. Your data stays on your own server the entire time.'),
+                    __('Yes. Self-hosting is fully open source under the AGPL-3.0 license, with unlimited users and unlimited records and no credit card required. Deploy it yourself with the published Docker Compose file. Your records stay on your own server, and the assistant sends prompts only to the AI provider you configure.'),
                 ],
                 [
                     __('Can I switch between self-hosted and cloud?'),
-                    __('Yes. Both options run the same open-source CRM and store your records the same way, so neither locks you in. Companies, people, opportunities, tasks, and notes each have a built-in CSV export, and the import wizard on the other side accepts CSV. Moving between a self-hosted install and the hosted plan is a standard export and re-import, not a proprietary migration.'),
+                    __('Yes. Both options run the same open-source CRM, so neither locks you in. Companies, people, opportunities, tasks, and notes each have a built-in CSV export, and the import wizard on the other side reads CSV. Links from tasks and notes to their records, files, and email history do not carry over.'),
                 ],
             ],
             __('Enterprise') => $billingActive ? [
@@ -179,7 +179,7 @@
         <x-slot:aside>
             <p class="text-base leading-relaxed text-gray-500 md:text-lg dark:text-gray-400">
                 {{ $billingActive
-                    ? __('Unlimited users and records on every plan. Run it yourself, or let us set it up for you.')
+                    ? __('Unlimited users and records on every plan. Run it yourself, or let us host it for you.')
                     : __('Unlimited users. Unlimited records. Self-host for free, or let us run it for you.') }}
             </p>
         </x-slot:aside>

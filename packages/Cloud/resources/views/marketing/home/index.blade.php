@@ -2,20 +2,25 @@
     $assistantName = (string) config('chat.assistant_name');
     $proposalExpiry = \Carbon\CarbonInterval::minutes((int) config('chat.pending_action_expiry_minutes'))->cascade()->forHumans();
     $emailIntegrationActive = \Laravel\Pennant\Feature::active(\App\Features\EmailIntegration::class);
+    $providerNames = ['anthropic' => 'Anthropic', 'openai' => 'OpenAI', 'gemini' => 'Google'];
+    $offeredProviders = collect(resolve(\Relaticle\Chat\Services\ModelRegistry::class)->offered())
+        ->map(fn (\Relaticle\Chat\Support\ModelDescriptor $model): string => $providerNames[$model->provider] ?? (string) $model->provider)
+        ->unique()
+        ->join(', ', ' or ');
 
     $faqs = array_values(array_filter([
         ["Can {$assistantName} create, change, or delete my CRM data without my approval?", "No. {$assistantName} proposes every create, update, and delete as a card showing exactly what will change. Nothing is written until you confirm it, and you can discard any proposal. An unanswered proposal expires after {$proposalExpiry}. Reading and searching need no approval."],
         ['Do external AI agents need my approval for each change?', "No. An agent you connect over MCP, such as Claude or ChatGPT, acts with your permissions in the one workspace you approved, and its changes apply directly. Only {$assistantName} adds a review step before every write."],
-        ["Does {$assistantName} send my data to OpenAI or Anthropic?", "On Relaticle Cloud, {$assistantName} runs on the model you pick from Anthropic, OpenAI, or Google. Self-hosted installs use their own provider keys or a local model through Ollama, so the destination is yours to choose. Conversation history is stored only in your Relaticle database, and Relaticle never trains on your data."],
+        ["Does {$assistantName} send my data to OpenAI or Anthropic?", "On Relaticle Cloud, {$assistantName} runs on the {$offeredProviders} model you pick in the message box. Self-hosted installs use their own provider keys or a local model through Ollama, so the destination is yours to choose. Relaticle keeps your conversation history in its own database, and the provider you pick processes each message under its own terms. Relaticle never trains on your data."],
         [
             __('What does Relaticle cost, and what happens when the trial ends?'),
-            __('Relaticle Cloud is $:price a month per workspace billed yearly ($:monthly billed monthly), with unlimited users and records. Every new workspace starts a :days-day Cloud Pro trial with no card. Hosted access pauses when the trial ends without a subscription; your data stays and resumes when you subscribe.', [
+            __('Cloud Pro is $:price a month per workspace billed yearly ($:monthly billed monthly), with unlimited users and records. Every new workspace starts a :days-day Cloud Pro trial with no card. Hosted access pauses when the trial ends without a subscription; your data stays and resumes when you subscribe.', [
                 'price' => \App\Enums\Plan::Pro->yearlyPricePerMonth(),
                 'monthly' => \App\Enums\Plan::Pro->monthlyPrice(),
                 'days' => \App\Models\Workspace::PRO_TRIAL_DAYS,
             ]),
         ],
-        ['How do I deploy Relaticle?', 'The quickest way is the hosted version at app.relaticle.com: sign up and start. To run it yourself, deploy with Docker Compose on your own server, and your data never leaves it.'],
+        ['How do I deploy Relaticle?', 'The quickest way is the hosted version at app.relaticle.com: sign up and start. To run it yourself, deploy with Docker Compose on your own server. Your CRM database stays there, and AI requests go only to the provider you configure.'],
         ['Can I customize the data model?', 'Yes. Add custom fields to any record: text, email, phone, currency, date, select, multi-select, and links to other records. You can encrypt sensitive fields. No code changes needed.'],
         ['Is Relaticle production-ready?', 'Yes. Relaticle Cloud runs in production today. Every change passes an automated test suite before it ships. Each workspace\'s data stays separate behind role-based permissions.'],
         $emailIntegrationActive

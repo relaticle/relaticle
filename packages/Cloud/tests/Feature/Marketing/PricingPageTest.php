@@ -35,7 +35,7 @@ it('shows the pro tier when billing is on', function (): void {
         ->assertSee('Cloud Pro')
         ->assertSee('Prefer to self-host? It’s free.')
         ->assertSee('Start for free')
-        ->assertSee('14-day trial. No card required.')
+        ->assertSee('14-day Cloud Pro trial. No card required.')
         ->assertDontSee('One workspace price as your workspace grows')
         ->assertDontSee('300 AI credits')
         ->assertDontSee('Generous free tier');
@@ -323,7 +323,7 @@ it('offers a prepaid credit top-up instead of a hard stop in the billing-on plan
 
     $this->get('/pricing')
         ->assertOk()
-        ->assertSee('buy a prepaid credit top-up instead of waiting');
+        ->assertSee('buy a prepaid credit pack instead of waiting');
 });
 
 it('never names a model the app cannot actually serve', function (): void {
@@ -336,7 +336,7 @@ it('never names a model the app cannot actually serve', function (): void {
         ->assertOk()
         ->assertDontSee('Gemini')
         ->assertSee(__('Which AI models does my plan unlock?'))
-        ->assertSee('Sonnet 5 and self-hosted models')
+        ->assertSee('1x for Sonnet 5;', false)
         ->assertSee('GPT 5.5, Opus 5 and GPT 5.4');
 });
 
@@ -352,11 +352,11 @@ it('pins the exact membership of every model list derived from the chat catalog'
     $this->get('/pricing')
         ->assertOk()
         // $freeCloudModels, via $modelsUnlockAnswer
-        ->assertSee('Every plan can use Sonnet 5 and any self-hosted model you connect yourself.')
+        ->assertSee('Every plan can use Sonnet 5.')
         // $paidCloudModels, via $modelsUnlockAnswer
         ->assertSee('Cloud Pro additionally unlocks the higher-multiplier models: GPT 5.5, Opus 5 and GPT 5.4.')
         // $multiplierOneModels, $multiplierOneHalfModels, $multiplierThreeModels, via $creditFaqAnswer
-        ->assertSee('1x for Sonnet 5 and self-hosted models; 1.5x for GPT 5.5 and GPT 5.4; 3x for Opus 5)', false);
+        ->assertSee('1x for Sonnet 5; 1.5x for GPT 5.5 and GPT 5.4; 3x for Opus 5)', false);
 });
 
 /**
@@ -373,7 +373,7 @@ it('names the models a plan includes even when this install holds no provider ke
 
     $this->get('/pricing')
         ->assertOk()
-        ->assertSee('Every plan can use Sonnet 5 and any self-hosted model you connect yourself.')
+        ->assertSee('Every plan can use Sonnet 5.')
         ->assertSee('Cloud Pro additionally unlocks the higher-multiplier models: GPT 5.5, Opus 5 and GPT 5.4', false)
         ->assertSee('3x for Opus 5', false)
         ->assertDontSee('Gemini');
@@ -474,7 +474,7 @@ it('names every offered model in exactly one multiplier clause', function (): vo
     assertNoCopyHoles($html);
 
     // 2x and 7.5x are multipliers the old three-bucket copy could not express at all.
-    expect($html)->toContain('1x for Alpha One and self-hosted models')
+    expect($html)->toContain('1x for Alpha One;')
         ->toContain('2x for Beta Two')
         ->toContain('7.5x for Gamma Seven');
 });
@@ -504,7 +504,9 @@ it('leaves no hole when the catalog offers nothing on the free plan', function (
 
     assertNoCopyHoles($html);
 
-    expect($html)->toContain('Every plan can use any self-hosted model you connect yourself.');
+    expect($html)->toContain('Cloud Pro unlocks Beta Two.')
+        ->not->toContain('Every plan can use')
+        ->not->toContain('self-hosted model you connect');
 });
 
 it('leaves no hole when the catalog offers nothing on a paid plan', function (): void {
