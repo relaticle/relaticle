@@ -259,6 +259,14 @@ it('records a mailbox that was already failing before health tracking without te
     $this->artisan('email:check-mailbox-health');
 
     Notification::assertNothingSent();
+
+    $account->update(['status' => EmailAccountStatus::ACTIVE, 'last_synced_at' => now()]);
+    $this->artisan('email:check-mailbox-health');
+    $account->update(['status' => EmailAccountStatus::ERROR]);
+    $this->travel(15)->minutes();
+    $this->artisan('email:check-mailbox-health');
+
+    Notification::assertSentToTimes($this->owner, MailboxHealthNotification::class, 1);
 });
 
 it('tells the owner when a mailbox connected after health tracking fails', function (): void {
@@ -354,3 +362,50 @@ it('renders owner and admin copy for every unhealthy state', function (MailboxHe
 })->with([
     MailboxHealth::Stale, MailboxHealth::Error, MailboxHealth::ReauthRequired, MailboxHealth::PausedBilling,
 ])->with(['owner' => false, 'admins' => true]);
+
+it('tells the owner about a billing pause after reconnecting a mailbox from before health tracking', function (): void {
+    Notification::fake();
+    Bus::fake();
+    withHostedBilling();
+    $workspace = BillingStatusFixture::workspace();
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $workspace->id, 'user_id' => $workspace->user_id, 'sync_cursor' => 'cursor',
+        'status' => EmailAccountStatus::REAUTH_REQUIRED, 'health_changed_at' => null,
+    ]));
+    $account->delete();
+
+    reconnect($workspace->owner, $account);
+
+    expect($account->fresh()->health)->toBe(MailboxHealth::PausedBilling)
+        ->and($account->fresh()->health_changed_at)->not->toBeNull();
+
+    $this->artisan('email:check-mailbox-health');
+
+    Notification::assertSentToTimes($workspace->owner, MailboxHealthNotification::class, 1);
+});
+
+it('sends no late admin notice for a mailbox reconnected while the check runs', function (): void {
+    Notification::fake();
+    $member = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $account = healthMailbox($member, ['status' => EmailAccountStatus::REAUTH_REQUIRED]);
+    $this->artisan('email:check-mailbox-health');
+    $this->travel(73)->hours();
+    $reconnected = false;
+    ConnectedAccount::retrieved(function (ConnectedAccount $retrieved) use ($account, &$reconnected): void {
+        if ($reconnected || ! $retrieved->is($account)) {
+            return;
+        }
+
+        $reconnected = true;
+        ConnectedAccount::query()->whereKey($account->id)->update([
+            'status' => EmailAccountStatus::ACTIVE->value, 'health' => MailboxHealth::Healthy->value,
+            'health_changed_at' => now(), 'health_notified_at' => null, 'last_synced_at' => now(),
+        ]);
+    });
+
+    $this->artisan('email:check-mailbox-health');
+
+    expect($reconnected)->toBeTrue();
+    Notification::assertNotSentTo($this->owner, MailboxHealthNotification::class);
+});

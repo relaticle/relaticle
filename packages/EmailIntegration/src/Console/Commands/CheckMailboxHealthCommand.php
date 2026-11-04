@@ -81,6 +81,11 @@ final class CheckMailboxHealthCommand extends Command
             return $account;
         }
 
+        return $this->reloaded($account);
+    }
+
+    private function reloaded(ConnectedAccount $account): ?ConnectedAccount
+    {
         $fresh = $account->fresh(['user', 'workspace']);
 
         return $fresh instanceof ConnectedAccount && ! $fresh->trashed() && $fresh->status !== EmailAccountStatus::DISCONNECTED ? $fresh : null;
@@ -101,6 +106,16 @@ final class CheckMailboxHealthCommand extends Command
             : $changedAt->lte(now()->subHours(self::ADMIN_NOTICE_AFTER_HOURS))
                 && ($notifiedAt === null || $notifiedAt->lt($changedAt->addHours(self::ADMIN_NOTICE_AFTER_HOURS)));
 
+        if (! $ownerDue && ! $adminsDue) {
+            return;
+        }
+
+        $current = $this->reloaded($account);
+
+        if (! $current instanceof ConnectedAccount || $current->health !== $account->health || ! $current->health_changed_at?->equalTo($changedAt)) {
+            return;
+        }
+
         if ($ownerDue) {
             $account->user->notify(new MailboxHealthNotification($account, $account->health, forAdmins: false));
         }
@@ -109,9 +124,7 @@ final class CheckMailboxHealthCommand extends Command
             Notification::send($this->adminsOf($account), new MailboxHealthNotification($account, $account->health, forAdmins: true));
         }
 
-        if ($ownerDue || $adminsDue) {
-            $account->forceFill(['health_notified_at' => now()])->save();
-        }
+        $account->forceFill(['health_notified_at' => now()])->save();
     }
 
     /** @return Collection<int, User> */

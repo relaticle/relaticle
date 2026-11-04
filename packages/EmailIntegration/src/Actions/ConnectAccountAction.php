@@ -115,6 +115,10 @@ final readonly class ConnectAccountAction
     // A reconnect cannot lift a billing pause, so it keeps that state and its sent notices.
     private function recordHealthAfterConnect(ConnectedAccount $account): void
     {
+        if ($account->health_changed_at === null) {
+            $account->forceFill(['health_changed_at' => now()])->save();
+        }
+
         $hasHostedAccess = ConnectedAccount::withTrashed()->whereKey($account->getKey())->inWorkspaceWithHostedAccess()->exists();
 
         $this->recordMailboxHealth->execute($account, $hasHostedAccess ? MailboxHealth::Healthy : MailboxHealth::PausedBilling);
