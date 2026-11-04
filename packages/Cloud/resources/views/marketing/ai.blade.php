@@ -142,24 +142,24 @@
 >
     <x-cloud::marketing.hero>
         <x-slot:eyebrow>
-            <x-cloud::marketing.eyebrow>{{ __('Meet :name', ['name' => $assistantName]) }}</x-cloud::marketing.eyebrow>
+            <x-cloud::marketing.eyebrow>{{ __(':name, the built-in AI assistant', ['name' => $assistantName]) }}</x-cloud::marketing.eyebrow>
         </x-slot:eyebrow>
 
         <x-slot:title>
-            {{ __('The AI assistant inside your CRM.') }}
-            <span class="text-gray-500 dark:text-gray-400">{{ __('It asks before it writes.') }}</span>
+            {{ __(':name drafts every change.', ['name' => $assistantName]) }}
+            <span class="text-gray-500 min-[360px]:whitespace-nowrap dark:text-gray-400">{{ __('You make the call.') }}</span>
         </x-slot:title>
 
         <x-slot:aside>
             <p class="text-base leading-relaxed text-gray-500 md:text-lg dark:text-gray-400">
-                {{ __(':name, the built-in AI assistant, finds, creates and updates your records. You approve every change before it happens.', ['name' => $assistantName]) }}
+                {{ __('It opens beside every page in Relaticle and answers from your records. Nothing it proposes is saved until you approve it.') }}
             </p>
 
             <div class="mt-7 flex flex-col gap-3 sm:flex-row">
                 <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="hero">
                     {{ __('Start for free') }}
                 </x-cloud::marketing.button>
-                <x-cloud::marketing.button variant="secondary" href="#demo">
+                <x-cloud::marketing.button variant="secondary" href="#demo" class="lg:hidden">
                     {{ __('See it work') }}
                 </x-cloud::marketing.button>
             </div>
