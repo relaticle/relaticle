@@ -19,6 +19,7 @@ final readonly class RecordMailboxHealth
             'health_changed_at' => $account->health === $health ? $account->health_changed_at : now(),
             'health' => $health,
             'health_reason' => $reason,
+            'health_notified_at' => $health === MailboxHealth::Healthy ? null : $account->health_notified_at,
         ])->save();
     }
 }

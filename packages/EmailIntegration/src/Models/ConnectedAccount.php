@@ -379,16 +379,26 @@ final class ConnectedAccount extends Model
             ! $workspaceHasHostedAccess => MailboxHealth::PausedBilling,
             $this->status === EmailAccountStatus::REAUTH_REQUIRED => MailboxHealth::ReauthRequired,
             $this->status === EmailAccountStatus::ERROR => MailboxHealth::Error,
-            $this->sync_cursor !== null && ($this->last_synced_at === null || $this->last_synced_at->lt(now()->subHours(self::STALE_AFTER_HOURS))) => MailboxHealth::Stale,
+            $this->health === MailboxHealth::PausedBilling => MailboxHealth::Healthy,
+            $this->sync_cursor !== null && $this->hasNotSyncedSince(now()->subHours(self::STALE_AFTER_HOURS)) => MailboxHealth::Stale,
             default => MailboxHealth::Healthy,
         };
+    }
+
+    // A mailbox that just turned healthy, as one leaving a billing pause does, gets a full day from then.
+    private function hasNotSyncedSince(CarbonInterface $since): bool
+    {
+        $healthySince = $this->health === MailboxHealth::Healthy ? $this->health_changed_at : null;
+        $lastGoodAt = collect([$this->last_synced_at, $healthySince])->filter()->max();
+
+        return $lastGoodAt === null || $lastGoodAt->lt($since);
     }
 
     public function healthReason(MailboxHealth $health): ?string
     {
         return match ($health) {
             MailboxHealth::Stale => 'no_sync_24h',
-            MailboxHealth::Error, MailboxHealth::ReauthRequired => SyncErrorReason::tryFrom((string) $this->last_error)?->value,
+            MailboxHealth::Error, MailboxHealth::ReauthRequired => $this->syncError()?->value,
             MailboxHealth::Healthy, MailboxHealth::PausedBilling => null,
         };
     }
@@ -405,7 +415,12 @@ final class ConnectedAccount extends Model
 
     public function syncErrorReason(): ?string
     {
-        return SyncErrorReason::tryFrom((string) $this->last_error)?->getLabel();
+        return $this->syncError()?->getLabel();
+    }
+
+    public function syncError(): ?SyncErrorReason
+    {
+        return SyncErrorReason::tryFrom((string) $this->last_error);
     }
 
     /**
