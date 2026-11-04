@@ -24,6 +24,7 @@ use Livewire\Attributes\On;
 use Relaticle\EmailIntegration\Data\ConversationFilters;
 use Relaticle\EmailIntegration\Data\ConversationPage;
 use Relaticle\EmailIntegration\Enums\ConversationView;
+use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Actions\ConnectMailboxAction;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConversationsFlag;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailComposeActions;
@@ -130,10 +131,12 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
         if (filled($emailId)) {
             $this->selectedEmailId = $emailId;
+            unset($this->selectedEmail);
+            $this->selectedEmailId = $this->selectedEmail() instanceof Email ? $emailId : null;
         }
 
         $this->conversationsCursor = null;
-        unset($this->emails, $this->conversations, $this->automatedCount);
+        unset($this->emails, $this->conversations, $this->automatedCount, $this->selectedEmail);
     }
 
     #[Computed]
@@ -168,7 +171,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
         }
 
         return resolve(ConversationsQuery::class)
-            ->counts($this->authUser(), ConversationFilters::forRecord($this->ownerRecordWithEmails()))['automated'];
+            ->count($this->authUser(), ConversationView::Automated, ConversationFilters::forRecord($this->ownerRecordWithEmails()));
     }
 
     public function updatedShowAutomated(): void
@@ -293,18 +296,40 @@ abstract class BaseEmailsRelationManager extends RelationManager
         }
 
         if ($this->showsConversations()) {
-            return $this->readableConversationCopy($this->selectedEmailId);
+            return $this->recordConversationCopy($this->selectedEmailId) ?? $this->recordEmail($this->selectedEmailId, undeliveredOwnOnly: true);
         }
+
+        return $this->recordEmail($this->selectedEmailId);
+    }
+
+    private function recordConversationCopy(string $emailId): ?Email
+    {
+        $email = $this->readableConversationCopy($emailId);
+
+        if (! $email instanceof Email || ! resolve(ConversationsQuery::class)->contains($this->authUser(), (string) $email->conversation_key, ConversationFilters::forRecord($this->ownerRecordWithEmails()))) {
+            return null;
+        }
+
+        return $email;
+    }
+
+    // A send just queued from this tab is not delivered yet, so no conversation holds it.
+    private function recordEmail(string $emailId, bool $undeliveredOwnOnly = false): ?Email
+    {
+        $user = $this->authUser();
 
         /** @var Email|null $email */
         $email = $this->ownerRecordWithEmails()
             ->emails()
             ->with(['body', 'participants', 'labels', 'attachments', 'from'])
-            ->withGlobalScope('visible', new VisibleEmailScope($this->authUser()))
-            ->whereKey($this->selectedEmailId)
+            ->withGlobalScope('visible', new VisibleEmailScope($user))
+            ->when($undeliveredOwnOnly, fn (EloquentBuilder $own): EloquentBuilder => $own
+                ->where('emails.user_id', $user->getKey())
+                ->whereNotIn('emails.status', [EmailStatus::SYNCED, EmailStatus::SENT]))
+            ->whereKey($emailId)
             ->first();
 
-        if (! $email instanceof Email || $this->authUser()->cannot('viewBody', $email)) {
+        if (! $email instanceof Email || $user->cannot('viewBody', $email)) {
             return null;
         }
 

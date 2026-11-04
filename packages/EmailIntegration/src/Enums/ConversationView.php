@@ -10,6 +10,8 @@ enum ConversationView: string implements HasLabel
 {
     public const int AWAITING_REPLY_BUSINESS_DAYS = 3;
 
+    public const int COUNT_CAP = 100;
+
     case NeedsReply = 'needs_reply';
     case AwaitingReply = 'awaiting_reply';
     case All = 'all';
@@ -25,6 +27,11 @@ enum ConversationView: string implements HasLabel
             self::Unlinked => __('filament/pages/email-inbox.views.unlinked'),
             self::Automated => __('filament/pages/email-inbox.views.automated'),
         };
+    }
+
+    public static function countLabel(int $count): string
+    {
+        return $count >= self::COUNT_CAP ? (self::COUNT_CAP - 1).'+' : (string) $count;
     }
 
     public function isPrimary(): bool

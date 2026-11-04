@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Enums\CustomFields\CompanyField;
 use App\Features\EmailConversations;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
 use App\Filament\Resources\CompanyResource\RelationManagers\EmailsRelationManager;
 use App\Models\Company;
+use App\Models\CustomField;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Str;
@@ -21,6 +23,7 @@ use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManag
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
+use Relaticle\EmailIntegration\Models\WorkspaceEmailBlocklist;
 use Relaticle\EmailIntegration\Queries\ConversationsQuery;
 
 use function Pest\Laravel\actingAs;
@@ -167,6 +170,69 @@ it('opens the reader from the email in the URL only while conversations are on',
     Feature::for($this->workspace)->deactivate(EmailConversations::class);
 
     Livewire::withQueryParams(['email' => $email->id])
+        ->test(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
+        ->assertSet('selectedEmailId', null)
+        ->assertDontSeeHtml('fi-email-reader-panel');
+});
+
+it('leaves out the viewer own conversation linked to another company', function (): void {
+    $linked = conversationsRecordMessage($this->ownerMailbox, 'conv-linked', 'brian@airbnb.test');
+    $this->company->emails()->attach($linked->id);
+    $other = Company::factory()->create(['workspace_id' => $this->workspace->id, 'name' => 'Stripe']);
+    $other->emails()->attach(conversationsRecordMessage($this->ownerMailbox, 'conv-stripe', 'olivia@stripe.test')->id);
+
+    $html = livewire(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])->html();
+
+    expect(conversationsRecordKeys($html))->toBe(['conv-linked']);
+});
+
+it('lists no conversations on a company whose mailbox is hidden', function (): void {
+    $domains = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->workspace->id)
+        ->where('entity_type', 'company')
+        ->where('code', CompanyField::DOMAINS->value)
+        ->firstOrFail();
+    $this->company->saveCustomFieldValue($domains, ['https://airbnb.test'], $this->workspace);
+    Feature::for($this->workspace)->activate(EmailConversations::class);
+    WorkspaceEmailBlocklist::factory()->protected()->domain('airbnb.test')->create([
+        'workspace_id' => $this->workspace->id,
+        'created_by' => $this->owner->id,
+    ]);
+    $email = conversationsRecordMessage($this->ownerMailbox, 'conv-human', 'brian@airbnb.test');
+    $this->company->emails()->attach($email->id);
+
+    $html = livewire(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])->html();
+
+    expect(conversationsRecordKeys($html))->toBe([]);
+});
+
+it('opens the queued send on the record and drops an id it cannot open', function (): void {
+    $queued = Email::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->owner->id,
+        'connected_account_id' => $this->ownerMailbox->id,
+        'direction' => EmailDirection::OUTBOUND,
+        'status' => EmailStatus::QUEUED,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'is_internal' => false,
+        'sent_at' => null,
+    ]);
+    $this->company->emails()->attach($queued->id);
+
+    livewire(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
+        ->dispatch('composer:sent', emailId: $queued->id)
+        ->assertSet('selectedEmailId', $queued->id)
+        ->assertSeeHtml('fi-email-reader-panel')
+        ->dispatch('composer:sent', emailId: (string) Str::ulid())
+        ->assertSet('selectedEmailId', null)
+        ->assertDontSeeHtml('fi-email-reader-panel');
+});
+
+it('opens only this record conversations from the email in the URL', function (): void {
+    $elsewhere = conversationsRecordMessage($this->ownerMailbox, 'conv-stripe', 'olivia@stripe.test');
+
+    Livewire::withQueryParams(['email' => $elsewhere->id])
         ->test(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
         ->assertSet('selectedEmailId', null)
         ->assertDontSeeHtml('fi-email-reader-panel');

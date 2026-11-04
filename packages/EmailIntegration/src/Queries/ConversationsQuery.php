@@ -71,7 +71,7 @@ final readonly class ConversationsQuery
         $counts = DB::query();
 
         foreach ([ConversationView::NeedsReply, ConversationView::Unlinked, ConversationView::Automated] as $view) {
-            $counts->selectSub($this->conversations($viewer, $visible, $view, $filters)->toBase()->selectRaw('count(*)'), $view->value);
+            $counts->selectSub($this->cappedCount($viewer, $visible, $view, $filters), $view->value);
         }
 
         $row = (array) $counts->first();
@@ -81,6 +81,38 @@ final readonly class ConversationsQuery
             'unlinked' => (int) $row[ConversationView::Unlinked->value],
             'automated' => (int) $row[ConversationView::Automated->value],
         ];
+    }
+
+    public function count(User $viewer, ConversationView $view, ConversationFilters $filters): int
+    {
+        Gate::forUser($viewer)->authorize('viewAny', Email::class);
+
+        return (int) $this->cappedCount($viewer, new VisibleEmailScope($viewer), $view, $filters)->value('count');
+    }
+
+    public function contains(User $viewer, string $conversationKey, ConversationFilters $filters): bool
+    {
+        Gate::forUser($viewer)->authorize('viewAny', Email::class);
+
+        return $this->visibleCopiesOf($viewer, new VisibleEmailScope($viewer), $filters)
+            ->where('emails.conversation_key', $conversationKey)
+            ->exists();
+    }
+
+    /**
+     * @param  VisibleEmailScope<Model>  $visible
+     */
+    private function cappedCount(User $viewer, VisibleEmailScope $visible, ConversationView $view, ConversationFilters $filters): BaseBuilder
+    {
+        // The view order keeps the planner on the view indexes; unordered, Unlinked hashes every email first.
+        $matches = $this->conversations($viewer, $visible, $view, $filters)
+            ->latest('last_message_at')
+            ->orderByDesc('id')
+            ->toBase()
+            ->select('email_conversations.id')
+            ->limit(ConversationView::COUNT_CAP);
+
+        return DB::query()->fromSub($matches, 'capped')->selectRaw('count(*) as count');
     }
 
     /** @return EloquentCollection<int, Email> */

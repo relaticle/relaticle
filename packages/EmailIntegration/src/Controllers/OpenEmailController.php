@@ -12,6 +12,7 @@ use App\Filament\Resources\PeopleResource;
 use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Models\Workspace;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,10 +21,14 @@ use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManager;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\Scopes\ActiveAccountScope;
+use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Queries\ConversationsQuery;
+use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 
 final readonly class OpenEmailController
 {
+    public function __construct(private EmailVisibilityService $visibility) {}
+
     /** @var array<string, class-string<CompanyResource|OpportunityResource|PeopleResource>> */
     private const array RECORD_RESOURCES = [
         'company' => CompanyResource::class,
@@ -39,6 +44,8 @@ final readonly class OpenEmailController
         $workspace = $this->bindWorkspace($user, $target);
 
         if (! Feature::for($workspace)->active(EmailConversations::class)) {
+            $this->assertVisible($user, $target);
+
             return redirect()->to(Dashboard::getUrl(
                 $user->can('viewBody', $target) ? ['email' => $target->getKey()] : [],
                 panel: 'app',
@@ -59,6 +66,15 @@ final readonly class OpenEmailController
         abort_unless($email instanceof Email && $user->belongsToWorkspaceId($email->workspace_id), 404);
 
         return $email;
+    }
+
+    private function assertVisible(User $user, Email $email): void
+    {
+        abort_unless(Email::query()
+            ->withoutGlobalScope(ActiveAccountScope::class)
+            ->withGlobalScope('visible', new VisibleEmailScope($user))
+            ->whereKey($email->getKey())
+            ->exists(), 404);
     }
 
     private function bindWorkspace(User $user, Email $email): Workspace
@@ -98,9 +114,10 @@ final readonly class OpenEmailController
                 ->where('workspace_id', $workspace->getKey())
                 ->whereKey($recordIds->all())
                 ->oldest('id')
-                ->first();
+                ->get()
+                ->first(fn (Model $linked): bool => ! $this->visibility->hidesRecordMailbox($linked));
 
-            if ($record !== null) {
+            if ($record instanceof Model) {
                 return $resource::getUrl('view', [
                     'record' => $record,
                     'relation' => BaseEmailsRelationManager::relationKeyOn($resource),

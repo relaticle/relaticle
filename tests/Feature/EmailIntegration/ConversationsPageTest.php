@@ -503,3 +503,14 @@ it('keeps the default view while paging even when its count changes', function (
 
     expect(conversationsPageKeys($page->call('$refresh')->html()))->toBe([]);
 });
+
+it('stops each view count at the cap and shows it as 99+', function (): void {
+    foreach (range(1, ConversationView::COUNT_CAP + 1) as $index) {
+        conversationsPageMessage($this->ownerMailbox, "conv-{$index}", "c{$index}@client.test");
+    }
+
+    $page = livewire(EmailInboxPage::class);
+
+    expect($page->instance()->viewCounts['needs_reply'])->toBe(ConversationView::COUNT_CAP);
+    $page->assertSeeHtml('>99+</span>');
+});

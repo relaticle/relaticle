@@ -21,6 +21,6 @@
             'rounded px-1.5 py-0.5 text-[11px] font-semibold leading-none tabular-nums',
             'bg-gray-200 text-gray-700 dark:bg-white/10 dark:text-gray-200' => $active,
             'bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-gray-400' => ! $active,
-        ])>{{ $badge > 99 ? '99+' : $badge }}</span>
+        ])>{{ \Relaticle\EmailIntegration\Enums\ConversationView::countLabel($badge) }}</span>
     @endif
 </button>

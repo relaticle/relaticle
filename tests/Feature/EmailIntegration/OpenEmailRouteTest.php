@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Enums\CustomFields\CompanyField;
 use App\Features\EmailConversations;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\CompanyResource\RelationManagers\EmailsRelationManager as CompanyEmailsRelationManager;
 use App\Models\Company;
+use App\Models\CustomField;
 use App\Models\User;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
@@ -20,6 +22,7 @@ use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
+use Relaticle\EmailIntegration\Models\WorkspaceEmailBlocklist;
 
 use function Pest\Laravel\actingAs;
 
@@ -176,3 +179,41 @@ it('leaves a resolved link to the record Emails tab instead of the panel reader'
     'conversations on' => [true, 0],
     'conversations off' => [false, 1],
 ]);
+
+it('skips a linked record whose Emails tab hides the mailbox', function (): void {
+    $domains = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->workspace->id)
+        ->where('entity_type', 'company')
+        ->where('code', CompanyField::DOMAINS->value)
+        ->firstOrFail();
+    $this->company->saveCustomFieldValue($domains, ['https://secret.example'], $this->workspace);
+    Feature::for($this->workspace)->activate(EmailConversations::class);
+    WorkspaceEmailBlocklist::factory()->protected()->domain('secret.example')->create([
+        'workspace_id' => $this->workspace->id,
+        'created_by' => $this->owner->id,
+    ]);
+    $email = conversationsRouteMessage($this->ownerMailbox, 'conv-secret', 'brian@secret.example');
+    $this->company->emails()->attach($email->id);
+
+    $this->get(route('email.open', $email))
+        ->assertRedirect(EmailInboxPage::getUrl(['view' => 'all', 'email' => $email->id], tenant: $this->workspace));
+
+    $open = Company::factory()->create(['workspace_id' => $this->workspace->id, 'name' => 'Stripe']);
+    $open->emails()->attach($email->id);
+    $relation = (string) array_search(CompanyEmailsRelationManager::class, CompanyResource::getRelations(), true);
+
+    $this->get(route('email.open', $email))
+        ->assertRedirect(CompanyResource::getUrl('view', ['record' => $open, 'relation' => $relation, 'email' => $email->id], tenant: $this->workspace));
+});
+
+it('answers a hidden or trashed email with not found while conversations are off', function (): void {
+    Feature::for($this->workspace)->deactivate(EmailConversations::class);
+    $private = conversationsRouteMessage($this->teammateMailbox, 'conv-private', 'olivia@stripe.test', ['privacy_tier' => EmailPrivacyTier::PRIVATE]);
+    $this->company->emails()->attach($private->id);
+    $trashed = conversationsRouteMessage($this->ownerMailbox, 'conv-trashed', 'brian@airbnb.test');
+    $trashed->delete();
+
+    $this->get(route('email.open', $private))->assertNotFound();
+    $this->get(route('email.open', $trashed))->assertNotFound();
+});

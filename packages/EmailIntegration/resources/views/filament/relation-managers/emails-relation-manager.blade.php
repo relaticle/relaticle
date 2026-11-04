@@ -38,7 +38,7 @@
                         >
                             {{ $showAutomated
                                 ? __('filament/pages/record-emails.automated_toggle_hide')
-                                : trans_choice('filament/pages/record-emails.automated_toggle', $this->automatedCount, ['count' => $this->automatedCount]) }}
+                                : trans_choice('filament/pages/record-emails.automated_toggle', $this->automatedCount, ['count' => \Relaticle\EmailIntegration\Enums\ConversationView::countLabel($this->automatedCount)]) }}
                         </button>
                     @endif
 
