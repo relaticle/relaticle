@@ -676,3 +676,54 @@ it('moves to the next and previous conversation in list order', function (): voi
 
     expect($page->html())->toMatch('/data-reader-action="previous"[^>]*\sdisabled\s/');
 });
+
+it('opens the viewer own preferred copy when the bell names another copy they may see', function (): void {
+    $carol = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+    $this->workspace->users()->attach($carol, ['role' => 'member']);
+    $bens = conversationsPageMessage($this->teammateMailbox, 'conv-shared-copy', 'olivia@airbnb.test', [
+        'subject' => 'Shared renewal',
+        'rfc_message_id' => '<renewal@airbnb.test>',
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+    ]);
+    EmailShare::factory()->create(['email_id' => $bens->id, 'shared_with' => $this->owner->id, 'shared_by' => $this->teammate->id, 'tier' => EmailPrivacyTier::FULL]);
+    $carols = conversationsPageMessage(conversationsPageMailbox($carol, 'carol@acme.test'), 'conv-shared-copy', 'olivia@airbnb.test', [
+        'subject' => 'Shared renewal',
+        'rfc_message_id' => '<renewal@airbnb.test>',
+    ]);
+    $this->company->emails()->attach($carols->id);
+    $preferred = resolve(ConversationsQuery::class)->messages($this->owner, 'conv-shared-copy')->sole();
+
+    expect($preferred->id)->toBe($carols->id);
+
+    livewire(EmailInboxPage::class)
+        ->dispatch('email:open', emailId: $bens->id)
+        ->assertSet('selectedEmailId', $carols->id)
+        ->assertSeeHtml('fi-email-reader-drawer')
+        ->assertSee('Shared renewal')
+        ->assertDontSee(__('filament/pages/email-inbox.drawer.not_available'));
+});
+
+it('shows the subject gate when a share opens the subject of a who and when email', function (): void {
+    $bens = conversationsPageMessage($this->teammateMailbox, 'conv-subject-share', 'olivia@airbnb.test', [
+        'subject' => 'Contract redlines',
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+    ]);
+    EmailShare::factory()->create(['email_id' => $bens->id, 'shared_with' => $this->owner->id, 'shared_by' => $this->teammate->id, 'tier' => EmailPrivacyTier::SUBJECT]);
+
+    livewire(EmailInboxPage::class)
+        ->call('selectEmail', $bens->id)
+        ->assertSee(__('filament/pages/email-inbox.drawer.gate.subject.heading'))
+        ->assertDontSee(__('filament/pages/email-inbox.drawer.gate.metadata_only.heading'))
+        ->assertSee('Contract redlines');
+});
+
+it('shows the not available line on the page for mail no conversation holds yet', function (): void {
+    $unkeyed = conversationsPageMessage($this->ownerMailbox, 'conv-unkeyed', 'brian@airbnb.test', ['subject' => 'Unkeyed renewal']);
+    $unkeyed->forceFill(['conversation_key' => null])->saveQuietly();
+
+    Livewire::withQueryParams(['email' => $unkeyed->id])
+        ->test(EmailInboxPage::class)
+        ->assertSet('selectedEmailId', $unkeyed->id)
+        ->assertSee(__('filament/pages/email-inbox.drawer.not_available'))
+        ->assertDontSee('Unkeyed renewal');
+});

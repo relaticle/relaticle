@@ -54,6 +54,10 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
     #[Locked]
     public bool $hostsReader = false;
 
+    // A record page's Emails tab may not be mounted, so the bell reloads the page through the resolver.
+    #[Locked]
+    public bool $readerOnRecordPage = false;
+
     public function mount(): void
     {
         if ($this->selectedEmailId !== null && ! $this->hostsReader) {
@@ -65,6 +69,12 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
     public function selectEmail(string $emailId): void
     {
         $this->closeNotificationsPanel();
+
+        if ($this->readerOnRecordPage) {
+            $this->redirect(route('email.open', $emailId));
+
+            return;
+        }
 
         if ($this->hostsReader) {
             $this->dispatch('email:open', emailId: $emailId);

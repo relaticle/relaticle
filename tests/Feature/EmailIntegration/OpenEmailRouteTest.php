@@ -8,6 +8,7 @@ use App\Filament\Pages\Dashboard;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
 use App\Filament\Resources\CompanyResource\RelationManagers\EmailsRelationManager as CompanyEmailsRelationManager;
+use App\Filament\Resources\CompanyResource\RelationManagers\NotesRelationManager;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\User;
@@ -254,4 +255,17 @@ it('follows a link to a locked email to the gate with its subject hidden everywh
         ->assertSeeHtml("data-reader-gate=\"{$locked->id}\"")
         ->assertSee(__('filament/pages/email-inbox.subject.hidden'))
         ->assertDontSee('Contract redlines');
+});
+
+it('leaves a link on another record tab to the Emails tab so the page never opens two readers', function (): void {
+    $email = conversationsRouteMessage($this->ownerMailbox, 'conv-route', 'brian@airbnb.test');
+    $this->company->emails()->attach($email->id);
+    $notes = (string) array_search(NotesRelationManager::class, CompanyResource::getRelations(), true);
+
+    $html = (string) $this->get(CompanyResource::getUrl('view', ['record' => $this->company, 'relation' => $notes, 'email' => $email->id], tenant: $this->workspace))
+        ->assertOk()
+        ->getContent();
+
+    expect(substr_count($html, 'fi-email-reader-drawer'))->toBe(0)
+        ->and(substr_count($html, 'fi-email-reader-panel'))->toBe(0);
 });

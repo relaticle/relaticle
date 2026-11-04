@@ -9,6 +9,7 @@ use App\Filament\Resources\CompanyResource\RelationManagers\EmailsRelationManage
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\User;
+use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
@@ -291,21 +292,32 @@ it('deep links to a locked email land on the gate, and to hidden mail on the not
         ->assertDontSee('Ben side project');
 });
 
-it('reads the same not available line for missing, private and unlinked teammate mail', function (): void {
+it('reads the same not available line for missing, private, unlinked teammate and other workspace mail', function (): void {
     $private = conversationsRecordMessage($this->teammateMailbox, 'conv-private', 'olivia@airbnb.test', [
         'subject' => 'Private compensation thread',
         'privacy_tier' => EmailPrivacyTier::PRIVATE,
     ]);
     $this->company->emails()->attach($private->id);
     $unlinked = conversationsRecordMessage($this->teammateMailbox, 'conv-unlinked', 'olivia@airbnb.test', ['subject' => 'Ben side project']);
+    $otherWorkspace = Workspace::factory()->create();
+    $otherWorkspace->users()->attach($this->owner, ['role' => 'member']);
+    $otherMailbox = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $otherWorkspace->id,
+        'user_id' => $this->owner->id,
+        'email_address' => 'ana@other.test',
+        'status' => 'active',
+    ]));
+    $elsewhere = conversationsRecordMessage($otherMailbox, 'conv-elsewhere', 'kim@other.test', ['subject' => 'Other workspace deal']);
+    $this->company->emails()->attach($elsewhere->id);
 
-    foreach ([(string) Str::ulid(), $private->id, $unlinked->id] as $id) {
+    foreach ([(string) Str::ulid(), $private->id, $unlinked->id, $elsewhere->id] as $id) {
         Livewire::withQueryParams(['email' => $id])
             ->test(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
             ->assertSet('selectedEmailId', $id)
             ->assertSee(__('filament/pages/email-inbox.drawer.not_available'))
             ->assertDontSee('Private compensation thread')
             ->assertDontSee('Ben side project')
+            ->assertDontSee('Other workspace deal')
             ->call('deselectEmail')
             ->assertSet('selectedEmailId', null)
             ->assertDontSee(__('filament/pages/email-inbox.drawer.not_available'));
@@ -344,4 +356,17 @@ it('saves the reply draft when the client clears the email open on the record', 
         ->set('selectedEmailId', null)
         ->assertDispatched('composer:dismiss-inline')
         ->assertDontSeeHtml('fi-email-reader-drawer');
+});
+
+it('shows the not available line for mail no conversation holds yet', function (): void {
+    $unkeyed = conversationsRecordMessage($this->ownerMailbox, 'conv-unkeyed', 'brian@airbnb.test', ['subject' => 'Unkeyed renewal']);
+    $unkeyed->forceFill(['conversation_key' => null])->saveQuietly();
+    $this->company->emails()->attach($unkeyed->id);
+
+    livewire(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
+        ->dispatch('email:open', emailId: $unkeyed->id)
+        ->assertNoRedirect()
+        ->assertSet('selectedEmailId', $unkeyed->id)
+        ->assertSee(__('filament/pages/email-inbox.drawer.not_available'))
+        ->assertDontSee('Unkeyed renewal');
 });

@@ -53,7 +53,9 @@ final readonly class OpenEmailController
             ));
         }
 
-        $copy = $this->viewerCopy($user, $target, $conversations);
+        $copy = $conversations->viewerCopy($user, $target);
+
+        abort_unless($copy instanceof Email, 404);
 
         return redirect()->to($this->recordUrl($copy, $workspace)
             ?? EmailInboxPage::getUrl(['view' => 'all', 'email' => $copy->getKey()], panel: 'app', tenant: $workspace));
@@ -85,20 +87,6 @@ final readonly class OpenEmailController
         $user->setRelation('currentWorkspace', $workspace);
 
         return $workspace;
-    }
-
-    private function viewerCopy(User $user, Email $email, ConversationsQuery $conversations): Email
-    {
-        abort_if(blank($email->conversation_key), 404);
-
-        $copies = $conversations->messages($user, (string) $email->conversation_key);
-        $copy = filled($email->rfc_message_id)
-            ? $copies->firstWhere('rfc_message_id', $email->rfc_message_id)
-            : $copies->find($email->getKey());
-
-        abort_unless($copy instanceof Email, 404);
-
-        return $copy;
     }
 
     private function recordUrl(Email $copy, Workspace $workspace): ?string

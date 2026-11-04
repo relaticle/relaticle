@@ -133,14 +133,21 @@ trait HasConversationReader
         $this->markThreadRead();
     }
 
-    // Mail the viewer may read elsewhere is dropped; mail they may not see at all opens as not available.
+    // A link opens the viewer's own copy of the message. Mail this host does not list is dropped;
+    // mail the viewer cannot see, or that no conversation holds yet, opens as not available.
     protected function openLinkedEmail(string $id): void
     {
-        $this->openConversationReader($id);
+        $email = $this->resolveWorkspaceEmail($id, 'view');
+        $copy = $email instanceof Email ? resolve(ConversationsQuery::class)->viewerCopy($this->readerUser(), $email) : null;
 
-        if ($this->selectedEmailId === null && ! $this->resolveWorkspaceEmail($id, 'view') instanceof Email) {
+        if (! $copy instanceof Email) {
+            $this->openConversationReader($id);
             $this->selectedEmailId = $id;
+
+            return;
         }
+
+        $this->openConversationReader($copy->getKey());
     }
 
     /** @return list<string> */

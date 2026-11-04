@@ -598,3 +598,25 @@ function handlerConversationEmail(object $test): Email
         'sent_at' => now(),
     ]);
 }
+
+it('reloads a record page through the resolver when the bell opens an email there', function (): void {
+    Feature::for($this->workspace)->activate(EmailConversations::class);
+    $email = handlerConversationEmail($this);
+
+    Livewire::test(EmailAccessNotificationHandler::class, ['hostsReader' => true, 'readerOnRecordPage' => true])
+        ->call('selectEmail', $email->getKey())
+        ->assertNotDispatched('email:open')
+        ->assertRedirect(route('email.open', $email->getKey()))
+        ->assertDontSeeHtml('fi-email-reader-drawer');
+});
+
+it('shows the not available line in the bell drawer for mail no conversation holds yet', function (): void {
+    Feature::for($this->workspace)->activate(EmailConversations::class);
+    $email = handlerConversationEmail($this);
+    $email->forceFill(['conversation_key' => null])->saveQuietly();
+
+    Livewire::test(EmailAccessNotificationHandler::class)
+        ->call('selectEmail', $email->getKey())
+        ->assertSee(__('filament/pages/email-inbox.drawer.not_available'))
+        ->assertDontSee('Kickoff agenda');
+});
