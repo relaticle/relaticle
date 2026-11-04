@@ -14,6 +14,10 @@
         />
     @endunless
 
+    @php
+        $pageTabShown = $this->showsConversations ? $tab : ($tab ?? \Relaticle\EmailIntegration\Enums\EmailPageTab::DRAFTS);
+    @endphp
+
     {{-- ── Page tabs: the drafts, outbox, failed and template lists, each a nested
          Livewire component also hosted by a standalone page. ────────────── --}}
     <div data-reveal-active-tab class="flex items-center gap-1 overflow-x-auto border-b border-gray-200/60 px-4 py-3 lg:px-6 dark:border-white/10">
@@ -46,13 +50,13 @@
         @foreach (\Relaticle\EmailIntegration\Enums\EmailPageTab::cases() as $pageTab)
             <x-email-integration::page-tab
                 :tab="$pageTab"
-                :active="$tab === $pageTab"
+                :active="$pageTabShown === $pageTab"
                 :badge="$this->tabCounts[$pageTab->value] ?? null"
             />
         @endforeach
     </div>
 
-    @if ($tab === null)
+    @if ($pageTabShown === null)
         <div class="divide-y divide-gray-200/60 dark:divide-white/10">
             @forelse ($this->conversations as $row)
                 <x-email-integration::conversation-row :row="$row" selectable wire:key="conversation-{{ $row->conversationKey }}" />
@@ -72,7 +76,7 @@
             layer="z-50"
         />
     @else
-        @livewire($tab->livewireComponent(), $tab->livewireParameters(), key($tab->value.'-table'))
+        @livewire($pageTabShown->livewireComponent(), $pageTabShown->livewireParameters(), key($pageTabShown->value.'-table'))
     @endif
 
     <x-filament-actions::modals />

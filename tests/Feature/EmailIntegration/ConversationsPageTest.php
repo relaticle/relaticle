@@ -14,11 +14,13 @@ use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
 use Relaticle\EmailIntegration\Enums\AutomatedReason;
 use Relaticle\EmailIntegration\Enums\ConversationView;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Enums\EmailPageTab;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailBlocklist;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailRead;
 use Relaticle\EmailIntegration\Models\EmailShare;
@@ -210,12 +212,22 @@ it('lists what the viewer sent three business days ago with no answer since', fu
     $answeredByBen = conversationsPageMessage($this->ownerMailbox, 'conv-ben-followed', 'ana@acme.test', ['sent_at' => now()->subDays(6)]);
     $followUp = conversationsPageMessage($this->teammateMailbox, 'conv-ben-followed', 'ben@acme.test', ['sent_at' => now()->subDays(5)]);
     $this->company->emails()->attach([$answeredByBen->id, $followUp->id]);
+    conversationsPageMessage($this->ownerMailbox, 'conv-customer-replied', 'ana@acme.test', ['sent_at' => CarbonImmutable::parse('2026-10-27 10:00', 'America/New_York')]);
+    conversationsPageMessage($this->ownerMailbox, 'conv-customer-replied', 'brian@airbnb.test', ['sent_at' => CarbonImmutable::parse('2026-10-28 10:00', 'America/New_York')]);
 
     livewire(EmailInboxPage::class)
         ->call('setView', ConversationView::AwaitingReply->value)
         ->assertSeeHtml('data-conversation="conv-tuesday"')
         ->assertDontSeeHtml('data-conversation="conv-wednesday"')
-        ->assertDontSeeHtml('data-conversation="conv-ben-followed"');
+        ->assertDontSeeHtml('data-conversation="conv-ben-followed"')
+        ->assertDontSeeHtml('data-conversation="conv-customer-replied"');
+
+    $this->travelTo(CarbonImmutable::parse('2026-10-31 10:00', 'America/New_York'));
+
+    livewire(EmailInboxPage::class)
+        ->call('setView', ConversationView::AwaitingReply->value)
+        ->assertSeeHtml('data-conversation="conv-tuesday"')
+        ->assertDontSeeHtml('data-conversation="conv-wednesday"');
 
     $this->travelTo(CarbonImmutable::parse('2026-11-02 10:00', 'America/New_York'));
 
@@ -316,4 +328,48 @@ it('opens the reader only on a copy the viewer may see', function (): void {
         ->call('selectEmail', $own->id)
         ->assertSet('selectedEmailId', $own->id)
         ->assertSeeHtml('fi-email-reader-panel');
+});
+
+it('keeps a conversation out of Needs reply when the viewer own copy is blocked by their mailbox', function (): void {
+    conversationsPageMessage($this->ownerMailbox, 'conv-blocked', 'spam@blocked.test');
+    $teammateCopy = conversationsPageMessage($this->teammateMailbox, 'conv-blocked', 'brian@airbnb.test');
+    $this->company->emails()->attach($teammateCopy->id);
+    EmailBlocklist::factory()->email('spam@blocked.test')->create([
+        'user_id' => $this->owner->id,
+        'workspace_id' => $this->workspace->id,
+        'connected_account_id' => $this->ownerMailbox->id,
+    ]);
+
+    $page = livewire(EmailInboxPage::class)->call('setView', ConversationView::NeedsReply->value);
+
+    expect(conversationsPageKeys($page->html()))->toBe([])
+        ->and($page->instance()->viewCounts['needs_reply'])->toBe(0);
+
+    expect(conversationsPageKeys($page->call('setView', ConversationView::All->value)->html()))->toBe(['conv-blocked']);
+});
+
+it('lists and counts only the current workspace when another holds the same conversation key', function (): void {
+    conversationsPageMessage($this->ownerMailbox, 'conv-shared-key', 'brian@airbnb.test');
+    $before = resolve(ConversationsQuery::class)->counts($this->owner);
+
+    $stranger = User::factory()->withWorkspace()->create();
+    conversationsPageMessage(conversationsPageMailbox($stranger, 'sam@other.test'), 'conv-shared-key', 'brian@airbnb.test');
+    conversationsPageMessage(conversationsPageMailbox($stranger, 'sam2@other.test'), 'conv-foreign', 'zoe@figma.test');
+
+    $html = livewire(EmailInboxPage::class)->call('setView', ConversationView::All->value)->html();
+
+    expect(conversationsPageKeys($html))->toBe(['conv-shared-key'])
+        ->and(resolve(ConversationsQuery::class)->counts($this->owner))->toBe($before);
+});
+
+it('keeps the drafts page when conversations are off, even with a view in the URL', function (): void {
+    conversationsPageMessage($this->ownerMailbox, 'conv-waiting', 'brian@airbnb.test');
+    Feature::for($this->workspace)->deactivate(EmailConversations::class);
+
+    Livewire::withQueryParams(['view' => 'needs_reply'])
+        ->test(EmailInboxPage::class)
+        ->assertSet('tab', EmailPageTab::DRAFTS)
+        ->assertSeeHtml('aria-current="true"')
+        ->assertDontSeeHtml('data-view=')
+        ->assertDontSeeHtml('data-conversation=');
 });

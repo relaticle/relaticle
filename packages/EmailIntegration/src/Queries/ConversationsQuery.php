@@ -109,7 +109,7 @@ final readonly class ConversationsQuery
     /** @return Builder<Email> */
     private function ownCopies(User $viewer): Builder
     {
-        return $this->delivered(Email::query())
+        return VisibleEmailScope::whereNotBlocked($this->delivered(Email::query()), $viewer->current_workspace_id)
             ->whereColumn('emails.workspace_id', 'email_conversations.workspace_id')
             ->whereColumn('emails.conversation_key', 'email_conversations.conversation_key')
             ->where('emails.user_id', $viewer->getKey());
@@ -134,8 +134,9 @@ final readonly class ConversationsQuery
      */
     private function awaitingReply(Builder $query, User $viewer): Builder
     {
-        // Counted in whole business days on the viewer's calendar, so mail sent at any hour of a day ages together.
-        $cutoff = now()->setTimezone($viewer->effectiveTimezone())
+        // Whole business days on the viewer's calendar; a weekend counts back from Friday, never as one.
+        $today = now()->setTimezone($viewer->effectiveTimezone());
+        $cutoff = ($today->isWeekend() ? $today->previousWeekday() : $today)
             ->subWeekdays(ConversationView::AWAITING_REPLY_BUSINESS_DAYS)
             ->endOfDay()
             ->utc();
