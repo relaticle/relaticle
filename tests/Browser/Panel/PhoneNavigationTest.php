@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Models\Company;
+use App\Models\People;
+use App\Models\Task;
 use App\Models\User;
 use App\Providers\AppServiceProvider;
 
@@ -11,6 +13,8 @@ mutates(AppServiceProvider::class);
 const OPEN_SHEET = "[...document.querySelectorAll('.fi-dropdown-panel[x-ref=panel]')].find((panel) => panel.style.display === 'block')";
 
 const ROW_MENU_TRIGGER = '.fi-ta-row:first-of-type .fi-ta-actions .fi-dropdown-trigger';
+
+const SHEET_HOLDS_BOTTOM_EDGE = '(() => '.OPEN_SHEET.'.contains(document.elementFromPoint(innerWidth / 2, innerHeight - 4)))()';
 
 function phoneCompaniesPage(User $user): mixed
 {
@@ -59,6 +63,25 @@ it('opens a row menu as a sheet along the bottom edge of a phone', function (): 
         ->click(ROW_MENU_TRIGGER)
         ->wait(0.5)
         ->assertScript('(() => { const r = '.OPEN_SHEET.'.getBoundingClientRect(); return r.left === 0 && r.right === innerWidth && Math.round(r.bottom) === innerHeight; })()', true)
+        ->assertScript(SHEET_HOLDS_BOTTOM_EDGE, true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('keeps a sheet opened on a record page above the tab bar', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $person = People::factory()->recycle([$user, $workspace])->create();
+    Task::factory()->recycle([$user, $workspace])->create()->people()->attach($person);
+
+    loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(393, 852)
+        ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}")
+        ->click('.fi-record-pane .fi-ta-row .fi-ta-actions .fi-dropdown-trigger')
+        ->wait(0.5)
+        ->assertScript(SHEET_HOLDS_BOTTOM_EDGE, true)
         ->assertNoJavaScriptErrors();
 });
 

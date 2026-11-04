@@ -2081,8 +2081,39 @@ html.fi:has(body.fi-onboarding-wizard),
 }
 
 /* Phones: a tab bar replaces the topbar's menu button, and menus and dialogs rise from the bottom edge. */
+
+/* Phones scroll the document rather than the content box. iOS clips a fixed sheet or dialog to a scrolling
+   box it sits in, and only the document gets tap-to-top and Safari's collapsing toolbar. */
+@media (width < 40rem) {
+    html.fi:has(body.fi-panel-app .fi-app-layout),
+    .fi-body.fi-panel-app:has(.fi-app-layout),
+    .fi-app-layout,
+    .fi-app-main-wrapper > .fi-layout {
+        height: auto;
+        overflow: visible;
+    }
+
+    html.fi:has(body.fi-panel-app .fi-app-layout) {
+        overflow-x: clip;
+    }
+
+    .fi-body.fi-panel-app:has(.fi-app-layout) {
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+
+    .fi-app-layout {
+        min-height: 100dvh;
+    }
+
+    .fi-app-main-wrapper > .fi-topbar-ctn {
+        padding-top: env(safe-area-inset-top);
+    }
+}
+
+/* z-25: above the content's own layers (the table toolbar is 21), under the sidebar overlay (29). */
 .fi-bottom-nav {
-    @apply flex h-(--bottom-nav-height) shrink-0 border-t border-gray-200 bg-white sm:hidden dark:border-white/10 dark:bg-gray-900;
+    @apply sticky bottom-0 z-25 box-content flex h-(--bottom-nav-height) shrink-0 border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)] sm:hidden dark:border-white/10 dark:bg-gray-900;
 }
 
 .fi-bottom-nav-item {
@@ -2120,17 +2151,18 @@ html.fi:has(body.fi-onboarding-wizard),
     }
 }
 
-/* iOS clips a fixed element to the touch-scrolling box it sits in, so every box a sheet or dialog can open
-   from stops scrolling while it is open. Hidden still keeps its scroll position. */
-:is(.fi-app-main-wrapper > .fi-layout, .fi-ta-content-ctn, .ff-columns, .ff-cards):has(.fi-dropdown-panel[x-ref='panel'][style*='display: block'], .fi-modal.fi-modal-open) {
+/* The table and board still scroll their own boxes, so those stop while a sheet is open. Hidden keeps the offset. */
+:is(.fi-ta-content-ctn, .ff-columns, .ff-cards):has(.fi-dropdown-panel[x-ref='panel'][style*='display: block']) {
     @apply max-sm:overflow-hidden!;
 }
 
-/* A sheet opened from the page must outrank the topbar, and a stacked row's actions cell the table header. */
-.fi-app-main-wrapper:has(> .fi-layout .fi-dropdown-panel[x-ref='panel'][style*='display: block']) > .fi-topbar-ctn {
-    @apply max-sm:z-0;
+/* A sheet or dialog from the page must outrank the topbar and tab bar. The record pane isolates its content at
+   level 0, so both bars stop sticking and leave the stacking order, keeping their space so nothing shifts. */
+.fi-app-main-wrapper:has(> .fi-layout :is(.fi-dropdown-panel[x-ref='panel'][style*='display: block'], .fi-modal.fi-modal-open)) > :is(.fi-topbar-ctn, .fi-bottom-nav) {
+    @apply max-sm:static max-sm:z-auto;
 }
 
+/* A stacked row's actions cell must outrank the table header. */
 .fi-ta-cell:has(.fi-dropdown-panel[x-ref='panel'][style*='display: block']) {
     @apply max-sm:z-40;
 }
