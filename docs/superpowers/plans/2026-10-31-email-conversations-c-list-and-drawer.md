@@ -343,7 +343,7 @@ by a minimal row. Later tasks deepen each layer.
   `automatedReason` (`?AutomatedReason`). Docblock carries the array shapes only.
 - [ ] `ConversationsQuery` (`final readonly`), constructor-injected `PrivacyService`,
   `PreferredEmailCopyService`, `EmailSearchService`. Public:
-  `paginate(User $viewer, ConversationView $view, ConversationFilters $filters, int $perPage = 50, ?string $cursor = null): CursorPaginator`,
+  `paginate(User $viewer, ConversationView $view, ConversationFilters $filters, int $perPage = 50, ?string $cursor = null): ConversationPage`,
   `counts(User $viewer): array`, `messages(User $viewer, string $conversationKey): Collection`.
   First line of each: `Gate::forUser($viewer)->authorize('viewAny', Email::class)`, the sibling of
   the `viewAny` rule in `.ai/rules/queries.md`. Private steps, each under 60 lines:
@@ -368,7 +368,8 @@ by a minimal row. Later tasks deepen each layer.
   - `visibleMessageStats(User, list<string>)`: one grouped query returning per key the count of
     `distinct coalesce(rfc_message_id, id)` and `max(sent_at)` among visible copies.
 - [ ] Order `last_message_at desc, id desc` and call `cursorPaginate($perPage, ['*'], 'cursor', $cursor ? Cursor::fromEncoded($cursor) : null)`.
-  Then replace the collection with `rows()`. `simplePaginate` and `paginate` are not used: both page
+  Then return a `ConversationPage` of `rows()` with the paginator's encoded next and previous cursors: a
+  `CursorPaginator` over rows cannot build a cursor, because rows lack `last_message_at` and `id`. `simplePaginate` and `paginate` are not used: both page
   by offset.
 - [ ] `PrivacyService::effectiveTier()` calls `PreferredEmailCopyService::viewerHasSyncedCopy()`
   (`src/Services/PrivacyService.php:40`), which queries per teammate row

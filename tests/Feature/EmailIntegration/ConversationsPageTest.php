@@ -7,6 +7,8 @@ use App\Models\Company;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Facade;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
@@ -372,4 +374,60 @@ it('keeps the drafts page when conversations are off, even with a view in the UR
         ->assertSeeHtml('aria-current="true"')
         ->assertDontSeeHtml('data-view=')
         ->assertDontSeeHtml('data-conversation=');
+});
+
+it('pages through conversations that share a timestamp with no repeats and no gaps', function (): void {
+    $this->travelTo(now()->startOfMinute());
+
+    foreach (range(1, 49) as $index) {
+        conversationsPageMessage($this->ownerMailbox, "conv-{$index}", "c{$index}@client.test", ['sent_at' => now()->subMinutes($index)]);
+    }
+
+    foreach (['tie-a', 'tie-b', 'tie-c'] as $key) {
+        conversationsPageMessage($this->ownerMailbox, $key, 'tie@client.test', ['sent_at' => now()->subHours(2)]);
+    }
+
+    $page = livewire(EmailInboxPage::class)->call('setView', ConversationView::All->value);
+    $first = conversationsPageKeys($page->html());
+    $second = conversationsPageKeys($page->call('nextConversationsPage')->html());
+    $back = conversationsPageKeys($page->call('previousConversationsPage')->html());
+
+    expect($first)->toHaveCount(50)
+        ->and($second)->toHaveCount(2)
+        ->and(array_intersect($first, $second))->toBe([])
+        ->and(array_unique([...$first, ...$second]))->toHaveCount(52)
+        ->and($back)->toBe($first);
+});
+
+it('renders a page of conversations in the same number of queries for 3 or 20 rows', function (): void {
+    $render = function (int $rows): int {
+        app()->forgetScopedInstances();
+        Facade::clearResolvedInstances();
+        Feature::for($this->workspace)->activate(EmailConversations::class);
+        Filament::setCurrentPanel(Filament::getPanel('app'));
+        Filament::setTenant($this->workspace);
+        $queries = 0;
+        DB::listen(function () use (&$queries): void {
+            $queries++;
+        });
+
+        $html = livewire(EmailInboxPage::class)->call('setView', ConversationView::All->value)->html();
+
+        expect(conversationsPageKeys($html))->toHaveCount($rows);
+
+        return $queries;
+    };
+
+    $seed = function (int $from, int $to): void {
+        foreach (range($from, $to) as $index) {
+            $email = conversationsPageMessage($index % 2 === 0 ? $this->ownerMailbox : $this->teammateMailbox, "conv-{$index}", "c{$index}@client.test");
+            $this->company->emails()->attach($email->id);
+        }
+    };
+
+    $seed(1, 3);
+    $few = $render(3);
+    $seed(4, 20);
+
+    expect($render(20))->toBe($few);
 });

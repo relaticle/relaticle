@@ -209,6 +209,8 @@ return [
         'all' => 'All',
         'unlinked' => 'Unlinked',
         'automated' => 'Automated',
+        'newer' => 'Newer',
+        'older' => 'Older',
         'empty' => [
             'needs_reply' => 'Nothing is waiting on you.',
             'awaiting_reply' => 'No one owes you a reply.',

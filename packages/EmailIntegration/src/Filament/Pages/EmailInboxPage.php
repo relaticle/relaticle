@@ -10,12 +10,11 @@ use Filament\Pages\Page;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Pagination\CursorPaginator;
 use Illuminate\Support\Collection as SupportCollection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 use Relaticle\EmailIntegration\Data\ConversationFilters;
-use Relaticle\EmailIntegration\Data\ConversationRow;
+use Relaticle\EmailIntegration\Data\ConversationPage;
 use Relaticle\EmailIntegration\Enums\ConversationView;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPageTab;
@@ -34,6 +33,7 @@ use Relaticle\EmailIntegration\Queries\ConversationsQuery;
 /**
  * @property-read ConversationView $activeView
  * @property-read array{needs_reply: int, unlinked: int, automated: int} $viewCounts
+ * @property-read ConversationPage $conversations
  * @property-read Email|null $selectedEmail
  * @property-read SupportCollection<int, EmailAccessRequest> $pendingAccessRequests
  */
@@ -107,6 +107,8 @@ final class EmailInboxPage extends Page
     #[Url(as: 'email')]
     public ?string $selectedEmailId = null;
 
+    public ?string $conversationsCursor = null;
+
     public function mount(): void
     {
         if (! $this->showsConversations()) {
@@ -146,7 +148,28 @@ final class EmailInboxPage extends Page
 
         $this->conversationView = ConversationView::from($view);
         $this->tab = null;
+        $this->conversationsCursor = null;
         unset($this->activeView, $this->conversations);
+    }
+
+    public function nextConversationsPage(): void
+    {
+        $this->moveConversationsCursor($this->conversations->nextCursor);
+    }
+
+    public function previousConversationsPage(): void
+    {
+        $this->moveConversationsCursor($this->conversations->previousCursor);
+    }
+
+    private function moveConversationsCursor(?string $cursor): void
+    {
+        if ($cursor === null) {
+            return;
+        }
+
+        $this->conversationsCursor = $cursor;
+        unset($this->conversations);
     }
 
     #[Computed]
@@ -174,14 +197,14 @@ final class EmailInboxPage extends Page
         return $this->conversationsEnabled($workspace instanceof Workspace ? $workspace : null);
     }
 
-    /** @return CursorPaginator<int, ConversationRow> */
     #[Computed]
-    public function conversations(): CursorPaginator
+    public function conversations(): ConversationPage
     {
         return resolve(ConversationsQuery::class)->paginate(
             $this->authUser(),
             $this->activeView,
             new ConversationFilters,
+            cursor: $this->conversationsCursor,
         );
     }
 

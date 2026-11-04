@@ -12,12 +12,12 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Query\Builder as BaseBuilder;
 use Illuminate\Pagination\Cursor;
-use Illuminate\Pagination\CursorPaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Data\ConversationFilters;
+use Relaticle\EmailIntegration\Data\ConversationPage;
 use Relaticle\EmailIntegration\Data\ConversationRow;
 use Relaticle\EmailIntegration\Enums\ConversationView;
 use Relaticle\EmailIntegration\Enums\EmailCategory;
@@ -42,8 +42,7 @@ final readonly class ConversationsQuery
         private EmailSearchService $search,
     ) {}
 
-    /** @return CursorPaginator<int, ConversationRow> */
-    public function paginate(User $viewer, ConversationView $view, ConversationFilters $filters, int $perPage = 50, ?string $cursor = null): CursorPaginator
+    public function paginate(User $viewer, ConversationView $view, ConversationFilters $filters, int $perPage = 50, ?string $cursor = null): ConversationPage
     {
         Gate::forUser($viewer)->authorize('viewAny', Email::class);
 
@@ -52,7 +51,12 @@ final readonly class ConversationsQuery
             ->orderByDesc('id')
             ->cursorPaginate($perPage, ['*'], 'cursor', $cursor === null ? null : Cursor::fromEncoded($cursor));
 
-        return $page->setCollection($this->rows($viewer, $page->getCollection()));
+        // Cursors are read off the summary models, which carry the order columns the rows do not.
+        return new ConversationPage(
+            rows: array_values($this->rows($viewer, $page->getCollection())->all()),
+            nextCursor: $page->nextCursor()?->encode(),
+            previousCursor: $page->previousCursor()?->encode(),
+        );
     }
 
     /** @return array{needs_reply: int, unlinked: int, automated: int} */
@@ -296,6 +300,7 @@ final readonly class ConversationsQuery
             ->selectRaw('distinct on (emails.conversation_key) emails.*')
             ->withRecordLinkState()
             ->selectSub($this->viewerSyncedCopy($viewer), 'viewer_has_synced_copy')
+            ->selectSub($this->viewerMessageShareTier($viewer), 'viewer_message_share_tier')
             ->withExists(['accessRequests as viewer_has_pending_access_request' => fn (Builder $requests): Builder => $requests
                 ->where('requester_id', $viewer->getKey())
                 ->scopes(['open'])])
@@ -318,6 +323,21 @@ final readonly class ConversationsQuery
             ->whereColumn('viewer_copies.rfc_message_id', 'emails.rfc_message_id')
             ->where('viewer_copies.user_id', $viewer->getKey())
             ->selectRaw('true')
+            ->limit(1);
+    }
+
+    private function viewerMessageShareTier(User $viewer): BaseBuilder
+    {
+        return DB::table('email_shares')
+            ->join('emails as shared_copies', 'shared_copies.id', '=', 'email_shares.email_id')
+            ->join('connected_accounts as shared_copy_accounts', 'shared_copy_accounts.id', '=', 'shared_copies.connected_account_id')
+            ->whereNull('shared_copies.deleted_at')
+            ->whereNull('shared_copy_accounts.deleted_at')
+            ->whereColumn('email_shares.workspace_id', 'emails.workspace_id')
+            ->whereColumn('shared_copies.workspace_id', 'emails.workspace_id')
+            ->whereColumn('shared_copies.rfc_message_id', 'emails.rfc_message_id')
+            ->where('email_shares.shared_with', $viewer->getKey())
+            ->select('email_shares.tier')
             ->limit(1);
     }
 

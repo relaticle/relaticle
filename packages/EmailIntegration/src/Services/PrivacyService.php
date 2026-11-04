@@ -43,10 +43,10 @@ final readonly class PrivacyService
 
         // Per-email share overrides the email's own tier (uses the loaded relation when
         // eager-loaded, so filtering a list of emails doesn't issue a query per row).
-        $share = $this->shareForViewer($email, $viewer);
+        $sharedTier = $this->sharedTierForViewer($email, $viewer);
 
-        if ($share instanceof EmailShare) {
-            $tier = EmailPrivacyTier::from($share->tier);
+        if ($sharedTier !== null) {
+            $tier = EmailPrivacyTier::from($sharedTier);
 
             if ($tier === EmailPrivacyTier::PRIVATE) {
                 return null;
@@ -79,17 +79,23 @@ final readonly class PrivacyService
         return $workspace->default_email_sharing_tier ?? EmailPrivacyTier::METADATA_ONLY;
     }
 
-    private function shareForViewer(Email $email, User $viewer): ?EmailShare
+    private function sharedTierForViewer(Email $email, User $viewer): ?string
     {
         $email->loadMissing('shares');
         $direct = $email->shares->firstWhere('shared_with', $viewer->getKey());
 
         if ($direct instanceof EmailShare) {
-            return $direct;
+            return $direct->tier;
         }
 
         if (blank($email->rfc_message_id)) {
             return null;
+        }
+
+        if (array_key_exists('viewer_message_share_tier', $email->getAttributes())) {
+            $preloaded = $email->getAttribute('viewer_message_share_tier');
+
+            return is_string($preloaded) ? $preloaded : null;
         }
 
         return EmailShare::query()
@@ -100,6 +106,6 @@ final readonly class PrivacyService
                     ->where('workspace_id', $email->workspace_id)
                     ->where('rfc_message_id', $email->rfc_message_id);
             })
-            ->first();
+            ->value('tier');
     }
 }

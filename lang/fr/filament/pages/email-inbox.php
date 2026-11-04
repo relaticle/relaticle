@@ -9,6 +9,8 @@ return [
         'all' => 'Toutes',
         'unlinked' => 'Non liées',
         'automated' => 'Automatiques',
+        'newer' => 'Plus récentes',
+        'older' => 'Plus anciennes',
         'empty' => [
             'needs_reply' => 'Rien ne vous attend.',
             'awaiting_reply' => 'Personne ne vous doit de réponse.',

@@ -58,7 +58,7 @@
 
     @if ($pageTabShown === null)
         <div class="divide-y divide-gray-200/60 dark:divide-white/10">
-            @forelse ($this->conversations as $row)
+            @forelse ($this->conversations->rows as $row)
                 <x-email-integration::conversation-row :row="$row" selectable wire:key="conversation-{{ $row->conversationKey }}" />
             @empty
                 <x-filament::empty-state
@@ -69,6 +69,31 @@
                 />
             @endforelse
         </div>
+
+        @if ($this->conversations->previousCursor !== null || $this->conversations->nextCursor !== null)
+            <div class="flex items-center justify-between border-t border-gray-200/60 px-4 py-3 sm:px-6 dark:border-white/10">
+                <button
+                    type="button"
+                    wire:click="previousConversationsPage"
+                    wire:loading.attr="disabled"
+                    @disabled($this->conversations->previousCursor === null)
+                    class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
+                >
+                    <x-heroicon-o-chevron-left class="h-3.5 w-3.5" />
+                    {{ __('filament/pages/email-inbox.views.newer') }}
+                </button>
+                <button
+                    type="button"
+                    wire:click="nextConversationsPage"
+                    wire:loading.attr="disabled"
+                    @disabled($this->conversations->nextCursor === null)
+                    class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
+                >
+                    {{ __('filament/pages/email-inbox.views.older') }}
+                    <x-heroicon-o-chevron-right class="h-3.5 w-3.5" />
+                </button>
+            </div>
+        @endif
 
         <x-email-integration::reader-overlay
             :email="$this->selectedEmail"
