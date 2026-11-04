@@ -7,6 +7,11 @@
             :action="$this->connectMailboxAction"
             :secondary-action="$this->connectAzureAction"
         />
+    @else
+        <x-email-integration::mailbox-health-banner
+            :mailboxes="$this->unhealthyMailboxes"
+            class="border-b border-gray-200/60 dark:border-white/10"
+        />
     @endunless
 
     {{-- ── Page tabs: the drafts, outbox, failed and template lists, each a nested

@@ -15,6 +15,8 @@ use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPageTab;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Enums\MailboxHealth;
+use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Livewire\AccessRequestsTable;
 use Relaticle\EmailIntegration\Livewire\DraftsTable;
@@ -414,4 +416,32 @@ it('lists shared and own templates in the templates tab', function (): void {
     Livewire::test(TemplatesTable::class)
         ->assertCanSeeTableRecords([$mine])
         ->assertCanNotSeeTableRecords([$foreign]);
+});
+
+it('warns the viewer about their own mailbox that needs reconnecting, with a reconnect link', function (): void {
+    $this->account->forceFill(['health' => MailboxHealth::ReauthRequired, 'health_changed_at' => now()])->save();
+
+    Livewire::test(EmailInboxPage::class)
+        ->assertSeeHtml('data-mailbox-health="reauth_required"')
+        ->assertSee(__('filament/pages/email-accounts.actions.reconnect'))
+        ->assertSeeHtml('href="'.e(EmailAccountsPage::getUrl(panel: 'app', tenant: $this->workspace)).'"');
+
+    expect(EmailInboxPage::getNavigationBadge())->toBe(__('filament/pages/email-inbox.health.nav_badge'));
+});
+
+it('shows no banner or dot for a teammate unhealthy mailbox or a paused one without reconnect', function (): void {
+    $teammate = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+    $this->workspace->users()->attach($teammate, ['role' => 'member']);
+    ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->health(MailboxHealth::Error)->create([
+        'workspace_id' => $this->workspace->id, 'user_id' => $teammate->id,
+    ]));
+
+    Livewire::test(EmailInboxPage::class)->assertDontSeeHtml('data-mailbox-health');
+    expect(EmailInboxPage::getNavigationBadge())->toBeNull();
+
+    $this->account->forceFill(['health' => MailboxHealth::PausedBilling, 'health_changed_at' => now()])->save();
+
+    Livewire::test(EmailInboxPage::class)
+        ->assertSeeHtml('data-mailbox-health="paused_billing"')
+        ->assertDontSee(__('filament/pages/email-accounts.actions.reconnect'));
 });

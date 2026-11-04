@@ -20,6 +20,8 @@
             'flex flex-col',
             'invisible' => $this->selectedEmail !== null,
         ])>
+            <x-email-integration::mailbox-health-banner :mailboxes="$this->unhealthyMailboxes" class="pb-0 sm:px-6" />
+
             <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-4 sm:px-6">
                 <div class="min-w-[10rem] max-w-sm flex-1">
                     <x-email-integration::search-bar :search="$search" :framed="false" />

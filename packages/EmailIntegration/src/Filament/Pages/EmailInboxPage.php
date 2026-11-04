@@ -9,6 +9,7 @@ use App\Models\Workspace;
 use Filament\Pages\Page;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -38,6 +39,32 @@ final class EmailInboxPage extends Page
     public static function getNavigationLabel(): string
     {
         return __('filament/pages/email-inbox.navigation_label');
+    }
+
+    public static function getNavigationBadge(): ?string
+    {
+        $user = auth()->user();
+        $workspace = filament()->getTenant();
+
+        if (! $user instanceof User || ! $workspace instanceof Workspace) {
+            return null;
+        }
+
+        if (ConnectedAccount::query()->ownedBy($user, $workspace)->connected()->unhealthy()->doesntExist()) {
+            return null;
+        }
+
+        return __('filament/pages/email-inbox.health.nav_badge');
+    }
+
+    public static function getNavigationBadgeColor(): string
+    {
+        return 'danger';
+    }
+
+    public static function getNavigationBadgeTooltip(): string
+    {
+        return __('filament/pages/email-inbox.health.nav_tooltip');
     }
 
     public function getTitle(): string
@@ -86,6 +113,19 @@ final class EmailInboxPage extends Page
         $workspace = filament()->getTenant();
 
         return ConnectedAccount::hasConnectedFor($this->authUser(), $workspace instanceof Workspace ? $workspace : null);
+    }
+
+    /** @return Collection<int, ConnectedAccount> */
+    #[Computed]
+    public function unhealthyMailboxes(): Collection
+    {
+        $workspace = filament()->getTenant();
+
+        if (! $workspace instanceof Workspace) {
+            return new Collection;
+        }
+
+        return ConnectedAccount::query()->ownedBy($this->authUser(), $workspace)->connected()->unhealthy()->with('workspace')->get();
     }
 
     public function connectMailboxAction(): ConnectMailboxAction

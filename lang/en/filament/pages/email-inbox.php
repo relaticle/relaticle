@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 return [
     'navigation_label' => 'Emails',
+    'health' => [
+        'nav_badge' => '!',
+        'nav_tooltip' => 'One of your mailboxes needs attention',
+    ],
     'account_filter' => [
         'label' => 'Account',
     ],

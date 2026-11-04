@@ -8,10 +8,12 @@ use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
+use App\Models\Workspace;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphPivot;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -21,6 +23,7 @@ use Livewire\Attributes\On;
 use Relaticle\EmailIntegration\Filament\Actions\ConnectMailboxAction;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailComposeActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
@@ -148,6 +151,19 @@ abstract class BaseEmailsRelationManager extends RelationManager
             ->emails()
             ->withGlobalScope('visible', new VisibleEmailScope($this->authUser()))
             ->doesntExist();
+    }
+
+    /** @return EloquentCollection<int, ConnectedAccount> */
+    #[Computed]
+    public function unhealthyMailboxes(): EloquentCollection
+    {
+        $workspace = filament()->getTenant();
+
+        if (! $workspace instanceof Workspace) {
+            return new EloquentCollection;
+        }
+
+        return ConnectedAccount::query()->ownedBy($this->authUser(), $workspace)->connected()->unhealthy()->with('workspace')->get();
     }
 
     #[Computed]
