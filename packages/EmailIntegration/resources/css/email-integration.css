@@ -268,7 +268,46 @@
 }
 
 .ei-visibility-search .fi-ta-search-field {
-    @apply w-full max-w-xs;
+    @apply w-full max-w-xs max-sm:max-w-none;
+}
+
+/* Below sm a row is a card, as list tables stack: the address heads it, then one label and value per line. */
+.ei-visibility-table {
+    @apply max-sm:block;
+
+    & > thead {
+        @apply max-sm:hidden;
+    }
+
+    & > tbody,
+    & > tbody > tr,
+    & > tbody > tr > td {
+        @apply max-sm:block;
+    }
+
+    & > tbody > tr {
+        @apply max-sm:relative max-sm:py-3;
+    }
+
+    & > tbody > tr > td {
+        @apply max-sm:py-1;
+    }
+
+    & > tbody > tr > td[data-label] {
+        @apply max-sm:grid max-sm:grid-cols-[8.5rem_minmax(0,1fr)] max-sm:items-center max-sm:gap-x-3;
+
+        &::before {
+            @apply max-sm:truncate max-sm:text-gray-500 max-sm:content-[attr(data-label)] dark:max-sm:text-gray-400;
+        }
+    }
+
+    & .ei-visibility-address {
+        @apply max-sm:pe-14 max-sm:pb-2;
+    }
+
+    & .ei-visibility-actions {
+        @apply max-sm:absolute max-sm:end-2 max-sm:top-2 max-sm:p-0;
+    }
 }
 
 .ei-enforcement-picker-option[aria-selected='true'] {
