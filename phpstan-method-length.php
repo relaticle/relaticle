@@ -77,7 +77,7 @@ return [
                 'Relaticle\EmailIntegration\Filament\Infolists\MeetingDetailInfolist::configure' => 95,
                 'Relaticle\EmailIntegration\Filament\RelationManagers\BaseMeetingsRelationManager::table' => 103,
                 'Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob::handle' => 100,
-                'Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob::handle' => 137,
+                'Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob::handle' => 135,
                 'Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob::handle' => 64,
                 'Relaticle\EmailIntegration\Jobs\InitialEmailSyncJob::handle' => 67,
                 'Relaticle\EmailIntegration\Jobs\InitialSyncPageStoreBatch::dispatchEmails' => 75,
