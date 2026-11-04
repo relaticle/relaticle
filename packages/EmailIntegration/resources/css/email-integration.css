@@ -314,6 +314,11 @@
     @apply bg-gray-50 dark:bg-white/5;
 }
 
+/* On a phone the picker is a bottom sheet, so its options sit as rounded rows like the panel's sheet menus. */
+.ei-enforcement-picker-option {
+    @apply max-sm:rounded-lg max-sm:border-b-0;
+}
+
 /* ── Email list: direction badge ───────────────────────────────────────────
    Filament's xs badge ships 2px of horizontal padding, which leaves the label
    touching the pill edge at this size. A little room either side makes it read
