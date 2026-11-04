@@ -24,7 +24,6 @@
     $pendingActionExpiry = \Carbon\CarbonInterval::minutes((int) config('chat.pending_action_expiry_minutes'))
         ->cascade()
         ->forHumans(short: false, parts: 1);
-    $opportunityIcon = \Relaticle\Chat\Support\RecordChipRenderer::iconPath('opportunity');
 
     if ($billingActive) {
         $whichModelsAnswer = trim(implode(' ', array_filter([
@@ -65,6 +64,36 @@
         ['name' => $assistantName]
     );
 
+    $capabilities = [
+        [__('Creates and updates any record'), __('Companies, people, opportunities, tasks, and notes. Ask for a field to change and it proposes the edit.')],
+        [__('Proposes many records at once'), __('Ask for a batch of up to :max records. You review them one at a time and keep the ones you want.', ['max' => $maxBatchSize])],
+        [__('Knows your custom fields'), __('Every active custom field your team has defined works out of the box, with option labels shown as text, not raw IDs.')],
+        [__('Answers questions from the docs'), __('Ask how something works and it searches Relaticle\'s own documentation for the answer, with a link to the source.')],
+        [__('Finds and summarizes your data'), __('Look up a record, list your team, or get a rollup of your pipeline without opening a single page.')],
+        [__('Guides you to the right page'), __('For the few things it cannot do itself, like importing a file or changing a field type, it links you straight to where you can.')],
+    ];
+
+    $controls = [
+        [
+            __(':name never writes without your approval', ['name' => $assistantName]),
+            __('Every proposed create, update, or delete renders as a card showing the old value and the new one. You approve or reject it; nothing saves until you do. An unanswered proposal expires after :duration.', ['duration' => $pendingActionExpiry]),
+        ],
+        [
+            __('Batches are reviewed record by record'),
+            __('A batch of up to :max records is stepped through one at a time. Keep the ones you want, reject the rest, and nothing you skipped is written.', ['max' => $maxBatchSize]),
+        ],
+        [
+            __('Answers you can check'),
+            __(':name links every record it names, so you can open the source. Like any AI model, it can misread a record, so check an answer that matters.', ['name' => $assistantName]),
+        ],
+    ];
+
+    $limits = [
+        __('It proposes each email on a card. Nothing is sent until you click Send.'),
+        __('It cannot import a file or change a field type. It links you to the page that can.'),
+        __('It reads only your workspace and Relaticle\'s documentation, not the web.'),
+    ];
+
     $faqs = [
         [
             __('What can :name change in my CRM?', ['name' => $assistantName]),
@@ -88,7 +117,13 @@
             $includedPlanQuestion,
             $includedPlanAnswer,
         ],
+        [
+            __('Does Relaticle train AI models on my data?'),
+            __('No. Relaticle does not train AI models on your CRM data, does not sell it, and does not use it for advertising.'),
+        ],
     ];
+
+    $linkClass = 'font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white';
 @endphp
 
 <x-cloud::guest-layout
@@ -97,30 +132,24 @@
     :ogTitle="$title"
     :ogDescription="$description"
     :ogImage="url('/images/open-graph-ai.jpg').'?v=1'"
+    framed
 >
-    {{-- Hero --}}
-    <section class="relative pt-32 pb-20 md:pt-40 md:pb-24 bg-white dark:bg-gray-950 overflow-hidden">
-        <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]"></div>
+    <x-cloud::marketing.hero>
+        <x-slot:eyebrow>
+            <x-cloud::marketing.eyebrow>{{ __('Meet :name', ['name' => $assistantName]) }}</x-cloud::marketing.eyebrow>
+        </x-slot:eyebrow>
 
-        <div class="relative max-w-3xl mx-auto px-6 lg:px-8 text-center">
+        <x-slot:title>
+            {{ __('The AI assistant inside your CRM.') }}
+            <span class="text-gray-500 dark:text-gray-400">{{ __('It asks before it writes.') }}</span>
+        </x-slot:title>
 
-            {{-- Badge --}}
-            <div class="flex justify-center mb-6">
-                <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-gray-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-                    <x-ri-sparkling-2-line class="h-3.5 w-3.5 text-primary dark:text-primary-400"/>
-                    <span class="uppercase tracking-wider text-[10px] font-medium text-gray-500 dark:text-gray-400">{{ __('Meet :name', ['name' => $assistantName]) }}</span>
-                </div>
-            </div>
-
-            <h1 class="font-display text-4xl sm:text-5xl font-bold text-gray-950 dark:text-white tracking-[-0.03em] leading-[1.1]">
-                {{ __('The AI teammate inside your CRM') }}
-            </h1>
-
-            <p class="mt-5 text-base md:text-lg text-gray-500 dark:text-gray-400 leading-relaxed max-w-2xl mx-auto">
-                {{ __(':name does real CRM work: it finds, creates, and updates your records. You approve every change before it happens.', ['name' => $assistantName]) }}
+        <x-slot:aside>
+            <p class="text-base leading-relaxed text-gray-500 md:text-lg dark:text-gray-400">
+                {{ __(':name, the built-in AI assistant, finds, creates and updates your records. You approve every change before it happens.', ['name' => $assistantName]) }}
             </p>
 
-            <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <div class="mt-7 flex flex-col gap-3 sm:flex-row">
                 <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="hero">
                     {{ __('Start for free') }}
                 </x-cloud::marketing.button>
@@ -129,337 +158,171 @@
                 </x-cloud::marketing.button>
             </div>
 
-            <a href="{{ route('aiNativeCrm') }}" class="group mt-6 inline-flex items-center gap-1 text-sm font-medium text-primary dark:text-primary-400 hover:gap-1.5 transition-all">
-                {{ __('What makes a CRM AI-native?') }}
-                <x-ri-arrow-right-line class="w-3.5 h-3.5"/>
-            </a>
-        </div>
-    </section>
-
-    {{-- Anatomy of a change: three stills of the real approval flow, revealed on
-         scroll. Deliberately NOT the homepage hero mockup, which replays the same
-         animation a visitor has already seen. Each step is a purpose-built
-         fragment mirroring the real proposal card in
-         packages/Chat/resources/views/livewire/chat/partials/_proposal-card.blade.php --}}
-    <section id="demo" class="py-20 md:py-28 bg-gray-50 dark:bg-gray-950 overflow-hidden">
-        <div class="max-w-5xl mx-auto px-6 lg:px-8">
-            <div class="max-w-2xl mx-auto text-center mb-14">
-                <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">
-                    {{ __('Anatomy of a change') }}
-                </h2>
-                <p class="mt-4 text-base text-gray-500 dark:text-gray-400 leading-relaxed">
-                    {{ __('You ask. :name proposes. Nothing is written until you say so.', ['name' => $assistantName]) }}
-                </p>
-            </div>
-
-            <ol
-                x-data="{ shown: false }"
-                x-init="
-                    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-                        shown = true;
-                    } else {
-                        const observer = new IntersectionObserver((entries) => {
-                            if (entries[0].isIntersecting) {
-                                shown = true;
-                                observer.disconnect();
-                            }
-                        }, { threshold: 0.25 });
-                        observer.observe($el);
-                    }
-                "
-                class="grid grid-cols-1 md:grid-cols-3 gap-5"
-            >
-                {{-- Step 1: the ask --}}
-                <li class="flex flex-col transition duration-500 ease-out motion-reduce:transition-none"
-                    :class="shown ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'">
-                    <p class="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">
-                        {{ __('Step 1: you ask') }}
-                    </p>
-                    <div class="rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-4 flex-1">
-                        {{-- Neutral gray, like the shipped user bubble
-                             (_transcript.blade.php): in the transcript the brand
-                             color belongs to the docked proposal alone. --}}
-                        <div class="rounded-lg bg-gray-100 px-3.5 py-2.5 dark:bg-white/10">
-                            <p class="text-sm text-gray-900 dark:text-gray-100 leading-relaxed">
-                                {{ __('Mark the Northwind renewal as won and set the close date to today') }}
-                            </p>
-                        </div>
-                        <p class="mt-3 text-xs text-gray-400 dark:text-gray-500">
-                            {{ __('Plain language. No commands to memorize.') }}
-                        </p>
-                    </div>
-                </li>
-
-                {{-- Step 2: the proposal card --}}
-                <li class="flex flex-col transition delay-150 duration-500 ease-out motion-reduce:transition-none motion-reduce:delay-0"
-                    :class="shown ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'">
-                    <p class="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">
-                        {{ __('Step 2: :name proposes', ['name' => $assistantName]) }}
-                    </p>
-                    {{-- The docked proposal card, as _dock-step.blade.php and
-                         proposal-card.blade.php ship it: a primary halo marks the
-                         one card asking for a decision, the operation title leads
-                         as a muted eyebrow, and the record identity sits under it
-                         behind an operation-tinted entity tile. --}}
-                    <div class="flex-1 overflow-hidden rounded-xl border border-primary-200 bg-[var(--surface-block-bg)] ring-[3px] ring-primary-100 dark:border-primary-400/30 dark:ring-primary-400/10">
-                        <div class="flex items-center gap-2 px-4 pt-3 text-xs font-medium text-gray-500 dark:text-gray-400">
-                            <span class="min-w-0 flex-1 truncate">{{ __('Update Opportunity') }}</span>
-                        </div>
-
-                        <div class="flex min-w-0 items-center gap-2.5 px-4 pb-2.5 pt-1.5" data-proposal-record-chip data-record-type="opportunity">
-                            <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-500 text-white" aria-hidden="true">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="{{ $opportunityIcon }}"/>
-                                </svg>
-                            </span>
-                            <p class="min-w-0 truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white">{{ __('Northwind renewal') }}</p>
-                        </div>
-
-                        <dl class="divide-y divide-gray-100 border-t border-gray-100 dark:divide-white/5 dark:border-white/5">
-                            <div class="flex items-center gap-3 px-4 py-2 text-xs font-medium text-gray-400 dark:text-gray-500">
-                                <x-cloud::home.hero-dock-checkbox/>
-                                <dt class="w-20 shrink-0 sm:w-24">{{ __('Attribute') }}</dt>
-                                <dd>{{ __('New value') }}</dd>
-                            </div>
-
-                            @foreach([
-                                [__('Stage'), __('Negotiation'), __('Won')],
-                                [__('Close date'), __('Not set'), __('Today')],
-                            ] as [$field, $before, $after])
-                                {{-- items-start + a wrapping value column, like
-                                     _proposal-field.blade.php: an old -> new pair
-                                     in a third of the row wraps onto two lines
-                                     rather than truncating both halves away. --}}
-                                <div class="flex items-start gap-3 px-4 py-2.5 text-sm">
-                                    <x-cloud::home.hero-dock-checkbox class="mt-0.5"/>
-                                    <dt class="w-20 shrink-0 truncate text-sm leading-5 text-gray-700 sm:w-24 dark:text-gray-300">{{ $field }}</dt>
-                                    <dd class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                                        <span class="text-gray-400 line-through dark:text-gray-500">{{ $before }}</span>
-                                        <x-ri-arrow-right-line class="h-3 w-3 shrink-0 text-gray-300 dark:text-gray-600"/>
-                                        <span class="text-gray-700 dark:text-gray-300">{{ $after }}</span>
-                                    </dd>
-                                </div>
-                            @endforeach
-                        </dl>
-                    </div>
-                </li>
-
-                {{-- Step 3: the approval --}}
-                <li class="flex flex-col transition delay-300 duration-500 ease-out motion-reduce:transition-none motion-reduce:delay-0"
-                    :class="shown ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'">
-                    <p class="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">
-                        {{ __('Step 3: you decide') }}
-                    </p>
-                    <div class="rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-4 flex-1">
-                        {{-- The dock's own footer, in its order and its weights
-                             (proposal-card.blade.php): a plain-text discard beside
-                             a brand-colored confirm whose label follows the
-                             operation -- an update reads "Save changes". --}}
-                        <div class="flex items-center gap-2">
-                            <span class="inline-flex h-7 items-center rounded-md px-2.5 text-xs font-medium text-gray-600 dark:text-gray-300">
-                                {{ __('Discard') }}
-                            </span>
-                            <span class="inline-flex h-7 items-center rounded-md bg-primary-600 px-2.5 text-xs font-medium text-white shadow-sm">
-                                {{ __('Save changes') }}
-                            </span>
-                        </div>
-
-                        <div class="mt-3 flex items-center gap-1.5 text-xs">
-                            <span class="inline-flex items-center gap-1 rounded-md bg-green-50 px-1.5 py-0.5 font-medium text-green-700 dark:bg-green-400/10 dark:text-green-400">
-                                <x-ri-check-line class="h-3 w-3"/>
-                                {{ __('Updated') }}
-                            </span>
-                            <span class="text-gray-400 dark:text-gray-500 truncate">{{ __('Northwind renewal') }}</span>
-                        </div>
-
-                        <p class="mt-3 text-xs text-gray-400 dark:text-gray-500">
-                            {{ __('Discard and nothing is written. The proposal expires on its own after :duration.', ['duration' => $pendingActionExpiry]) }}
-                        </p>
-                    </div>
-                </li>
-            </ol>
-        </div>
-    </section>
-
-    {{-- Capabilities --}}
-    <section class="py-20 md:py-28 bg-white dark:bg-gray-950">
-        <div class="max-w-5xl mx-auto px-6 lg:px-8">
-            <div class="max-w-2xl mx-auto text-center mb-14">
-                <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">
-                    {{ __('What :name actually does', ['name' => $assistantName]) }}
-                </h2>
-                <p class="mt-4 text-base text-gray-500 dark:text-gray-400 leading-relaxed">
-                    {{ __('No canned demos. Every capability below runs against your real workspace.') }}
-                </p>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                @foreach([
-                    ['ri-edit-2-line', __('Creates and updates any record'), __('Companies, people, opportunities, tasks, and notes. Ask for a field to change and it proposes the edit.')],
-                    ['ri-checkbox-multiple-line', __('Proposes many records at once'), __('Ask for a batch of up to :max records. You review them one at a time and keep the ones you want.', ['max' => $maxBatchSize])],
-                    ['ri-stack-line', __('Knows your custom fields'), __('Every active custom field your team has defined works out of the box, with option labels shown as text, not raw IDs.')],
-                    ['ri-book-open-line', __('Answers questions from the docs'), __('Ask how something works and it searches Relaticle\'s own documentation for the answer, with a link to the source.')],
-                    ['ri-search-line', __('Finds and summarizes your data'), __('Look up a record, list your team, or get a rollup of your pipeline without opening a single page.')],
-                    ['ri-guide-line', __('Guides you to the right page'), __('For the few things it cannot do itself, like importing a file or changing a field type, it links you straight to where you can.')],
-                ] as [$icon, $cardTitle, $cardDesc])
-                    <div class="rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-6">
-                        <div class="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/[0.08] dark:bg-primary/[0.15] mb-4">
-                            <x-dynamic-component :component="$icon" class="w-4.5 h-4.5 text-primary dark:text-primary-400"/>
-                        </div>
-                        <h3 class="font-display text-base font-semibold text-gray-900 dark:text-white mb-1.5">
-                            {{ $cardTitle }}
-                        </h3>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                            {{ $cardDesc }}
-                        </p>
-                    </div>
-                @endforeach
-            </div>
-        </div>
-    </section>
-
-    {{-- Control / trust --}}
-    <section class="py-20 md:py-28 bg-gray-50 dark:bg-gray-950">
-        <div class="max-w-3xl mx-auto px-6 lg:px-8">
-            <div class="text-center mb-14">
-                <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">
-                    {{ __('You stay in control') }}
-                </h2>
-                <p class="mt-4 text-base text-gray-500 dark:text-gray-400 leading-relaxed max-w-xl mx-auto">
-                    {{ __('An assistant that can write to your CRM only earns trust one way: by never writing without asking first.') }}
-                </p>
-            </div>
-
-            <div class="space-y-4">
-                <div class="flex gap-4 rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-6">
-                    <div class="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/[0.08] dark:bg-primary/[0.15] shrink-0">
-                        <x-ri-shield-check-line class="w-4.5 h-4.5 text-primary dark:text-primary-400"/>
-                    </div>
-                    <div>
-                        <h3 class="font-display text-base font-semibold text-gray-900 dark:text-white mb-1.5">
-                            {{ __(':name never writes without your approval', ['name' => $assistantName]) }}
-                        </h3>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                            {{ __('Every proposed create, update, or delete renders as a card showing the old value and the new one. You approve or reject it; nothing saves until you do. An unanswered proposal expires after :duration.', ['duration' => $pendingActionExpiry]) }}
-                        </p>
-                    </div>
-                </div>
-
-                <div class="flex gap-4 rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-6">
-                    <div class="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/[0.08] dark:bg-primary/[0.15] shrink-0">
-                        <x-ri-checkbox-multiple-line class="w-4.5 h-4.5 text-primary dark:text-primary-400"/>
-                    </div>
-                    <div>
-                        <h3 class="font-display text-base font-semibold text-gray-900 dark:text-white mb-1.5">
-                            {{ __('Batches are reviewed record by record') }}
-                        </h3>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                            {{ __('A batch of up to :max records is stepped through one at a time. Keep the ones you want, reject the rest, and nothing you skipped is written.', ['max' => $maxBatchSize]) }}
-                        </p>
-                    </div>
-                </div>
-
-                <div class="flex gap-4 rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-6">
-                    <div class="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/[0.08] dark:bg-primary/[0.15] shrink-0">
-                        <x-ri-hand-coin-line class="w-4.5 h-4.5 text-primary dark:text-primary-400"/>
-                    </div>
-                    <div>
-                        <h3 class="font-display text-base font-semibold text-gray-900 dark:text-white mb-1.5">
-                            {{ __('Transparent credits, your choice of model') }}
-                        </h3>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                            {{ $modelChoiceLine }}
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    {{-- MCP --}}
-    <section class="py-20 md:py-28 bg-gray-50 dark:bg-gray-950">
-        <div class="max-w-3xl mx-auto px-6 lg:px-8 text-center">
-            <div class="flex justify-center mb-6">
-                <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-gray-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-                    <x-ri-plug-line class="h-3.5 w-3.5 text-primary dark:text-primary-400"/>
-                    <span class="uppercase tracking-wider text-[10px] font-medium text-gray-500 dark:text-gray-400">{{ __('MCP server') }}</span>
-                </div>
-            </div>
-
-            <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">
-                {{ __('Use Relaticle from Claude or ChatGPT') }}
-            </h2>
-            <p class="mt-4 text-base text-gray-500 dark:text-gray-400 leading-relaxed max-w-xl mx-auto">
-                {{ __('Relaticle ships a built-in MCP server, so your own AI client can read and write your CRM directly. It works with Claude, ChatGPT, and any other MCP-compatible client. MCP calls run against the same records, and because you authorized the client yourself, they apply straight away rather than waiting for an in-app approval.') }}
+            <p class="mt-5 text-sm text-gray-500 dark:text-gray-400">
+                <a href="{{ route('aiNativeCrm') }}" class="{{ $linkClass }}">{{ __('What makes a CRM AI-native?') }}</a>
             </p>
+        </x-slot:aside>
 
-            @feature(App\Features\Documentation::class)
-                <div class="mt-8">
-                    <x-cloud::marketing.button variant="secondary" href="{{ route('documentation.index') }}">
-                        {{ __('Read the developer docs') }}
+        @include('cloud::marketing.partials.ai-playground')
+    </x-cloud::marketing.hero>
+
+    <x-cloud::marketing.frame>
+        <x-cloud::marketing.frame-header :label="__('Capabilities')" :lead="__('What :name actually does.', ['name' => $assistantName])">
+            {{ __('Every capability runs against your real workspace.') }}
+        </x-cloud::marketing.frame-header>
+
+        <div class="grid grid-cols-1 gap-x-10 gap-y-10 px-6 py-12 sm:grid-cols-2 md:px-10 md:py-16 lg:grid-cols-3">
+            @foreach($capabilities as [$capabilityTitle, $capabilityDescription])
+                <div class="border-rail border-t pt-5">
+                    <h3 class="text-base font-medium text-gray-950 dark:text-white">{{ $capabilityTitle }}</h3>
+                    <p class="type-prose mt-1.5 text-gray-500 dark:text-gray-400">{{ $capabilityDescription }}</p>
+                </div>
+            @endforeach
+        </div>
+
+        <div class="border-rail bg-rail grid grid-cols-1 gap-px border-t lg:grid-cols-12">
+            <div class="bg-surface px-6 py-8 md:px-10 lg:col-span-4">
+                <h3 class="type-label text-gray-500 dark:text-gray-400">{{ __('What it can’t do') }}</h3>
+            </div>
+            <div class="bg-surface px-6 md:px-10 lg:col-span-8">
+                <ul class="divide-rail divide-y">
+                    @foreach($limits as $limit)
+                        <li class="type-prose py-4 text-gray-700 dark:text-gray-300">{{ $limit }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        </div>
+    </x-cloud::marketing.frame>
+
+    <x-cloud::marketing.frame>
+        <x-cloud::marketing.frame-header :label="__('Control')" :lead="__('You stay in control.')">
+            {{ __('It earns trust by asking first.') }}
+        </x-cloud::marketing.frame-header>
+
+        <div class="bg-rail grid grid-cols-1 gap-px md:grid-cols-3">
+            @foreach($controls as $index => [$controlTitle, $controlDescription])
+                <div class="bg-surface p-6 md:p-10">
+                    <x-cloud::marketing.eyebrow class="mb-4">{{ sprintf('%02d', $index + 1) }}</x-cloud::marketing.eyebrow>
+                    <h3 class="text-lg font-medium text-gray-950 dark:text-white">{{ $controlTitle }}</h3>
+                    <p class="type-prose mt-2 text-gray-500 dark:text-gray-400">{{ $controlDescription }}</p>
+                </div>
+            @endforeach
+        </div>
+    </x-cloud::marketing.frame>
+
+    <x-cloud::marketing.frame id="data">
+        <x-cloud::marketing.frame-header :label="__('Your data')" :lead="__('Clear about what it sees.')">
+            {{ __('And which model answers.') }}
+        </x-cloud::marketing.frame-header>
+
+        <div class="bg-rail grid grid-cols-1 gap-px md:grid-cols-3">
+            <div class="bg-surface p-6 md:p-10">
+                <h3 class="text-lg font-medium text-gray-950 dark:text-white">{{ __('What it reads') }}</h3>
+                <p class="type-prose mt-2 text-gray-500 dark:text-gray-400">{{ __(':name answers from the records in your workspace and Relaticle\'s product documentation, with the permissions you already have.', ['name' => $assistantName]) }}</p>
+            </div>
+            <div class="bg-surface p-6 md:p-10">
+                <h3 class="text-lg font-medium text-gray-950 dark:text-white">{{ __('Transparent credits, your choice of model') }}</h3>
+                <p class="type-prose mt-2 text-gray-500 dark:text-gray-400">{{ $modelChoiceLine }}</p>
+                @if($billingActive)
+                    <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">
+                        <a href="{{ route('pricing') }}#pricing-faq" class="{{ $linkClass }}">{{ __('How credits work') }}</a>
+                    </p>
+                @endif
+            </div>
+            <div class="bg-surface p-6 md:p-10">
+                <h3 class="text-lg font-medium text-gray-950 dark:text-white">{{ __('No training on your data') }}</h3>
+                <p class="type-prose mt-2 text-gray-500 dark:text-gray-400">{{ __('Relaticle does not train AI models on your CRM data.') }}</p>
+                <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">
+                    <a href="{{ route('security') }}#ai" class="{{ $linkClass }}">{{ __('Which providers handle a request') }}</a>
+                </p>
+            </div>
+        </div>
+    </x-cloud::marketing.frame>
+
+    <x-cloud::marketing.frame>
+        <x-cloud::marketing.frame-header :label="__('Beyond the app')" :lead="__('Bring your own assistant.')">
+            {{ __('Or your own server.') }}
+        </x-cloud::marketing.frame-header>
+
+        <div class="bg-rail grid grid-cols-1 gap-px md:grid-cols-2">
+            <div class="bg-surface flex flex-col gap-6 p-6 md:p-10">
+                <div>
+                    <x-cloud::marketing.eyebrow class="mb-4">{{ __('MCP server') }}</x-cloud::marketing.eyebrow>
+                    <h3 class="text-lg font-medium text-gray-950 dark:text-white">{{ __('Use Relaticle from Claude or ChatGPT') }}</h3>
+                    <p class="type-prose mt-2 text-gray-500 dark:text-gray-400">{{ __('Relaticle ships a built-in MCP server, so your own AI client can read and write your CRM directly. It works with Claude, ChatGPT, and any other MCP-compatible client. MCP calls run against the same records, and because you authorized the client yourself, they apply straight away rather than waiting for an in-app approval.') }}</p>
+                </div>
+                <div class="mt-auto flex flex-wrap gap-3">
+                    @foreach(\Relaticle\Cloud\Marketing\Enums\ConnectableAssistant::cases() as $assistant)
+                        <x-cloud::marketing.button variant="secondary" size="sm" :href="route($assistant->routeName())" iconTrailing="ri-arrow-right-line">
+                            {{ __('Relaticle for :assistant', ['assistant' => $assistant->label()]) }}
+                        </x-cloud::marketing.button>
+                    @endforeach
+                    @feature(App\Features\Documentation::class)
+                        <x-cloud::marketing.button variant="secondary" size="sm" href="{{ route('documentation.index') }}">
+                            {{ __('Read the developer docs') }}
+                        </x-cloud::marketing.button>
+                    @endfeature
+                </div>
+            </div>
+
+            <div class="bg-surface flex flex-col gap-6 p-6 md:p-10">
+                <div>
+                    <x-cloud::marketing.eyebrow class="mb-4">{{ __('Self-hosted AI') }}</x-cloud::marketing.eyebrow>
+                    <h3 class="text-lg font-medium text-gray-950 dark:text-white">{{ __('Run the assistant on your own server') }}</h3>
+                    <p class="type-prose mt-2 text-gray-500 dark:text-gray-400">{{ __('Self-hosting Relaticle does not mean giving up the assistant. On your own server, bring your own API key for Claude or GPT, or point it at a local model with Ollama and keep every request on your own infrastructure.') }}</p>
+                </div>
+                <div class="mt-auto">
+                    <x-cloud::marketing.button variant="secondary" size="sm" href="{{ route('selfHosted') }}" iconTrailing="ri-arrow-right-line">
+                        {{ __('See self-hosting options') }}
                     </x-cloud::marketing.button>
                 </div>
-            @endfeature
+            </div>
         </div>
-    </section>
+    </x-cloud::marketing.frame>
 
-    {{-- Self-hosted AI --}}
-    <section class="py-20 md:py-28 bg-white dark:bg-gray-950">
-        <div class="max-w-3xl mx-auto px-6 lg:px-8 text-center">
-            <div class="flex justify-center mb-6">
-                <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-gray-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-                    <x-ri-server-line class="h-3.5 w-3.5 text-primary dark:text-primary-400"/>
-                    <span class="uppercase tracking-wider text-[10px] font-medium text-gray-500 dark:text-gray-400">{{ __('Self-hosted AI') }}</span>
+    <x-cloud::marketing.frame id="ai-faq">
+        <div class="bg-rail grid grid-cols-1 gap-px lg:grid-cols-12">
+            <div class="bg-surface px-6 pb-6 pt-16 md:px-10 md:pt-24 lg:col-span-4">
+                <div class="lg:sticky lg:top-28">
+                    <x-cloud::marketing.eyebrow class="mb-5">{{ __('FAQ') }}</x-cloud::marketing.eyebrow>
+                    <h2 class="type-title text-gray-950 dark:text-white">{{ __('Questions about :name, answered', ['name' => $assistantName]) }}</h2>
+                    <p class="mt-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+                        {{ __('Something else on your mind?') }}
+                        <a href="{{ route('contact') }}" class="{{ $linkClass }}">{{ __('Get in touch') }}</a>
+                    </p>
                 </div>
             </div>
 
-            <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">
-                {{ __('Run the assistant on your own server') }}
-            </h2>
-            <p class="mt-4 text-base text-gray-500 dark:text-gray-400 leading-relaxed max-w-xl mx-auto">
-                {{ __('Self-hosting Relaticle does not mean giving up the assistant. On your own server, bring your own API key for Claude or GPT, or point it at a local model with Ollama and keep every request on your own infrastructure.') }}
-            </p>
-
-            <div class="mt-8">
-                <x-cloud::marketing.button variant="secondary" href="{{ route('selfHosted') }}">
-                    {{ __('See self-hosting options') }}
-                </x-cloud::marketing.button>
+            <div class="bg-surface px-6 pb-16 md:px-10 lg:col-span-8 lg:pt-20">
+                <x-cloud::marketing.faq-accordion :faqs="$faqs" id-prefix="ai-faq" />
             </div>
         </div>
-    </section>
+    </x-cloud::marketing.frame>
 
-    {{-- FAQ --}}
-    <section class="py-20 md:py-28 bg-gray-50 dark:bg-gray-950">
-        <div class="max-w-3xl mx-auto px-6 lg:px-8">
-            <div class="text-center mb-10">
-                <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">
-                    {{ __('Questions about :name, answered', ['name' => $assistantName]) }}
-                </h2>
+    <x-cloud::marketing.frame>
+        <div class="bg-warm relative overflow-hidden px-6 py-24 text-center md:py-32">
+            <div class="mask-top-corners absolute inset-0 text-gray-400 dark:text-gray-600" aria-hidden="true">
+                <svg class="absolute inset-0 size-full">
+                    <pattern id="ai-cta-dots" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.2" fill="currentColor"/></pattern>
+                    <rect width="100%" height="100%" fill="url(#ai-cta-dots)"/>
+                </svg>
             </div>
 
-            <x-cloud::marketing.faq-accordion :faqs="$faqs" id-prefix="ai-faq" />
-        </div>
-    </section>
+            <div class="relative mx-auto max-w-2xl">
+                <h2 class="type-title text-gray-950 md:text-5xl dark:text-white">{{ __('Try :name in your own workspace', ['name' => $assistantName]) }}</h2>
+                <p class="type-prose mx-auto mt-5 text-gray-500 dark:text-gray-400">{{ __('Free to start, no credit card required. Self-host it yourself whenever you want.') }}</p>
 
-    {{-- CTA --}}
-    <section class="py-20 md:py-28 bg-white dark:bg-gray-950">
-        <div class="max-w-xl mx-auto px-6 lg:px-8 text-center">
-            <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">
-                {{ __('Try :name in your own workspace', ['name' => $assistantName]) }}
-            </h2>
-            <p class="mt-4 text-base text-gray-500 dark:text-gray-400 leading-relaxed">
-                {{ __('Free to start, no credit card required. Self-host it yourself whenever you want.') }}
-            </p>
-            <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-                <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="footer">
-                    {{ __('Start for free') }}
-                </x-cloud::marketing.button>
-                <x-cloud::marketing.button variant="secondary" href="{{ route('pricing') }}">
-                    {{ __('See pricing') }}
-                </x-cloud::marketing.button>
+                <div class="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                    <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="footer">
+                        {{ __('Start for free') }}
+                    </x-cloud::marketing.button>
+                    <x-cloud::marketing.button variant="secondary" href="{{ route('pricing') }}">
+                        {{ __('See pricing') }}
+                    </x-cloud::marketing.button>
+                </div>
             </div>
         </div>
-    </section>
+    </x-cloud::marketing.frame>
 
     @php
         $schema = (new \Spatie\SchemaOrg\Graph())

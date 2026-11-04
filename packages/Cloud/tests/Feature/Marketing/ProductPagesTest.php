@@ -71,22 +71,20 @@ it('names the assistant from config rather than a hardcoded literal', function (
     $this->get('/ai')->assertOk()->assertSee('Testbot');
 });
 
-it('renders the three-step approval walkthrough at the #demo anchor the hero points to', function (): void {
+it('renders the ask playground at the #demo anchor the hero points to', function (): void {
     $html = $this->get('/ai')->assertOk()->getContent();
 
     expect($html)->toContain('id="demo"')
-        ->and($html)->toContain(__('Anatomy of a change'))
-        ->and($html)->toContain(__('Step 1: you ask'))
-        ->and($html)->toContain(__('Step 3: you decide'));
+        ->and($html)->toContain(__('Try an ask'))
+        ->and($html)->toContain(__('Update three deals'))
+        ->and($html)->toContain(__('Add a person'))
+        ->and($html)->toContain(__('Find overdue tasks'));
 
-    // The walkthrough is a twin of the shipped dock, so it must carry the dock's
-    // own header and footer: the operation title as a muted eyebrow, and the
-    // discard/confirm pair whose confirm label follows the operation. Approving
-    // a card the product labels differently teaches the wrong control.
     expect($html)->toContain(__('Update Opportunity'))
+        ->and($html)->toContain(__('Create Person'))
         ->and($html)->toContain(__('Save changes'))
         ->and($html)->toContain(__('Discard'))
-        ->and($html)->not->toContain('uppercase tracking-wider text-amber-600');
+        ->and($html)->not->toContain('bg-amber-500 text-white');
 });
 
 it('builds its own walkthrough instead of replaying the homepage mockup', function (): void {
