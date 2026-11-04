@@ -115,3 +115,17 @@ it('docks a confirmation dialog to the bottom edge of a phone', function (): voi
         ->assertScript("Math.round(document.querySelector('.fi-modal-open .fi-modal-window').getBoundingClientRect().bottom) === innerHeight", true)
         ->assertNoJavaScriptErrors();
 });
+
+it('centres a notification across a phone screen', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+
+    $page = phoneCompaniesPage($user)->resize(440, 956);
+
+    $page->script("new FilamentNotification().title('Saved').success().send()");
+
+    $page->wait(0.5)
+        ->assertScript('(() => { const toast = document.querySelector(".fi-no-notification").getBoundingClientRect(); return Math.round(toast.left) === Math.round(innerWidth - toast.right); })()', true)
+        ->assertNoJavaScriptErrors();
+});

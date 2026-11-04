@@ -2093,6 +2093,16 @@ html.fi:has(body.fi-onboarding-wizard),
     }
 }
 
+/* A toast is capped at max-w-sm and pinned to the right, so on a phone it sat off-centre. It spans the screen
+   there instead, below the notch. */
+.fi-no {
+    @apply max-sm:top-[calc(env(safe-area-inset-top)+1rem)] max-sm:items-stretch;
+
+    & .fi-no-notification {
+        @apply max-sm:max-w-none;
+    }
+}
+
 /* Phones: a tab bar replaces the topbar's menu button, and menus and dialogs rise from the bottom edge. */
 
 /* Phones scroll the document rather than the content box. iOS clips a fixed sheet or dialog to a scrolling
