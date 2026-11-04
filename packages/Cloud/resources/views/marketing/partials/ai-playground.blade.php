@@ -132,11 +132,7 @@
     </div>
 
     <div class="bg-tint flex justify-center px-4 py-10 sm:px-8 md:py-14">
-        <x-cloud::marketing.window class="w-full max-w-2xl">
-            <div class="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-white/[0.06]">
-                <x-cloud::marketing.actor as="rela"/>
-                <span class="text-xs text-gray-500 dark:text-gray-400">{{ __('Northwind workspace') }}</span>
-            </div>
+        <x-cloud::marketing.chat-window class="w-full max-w-2xl">
 
             <div id="ai-ask-panel" role="tabpanel" x-bind:aria-labelledby="'ai-ask-' + scenario" class="grid p-4 sm:p-6" aria-live="polite">
 
@@ -208,7 +204,7 @@
                                     </span>
                                     <span class="ms-auto inline-flex shrink-0 items-center gap-1.5 text-micro font-medium text-gray-500 dark:text-gray-400">
                                         <span class="h-1.5 w-1.5 shrink-0 rounded-full" x-bind:class="deals[{{ $index }}].decision === 'saved' ? 'bg-green-500' : 'bg-gray-400'"></span>
-                                        <span x-text="deals[{{ $index }}].decision === 'saved' ? @js(__('Updated')) : @js(__('Discarded'))">{{ __('Updated') }}</span>
+                                        <span x-text="deals[{{ $index }}].decision === 'saved' ? @js(__('Updated')) : @js(__('Skipped'))">{{ __('Updated') }}</span>
                                     </span>
                                 </li>
                             @endforeach
@@ -249,7 +245,7 @@
                                 <span class="w-24 shrink-0 leading-5 text-gray-700 sm:w-28 dark:text-gray-300">{{ __('Name') }}</span>
                                 <span class="min-w-0 flex-1 font-medium text-gray-900 dark:text-white">Sarah Chen</span>
                             </div>
-                            @foreach([['title', __('Job title'), __('VP of Engineering')], ['company', __('Company'), 'Kovra Systems']] as [$key, $field, $value])
+                            @foreach([['title', __('Job Title'), __('VP of Engineering')], ['company', __('Company'), 'Kovra Systems']] as [$key, $field, $value])
                                 <div class="flex items-start gap-3 px-4 py-2.5 text-sm">
                                     <button type="button" role="checkbox" class="{{ $checkbox }}" aria-checked="true" x-bind:aria-checked="person.{{ $key }}.toString()" x-bind:disabled="person.decision !== null" x-on:click="person.{{ $key }} = ! person.{{ $key }}" aria-label="{{ __('Include :field', ['field' => $field]) }}">
                                         <x-heroicon-m-check class="size-3" aria-hidden="true"/>
@@ -319,6 +315,6 @@
                 <span>{{ __('A demo with sample records. Nothing here touches a real workspace.') }}</span>
                 <button type="button" class="shrink-0 cursor-pointer whitespace-nowrap font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white" x-on:click="reset()">{{ __('Start over') }}</button>
             </div>
-        </x-cloud::marketing.window>
+        </x-cloud::marketing.chat-window>
     </div>
 </div>

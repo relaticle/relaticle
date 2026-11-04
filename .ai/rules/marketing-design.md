@@ -22,8 +22,11 @@ reviewer reads for a hand-rolled section, a raw gray pair, or a heading class ou
 | `tint` | gray-50 | gray-900 | cells that hold product UI, link hover |
 
 Two treatments sit on top of the tokens. A `spotlight dark` frame stays dark in both themes and
-lifts to `gray-900` on a dark page; the page has one, the four-hands story. `bg-warm` is a static
+lifts to `gray-900` on a dark page. A page has at most one: the homepage four-hands story, the Control section on `/ai`. `bg-warm` is a static
 radial wash for the human moments (the email visuals and the closing CTA), never behind body text.
+
+`bg-dots` is a 20px dot texture for the `tint` cells that hold product UI, so a mock has something to
+sit on. It never sits behind marketing copy. On `/ai` the showcase visuals and the Control cells use it.
 
 Cells inside a `gap-px` grid stay opaque. A translucent fill lets the rail color show through and
 turns the cell gray in dark mode. `canvas` is taken by the Scribe theme, which is why the third
@@ -81,6 +84,8 @@ reach it. Change the header height and the token together. `html` also carries `
 - `board-mock`: the opportunities board built from the live board's markup, with a card that
   `motion.js` drags to the next stage. The hero tab and the press page keep the screenshot.
 - `window`: the frame around a product fragment.
+- `chat-window`: a `window` with the Rela chip and the sample workspace name in its header. Every chat
+  fragment on `/ai` sits in one, so the playground and the showcases read as the same product.
 - `theme-image`: a light and a dark WebP of a real app screenshot. It loads only the current
   theme's file and swaps on theme change.
 - `actor`: the You, Rela, Claude, ChatGPT and Mailbox chips. They are the site's signature: every place

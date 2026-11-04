@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Features\Billing as BillingFeature;
+use App\Features\Documentation;
+use App\Features\EmailIntegration;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\CloudServiceProvider;
 
@@ -85,6 +87,46 @@ it('renders the ask playground at the #demo anchor the hero points to', function
         ->and($html)->toContain(__('Save changes'))
         ->and($html)->toContain(__('Discard'))
         ->and($html)->not->toContain('bg-amber-500 text-white');
+});
+
+it('shows a plan, a docs answer and an email proposal as product fragments', function (): void {
+    Feature::activate([Documentation::class, EmailIntegration::class]);
+
+    $html = $this->get('/ai')->assertOk()->getContent();
+
+    expect($html)->toContain(__('Approved together, in order'))
+        ->and($html)->toContain(__('Runs after step :step', ['step' => 1]))
+        ->and($html)->toContain(__('Kovra Systems (step 1)'))
+        ->and($html)->toContain(__('Up to :steps linked steps in one plan', ['steps' => config('chat.max_plan_steps')]))
+        ->and($html)->toContain(route('help.show', ['category' => 'ai-assistant', 'slug' => 'connect-claude-or-chatgpt']))
+        ->and($html)->toContain(__('Send Email'))
+        ->and($html)->toContain(__('Approve all never sends an email'));
+});
+
+it('leaves the email showcase out when email integration is off', function (): void {
+    Feature::deactivate(EmailIntegration::class);
+
+    $html = $this->get('/ai')->assertOk()->getContent();
+
+    expect($html)->not->toContain('data-ai-email')
+        ->and($html)->not->toContain(__('Send Email'))
+        ->and($html)->not->toContain(__('It also proposes emails, and each one waits for its own Send.'));
+});
+
+it('lists no limit that is really a capability', function (): void {
+    $html = $this->get('/ai')->assertOk()->getContent();
+
+    expect($html)->toContain(__('Deleting a record never removes the records linked to it. Ask for each one by name.'))
+        ->and($html)->not->toContain('It proposes each email on a card')
+        ->and($html)->not->toContain('cannot import a file');
+});
+
+it('says Rela takes an attached file and hands a bigger CSV to the import wizard', function (): void {
+    $html = $this->get('/ai')->assertOk()->getContent();
+
+    expect($html)->toContain(__('Can :name import a file?', ['name' => config('chat.assistant_name')]))
+        ->and($html)->toContain('CSV, TXT or MD file of up to 10 MB')
+        ->and($html)->toContain('up to 25 at a time');
 });
 
 it('builds its own walkthrough instead of replaying the homepage mockup', function (): void {

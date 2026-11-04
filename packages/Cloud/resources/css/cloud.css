@@ -56,6 +56,16 @@ html:has(#main-header) {
     }
 }
 
+@utility bg-dots {
+    background-image: radial-gradient(circle, var(--color-gray-300) 1px, transparent 1.25px);
+    background-size: 20px 20px;
+    background-position: center;
+
+    &:where(.dark, .dark *) {
+        background-image: radial-gradient(circle, rgb(255 255 255 / 0.08) 1px, transparent 1.25px);
+    }
+}
+
 @utility mask-top-corners {
     mask-image:
         radial-gradient(ellipse 30% 75% at 0% 0%, #000 35%, transparent),
