@@ -377,3 +377,23 @@ jobs:
             tests/Browser/Screenshots
             storage/logs
           if-no-files-found: ignore
+
+  # The one check branch protection requires, so resharding or renaming a job above
+  # never leaves auto-merge waiting on a check that no longer reports.
+  passed:
+    runs-on: ubuntu-latest
+    name: All Checks Passed
+    needs: [lint-and-static-analysis, type-coverage, tests, self-hosted-build, browser-tests]
+    if: always()
+
+    steps:
+      - name: Fail unless every job succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          for result in $RESULTS; do
+            if [[ "$result" != success ]]; then
+              echo "::error::A CI job ended with: $result"
+              exit 1
+            fi
+          done

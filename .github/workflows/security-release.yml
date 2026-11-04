@@ -1,0 +1,81 @@
+name: Security Release
+
+# Production deploys on the merge itself. The release ships the fix to self-hosted installs,
+# through the image docker-publish.yml builds from the tag, and only when the patch is all
+# that main holds since the last release. Anything more waits for a person to release it.
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-release
+
+jobs:
+  release:
+    if: >-
+      github.event.pull_request.merged &&
+      github.event.pull_request.head.ref == 'security/composer-advisories' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    name: Release Security Patch
+    timeout-minutes: 5
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Pick the version
+        id: version
+        env:
+          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          latest="$(git describe --tags --abbrev=0 --first-parent --match 'v*' "$MERGE_SHA")"
+          unreleased="$(git rev-list --first-parent --count "$latest..$MERGE_SHA")"
+          IFS=. read -r major minor patch <<<"${latest#v}"
+
+          {
+            echo "latest=$latest"
+            echo "unreleased=$unreleased"
+            echo "next=v$major.$minor.$((patch + 1))"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create bot token
+        id: token
+        if: steps.version.outputs.unreleased == '1'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.SECURITY_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.SECURITY_BOT_PRIVATE_KEY }}
+          permission-contents: write
+
+      # A release made with GITHUB_TOKEN starts no workflow, so deploy.yml and docker-publish.yml need the bot's token.
+      - name: Publish the release
+        if: steps.version.outputs.unreleased == '1'
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          NEXT: ${{ steps.version.outputs.next }}
+          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+        run: gh release create "$NEXT" --repo "$GITHUB_REPOSITORY" --target "$MERGE_SHA" --title "$NEXT" --generate-notes --latest
+
+      - name: Explain the skipped release
+        if: steps.version.outputs.unreleased != '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          LATEST: ${{ steps.version.outputs.latest }}
+          UNRELEASED: ${{ steps.version.outputs.unreleased }}
+        run: |
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "Not released automatically. Main holds $UNRELEASED commits since $LATEST, and this patch is only one of them. Production already runs it. Cut the next release by hand to ship it to self-hosted installs."
