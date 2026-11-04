@@ -6,6 +6,8 @@ namespace Relaticle\Cloud;
 
 use App\Contracts\Billing as BillingContract;
 use App\Contracts\Entitlements;
+use App\Events\WorkspaceCreated;
+use App\Events\WorkspaceSetupCompleted;
 use App\Features\Billing;
 use App\Features\Documentation;
 use App\Models\User;
@@ -14,22 +16,31 @@ use App\Providers\Filament\AppPanelProvider;
 use App\Services\NoBilling;
 use App\Services\SelfHostedEntitlements;
 use App\Support\Mail\MailPreview;
+use Filament\Auth\Events\Registered;
 use Filament\Panel;
 use Filament\View\PanelsRenderHook;
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\View\View as ViewContract;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 use Laravel\Cashier\Events\WebhookHandled;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Relaticle\Cloud\Admin\CloudAdminPlugin;
 use Relaticle\Cloud\Admin\Mail\ManagedPlanInvoiceMail;
+use Relaticle\Cloud\Analytics\Actions\AssociateAcquisitionWorkspace;
+use Relaticle\Cloud\Analytics\Actions\CompleteAcquisitionSetup;
+use Relaticle\Cloud\Analytics\Actions\RecordAcquisition;
+use Relaticle\Cloud\Analytics\Attribution;
+use Relaticle\Cloud\Analytics\Http\Middleware\CaptureAcquisition;
 use Relaticle\Cloud\Billing\Commands\ProcessTrialsCommand;
 use Relaticle\Cloud\Billing\Filament\Billing as BillingPage;
 use Relaticle\Cloud\Billing\Filament\BillingPanelHooks;
@@ -65,6 +76,7 @@ final class CloudServiceProvider extends ServiceProvider
             : $app->make(NoBilling::class));
 
         $this->mergeConfigFrom(__DIR__.'/../config/comparisons.php', 'comparisons');
+        $this->mergeConfigFrom(__DIR__.'/../config/analytics.php', 'analytics');
 
         $this->configureBlog();
 
@@ -80,6 +92,8 @@ final class CloudServiceProvider extends ServiceProvider
     {
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'cloud');
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'cloud');
+        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+        $this->configureAnalytics();
         $this->loadRoutesFrom(__DIR__.'/../routes/webhooks.php');
         $this->registerMarketingRoutes();
         $this->registerDocsRoutes();
@@ -101,6 +115,38 @@ final class CloudServiceProvider extends ServiceProvider
         $this->linkWebsiteFromCore();
         $this->registerMailPreviews();
         $this->registerCommunityCounts();
+    }
+
+    private function configureAnalytics(): void
+    {
+        Route::pushMiddlewareToGroup('web', CaptureAcquisition::class);
+
+        Event::listen(Registered::class, static function (Registered $event): void {
+            $user = $event->getUser();
+
+            if ($user instanceof User && request()->hasSession() && ! Attribution::optedOut(request())) {
+                resolve(RecordAcquisition::class)->execute($user, session('analytics.acquisition'));
+                DB::afterCommit(static fn () => session()->forget('analytics.acquisition'));
+            }
+        });
+
+        Event::listen(Verified::class, static function (Verified $event): void {
+            if ($event->user instanceof User && request()->hasSession()) {
+                DB::afterCommit(static fn () => session()->put('fathom.track_email_verified', (string) Str::uuid()));
+            }
+        });
+
+        Event::listen(WorkspaceCreated::class, static function (WorkspaceCreated $event): void {
+            resolve(AssociateAcquisitionWorkspace::class)->execute($event->workspace);
+        });
+
+        Event::listen(WorkspaceSetupCompleted::class, static function (WorkspaceSetupCompleted $event): void {
+            resolve(CompleteAcquisitionSetup::class)->execute($event->workspace);
+
+            if (request()->hasSession()) {
+                session()->put('fathom.track_setup_completed', (string) Str::uuid());
+            }
+        });
     }
 
     private function configureBlog(): void

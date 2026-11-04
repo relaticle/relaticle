@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Relaticle\Cloud\Marketing\Enums\ContactInquiry;
 use Relaticle\Cloud\Marketing\Http\Controllers\ContactController;
 use Relaticle\Cloud\Marketing\Http\Requests\ContactRequest;
@@ -133,7 +134,8 @@ it('submits the contact form successfully', function () {
         'message' => 'I would like to learn more about your enterprise plan and integrations.',
     ])
         ->assertRedirect('/contact')
-        ->assertSessionHas('success');
+        ->assertSessionHas('success')
+        ->assertSessionHas('fathom.track_contact_submitted', fn (mixed $id): bool => is_string($id) && Str::isUuid($id));
 
     Mail::assertQueued(NewContactSubmissionMail::class);
 });
@@ -146,7 +148,8 @@ it('rejects an invalid submission', function () {
         'email' => 'not-an-email',
         'message' => 'Too short.',
     ])
-        ->assertSessionHasErrors(['email', 'message']);
+        ->assertSessionHasErrors(['email', 'message'])
+        ->assertSessionMissing('fathom.track_contact_submitted');
 
     Mail::assertNothingQueued();
 });
@@ -161,7 +164,8 @@ it('silently swallows a submission that fills the honeypot field', function () {
         'message' => 'I would like to learn more about your enterprise plan and integrations.',
         'my_name' => 'I fill every field I see',
     ])
-        ->assertOk();
+        ->assertOk()
+        ->assertSessionMissing('fathom.track_contact_submitted');
 
     Mail::assertNothingQueued();
 });

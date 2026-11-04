@@ -91,24 +91,36 @@ it('renders the signup event once and clears the flag', function (): void {
     session()->put('fathom.track_signup', true);
 
     $html = view('filament.app.analytics')->render();
+    $payload = json_decode(Str::betweenFirst($html, 'data-relaticle-analytics>', '</script>'), true, flags: JSON_THROW_ON_ERROR);
 
-    expect($html)->toContain("fathom.trackEvent('signup')")
-        ->and(session()->has('fathom.track_signup'))->toBeFalse();
+    expect($payload['events'])->toHaveCount(1);
+    expect($payload['events'][0]['name'])->toBe('signup');
+    expect($payload['events'][0]['id'])->toBeUuid();
+    expect(session()->has('fathom.track_signup'))->toBeFalse();
 
     $again = view('filament.app.analytics')->render();
 
-    expect($again)->not->toContain("trackEvent('signup')");
+    expect(json_decode(Str::betweenFirst($again, 'data-relaticle-analytics>', '</script>'), true, flags: JSON_THROW_ON_ERROR)['events'])->toBe([]);
 });
 
-it('keeps panel auth pages out of tenant-slug normalization', function (): void {
+it('provides the configured panel prefix for browser URL normalization', function (): void {
     $this->app['env'] = 'production';
-    config(['services.fathom.site_id' => 'TESTSITE']);
+    config(['services.fathom.site_id' => 'TESTSITE', 'app.app_panel_domain' => null, 'app.app_panel_path' => 'crm']);
 
     $html = view('filament.app.analytics')->render();
+    $payload = json_decode(Str::betweenFirst($html, 'data-relaticle-analytics>', '</script>'), true, flags: JSON_THROW_ON_ERROR);
 
-    expect($html)->toContain("'/register'")
-        ->and($html)->toContain("'/login'")
-        ->and($html)->toContain("'/email-verification'");
+    expect($payload)->toMatchArray(['site' => 'TESTSITE', 'panel' => true, 'prefix' => '/crm']);
+});
+
+it('omits a panel prefix on a domain-routed panel', function (): void {
+    $this->app['env'] = 'production';
+    config(['services.fathom.site_id' => 'TESTSITE', 'app.app_panel_domain' => 'app.relaticle.test']);
+
+    $html = view('filament.app.analytics')->render();
+    $payload = json_decode(Str::betweenFirst($html, 'data-relaticle-analytics>', '</script>'), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($payload['prefix'])->toBe('');
 });
 
 it('loads Fathom on the sign-in page', function (): void {
@@ -336,22 +348,38 @@ it('renders the workspace created event once and clears the flag', function (): 
     session()->put('fathom.track_workspace_created', true);
 
     $html = view('filament.app.analytics')->render();
+    $payload = json_decode(Str::betweenFirst($html, 'data-relaticle-analytics>', '</script>'), true, flags: JSON_THROW_ON_ERROR);
 
-    expect($html)->toContain("fathom.trackEvent('workspace_created')")
-        ->and(session()->has('fathom.track_workspace_created'))->toBeFalse();
+    expect($payload['events'])->toHaveCount(1);
+    expect($payload['events'][0]['name'])->toBe('workspace_created');
+    expect($payload['events'][0]['id'])->toBeUuid();
+    expect(session()->has('fathom.track_workspace_created'))->toBeFalse();
 
     $again = view('filament.app.analytics')->render();
 
-    expect($again)->not->toContain("trackEvent('workspace_created')");
+    expect(json_decode(Str::betweenFirst($again, 'data-relaticle-analytics>', '</script>'), true, flags: JSON_THROW_ON_ERROR)['events'])->toBe([]);
 });
 
-it('renders each conversion event only for its own flag', function (): void {
+it('renders each conversion event only for its own flag', function (string $event): void {
     $this->app['env'] = 'production';
     config(['services.fathom.site_id' => 'TESTSITE']);
-    session()->put('fathom.track_signup', true);
+    $operation = (string) Str::uuid();
+    session()->put('fathom.track_'.$event, $operation);
+    session()->put('fathom.track_unapproved', true);
 
     $html = view('filament.app.analytics')->render();
+    $payload = json_decode(Str::betweenFirst($html, 'data-relaticle-analytics>', '</script>'), true, flags: JSON_THROW_ON_ERROR);
 
-    expect($html)->toContain("fathom.trackEvent('signup')")
-        ->and($html)->not->toContain("trackEvent('workspace_created')");
+    expect($payload['events'])->toBe([['id' => $operation, 'name' => $event]]);
+    expect(session()->has('fathom.track_'.$event))->toBeFalse();
+    expect(session()->has('fathom.track_unapproved'))->toBeTrue();
+})->with(['signup', 'workspace_created', 'signup_started', 'email_verified', 'login_completed', 'setup_completed', 'contact_submitted', 'checkout_started']);
+
+it('does not consume analytics flags when tracking is disabled', function (): void {
+    $this->app['env'] = 'production';
+    config(['services.fathom.site_id' => null]);
+    session()->put('fathom.track_signup', true);
+
+    expect(view('filament.app.analytics')->render())->toBe('');
+    expect(session()->get('fathom.track_signup'))->toBeTrue();
 });

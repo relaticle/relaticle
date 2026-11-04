@@ -393,7 +393,7 @@
                 <x-cloud::marketing.button href="https://github.com/relaticle/relaticle" icon="ri-github-fill" external>
                     {{ __('Deploy self-hosted') }}
                 </x-cloud::marketing.button>
-                <x-cloud::marketing.button variant="secondary" href="{{ route('login') }}">
+                <x-cloud::marketing.button variant="secondary" href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="footer">
                     {{ __('Try Relaticle Cloud') }}
                 </x-cloud::marketing.button>
             </div>

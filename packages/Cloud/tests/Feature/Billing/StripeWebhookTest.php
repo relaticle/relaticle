@@ -24,6 +24,8 @@ use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Cloud\Admin\Actions\TransferWorkspaceBilling;
+use Relaticle\Cloud\Analytics\Actions\RecordSubscriptionOutcome;
+use Relaticle\Cloud\Analytics\Models\Acquisition;
 use Relaticle\Cloud\Billing\Actions\ActivateManagedPlan;
 use Relaticle\Cloud\Billing\Actions\CancelWithUnusedTimeRefund;
 use Relaticle\Cloud\Billing\Actions\GrantPurchasedCredits;
@@ -51,6 +53,7 @@ mutates(RefreshManagedRenewal::class);
 mutates(PaymentFailedNotification::class);
 mutates(ManagedInvoiceOverdueNotification::class);
 mutates(StripeWebhookController::class);
+mutates(RecordSubscriptionOutcome::class);
 
 beforeEach(function (): void {
     config()->set('cashier.webhook.secret', 'whsec_test_secret');
@@ -1817,4 +1820,235 @@ it('remembers no renewal for a Pro subscription update', function (): void {
     sendStripeWebhook($payload)->assertSuccessful();
 
     expect(Cache::get(RefreshManagedRenewal::CACHE_PREFIX.'sub_test_1'))->toBeNull();
+});
+
+function acquiredBillingWorkspace(Workspace $workspace): Acquisition
+{
+    return Acquisition::query()->create([
+        'user_id' => $workspace->user_id,
+        'workspace_id' => $workspace->getKey(),
+        'source' => 'google',
+        'landing' => 'pricing',
+        'captured_at' => now()->subDays(40),
+        'workspace_linked_at' => now()->subDays(40),
+    ]);
+}
+
+/**
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function acquisitionPaidEvent(Workspace $workspace, array $overrides = []): array
+{
+    return invoicePaidEvent($workspace, array_merge([
+        'id' => 'in_acquisition',
+        'status' => 'paid',
+        'amount_paid' => 1900,
+        'amount_paid_off_stripe' => 0,
+        'status_transitions' => ['paid_at' => 1_800_000_000],
+        'parent' => ['type' => 'subscription_details', 'subscription_details' => ['subscription' => 'sub_pro_1']],
+    ], $overrides));
+}
+
+it('keeps the earliest paid invoice atomically across duplicate and out of order deliveries', function (): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    proSubscriptionOn($workspace);
+
+    sendStripeWebhook(acquisitionPaidEvent($workspace))->assertOk();
+    sendStripeWebhook(acquisitionPaidEvent($workspace))->assertOk();
+    sendStripeWebhook(acquisitionPaidEvent($workspace, [
+        'id' => 'in_earlier', 'status_transitions' => ['paid_at' => 1_799_000_000],
+    ]))->assertOk();
+    sendStripeWebhook(acquisitionPaidEvent($workspace))->assertOk();
+
+    expect($acquisition->refresh()->first_paid_invoice_id)->toBe('in_earlier')
+        ->and($acquisition->first_paid_at->getTimestamp())->toBe(1_799_000_000);
+    $this->assertDatabaseCount('acquisitions', 1);
+});
+
+it('records a paid subscription before its local subscription created webhook arrives', function (): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    $body = stripeSubscriptionEvent($workspace, 'created', ['id' => 'sub_pro_1'])['data']['object'];
+    $recorder = StripeRecorder::install()->respondTo('/v1/subscriptions/sub_pro_1', $body);
+
+    sendStripeWebhook(acquisitionPaidEvent($workspace))->assertOk();
+
+    expect($acquisition->refresh()->first_paid_invoice_id)->toBe('in_acquisition')
+        ->and($recorder->countFor('GET /v1/subscriptions/sub_pro_1'))->toBe(1);
+    $this->assertDatabaseMissing('subscriptions', ['stripe_id' => 'sub_pro_1']);
+});
+
+it('refuses an out of order invoice when Stripe associates the subscription with another customer', function (): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    $body = stripeSubscriptionEvent($workspace, 'created', ['id' => 'sub_pro_1', 'customer' => 'cus_other'])['data']['object'];
+    StripeRecorder::install()->respondTo('/v1/subscriptions/sub_pro_1', $body);
+
+    sendStripeWebhook(acquisitionPaidEvent($workspace))->assertOk();
+
+    expect($acquisition->refresh()->first_paid_invoice_id)->toBeNull();
+});
+
+it('retries a paid conversion rather than losing it when subscription verification is unavailable', function (): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    $recorder = StripeRecorder::install()->respondTo('/v1/subscriptions/sub_pro_1', [
+        'error' => ['type' => 'invalid_request_error', 'message' => 'Subscription unavailable'],
+    ], 400);
+
+    sendStripeWebhook(acquisitionPaidEvent($workspace))->assertStatus(500);
+    expect($acquisition->refresh()->first_paid_invoice_id)->toBeNull();
+
+    $recorder->respondTo('/v1/subscriptions/sub_pro_1', stripeSubscriptionEvent($workspace, 'created', ['id' => 'sub_pro_1'])['data']['object']);
+
+    sendStripeWebhook(acquisitionPaidEvent($workspace))->assertOk();
+    expect($acquisition->refresh()->first_paid_invoice_id)->toBe('in_acquisition');
+});
+
+it('counts no paid conversion for a nonqualifying invoice', function (array $overrides): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    proSubscriptionOn($workspace);
+
+    sendStripeWebhook(acquisitionPaidEvent($workspace, $overrides))->assertOk();
+
+    expect($acquisition->refresh()->first_paid_at)->toBeNull()
+        ->and($acquisition->first_paid_invoice_id)->toBeNull();
+})->with([
+    'zero dollar trial invoice' => [['amount_paid' => 0]],
+    'negative payment' => [['amount_paid' => -1900]],
+    'unpaid invoice' => [['status' => 'open']],
+    'one off credit pack' => [['parent' => null, 'billing_reason' => 'manual']],
+    'wrong customer' => [['customer' => 'cus_other']],
+    'outside Stripe' => [['amount_paid_off_stripe' => 1900]],
+    'marked paid out of band' => [['paid_out_of_band' => true]],
+    'no provider payment timestamp' => [['status_transitions' => ['paid_at' => null]]],
+]);
+
+it('verifies off Stripe payment amounts when the webhook omits the includable field', function (int $offStripe, ?string $expected): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    proSubscriptionOn($workspace);
+    $event = acquisitionPaidEvent($workspace);
+    unset($event['data']['object']['amount_paid_off_stripe']);
+    $recorder = StripeRecorder::install()->respondTo('/v1/invoices/in_acquisition', [
+        'id' => 'in_acquisition', 'object' => 'invoice', 'amount_paid_off_stripe' => $offStripe,
+    ]);
+
+    sendStripeWebhook($event)->assertOk();
+
+    expect($acquisition->refresh()->first_paid_invoice_id)->toBe($expected)
+        ->and($recorder->paramsFor('GET /v1/invoices/in_acquisition'))->toBe(['expand' => ['amount_paid_off_stripe']]);
+})->with([
+    'Stripe collected payment' => [0, 'in_acquisition'],
+    'manually recorded payment' => [1900, null],
+]);
+
+it('does not attribute another workspaces local subscription to the invoice customer', function (): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    proSubscriptionOn(stripeBillingWorkspace());
+
+    sendStripeWebhook(acquisitionPaidEvent($workspace))->assertOk();
+
+    expect($acquisition->refresh()->first_paid_at)->toBeNull();
+});
+
+it('does not fabricate acquisition rows for legacy paid subscribers', function (): void {
+    $workspace = stripeBillingWorkspace();
+    proSubscriptionOn($workspace);
+
+    sendStripeWebhook(acquisitionPaidEvent($workspace))->assertOk();
+
+    $this->assertDatabaseCount('acquisitions', 0);
+});
+
+it('records one first renewal failure using provider time without counting retries or plan changes', function (): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    proSubscriptionOn($workspace, 'sub_test_1');
+    $acquisition->update(['first_paid_at' => now()->subMonth(), 'first_paid_invoice_id' => 'in_first']);
+    $failedAt = now()->getTimestamp();
+    $event = invoicePaymentFailedEvent($workspace, ['id' => 'in_failed']);
+    $event['created'] = $failedAt;
+
+    sendStripeWebhook($event)->assertOk();
+    sendStripeWebhook($event)->assertOk();
+    $event['data']['object']['attempt_count'] = 2;
+    $event['created'] += 60;
+    sendStripeWebhook($event)->assertOk();
+    $event['data']['object'] = array_merge($event['data']['object'], ['id' => 'in_plan_change', 'attempt_count' => 1, 'billing_reason' => 'subscription_update']);
+    sendStripeWebhook($event)->assertOk();
+
+    expect($acquisition->refresh()->first_renewal_failed_invoice_id)->toBe('in_failed')
+        ->and($acquisition->first_renewal_failed_at->getTimestamp())->toBe($failedAt);
+});
+
+it('does not record a failed first charge as a renewal failure', function (string $reason): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    proSubscriptionOn($workspace, 'sub_test_1');
+    StripeRecorder::install();
+    $event = invoicePaymentFailedEvent($workspace, ['billing_reason' => $reason]);
+    $event['created'] = now()->getTimestamp();
+
+    sendStripeWebhook($event)->assertOk();
+
+    expect($acquisition->refresh()->first_renewal_failed_at)->toBeNull();
+})->with(['subscription_create', 'subscription_cycle']);
+
+it('does not mistake nonrenewal failures or retries for the first renewal failure', function (array $overrides): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    proSubscriptionOn($workspace, 'sub_test_1');
+    $acquisition->update(['first_paid_at' => now()->subMonth(), 'first_paid_invoice_id' => 'in_first']);
+    $event = invoicePaymentFailedEvent($workspace, $overrides);
+    $event['created'] = now()->getTimestamp();
+
+    sendStripeWebhook($event)->assertOk();
+
+    expect($acquisition->refresh()->first_renewal_failed_at)->toBeNull()
+        ->and($acquisition->first_renewal_failed_invoice_id)->toBeNull();
+})->with([
+    'plan change' => [['billing_reason' => 'subscription_update']],
+    'first charge' => [['billing_reason' => 'subscription_create']],
+    'one off credit pack' => [['parent' => null]],
+    'automatic retry' => [['attempt_count' => 2]],
+    'unknown customer' => [['customer' => 'cus_other']],
+]);
+
+it('recognizes a renewal when its prior positive payment webhook has not arrived yet', function (): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    proSubscriptionOn($workspace, 'sub_test_1');
+    $paidAt = now()->subMonth()->getTimestamp();
+    $priorInvoice = acquisitionPaidEvent($workspace, [
+        'status_transitions' => ['paid_at' => $paidAt],
+        'parent' => ['type' => 'subscription_details', 'subscription_details' => ['subscription' => 'sub_test_1']],
+    ])['data']['object'];
+    StripeRecorder::install()->respondTo('GET /v1/invoices', [
+        'object' => 'list', 'has_more' => false, 'data' => [$priorInvoice],
+    ]);
+    $event = invoicePaymentFailedEvent($workspace, ['id' => 'in_failed']);
+    $event['created'] = now()->getTimestamp();
+
+    sendStripeWebhook($event)->assertOk();
+
+    expect($acquisition->refresh()->first_paid_invoice_id)->toBe('in_acquisition')
+        ->and($acquisition->first_paid_at->getTimestamp())->toBe($paidAt)
+        ->and($acquisition->first_renewal_failed_invoice_id)->toBe('in_failed');
+});
+
+it('does not count a historic payment from before acquisition capture', function (): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    proSubscriptionOn($workspace);
+
+    sendStripeWebhook(acquisitionPaidEvent($workspace, [
+        'status_transitions' => ['paid_at' => now()->subDays(50)->getTimestamp()],
+    ]))->assertOk();
+
+    expect($acquisition->refresh()->first_paid_at)->toBeNull();
 });

@@ -6,8 +6,10 @@ use App\Enums\Plan;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
+use Relaticle\Cloud\Analytics\Models\Acquisition;
 use Relaticle\Cloud\Billing\Actions\CreateSubscriptionCheckout;
 use Relaticle\Cloud\Billing\Filament\Billing;
+use Stripe\Exception\InvalidRequestException;
 use Tests\Helpers\StripeRecorder;
 
 mutates(Billing::class, CreateSubscriptionCheckout::class);
@@ -127,4 +129,82 @@ it('rejects an interval that is not on the price map', function (): void {
 
     expect(fn (): string => resolve(CreateSubscriptionCheckout::class)->execute($this->workspace, Plan::Pro, 'weekly'))
         ->toThrow(InvalidArgumentException::class);
+});
+
+function checkoutAcquisition(Workspace $workspace): Acquisition
+{
+    return Acquisition::query()->create([
+        'user_id' => $workspace->user_id,
+        'workspace_id' => $workspace->getKey(),
+        'source' => 'google',
+        'landing' => 'pricing',
+        'captured_at' => now()->subDay(),
+        'workspace_linked_at' => now()->subDay(),
+    ]);
+}
+
+it('records the first successful subscription checkout and exposes its operation id to the browser', function (): void {
+    withHostedBilling();
+    $this->travelTo(now()->startOfSecond());
+    $acquisition = checkoutAcquisition($this->workspace);
+    $recorder = StripeRecorder::install();
+    request()->setLaravelSession(app('session.store'));
+
+    resolve(CreateSubscriptionCheckout::class)->execute($this->workspace, Plan::Pro, 'monthly');
+
+    expect($acquisition->refresh()->first_checkout_session_id)->toBe('cs_test_fake')
+        ->and($acquisition->first_checkout_at->equalTo(now()))->toBeTrue()
+        ->and(session('fathom.track_checkout_started'))->toBeUuid();
+
+    $this->travel(1)->hour();
+    $recorder->respondTo('/checkout/sessions', [
+        'id' => 'cs_later',
+        'object' => 'checkout.session',
+        'url' => 'https://checkout.stripe.com/c/pay/cs_later',
+    ]);
+
+    resolve(CreateSubscriptionCheckout::class)->execute($this->workspace, Plan::Pro, 'yearly');
+
+    expect($acquisition->refresh()->first_checkout_session_id)->toBe('cs_test_fake')
+        ->and($acquisition->first_checkout_at->equalTo(now()->subHour()))->toBeTrue()
+        ->and(session('fathom.track_checkout_started'))->toBeUuid();
+});
+
+it('does not fabricate an acquisition for a legacy workspace checkout', function (): void {
+    withHostedBilling();
+    StripeRecorder::install();
+
+    resolve(CreateSubscriptionCheckout::class)->execute($this->workspace, Plan::Pro, 'monthly');
+
+    $this->assertDatabaseMissing('acquisitions', ['workspace_id' => $this->workspace->getKey()]);
+});
+
+it('records neither checkout nor browser success when Stripe rejects checkout creation', function (): void {
+    withHostedBilling();
+    $acquisition = checkoutAcquisition($this->workspace);
+    request()->setLaravelSession(app('session.store'));
+    StripeRecorder::install()->respondTo('/checkout/sessions', [
+        'error' => ['type' => 'invalid_request_error', 'message' => 'Checkout unavailable'],
+    ], 400);
+
+    expect(fn (): string => resolve(CreateSubscriptionCheckout::class)->execute($this->workspace, Plan::Pro, 'monthly'))
+        ->toThrow(InvalidRequestException::class);
+
+    expect($acquisition->refresh()->first_checkout_at)->toBeNull()
+        ->and($acquisition->first_checkout_session_id)->toBeNull()
+        ->and(session()->has('fathom.track_checkout_started'))->toBeFalse();
+});
+
+it('records neither checkout nor browser success for an invalid plan interval', function (): void {
+    withHostedBilling();
+    $acquisition = checkoutAcquisition($this->workspace);
+    request()->setLaravelSession(app('session.store'));
+    $recorder = StripeRecorder::install();
+
+    expect(fn (): string => resolve(CreateSubscriptionCheckout::class)->execute($this->workspace, Plan::Pro, 'weekly'))
+        ->toThrow(InvalidArgumentException::class);
+
+    expect($acquisition->refresh()->first_checkout_at)->toBeNull()
+        ->and(session()->has('fathom.track_checkout_started'))->toBeFalse()
+        ->and($recorder->requests)->toBeEmpty();
 });

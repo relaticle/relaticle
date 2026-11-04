@@ -109,7 +109,7 @@
             </p>
 
             <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-                <x-cloud::marketing.button href="{{ route('login') }}">
+                <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="hero">
                     {{ __('Start for free') }}
                 </x-cloud::marketing.button>
                 <x-cloud::marketing.button variant="secondary" href="#connect">
@@ -376,7 +376,7 @@
                 {{ __('Free to start, no credit card required. Self-host it yourself whenever you want.') }}
             </p>
             <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-                <x-cloud::marketing.button href="{{ route('login') }}">
+                <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="footer">
                     {{ __('Start for free') }}
                 </x-cloud::marketing.button>
                 <x-cloud::marketing.button variant="secondary" href="{{ route('pricing') }}">

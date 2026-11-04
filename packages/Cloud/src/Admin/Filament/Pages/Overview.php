@@ -9,6 +9,7 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Widgets\WidgetConfiguration;
 use Override;
+use Relaticle\Cloud\Admin\Filament\Widgets\Overview\AcquisitionTable;
 use Relaticle\Cloud\Admin\Filament\Widgets\Overview\CohortTable;
 use Relaticle\Cloud\Admin\Filament\Widgets\Overview\MoneyStats;
 use Relaticle\Cloud\Admin\Filament\Widgets\Overview\PlanStats;
@@ -47,6 +48,7 @@ final class Overview extends BaseDashboard
             PlanStats::class,
             ValueStats::class,
             CohortTable::class,
+            AcquisitionTable::class,
             SalesLeads::class,
             ProblemsStats::class,
         ];
