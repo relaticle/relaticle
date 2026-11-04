@@ -19,7 +19,10 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 use Relaticle\EmailIntegration\Actions\CancelQueuedEmailAction;
 use Relaticle\EmailIntegration\Actions\RetryMailboxHistoryImportFailuresAction;
+use Relaticle\EmailIntegration\Data\ConversationRow;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Filament\Concerns\HasConversationReader;
+use Relaticle\EmailIntegration\Filament\Concerns\HasConversationsFlag;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -27,16 +30,17 @@ use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use RuntimeException;
 
 /**
- * Panel-wide handler for notification clicks: the Emails-tab reader overlay
- * from the bell, and Undo on the queued-send toast. It is the same
- * `selectedEmailId` overlay as the person Emails tab, not a Filament
- * ViewAction modal.
+ * Panel-wide handler for notification clicks: the reader from the bell on pages
+ * that host none, and Undo on the queued-send toast.
  *
  * @property-read Email|null $selectedEmail
+ * @property-read bool $showsConversations
  * @property-read Collection<int, EmailAccessRequest> $pendingAccessRequests
  */
 final class EmailAccessNotificationHandler extends Component implements HasActions, HasSchemas
 {
+    use HasConversationReader;
+    use HasConversationsFlag;
     use HasEmailReaderActions;
     use InteractsWithActions;
     use InteractsWithSchemas;
@@ -46,14 +50,14 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
     #[Url(as: 'email')]
     public ?string $selectedEmailId = null;
 
-    // The page opens `?email=` in its own reader, so this one stays shut until the bell asks.
+    // The page opens `?email=` in its own reader, and the bell asks it to open the rest.
     #[Locked]
     public bool $hostsReader = false;
 
     public function mount(): void
     {
         if ($this->selectedEmailId !== null && ! $this->hostsReader) {
-            $this->openEmailReader($this->selectedEmailId);
+            $this->openRequestedEmail($this->selectedEmailId);
         }
     }
 
@@ -62,17 +66,36 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
     {
         $this->closeNotificationsPanel();
 
-        $this->hostsReader = false;
-        $this->openEmailReader($emailId);
+        if ($this->hostsReader) {
+            $this->dispatch('email:open', emailId: $emailId);
+
+            return;
+        }
+
+        $this->openRequestedEmail($emailId);
     }
 
-    /**
-     * Covers selection changes that come from the client (the mobile back button
-     * clears it) rather than from {@see deselectEmail()}.
-     */
-    public function updatedSelectedEmailId(): void
+    #[Computed]
+    public function showsConversations(): bool
     {
-        $this->dispatch('composer:dismiss-inline');
+        return $this->conversationsEnabled($this->authUser()->currentWorkspace);
+    }
+
+    /** @return list<ConversationRow> */
+    protected function conversationRows(): array
+    {
+        return [];
+    }
+
+    private function openRequestedEmail(string $emailId): void
+    {
+        if ($this->showsConversations()) {
+            $this->openLinkedEmail($emailId);
+
+            return;
+        }
+
+        $this->openEmailReader($emailId);
     }
 
     public function deselectEmail(): void
@@ -86,8 +109,12 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
     #[Computed]
     public function selectedEmail(): ?Email
     {
-        if ($this->hostsReader) {
+        if ($this->hostsReader || $this->selectedEmailId === null) {
             return null;
+        }
+
+        if ($this->showsConversations()) {
+            return $this->conversationCopy($this->selectedEmailId);
         }
 
         $email = $this->resolveWorkspaceEmail($this->selectedEmailId, 'viewBody');

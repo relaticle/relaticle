@@ -311,3 +311,37 @@ it('reads the same not available line for missing, private and unlinked teammate
             ->assertDontSee(__('filament/pages/email-inbox.drawer.not_available'));
     }
 });
+
+it('opens the email the bell names on the record that holds it', function (): void {
+    $email = conversationsRecordMessage($this->ownerMailbox, 'conv-bell', 'brian@airbnb.test', ['subject' => 'Renewal terms']);
+    $this->company->emails()->attach($email->id);
+
+    $tab = livewire(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class]);
+
+    expect($tab->effects['url']['selectedEmailId']['use'])->toBe('replace');
+
+    $tab->dispatch('email:open', emailId: $email->id)
+        ->assertSet('selectedEmailId', $email->id)
+        ->assertSeeHtml('fi-email-reader-drawer')
+        ->assertNoRedirect();
+});
+
+it('sends the email the bell names to its own place when this record does not hold it', function (): void {
+    $elsewhere = conversationsRecordMessage($this->ownerMailbox, 'conv-stripe', 'olivia@stripe.test');
+
+    livewire(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
+        ->dispatch('email:open', emailId: $elsewhere->id)
+        ->assertSet('selectedEmailId', null)
+        ->assertRedirect(route('email.open', $elsewhere->id));
+});
+
+it('saves the reply draft when the client clears the email open on the record', function (): void {
+    $email = conversationsRecordMessage($this->ownerMailbox, 'conv-back', 'brian@airbnb.test');
+    $this->company->emails()->attach($email->id);
+
+    livewire(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
+        ->call('selectEmail', $email->id)
+        ->set('selectedEmailId', null)
+        ->assertDispatched('composer:dismiss-inline')
+        ->assertDontSeeHtml('fi-email-reader-drawer');
+});

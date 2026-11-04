@@ -74,6 +74,12 @@ trait HasConversationReader
         return $this->selectedEmailId !== null && ! $this->selectedEmail instanceof Email;
     }
 
+    // A selection the client clears (the mobile back button) saves the reply draft too.
+    public function updatedSelectedEmailId(): void
+    {
+        $this->dispatch('composer:dismiss-inline');
+    }
+
     public function expandMessage(string $id): void
     {
         if (in_array($id, $this->expandedEmailIds, true) || ! $this->thread->contains(fn (Email $message): bool => $message->getKey() === $id)) {

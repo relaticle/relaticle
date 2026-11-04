@@ -607,3 +607,45 @@ it('expands and replies to the newest message the viewer can read when the newes
             "data-reader-gate=\"{$bens->id}\"",
         ]);
 });
+
+it('opens the drawer from the URL on the Emails page and clears it on close', function (): void {
+    $email = conversationsPageMessage($this->ownerMailbox, 'conv-url', 'brian@airbnb.test', ['subject' => 'Quarterly review']);
+
+    $page = Livewire::withQueryParams(['email' => $email->id, 'view' => 'all'])
+        ->test(EmailInboxPage::class)
+        ->assertSeeHtml('fi-email-reader-drawer')
+        ->assertSee('Quarterly review');
+
+    expect($page->effects['url']['selectedEmailId']['use'])->toBe('replace');
+
+    $page->call('deselectEmail')
+        ->assertSet('selectedEmailId', null)
+        ->assertSet('conversationView', ConversationView::All)
+        ->assertDispatched('composer:dismiss-inline')
+        ->assertDontSeeHtml('fi-email-reader-drawer');
+});
+
+it('opens the email the bell names in the page drawer and keeps the view', function (): void {
+    $email = conversationsPageMessage($this->ownerMailbox, 'conv-bell', 'brian@airbnb.test', ['subject' => 'Renewal terms']);
+    $hidden = conversationsPageMessage($this->teammateMailbox, 'conv-hidden', 'olivia@stripe.test', ['subject' => 'Ben side project']);
+
+    livewire(EmailInboxPage::class)
+        ->call('setView', ConversationView::All->value)
+        ->dispatch('email:open', emailId: $email->id)
+        ->assertSet('selectedEmailId', $email->id)
+        ->assertSet('conversationView', ConversationView::All)
+        ->assertSee('Renewal terms')
+        ->dispatch('email:open', emailId: $hidden->id)
+        ->assertSee(__('filament/pages/email-inbox.drawer.not_available'))
+        ->assertDontSee('Ben side project');
+});
+
+it('saves the reply draft when the client clears the open email', function (): void {
+    $email = conversationsPageMessage($this->ownerMailbox, 'conv-back', 'brian@airbnb.test');
+
+    livewire(EmailInboxPage::class)
+        ->call('selectEmail', $email->id)
+        ->set('selectedEmailId', null)
+        ->assertDispatched('composer:dismiss-inline')
+        ->assertDontSeeHtml('fi-email-reader-drawer');
+});

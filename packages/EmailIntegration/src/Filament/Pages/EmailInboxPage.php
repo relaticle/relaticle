@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Relaticle\EmailIntegration\Data\ConversationFilters;
 use Relaticle\EmailIntegration\Data\ConversationPage;
@@ -252,6 +253,12 @@ final class EmailInboxPage extends Page
     public function selectEmail(string $id): void
     {
         $this->openConversationReader($id);
+    }
+
+    #[On('email:open')]
+    public function openRequestedEmail(string $emailId): void
+    {
+        $this->openLinkedEmail($emailId);
     }
 
     public function deselectEmail(): void

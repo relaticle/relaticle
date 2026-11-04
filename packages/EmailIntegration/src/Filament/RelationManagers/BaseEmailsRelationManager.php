@@ -113,11 +113,11 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
     // The flag-off tab keeps today's URL, where the panel's own reader opens `?email=`.
     /**
-     * @return array<string, array{as: string}>
+     * @return array<string, array{as: string, history: bool}>
      */
     protected function queryString(): array
     {
-        return $this->showsConversations() ? ['selectedEmailId' => ['as' => 'email']] : [];
+        return $this->showsConversations() ? ['selectedEmailId' => ['as' => 'email', 'history' => false]] : [];
     }
 
     public function table(Table $table): Table
@@ -364,6 +364,21 @@ abstract class BaseEmailsRelationManager extends RelationManager
         }
 
         $this->openEmailReader($id);
+    }
+
+    // Mail the bell names that this record does not hold opens on the record or page that does.
+    #[On('email:open')]
+    public function openRequestedEmail(string $emailId): void
+    {
+        if (! $this->showsConversations()) {
+            return;
+        }
+
+        $this->openLinkedEmail($emailId);
+
+        if ($this->selectedEmailId === null) {
+            $this->redirect(route('email.open', $emailId));
+        }
     }
 
     public function deselectEmail(): void
