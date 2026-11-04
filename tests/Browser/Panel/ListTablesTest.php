@@ -16,6 +16,8 @@ mutates(AppPanelProvider::class, RecordChipColumn::class);
 
 const CELL_LABELS_SHOWN = '[...document.querySelectorAll(".fi-ta-row .fi-ta-cell-label")].some((label) => label.offsetParent !== null)';
 
+const SEARCH_FILLS_TOOLBAR = '(() => { const toolbar = document.querySelector(".fi-ta-header-toolbar"); const style = getComputedStyle(toolbar); const start = toolbar.getBoundingClientRect().left + parseFloat(style.paddingLeft); const width = toolbar.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight); const group = toolbar.querySelector(":scope > :has(> .fi-ta-search-field)"); const used = [...toolbar.children].filter((child) => child.getBoundingClientRect().width > 0).reduce((sum, child) => sum + child.getBoundingClientRect().width + parseFloat(getComputedStyle(child).marginInlineStart) + parseFloat(getComputedStyle(child).marginInlineEnd), 0); return Math.round(group.getBoundingClientRect().left) === Math.round(start) && Math.round(used) === Math.round(width); })()';
+
 const TABLE_SCROLLS_SIDEWAYS = '(() => { const content = document.querySelector(".fi-ta-content-ctn"); return content.scrollWidth > content.clientWidth; })()';
 
 function seedListRows(User $user): void
@@ -48,6 +50,7 @@ it('stacks each list row into a card so no column sits off a phone screen', func
         ->assertVisible('.fi-ta-row')
         ->assertScript(CELL_LABELS_SHOWN, true)
         ->assertScript(TABLE_SCROLLS_SIDEWAYS, false)
+        ->assertScript(SEARCH_FILLS_TOOLBAR, true)
         ->assertNoJavaScriptErrors();
 })->with(['tasks', 'companies', 'people', 'opportunities', 'import-history']);
 

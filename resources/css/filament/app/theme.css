@@ -956,6 +956,28 @@ a.fi-linked-records-chip {
     @apply max-sm:p-0;
 }
 
+/* On a phone the table search fills the toolbar row, beside the filter and column buttons. The actions after
+   it are often only bulk actions waiting on a selection, so they take a margin once shown rather than a gap. */
+.fi-ta-header-toolbar {
+    @apply max-sm:gap-x-0;
+
+    & > :has(> .fi-ta-search-field) {
+        @apply max-sm:ms-0 max-sm:flex-1;
+
+        & > .fi-ta-search-field {
+            @apply max-sm:w-full max-sm:max-w-none;
+        }
+    }
+
+    & > .fi-ta-actions {
+        @apply max-sm:order-last;
+
+        &:has(> :not([style*='display: none'])) {
+            @apply max-sm:ms-3;
+        }
+    }
+}
+
 /* The head cells already rule off an empty table. */
 .fi-ta-ctn .fi-ta-empty-state {
     @apply border-t-0;
@@ -1196,24 +1218,7 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-ta-header-toolbar {
-        @apply order-1 border-b-0 p-0 max-sm:order-2 max-sm:basis-full max-sm:gap-x-0;
-
-        & > :has(> .fi-ta-search-field) {
-            @apply max-sm:ms-0 max-sm:flex-1;
-
-            & > .fi-ta-search-field {
-                @apply max-sm:w-full max-sm:max-w-none;
-            }
-        }
-
-        /* Bulk actions show only with a selection, so they space themselves rather than through a gap. */
-        & > .fi-ta-actions {
-            @apply max-sm:order-last;
-
-            & > .fi-dropdown {
-                @apply max-sm:ms-3;
-            }
-        }
+        @apply order-1 border-b-0 p-0 max-sm:order-2 max-sm:basis-full;
     }
 
     /* A modal mounted in the pane keeps its sections as cards, as it has them everywhere else. */
