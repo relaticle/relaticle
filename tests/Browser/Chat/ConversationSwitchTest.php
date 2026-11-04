@@ -111,7 +111,8 @@ it('places the conversation title in the topbar and the toggle beside the worksp
         ->assertScript('(() => document.querySelector("#fi-main-sidebar").classList.contains("fi-sidebar-open"))()')
         ->resize(390, 844)
         ->assertVisible('[data-page-heading]')
-        ->assertScript('(() => Array.from(document.querySelectorAll("nav[aria-label=Topbar] button[aria-label^=Expand]")).filter((button) => button.getClientRects().length > 0).length === 1)()')
+        ->assertScript('(() => Array.from(document.querySelectorAll("nav[aria-label=Topbar] button[aria-label^=Expand]")).filter((button) => button.getClientRects().length > 0).length === 0)()')
+        ->assertVisible('.fi-bottom-nav button[aria-controls=fi-main-sidebar]')
         ->assertScript('(() => getComputedStyle(document.querySelector("[data-sidebar-workspace-toggle]")).display === "none")()');
 
     $page->script(<<<JS

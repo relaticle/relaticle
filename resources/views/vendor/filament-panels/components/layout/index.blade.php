@@ -108,6 +108,10 @@
 
                     {{ \Filament\Support\Facades\FilamentView::renderHook(\Filament\View\PanelsRenderHook::LAYOUT_END, scopes: $renderHookScopes) }}
                 </div>
+
+                @if ($hasNavigation)
+                    @include('filament.app.bottom-navigation')
+                @endif
             </div>
         </div>
     @else

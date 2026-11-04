@@ -397,9 +397,12 @@ html.fi-chat-docked .fi-app-main-wrapper {
     }
 }
 
-/* Top Navigation Bar: 3rem, the height of the sidebar's workspace row. */
+/* Top Navigation Bar: 3rem, the height of the sidebar's workspace row. The phone tab bar sits below the content. */
 .fi-body {
     --topbar-height: 3rem;
+    --bottom-nav-height: 0rem;
+
+    @apply max-sm:[--bottom-nav-height:3.75rem];
 }
 
 .fi-topbar {
@@ -2075,4 +2078,71 @@ html.fi:has(body.fi-onboarding-wizard),
 
 .fi-note-card-date {
     @apply shrink-0 text-gray-500 dark:text-gray-400;
+}
+
+/* Phones: a tab bar replaces the topbar's menu button, and menus and dialogs rise from the bottom edge. */
+.fi-bottom-nav {
+    @apply flex h-(--bottom-nav-height) shrink-0 border-t border-gray-200 bg-white sm:hidden dark:border-white/10 dark:bg-gray-900;
+}
+
+.fi-bottom-nav-item {
+    @apply flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[0.6875rem] font-medium text-gray-500 dark:text-gray-400;
+
+    & > .fi-icon {
+        @apply size-6;
+    }
+
+    & > span {
+        @apply max-w-full truncate;
+    }
+
+    &.fi-active {
+        @apply text-primary-600 dark:text-primary-400;
+    }
+}
+
+.fi-topbar-open-sidebar-btn {
+    @apply max-sm:hidden!;
+}
+
+/* Floating UI writes position inline, hence !important; min-width outranks every fi-width-* cap.
+   Menus inside the sidebar or a dialog stay anchored to their trigger. */
+.fi-dropdown-panel[x-ref='panel']:not(.fi-sidebar *, .fi-modal *) {
+    @apply max-sm:fixed! max-sm:inset-x-0! max-sm:top-auto! max-sm:bottom-0! max-sm:z-40 max-sm:max-h-[80dvh] max-sm:min-w-full max-sm:overflow-y-auto max-sm:rounded-b-none max-sm:rounded-t-2xl max-sm:px-2 max-sm:pt-3 max-sm:pb-[max(0.5rem,env(safe-area-inset-bottom))] max-sm:transition-[opacity,translate] max-sm:duration-200;
+    @apply max-sm:shadow-[0_0_0_100vmax_rgb(3_7_18/0.5)];
+
+    &.fi-opacity-0 {
+        @apply max-sm:translate-y-full;
+    }
+
+    & .fi-dropdown-list-item {
+        @apply max-sm:gap-3 max-sm:px-3 max-sm:py-3 max-sm:text-base;
+    }
+}
+
+/* iOS clips a fixed element to the touch-scrolling box it sits in, so every box a sheet or dialog can open
+   from stops scrolling while it is open. Hidden still keeps its scroll position. */
+:is(.fi-app-main-wrapper > .fi-layout, .fi-ta-content-ctn, .ff-columns, .ff-cards):has(.fi-dropdown-panel[x-ref='panel'][style*='display: block'], .fi-modal.fi-modal-open) {
+    @apply max-sm:overflow-hidden!;
+}
+
+/* A sheet opened from the page must outrank the topbar, and a stacked row's actions cell the table header. */
+.fi-app-main-wrapper:has(> .fi-layout .fi-dropdown-panel[x-ref='panel'][style*='display: block']) > .fi-topbar-ctn {
+    @apply max-sm:z-0;
+}
+
+.fi-ta-cell:has(.fi-dropdown-panel[x-ref='panel'][style*='display: block']) {
+    @apply max-sm:z-40;
+}
+
+.fi-modal:not(.fi-modal-slide-over, .fi-width-screen) > .fi-modal-window-ctn {
+    @apply max-sm:grid-rows-[1fr_auto] max-sm:p-0;
+
+    & > .fi-modal-window {
+        @apply max-sm:max-h-[90dvh] max-sm:overflow-y-auto max-sm:rounded-b-none max-sm:rounded-t-2xl max-sm:pb-[env(safe-area-inset-bottom)];
+
+        &:is(.fi-transition-enter-start, .fi-transition-leave-end) {
+            @apply max-sm:translate-y-full max-sm:scale-100 max-sm:opacity-100;
+        }
+    }
 }
