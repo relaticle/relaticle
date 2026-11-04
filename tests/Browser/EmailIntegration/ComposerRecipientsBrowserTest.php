@@ -218,3 +218,29 @@ it('puts the caret on the recipient in a new email and on the message in an addr
         ->assertScript('document.activeElement.closest(".email-composer-body-ctn") !== null', true)
         ->assertNoJavaScriptErrors();
 });
+
+it('opens the composer across a phone screen with every field on it', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'user_id' => $user->id,
+        'workspace_id' => $workspace->id,
+        'email_address' => 'olivia@acme.example',
+        'sync_cursor' => 'history-done',
+        'last_synced_at' => now(),
+    ]));
+
+    loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(393, 852)
+        ->navigate("/app/{$workspace->slug}/email")
+        ->click(__('filament/concerns/email-compose.actions.compose.label'))
+        ->waitForText(__('filament/emails/composer.title'))
+        ->click('[aria-label="'.__('filament/emails/composer.actions.shrink').'"]')
+        ->assertVisible('[aria-label="'.__('filament/emails/composer.actions.expand').'"]')
+        ->wait(0.5)
+        ->assertScript("(() => { const field = document.querySelector('[role=\"combobox\"]').getBoundingClientRect(); return field.left >= 0 && field.right <= innerWidth; })()", true)
+        ->assertNoJavaScriptErrors();
+});
