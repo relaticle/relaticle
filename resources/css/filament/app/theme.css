@@ -2093,6 +2093,11 @@ html.fi:has(body.fi-onboarding-wizard),
     }
 }
 
+/* A rich editor whose tools sit in one group ran its toolbar off a phone screen: the toolbar wraps groups, not tools. */
+.fi-fo-rich-editor-toolbar-group {
+    @apply max-sm:flex-wrap max-sm:gap-y-1;
+}
+
 /* A toast is capped at max-w-sm and pinned to the right, so on a phone it sat off-centre. It spans the screen
    there instead, below the notch. */
 .fi-no {
