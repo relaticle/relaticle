@@ -9,16 +9,22 @@
     'unavailable' => false,
 ])
 
+@php
+    $storedWidth = "Math.min(70, Math.max(40, Number(localStorage.getItem('relaticle.emailReader.width')) || 55))";
+@endphp
+
 @if ($email === null && $unavailable)
     <aside
         wire:key="email-reader-unavailable"
-        x-data
+        x-data="{ width: {{ $storedWidth }} }"
+        style="--ei-reader-width: 55vw"
+        x-bind:style="{ '--ei-reader-width': width + 'vw' }"
         x-init="$nextTick(() => document.getElementById('email-reader-heading')?.focus())"
         role="dialog"
         aria-modal="false"
         aria-labelledby="email-reader-heading"
         x-on:keydown.escape.window="$event.defaultPrevented || document.querySelector('.fi-modal-open, .fi-dropdown-panel[style*=\'display: block\']') || $wire.deselectEmail()"
-        class="fi-email-reader-drawer fixed inset-0 z-40 flex flex-col bg-white shadow-xl ring-1 ring-gray-950/10 sm:inset-y-0 sm:left-auto sm:right-0 sm:w-[55vw] lg:max-w-[calc(100vw-var(--sidebar-width,0px))] dark:bg-gray-900 dark:ring-white/10"
+        class="fi-email-reader-drawer fixed inset-0 z-40 flex flex-col bg-white shadow-xl ring-1 ring-gray-950/10 sm:inset-y-0 sm:left-auto sm:right-0 sm:w-[var(--ei-reader-width)] lg:max-w-[calc(100vw-var(--sidebar-width,0px))] dark:bg-gray-900 dark:ring-white/10"
     >
         <div class="flex items-start gap-3 border-b border-gray-200 px-4 py-3 sm:px-6 dark:border-gray-700">
             <p id="email-reader-heading" tabindex="-1" class="min-w-0 flex-1 text-sm text-gray-600 outline-none dark:text-gray-300">
@@ -48,6 +54,18 @@
         x-data="{
             closing: false,
 
+            width: {{ $storedWidth }},
+
+            resizing: false,
+
+            resizeTo(vw, persist = true) {
+                this.width = Math.round(Math.min(70, Math.max(40, vw)))
+
+                if (persist) {
+                    localStorage.setItem('relaticle.emailReader.width', this.width)
+                }
+            },
+
             async closeReader() {
                 if (this.closing) {
                     return
@@ -72,13 +90,32 @@
         }"
         x-init="$nextTick(() => document.getElementById('email-reader-heading')?.focus())"
         wire:key="email-reader-{{ $email->getKey() }}"
-        x-bind:style="closing ? { display: 'none' } : {}"
+        style="--ei-reader-width: 55vw"
+        x-bind:style="{ '--ei-reader-width': width + 'vw', ...(closing ? { display: 'none' } : {}) }"
+        x-bind:class="resizing && 'select-none'"
         x-on:keydown.escape.window="$event.defaultPrevented || document.querySelector('.fi-modal-open, .fi-dropdown-panel[style*=\'display: block\']') || closeReader()"
         role="dialog"
         aria-modal="false"
         aria-labelledby="email-reader-heading"
-        {{ $attributes->class(['fi-email-reader-drawer fixed inset-0 z-40 flex flex-col bg-white shadow-xl ring-1 ring-gray-950/10 sm:inset-y-0 sm:left-auto sm:right-0 sm:w-[55vw] lg:max-w-[calc(100vw-var(--sidebar-width,0px))] dark:bg-gray-900 dark:ring-white/10']) }}
+        {{ $attributes->class(['fi-email-reader-drawer fixed inset-0 z-40 flex flex-col bg-white shadow-xl ring-1 ring-gray-950/10 sm:inset-y-0 sm:left-auto sm:right-0 sm:w-[var(--ei-reader-width)] lg:max-w-[calc(100vw-var(--sidebar-width,0px))] dark:bg-gray-900 dark:ring-white/10']) }}
     >
+        <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="{{ __('filament/pages/email-inbox.drawer.resize') }}"
+            aria-valuemin="40"
+            aria-valuemax="70"
+            x-bind:aria-valuenow="width"
+            tabindex="0"
+            x-on:pointerdown="resizing = true; $el.setPointerCapture($event.pointerId)"
+            x-on:pointermove="resizing && resizeTo((window.innerWidth - $event.clientX) / window.innerWidth * 100, false)"
+            x-on:pointerup="resizing = false; resizeTo(width)"
+            x-on:pointercancel="resizing = false; resizeTo(width)"
+            x-on:keydown.left.prevent="resizeTo(width + 5)"
+            x-on:keydown.right.prevent="resizeTo(width - 5)"
+            class="absolute inset-y-0 left-0 z-10 hidden w-1.5 -translate-x-1/2 cursor-col-resize touch-none outline-none transition-colors hover:bg-primary-500/40 focus-visible:bg-primary-500 sm:block"
+        ></div>
+
         <header class="shrink-0 border-b border-gray-200 px-4 py-3 sm:px-6 dark:border-gray-700">
             <div class="flex items-start gap-3">
                 <h2 id="email-reader-heading" tabindex="-1" class="min-w-0 flex-1 break-words text-base font-semibold leading-snug text-gray-900 outline-none dark:text-white">
