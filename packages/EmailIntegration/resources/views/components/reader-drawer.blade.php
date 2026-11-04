@@ -3,10 +3,35 @@
     'pendingAccessRequests',
     'thread',
     'bodies',
+    'expanded' => [],
     'row' => null,
+    'unavailable' => false,
 ])
 
-@if ($email !== null)
+@if ($email === null && $unavailable)
+    <aside
+        wire:key="email-reader-unavailable"
+        role="dialog"
+        aria-modal="false"
+        aria-labelledby="email-reader-heading"
+        x-on:keydown.escape.window="$event.defaultPrevented || document.querySelector('.fi-modal-open, .fi-dropdown-panel[style*=\'display: block\']') || $wire.deselectEmail()"
+        class="fi-email-reader-drawer fixed inset-0 z-40 flex flex-col bg-white shadow-xl ring-1 ring-gray-950/10 sm:inset-y-0 sm:left-auto sm:right-0 sm:w-[55vw] lg:max-w-[calc(100vw-var(--sidebar-width,0px))] dark:bg-gray-900 dark:ring-white/10"
+    >
+        <div class="flex items-start gap-3 border-b border-gray-200 px-4 py-3 sm:px-6 dark:border-gray-700">
+            <p id="email-reader-heading" tabindex="-1" class="min-w-0 flex-1 text-sm text-gray-600 outline-none dark:text-gray-300">
+                {{ __('filament/pages/email-inbox.drawer.not_available') }}
+            </p>
+            <button
+                wire:click="deselectEmail"
+                type="button"
+                aria-label="{{ __('filament/emails/composer.actions.close') }}"
+                class="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+            >
+                <x-heroicon-m-x-mark class="h-4 w-4" />
+            </button>
+        </div>
+    </aside>
+@elseif ($email !== null)
     @php
         $authUser = auth()->user();
         $newest = $thread->last() ?? $email;
@@ -98,7 +123,7 @@
         <x-email-integration::reader-access-bar :pending-access-requests="$pendingAccessRequests" />
 
         <div class="min-h-0 flex-1 overflow-y-auto motion-safe:scroll-smooth" data-email-scroll-region>
-            <x-email-integration::reader-thread :thread="$thread" :bodies="$bodies" :reply-target="$replyTarget" />
+            <x-email-integration::reader-thread :thread="$thread" :bodies="$bodies" :expanded="$expanded" :reply-target="$replyTarget" />
         </div>
     </aside>
 @endif

@@ -41,15 +41,16 @@ use Relaticle\EmailIntegration\Services\EmailThreadSummaryService;
 trait HasEmailReaderActions
 {
     /**
-     * Open the reader overlay only when the viewer has full body access.
-     * Metadata and subject-only mail stay on the list with request-access.
+     * Open the reader on the host's selected copy. A copy below the body tier opens only
+     * where the host's selection allows it (the conversations drawer), and is never marked read.
      */
     protected function openEmailReader(string $id): bool
     {
         $this->selectedEmailId = $id;
         unset($this->selectedEmail);
+        $email = $this->selectedEmail();
 
-        if (! $this->selectedEmail() instanceof Email) {
+        if (! $email instanceof Email) {
             $this->selectedEmailId = null;
             unset($this->selectedEmail);
 
@@ -59,15 +60,17 @@ trait HasEmailReaderActions
         $this->dispatch('composer:dismiss-inline');
         $this->dispatch('composer:resume-draft', emailId: $id);
 
-        resolve(MarkEmailAsReadAction::class)->execute($id, $this->readerUser());
+        if ($this->readerUser()->can('viewBody', $email)) {
+            resolve(MarkEmailAsReadAction::class)->execute($id, $this->readerUser());
+        }
 
         return true;
     }
 
     /**
-     * The copy a conversation list may open: one of the viewer's preferred visible copies with a readable body.
+     * The copy a conversation list may open: one of the viewer's preferred visible copies, at any tier.
      */
-    protected function readableConversationCopy(string $emailId): ?Email
+    protected function conversationCopy(string $emailId): ?Email
     {
         $user = $this->readerUser();
         $conversationKey = Email::query()
@@ -81,11 +84,7 @@ trait HasEmailReaderActions
 
         $email = resolve(ConversationsQuery::class)->messages($user, $conversationKey)->find($emailId);
 
-        if (! $email instanceof Email || $user->cannot('viewBody', $email)) {
-            return null;
-        }
-
-        return $email->loadMissing(['body', 'labels', 'attachments', 'from']);
+        return $email instanceof Email ? $email->loadMissing(['labels', 'from']) : null;
     }
 
     /**

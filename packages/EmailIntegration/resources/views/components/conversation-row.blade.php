@@ -3,7 +3,7 @@
 @php
     use Filament\Support\Facades\FilamentTimezone;
 
-    $opens = $selectable && $row->access->showsBody();
+    $opens = $selectable;
     $sentAt = $row->lastMessageAt->setTimezone(FilamentTimezone::get());
     $timestamp = match (true) {
         $sentAt->isToday() => $sentAt->format('g:i A'),

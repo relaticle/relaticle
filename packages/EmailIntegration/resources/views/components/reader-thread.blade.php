@@ -1,4 +1,4 @@
-@props(['thread', 'bodies', 'replyTarget'])
+@props(['thread', 'bodies', 'expanded', 'replyTarget'])
 
 @php
     $authUser = auth()->user();
@@ -7,13 +7,13 @@
 
 <div class="flex flex-col divide-y divide-gray-100 dark:divide-white/5">
     @foreach ($thread as $message)
-        @php
-            $expanded = $bodies->get($message->getKey());
-        @endphp
-
-        @if ($expanded !== null)
+        @if ($bodies->has($message->getKey()))
             <div wire:key="thread-message-{{ $message->getKey() }}" data-thread-message="{{ $message->getKey() }}">
-                <x-email-integration::email-view :record="$expanded" threaded />
+                <x-email-integration::email-view :record="$bodies->get($message->getKey())" threaded />
+            </div>
+        @elseif (in_array($message->getKey(), $expanded, true))
+            <div wire:key="thread-message-{{ $message->getKey() }}" data-thread-message="{{ $message->getKey() }}">
+                <x-email-integration::reader-gate :email="$message" />
             </div>
         @else
             @php
@@ -25,12 +25,8 @@
             <button
                 type="button"
                 wire:key="thread-row-{{ $message->getKey() }}"
-                @if ($authUser->can('viewBody', $message))
-                    wire:click="expandMessage('{{ $message->getKey() }}')"
-                @else
-                    disabled
-                @endif
-                class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors enabled:hover:bg-gray-50 sm:px-6 dark:enabled:hover:bg-white/5"
+                wire:click="expandMessage('{{ $message->getKey() }}')"
+                class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 sm:px-6 dark:hover:bg-white/5"
             >
                 <span class="w-36 shrink-0 truncate font-medium text-gray-800 dark:text-gray-200">
                     {{ $from?->name ?: $from?->email_address ?: __('filament/pages/email-inbox.reader.unknown_sender') }}

@@ -19,10 +19,12 @@ use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Enums\MailboxHealth;
+use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManager;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
+use Relaticle\EmailIntegration\Models\EmailRead;
 use Relaticle\EmailIntegration\Models\WorkspaceEmailBlocklist;
 use Relaticle\EmailIntegration\Queries\ConversationsQuery;
 
@@ -249,4 +251,63 @@ it('keeps the list visible beside the open reader', function (): void {
         ->assertDontSeeHtml('fi-email-reader-backdrop')
         ->assertSeeHtml('data-conversation="conv-other"')
         ->assertDontSeeHtml('flex flex-col invisible');
+});
+
+it('opens a locked teammate conversation at the gate without its subject', function (): void {
+    $email = conversationsRecordMessage($this->teammateMailbox, 'conv-gate', 'olivia@airbnb.test', [
+        'subject' => 'Contract redlines',
+        'snippet' => 'Clause 7 is a blocker',
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+    ]);
+    $this->company->emails()->attach($email->id);
+
+    livewire(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
+        ->call('selectEmail', $email->id)
+        ->assertSeeHtml('fi-email-reader-drawer')
+        ->assertSee(__('filament/pages/email-inbox.subject.hidden'))
+        ->assertDontSee('Contract redlines')
+        ->assertDontSee('Clause 7 is a blocker')
+        ->assertActionVisible('requestAccess', ['emailId' => $email->id]);
+
+    expect(EmailRead::query()->where('email_id', $email->id)->exists())->toBeFalse();
+});
+
+it('deep links to a locked email land on the gate, and to hidden mail on the not available state', function (): void {
+    $locked = conversationsRecordMessage($this->teammateMailbox, 'conv-locked', 'olivia@airbnb.test', [
+        'subject' => 'Contract redlines',
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+    ]);
+    $this->company->emails()->attach($locked->id);
+    $hidden = conversationsRecordMessage($this->teammateMailbox, 'conv-hidden', 'olivia@airbnb.test', ['subject' => 'Ben side project']);
+
+    Livewire::withQueryParams(['email' => $locked->id])
+        ->test(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
+        ->assertSeeHtml('fi-email-reader-drawer')
+        ->assertDontSee('Contract redlines');
+
+    Livewire::withQueryParams(['email' => $hidden->id])
+        ->test(EmailInboxPage::class)
+        ->assertSee(__('filament/pages/email-inbox.drawer.not_available'))
+        ->assertDontSee('Ben side project');
+});
+
+it('reads the same not available line for missing, private and unlinked teammate mail', function (): void {
+    $private = conversationsRecordMessage($this->teammateMailbox, 'conv-private', 'olivia@airbnb.test', [
+        'subject' => 'Private compensation thread',
+        'privacy_tier' => EmailPrivacyTier::PRIVATE,
+    ]);
+    $this->company->emails()->attach($private->id);
+    $unlinked = conversationsRecordMessage($this->teammateMailbox, 'conv-unlinked', 'olivia@airbnb.test', ['subject' => 'Ben side project']);
+
+    foreach ([(string) Str::ulid(), $private->id, $unlinked->id] as $id) {
+        Livewire::withQueryParams(['email' => $id])
+            ->test(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
+            ->assertSet('selectedEmailId', $id)
+            ->assertSee(__('filament/pages/email-inbox.drawer.not_available'))
+            ->assertDontSee('Private compensation thread')
+            ->assertDontSee('Ben side project')
+            ->call('deselectEmail')
+            ->assertSet('selectedEmailId', null)
+            ->assertDontSee(__('filament/pages/email-inbox.drawer.not_available'));
+    }
 });

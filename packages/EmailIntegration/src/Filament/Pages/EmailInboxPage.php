@@ -122,7 +122,7 @@ final class EmailInboxPage extends Page
         }
 
         if ($this->selectedEmailId !== null) {
-            $this->openConversationReader($this->selectedEmailId);
+            $this->openLinkedEmail($this->selectedEmailId);
         }
     }
 
@@ -233,7 +233,7 @@ final class EmailInboxPage extends Page
             return null;
         }
 
-        return $this->readableConversationCopy($this->selectedEmailId);
+        return $this->conversationCopy($this->selectedEmailId);
     }
 
     /** @return SupportCollection<int, EmailAccessRequest> */

@@ -17,6 +17,7 @@ use Relaticle\EmailIntegration\Queries\ConversationsQuery;
  * @property-read EloquentCollection<int, Email> $thread
  * @property-read EloquentCollection<string, Email> $expandedBodies
  * @property-read ConversationRow|null $selectedConversationRow
+ * @property-read bool $selectedEmailUnavailable
  */
 trait HasConversationReader
 {
@@ -65,6 +66,13 @@ trait HasConversationReader
         return collect($this->conversationRows())->first(fn (ConversationRow $row): bool => $row->conversationKey === $key);
     }
 
+    // Only a link can leave an id that opens nothing: a click that cannot open clears it.
+    #[Computed]
+    public function selectedEmailUnavailable(): bool
+    {
+        return $this->selectedEmailId !== null && ! $this->selectedEmail() instanceof Email;
+    }
+
     public function expandMessage(string $id): void
     {
         if (in_array($id, $this->expandedEmailIds, true) || ! $this->thread->contains(fn (Email $message): bool => $message->getKey() === $id)) {
@@ -77,7 +85,7 @@ trait HasConversationReader
 
     protected function openConversationReader(string $id): void
     {
-        unset($this->thread, $this->expandedBodies, $this->selectedConversationRow);
+        unset($this->thread, $this->expandedBodies, $this->selectedConversationRow, $this->selectedEmailUnavailable);
         $this->expandedEmailIds = [];
 
         if (! $this->openEmailReader($id)) {
@@ -86,6 +94,16 @@ trait HasConversationReader
 
         $this->expandedEmailIds = $this->initiallyExpandedIds();
         $this->markThreadRead();
+    }
+
+    // Mail the viewer may read elsewhere is dropped; mail they may not see at all opens as not available.
+    protected function openLinkedEmail(string $id): void
+    {
+        $this->openConversationReader($id);
+
+        if ($this->selectedEmailId === null && ! $this->resolveWorkspaceEmail($id, 'view') instanceof Email) {
+            $this->selectedEmailId = $id;
+        }
     }
 
     /** @return list<string> */

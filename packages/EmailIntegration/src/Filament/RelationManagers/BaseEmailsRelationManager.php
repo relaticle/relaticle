@@ -107,7 +107,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
         parent::mount();
 
         if ($this->selectedEmailId !== null && $this->showsConversations()) {
-            $this->openConversationReader($this->selectedEmailId);
+            $this->openLinkedEmail($this->selectedEmailId);
         }
     }
 
@@ -308,7 +308,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
     private function recordConversationCopy(string $emailId): ?Email
     {
-        $email = $this->readableConversationCopy($emailId);
+        $email = $this->conversationCopy($emailId);
 
         if (! $email instanceof Email || ! resolve(ConversationsQuery::class)->contains($this->authUser(), (string) $email->conversation_key, ConversationFilters::forRecord($this->ownerRecordWithEmails()))) {
             return null;

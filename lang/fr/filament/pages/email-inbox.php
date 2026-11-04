@@ -28,5 +28,18 @@ return [
     'drawer' => [
         'reply' => 'Répondre',
         'source' => 'Visible via la boîte mail de :name',
+        'not_available' => 'Cet e-mail ne vous est pas accessible.',
+        'gate' => [
+            'metadata_only' => [
+                'heading' => 'Vous voyez qui et quand',
+                'description' => ':name ne partage que l\'auteur et la date de cet e-mail.',
+            ],
+            'subject' => [
+                'heading' => 'Vous voyez l\'objet',
+                'description' => ':name ne partage que l\'objet de cet e-mail.',
+            ],
+            'request' => 'Demander l\'accès',
+            'requested' => 'Demandé',
+        ],
     ],
 ];

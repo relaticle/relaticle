@@ -228,5 +228,18 @@ return [
     'drawer' => [
         'reply' => 'Reply',
         'source' => 'Visible through :name\'s mailbox',
+        'not_available' => 'This email is not available to you.',
+        'gate' => [
+            'metadata_only' => [
+                'heading' => 'You can see who and when',
+                'description' => ':name shares only who wrote this email and when.',
+            ],
+            'subject' => [
+                'heading' => 'You can see the subject',
+                'description' => ':name shares only the subject of this email.',
+            ],
+            'request' => 'Request access',
+            'requested' => 'Requested',
+        ],
     ],
 ];

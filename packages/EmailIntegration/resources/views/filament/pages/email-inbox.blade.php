@@ -104,7 +104,9 @@
             :pending-access-requests="$this->pendingAccessRequests"
             :thread="$this->thread"
             :bodies="$this->expandedBodies"
+            :expanded="[...$expandedEmailIds, $selectedEmailId]"
             :row="$this->selectedConversationRow"
+            :unavailable="$this->selectedEmailUnavailable"
         />
     @endif
 

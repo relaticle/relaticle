@@ -302,7 +302,7 @@ it('renders a teammate row only at the tier the viewer holds', function (EmailPr
     expect(str_contains($html, 'Security review findings'))->toBe($showsSubject)
         ->and(str_contains($html, 'Two critical issues remain open'))->toBe($showsSnippet)
         ->and($html)->toContain('Airbnb')
-        ->and(str_contains($html, "selectEmail('{$email->id}')"))->toBe($tier === EmailPrivacyTier::FULL);
+        ->and($html)->toContain("selectEmail('{$email->id}')");
 })->with([
     'metadata' => [EmailPrivacyTier::METADATA_ONLY, false, false],
     'subject' => [EmailPrivacyTier::SUBJECT, true, false],
@@ -540,7 +540,7 @@ it('marks read only the messages the viewer can open', function (): void {
     $bens = conversationsPageMessage($this->teammateMailbox, 'conv-mixed-tier', 'olivia@airbnb.test', ['privacy_tier' => EmailPrivacyTier::METADATA_ONLY]);
     $this->company->emails()->attach([$mine->id, $bens->id]);
 
-    livewire(EmailInboxPage::class)->call('selectEmail', $mine->id);
+    livewire(EmailInboxPage::class)->call('selectEmail', $bens->id);
 
     expect(EmailRead::query()->where('user_id', $this->owner->id)->pluck('email_id')->sort()->values()->all())
         ->toBe(collect([$earlier->id, $mine->id])->sort()->values()->all());
@@ -556,4 +556,22 @@ it('expands only messages of the open conversation', function (): void {
         ->call('expandMessage', $elsewhere->id)
         ->assertSet('expandedEmailIds', [$open->id])
         ->assertDontSee('Another conversation body');
+});
+
+it('shows the gate for a locked message expanded inside a readable conversation', function (): void {
+    $mine = conversationsPageMessage($this->ownerMailbox, 'conv-locked-inside', 'brian@airbnb.test', ['sent_at' => now()->subHour()]);
+    $bens = conversationsPageMessage($this->teammateMailbox, 'conv-locked-inside', 'olivia@airbnb.test', [
+        'snippet' => 'Clause 7 is a blocker',
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        'sent_at' => now()->subHours(2),
+    ]);
+    EmailBody::factory()->create(['email_id' => $bens->id, 'body_html' => null, 'body_text' => 'Clause 7 is a blocker in full']);
+    $this->company->emails()->attach([$mine->id, $bens->id]);
+
+    livewire(EmailInboxPage::class)
+        ->call('selectEmail', $mine->id)
+        ->assertDontSeeHtml("data-reader-gate=\"{$bens->id}\"")
+        ->call('expandMessage', $bens->id)
+        ->assertSeeHtml("data-reader-gate=\"{$bens->id}\"")
+        ->assertDontSee('Clause 7 is a blocker');
 });

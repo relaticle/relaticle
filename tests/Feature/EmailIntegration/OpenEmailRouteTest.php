@@ -6,12 +6,15 @@ use App\Enums\CustomFields\CompanyField;
 use App\Features\EmailConversations;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Resources\CompanyResource;
+use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
 use App\Filament\Resources\CompanyResource\RelationManagers\EmailsRelationManager as CompanyEmailsRelationManager;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\User;
+use Filament\Facades\Filament;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
+use Livewire\Livewire;
 use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
 use Relaticle\EmailIntegration\Controllers\OpenEmailController;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -217,4 +220,30 @@ it('answers a hidden or trashed email with not found while conversations are off
 
     $this->get(route('email.open', $private))->assertNotFound();
     $this->get(route('email.open', $trashed))->assertNotFound();
+});
+
+it('follows a link to a locked email to the gate with its subject hidden everywhere', function (): void {
+    $locked = conversationsRouteMessage($this->teammateMailbox, 'conv-locked', 'olivia@airbnb.test', [
+        'subject' => 'Contract redlines',
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+    ]);
+    $this->company->emails()->attach($locked->id);
+
+    $target = (string) $this->get(route('email.open', $locked))->assertRedirect()->headers->get('Location');
+    parse_str((string) parse_url($target, PHP_URL_QUERY), $query);
+    $html = (string) $this->followingRedirects()->get(route('email.open', $locked))->assertOk()->getContent();
+    preg_match('/<title>(.*?)<\\/title>/s', $html, $title);
+
+    expect($query['email'] ?? null)->toBe($locked->id)
+        ->and($html)->not->toContain('Contract redlines')
+        ->and($title[1] ?? '')->toContain('Airbnb')->not->toContain('Contract redlines');
+
+    Filament::setCurrentPanel(Filament::getPanel('app'));
+    Filament::setTenant($this->workspace);
+
+    Livewire::withQueryParams($query)
+        ->test(CompanyEmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
+        ->assertSeeHtml("data-reader-gate=\"{$locked->id}\"")
+        ->assertSee(__('filament/pages/email-inbox.subject.hidden'))
+        ->assertDontSee('Contract redlines');
 });
