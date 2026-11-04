@@ -49,7 +49,7 @@
             @if ($this->showsConversations)
                 <div class="flex min-h-[20rem] flex-col divide-y divide-gray-100 border-t border-gray-200 dark:divide-white/5 dark:border-white/10">
                     @forelse ($this->conversations->rows as $row)
-                        <x-email-integration::conversation-row :row="$row" selectable wire:key="record-conversation-{{ $row->conversationKey }}" />
+                        <x-email-integration::conversation-row :row="$row" selectable :current="$row->conversationKey === $this->selectedEmail?->conversation_key" wire:key="record-conversation-{{ $row->conversationKey }}" />
                     @empty
                         <x-email-integration::list-empty
                             class="flex-1"
@@ -138,6 +138,7 @@
                 :bodies="$this->expandedBodies"
                 :expanded="[...$expandedEmailIds, $selectedEmailId]"
                 :row="$this->selectedConversationRow"
+                :adjacent="$this->adjacentConversations"
                 :unavailable="$this->selectedEmailUnavailable"
             />
         @else

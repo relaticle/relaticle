@@ -59,7 +59,7 @@
     @if ($pageTabShown === null)
         <div class="divide-y divide-gray-200/60 dark:divide-white/10">
             @forelse ($this->conversations->rows as $row)
-                <x-email-integration::conversation-row :row="$row" selectable wire:key="conversation-{{ $row->conversationKey }}" />
+                <x-email-integration::conversation-row :row="$row" selectable :current="$row->conversationKey === $this->selectedEmail?->conversation_key" wire:key="conversation-{{ $row->conversationKey }}" />
             @empty
                 <x-filament::empty-state
                     :heading="__('filament/pages/email-inbox.views.empty.'.$this->activeView->value)"
@@ -106,6 +106,7 @@
             :bodies="$this->expandedBodies"
             :expanded="[...$expandedEmailIds, $selectedEmailId]"
             :row="$this->selectedConversationRow"
+            :adjacent="$this->adjacentConversations"
             :unavailable="$this->selectedEmailUnavailable"
         />
     @endif

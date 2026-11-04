@@ -1,4 +1,4 @@
-@props(['row', 'selectable' => false])
+@props(['row', 'selectable' => false, 'current' => false])
 
 @php
     use Filament\Support\Facades\FilamentTimezone;
@@ -28,6 +28,7 @@
 
 <div
     data-conversation="{{ $row->conversationKey }}" data-unread="{{ $row->isUnread ? 'true' : 'false' }}" data-message-count="{{ $row->messageCount }}"
+    @if ($current) aria-current="true" @endif
     {{ $attributes->class([
         'relative flex w-full items-start gap-2 px-4 py-3 transition-colors sm:px-6',
         'hover:bg-gray-50 dark:hover:bg-white/5' => $opens,
@@ -37,6 +38,7 @@
         <button
             type="button"
             wire:click="selectEmail('{{ $row->viewerCopyEmailId }}')"
+            x-on:click="Alpine.store('emailReader', { returnTo: @js($row->conversationKey) })"
             wire:loading.attr="disabled"
             wire:target="selectEmail('{{ $row->viewerCopyEmailId }}')"
             aria-label="{{ $subject }}"

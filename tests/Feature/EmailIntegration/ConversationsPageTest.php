@@ -649,3 +649,30 @@ it('saves the reply draft when the client clears the open email', function (): v
         ->assertDispatched('composer:dismiss-inline')
         ->assertDontSeeHtml('fi-email-reader-drawer');
 });
+
+it('moves to the next and previous conversation in list order', function (): void {
+    $newest = conversationsPageMessage($this->ownerMailbox, 'conv-a', 'a@client.test', ['sent_at' => now()->subMinute()]);
+    $middle = conversationsPageMessage($this->ownerMailbox, 'conv-b', 'b@client.test', ['sent_at' => now()->subMinutes(2)]);
+    $oldest = conversationsPageMessage($this->ownerMailbox, 'conv-c', 'c@client.test', ['sent_at' => now()->subMinutes(3)]);
+
+    $page = livewire(EmailInboxPage::class)
+        ->call('setView', ConversationView::All->value)
+        ->call('selectEmail', $middle->id)
+        ->call('openAdjacentConversation', 'sideways')
+        ->assertSet('selectedEmailId', $middle->id)
+        ->call('openAdjacentConversation', 'next')
+        ->assertSet('selectedEmailId', $oldest->id)
+        ->call('openAdjacentConversation', 'next')
+        ->assertSet('selectedEmailId', $oldest->id);
+
+    preg_match_all('/data-conversation="([^"]+)"[^>]*aria-current="true"/', $page->html(), $current);
+    expect($current[1])->toBe(['conv-c'])
+        ->and($page->html())->toMatch('/data-reader-action="next"[^>]*\sdisabled\s/')
+        ->not->toMatch('/data-reader-action="previous"[^>]*\sdisabled\s/');
+
+    $page->call('openAdjacentConversation', 'previous')
+        ->call('openAdjacentConversation', 'previous')
+        ->assertSet('selectedEmailId', $newest->id);
+
+    expect($page->html())->toMatch('/data-reader-action="previous"[^>]*\sdisabled\s/');
+});

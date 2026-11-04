@@ -19,6 +19,7 @@ use Relaticle\EmailIntegration\Queries\ConversationsQuery;
  * @property-read EloquentCollection<string, Email> $expandedBodies
  * @property-read ConversationRow|null $selectedConversationRow
  * @property-read bool $selectedEmailUnavailable
+ * @property-read array{previous: ConversationRow|null, next: ConversationRow|null} $adjacentConversations
  */
 trait HasConversationReader
 {
@@ -67,6 +68,35 @@ trait HasConversationReader
         return collect($this->conversationRows())->first(fn (ConversationRow $row): bool => $row->conversationKey === $key);
     }
 
+    /** @return array{previous: ConversationRow|null, next: ConversationRow|null} */
+    #[Computed]
+    public function adjacentConversations(): array
+    {
+        $rows = $this->conversationRows();
+        $key = $this->selectedEmail?->conversation_key;
+        $index = array_search($key, array_map(fn (ConversationRow $row): string => $row->conversationKey, $rows), true);
+
+        if (! is_int($index)) {
+            return ['previous' => null, 'next' => null];
+        }
+
+        return ['previous' => $rows[$index - 1] ?? null, 'next' => $rows[$index + 1] ?? null];
+    }
+
+    // Crossing a page boundary is the list keyboard's job, so the ends of the loaded page stop here.
+    public function openAdjacentConversation(string $direction): void
+    {
+        $row = match ($direction) {
+            'previous' => $this->adjacentConversations['previous'],
+            'next' => $this->adjacentConversations['next'],
+            default => null,
+        };
+
+        if ($row instanceof ConversationRow) {
+            $this->openConversationReader($row->viewerCopyEmailId);
+        }
+    }
+
     // Only a link can leave an id that opens nothing: a click that cannot open clears it.
     #[Computed]
     public function selectedEmailUnavailable(): bool
@@ -92,7 +122,7 @@ trait HasConversationReader
 
     protected function openConversationReader(string $id): void
     {
-        unset($this->thread, $this->expandedBodies, $this->selectedConversationRow, $this->selectedEmailUnavailable);
+        unset($this->thread, $this->expandedBodies, $this->selectedConversationRow, $this->selectedEmailUnavailable, $this->adjacentConversations);
         $this->expandedEmailIds = [];
 
         if (! $this->openEmailReader($id)) {

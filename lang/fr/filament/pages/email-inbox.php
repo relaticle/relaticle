@@ -28,6 +28,8 @@ return [
     'drawer' => [
         'reply' => 'Répondre',
         'source' => 'Visible via la boîte mail de :name',
+        'previous' => 'Conversation précédente',
+        'next' => 'Conversation suivante',
         'not_available' => 'Cet e-mail ne vous est pas accessible.',
         'gate' => [
             'metadata_only' => [

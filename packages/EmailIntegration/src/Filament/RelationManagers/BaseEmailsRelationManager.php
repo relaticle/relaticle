@@ -140,7 +140,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
         $this->conversationsCursor = null;
         $this->expandedEmailIds = [];
-        unset($this->emails, $this->conversations, $this->automatedCount, $this->selectedEmail, $this->thread, $this->expandedBodies, $this->selectedConversationRow);
+        unset($this->emails, $this->conversations, $this->automatedCount, $this->selectedEmail, $this->thread, $this->expandedBodies, $this->selectedConversationRow, $this->adjacentConversations);
     }
 
     #[Computed]
