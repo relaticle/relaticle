@@ -106,6 +106,8 @@ final readonly class PrivacyService
                     ->where('workspace_id', $email->workspace_id)
                     ->where('rfc_message_id', $email->rfc_message_id);
             })
+            // The most open grant wins, as VisibleEmailScope and EmailSearchService admit a row on any visible share.
+            ->orderByRaw('array_position(?::text[], tier::text) desc nulls last', [EmailPrivacyTier::opennessRanking()])
             ->value('tier');
     }
 }

@@ -23,6 +23,7 @@ use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBlocklist;
+use Relaticle\EmailIntegration\Models\EmailConversation;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailRead;
 use Relaticle\EmailIntegration\Models\EmailShare;
@@ -373,6 +374,8 @@ it('keeps the drafts page when conversations are off, even with a view in the UR
         ->assertSet('tab', EmailPageTab::DRAFTS)
         ->assertSeeHtml('aria-current="true"')
         ->assertDontSeeHtml('data-view=')
+        ->assertDontSeeHtml('data-conversation=')
+        ->set('tab', null)
         ->assertDontSeeHtml('data-conversation=');
 });
 
@@ -430,4 +433,73 @@ it('renders a page of conversations in the same number of queries for 3 or 20 ro
     $seed(4, 20);
 
     expect($render(20))->toBe($few);
+});
+
+it('opens the viewer own copy when a teammate copy of the newest message synced a second later', function (): void {
+    $own = conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'brian@airbnb.test', [
+        'rfc_message_id' => '<pricing-2@airbnb.test>',
+        'sent_at' => now()->subSecond(),
+    ]);
+    $teammates = conversationsPageMessage($this->teammateMailbox, 'conv-pricing', 'brian@airbnb.test', [
+        'rfc_message_id' => '<pricing-2@airbnb.test>',
+    ]);
+    $this->company->emails()->attach([$own->id, $teammates->id]);
+
+    $page = livewire(EmailInboxPage::class)->call('setView', ConversationView::All->value);
+
+    expect($page->html())->toContain("selectEmail('{$own->id}')")
+        ->not->toContain($teammates->id);
+
+    $page->call('selectEmail', $own->id)
+        ->assertSet('selectedEmailId', $own->id)
+        ->assertSeeHtml('fi-email-reader-panel');
+});
+
+it('grants the most open share when copies of one message are shared at different levels', function (): void {
+    $metadataCopy = conversationsPageMessage($this->teammateMailbox, 'conv-shared', 'lee@linear.test', [
+        'rfc_message_id' => '<shared-1@linear.test>',
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+    ]);
+    $fullCopy = conversationsPageMessage(conversationsPageMailbox($this->teammate, 'ben.sales@acme.test'), 'conv-shared', 'lee@linear.test', [
+        'rfc_message_id' => '<shared-1@linear.test>',
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+    ]);
+    $unsharedCopy = conversationsPageMessage(conversationsPageMailbox($this->teammate, 'ben.ops@acme.test'), 'conv-shared', 'lee@linear.test', [
+        'rfc_message_id' => '<shared-1@linear.test>',
+        'privacy_tier' => EmailPrivacyTier::SUBJECT,
+        'snippet' => 'Signed order form attached',
+    ]);
+
+    foreach ([[$metadataCopy, EmailPrivacyTier::METADATA_ONLY], [$fullCopy, EmailPrivacyTier::FULL]] as [$copy, $tier]) {
+        EmailShare::factory()->tier($tier)->create([
+            'email_id' => $copy->id,
+            'shared_by' => $this->teammate->id,
+            'shared_with' => $this->owner->id,
+        ]);
+    }
+
+    livewire(EmailInboxPage::class)
+        ->call('setView', ConversationView::All->value)
+        ->assertSee('Signed order form attached')
+        ->assertSeeHtml("selectEmail('{$unsharedCopy->id}')")
+        ->call('selectEmail', $unsharedCopy->id)
+        ->assertSet('selectedEmailId', $unsharedCopy->id);
+});
+
+it('keeps the default view while paging even when its count changes', function (): void {
+    $this->travelTo(now()->startOfMinute());
+
+    foreach (range(1, 51) as $index) {
+        conversationsPageMessage($this->ownerMailbox, "conv-{$index}", "c{$index}@client.test", ['sent_at' => now()->subMinutes($index)]);
+    }
+
+    $page = livewire(EmailInboxPage::class)
+        ->call('nextConversationsPage')
+        ->assertSet('conversationView', ConversationView::NeedsReply);
+
+    expect(conversationsPageKeys($page->html()))->toBe(['conv-51']);
+
+    EmailConversation::query()->update(['last_member_outbound_at' => now()]);
+
+    expect(conversationsPageKeys($page->call('$refresh')->html()))->toBe([]);
 });

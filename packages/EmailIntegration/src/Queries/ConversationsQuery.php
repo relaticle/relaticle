@@ -306,9 +306,11 @@ final readonly class ConversationsQuery
                 ->scopes(['open'])])
             ->with(['participants', 'shares', 'user'])
             ->orderBy('emails.conversation_key')
-            ->orderByDesc('emails.sent_at')
+            ->orderByRaw('max(emails.sent_at) over (partition by emails.conversation_key, coalesce(emails.rfc_message_id, emails.id::text)) desc')
+            ->orderByRaw('coalesce(emails.rfc_message_id, emails.id::text) desc')
             ->orderByRaw('case when emails.user_id = ? then 0 else 1 end', [$viewer->getKey()])
             ->orderByRaw('array_position(?::text[], emails.privacy_tier::text) desc nulls last', [EmailPrivacyTier::opennessRanking()])
+            ->orderByDesc('emails.sent_at')
             ->orderByDesc('emails.id')
             ->get();
     }
@@ -338,6 +340,7 @@ final readonly class ConversationsQuery
             ->whereColumn('shared_copies.rfc_message_id', 'emails.rfc_message_id')
             ->where('email_shares.shared_with', $viewer->getKey())
             ->select('email_shares.tier')
+            ->orderByRaw('array_position(?::text[], email_shares.tier::text) desc nulls last', [EmailPrivacyTier::opennessRanking()])
             ->limit(1);
     }
 

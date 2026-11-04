@@ -176,7 +176,7 @@
 
         @if ($canRequestAccess)
             <x-email-integration::request-access-list-pill
-:email-id="$email->id"
+                :email-id="$email->id"
                 :owner-name="$ownerName"
                 :requested="$hasPendingAccessRequest"
             />

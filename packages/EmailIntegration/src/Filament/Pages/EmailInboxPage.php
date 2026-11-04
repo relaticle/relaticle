@@ -154,11 +154,13 @@ final class EmailInboxPage extends Page
 
     public function nextConversationsPage(): void
     {
+        $this->conversationView ??= $this->activeView;
         $this->moveConversationsCursor($this->conversations->nextCursor);
     }
 
     public function previousConversationsPage(): void
     {
+        $this->conversationView ??= $this->activeView;
         $this->moveConversationsCursor($this->conversations->previousCursor);
     }
 
