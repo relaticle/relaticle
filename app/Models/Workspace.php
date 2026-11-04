@@ -545,6 +545,16 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
      * @return Builder<Workspace>
      */
     #[Scope]
+    protected function notScheduledForDeletion(Builder $query): Builder
+    {
+        return $query->whereNull('scheduled_deletion_at');
+    }
+
+    /**
+     * @param  Builder<Workspace>  $query
+     * @return Builder<Workspace>
+     */
+    #[Scope]
     protected function expiredDeletion(Builder $query): Builder
     {
         return $query->whereNotNull('scheduled_deletion_at')

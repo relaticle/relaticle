@@ -12,9 +12,13 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Queue\Attributes\Backoff;
+use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\SerializesModels;
 use Relaticle\Cloud\Billing\Filament\Billing;
 
+#[Tries(3)]
+#[Backoff(60, 300)]
 final class ProTrialEndingSoonMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
@@ -25,22 +29,28 @@ final class ProTrialEndingSoonMail extends Mailable implements ShouldQueue
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: __('mail.trial_ending.subject'));
+        return new Envelope(subject: __('mail.trial_ending.subject', ['date' => $this->endsOn('M j')]));
     }
 
     public function content(): Content
     {
-        $owner = $this->workspace->owner;
-        $timezone = $owner instanceof User ? $owner->effectiveTimezone() : (string) config('app.timezone');
-
         return new Content(
             markdown: 'cloud::mail.pro-trial-ending-soon',
             with: [
                 'credits' => number_format(Plan::Pro->credits()),
-                'endsOn' => $this->workspace->trial_ends_at?->setTimezone($timezone)->format('M j, Y') ?? '',
+                'endsOn' => $this->endsOn('M j, Y'),
+                'endsOnShort' => $this->endsOn('M j'),
                 'billingUrl' => Billing::getUrl(panel: 'app', tenant: $this->workspace),
                 'grandfathered' => $this->workspace->hosted_free_grandfathered_at !== null,
             ],
         );
+    }
+
+    private function endsOn(string $format): string
+    {
+        $owner = $this->workspace->owner;
+        $timezone = $owner instanceof User ? $owner->effectiveTimezone() : (string) config('app.timezone');
+
+        return $this->workspace->trial_ends_at?->setTimezone($timezone)->format($format) ?? '';
     }
 }

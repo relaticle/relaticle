@@ -20,9 +20,9 @@ it('renders the trial end date in the owner timezone with the paused-access outc
 
     $mail = new ProTrialEndingSoonMail($workspace);
 
-    $mail->assertHasSubject(__('mail.trial_ending.subject'));
-    $mail->assertSeeInHtml(__('mail.trial_ending.heading', ['workspace' => 'Acme']));
-    $mail->assertSeeInHtml(__('mail.trial_ending.ends_on', ['date' => 'Sep 10, 2026']));
+    $mail->assertHasSubject('Your Pro trial ends on Sep 10');
+    $mail->assertSeeInHtml('Pro for Acme ends on Sep 10');
+    $mail->assertSeeInHtml('Your Pro trial ends on Sep 10, 2026.');
     $mail->assertSeeInHtml(__('mail.trial_ending.paused'));
     $mail->assertDontSeeInHtml(__('mail.trial_ending.grandfathered', ['workspace' => 'Acme']));
     $mail->assertSeeInHtml(__('mail.footer.reason.owner', ['workspace' => 'Acme']));
@@ -42,4 +42,21 @@ it('describes the grandfathered outcome for grandfathered workspaces', function 
 
     $mail->assertSeeInHtml(__('mail.trial_ending.grandfathered', ['workspace' => 'Acme']));
     $mail->assertDontSeeInHtml(__('mail.trial_ending.paused'));
+});
+
+it('names the end date and no fixed length on an extended trial', function (): void {
+    $owner = User::factory()->create(['timezone' => 'UTC']);
+    $workspace = Workspace::factory()->create([
+        'name' => 'Acme',
+        'user_id' => $owner->id,
+        'pro_trial_used_at' => '2026-10-01 09:00:00',
+        'trial_ends_at' => '2026-11-15 09:00:00',
+    ]);
+
+    $mail = new ProTrialEndingSoonMail($workspace);
+
+    $mail->assertHasSubject('Your Pro trial ends on Nov 15');
+    $mail->assertSeeInHtml('Your Pro trial ends on Nov 15, 2026.');
+    $mail->assertDontSeeInHtml('14-day');
+    $mail->assertDontSeeInHtml('3 days');
 });

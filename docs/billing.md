@@ -86,9 +86,11 @@ deletion remain reachable.
 a hosted workspace is created. `StartProTrial` uses row locks so concurrent workspace creation
 cannot grant multiple trials, then sets
 `team.plan = pro` and `teams.trial_ends_at` (Cashier generic trial, so no Stripe objects until
-conversion). The daily `billing:process-trials` command emails a "3 days left" reminder and
-sets expired, unconverted teams back to the internal Free bundle. Hosted access is already paused
-as soon as `trial_ends_at` passes, without waiting for the daily command. Converting mid-trial is
+conversion). `billing:process-trials remind` runs daily at 00:15 UTC and emails a reminder to
+trials ending three days later. `billing:process-trials pause` runs every five minutes and sets
+expired, unconverted teams back to the internal Free bundle, then emails the owner. Neither mails
+a workspace scheduled for deletion. Hosted access is already paused as soon as `trial_ends_at`
+passes, so the pause step only catches up the plan, the credits and the mail. Converting mid-trial is
 a normal checkout; the `customer.subscription.*` webhook takes over and clears the trial marker.
 
 The grandfathering migration stamps every workspace that exists when this change deploys. Those

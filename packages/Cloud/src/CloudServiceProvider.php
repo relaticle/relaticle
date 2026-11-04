@@ -94,7 +94,8 @@ final class CloudServiceProvider extends ServiceProvider
         $this->commands([ProcessTrialsCommand::class, GenerateSitemapCommand::class, ReportStaleCompetitorFactsCommand::class]);
 
         $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {
-            $schedule->command('billing:process-trials')->dailyAt('00:15')->withoutOverlapping()->onOneServer();
+            $schedule->command('billing:process-trials remind')->dailyAt('00:15')->withoutOverlapping()->onOneServer();
+            $schedule->command('billing:process-trials pause')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
             $schedule->command('app:generate-sitemap')->daily()->onOneServer();
         });
 

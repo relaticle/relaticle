@@ -93,7 +93,7 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
             return self::TrialEnded;
         }
 
-        // The nightly downgrade clears trial_ends_at, so only the trial marker is left.
+        // The trial downgrade clears trial_ends_at, so only the trial marker is left.
         if ($workspace->plan === Plan::Free && $workspace->pro_trial_used_at !== null) {
             return self::TrialEnded;
         }

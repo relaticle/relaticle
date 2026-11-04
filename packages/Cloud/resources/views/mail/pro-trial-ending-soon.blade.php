@@ -1,6 +1,6 @@
 <x-mail::message :reason="__('mail.footer.reason.owner', ['workspace' => $workspace->name])">
 <x-slot:preheader>{{ __('mail.trial_ending.preheader', ['credits' => $credits]) }}</x-slot:preheader>
-# {{ __('mail.trial_ending.heading', ['workspace' => $workspace->name]) }}
+# {{ __('mail.trial_ending.heading', ['workspace' => $workspace->name, 'date' => $endsOnShort]) }}
 
 {{ __('mail.trial_ending.ends_on', ['date' => $endsOn]) }}
 

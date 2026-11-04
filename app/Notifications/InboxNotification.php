@@ -17,9 +17,13 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notification;
+use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
+use Illuminate\Queue\Attributes\Tries;
 
 #[DeleteWhenMissingModels]
+#[Tries(3)]
+#[Backoff(60, 300)]
 abstract class InboxNotification extends Notification implements ShouldQueueAfterCommit
 {
     use Queueable;

@@ -7,10 +7,15 @@ use App\Mcp\Servers\RelaticleServer;
 use App\Notifications\InboxNotification;
 use Illuminate\Contracts\Database\Eloquent\Builder as EloquentBuilderContract;
 use Illuminate\Contracts\Database\Query\Builder as QueryBuilderContract;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Mail\Mailable;
+use Illuminate\Notifications\Notification;
+use Illuminate\Queue\Attributes\Backoff;
+use Illuminate\Queue\Attributes\Tries;
 
 /**
  * Guards documented conventions that pest-arch and PHPStan cannot express.
@@ -69,6 +74,21 @@ function phpFilesUnder(array $directories): array
     }
 
     return $files;
+}
+
+/**
+ * @param  ReflectionClass<object>  $class
+ * @param  class-string  $attribute
+ */
+function declaresQueueAttribute(ReflectionClass $class, string $attribute): bool
+{
+    do {
+        if ($class->getAttributes($attribute) !== []) {
+            return true;
+        }
+    } while ($class = $class->getParentClass());
+
+    return false;
 }
 
 it('keeps migrations forward-only (no down methods)', function (): void {
@@ -1235,6 +1255,40 @@ it('sends in-app notifications only through the inbox base', function (): void {
         [],
         'A bell row always carries its workspace, subject and reason, so it is written by InboxChannel for an InboxNotification. '.
         'Send an InboxNotification instead of calling sendToDatabase() or toDatabase(): '.implode(', ', $outsideTheBase),
+    );
+});
+
+it('retries every queued mail and notification after a provider failure', function (): void {
+    $root = dirname(__DIR__, 2);
+    $withoutRetries = [];
+
+    foreach (phpFilesUnder([$root.'/app', ...glob($root.'/packages/*/src', GLOB_ONLYDIR) ?: []]) as $path) {
+        $source = (string) file_get_contents($root.'/'.$path);
+
+        if (preg_match('/^namespace\s+([^;]+);/m', $source, $namespace) !== 1
+            || preg_match('/^(?:final\s+|readonly\s+)*class\s+(\w+)/m', $source, $class) !== 1) {
+            continue;
+        }
+
+        $reflection = new ReflectionClass($namespace[1].'\\'.$class[1]);
+
+        if (! $reflection->implementsInterface(ShouldQueue::class)) {
+            continue;
+        }
+
+        if (! $reflection->isSubclassOf(Mailable::class) && ! $reflection->isSubclassOf(Notification::class)) {
+            continue;
+        }
+
+        if (! declaresQueueAttribute($reflection, Tries::class) || ! declaresQueueAttribute($reflection, Backoff::class)) {
+            $withoutRetries[] = $path;
+        }
+    }
+
+    expect($withoutRetries)->toBe(
+        [],
+        'Queued mail runs on the default queue, which tries a job once, so one provider 502 loses the message. '.
+        'Declare #[Tries] and #[Backoff] on: '.implode(', ', $withoutRetries),
     );
 });
 

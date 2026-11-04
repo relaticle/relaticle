@@ -21,19 +21,27 @@ use Relaticle\Chat\Services\CreditService;
 use Relaticle\Cloud\Billing\Mail\ProEndedMail;
 use Relaticle\Cloud\Billing\Mail\ProTrialEndingSoonMail;
 
-#[Description('Send trial-ending reminders and pause expired Pro trials')]
-#[Signature('billing:process-trials')]
+#[Description('Send trial-ending reminders, or pause expired Pro trials')]
+#[Signature('billing:process-trials {step : remind or pause}')]
 final class ProcessTrialsCommand extends Command
 {
     public function handle(CreditService $credits): int
     {
-        $this->sendEndingSoonReminders();
-        $this->pauseExpired($credits);
-
-        return self::SUCCESS;
+        return match ($this->argument('step')) {
+            'remind' => $this->sendEndingSoonReminders(),
+            'pause' => $this->pauseExpired($credits),
+            default => $this->unknownStep(),
+        };
     }
 
-    private function sendEndingSoonReminders(): void
+    private function unknownStep(): int
+    {
+        $this->error('The step must be remind or pause.');
+
+        return self::INVALID;
+    }
+
+    private function sendEndingSoonReminders(): int
     {
         $windowStart = now()->addDays(3)->startOfDay();
         $windowEnd = now()->addDays(3)->endOfDay();
@@ -41,6 +49,7 @@ final class ProcessTrialsCommand extends Command
 
         Workspace::query()
             ->whereBetween('trial_ends_at', [$windowStart, $windowEnd])
+            ->notScheduledForDeletion()
             ->whereDoesntHave('subscriptions', $this->live(...))
             ->with('owner')
             ->chunkById(100, function (Collection $workspaces) use (&$count): void {
@@ -57,9 +66,11 @@ final class ProcessTrialsCommand extends Command
             });
 
         $this->comment("Sent {$count} trial-ending reminder(s).");
+
+        return self::SUCCESS;
     }
 
-    private function pauseExpired(CreditService $credits): void
+    private function pauseExpired(CreditService $credits): int
     {
         $count = 0;
 
@@ -88,7 +99,7 @@ final class ProcessTrialsCommand extends Command
                         $credits->resetPeriod($workspace);
                     });
 
-                    if ($workspace->owner instanceof User) {
+                    if ($workspace->owner instanceof User && ! $workspace->isScheduledForDeletion()) {
                         Mail::to($workspace->owner->email)->queue(ProEndedMail::afterTrial($workspace));
                     }
 
@@ -98,6 +109,8 @@ final class ProcessTrialsCommand extends Command
             });
 
         $this->comment("Paused {$count} expired trial(s).");
+
+        return self::SUCCESS;
     }
 
     /**

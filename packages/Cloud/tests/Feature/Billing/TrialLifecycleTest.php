@@ -7,7 +7,11 @@ use App\Enums\Plan;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Console\Command;
+use Illuminate\Console\Scheduling\Event;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
@@ -104,7 +108,7 @@ it('downgrades expired trials and resets the allowance', function (): void {
     [, $workspace] = trialOwnerAndWorkspace();
     $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subDay()])->save();
 
-    $this->artisan('billing:process-trials')->assertSuccessful();
+    $this->artisan('billing:process-trials pause')->assertSuccessful();
 
     $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
 
@@ -124,7 +128,7 @@ it('does not downgrade an expired trial that converted to a subscription', funct
         'quantity' => 1,
     ]);
 
-    $this->artisan('billing:process-trials')->assertSuccessful();
+    $this->artisan('billing:process-trials pause')->assertSuccessful();
 
     expect($workspace->refresh()->plan)->toBe(Plan::Pro)
         ->and($workspace->trial_ends_at)->toBeNull();
@@ -148,7 +152,7 @@ it('downgrades an expired trial whose only subscription never started', function
         'ends_at' => null,
     ]);
 
-    $this->artisan('billing:process-trials')->assertSuccessful();
+    $this->artisan('billing:process-trials pause')->assertSuccessful();
 
     Mail::assertQueued(ProEndedMail::class, fn (ProEndedMail $mail): bool => $mail->hasTo($owner->email)
         && $mail->status === BillingStatus::TrialEnded);
@@ -164,8 +168,8 @@ it('emails the owner once when their expired trial is paused', function (): void
     [$owner, $workspace] = trialOwnerAndWorkspace();
     $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subHour()])->save();
 
-    $this->artisan('billing:process-trials')->assertSuccessful();
-    $this->artisan('billing:process-trials')->assertSuccessful();
+    $this->artisan('billing:process-trials pause')->assertSuccessful();
+    $this->artisan('billing:process-trials pause')->assertSuccessful();
 
     Mail::assertQueued(ProEndedMail::class, 1);
     Mail::assertQueued(ProEndedMail::class, fn (ProEndedMail $mail): bool => $mail->hasTo($owner->email)
@@ -173,7 +177,7 @@ it('emails the owner once when their expired trial is paused', function (): void
         && $mail->workspace->is($workspace));
 });
 
-it('still reads Trial ended after the nightly downgrade pauses the trial', function (): void {
+it('still reads Trial ended after the downgrade pauses the trial', function (): void {
     Mail::fake();
 
     [, $workspace] = trialOwnerAndWorkspace();
@@ -183,7 +187,7 @@ it('still reads Trial ended after the nightly downgrade pauses the trial', funct
         'pro_trial_used_at' => now()->subDays(14),
     ])->save();
 
-    $this->artisan('billing:process-trials')->assertSuccessful();
+    $this->artisan('billing:process-trials pause')->assertSuccessful();
 
     expect($workspace->refresh()->billingStatus())->toBe(BillingStatus::TrialEnded);
 });
@@ -194,7 +198,7 @@ it('sends no trial-ended email when the plan outlives the trial', function (call
     [, $workspace] = trialOwnerAndWorkspace();
     $arrange($workspace);
 
-    $this->artisan('billing:process-trials')->assertSuccessful();
+    $this->artisan('billing:process-trials pause')->assertSuccessful();
 
     Mail::assertNotQueued(ProEndedMail::class);
 })->with([
@@ -218,9 +222,83 @@ it('emails the owner when the trial ends in three days', function (): void {
     [, $workspace] = trialOwnerAndWorkspace();
     $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(3)->addHour()])->save();
 
-    $this->artisan('billing:process-trials')->assertSuccessful();
+    $this->artisan('billing:process-trials remind')->assertSuccessful();
 
     Mail::assertQueued(ProTrialEndingSoonMail::class, 1);
+});
+
+it('sends no trial reminder to a workspace scheduled for deletion', function (): void {
+    $this->travelTo(now()->startOfDay()->addHours(12));
+    Mail::fake();
+
+    [, $workspace] = trialOwnerAndWorkspace();
+    $workspace->forceFill([
+        'plan' => Plan::Pro,
+        'trial_ends_at' => now()->addDays(3)->addHour(),
+        'scheduled_deletion_at' => now()->addDays(30),
+    ])->save();
+
+    $this->artisan('billing:process-trials remind')->assertSuccessful();
+
+    Mail::assertNothingQueued();
+});
+
+it('pauses the expired trial of a workspace scheduled for deletion without emailing the owner', function (): void {
+    Mail::fake();
+
+    [, $workspace] = trialOwnerAndWorkspace();
+    $workspace->forceFill([
+        'plan' => Plan::Pro,
+        'trial_ends_at' => now()->subHour(),
+        'scheduled_deletion_at' => now()->addDays(30),
+    ])->save();
+
+    $this->artisan('billing:process-trials pause')->assertSuccessful();
+
+    Mail::assertNothingQueued();
+
+    expect($workspace->refresh()->plan)->toBe(Plan::Free)
+        ->and($workspace->trial_ends_at)->toBeNull();
+});
+
+it('leaves expired trials alone on the reminder step and reminders alone on the pause step', function (): void {
+    $this->travelTo(now()->startOfDay()->addHours(12));
+    Mail::fake();
+
+    [, $expired] = trialOwnerAndWorkspace();
+    $expired->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subHour()])->save();
+
+    [, $endingSoon] = trialOwnerAndWorkspace();
+    $endingSoon->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(3)->addHour()])->save();
+
+    $this->artisan('billing:process-trials remind')->assertSuccessful();
+
+    Mail::assertQueued(ProTrialEndingSoonMail::class, 1);
+    Mail::assertNotQueued(ProEndedMail::class);
+    expect($expired->refresh()->plan)->toBe(Plan::Pro);
+
+    $this->artisan('billing:process-trials pause')->assertSuccessful();
+
+    Mail::assertQueued(ProTrialEndingSoonMail::class, 1);
+    Mail::assertQueued(ProEndedMail::class, 1);
+    expect($expired->refresh()->plan)->toBe(Plan::Free);
+});
+
+it('refuses a trial step it does not know', function (): void {
+    $this->artisan('billing:process-trials everything')->assertExitCode(Command::INVALID);
+});
+
+it('pauses expired trials every five minutes and sends reminders once a day', function (): void {
+    $this->artisan('schedule:list')->assertSuccessful();
+
+    $trialEvents = collect(resolve(Schedule::class)->events())
+        ->filter(fn (Event $event): bool => str_contains((string) $event->command, 'billing:process-trials'))
+        ->mapWithKeys(fn (Event $event): array => [Str::after((string) $event->command, 'billing:process-trials ') => $event->expression]);
+
+    expect($trialEvents->all())->toBe([
+        'remind' => '15 0 * * *',
+        'pause' => '*/5 * * * *',
+    ]);
 });
 
 it('downgrades an expired trial whose only subscription is an unpaid managed invoice', function (): void {
@@ -236,7 +314,7 @@ it('downgrades an expired trial whose only subscription is an unpaid managed inv
         'quantity' => 1,
     ]);
 
-    $this->artisan('billing:process-trials')->assertSuccessful();
+    $this->artisan('billing:process-trials pause')->assertSuccessful();
 
     Mail::assertQueued(ProEndedMail::class, fn (ProEndedMail $mail): bool => $mail->hasTo($owner->email));
 
@@ -255,7 +333,7 @@ it('keeps an expired trial on its plan when a paid managed subscription is live'
         'quantity' => 1,
     ]);
 
-    $this->artisan('billing:process-trials')->assertSuccessful();
+    $this->artisan('billing:process-trials pause')->assertSuccessful();
 
     expect($workspace->refresh()->plan)->toBe(Plan::Pro)
         ->and($workspace->trial_ends_at)->toBeNull();
@@ -276,7 +354,7 @@ it('reminds the owner when the only subscription never started', function (): vo
         'ends_at' => null,
     ]);
 
-    $this->artisan('billing:process-trials')->assertSuccessful();
+    $this->artisan('billing:process-trials remind')->assertSuccessful();
 
     Mail::assertQueued(ProTrialEndingSoonMail::class, 1);
 });
@@ -292,7 +370,7 @@ it('skips ownerless workspaces without aborting trial reminders', function (): v
     [, $ownedWorkspace] = trialOwnerAndWorkspace();
     $ownedWorkspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(3)->addHour()])->save();
 
-    $this->artisan('billing:process-trials')->assertSuccessful();
+    $this->artisan('billing:process-trials remind')->assertSuccessful();
 
     Mail::assertQueued(
         ProTrialEndingSoonMail::class,
@@ -307,7 +385,7 @@ it('does not email when the trial is outside the three-day window', function ():
     [, $workspace] = trialOwnerAndWorkspace();
     $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(7)])->save();
 
-    $this->artisan('billing:process-trials')->assertSuccessful();
+    $this->artisan('billing:process-trials remind')->assertSuccessful();
 
     Mail::assertNothingQueued();
 });
@@ -316,7 +394,7 @@ it('keeps a sysadmin-granted plan when a stale trial timestamp expires', functio
     [, $workspace] = trialOwnerAndWorkspace();
     $workspace->forceFill(['plan' => Plan::Enterprise, 'trial_ends_at' => now()->subDay()])->save();
 
-    $this->artisan('billing:process-trials')->assertSuccessful();
+    $this->artisan('billing:process-trials pause')->assertSuccessful();
 
     $workspace->refresh();
 
@@ -345,7 +423,7 @@ it('grants exactly one allowance for a trial that crosses a month boundary', fun
     expect($grants)->toBe(1);
 });
 
-it('grants no second pro allowance when the hourly reset runs before the nightly downgrade', function (): void {
+it('grants no second pro allowance when the hourly reset runs before the downgrade', function (): void {
     withHostedBilling();
 
     $this->travelTo(new DateTimeImmutable('2026-06-10 03:00:00', new DateTimeZone('UTC')));
@@ -398,7 +476,7 @@ it('downgrades two or more expired trials in a single chunked run', function ():
     [, $workspaceB] = trialOwnerAndWorkspace();
     $workspaceB->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subDay()])->save();
 
-    $this->artisan('billing:process-trials')->assertSuccessful();
+    $this->artisan('billing:process-trials pause')->assertSuccessful();
 
     $balanceA = AiCreditBalance::query()->where('workspace_id', $workspaceA->getKey())->sole();
     $balanceB = AiCreditBalance::query()->where('workspace_id', $workspaceB->getKey())->sole();

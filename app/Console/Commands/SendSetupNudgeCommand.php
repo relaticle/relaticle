@@ -33,7 +33,7 @@ final class SendSetupNudgeCommand extends Command
             ->whereHas('ownedWorkspaces', fn (Builder $query): Builder => $query
                 ->where('personal_workspace', true)
                 ->whereNull('setup_nudge_sent_at')
-                ->whereNull('scheduled_deletion_at')
+                ->notScheduledForDeletion()
                 ->whereBetween('created_at', [now()->subDays(3), now()->subDays(2)]))
             ->whereNotNull('email_verified_at')
             ->with('ownedWorkspaces')

@@ -239,6 +239,21 @@ it('emails the owner once when the subscription ends', function (): void {
         && $mail->status === BillingStatus::SubscriptionEnded);
 });
 
+it('sends no ended email when the subscription of a workspace scheduled for deletion ends', function (): void {
+    Mail::fake();
+    $workspace = stripeBillingWorkspace();
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created'))->assertSuccessful();
+    $workspace->refresh()->forceFill(['scheduled_deletion_at' => now()->addDays(30)])->save();
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'deleted', [
+        'status' => 'canceled',
+        'ended_at' => now()->getTimestamp(),
+    ]))->assertSuccessful();
+
+    Mail::assertNotQueued(ProEndedMail::class);
+    expect($workspace->refresh()->plan)->toBe(Plan::Free);
+});
+
 it('sends no ended email when an Enterprise grant outlives the subscription', function (): void {
     Mail::fake();
     $workspace = stripeBillingWorkspace();

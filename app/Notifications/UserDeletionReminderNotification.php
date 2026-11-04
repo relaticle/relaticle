@@ -9,7 +9,11 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Queue\Attributes\Backoff;
+use Illuminate\Queue\Attributes\Tries;
 
+#[Tries(3)]
+#[Backoff(60, 300)]
 final class UserDeletionReminderNotification extends Notification implements ShouldQueue
 {
     use Queueable;

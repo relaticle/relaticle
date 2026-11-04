@@ -34,10 +34,10 @@ return [
     ],
 
     'trial_ending' => [
-        'subject' => 'Your Pro trial ends in 3 days',
+        'subject' => 'Your Pro trial ends on :date',
         'preheader' => 'Keep every AI model and :credits credits for one flat price',
-        'heading' => '3 days left on Pro for :workspace',
-        'ends_on' => 'Your 14-day Pro trial ends on :date.',
+        'heading' => 'Pro for :workspace ends on :date',
+        'ends_on' => 'Your Pro trial ends on :date.',
         'keeps' => 'Pro keeps every AI model, :credits monthly credits, and higher rate limits.',
         'flat_price' => 'There is no per-seat pricing. One flat price covers the whole workspace.',
         'grandfathered' => 'If you do nothing, :workspace returns to its grandfathered Cloud Free plan. Your data is untouched.',
