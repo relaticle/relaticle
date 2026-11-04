@@ -6,6 +6,7 @@ use App\Features\Billing as BillingFeature;
 use App\Features\Documentation;
 use App\Features\EmailIntegration;
 use Laravel\Pennant\Feature;
+use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Cloud\CloudServiceProvider;
 
 mutates(CloudServiceProvider::class);
@@ -77,7 +78,6 @@ it('renders the ask playground at the #demo anchor the hero points to', function
     $html = $this->get('/ai')->assertOk()->getContent();
 
     expect($html)->toContain('id="demo"')
-        ->and($html)->toContain(__('Try an ask'))
         ->and($html)->toContain(__('Update three deals'))
         ->and($html)->toContain(__('Add a person'))
         ->and($html)->toContain(__('Find overdue tasks'));
@@ -87,6 +87,13 @@ it('renders the ask playground at the #demo anchor the hero points to', function
         ->and($html)->toContain(__('Save changes'))
         ->and($html)->toContain(__('Discard'))
         ->and($html)->not->toContain('bg-amber-500 text-white');
+});
+
+it('quotes a line the assistant instructions really contain', function (): void {
+    $html = $this->get('/ai')->assertOk()->getContent();
+
+    expect($html)->toContain('Every write needs the user&#039;s approval.')
+        ->and((string) resolve(CrmAssistant::class)->instructions())->toContain("Every write needs the user's approval.");
 });
 
 it('shows a plan, a docs answer and an email proposal as product fragments', function (): void {

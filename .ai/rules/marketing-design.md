@@ -85,7 +85,11 @@ reach it. Change the header height and the token together. `html` also carries `
   `motion.js` drags to the next stage. The hero tab and the press page keep the screenshot.
 - `window`: the frame around a product fragment.
 - `chat-window`: a `window` with the Rela chip and the sample workspace name in its header. Every chat
-  fragment on `/ai` sits in one, so the playground and the showcases read as the same product.
+  fragment in the `/ai` showcases sits in one, so they read as the same product.
+- The `/ai` hero is that page's signature: a list page with Rela's side panel docked beside it, as the
+  app renders it. An approved proposal changes the row in the list, because `ListOpportunities`,
+  `ListPeople` and `ManageTasks` re-render on `ai-write-completed`. A record page does not re-render, so
+  the hero never shows one changing live. `tests/Browser/Marketing/AiPlaygroundTest.php` pins the rows.
 - `theme-image`: a light and a dark WebP of a real app screenshot. It loads only the current
   theme's file and swaps on theme change.
 - `actor`: the You, Rela, Claude, ChatGPT and Mailbox chips. They are the site's signature: every place
