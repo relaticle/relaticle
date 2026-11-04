@@ -2172,14 +2172,31 @@ html.fi:has(body.fi-onboarding-wizard),
     @apply max-sm:z-40;
 }
 
+/* The container clips rather than scrolls: mid-rise the window overflows it, and iOS scrolled it to the
+   focused button, so the dialog showed mid-screen and then slid down. The window scrolls itself. */
 .fi-modal:not(.fi-modal-slide-over, .fi-width-screen) > .fi-modal-window-ctn {
-    @apply max-sm:grid-rows-[1fr_auto] max-sm:p-0;
+    @apply max-sm:grid-rows-[1fr_auto] max-sm:overflow-clip! max-sm:p-0;
 
     & > .fi-modal-window {
         @apply max-sm:max-h-[90dvh] max-sm:overflow-y-auto max-sm:rounded-b-none max-sm:rounded-t-2xl max-sm:pb-[env(safe-area-inset-bottom)];
 
-        &:is(.fi-transition-enter-start, .fi-transition-leave-end) {
+        /* Rises on a keyframe: iOS skips a transition whose start state lands as the window is unhidden. */
+        &.fi-transition-enter {
+            @apply max-sm:animate-[fi-sheet-rise_300ms_ease-out];
+        }
+
+        &:is(.fi-transition-enter-start, .fi-transition-enter-end) {
+            @apply max-sm:scale-100 max-sm:opacity-100;
+        }
+
+        &.fi-transition-leave-end {
             @apply max-sm:translate-y-full max-sm:scale-100 max-sm:opacity-100;
         }
+    }
+}
+
+@keyframes fi-sheet-rise {
+    from {
+        translate: 0 100%;
     }
 }
