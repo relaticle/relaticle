@@ -210,7 +210,11 @@ return [
         'unlinked' => 'Unlinked',
         'automated' => 'Automated',
         'empty' => [
+            'needs_reply' => 'Nothing is waiting on you.',
+            'awaiting_reply' => 'No one owes you a reply.',
             'all' => 'No conversations yet.',
+            'unlinked' => 'Every conversation is linked to a record.',
+            'automated' => 'No automated mail.',
         ],
     ],
 ];

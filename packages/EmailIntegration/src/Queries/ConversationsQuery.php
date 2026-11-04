@@ -52,6 +52,20 @@ final readonly class ConversationsQuery
         return $page->setCollection($this->rows($viewer, $page->getCollection()));
     }
 
+    /** @return array{needs_reply: int, unlinked: int, automated: int} */
+    public function counts(User $viewer, ?ConversationFilters $filters = null): array
+    {
+        Gate::forUser($viewer)->authorize('viewAny', Email::class);
+
+        $filters ??= new ConversationFilters;
+
+        return [
+            'needs_reply' => $this->conversations($viewer, ConversationView::NeedsReply, $filters)->count(),
+            'unlinked' => $this->conversations($viewer, ConversationView::Unlinked, $filters)->count(),
+            'automated' => $this->conversations($viewer, ConversationView::Automated, $filters)->count(),
+        ];
+    }
+
     /** @return EloquentCollection<int, Email> */
     public function messages(User $viewer, string $conversationKey): EloquentCollection
     {
@@ -72,12 +86,80 @@ final readonly class ConversationsQuery
     /** @return Builder<EmailConversation> */
     private function conversations(User $viewer, ConversationView $view, ConversationFilters $filters): Builder
     {
-        return EmailConversation::query()
-            ->where('workspace_id', $viewer->current_workspace_id)
+        $query = EmailConversation::query()
+            ->where('email_conversations.workspace_id', $viewer->current_workspace_id)
             ->whereExists($this->visibleCopiesOf($viewer, $filters)
                 ->whereColumn('emails.conversation_key', 'email_conversations.conversation_key')
                 ->toBase())
-            ->where('is_automated', $view->includesAutomated());
+            ->where('email_conversations.is_automated', $view->includesAutomated())
+            ->when($view->requiresOwnCopy(), fn (Builder $conversations): Builder => $conversations
+                ->whereExists($this->ownCopies($viewer)->toBase()));
+
+        return match ($view) {
+            ConversationView::NeedsReply => $this->needsReply($query),
+            ConversationView::AwaitingReply => $this->awaitingReply($query, $viewer),
+            ConversationView::Unlinked => $this->unlinked($query),
+            ConversationView::All, ConversationView::Automated => $query,
+        };
+    }
+
+    /** @return Builder<Email> */
+    private function ownCopies(User $viewer): Builder
+    {
+        return $this->delivered(Email::query())
+            ->whereColumn('emails.workspace_id', 'email_conversations.workspace_id')
+            ->whereColumn('emails.conversation_key', 'email_conversations.conversation_key')
+            ->where('emails.user_id', $viewer->getKey());
+    }
+
+    /**
+     * @param  Builder<EmailConversation>  $query
+     * @return Builder<EmailConversation>
+     */
+    private function needsReply(Builder $query): Builder
+    {
+        return $query
+            ->whereNotNull('email_conversations.last_external_inbound_at')
+            ->where(fn (Builder $unanswered): Builder => $unanswered
+                ->whereNull('email_conversations.last_member_outbound_at')
+                ->orWhereColumn('email_conversations.last_external_inbound_at', '>', 'email_conversations.last_member_outbound_at'));
+    }
+
+    /**
+     * @param  Builder<EmailConversation>  $query
+     * @return Builder<EmailConversation>
+     */
+    private function awaitingReply(Builder $query, User $viewer): Builder
+    {
+        // Counted in whole business days on the viewer's calendar, so mail sent at any hour of a day ages together.
+        $cutoff = now()->setTimezone($viewer->effectiveTimezone())
+            ->subWeekdays(ConversationView::AWAITING_REPLY_BUSINESS_DAYS)
+            ->endOfDay()
+            ->utc();
+
+        return $query
+            ->where('email_conversations.last_member_outbound_at', '<=', $cutoff)
+            ->where(fn (Builder $unanswered): Builder => $unanswered
+                ->whereNull('email_conversations.last_external_inbound_at')
+                ->orWhereColumn('email_conversations.last_external_inbound_at', '<', 'email_conversations.last_member_outbound_at'))
+            ->whereExists($this->ownCopies($viewer)
+                ->where('emails.direction', EmailDirection::OUTBOUND)
+                ->whereColumn('emails.sent_at', 'email_conversations.last_member_outbound_at')
+                ->toBase());
+    }
+
+    /**
+     * @param  Builder<EmailConversation>  $query
+     * @return Builder<EmailConversation>
+     */
+    private function unlinked(Builder $query): Builder
+    {
+        return $query->whereNotExists(fn (BaseBuilder $link): BaseBuilder => $link
+            ->from('emailables')
+            ->join('emails', 'emails.id', '=', 'emailables.email_id')
+            ->whereNull('emails.deleted_at')
+            ->whereColumn('emails.workspace_id', 'email_conversations.workspace_id')
+            ->whereColumn('emails.conversation_key', 'email_conversations.conversation_key'));
     }
 
     /** @return Builder<Email> */

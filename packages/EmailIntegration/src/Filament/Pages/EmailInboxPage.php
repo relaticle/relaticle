@@ -28,6 +28,10 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Queries\ConversationsQuery;
 
+/**
+ * @property-read ConversationView $activeView
+ * @property-read array{needs_reply: int, unlinked: int, automated: int} $viewCounts
+ */
 final class EmailInboxPage extends Page
 {
     use HasConversationsFlag;
@@ -133,7 +137,24 @@ final class EmailInboxPage extends Page
 
         $this->conversationView = ConversationView::from($view);
         $this->tab = null;
-        unset($this->conversations);
+        unset($this->activeView, $this->conversations);
+    }
+
+    #[Computed]
+    public function activeView(): ConversationView
+    {
+        if ($this->conversationView instanceof ConversationView) {
+            return $this->conversationView;
+        }
+
+        return $this->viewCounts['needs_reply'] > 0 ? ConversationView::NeedsReply : ConversationView::All;
+    }
+
+    /** @return array{needs_reply: int, unlinked: int, automated: int} */
+    #[Computed]
+    public function viewCounts(): array
+    {
+        return resolve(ConversationsQuery::class)->counts($this->authUser());
     }
 
     #[Computed]
@@ -150,7 +171,7 @@ final class EmailInboxPage extends Page
     {
         return resolve(ConversationsQuery::class)->paginate(
             $this->authUser(),
-            $this->conversationView ?? ConversationView::All,
+            $this->activeView,
             new ConversationFilters,
         );
     }

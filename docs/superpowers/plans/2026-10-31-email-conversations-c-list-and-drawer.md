@@ -445,10 +445,11 @@ PR 3's rule is missing from the visibility predicate.
   view:
   - `requiresOwnCopy()` views add `whereExists(emails where workspace_id, conversation_key match and user_id = viewer)`.
   - NeedsReply: `last_external_inbound_at is not null and (last_member_outbound_at is null or last_external_inbound_at > last_member_outbound_at) and is_automated = false`.
-  - AwaitingReply: `last_member_outbound_at < :cutoff`, `(last_external_inbound_at is null or last_external_inbound_at < last_member_outbound_at)`,
+  - AwaitingReply: `last_member_outbound_at <= :cutoff`, `(last_external_inbound_at is null or last_external_inbound_at < last_member_outbound_at)`,
     `is_automated = false`, and an exists over the viewer's own outbound copy whose `sent_at` equals
     `last_member_outbound_at`. `:cutoff` is
-    `now()->setTimezone($viewer->timezone ?? config('app.timezone'))->subWeekdays(ConversationView::AWAITING_REPLY_BUSINESS_DAYS)->utc()`.
+    `now()->setTimezone($viewer->effectiveTimezone())->subWeekdays(ConversationView::AWAITING_REPLY_BUSINESS_DAYS)->endOfDay()->utc()`:
+    whole business days on the viewer's calendar, so the test's Wednesday 16:00 mail ages by Monday 10:00.
   - Unlinked: `whereNotExists(emailables join emails on email_id where emails.workspace_id and conversation_key match)`, automated excluded.
   - Automated: `is_automated = true`.
 - [ ] `counts()` returns `['needs_reply' => int, 'unlinked' => int, 'automated' => int]`, three
