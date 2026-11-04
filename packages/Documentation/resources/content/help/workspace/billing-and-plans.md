@@ -2,7 +2,7 @@
 title: Billing and plans
 description: Relaticle Cloud is priced per workspace, never per seat. Trials, subscriptions, credits, and pausing explained.
 order: 3
-updated: "2026-10-30"
+updated: "2026-11-04"
 related: [help/ai-assistant/ai-credits-and-limits, help/workspace/rename-or-delete-your-workspace]
 ---
 
@@ -28,15 +28,6 @@ in Cloud Pro, raises the allowance to 5,000 AI credits a month, allows up to
 priority support. It costs **$49/mo per workspace billed yearly** ($588 a
 year), or **$59/mo billed monthly**. Switch between Pro and Scale from the
 Billing page; Stripe prorates the change.
-
-## Guided setup
-
-Guided setup is a service for Cloud Scale workspaces, and is included with
-Enterprise. We design your pipeline and fields around how you sell, move your
-existing data in, and walk your team through it. After that, we make up to 5
-changes a month, each within one business day. It costs **$708 a year per
-workspace**, invoiced yearly. Ask for it from the [pricing page](/pricing).
-Setup starts once the invoice is paid.
 
 ## The trial
 

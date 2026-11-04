@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
-use Relaticle\Cloud\Marketing\Enums\ContactInquiry;
 use Relaticle\Cloud\Marketing\Http\Controllers\ContactController;
 use Relaticle\Cloud\Marketing\Http\Requests\ContactRequest;
 use Relaticle\Cloud\Marketing\Mail\NewContactSubmissionMail;
@@ -27,23 +26,22 @@ it('carries the Enterprise offer into the inquiry form', function (): void {
         ->assertSee('Workflow and integrations we need:');
 });
 
-it('carries the guided setup offer into the inquiry form', function (): void {
+it('treats the retired guided setup plan as a general contact', function (): void {
     withHostedBilling();
 
     $this->get('/contact?plan=setup')
-        ->assertSee('Let’s set up your workspace together')
-        ->assertSee('$708 / year')
-        ->assertSee('Setup starts once the invoice is paid.')
-        ->assertSee('How we sell today:');
+        ->assertOk()
+        ->assertSee('Get in touch')
+        ->assertDontSee('Guided setup');
 });
 
 it('treats a malformed plan parameter as a general contact', function (): void {
     withHostedBilling();
 
-    $this->get('/contact?plan[]=setup')
+    $this->get('/contact?plan[]=enterprise')
         ->assertOk()
         ->assertSee('Get in touch')
-        ->assertDontSee('Let’s set up your workspace together');
+        ->assertDontSee('Let’s plan your Enterprise workspace');
 });
 
 it('treats a self-serve plan as a general contact', function (): void {
@@ -51,7 +49,6 @@ it('treats a self-serve plan as a general contact', function (): void {
 
     $this->get('/contact?plan=pro')
         ->assertSee('Get in touch')
-        ->assertDontSee('Let’s set up your workspace together')
         ->assertDontSee('Let’s plan your Enterprise workspace');
 });
 
@@ -86,20 +83,6 @@ it('delivers the Enterprise inquiry details through the contact workflow', funct
 
     Mail::assertQueued(NewContactSubmissionMail::class, fn (NewContactSubmissionMail $mail): bool => $mail->data['message'] === $message
         && $mail->data['company'] === 'Northstar Operations');
-});
-
-it('names the guided setup service on the inquiry mail and keeps it in the redirect', function (): void {
-    Mail::fake();
-    withHostedBilling();
-
-    $this->post('/contact?plan=setup', honeypotFields() + [
-        'name' => 'Maya Chen',
-        'email' => 'maya@gmail.com',
-        'message' => 'We want Relaticle set up for our twelve person sales team.',
-    ])->assertRedirect('/contact?plan=setup')->assertSessionHas('success');
-
-    Mail::assertQueued(NewContactSubmissionMail::class, fn (NewContactSubmissionMail $mail): bool => $mail->inquiry === ContactInquiry::Setup
-        && $mail->envelope()->subject === 'New Guided setup inquiry: Maya Chen');
 });
 
 it('keeps the general contact subject and redirect without a managed plan', function (): void {
