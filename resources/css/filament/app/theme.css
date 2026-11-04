@@ -2085,6 +2085,14 @@ html.fi:has(body.fi-onboarding-wizard),
     @apply shrink-0 text-gray-500 dark:text-gray-400;
 }
 
+/* iOS zooms into a field set under 16px when it is tapped, and the page stays zoomed after, so on a touch
+   screen every text field and editor is 16px. Filament's own inputs only do this below sm. */
+@media (pointer: coarse) {
+    .fi-body.fi-panel-app :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file']), textarea, select, [contenteditable='true']) {
+        font-size: 16px;
+    }
+}
+
 /* Phones: a tab bar replaces the topbar's menu button, and menus and dialogs rise from the bottom edge. */
 
 /* Phones scroll the document rather than the content box. iOS clips a fixed sheet or dialog to a scrolling

@@ -267,3 +267,26 @@ it('fits a shrunk composer onto a phone screen with every field on it', function
         ->assertScript("(() => { const field = document.querySelector('[role=\"combobox\"]').getBoundingClientRect(); return field.left >= 0 && field.right <= innerWidth; })()", true)
         ->assertNoJavaScriptErrors();
 });
+
+it('sets composer fields at 16px on a touch screen so iOS does not zoom into them', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    connectSendingMailbox($user);
+
+    $this->visit('/app/login')->on()->mobile()
+        ->type('[id="form.email"]', $user->email)
+        ->click('button[type="submit"]')
+        ->assertVisible('[id="form.password"]')
+        ->assertScript(asyncAlpineComponentsLoaded())
+        ->type('[id="form.password"]', 'password')
+        ->click('button[type="submit"]')
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/email")
+        ->click(__('filament/concerns/email-compose.actions.compose.label'))
+        ->waitForText(__('filament/emails/composer.title'))
+        ->assertScript("getComputedStyle(document.querySelector('[role=\"combobox\"]')).fontSize", '16px')
+        ->assertScript("getComputedStyle(document.querySelector('[contenteditable=\"true\"]')).fontSize", '16px')
+        ->assertNoJavaScriptErrors();
+});
