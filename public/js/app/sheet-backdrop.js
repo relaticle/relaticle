@@ -5,8 +5,8 @@ const openSheet = () => {
         return null
     }
 
-    return [...document.querySelectorAll(".fi-dropdown-panel[x-ref='panel']")].find(
-        (panel) => panel.style.display === 'block' && !panel.closest('.fi-sidebar, .fi-modal'),
+    return [...document.querySelectorAll(".fi-dropdown-panel[x-ref='panel'], [data-sheet]")].find(
+        (panel) => panel.checkVisibility() && !panel.closest('.fi-sidebar, .fi-modal'),
     )
 }
 

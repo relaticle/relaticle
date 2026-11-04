@@ -68,6 +68,7 @@
                 x-transition:leave-end="opacity-0 scale-95"
                 x-bind:style="`position: fixed; top: ${top}px; left: ${left}px; width: ${width}px; z-index: 50;`"
                 role="listbox"
+                data-sheet
                 class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-white/10 dark:bg-gray-900"
             >
                 @foreach (EmailVisibilityEnforcement::cases() as $option)
