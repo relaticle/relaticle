@@ -91,6 +91,7 @@ it('leaves an email unkeyed when its merge fails, so the next run merges it', fu
 });
 
 it('keys without touching updated_at', function (): void {
+    $this->travelTo(now()->startOfSecond());
     $email = ($this->email)(($this->mailbox)(), ['in_reply_to' => ' <p@acme.example> (comment)', 'updated_at' => now()->subWeek()]);
 
     $this->artisan('email:backfill-conversations', ['--force' => true])->assertSuccessful();
@@ -175,12 +176,22 @@ it('rebuilds a summary whose external inbound time counts an automated message',
 
 it('leaves a summary alone when inbound copies come from members and mailboxes', function (): void {
     $mailbox = ($this->mailbox)();
+    $disconnected = ($this->mailbox)();
+    $disconnected->delete();
     $member = User::factory()->create();
     $this->workspace->users()->attach($member, ['role' => 'member']);
-    $fromMailbox = ($this->email)($mailbox, ['rfc_message_id' => '<m@acme.example>']);
-    $fromMember = ($this->email)($mailbox, ['rfc_message_id' => '<t@acme.example>', 'in_reply_to' => '<m@acme.example>']);
-    EmailParticipant::query()->create(['email_id' => $fromMailbox->getKey(), 'email_address' => strtoupper($mailbox->email_address), 'role' => 'from']);
-    EmailParticipant::query()->create(['email_id' => $fromMember->getKey(), 'email_address' => $member->email, 'role' => 'from']);
+    $senders = [
+        strtoupper($mailbox->email_address),
+        $member->email,
+        $this->workspace->owner->email,
+        $disconnected->email_address,
+    ];
+
+    foreach ($senders as $index => $sender) {
+        $email = ($this->email)($mailbox, ['rfc_message_id' => "<m{$index}@acme.example>", 'in_reply_to' => $index === 0 ? null : '<m0@acme.example>']);
+        EmailParticipant::query()->create(['email_id' => $email->getKey(), 'email_address' => $sender, 'role' => 'from']);
+    }
+
     $this->artisan('email:backfill-conversations', ['--force' => true])->assertSuccessful();
 
     $this->artisan('email:backfill-conversations', ['--force' => true])

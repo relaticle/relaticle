@@ -182,10 +182,11 @@ final class BackfillConversationsCommand extends Command
             max(sent_at) filter (where direction = ? and automated_reason is null and not exists (
                 select 1 from email_participants as sender
                 where sender.email_id = emails.id and sender.role = ? and lower(sender.email_address) in (
-                    select lower(users.email) from users
-                    where users.id in (select user_id from workspace_user where workspace_user.workspace_id = emails.workspace_id)
-                        or users.id in (select user_id from workspaces where workspaces.id = emails.workspace_id)
-                    union select lower(connected_accounts.email_address) from connected_accounts
+                    select lower(users.email) from workspace_user join users on users.id = workspace_user.user_id
+                    where workspace_user.workspace_id = emails.workspace_id
+                    union all select lower(users.email) from workspaces join users on users.id = workspaces.user_id
+                    where workspaces.id = emails.workspace_id
+                    union all select lower(connected_accounts.email_address) from connected_accounts
                     where connected_accounts.workspace_id = emails.workspace_id
                 )
             )) as last_external_inbound_at

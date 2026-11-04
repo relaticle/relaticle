@@ -47,8 +47,9 @@ final class BackfillAutomatedReasonsCommand extends Command
         $touched = [];
 
         foreach ($this->candidates()->lazyById(self::PAGE) as $email) {
-            // Per page, so a run killed mid-chunk leaves no marked row behind a stale summary.
-            if ($read > 0 && $read % self::PAGE === 0) {
+            // Per page, so a killed run leaves at most one page of stale summaries for the
+            // conversation backfill queued at the end to repair.
+            if ($write && $read > 0 && $read % self::PAGE === 0) {
                 $this->refreshSummaries($touched, $refresh, $currentWorkspace);
                 $touched = [];
             }
@@ -68,7 +69,7 @@ final class BackfillAutomatedReasonsCommand extends Command
 
             $marked++;
 
-            if ($email->conversation_key !== null) {
+            if ($write && $email->conversation_key !== null) {
                 $touched[$email->workspace_id][$email->conversation_key] = true;
             }
         }
@@ -80,7 +81,11 @@ final class BackfillAutomatedReasonsCommand extends Command
         }
 
         $this->refreshSummaries($touched, $refresh, $currentWorkspace);
-        $this->comment("{$marked} email(s) marked.");
+        Artisan::queue('email:backfill-conversations', array_filter([
+            '--force' => true,
+            '--workspace' => $this->option('workspace'),
+        ]))->onQueue('imports');
+        $this->comment("{$marked} email(s) marked. A conversation summary check is queued.");
 
         return self::SUCCESS;
     }

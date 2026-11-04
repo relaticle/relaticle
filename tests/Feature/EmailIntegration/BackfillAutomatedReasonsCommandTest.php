@@ -161,5 +161,26 @@ it('resumes after the last email the queued run names', function (): void {
 
     expect($noreply->refresh()->automated_reason)->toBe(AutomatedReason::RoleSender)
         ->and($person->refresh()->automated_reason)->toBeNull();
-    Queue::assertPushed(QueuedCommand::class, 1);
+    Queue::assertPushed(QueuedCommand::class, 2);
+    Queue::assertPushedOn('imports', QueuedCommand::class, fn (QueuedCommand $job): bool => (fn (): array => $this->data)->call($job) === [
+        'email:backfill-conversations',
+        ['--force' => true],
+    ]);
+});
+
+it('writes nothing on a report-only run that spans pages', function (): void {
+    ($this->history)('noreply@stripe.example');
+    Email::factory()->count(500)->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'user_id' => $this->account->user_id,
+        'connected_account_id' => $this->account->getKey(),
+        'created_at' => now()->subMonth(),
+    ]);
+
+    $this->artisan('email:backfill-automated-reasons', ['--before' => now()->toIso8601String()])
+        ->expectsOutputToContain('1 email(s) would be marked')
+        ->assertSuccessful();
+
+    expect(EmailConversation::query()->exists())->toBeFalse()
+        ->and(Email::query()->withoutGlobalScopes()->whereNotNull('automated_reason')->exists())->toBeFalse();
 });
