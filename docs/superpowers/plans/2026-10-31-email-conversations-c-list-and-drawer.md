@@ -375,7 +375,8 @@ by a minimal row. Later tasks deepen each layer.
   (`src/Services/PreferredEmailCopyService.php:54-69`). Make `viewerHasSyncedCopy()` return the
   loaded `viewer_has_synced_copy` attribute when the model has it. That keeps one owner of the tier
   rule and removes the per-row query. Task 5's query-count test proves it.
-- [ ] Page: add `use HasConversationsFlag`, `#[Url(as: 'view')] public ?ConversationView $view = null`,
+- [ ] Page: add `use HasConversationsFlag`, `#[Url(as: 'view')] public ?ConversationView $conversationView = null`
+  (Filament's `Page` already declares `$view`, the Blade view name),
   change `#[Url(as: 'tab')] public ?EmailPageTab $tab = null`, and in `mount()` set
   `$this->tab ??= EmailPageTab::DRAFTS` when the flag is off, so the flag-off page and
   `DestinationResolver`'s `?tab=drafts` links (`packages/Chat/src/Support/DestinationResolver.php:103-104`)
@@ -453,7 +454,7 @@ PR 3's rule is missing from the visibility predicate.
 - [ ] `counts()` returns `['needs_reply' => int, 'unlinked' => int, 'automated' => int]`, three
   `count()` calls over `conversations()` with an empty `ConversationFilters`. No caching here: PR 11
   owns the cache.
-- [ ] Page: computed `viewCounts()` and `activeView()`. `activeView()` returns `$this->view` when set,
+- [ ] Page: computed `viewCounts()` and `activeView()`. `activeView()` returns `$this->conversationView` when set,
   else `NeedsReply` when `viewCounts['needs_reply'] > 0`, else `All`. The resolved default is not
   written to the URL, so a shared link without `?view=` always opens on the default (D2 drops
   "remember the last view").

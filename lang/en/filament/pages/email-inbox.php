@@ -203,4 +203,14 @@ return [
         'role_sender' => 'Sent from a role address like no-reply or marketing',
         'provider_category' => 'Filed under a Gmail category',
     ],
+    'views' => [
+        'needs_reply' => 'Needs reply',
+        'awaiting_reply' => 'Awaiting reply',
+        'all' => 'All',
+        'unlinked' => 'Unlinked',
+        'automated' => 'Automated',
+        'empty' => [
+            'all' => 'No conversations yet.',
+        ],
+    ],
 ];

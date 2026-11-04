@@ -10,20 +10,27 @@ use Filament\Pages\Page;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Pagination\CursorPaginator;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
+use Relaticle\EmailIntegration\Data\ConversationFilters;
+use Relaticle\EmailIntegration\Data\ConversationRow;
+use Relaticle\EmailIntegration\Enums\ConversationView;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPageTab;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Enums\OutboxTab;
 use Relaticle\EmailIntegration\Filament\Actions\ConnectMailboxAction;
+use Relaticle\EmailIntegration\Filament\Concerns\HasConversationsFlag;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
+use Relaticle\EmailIntegration\Queries\ConversationsQuery;
 
 final class EmailInboxPage extends Page
 {
+    use HasConversationsFlag;
     use HasEmailFeatureFlag;
 
     protected string $view = 'email-integration::filament.pages.email-inbox';
@@ -82,7 +89,17 @@ final class EmailInboxPage extends Page
      * bodies are nested Livewire components shared with their standalone pages.
      */
     #[Url(as: 'tab')]
-    public EmailPageTab $tab = EmailPageTab::DRAFTS;
+    public ?EmailPageTab $tab = null;
+
+    #[Url(as: 'view')]
+    public ?ConversationView $conversationView = null;
+
+    public function mount(): void
+    {
+        if (! $this->showsConversations()) {
+            $this->tab ??= EmailPageTab::DRAFTS;
+        }
+    }
 
     /**
      * @return array<string, string>
@@ -105,6 +122,37 @@ final class EmailInboxPage extends Page
     public function setTab(string $tab): void
     {
         $this->tab = EmailPageTab::from($tab);
+        $this->conversationView = null;
+    }
+
+    public function setView(string $view): void
+    {
+        if (! $this->showsConversations()) {
+            return;
+        }
+
+        $this->conversationView = ConversationView::from($view);
+        $this->tab = null;
+        unset($this->conversations);
+    }
+
+    #[Computed]
+    public function showsConversations(): bool
+    {
+        $workspace = filament()->getTenant();
+
+        return $this->conversationsEnabled($workspace instanceof Workspace ? $workspace : null);
+    }
+
+    /** @return CursorPaginator<int, ConversationRow> */
+    #[Computed]
+    public function conversations(): CursorPaginator
+    {
+        return resolve(ConversationsQuery::class)->paginate(
+            $this->authUser(),
+            $this->conversationView ?? ConversationView::All,
+            new ConversationFilters,
+        );
     }
 
     #[Computed]
