@@ -121,6 +121,15 @@ return [
         'disconnected' => 'Disconnected',
         'reauth_required' => 'Reconnect needed',
     ],
+    'health' => [
+        'labels' => [
+            'healthy' => 'Healthy',
+            'stale' => 'Not syncing',
+            'reauth_required' => 'Reconnect needed',
+            'error' => 'Sync issue',
+            'paused_billing' => 'Paused',
+        ],
+    ],
     'history_import' => [
         'processed' => ':processed of :total processed',
         'successful_jobs' => ':count imported successfully',
