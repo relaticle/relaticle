@@ -143,7 +143,8 @@ final readonly class ConversationsQuery
             ->whereExists($this->visibleCopiesOf($viewer, $visible, $filters)
                 ->whereColumn('emails.conversation_key', 'email_conversations.conversation_key')
                 ->toBase())
-            ->where('email_conversations.is_automated', $view->includesAutomated())
+            // A literal, never a binding: a generic plan cannot match a bound boolean to the partial indexes.
+            ->whereRaw($view->includesAutomated() ? 'email_conversations.is_automated' : 'not email_conversations.is_automated')
             ->when($view->requiresOwnCopy(), fn (Builder $conversations): Builder => $conversations
                 ->whereExists($this->ownCopies($viewer, $visible)->toBase()));
 
