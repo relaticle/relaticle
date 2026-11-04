@@ -296,13 +296,14 @@
                         'flex shrink-0 flex-col gap-2 border-t border-gray-200 px-3 dark:border-white/10 sm:px-5',
                         'sticky bottom-0 z-10 bg-white dark:bg-gray-900' => ! $isFloating,
                         'py-3' => $showMassSendToggle && $isMassSend,
-                        'h-14 justify-center' => ! ($showMassSendToggle && $isMassSend),
+                        'h-14 justify-center max-sm:h-auto max-sm:py-3' => ! ($showMassSendToggle && $isMassSend),
                     ])>
                         @if ($showMassSendToggle && $isMassSend)
                             <x-email-integration::composer-mass-send-outbox-hint />
                         @endif
 
-                        <div class="flex items-center justify-between gap-3">
+                        {{-- A phone has no room for one row, so Send takes a full-width row of its own under the tools. --}}
+                        <div class="flex items-center justify-between gap-3 max-sm:flex-wrap max-sm:gap-y-3">
                         <div class="flex items-center gap-1">
                             <x-email-integration::composer-icon-button icon="heroicon-o-paper-clip" :label="__('filament/emails/composer.actions.attach')" x-on:click="$refs.attachments.click()" />
                             <input type="file" x-ref="attachments" wire:model="attachments" multiple class="hidden" />
@@ -331,7 +332,7 @@
                             <span wire:loading wire:target="attachments" class="pl-1 text-xs text-gray-400">{{ __('filament/emails/composer.actions.uploading') }}</span>
                         </div>
 
-                        <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-3 max-sm:contents">
                             <x-email-integration::composer-mass-send-footer-actions
                                 :show-toggle="$showMassSendToggle"
                                 :is-mass-send="$isMassSend"
@@ -343,6 +344,7 @@
                             wire:loading.attr="disabled"
                             wire:target="send, attachments"
                             icon="heroicon-m-paper-airplane"
+                            class="max-sm:basis-full"
                         >
                             @if ($isMassSend)
                                 {{ __('filament/emails/composer.mass_send.send_button', ['count' => count($massRecipients)]) }}
