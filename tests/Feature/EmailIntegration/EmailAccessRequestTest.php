@@ -804,7 +804,7 @@ describe('EmailAccessRespondedNotification', function (): void {
                 && $mail->subject === 'Email access approved'
                 && str_contains($html, 'Confidential Thread')
                 && $mail->actionText === 'View email'
-                && str_contains($mail->actionUrl, 'email='.$this->email->getKey());
+                && $mail->actionUrl === route('email.open', $this->email);
         });
     });
 

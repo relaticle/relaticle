@@ -50,7 +50,7 @@ it('lists a request with its sentence, subject, deadline and link to the email',
         ->assertSee('Dana Whitfield requested email access')
         ->assertSee('Confidential Thread')
         ->assertSee('Expires '.$request->deadline()->diffForHumans())
-        ->assertSeeHtml('href="'.e($request->email->appUrlFor($this->user)).'"');
+        ->assertSeeHtml('href="'.e($request->email->appUrl()).'"');
 });
 
 it('reports the thirty day deadline of an undated open request', function (): void {

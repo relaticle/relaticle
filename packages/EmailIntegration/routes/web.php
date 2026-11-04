@@ -7,6 +7,7 @@ use Relaticle\EmailIntegration\Controllers\CalendarPushWebhookController;
 use Relaticle\EmailIntegration\Controllers\CallbackController as EmailCallbackController;
 use Relaticle\EmailIntegration\Controllers\ComposerInlineImageController;
 use Relaticle\EmailIntegration\Controllers\EmailAttachmentController;
+use Relaticle\EmailIntegration\Controllers\OpenEmailController;
 use Relaticle\EmailIntegration\Controllers\RedirectController as EmailRedirectController;
 
 Route::post('webhooks/calendar/{provider}', CalendarPushWebhookController::class)
@@ -24,6 +25,11 @@ Route::middleware(['web', 'auth', 'verified'])->group(function (): void {
         ->name('email-accounts.callback')
         ->whereIn('provider', ['gmail', 'azure'])
         ->middleware('throttle:10,1');
+
+    Route::get('/email/open/{email}', OpenEmailController::class)
+        ->name('email.open')
+        ->whereUlid('email')
+        ->middleware('throttle:60,1');
 });
 
 Route::middleware(['web', 'auth', 'verified', 'no-referrer'])->group(function (): void {

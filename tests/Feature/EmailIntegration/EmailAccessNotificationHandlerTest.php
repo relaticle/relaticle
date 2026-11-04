@@ -544,3 +544,13 @@ describe('EmailSendHeldNotification', function (): void {
         Queue::assertNotPushed(SendQueuedNotifications::class);
     });
 });
+
+it('leaves the reader to the host page until the bell asks for one', function (): void {
+    Livewire::withQueryParams(['email' => $this->email->getKey()])
+        ->test(EmailAccessNotificationHandler::class, ['hostsReader' => true])
+        ->assertSet('selectedEmailId', $this->email->getKey())
+        ->assertDontSeeHtml('fi-email-reader-panel')
+        ->call('selectEmail', $this->email->getKey())
+        ->assertSet('hostsReader', false)
+        ->assertSeeHtml('fi-email-reader-panel');
+});

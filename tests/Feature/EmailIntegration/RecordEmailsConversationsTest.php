@@ -10,6 +10,7 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
+use Livewire\Livewire;
 use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
 use Relaticle\EmailIntegration\Enums\AutomatedReason;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -152,4 +153,21 @@ it('opens a conversation from the record tab through the viewer readable copy', 
         ->call('selectEmail', $email->id)
         ->assertSet('selectedEmailId', $email->id)
         ->assertSeeHtml('fi-email-reader-panel');
+});
+
+it('opens the reader from the email in the URL only while conversations are on', function (): void {
+    $email = conversationsRecordMessage($this->ownerMailbox, 'conv-human', 'brian@airbnb.test');
+    $this->company->emails()->attach($email->id);
+
+    Livewire::withQueryParams(['email' => $email->id])
+        ->test(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
+        ->assertSet('selectedEmailId', $email->id)
+        ->assertSeeHtml('fi-email-reader-panel');
+
+    Feature::for($this->workspace)->deactivate(EmailConversations::class);
+
+    Livewire::withQueryParams(['email' => $email->id])
+        ->test(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
+        ->assertSet('selectedEmailId', null)
+        ->assertDontSeeHtml('fi-email-reader-panel');
 });

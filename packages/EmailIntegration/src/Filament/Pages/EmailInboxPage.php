@@ -113,6 +113,12 @@ final class EmailInboxPage extends Page
     {
         if (! $this->showsConversations()) {
             $this->tab ??= EmailPageTab::DRAFTS;
+
+            return;
+        }
+
+        if ($this->selectedEmailId !== null) {
+            $this->openEmailReader($this->selectedEmailId);
         }
     }
 

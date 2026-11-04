@@ -10,6 +10,7 @@ use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Resources\Resource as FilamentResource;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
@@ -20,7 +21,6 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
-use Livewire\Attributes\Url;
 use Relaticle\EmailIntegration\Data\ConversationFilters;
 use Relaticle\EmailIntegration\Data\ConversationPage;
 use Relaticle\EmailIntegration\Enums\ConversationView;
@@ -61,7 +61,6 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
     protected string $view = 'email-integration::filament.relation-managers.emails-relation-manager';
 
-    #[Url(as: 'email')]
     public ?string $selectedEmailId = null;
 
     public string $search = '';
@@ -69,6 +68,20 @@ abstract class BaseEmailsRelationManager extends RelationManager
     public bool $showAutomated = false;
 
     public ?string $conversationsCursor = null;
+
+    /**
+     * @param  class-string<FilamentResource>  $resource
+     */
+    public static function relationKeyOn(string $resource): ?string
+    {
+        foreach ($resource::getRelations() as $key => $manager) {
+            if (is_string($manager) && is_a($manager, self::class, true)) {
+                return (string) $key;
+            }
+        }
+
+        return null;
+    }
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {
@@ -83,6 +96,24 @@ abstract class BaseEmailsRelationManager extends RelationManager
         }
 
         return resolve(EmailVisibilityService::class)->visibleEmailCountBadge($ownerRecord, $user);
+    }
+
+    public function mount(): void
+    {
+        parent::mount();
+
+        if ($this->selectedEmailId !== null && $this->showsConversations()) {
+            $this->openEmailReader($this->selectedEmailId);
+        }
+    }
+
+    // The flag-off tab keeps today's URL, where the panel's own reader opens `?email=`.
+    /**
+     * @return array<string, array{as: string}>
+     */
+    protected function queryString(): array
+    {
+        return $this->showsConversations() ? ['selectedEmailId' => ['as' => 'email']] : [];
     }
 
     public function table(Table $table): Table

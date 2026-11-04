@@ -94,14 +94,16 @@
                 </button>
             </div>
         @endif
+    @else
+        @livewire($pageTabShown->livewireComponent(), $pageTabShown->livewireParameters(), key($pageTabShown->value.'-table'))
+    @endif
 
+    @if ($this->showsConversations)
         <x-email-integration::reader-overlay
             :email="$this->selectedEmail"
             :pending-access-requests="$this->pendingAccessRequests"
             layer="z-50"
         />
-    @else
-        @livewire($pageTabShown->livewireComponent(), $pageTabShown->livewireParameters(), key($pageTabShown->value.'-table'))
     @endif
 
     <x-filament-actions::modals />
