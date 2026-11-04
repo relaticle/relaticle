@@ -112,6 +112,8 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             'streamError' => __('The assistant encountered an error. Please try again.'),
             'timeout' => __('The assistant took too long to respond.'),
             'retrying' => __('Provider is busy, retrying (attempt :attempt of :max)…'),
+            'searchingWebFor' => __('Searching the web for ":query"…'),
+            'readingDomain' => __('Reading :domain…'),
         ]),
         {{-- The shimmer label for each tool the agent can call, keyed by the
              snake_case class basename laravel/ai broadcasts as `tool_name`.
@@ -149,6 +151,8 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             'guide_to_page' => __('Finding the right page…'),
             'get_credit_balance' => __('Checking your AI credits…'),
             'request_web_access' => __('Asking to search the web…'),
+            'web_search' => __('Searching the web…'),
+            'web_fetch' => __('Reading a web page…'),
             'create_company' => __('Drafting a company…'),
             'update_company' => __('Preparing company changes…'),
             'delete_company' => __('Preparing company deletion…'),

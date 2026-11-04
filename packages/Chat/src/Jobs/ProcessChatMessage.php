@@ -947,19 +947,19 @@ final class ProcessChatMessage implements ShouldQueue
 
     private function settleBlankTurn(StreamedAgentResponse $streamedResponse, CreditService $creditService): bool
     {
-        if ($this->sawToolCall || $this->ranProviderTool($streamedResponse)) {
+        if ($this->sawToolCall || trim(AssistantText::finalReply($streamedResponse->text, $this->textAfterLastToolCall, $this->sawToolCall)) !== '') {
             return false;
         }
 
-        if (trim(AssistantText::finalReply($streamedResponse->text, $this->textAfterLastToolCall, $this->sawToolCall)) !== '') {
-            return false;
-        }
+        $ranProviderTool = $this->ranProviderTool($streamedResponse);
 
-        $creditService->refundReservation(
-            $this->workspace,
-            resolutionKey: $this->resolutionKey(),
-            conversationId: $this->conversationId,
-        );
+        if (! $ranProviderTool) {
+            $creditService->refundReservation(
+                $this->workspace,
+                resolutionKey: $this->resolutionKey(),
+                conversationId: $this->conversationId,
+            );
+        }
 
         $note = $this->blankTurnMessage($streamedResponse);
 
@@ -969,7 +969,7 @@ final class ProcessChatMessage implements ShouldQueue
 
         ChatTelemetry::breadcrumb('stream.blank_reply', ['model' => $this->resolved['model'] ?? null]);
 
-        return true;
+        return ! $ranProviderTool;
     }
 
     private function ranProviderTool(StreamedAgentResponse $streamedResponse): bool

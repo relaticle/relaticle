@@ -21,6 +21,8 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
         streamError: 'The assistant encountered an error. Please try again.',
         timeout: 'The assistant took too long to respond.',
         retrying: 'Provider is busy, retrying (attempt :attempt of :max)…',
+        searchingWebFor: 'Searching the web for ":query"…',
+        readingDomain: 'Reading :domain…',
         ...texts,
     },
     // One human label per tool the agent can call, keyed by the snake_case form
@@ -67,6 +69,9 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
         update_custom_field: 'Preparing custom field changes…',
         set_custom_field_options: 'Preparing field option changes…',
         delete_custom_field: 'Preparing custom field deletion…',
+        request_web_access: 'Asking to search the web…',
+        web_search: 'Searching the web…',
+        web_fetch: 'Reading a web page…',
         ...toolLabels,
     },
     // Set as the FIRST line of destroy() in chat-interface.blade.php. unsubscribe()
@@ -106,6 +111,9 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
             // so this stays empty until reconcileLatestAssistant() fills it from
             // the persisted tool results at stream end.
             display_blocks: [],
+            // Web pages the reply cited, filled live by `.citation` and replaced
+            // by the persisted list at stream end.
+            sources: [],
             paywall: null,
             sessionExpired: false,
             rendered: false,
@@ -172,6 +180,7 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
             b._needsSeparator = false;
             b.pending_actions = [];
             b.display_blocks = [];
+            b.sources = [];
             b.paywall = null;
             b.streamError = null;
             return b;
@@ -254,6 +263,8 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
             .listen('.text_delta', (e) => this.handleTextDelta(e))
             .listen('.tool_call', (e) => this.handleToolCall(e))
             .listen('.tool_result', (e) => this.handleToolResult(e))
+            .listen('.provider_tool', (e) => this.handleProviderTool(e))
+            .listen('.citation', (e) => this.handleCitation(e))
             .listen('.stream_end', (e) => this.handleStreamEnd(e))
             .listen('.stream.failed', (e) => this.handleStreamFailed(e))
             .listen('.stream.retrying', (e) => this.handleStreamRetrying(e))
@@ -505,6 +516,32 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
         this.scrollToBottom();
     },
 
+    // A web search or page read the provider runs inside its own request. Only
+    // the shimmer changes: the result reaches the reply as text and citations.
+    handleProviderTool(event) {
+        if (!this.isForCurrentConversation()) return;
+        this.startStreamTimeout();
+        if (event?.name === 'web_fetch' && event?.url) {
+            let domain = event.url;
+            try { domain = new URL(event.url).hostname.replace(/^www\./, ''); } catch { /* keep the url */ }
+            this.currentToolStatus = this.streamTexts.readingDomain.replace(':domain', domain);
+        } else if (event?.name === 'web_search' && event?.query) {
+            this.currentToolStatus = this.streamTexts.searchingWebFor.replace(':query', event.query);
+        } else {
+            this.currentToolStatus = this.friendlyToolStatus(event?.name);
+        }
+        this.targetBubbleFor(event.invocation_id ?? null);
+        this.scrollToBottom();
+    },
+
+    handleCitation(event) {
+        if (!this.isForCurrentConversation() || !event?.url) return;
+        const assistantMsg = this.targetBubbleFor(event.invocation_id ?? null);
+        assistantMsg.sources = assistantMsg.sources || [];
+        if (assistantMsg.sources.length >= 10 || assistantMsg.sources.some((s) => s.url === event.url)) return;
+        assistantMsg.sources.push({ url: event.url, title: event.title ?? null, domain: event.domain ?? event.url });
+    },
+
     handleToolResult(event) {
         if (!this.isForCurrentConversation()) return;
         this.startStreamTimeout();
@@ -592,6 +629,9 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
         // and a second reconcile of the same turn must not double it.
         if (Array.isArray(authoritative.display_blocks)) {
             assistantMsg.display_blocks = authoritative.display_blocks;
+        }
+        if (Array.isArray(authoritative.sources)) {
+            assistantMsg.sources = authoritative.sources;
         }
         // Picks up a `.next_steps` broadcast the client never received. The
         // suggester usually finishes AFTER this reconcile, in which case the

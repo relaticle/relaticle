@@ -260,6 +260,9 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
             if (!Array.isArray(m.next_steps)) {
                 m.next_steps = [];
             }
+            if (!Array.isArray(m.sources)) {
+                m.sources = [];
+            }
             m.feedback = m.feedback ?? null;
             m.feedbackPanelOpen = false;
             m.feedbackCategory = m.feedback?.category ?? null;
@@ -276,6 +279,24 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     // ever read server-side, to seed the agent's system prompt in
     // ProcessChatMessage): adding a new server-to-client channel just for
     // this would be new plumbing the task does not call for.
+    sourceLabel(sources, source) {
+        if (sources.filter((s) => s.domain === source.domain).length < 2) {
+            return source.domain;
+        }
+
+        if (source.title) {
+            return source.title;
+        }
+
+        try {
+            const path = new URL(source.url).pathname;
+
+            return path === '/' ? source.domain : source.domain + path;
+        } catch {
+            return source.domain;
+        }
+    },
+
     sameCalendarDay(a, b) {
         if (!a || !b) return false;
         const da = new Date(a);

@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 use App\Enums\Plan;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Actions\GrantWebAccess;
+use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
 use Tests\Helpers\ChatBrowser;
+use Tests\Helpers\ChatDocument;
 
 mutates(ProposalCard::class);
 
@@ -78,4 +81,51 @@ it('declines web access with Deny', function (): void {
         ->assertMissing('[data-web-access-dock]');
 
     expect($request->fresh()->status)->toBe(PendingActionStatus::Rejected);
+});
+
+it('lists the pages a reply cited as source links that open in a new tab and tell pages on one site apart', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'web research');
+    $message = fn (string $id, string $role, string $content, array $meta, int $minute): array => [
+        'id' => $id,
+        'conversation_id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'agent' => CrmAssistant::class,
+        'role' => $role,
+        'content' => $content,
+        'document' => ChatDocument::emptyJson(),
+        'attachments' => '[]',
+        'steps' => '[]',
+        'usage' => '{}',
+        'meta' => json_encode($meta, JSON_THROW_ON_ERROR),
+        'created_at' => now()->subMinutes(10 - $minute),
+        'updated_at' => now()->subMinutes(10 - $minute),
+    ];
+    DB::table('agent_conversation_messages')->insert([
+        $message('src-0001', 'user', 'Research Filaforms', [], 1),
+        $message('src-0002', 'assistant', 'Filaforms builds forms for Filament.', ['citations' => [
+            ['type' => 'url', 'url' => 'https://www.filaforms.app/?utm_source=claude', 'title' => 'Filaforms'],
+            ['type' => 'url', 'url' => 'https://github.com/filaforms', 'title' => null],
+            ['type' => 'url', 'url' => 'https://www.filaforms.app/', 'title' => 'Filaforms'],
+            ['type' => 'url', 'url' => 'https://github.com/filaforms/docs', 'title' => null],
+        ]], 2),
+    ]);
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertVisible('[data-web-sources]')
+        ->assertSeeIn('[data-web-sources]', 'Sources');
+
+    $links = $page->script(<<<'JS'
+        (() => Array.from(document.querySelectorAll('[data-web-source]'))
+            .filter((el) => el.offsetParent !== null)
+            .map((el) => ({ href: el.getAttribute('href'), target: el.target, rel: el.rel, text: el.textContent.trim() })))();
+    JS);
+
+    expect($links)->toBe([
+        ['href' => 'https://www.filaforms.app/', 'target' => '_blank', 'rel' => 'noopener noreferrer', 'text' => 'filaforms.app'],
+        ['href' => 'https://github.com/filaforms', 'target' => '_blank', 'rel' => 'noopener noreferrer', 'text' => 'github.com/filaforms'],
+        ['href' => 'https://github.com/filaforms/docs', 'target' => '_blank', 'rel' => 'noopener noreferrer', 'text' => 'github.com/filaforms/docs'],
+    ]);
 });

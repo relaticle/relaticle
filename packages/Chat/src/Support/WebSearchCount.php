@@ -31,6 +31,35 @@ final readonly class WebSearchCount
     }
 
     /**
+     * @return array{name: 'web_search'|'web_fetch', status: 'started'|'completed', query: string|null, url: string|null}|null
+     */
+    public static function step(ProviderToolEvent $event): ?array
+    {
+        $status = match ($event->status) {
+            'started', 'in_progress' => 'started',
+            'completed' => 'completed',
+            default => null,
+        };
+        // OpenAI's search start carries no action yet, so it reads as a search.
+        $kind = self::kindOf($event) ?? ($status === 'started' && $event->type === 'web_search_call' ? self::SEARCH : null);
+
+        if ($status === null || $kind === null || ($status === 'completed' && self::kindOf($event) === null)) {
+            return null;
+        }
+
+        $input = $event->type === 'server_tool_use' ? ($event->data['input'] ?? []) : ($event->data['action'] ?? []);
+        $query = is_array($input) && is_string($input['query'] ?? null) ? mb_substr($input['query'], 0, 200) : null;
+        $url = is_array($input) && is_string($input['url'] ?? null) ? WebSources::source(['url' => $input['url']])['url'] ?? null : null;
+
+        return [
+            'name' => $kind === self::SEARCH ? 'web_search' : 'web_fetch',
+            'status' => $status,
+            'query' => $kind === self::SEARCH ? $query : null,
+            'url' => $kind === self::FETCH ? $url : null,
+        ];
+    }
+
+    /**
      * @param  Collection<int, StreamEvent>  $events
      */
     private static function distinct(Collection $events, string $kind): int

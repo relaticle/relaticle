@@ -16,6 +16,7 @@ use Relaticle\Chat\Support\MarkdownRenderer;
 use Relaticle\Chat\Support\NextSteps;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\StoredSteps;
+use Relaticle\Chat\Support\WebSources;
 use stdClass;
 
 final readonly class ConversationMessagesQuery
@@ -26,7 +27,7 @@ final readonly class ConversationMessagesQuery
     ) {}
 
     /**
-     * @return array<int, array{id: string, role: string, content: string, document: array<string, mixed>, created_at: ?string, pending_actions: array<int, mixed>, display_blocks: list<array<string, mixed>>, next_steps: list<array{label: string, prompt: string}>, feedback: ?array{rating: string, category: ?string}, mentions: list<array{type: string, id: string, label: string, url: ?string}>, page_context: array{type: string, id: string, label: string, url: string|null}|null, attachment: array{id: string, name: string, kind: string, row_count: int}|null}>
+     * @return array<int, array{id: string, role: string, content: string, document: array<string, mixed>, created_at: ?string, pending_actions: array<int, mixed>, display_blocks: list<array<string, mixed>>, next_steps: list<array{label: string, prompt: string}>, sources: list<array{url: string, title: string|null, domain: string}>, feedback: ?array{rating: string, category: ?string}, mentions: list<array{type: string, id: string, label: string, url: ?string}>, page_context: array{type: string, id: string, label: string, url: string|null}|null, attachment: array{id: string, name: string, kind: string, row_count: int}|null}>
      */
     public function get(User $user, string $conversationId, ?string $beforeMessageId = null, int $limit = 50): array
     {
@@ -104,14 +105,7 @@ final readonly class ConversationMessagesQuery
                     $attachment !== null => AttachedRows::typedText((string) ($msg->content ?? '')),
                     default => (string) ($msg->content ?? ''),
                 },
-                'document' => (function (mixed $raw): array {
-                    if ($raw === null) {
-                        return ['type' => 'doc', 'content' => []];
-                    }
-                    $decoded = json_decode((string) $raw, true);
-
-                    return is_array($decoded) ? $decoded : ['type' => 'doc', 'content' => []];
-                })($msg->document ?? null),
+                'document' => $this->documentFrom($msg->document ?? null),
                 // Normalized to the same ISO 8601 UTC shape (`.toISOString()`) the
                 // client mints for optimistic/streamed messages, see send.js and
                 // stream.js. The raw DB column value is `Y-m-d H:i:s` with no
@@ -125,6 +119,7 @@ final readonly class ConversationMessagesQuery
                 'pending_actions' => $this->extractPendingActions($envelopesByMessage[(string) $msg->id] ?? [], $records),
                 'display_blocks' => DisplayBlocks::collect($toolResultsByMessage[(string) $msg->id]),
                 'next_steps' => NextSteps::fromMeta($msg->meta === null ? null : (string) $msg->meta),
+                'sources' => WebSources::fromMeta($msg->meta === null ? null : (string) $msg->meta),
                 'feedback' => isset($feedbackByMessage[$msg->id]) ? [
                     'rating' => (string) $feedbackByMessage[$msg->id]->rating,
                     'category' => $feedbackByMessage[$msg->id]->category === null ? null : (string) $feedbackByMessage[$msg->id]->category,
@@ -152,6 +147,16 @@ final readonly class ConversationMessagesQuery
                 'attachment' => $attachment,
             ];
         })->values()->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function documentFrom(mixed $raw): array
+    {
+        $decoded = $raw === null ? null : json_decode((string) $raw, true);
+
+        return is_array($decoded) ? $decoded : ['type' => 'doc', 'content' => []];
     }
 
     /**

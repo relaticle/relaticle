@@ -10,6 +10,9 @@ use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\DB;
 use Laravel\Ai\Responses\Data\ToolCall as DataToolCall;
 use Laravel\Ai\Responses\Data\ToolResult as DataToolResult;
+use Laravel\Ai\Responses\Data\UrlCitation;
+use Laravel\Ai\Streaming\Events\Citation;
+use Laravel\Ai\Streaming\Events\ProviderToolEvent;
 use Laravel\Ai\Streaming\Events\ReasoningDelta;
 use Laravel\Ai\Streaming\Events\StreamStart;
 use Laravel\Ai\Streaming\Events\TextDelta;
@@ -227,4 +230,35 @@ it('carries the proposal expiry to the client without writing it into the stored
     // The value the message persists is replayed to the model on every later turn,
     // so it must stay byte-identical to what the tool returned.
     expect(json_decode($storedResult, true))->not->toHaveKey('expires_at');
+});
+
+it('broadcasts the start and finish of a web search and page read without their results', function (): void {
+    $anthropic = fn (string $status, array $data, string $type = 'server_tool_use'): ?array => StreamEventBroadcaster::payloadFor(
+        new ProviderToolEvent('evt', 'srv-1', $type, $data, $status, time(), 'anthropic'),
+    );
+
+    expect($anthropic('started', ['name' => 'web_search', 'input' => []])['with'])->toMatchArray(['name' => 'web_search', 'status' => 'started', 'query' => null])
+        ->and($anthropic('completed', ['name' => 'web_search', 'input' => ['query' => 'filaforms']])['with'])->toMatchArray(['name' => 'web_search', 'status' => 'completed', 'query' => 'filaforms'])
+        ->and($anthropic('completed', ['name' => 'web_fetch', 'input' => ['url' => 'https://filaforms.app/']])['with'])->toMatchArray(['name' => 'web_fetch', 'url' => 'https://filaforms.app/', 'query' => null])
+        ->and($anthropic('result_received', ['content' => [['url' => 'https://filaforms.app/', 'encrypted_content' => str_repeat('x', 20000)]]], 'web_search_tool_result'))->toBeNull();
+});
+
+it('broadcasts one finish per OpenAI web search, from the event that names its action', function (): void {
+    $openai = fn (string $status, array $data): ?array => StreamEventBroadcaster::payloadFor(
+        new ProviderToolEvent('evt', 'ws_1', 'web_search_call', $data, $status, time(), 'openai'),
+    );
+
+    expect($openai('in_progress', ['item_id' => 'ws_1'])['with'])->toMatchArray(['name' => 'web_search', 'status' => 'started'])
+        ->and($openai('completed', ['item_id' => 'ws_1']))->toBeNull()
+        ->and($openai('completed', ['id' => 'ws_1', 'action' => ['type' => 'open_page', 'url' => 'https://filaforms.app/']])['with'])->toMatchArray(['name' => 'web_fetch', 'status' => 'completed', 'url' => 'https://filaforms.app/']);
+});
+
+it('broadcasts a citation as a source and drops one that is not a web page', function (): void {
+    $citation = fn (string $url, ?string $title): ?array => StreamEventBroadcaster::payloadFor(
+        new Citation('evt', 'msg', new UrlCitation($url, $title), time()),
+    );
+
+    expect($citation('https://www.filaforms.app/pricing?utm_source=openai&plan=pro', 'Pricing')['with'])
+        ->toMatchArray(['url' => 'https://www.filaforms.app/pricing?plan=pro', 'title' => 'Pricing', 'domain' => 'filaforms.app'])
+        ->and($citation('javascript:alert(1)', 'x'))->toBeNull();
 });

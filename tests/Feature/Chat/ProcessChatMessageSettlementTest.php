@@ -18,14 +18,16 @@ use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
+use Relaticle\Chat\Queries\ConversationMessagesQuery;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\Chat\Support\WebSearchCount;
+use Relaticle\Chat\Support\WebSources;
 use Relaticle\Cloud\Entitlements\PlanEntitlements;
 use Tests\Helpers\AnthropicSse;
 use Tests\Helpers\OpenAiSse;
 
-mutates(ProcessChatMessage::class, CreditService::class, WebSearchCount::class, SelfHostedEntitlements::class, PlanEntitlements::class);
+mutates(ProcessChatMessage::class, CreditService::class, WebSearchCount::class, WebSources::class, SelfHostedEntitlements::class, PlanEntitlements::class);
 
 it('refunds the reservation when a job fails without ever streaming', function (): void {
     withHostedBilling();
@@ -683,7 +685,9 @@ it('bills web research that stopped before writing any text', function (): void 
 
     expect($resolution->type)->toBe(AiCreditType::Chat)
         ->and($resolution->credits_charged)->toBe(5)
-        ->and($resolution->metadata['web_searches_count'])->toBe(2);
+        ->and($resolution->metadata['web_searches_count'])->toBe(2)
+        ->and(DB::table('agent_conversation_messages')->where('conversation_id', 'c-web-5')->where('role', 'assistant')->value('content'))
+        ->toBe('This reply ran out of room before it said anything. Ask again, or ask for a shorter answer.');
 });
 
 it('refunds a blank turn and stores copy chosen by how the model stopped', function (string $reply, string $stopReason, string $expected): void {
@@ -742,3 +746,19 @@ it('refunds a blank turn and stores copy chosen by how the model stopped', funct
     'declined by the model' => ['', 'refusal', 'The model declined to answer this. Try rephrasing your request.'],
     'unrecognised stop reason' => ['', 'something_new', 'Noted. Go on, or ask me a question.'],
 ]);
+
+it('lists the pages a web research reply cited as its sources', function (): void {
+    AnthropicSse::fake(AnthropicSse::webResearchReply(
+        ['filaforms'],
+        'Filaforms builds forms for Filament.',
+        'https://www.filaforms.com/?utm_source=claude',
+        'Filaforms',
+    ));
+
+    settleWebResearchTurn('anthropic', 'claude-sonnet-5', 'c-web-6', '01TURNWEBSOURCESAAAAAAAAAA');
+    $user = User::query()->latest('id')->first();
+
+    $reply = collect(resolve(ConversationMessagesQuery::class)->get($user, 'c-web-6'))->firstWhere('role', 'assistant');
+
+    expect($reply['sources'])->toBe([['url' => 'https://www.filaforms.com/', 'title' => 'Filaforms', 'domain' => 'filaforms.com']]);
+});

@@ -8,6 +8,8 @@ use Carbon\CarbonInterface;
 use Illuminate\Broadcasting\BroadcastException;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Support\Facades\Broadcast;
+use Laravel\Ai\Streaming\Events\Citation;
+use Laravel\Ai\Streaming\Events\ProviderToolEvent;
 use Laravel\Ai\Streaming\Events\StreamEnd;
 use Laravel\Ai\Streaming\Events\StreamEvent;
 use Laravel\Ai\Streaming\Events\StreamStart;
@@ -19,7 +21,7 @@ use Relaticle\Chat\Models\PendingAction;
 final readonly class StreamEventBroadcaster
 {
     // The only stream events chat/stream.js listens for.
-    private const array CLIENT_EVENTS = [StreamStart::class, TextDelta::class, ToolCall::class, ToolResult::class, StreamEnd::class];
+    private const array CLIENT_EVENTS = [StreamStart::class, TextDelta::class, ToolCall::class, ToolResult::class, StreamEnd::class, ProviderToolEvent::class, Citation::class];
 
     public function __construct(
         private Channel $channel,
@@ -74,6 +76,16 @@ final readonly class StreamEventBroadcaster
 
         if ($event instanceof ToolCall) {
             return self::payloadForToolCall($event);
+        }
+
+        if ($event instanceof ProviderToolEvent) {
+            return self::payloadForProviderTool($event);
+        }
+
+        if ($event instanceof Citation) {
+            $source = WebSources::source($event->citation);
+
+            return $source === null ? null : ['as' => 'citation', 'with' => ['invocation_id' => $event->invocationId, ...$source]];
         }
 
         return [
@@ -148,5 +160,21 @@ final readonly class StreamEventBroadcaster
                 'tool_name' => $event->toolCall->name,
             ],
         ];
+    }
+
+    // Result blocks carry whole pages and would break Reverb's 10 KB cap, so only
+    // the start and finish of a search or page read reach the client.
+    /**
+     * @return array{as: string, with: array<string, mixed>}|null
+     */
+    private static function payloadForProviderTool(ProviderToolEvent $event): ?array
+    {
+        $step = WebSearchCount::step($event);
+
+        if ($step === null) {
+            return null;
+        }
+
+        return ['as' => 'provider_tool', 'with' => ['invocation_id' => $event->invocationId, ...$step]];
     }
 }
