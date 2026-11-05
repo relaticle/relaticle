@@ -2058,6 +2058,7 @@ it('does not count a historic payment from before acquisition capture', function
 });
 
 it('finishes payment history verification before remembering its earliest payment', function (): void {
+    $this->travelTo(now()->startOfSecond());
     $workspace = stripeBillingWorkspace();
     $acquisition = acquiredBillingWorkspace($workspace);
     proSubscriptionOn($workspace, 'sub_test_1');
