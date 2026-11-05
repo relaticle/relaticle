@@ -93,7 +93,7 @@
             </p>
 
             <div class="mt-7 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
-                <x-cloud::marketing.button href="{{ route('login') }}">
+                <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="hero">
                     {{ __('Start for free') }}
                 </x-cloud::marketing.button>
                 <x-cloud::marketing.button variant="secondary" href="#sharing">
@@ -101,12 +101,10 @@
                 </x-cloud::marketing.button>
             </div>
 
-            <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">{{ __('No credit card. Unlimited users. Open source.') }}</p>
+            <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">{{ __('No credit card. Unlimited users. Open source.') }}</p>
         </x-slot:aside>
 
-        <div class="feat-card bg-hero-panel border-rail flex justify-center border-t px-4 py-10 sm:px-8 md:py-16">
-            <x-cloud::marketing.record-emails-mock class="w-full max-w-2xl" data-mail-demo/>
-        </div>
+        @include('cloud::marketing.partials.email-calendar-demo')
     </x-cloud::marketing.hero>
 
     <x-cloud::marketing.frame>
