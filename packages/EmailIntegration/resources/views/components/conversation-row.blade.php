@@ -32,6 +32,7 @@
     {{ $attributes->class([
         'relative flex w-full items-start gap-2 px-4 py-3 transition-colors sm:px-6',
         'hover:bg-gray-50 dark:hover:bg-white/5' => $opens,
+        'bg-gray-50 before:absolute before:inset-y-0 before:start-0 before:w-0.5 before:bg-primary-500 dark:bg-white/5' => $current,
     ]) }}
 >
     @if ($opens)
