@@ -12,6 +12,7 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Translation\PotentiallyTranslatedString;
 use Illuminate\Validation\Rule;
+use Relaticle\CustomFields\Enums\FieldCapability;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\CustomFields\Models\CustomField as BaseCustomField;
 use Relaticle\CustomFields\Services\ValidationService;
@@ -46,7 +47,7 @@ final readonly class ValidCustomFields implements ValidationRule
         if ($customFields->isNotEmpty()) {
             $validationService = resolve(ValidationService::class);
 
-            /** @var BaseCustomField $customField */
+            /** @var CustomField $customField */
             foreach ($customFields as $customField) {
                 $fieldRules = $validationService->getValidationRules($customField, $this->ignoreEntityId);
 
@@ -98,14 +99,8 @@ final readonly class ValidCustomFields implements ValidationRule
         $fail("Unknown custom field keys: {$unknownList}.");
     }
 
-    /**
-     * A link field's payload holds record ids, and nothing under the package checks that
-     * they belong to this workspace: its reachability query runs on the target model,
-     * which carries no team scope here.
-     *
-     * @param  array<string, array<int, mixed>>  $rules
-     */
-    private function addLinkTargetRules(BaseCustomField $customField, array &$rules): void
+    /** @param  array<string, array<int, mixed>>  $rules */
+    private function addLinkTargetRules(CustomField $customField, array &$rules): void
     {
         if (! $customField->relationshipDefinition() instanceof CustomFieldRelationship) {
             return;
@@ -138,7 +133,7 @@ final readonly class ValidCustomFields implements ValidationRule
             return;
         }
 
-        if ($fieldTypeData->acceptsArbitraryValues) {
+        if ($fieldTypeData->supports(FieldCapability::AcceptsArbitraryValues)) {
             return;
         }
 
@@ -169,7 +164,8 @@ final readonly class ValidCustomFields implements ValidationRule
             ->where('tenant_id', $this->tenantId)
             ->where('entity_type', $this->entityType)
             ->active()
-            ->with('options');
+            ->with('options')
+            ->withRelationshipDefinition();
 
         if ($this->isUpdate) {
             if ($submittedCodes === []) {

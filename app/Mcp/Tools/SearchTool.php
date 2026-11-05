@@ -62,12 +62,8 @@ final class SearchTool extends Tool
         ];
     }
 
-    /**
-     * A field that links records keeps its targets in the edge ledger, and what a value
-     * row would hold there is a record id, which no one searches for by typing it. The
-     * field is left out by its definition rather than by its type key: two field types
-     * link records, and a check on one of them would miss the other.
-     */
+    // A link field's value row would hold a record id nobody types. It is left out by its
+    // definition, not its type key, because two field types link records.
     private function relationshipSlot(QueryBuilder $query): QueryBuilder
     {
         $table = (string) config('custom-fields.database.table_names.custom_field_relationships');

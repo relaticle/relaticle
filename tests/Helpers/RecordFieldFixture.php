@@ -15,16 +15,8 @@ use Relaticle\CustomFields\Models\CustomFieldRelationship;
 use Relaticle\CustomFields\Services\Relationships\CreateRelationshipDefinition;
 use Relaticle\CustomFields\Services\TenantContextService;
 
-/**
- * Link fields as the product creates them: a field row plus the relationship definition
- * that makes it a slot. Everything downstream of a link field (chat, API, MCP, import,
- * the timeline) needs one, so the shape lives here rather than in each test.
- */
 final class RecordFieldFixture
 {
-    /**
-     * A one-way `record` field on $entityType pointing at $targetEntityType.
-     */
     public static function record(
         Workspace $workspace,
         string $entityType,
@@ -46,12 +38,7 @@ final class RecordFieldFixture
         return $field->refresh();
     }
 
-    /**
-     * A paired `relationship` field: the near slot on $entityType, the far slot on
-     * $targetEntityType, both reading the same edges.
-     *
-     * @return array{0: CustomField, 1: CustomField}
-     */
+    /** @return array{0: CustomField, 1: CustomField} */
     public static function paired(
         Workspace $workspace,
         string $entityType,
@@ -75,18 +62,11 @@ final class RecordFieldFixture
         return [$near->refresh(), $far->refresh()];
     }
 
-    /**
-     * Point an already-created record field at an entity. For tests that build the field
-     * row themselves and only need the definition that replaced `lookup_type`.
-     */
     public static function pointAt(
         CustomField $field,
         string $targetEntityType,
         RelationshipCardinality $cardinality = RelationshipCardinality::ManyToMany,
     ): CustomField {
-        // The definition takes its tenant from ambient context, and the link rows take
-        // theirs from the definition, so a definition built without it writes links no
-        // tenant-scoped read can see.
         TenantContextService::setTenantId($field->tenant_id);
 
         self::definition(new RelationshipDefinitionData(

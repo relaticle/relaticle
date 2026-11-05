@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Rules;
 
 use App\Enums\CrmEntity;
+use App\Models\CustomField;
+use App\Models\CustomFieldRelationship;
 use App\Models\Scopes\WorkspaceScope;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -12,20 +14,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Translation\PotentiallyTranslatedString;
 use Relaticle\CustomFields\Data\RecordLinkPayload;
-use Relaticle\CustomFields\Models\CustomField as BaseCustomField;
-use Relaticle\CustomFields\Models\CustomFieldRelationship;
 
-/**
- * Every record a link field points at has to belong to the workspace writing it.
- *
- * The package checks a target only exists, so nothing below this stops one workspace
- * from linking another's company by id. It runs wherever custom fields are validated:
- * the API, the MCP tools, and the chat write tools.
- */
+// The package only checks that a target exists, so this stops one workspace linking another's records by id.
 final readonly class OwnedLinkTargets implements ValidationRule
 {
     public function __construct(
-        private BaseCustomField $field,
+        private CustomField $field,
         private string $tenantId,
     ) {}
 
@@ -40,7 +34,7 @@ final readonly class OwnedLinkTargets implements ValidationRule
             return;
         }
 
-        $entityType = $definition->targetEntityTypeFor($this->field);
+        $entityType = $definition->farEnd($this->field)->entityType;
         $modelClass = Relation::getMorphedModel($entityType);
 
         if (! CrmEntity::tryFrom($entityType) instanceof CrmEntity
@@ -88,12 +82,7 @@ final readonly class OwnedLinkTargets implements ValidationRule
         ]));
     }
 
-    /**
-     * The items the caller sent, in either the plain list or the map form that confirms
-     * a replacement, before anything is filtered out of them.
-     *
-     * @return array<array-key, mixed>
-     */
+    /** @return array<array-key, mixed> */
     private function rawItems(mixed $value): array
     {
         if (is_array($value) && array_key_exists('ids', $value)) {

@@ -160,12 +160,6 @@ arch('avoid mutation')
         // RequestActivityBatch above: mutable by design, reset per request/job
         // via the scoped container binding in AppServiceProvider.
         'App\Services\WorkspaceActivationFacts',
-        // Holds the actor a write names for itself, put back by the caller's finally
-        // block. Same shape again: a scoped holder, not a service.
-        'App\Support\LinkActorResolver',
-        // Remembers which fields of an entity read the link ledger, for the lifetime of
-        // one request: a lookup cache, not a service.
-        'App\Support\RecordLinkFields',
         // Extends the non-readonly sluggable GenerateSlugAction to hook slug
         // uniqueness; PHP forbids a readonly class extending a non-readonly one.
         'App\Support\ReservedSlugAwareGenerateSlugAction',
@@ -514,13 +508,8 @@ foreach (['App', 'Relaticle\ImportWizard', 'Relaticle\OnboardSeed', 'Relaticle\D
             'App\Filament\CustomFields\RichContentEntry',
             'App\Filament\CustomFields\RichEditorFieldType',
             'App\Http\Resources\V1\Concerns\FormatsCustomFields',
-            'App\Listeners\CustomFields\LogLinkChangeListener',
-            'App\Mcp\Schema\CustomFieldSchema',
             'App\Observers\CustomFieldValueObserver',
-            'App\Rules\OwnedLinkTargets',
             'App\Rules\ValidCustomFields',
-            'App\Support\CustomFields\CustomFieldInput',
-            'App\Support\RecordLinkFields',
             'App\Support\ActivityLog\CustomFieldChangeLog',
             'App\Support\CustomFieldMerger',
             'App\Support\Media\UploadClaims',

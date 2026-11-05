@@ -10,8 +10,10 @@ use App\Models\User;
 use App\Support\CustomFieldDefinitionValidator;
 use App\Support\CustomFieldSettingsSchema;
 use Illuminate\Support\Facades\DB;
+use Relaticle\CustomFields\Data\CustomFieldOptionSettingsData;
 use Relaticle\CustomFields\Data\FieldSlotData;
 use Relaticle\CustomFields\Data\RelationshipDefinitionData;
+use Relaticle\CustomFields\Enums\OptionCategory;
 use Relaticle\CustomFields\Enums\RelationshipCardinality;
 use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
 use Relaticle\CustomFields\Services\Relationships\CreateRelationshipDefinition;
@@ -50,20 +52,22 @@ final readonly class CreateCustomField
             // someone else claimed the name must fail rather than write a duplicate.
             $validated = CustomFieldDefinitionValidator::forCreate($user, $data);
 
-            $optionNames = array_column(is_array($validated['options'] ?? null) ? $validated['options'] : [], 'name');
+            /** @var list<array{name: string, category?: string}> $options */
+            $options = is_array($validated['options'] ?? null) ? $validated['options'] : [];
             $attributes = $this->attributes($workspaceId, $validated);
 
-            $field = DB::transaction(function () use ($workspaceId, $attributes, $optionNames, $validated): CustomField {
+            $field = DB::transaction(function () use ($workspaceId, $attributes, $options, $validated): CustomField {
                 $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
 
                 /** @var CustomField $created */
                 $created = CustomField::query()->create([$tenantKey => $workspaceId, ...$attributes]);
 
-                foreach ($optionNames as $index => $optionName) {
+                foreach ($options as $index => $option) {
                     $created->options()->create([
                         $tenantKey => $workspaceId,
-                        'name' => $optionName,
+                        'name' => $option['name'],
                         'sort_order' => $index,
+                        'settings' => new CustomFieldOptionSettingsData(category: OptionCategory::tryFrom($option['category'] ?? '')),
                     ]);
                 }
 

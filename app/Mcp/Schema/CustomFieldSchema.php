@@ -8,6 +8,7 @@ use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
+use App\Models\CustomFieldRelationship;
 use App\Models\User;
 use App\Queries\CustomFieldFilterSchema;
 use App\Queries\EntityFilters;
@@ -16,8 +17,6 @@ use App\Support\CustomFields\CustomFieldOptionMap;
 use App\Support\CustomFields\CustomFieldSchemaCache;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Relaticle\CustomFields\Models\CustomFieldRelationship;
-use Relaticle\CustomFields\Services\ValidationService;
 use stdClass;
 
 /**
@@ -62,6 +61,7 @@ final readonly class CustomFieldSchema
                 ->active()
                 ->select('id', 'code', 'name', 'type', 'validation_rules')
                 ->with(['options:id,custom_field_id,name,settings'])
+                ->withRelationshipDefinition()
                 ->get();
 
             return $this->format($fields);
@@ -94,9 +94,7 @@ final readonly class CustomFieldSchema
                 continue;
             }
 
-            // validation_rules casts to ['required' => true], so a ['name' => 'required']
-            // scan matches nothing and tells every agent no field was ever required.
-            $required = resolve(ValidationService::class)->isRequired($field);
+            $required = $field->isRequired();
 
             $entry = [
                 'name' => $field->name,
@@ -129,18 +127,10 @@ final readonly class CustomFieldSchema
         return $result;
     }
 
-    /**
-     * What a link field points at, said in the relationship's own vocabulary so a client
-     * can reason about both ends: the entity, how many records this side holds, and the
-     * definition the far end reads the same edges through.
-     *
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     private function linkVocabulary(CustomField $field, CustomFieldRelationship $definition): array
     {
-        $farFieldId = $definition->directionFor($field) === CustomFieldRelationship::DIRECTION_FROM
-            ? $definition->to_field_id
-            : $definition->from_field_id;
+        $farFieldId = $definition->farEnd($field)->fieldId;
 
         $farField = $farFieldId === null || (string) $farFieldId === (string) $field->getKey()
             ? null
@@ -151,7 +141,7 @@ final readonly class CustomFieldSchema
                 ? 'array of record IDs'
                 : 'array holding at most one record ID',
             'example' => ['01JJXYZ123ABC456DEF789GHI'],
-            'target_entity' => $definition->targetEntityTypeFor($field),
+            'target_entity' => $definition->farEnd($field)->entityType,
             'multiple' => $field->allowsMultipleRecords(),
             'relationship' => [
                 'code' => $definition->code,

@@ -20,7 +20,6 @@ use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tool;
-use Relaticle\CustomFields\Services\ValidationService;
 
 #[Title('List Custom Fields')]
 #[Description('List workspace custom-field definitions, including inactive fields and configured option labels and categories. Use get-crm-schema-tool for the active write schema.')]
@@ -32,10 +31,6 @@ final class ListCustomFieldsTool extends Tool
     private const int MAX_PER_PAGE = 25;
 
     private const int MAX_PAGE = 1_000_000;
-
-    public function __construct(
-        private readonly ValidationService $validation,
-    ) {}
 
     public function schema(JsonSchema $schema): array
     {
@@ -124,7 +119,7 @@ final class ListCustomFieldsTool extends Tool
             'type' => $field->type,
             'active' => $field->active,
             'system_defined' => $field->system_defined,
-            'required' => $this->validation->isRequired($field),
+            'required' => $field->isRequired(),
             'options' => $field->options->map(fn (CustomFieldOption $option): array => [
                 'id' => $option->id,
                 'label' => $option->name,

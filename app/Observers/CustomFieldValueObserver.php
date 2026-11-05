@@ -72,12 +72,8 @@ final readonly class CustomFieldValueObserver
         $this->log($value, $value->getOriginal($column));
     }
 
-    /**
-     * A field that links records keeps its history in the edge ledger, and
-     * LogLinkChangeListener writes the timeline entry for both records from the one
-     * event. Any value row left on such a field is pre-migration residue: logging it
-     * here would double the entry, or announce an id as the value.
-     */
+    // LogLinkChangeListener logs a link field for both records. A value row left on one is
+    // pre-migration residue, and logging it would double the entry.
     private function readsLinks(CustomFieldValue $value): bool
     {
         return $value->customField->relationshipDefinition() instanceof CustomFieldRelationship;

@@ -13,7 +13,6 @@ use App\Onboarding\FieldOptionRows;
 use Illuminate\Support\Facades\DB;
 use Relaticle\CustomFields\Enums\OptionCategory;
 use Relaticle\CustomFields\Facades\Entities;
-use Relaticle\CustomFields\Services\Visibility\BackendVisibilityService;
 
 final readonly class ApplyStagePreset
 {
@@ -55,9 +54,7 @@ final readonly class ApplyStagePreset
             ));
         });
 
-        // Builder writes fire no option events, and those are what clear the schema caches.
+        // Builder writes fire no option events. The touch fires the field events that clear the schema and visibility caches.
         $stage->touch();
-
-        BackendVisibilityService::clearCache($entityType);
     }
 }

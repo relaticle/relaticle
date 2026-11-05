@@ -33,6 +33,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
+use Relaticle\CustomFields\Enums\WriteSource;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Tests\Helpers\LegacyCompanyDomains;
@@ -227,8 +228,6 @@ it('clears a multi-select field sent an empty string', function (): void {
         ->tool(UpdateTaskTool::class, ['id' => $task->getKey(), 'custom_fields' => ['markets' => '']])
         ->assertOk();
 
-    // A link field reads its cleared state back as an empty list, every other type as
-    // null, and both mean the record holds no value.
     expect(blank($task->fresh('customFieldValues.customField.options')->getCustomFieldValue($field)))->toBeTrue();
 });
 
@@ -442,7 +441,7 @@ it('reads a foreign-workspace record value as a null name', function (): void {
         'to_entity_id' => $foreign->getKey(),
         'sort_order' => 0,
         'active_from' => now(),
-        'source' => CustomFieldLink::SOURCE_MIGRATION,
+        'source' => WriteSource::Migration,
     ]);
 
     $response = RelaticleServer::actingAs($this->user)
@@ -500,8 +499,6 @@ it('resolves a dangling record reference without one query per row', function ()
         Task::factory()->create(['workspace_id' => $this->workspace->getKey()])->saveCustomFieldValue($field, [$trashed->getKey()]);
     }
 
-    // A link can only be made to a reachable record, so the reference goes dangling the
-    // way it does in production: the target is deleted after the links exist.
     $trashed->delete();
 
     DB::enableQueryLog();
@@ -584,8 +581,6 @@ it('sets then clears a value for every writable custom field type', function (st
         ->tool(UpdateTaskTool::class, ['id' => $task->getKey(), 'custom_fields' => ['probe' => null]])
         ->assertOk();
 
-    // A link field reads its cleared state back as an empty list, every other type as
-    // null, and both mean the record holds no value.
     expect(blank($task->fresh('customFieldValues.customField.options')->getCustomFieldValue($field)))->toBeTrue();
 })->with([
     'text' => ['text', 'Acme renewal', 'Acme renewal'],

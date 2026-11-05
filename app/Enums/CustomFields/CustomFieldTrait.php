@@ -97,11 +97,7 @@ trait CustomFieldTrait
         return null;
     }
 
-    /**
-     * Get category mapping for single-choice field options
-     *
-     * @return array<string, OptionCategory>|null Array of option => category mappings or null if not applicable
-     */
+    /** @return array<string, OptionCategory>|null */
     public function getOptionCategories(): ?array
     {
         return null;

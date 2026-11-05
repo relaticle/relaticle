@@ -98,10 +98,6 @@ return [
             CustomFieldsFeature::UI_TOGGLEABLE_COLUMNS,
             CustomFieldsFeature::UI_TABLE_FILTERS,
             CustomFieldsFeature::SYSTEM_MULTI_TENANCY,
-
-            // Creates the two relationship tables and lets the upgrade command run. Record
-            // fields store their targets as links from 4.0 on, so this is not optional here.
-            CustomFieldsFeature::SYSTEM_RELATIONSHIPS,
         )->disable(
             // Hide the package's management page from the sidebar; reachable via the
             // tenant dropdown's "Custom Fields" entry. The page route is still registered.
@@ -111,15 +107,15 @@ return [
             CustomFieldsFeature::UI_FIELD_WIDTH_CONTROL,
             CustomFieldsFeature::SYSTEM_SECTIONS,
 
-            // Off in 3.x because this block did not name them, and a flag it does not name
-            // now takes the package default instead. Naming them keeps the field editor and
-            // the record pages exactly as they are; each is a product call, not a bump.
+            // Off in 3.x, and an unnamed flag now takes the package default. Naming them keeps
+            // the field editor and record pages as they are: each is a product call, not a bump.
             CustomFieldsFeature::FIELD_DESCRIPTION,
             CustomFieldsFeature::FIELD_DESCRIPTION_POSITION,
             CustomFieldsFeature::SECTION_CONDITIONAL_VISIBILITY,
             CustomFieldsFeature::UI_SECTION_WIDTH_CONTROL,
             CustomFieldsFeature::MODEL_ATTRIBUTE_CONDITIONS,
             CustomFieldsFeature::UI_TOGGLEABLE_COLUMNS_HIDDEN_DEFAULT,
+            CustomFieldsFeature::FIELD_OPTION_PASTE,
         ),
 
     /*
