@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Services\Tools;
 
+use App\Enums\CustomFields\TaskField;
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\Workspace;
@@ -87,6 +88,10 @@ final readonly class CustomFieldsSchemaDescriber
         }
 
         $parts[] = $type->inputFormat();
+
+        if ($field->holdsChecklists()) {
+            $parts[] = TaskField::CHECKLIST_INPUT_FORMAT;
+        }
 
         $example = $type->example();
 

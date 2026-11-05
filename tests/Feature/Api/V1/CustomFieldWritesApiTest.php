@@ -11,13 +11,14 @@ use App\Models\CustomFieldSection;
 use App\Models\CustomFieldValue;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\ChecklistHtml;
 use App\Support\Media\MediaLookup;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-mutates(BaseCrmEntityRequest::class, MediaLookup::class);
+mutates(BaseCrmEntityRequest::class, ChecklistHtml::class, MediaLookup::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();
@@ -54,6 +55,74 @@ it('stores markdown note bodies as html', function (): void {
     $this->postJson('/api/v1/notes', ['title' => 'Md note', 'custom_fields' => ['body' => '**bold**']])
         ->assertCreated()
         ->assertJsonPath('data.attributes.custom_fields.body', fn (string $body): bool => str_contains($body, '<strong>bold</strong>'));
+});
+
+it('stores markdown checklist items in a task description as a checklist', function (): void {
+    $response = $this->postJson('/api/v1/tasks', [
+        'title' => 'Checklist',
+        'custom_fields' => ['description' => "- [ ] Call **Bob**\n- [x] Send quote\n- [X] Book room\n  - [ ] Pick a date\n- Agenda"],
+    ])->assertCreated();
+
+    $stored = $response->json('data.attributes.custom_fields.description');
+
+    expect(substr_count($stored, 'data-type="taskList"'))->toBe(1)
+        ->and(substr_count($stored, 'data-type="taskItem"'))->toBe(5)
+        ->and(substr_count($stored, 'data-checked="true"'))->toBe(2)
+        ->and($stored)->toContain('<strong>Bob</strong>')
+        ->toContain('<div><p>Book room</p></div>')
+        ->toContain('Pick a date')
+        ->toContain('Agenda')
+        ->not->toContain('[ ]')
+        ->not->toContain('[x]')
+        ->not->toContain('[X]')
+        ->and(preg_match('/<li[^>]*>(?:(?!<\/li>).)*<ul/s', $stored))->toBe(0);
+});
+
+it('keeps markdown checklist syntax in a fenced code block as code', function (): void {
+    $stored = $this->postJson('/api/v1/tasks', [
+        'title' => 'Fence',
+        'custom_fields' => ['description' => "```\n- [ ] not a task\n```"],
+    ])->assertCreated()->json('data.attributes.custom_fields.description');
+
+    expect($stored)->toContain('<code')
+        ->not->toContain('taskList')
+        ->and(html_entity_decode(strip_tags($stored)))->toContain('[ ] not a task');
+});
+
+it('keeps markdown checklist items in a note as bullets', function (): void {
+    $stored = $this->postJson('/api/v1/notes', [
+        'title' => 'Bullets',
+        'custom_fields' => ['body' => '- [ ] Call Bob'],
+    ])->assertCreated()->json('data.attributes.custom_fields.body');
+
+    expect($stored)->not->toContain('taskList')
+        ->toContain('<li>')
+        ->toContain('[ ] Call Bob');
+});
+
+it('repairs a malformed checklist item sent as html', function (): void {
+    $stored = $this->postJson('/api/v1/tasks', [
+        'title' => 'Malformed',
+        'custom_fields' => ['description' => '<ul data-type="taskList"><li data-type="taskItem" data-checked="true">Call Bob<ul data-type="taskList"><li data-type="taskItem" data-checked="false"><p>Sub</p></li></ul></li></ul>'],
+    ])->assertCreated()->json('data.attributes.custom_fields.description');
+
+    expect(substr_count($stored, 'data-type="taskItem"'))->toBe(2)
+        ->and($stored)->toContain('<div><p>Call Bob</p></div>')
+        ->toContain('<div><p>Sub</p></div>')
+        ->and(substr_count($stored, 'data-checked="true"'))->toBe(1)
+        ->and(substr_count($stored, 'data-checked="false"'))->toBe(1)
+        ->and(preg_match('/<li[^>]*>(?:(?!<\/li>).)*<ul/s', $stored))->toBe(0);
+});
+
+it('stores a well-formed checklist sent as html byte for byte', function (): void {
+    $html = '<ul data-type="taskList"><li data-checked="true" data-type="taskItem"><label><input type="checkbox" checked="checked"><span></span></label><div><p>Call Bob</p></div></li><li data-checked="false" data-type="taskItem"><label><input type="checkbox"><span></span></label><div><p>Send quote</p></div></li></ul>';
+
+    $stored = $this->postJson('/api/v1/tasks', [
+        'title' => 'Exact',
+        'custom_fields' => ['description' => $html],
+    ])->assertCreated()->json('data.attributes.custom_fields.description');
+
+    expect($stored)->toBe($html);
 });
 
 it('returns a record field as id and name pairs for an own-workspace company', function (): void {
