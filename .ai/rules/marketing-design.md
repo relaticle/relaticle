@@ -139,10 +139,10 @@ reach it. Change the header height and the token together. `html` also carries `
   app renders it. An approved proposal changes the row in the list, because `ListOpportunities`,
   `ListPeople` and `ManageTasks` re-render on `ai-write-completed`. A record page does not re-render, so
   the hero never shows one changing live. `tests/Browser/Marketing/AiPlaygroundTest.php` pins the rows.
-- The 404 page opens on the logo with one node snapped off (`.not-found-mark` in `cloud.css`), above the
-  eyebrow of a left-aligned hero. It uses the logo's own geometry and `#5D54E8`, so it reads as the brand
-  mark broken, not as clip art. The node detaches once on load inside 2 seconds and leans back toward its
-  dashed slot on hover; reduced motion shows it at rest. The popular pages follow as linked cells.
+- The 404 page stays plain: "Error 404" alone in a thin row above a rail, then the headline with generous
+  space around it, one sentence (the suggestion when `MarketingNavigation::closestTo()` finds one) and at
+  most two buttons, then the popular pages as linked cells. It carries no illustration; a drawn mark
+  next to the header logo read as a second logo.
 - `theme-image`: a light and a dark WebP of a real app screenshot. It loads only the current
   theme's file and swaps on theme change. It lazy-loads unless `loading="eager"` is passed, which a
   hero image needs, because the LCP image is never lazy-loaded.
