@@ -2,7 +2,7 @@
 title: Billing and plans
 description: Relaticle Cloud is priced per workspace, never per seat. Trials, subscriptions, credits, and pausing explained.
 order: 3
-updated: "2026-10-30"
+updated: "2026-11-05"
 related: [help/ai-assistant/ai-credits-and-limits, help/workspace/rename-or-delete-your-workspace]
 ---
 
@@ -45,7 +45,8 @@ card**. The trial includes everything in Cloud Pro, with 2,000 AI credits.
 Premium AI models unlock once the workspace holds a record of its own.
 When it ends, subscribe from the Billing page to keep Cloud access; without
 a subscription the workspace pauses. If you need more time, the owner can
-extend the trial by 7 days once from the Billing page. Relaticle Cloud has no free plan.
+extend the trial by 7 days once from the Billing page. AI credits do not
+refill during the extension. Relaticle Cloud has no free plan.
 
 ## Managing the subscription
 

@@ -337,7 +337,7 @@ function pausedTrialWorkspace(): array
 function actingAsMemberOf(Workspace $workspace): void
 {
     $member = User::factory()->create();
-    $workspace->users()->attach($member, ['role' => 'member']);
+    $workspace->users()->attach($member, ['role' => 'admin']);
 
     test()->actingAs($member);
     Filament::setTenant($workspace->refresh());
@@ -350,7 +350,7 @@ it('offers the owner a seven-day extension on the paused screen', function (): v
 
     $this->get(Billing::getUrl(panel: 'app', tenant: $workspace))
         ->assertOk()
-        ->assertSee(__('cloud::billing.paused.extend'))
+        ->assertSee(__('cloud::billing.paused.extend', ['days' => Workspace::TRIAL_EXTENSION_DAYS]))
         ->assertSee(__('cloud::billing.paused.extend_once'));
 });
 
@@ -361,15 +361,29 @@ it('extends the trial from the paused screen and reopens the workspace', functio
 
     livewire(Billing::class)
         ->call('extendTrial')
-        ->assertNotified(__('cloud::billing.paused.extended'))
+        ->assertNotified(__('cloud::billing.paused.extended', ['days' => Workspace::TRIAL_EXTENSION_DAYS]))
         ->assertRedirect(Billing::getUrl());
 
     expect($workspace->refresh()->billingStatus())->toBe(BillingStatus::Trialing);
 
     $this->get(Billing::getUrl(panel: 'app', tenant: $workspace))
         ->assertOk()
-        ->assertDontSee(__('cloud::billing.paused.extend'))
+        ->assertDontSee(__('cloud::billing.paused.extend', ['days' => Workspace::TRIAL_EXTENSION_DAYS]))
         ->assertSee(__('cloud::billing.usage.title'));
+});
+
+it('meters an extended trial against the Free allowance', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = pausedTrialWorkspace();
+
+    livewire(Billing::class)->call('extendTrial');
+
+    expect($workspace->refresh()->onExtendedTrial())->toBeTrue();
+
+    livewire(Billing::class)
+        ->assertSeeHtml('/ '.number_format(Plan::Free->credits()))
+        ->assertDontSeeHtml('/ '.number_format(Plan::Pro->credits()));
 });
 
 it('hides the extension once it was used', function (): void {
@@ -380,7 +394,7 @@ it('hides the extension once it was used', function (): void {
 
     livewire(Billing::class)
         ->assertSee(__('cloud::billing.paused.continue'))
-        ->assertDontSee(__('cloud::billing.paused.extend'))
+        ->assertDontSee(__('cloud::billing.paused.extend', ['days' => Workspace::TRIAL_EXTENSION_DAYS]))
         ->assertDontSee(__('cloud::billing.paused.extend_once'));
 });
 
@@ -391,7 +405,8 @@ it('hides the extension from a member', function (): void {
     actingAsMemberOf($workspace);
 
     livewire(Billing::class)
-        ->assertDontSee(__('cloud::billing.paused.extend'))
+        ->assertSee(__('cloud::billing.paused.member_body', ['owner' => $workspace->owner->name, 'workspace' => $workspace->name]))
+        ->assertDontSee(__('cloud::billing.paused.extend', ['days' => Workspace::TRIAL_EXTENSION_DAYS]))
         ->assertDontSee(__('cloud::billing.paused.extend_once'));
 });
 
@@ -403,7 +418,7 @@ it('refuses a member who calls the extension directly', function (): void {
 
     livewire(Billing::class)
         ->call('extendTrial')
-        ->assertNotified()
+        ->assertNotified(__('cloud::billing.trial.extend_owner_only'))
         ->assertNoRedirect();
 
     $workspace->refresh();

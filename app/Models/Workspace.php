@@ -199,6 +199,8 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
 
     public const int PRO_TRIAL_DAYS = 14;
 
+    public const int TRIAL_EXTENSION_DAYS = 7;
+
     /**
      * The event map for the model.
      *
@@ -409,6 +411,14 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
                 && $subscription->type !== SubscriptionType::ManagedPending->value
                 && ! in_array($subscription->stripe_status, StripeSubscriptionStatus::neverGranted(), true),
         );
+    }
+
+    public function onExtendedTrial(): bool
+    {
+        return $this->billingStatus() === BillingStatus::Trialing
+            && $this->trial_extended_at !== null
+            && $this->trial_ends_at !== null
+            && $this->trial_ends_at <= $this->trial_extended_at->addDays(self::TRIAL_EXTENSION_DAYS);
     }
 
     public function canExtendTrial(): bool

@@ -15,8 +15,6 @@ use Relaticle\Cloud\Admin\Actions\RecordTrialChange;
 
 final readonly class ExtendEndedTrial
 {
-    public const int DAYS = 7;
-
     public function __construct(private RecordTrialChange $recordTrialChange) {}
 
     /** @throws AuthorizationException */
@@ -25,7 +23,7 @@ final readonly class ExtendEndedTrial
         throw_unless(
             $user->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage),
             AuthorizationException::class,
-            'Only the workspace owner can extend a trial.',
+            __('cloud::billing.trial.extend_owner_only'),
         );
 
         $extended = DB::transaction(function () use ($user, $workspace): bool {
@@ -37,12 +35,13 @@ final readonly class ExtendEndedTrial
             }
 
             $before = $lockedWorkspace->only(['plan', 'trial_ends_at']);
-            $endsAt = now()->addDays(self::DAYS);
+            $now = now();
+            $endsAt = $now->addDays(Workspace::TRIAL_EXTENSION_DAYS);
 
             $lockedWorkspace->forceFill([
                 'plan' => Plan::Pro,
                 'trial_ends_at' => $endsAt,
-                'trial_extended_at' => now(),
+                'trial_extended_at' => $now,
             ])->save();
 
             // Pinned so chat:reset-credits cannot grant the Pro allowance mid-extension.

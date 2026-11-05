@@ -62,7 +62,7 @@
                             </x-filament::button>
                             @if($trialExtensionAvailable)
                                 <x-filament::button size="lg" color="gray" class="w-full justify-center" wire:click="extendTrial">
-                                    {{ __('cloud::billing.paused.extend') }}
+                                    {{ __('cloud::billing.paused.extend', ['days' => \App\Models\Workspace::TRIAL_EXTENSION_DAYS]) }}
                                 </x-filament::button>
                                 <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('cloud::billing.paused.extend_once') }}</p>
                             @endif

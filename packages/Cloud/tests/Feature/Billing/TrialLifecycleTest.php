@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Contracts\Entitlements;
 use App\Enums\BillingStatus;
 use App\Enums\Plan;
 use App\Enums\WorkspaceRole;
@@ -673,4 +674,23 @@ it('records who extended the trial', function (): void {
     expect($activity->causer?->is($owner))->toBeTrue()
         ->and($activity->subject?->is($workspace))->toBeTrue()
         ->and($activity->properties['attributes']['trial_ends_at'])->toBe($workspace->trial_ends_at?->toDateTimeString());
+});
+
+it('subscribing during an extension restores the plan allowance', function (): void {
+    withHostedBilling();
+    [$owner, $workspace] = trialOwnerAndWorkspace();
+    pauseTrialOf($workspace);
+    app(ExtendEndedTrial::class)->execute($owner, $workspace);
+
+    expect(resolve(Entitlements::class)->creditAllowance($workspace->refresh()))->toBe(Plan::Free->credits());
+
+    $workspace->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_during_extension',
+        'stripe_status' => 'active',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+    ]);
+
+    expect(resolve(Entitlements::class)->creditAllowance($workspace->refresh()))->toBe(Plan::Pro->credits());
 });

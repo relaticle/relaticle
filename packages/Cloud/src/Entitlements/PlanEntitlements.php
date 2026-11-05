@@ -28,7 +28,7 @@ final readonly class PlanEntitlements implements Entitlements
             return Plan::Free->credits();
         }
 
-        if ($workspace->billingStatus() === BillingStatus::TrialEnded) {
+        if ($workspace->billingStatus() === BillingStatus::TrialEnded || $workspace->onExtendedTrial()) {
             return Plan::Free->credits();
         }
 
