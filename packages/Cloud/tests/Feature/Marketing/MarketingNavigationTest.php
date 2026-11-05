@@ -90,6 +90,18 @@ it('links llms.txt and the GitHub repository from the footer', function (): void
         ->and($html)->toContain('https://github.com/relaticle/relaticle');
 });
 
+it('keeps the legal links and the company name in the copyright row, out of the footer columns', function (): void {
+    $html = $this->get('/')->assertOk()->getContent();
+
+    preg_match('/<footer[\s\S]*?<\/footer>/', $html, $footer);
+    $columns = extractNavRegion($footer[0], __('Footer'));
+
+    expect($footer[0])->toContain('© '.now()->year.' Relaticle, Inc.')
+        ->and($footer[0])->toContain('href="'.url('privacy-policy').'"', 'href="'.url('terms-of-service').'"')
+        ->and($columns)->not->toContain(url('privacy-policy'), url('terms-of-service'), 'https://github.com/relaticle/relaticle')
+        ->and($columns)->toContain('href="'.route('press').'"');
+});
+
 it('renders the same items in desktop and mobile navigation', function (): void {
     $html = $this->get('/')->assertOk()->getContent();
 
@@ -270,6 +282,7 @@ it('suggests the page a missing url most likely meant on the 404 page', function
     expect($matches[1] ?? null)->toBe($suggestion);
 })->with([
     'a typo' => ['/pricng', 'Pricing'],
+    'a typo of a legal page' => ['/privacy-polcy', 'Privacy Policy'],
     'a removed help article' => ['/help/an-old-article', 'Help center'],
     'a sibling that is not a near spelling' => ['/compare/relaticle-vs-hubspot', null],
     'nothing alike' => ['/zz-qq-xx', null],

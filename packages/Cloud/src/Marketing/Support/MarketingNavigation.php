@@ -12,8 +12,6 @@ use Relaticle\Cloud\Marketing\Enums\ConnectableAssistant;
 
 final readonly class MarketingNavigation
 {
-    private const string GITHUB_URL = 'https://github.com/relaticle/relaticle';
-
     /** @return list<NavItem> */
     public function header(): array
     {
@@ -84,7 +82,7 @@ final readonly class MarketingNavigation
     {
         return [
             new NavItem(__('Product'), children: array_values(array_filter([
-                new NavItem((string) config('chat.assistant_name'), route('ai')),
+                new NavItem(__(':name AI assistant', ['name' => (string) config('chat.assistant_name')]), route('ai')),
                 new NavItem(__('Features'), url('/#features')),
                 Feature::active(EmailIntegration::class) ? new NavItem(__('Email and calendar'), route('emailAndCalendar')) : null,
                 new NavItem(__('Pricing'), route('pricing')),
@@ -100,16 +98,22 @@ final readonly class MarketingNavigation
             new NavItem(__('Resources'), children: [
                 ...$this->resourceItems(),
                 new NavItem(__('AI-native CRM'), route('aiNativeCrm')),
-                new NavItem(__('Press kit'), route('press')),
             ]),
             new NavItem(__('Compare'), children: $this->comparisonItems()),
             new NavItem(__('Company'), children: [
                 new NavItem(__('Contact'), route('contact')),
-                new NavItem(__('GitHub'), self::GITHUB_URL, external: true),
                 new NavItem(__('Security'), route('security')),
-                new NavItem(__('Privacy Policy'), url('privacy-policy')),
-                new NavItem(__('Terms of Service'), url('terms-of-service')),
+                new NavItem(__('Press kit'), route('press')),
             ]),
+        ];
+    }
+
+    /** @return list<NavItem> */
+    public function legal(): array
+    {
+        return [
+            new NavItem(__('Privacy Policy'), url('privacy-policy')),
+            new NavItem(__('Terms of Service'), url('terms-of-service')),
         ];
     }
 
@@ -121,7 +125,7 @@ final readonly class MarketingNavigation
         $closest = null;
         $closestDistance = PHP_INT_MAX;
 
-        foreach (array_merge(...array_map(fn (NavItem $column): array => $column->children, $this->footer())) as $item) {
+        foreach ([...array_merge(...array_map(fn (NavItem $column): array => $column->children, $this->footer())), ...$this->legal()] as $item) {
             $candidate = parse_url((string) $item->url, PHP_URL_PATH) ?: '/';
 
             if ($item->external || $candidate === '/' || $candidate === $path) {

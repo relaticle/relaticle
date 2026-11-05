@@ -186,7 +186,9 @@ card's bottom edge (4.75rem at `md`), and `scroll-padding-top` follows it. On ph
 as a card under the header instead of a full screen.
 
 The framed footer is quiet: the logo and blurb with four small social icons, four link columns,
-then the copyright row with the theme switcher. No cells, no wordmark.
+then the copyright row with the theme switcher. No cells, no wordmark. The copyright names
+Relaticle, Inc., as `.github/TRADEMARK.md` does, and the row carries the legal links and llms.txt.
+`MarketingNavigation::legal()` holds them, and `closestTo()` reads it with the columns.
 
 The old full-width header and footer are gone; the `framed` flag went with them on 2026-11-06.
 

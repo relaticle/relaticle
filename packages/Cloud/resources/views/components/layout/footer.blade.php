@@ -1,5 +1,7 @@
 @php
-    $columns = app(\Relaticle\Cloud\Marketing\Support\MarketingNavigation::class)->footer();
+    $navigation = app(\Relaticle\Cloud\Marketing\Support\MarketingNavigation::class);
+    $columns = $navigation->footer();
+    $legalLinks = $navigation->legal();
 
     $socialLinks = [
         ['ri-github-fill', 'GitHub', 'https://github.com/relaticle/relaticle'],
@@ -53,8 +55,14 @@
         </div>
 
         <div class="border-rail flex flex-col items-center gap-4 border-t px-6 py-5 md:flex-row md:justify-between md:px-10">
-            <div class="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
-                <p>{{ __('© :year Relaticle. All rights reserved.', ['year' => date('Y')]) }}</p>
+            <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm text-gray-500 md:justify-start dark:text-gray-400">
+                <p>{{ __('© :year Relaticle, Inc. All rights reserved.', ['year' => now()->year]) }}</p>
+
+                @foreach($legalLinks as $item)
+                    <a href="{{ $item->url }}"
+                       @if(url()->current() === $item->url) aria-current="page" @endif
+                       class="transition-colors hover:text-gray-950 aria-[current=page]:text-gray-950 dark:hover:text-white dark:aria-[current=page]:text-white">{{ $item->label }}</a>
+                @endforeach
 
                 {{-- The Documentation provider registers this route, so an unguarded route() here 500s every
                      marketing page when that feature is off. --}}
