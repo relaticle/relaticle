@@ -12,7 +12,7 @@ it('registers the billing mail previews and renders each one', function (): void
 
     expect($preview->names())->toContain('trial-ending', 'trial-ended', 'extension-ended', 'subscription-ended');
 
-    foreach (['trial-ending', 'trial-ended', 'extension-ended', 'subscription-ended', 'inactive-deletion-warning'] as $name) {
+    foreach (['trial-ending', 'trial-ended', 'extension-ended', 'subscription-ended', 'inactive-deletion-warning', 'inactive-deletion-reminder', 'inactive-deleted'] as $name) {
         expect($preview->render($name))
             ->toContain('<html xmlns="http://www.w3.org/1999/xhtml" lang="en">')
             ->not->toMatch('/\bmail\.[a-z_]+\.[a-z_]+/');

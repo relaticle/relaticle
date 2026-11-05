@@ -7,6 +7,7 @@ namespace Relaticle\Cloud;
 use App\Contracts\Billing as BillingContract;
 use App\Contracts\Entitlements;
 use App\Enums\Plan;
+use App\Events\WorkspaceDeleted;
 use App\Features\Billing;
 use App\Features\Documentation;
 use App\Models\User;
@@ -39,8 +40,11 @@ use Relaticle\Cloud\Billing\Filament\Billing as BillingPage;
 use Relaticle\Cloud\Billing\Filament\BillingPanelHooks;
 use Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal;
 use Relaticle\Cloud\Billing\Listeners\CancelInactivityDeletionOnLogin;
+use Relaticle\Cloud\Billing\Listeners\SendInactiveWorkspaceDeletedMail;
 use Relaticle\Cloud\Billing\Listeners\SyncPlanOnStripeSubscriptionChange;
 use Relaticle\Cloud\Billing\Livewire\UpgradeModal;
+use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletedMail;
+use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletionReminderMail;
 use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletionWarningMail;
 use Relaticle\Cloud\Billing\Mail\ProEndedMail;
 use Relaticle\Cloud\Billing\Mail\ProTrialEndingSoonMail;
@@ -97,6 +101,7 @@ final class CloudServiceProvider extends ServiceProvider
 
         Event::listen(WebhookHandled::class, [SyncPlanOnStripeSubscriptionChange::class, 'handle']);
         Event::listen(Login::class, [CancelInactivityDeletionOnLogin::class, 'handle']);
+        Event::listen(WorkspaceDeleted::class, [SendInactiveWorkspaceDeletedMail::class, 'handle']);
 
         $this->commands([ProcessTrialsCommand::class, ScheduleInactiveTrialDeletionsCommand::class, GenerateSitemapCommand::class, ReportStaleCompetitorFactsCommand::class]);
 
@@ -224,6 +229,14 @@ final class CloudServiceProvider extends ServiceProvider
 
             return new InactiveWorkspaceDeletionWarningMail($workspace, now()->addDays(14), now()->subDays(46));
         });
+
+        MailPreview::register('inactive-deletion-reminder', static function (User $owner, Workspace $workspace): Mailable {
+            $workspace->setRelation('owner', $owner);
+
+            return new InactiveWorkspaceDeletionReminderMail($workspace, now()->addDays(5));
+        });
+
+        MailPreview::register('inactive-deleted', static fn (User $owner, Workspace $workspace): Mailable => new InactiveWorkspaceDeletedMail($workspace->name));
 
         MailPreview::register('contact-submission', static fn (): Mailable => new NewContactSubmissionMail([
             'name' => 'Ana Reyes',

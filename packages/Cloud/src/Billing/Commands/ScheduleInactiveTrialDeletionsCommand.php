@@ -10,8 +10,10 @@ use App\Models\Workspace;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletionReminderMail;
 use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletionWarningMail;
 use Relaticle\Cloud\Billing\Queries\InactiveTrialWorkspacesQuery;
 
@@ -24,6 +26,14 @@ final class ScheduleInactiveTrialDeletionsCommand extends Command
     public const int WARNING_DAYS = 14;
 
     public function handle(InactiveTrialWorkspacesQuery $inactive): int
+    {
+        $this->scheduleDeletions($inactive);
+        $this->sendReminders();
+
+        return self::SUCCESS;
+    }
+
+    private function scheduleDeletions(InactiveTrialWorkspacesQuery $inactive): void
     {
         $scheduled = 0;
 
@@ -70,7 +80,32 @@ final class ScheduleInactiveTrialDeletionsCommand extends Command
         });
 
         $this->comment("Scheduled {$scheduled} inactive workspace(s) for deletion.");
+    }
 
-        return self::SUCCESS;
+    private function sendReminders(): void
+    {
+        $reminderDate = now()->addDays(config('relaticle.deletion.reminder_days_before'));
+        $reminded = 0;
+
+        Workspace::query()
+            ->scheduledForInactivity()
+            ->whereBetween('scheduled_deletion_at', [$reminderDate->startOfDay(), $reminderDate->endOfDay()])
+            ->with('owner')
+            ->chunkById(100, function (Collection $workspaces) use (&$reminded): void {
+                $workspaces->each(function (Workspace $workspace) use (&$reminded): void {
+                    $owner = $workspace->owner;
+
+                    if (! $owner instanceof User || $workspace->scheduled_deletion_at === null) {
+                        return;
+                    }
+
+                    $this->info("Reminding the owner of {$workspace->name}...");
+
+                    Mail::to($owner->email)->queue(new InactiveWorkspaceDeletionReminderMail($workspace, $workspace->scheduled_deletion_at));
+                    $reminded++;
+                });
+            });
+
+        $this->comment("Sent {$reminded} deletion reminder(s).");
     }
 }

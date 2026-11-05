@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\DeletionReason;
 use App\Enums\Plan;
+use App\Filament\Pages\CreateWorkspace;
 use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
@@ -22,6 +23,9 @@ use Relaticle\Cloud\Billing\Actions\CancelInactivityDeletion;
 use Relaticle\Cloud\Billing\Commands\ScheduleInactiveTrialDeletionsCommand;
 use Relaticle\Cloud\Billing\Filament\Billing;
 use Relaticle\Cloud\Billing\Listeners\CancelInactivityDeletionOnLogin;
+use Relaticle\Cloud\Billing\Listeners\SendInactiveWorkspaceDeletedMail;
+use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletedMail;
+use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletionReminderMail;
 use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletionWarningMail;
 use Relaticle\Cloud\Billing\Queries\InactiveTrialWorkspacesQuery;
 
@@ -30,6 +34,9 @@ mutates(InactiveTrialWorkspacesQuery::class);
 mutates(InactiveWorkspaceDeletionWarningMail::class);
 mutates(CancelInactivityDeletion::class);
 mutates(CancelInactivityDeletionOnLogin::class);
+mutates(InactiveWorkspaceDeletionReminderMail::class);
+mutates(InactiveWorkspaceDeletedMail::class);
+mutates(SendInactiveWorkspaceDeletedMail::class);
 
 const INACTIVE_PAUSED_AT = '2026-11-01 10:00:00';
 
@@ -356,4 +363,117 @@ it('does nothing for a workspace that has no countdown', function (): void {
     resolve(CancelInactivityDeletion::class)->execute($workspace);
 
     expect($workspace->refresh()->scheduled_deletion_at)->toBeNull();
+});
+
+it('reminds the owner of an inactivity deletion five days before it', function (): void {
+    Mail::fake();
+    $this->travelTo(inactivePausedAt()->addDays(50)->setTime(2, 0));
+    $workspace = inactivePausedWorkspace();
+    $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(5)->setTime(17, 30), 'deletion_reason' => DeletionReason::Inactivity])->save();
+
+    runInactivityCommand();
+
+    Mail::assertQueued(InactiveWorkspaceDeletionReminderMail::class, 1);
+    Mail::assertQueued(InactiveWorkspaceDeletionReminderMail::class, fn (InactiveWorkspaceDeletionReminderMail $mail): bool => $mail->hasTo($workspace->owner->email)
+        && $mail->workspace->is($workspace));
+});
+
+it('sends no reminder outside the five-day window or for a deletion the owner requested', function (): void {
+    Mail::fake();
+    $this->travelTo(inactivePausedAt()->addDays(50)->setTime(2, 0));
+    $sixDays = inactivePausedWorkspace();
+    $sixDays->forceFill(['scheduled_deletion_at' => now()->addDays(6), 'deletion_reason' => DeletionReason::Inactivity])->save();
+    $fourDays = inactivePausedWorkspace();
+    $fourDays->forceFill(['scheduled_deletion_at' => now()->addDays(4), 'deletion_reason' => DeletionReason::Inactivity])->save();
+    $requested = inactivePausedWorkspace();
+    $requested->forceFill(['scheduled_deletion_at' => now()->addDays(5), 'deletion_reason' => DeletionReason::Requested])->save();
+
+    runInactivityCommand();
+
+    Mail::assertNothingQueued();
+});
+
+it('writes the reminder with the deletion date in the owner timezone', function (): void {
+    $workspace = inactivePausedWorkspace(timezone: 'Pacific/Auckland');
+    $mail = new InactiveWorkspaceDeletionReminderMail($workspace, CarbonImmutable::parse('2026-12-31 23:00:00'));
+
+    $mail->assertHasSubject('Acme will be deleted on Jan 1, 2027');
+    $mail->assertSeeInHtml('We will delete Acme and every record in it on Jan 1, 2027. This cannot be undone.');
+    $mail->assertSeeInHtml('Choose a plan or sign in before then to keep it.');
+    $mail->assertSeeInHtml('This is the last reminder. Choose a plan or sign in to keep it.');
+    $mail->assertSeeInHtml('Questions? Reply to this email.');
+    $mail->assertSeeInText('Choose a plan: '.Billing::getUrl(panel: 'app', tenant: $workspace));
+});
+
+it('writes the deleted confirmation from the workspace name alone', function (): void {
+    $mail = new InactiveWorkspaceDeletedMail('Acme');
+
+    $mail->assertHasSubject('Acme has been deleted');
+    $mail->assertSeeInHtml('Acme was paused for 60 days with no sign-ins, so we deleted it and its records.');
+    $mail->assertSeeInHtml('You can sign in at any time and start a new workspace.');
+    $mail->assertSeeInHtml('It was paused for 60 days with no sign-ins.');
+    $mail->assertSeeInHtml('Questions? Reply to this email.');
+});
+
+function purgeDueDeletion(Workspace $workspace, DeletionReason $reason): void
+{
+    $workspace->forceFill(['scheduled_deletion_at' => now()->subMinute(), 'deletion_reason' => $reason])->save();
+
+    test()->artisan('app:purge-scheduled-deletions')->assertSuccessful();
+}
+
+it('confirms an inactivity deletion to the owner after the purge, from plain values', function (): void {
+    Mail::fake();
+    $workspace = inactivePausedWorkspace();
+    $ownerEmail = $workspace->owner->email;
+
+    purgeDueDeletion($workspace, DeletionReason::Inactivity);
+
+    expect(Workspace::query()->whereKey($workspace->getKey())->exists())->toBeFalse();
+    Mail::assertQueued(InactiveWorkspaceDeletedMail::class, 1);
+    Mail::assertQueued(InactiveWorkspaceDeletedMail::class, function (InactiveWorkspaceDeletedMail $mail) use ($ownerEmail): bool {
+        expect(serialize($mail))->not->toContain(Workspace::class);
+
+        return $mail->hasTo($ownerEmail) && $mail->workspaceName === 'Acme';
+    });
+});
+
+it('sends no confirmation after a deletion the owner requested', function (): void {
+    Mail::fake();
+    $workspace = inactivePausedWorkspace();
+
+    purgeDueDeletion($workspace, DeletionReason::Requested);
+
+    expect(Workspace::query()->whereKey($workspace->getKey())->exists())->toBeFalse();
+    Mail::assertNothingQueued();
+});
+
+it('lets the owner of a purged inactive workspace sign in and start a new workspace with a fresh trial', function (): void {
+    withHostedBilling();
+    Mail::fake();
+    $workspace = inactivePausedWorkspace();
+    $owner = $workspace->owner;
+
+    purgeDueDeletion($workspace, DeletionReason::Inactivity);
+
+    expect($owner->refresh()->ownedWorkspaces()->count())->toBe(0);
+
+    Auth::guard('web')->login($owner);
+    $this->actingAs($owner);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm(['name' => 'Acme Again'])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $created = $owner->ownedWorkspaces()->sole();
+
+    expect($created->name)->toBe('Acme Again')
+        ->and($created->getKey())->not->toBe($workspace->getKey())
+        ->and($created->plan)->toBe(Plan::Pro)
+        ->and($created->onGenericTrial())->toBeTrue()
+        ->and($created->trial_ends_at?->isFuture())->toBeTrue()
+        ->and($created->paused_at)->toBeNull()
+        ->and($created->scheduled_deletion_at)->toBeNull()
+        ->and($created->deletion_reason)->toBeNull();
 });
