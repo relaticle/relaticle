@@ -250,7 +250,10 @@ final class EmailConversationsSeeder extends Seeder
 
         return [
             'airbnb-renewal' => ['subject' => 'Renewal pricing for next year', 'contact' => 'brian.chen@airbnb.com', 'company' => 'Airbnb', 'read' => false, 'attachment' => 'Airbnb-renewal-quote.pdf', 'messages' => [
+                ['owner', $o, '-8 days', 'Hi Brian, your current plan renews on the 1st. Shall I put together a quote for next year?'],
+                ['owner', 'brian.chen@airbnb.com', '-7 days', 'Yes please. We are growing the team to 120 seats, and finance would like a multi-year option.'],
                 ['owner', $o, '-3 days', 'Hi Brian, attached is the renewal quote for 120 seats. Happy to walk through it this week.'],
+                ['owner,mate', 'brian.chen@airbnb.com', '-1 day', 'Looping in Adam for the security addendum. Could he join our call on Thursday?'],
                 ['owner', 'brian.chen@airbnb.com', '-2 hours', 'Thanks Olivia. Finance wants to know if the 12% multi-year discount still applies if we sign before the 15th.'],
             ]],
             'figma-security' => ['subject' => 'Security questionnaire before procurement', 'contact' => 'nina.patel@figma.com', 'company' => 'Figma', 'read' => false, 'messages' => [
