@@ -10,6 +10,7 @@ use App\Models\Workspace;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -545,7 +546,7 @@ it('re-reads the workspace under a row lock so concurrent extensions serialise',
     pauseTrialOf($workspace);
 
     $statements = [];
-    DB::listen(function ($query) use (&$statements): void {
+    DB::listen(function (QueryExecuted $query) use (&$statements): void {
         $statements[] = $query->sql;
     });
 
