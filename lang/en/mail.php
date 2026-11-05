@@ -118,7 +118,9 @@ return [
     ],
 
     'task_digest' => [
-        'subject' => 'Your tasks for :date',
+        'subject_both' => ':overdue overdue, :due due today, :date',
+        'subject_overdue' => ':count overdue task, :date|:count overdue tasks, :date',
+        'subject_due' => ':count task due today, :date|:count tasks due today, :date',
         'preheader' => ':overdue overdue, :due due today',
         'heading' => "Today's tasks, :name",
         'overdue' => 'Overdue',
