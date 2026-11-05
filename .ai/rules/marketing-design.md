@@ -21,9 +21,12 @@ reviewer reads for a hand-rolled section, a raw gray pair, or a heading class ou
 | `surface` | white | gray-950 | every cell |
 | `tint` | gray-50 | gray-900 | cells that hold product UI, link hover |
 
-Two treatments sit on top of the tokens. A `spotlight dark` frame stays dark in both themes and
-lifts to `gray-900` on a dark page. A page has at most one: the homepage four-hands story, the Control section on `/ai`. `bg-warm` is a static
-radial wash for the human moments (the email visuals and the closing CTA), never behind body text.
+Four treatments sit on top of the tokens. A `spotlight dark` frame stays dark in both themes and
+lifts to `gray-900` on a dark page. A page has at most one dark moment: the `closing-band` on the
+homepage, `/ai` and `/email-and-calendar`, the Control section on `/ai`. `bg-hero-panel` is the
+gradient in the logo's colours (`#4038CD` to `#5D54E8`) under a hero's product window; it never
+carries copy. `bg-cta-band` is the closing band's surface. `bg-warm` is a static radial wash for the
+human moments (the homepage email visual), never behind body text.
 
 `bg-dots` is a 20px dot texture for the `tint` cells that hold product UI, so a mock has something to
 sit on. It never sits behind marketing copy. On `/ai` the showcase visuals and the Control cells use it.
@@ -71,9 +74,20 @@ reach it. Change the header height and the token together. `html` also carries `
 ## Components (`components/marketing`)
 
 - `hero`: the split hero for inner pages. The `h1` on the left, the subline and CTAs on the right,
-  then the page's visual below in a `tint` cell. The homepage hero is centered but built from the same
-  parts, inside the frame: a `type-label` pill, a two-tone `type-display` headline, the subline, two
-  buttons, a row of tab cells on the rails, and the demo in a `tint` cell. The demo plays once per visit and again on each return to its tab.
+  then the page's visual below on a `bg-hero-panel` cell. The homepage hero is centered and built from
+  the same parts: the open-source pill, a two-tone `type-display` headline, one subline with Claude
+  and ChatGPT in plain text and Rela as the only chip, two buttons, the trial line, then the demo on
+  a rounded `bg-hero-panel` that sits outside the rails, with joined tabs on a `mac-window`. The copy
+  gaps are 32, 20, 28 and 16px, so the product window starts near 660px at 1440x900. The demo plays
+  once per visit and again on each return to its tab. Nothing in the hero loops: a looping badge was
+  removed for WCAG 2.2.2.
+- `mac-window`: the browser chrome around a full app screen (traffic lights, a gray frame, a white
+  inner panel). The homepage demo and the `/ai` playground use it. A record fragment such as
+  `record-emails-mock` keeps the plain `window`.
+- `closing-band`: the page's ending and its one dark moment on the homepage, `/ai` and
+  `/email-and-calendar`: a 48px spacer row, then a dark band the page above hangs into as a tab, a
+  two-tone `type-title`, an optional `lead`, buttons in the slot (Start for free and Get in touch by
+  default) and the trial note. Never two dark moments on one page.
 - `frame`: a section with rails. Everything below the hero sits in one.
 - `frame-header`: label plus two-tone title, left-aligned. Copy stays under two lines at 1440px.
 - `showcase`: a text cell (label, lead, one link) beside a `tint` cell holding product UI, with an
@@ -92,9 +106,16 @@ reach it. Change the header height and the token together. `html` also carries `
   the hero never shows one changing live. `tests/Browser/Marketing/AiPlaygroundTest.php` pins the rows.
 - `theme-image`: a light and a dark WebP of a real app screenshot. It loads only the current
   theme's file and swaps on theme change.
-- `actor`: the You, Rela, Claude, ChatGPT and Mailbox chips. They are the site's signature: every place
-  that shows who did something uses them, and nothing else uses those colors. ChatGPT stays neutral
-  gray, as the works-with strip draws it, and differs from You by its icon.
+- `actor`: the You, Rela, Claude, ChatGPT and Mailbox chips, in `sm` and `lg`. They are the site's
+  signature: every place that shows who did something uses them, and nothing else uses those colors.
+  ChatGPT stays neutral gray, as the works-with strip draws it, and differs from You by its icon. A
+  chip marks an actor in a story, never a tool in a sentence: the hero names Claude and ChatGPT in
+  plain text and keeps Rela as its one chip.
+- The four-hands story (`home/partials/story.blade.php`, `story-record.blade.php`): the Northwind
+  record in the middle, the four actors around it on dashed wires. `motion.js` `playStory()` reveals
+  each actor, sends a pulse along its wire and writes its fields, with the stage moving from Proposal
+  to Negotiation to Won, inside 5 seconds. On phones the wires hide and the record shows its end state
+  above the cards.
 - `record-emails-mock`: a record's Emails and Meetings tabs, mirroring the shipped UI. The two tabs are
   real tabs a visitor can switch; meeting dates are computed from today, so the mock never goes stale.
 - `quote`: a named customer quote in a `figure`, with name, role and company in the caption. The
@@ -116,7 +137,17 @@ reach it. Change the header height and the token together. `html` also carries `
 ## Header and footer
 
 A page passes `framed` to `x-cloud::guest-layout`, and the header and footer then sit on the same
-`max-w-6xl` rails with a `md:px-10` inset, so the logo, the `h1` and every section edge line up.
+`max-w-6xl` rails, so the logo, the `h1` and every section edge line up.
+
+The framed header is a floating card: 64px tall (the height of the app's top bar) with a 12px gap
+above it at `md`, a 1px `gray-200` ring and one soft shadow (`shadow-navbar`). A 92px band on the
+rails sits under it with a `cross` mark at each bottom corner from `xl`. `--header-height` is the
+card's bottom edge (4.75rem at `md`), and `scroll-padding-top` follows it. On phones the menu opens
+as a card under the header instead of a full screen.
+
+The framed footer is quiet: the logo and blurb with four small social icons, four link columns,
+then the copyright row with the theme switcher. No cells, no wordmark.
+
 Pages not yet rebuilt on this system omit the flag and keep the old layout. Flip the default once
 every page is framed.
 

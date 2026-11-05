@@ -63,40 +63,8 @@ html:has(#main-header[data-framed]) {
     }
 }
 
-/* The hero's product panel: a warm base with violet and peach light, after CrowdReply's hero. */
+/* The hero's product panel takes the logo's own colours, #4038CD to #5D54E8. */
 @utility bg-hero-panel {
-    background-color: color-mix(in oklab, var(--color-amber-100) 40%, var(--color-stone-100));
-    background-image:
-        radial-gradient(55% 90% at 78% 8%, color-mix(in oklab, var(--color-primary-300) 80%, transparent), transparent 70%),
-        radial-gradient(32% 70% at 100% 12%, var(--color-orange-100), transparent 72%),
-        radial-gradient(60% 80% at 0% 100%, var(--color-amber-50), transparent 70%);
-
-    &:where(.dark, .dark *) {
-        background-color: var(--color-gray-900);
-        background-image:
-            radial-gradient(55% 90% at 78% 8%, color-mix(in oklab, var(--color-primary-500) 32%, transparent), transparent 70%),
-            radial-gradient(32% 70% at 100% 12%, color-mix(in oklab, var(--color-orange-500) 14%, transparent), transparent 72%),
-            radial-gradient(60% 80% at 0% 100%, color-mix(in oklab, var(--color-amber-500) 8%, transparent), transparent 70%);
-    }
-}
-
-@utility bg-hero-panel-violet {
-    background-color: var(--color-primary-50);
-    background-image:
-        radial-gradient(50% 80% at 18% 0%, color-mix(in oklab, var(--color-primary-200) 90%, transparent), transparent 70%),
-        radial-gradient(50% 85% at 85% 8%, color-mix(in oklab, var(--color-primary-300) 75%, transparent), transparent 70%),
-        radial-gradient(60% 60% at 50% 100%, var(--color-white), transparent 70%);
-
-    &:where(.dark, .dark *) {
-        background-color: var(--color-gray-900);
-        background-image:
-            radial-gradient(50% 80% at 18% 0%, color-mix(in oklab, var(--color-primary-500) 22%, transparent), transparent 70%),
-            radial-gradient(50% 85% at 85% 8%, color-mix(in oklab, var(--color-primary-500) 32%, transparent), transparent 70%);
-    }
-}
-
-/* Indigo leans on the logo's own colours, #4038CD to #5D54E8. */
-@utility bg-hero-panel-indigo {
     background-color: var(--color-indigo-50);
     background-image:
         radial-gradient(55% 90% at 80% 5%, color-mix(in oklab, var(--color-indigo-400) 45%, transparent), transparent 70%),
@@ -111,23 +79,7 @@ html:has(#main-header[data-framed]) {
     }
 }
 
-@utility bg-hero-panel-deep {
-    background-color: var(--color-primary-700);
-    background-image:
-        radial-gradient(60% 90% at 80% 0%, color-mix(in oklab, var(--color-primary-400) 55%, transparent), transparent 70%),
-        radial-gradient(50% 80% at 0% 100%, color-mix(in oklab, var(--color-indigo-500) 50%, transparent), transparent 70%),
-        linear-gradient(135deg, var(--color-primary-700), var(--color-indigo-800));
-
-    &:where(.dark, .dark *) {
-        background-color: var(--color-primary-950);
-        background-image:
-            radial-gradient(60% 90% at 80% 0%, color-mix(in oklab, var(--color-primary-500) 35%, transparent), transparent 70%),
-            radial-gradient(50% 80% at 0% 100%, color-mix(in oklab, var(--color-indigo-500) 25%, transparent), transparent 70%),
-            linear-gradient(135deg, var(--color-primary-950), var(--color-indigo-950));
-    }
-}
-
-/* The closing call to action: a dark band with violet, green and amber light, after dub.co's last section. */
+/* The closing band: the page's one dark moment, lit with the actor colours. */
 @utility bg-cta-band {
     background-color: var(--color-gray-950);
     background-image:
@@ -162,13 +114,6 @@ html:has(#main-header[data-framed]) {
     &:where(.dark, .dark *) {
         background-image: radial-gradient(circle, rgb(255 255 255 / 0.08) 1px, transparent 1.25px);
     }
-}
-
-@utility mask-top-corners {
-    mask-image:
-        radial-gradient(ellipse 30% 75% at 0% 0%, #000 35%, transparent),
-        radial-gradient(ellipse 30% 75% at 100% 0%, #000 35%, transparent),
-        linear-gradient(to bottom, rgb(0 0 0 / 0.5), transparent 22%);
 }
 
 @utility type-display {

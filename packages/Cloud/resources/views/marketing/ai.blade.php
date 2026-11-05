@@ -372,30 +372,17 @@
         </div>
     </x-cloud::marketing.frame>
 
-    <x-cloud::marketing.frame>
-        <div class="bg-warm relative overflow-hidden px-6 py-24 text-center md:py-32">
-            <div class="mask-top-corners absolute inset-0 text-gray-400 dark:text-gray-600" aria-hidden="true">
-                <svg class="absolute inset-0 size-full">
-                    <pattern id="ai-cta-dots" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.2" fill="currentColor"/></pattern>
-                    <rect width="100%" height="100%" fill="url(#ai-cta-dots)"/>
-                </svg>
-            </div>
-
-            <div class="relative mx-auto max-w-2xl">
-                <h2 class="type-title text-gray-950 md:text-5xl dark:text-white">{{ __('Try :name in your own workspace', ['name' => $assistantName]) }}</h2>
-                <p class="type-prose mx-auto mt-5 text-gray-500 dark:text-gray-400">{{ __('Free to start, no credit card required. Self-host it yourself whenever you want.') }}</p>
-
-                <div class="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                    <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="footer">
-                        {{ __('Start for free') }}
-                    </x-cloud::marketing.button>
-                    <x-cloud::marketing.button variant="secondary" href="{{ route('pricing') }}">
-                        {{ __('See pricing') }}
-                    </x-cloud::marketing.button>
-                </div>
-            </div>
-        </div>
-    </x-cloud::marketing.frame>
+    <x-cloud::marketing.closing-band
+        :title="__('Try :name in your own workspace.', ['name' => $assistantName])"
+        :lead="__('Free to start, no card. Self-host it whenever you want.')"
+    >
+        <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="footer">
+            {{ __('Start for free') }}
+        </x-cloud::marketing.button>
+        <x-cloud::marketing.button variant="secondary" href="{{ route('pricing') }}">
+            {{ __('See pricing') }}
+        </x-cloud::marketing.button>
+    </x-cloud::marketing.closing-band>
 
     @php
         $schema = (new \Spatie\SchemaOrg\Graph())

@@ -82,34 +82,14 @@
                 'custom-fields' => [__('Fields'), __('Custom fields')],
             ];
 
-            $panelVariant = match (request()->query('panel')) {
-                '1' => 'warm',
-                '2' => 'violet',
-                '4' => 'deep',
-                default => 'indigo',
-            };
-            $onDeep = $panelVariant === 'deep';
-            $tabIdle = $onDeep
-                ? 'text-white/80 hover:text-white'
-                : 'text-gray-600 hover:text-gray-950 dark:text-gray-400 dark:hover:text-white';
         @endphp
 
     </div>
 
     <div class="relative px-2 pb-2 sm:px-3 sm:pb-3 md:px-6 md:pb-6">
-        <div @class([
-            'rounded-2xl px-3 pb-4 pt-8 sm:px-6 sm:pb-8 sm:pt-11 md:rounded-3xl md:px-10 md:pb-12 md:pt-12',
-            'bg-hero-panel' => $panelVariant === 'warm',
-            'bg-hero-panel-violet' => $panelVariant === 'violet',
-            'bg-hero-panel-indigo' => $panelVariant === 'indigo',
-            'bg-hero-panel-deep' => $onDeep,
-        ])>
+        <div class="bg-hero-panel rounded-2xl px-3 pb-4 pt-8 sm:px-6 sm:pb-8 sm:pt-11 md:rounded-3xl md:px-10 md:pb-12 md:pt-12">
             <div class="mx-auto max-w-6xl">
-                <div id="hero-tabs" role="tablist" @class([
-                    'mx-auto flex w-fit rounded-t-xl px-1 pt-1 backdrop-blur-sm',
-                    'bg-white/50 dark:bg-white/[0.05]' => ! $onDeep,
-                    'bg-white/15' => $onDeep,
-                ])>
+                <div id="hero-tabs" role="tablist" class="mx-auto flex w-fit rounded-t-xl bg-white/50 px-1 pt-1 backdrop-blur-sm dark:bg-white/[0.05]">
                     @foreach($heroTabs as $id => [$short, $long])
                         <button type="button"
                                 id="tab-{{ $id }}"
@@ -120,21 +100,14 @@
                                 x-ref="tab-{{ $id }}"
                                 x-on:click="switchTab('{{ $id }}')"
                                 x-on:keydown="handleTabKeydown($event)"
-                                :class="activeTab === '{{ $id }}' ? 'z-10 border-gray-200 bg-gray-100 text-gray-950 dark:border-white/[0.1] dark:bg-gray-900 dark:text-white' : 'border-transparent {{ $tabIdle }}'"
+                                :class="activeTab === '{{ $id }}' ? 'z-10 border-gray-200 bg-gray-100 text-gray-950 dark:border-white/[0.1] dark:bg-gray-900 dark:text-white' : 'border-transparent text-gray-600 hover:text-gray-950 dark:text-gray-400 dark:hover:text-white'"
                                 class="relative -mb-px cursor-pointer rounded-t-lg border border-b-0 px-3 py-2 text-xs font-medium transition-colors sm:px-5 sm:text-sm md:px-6 md:py-2.5 md:text-base">
                             <span class="sm:hidden">{{ $short }}</span><span class="hidden sm:inline">{{ $long }}</span>
                         </button>
                     @endforeach
                 </div>
 
-                <div class="rounded-xl border border-gray-200 bg-gray-100 px-1.5 pb-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_24px_48px_-24px_rgba(0,0,0,0.18)] sm:rounded-2xl sm:px-2 sm:pb-2 dark:border-white/[0.1] dark:bg-gray-900 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_24px_48px_-24px_rgba(0,0,0,0.6)]">
-                    <div class="flex h-8 items-center gap-1.5 px-1 sm:h-9 sm:px-1.5" aria-hidden="true">
-                        <span class="size-2.5 rounded-full bg-[#ff5c5a] sm:size-3"></span>
-                        <span class="size-2.5 rounded-full bg-[#f5b902] sm:size-3"></span>
-                        <span class="size-2.5 rounded-full bg-[#10c27b] sm:size-3"></span>
-                    </div>
-
-                <div class="relative overflow-hidden rounded-md border border-gray-200 bg-white sm:rounded-lg dark:border-white/[0.06] dark:bg-gray-950">
+                <x-cloud::marketing.mac-window>
                     {{-- The frame keeps the chat panel's height on every tab, so the screenshots cover it from
                          their top-left corner and crop the rest instead of resizing the frame. --}}
                     <div class="relative h-[520px] sm:h-[580px] md:h-[640px]">
@@ -178,8 +151,7 @@
                         {{-- Bottom fade overlay --}}
                         <div class="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white/60 via-white/20 to-transparent dark:from-gray-950/60 dark:via-gray-950/20 dark:to-transparent pointer-events-none"></div>
                     </div>
-                </div>
-                </div>
+                </x-cloud::marketing.mac-window>
             </div>
         </div>
     </div>
