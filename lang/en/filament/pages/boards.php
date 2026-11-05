@@ -14,7 +14,6 @@ return [
 
     'move_to' => [
         'label' => 'Move to',
-        'current' => 'Current',
         'moved' => 'Moved to :column',
     ],
 

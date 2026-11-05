@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Actions;
 
 use Filament\Actions\Action;
+use Filament\Support\Enums\Alignment;
 use Filament\Support\Enums\Width;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Contracts\View\View;
@@ -28,6 +29,7 @@ final class MoveCardAction extends Action
             ->modalHeading(__('filament/pages/boards.move_to.label'))
             ->modalDescription(fn (Model $record, BoardResourcePage $livewire): string => (string) $record->getAttribute($livewire->getBoard()->getRecordTitleAttribute()))
             ->modalWidth(Width::Small)
+            ->modalAlignment(Alignment::Start)
             ->modalSubmitAction(false)
             ->modalCancelAction(false)
             ->modalContent(fn (Model $record, BoardResourcePage $livewire): View => view('filament.app.board-move-card', [

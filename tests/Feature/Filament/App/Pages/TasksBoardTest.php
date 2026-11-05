@@ -156,7 +156,7 @@ it('moves a card to the status picked from its move to sheet', function (): void
 
     livewire(TasksBoard::class)
         ->call('mountAction', 'moveTo', [], ['recordKey' => (string) $task->id])
-        ->assertMountedActionModalSee(__('filament/pages/boards.move_to.current'))
+        ->assertMountedActionModalSee(['To do', 'In progress', 'Done'])
         ->call('callMountedAction', ['to' => (string) $inProgress->getKey()])
         ->assertHasNoActionErrors()
         ->assertNotified(__('filament/pages/boards.move_to.moved', ['column' => 'In progress']));

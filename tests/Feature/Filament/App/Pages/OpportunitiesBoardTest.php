@@ -280,7 +280,7 @@ it('moves a card to the stage picked from its move to sheet', function (): void 
 
     livewire(OpportunitiesBoard::class)
         ->call('mountAction', 'moveTo', [], ['recordKey' => (string) $opportunity->id])
-        ->assertMountedActionModalSee(__('filament/pages/boards.move_to.current'))
+        ->assertMountedActionModalSee(['Prospecting', 'Closed Won'])
         ->call('callMountedAction', ['to' => (string) $closedWon->getKey()])
         ->assertHasNoActionErrors()
         ->assertNotified(__('filament/pages/boards.move_to.moved', ['column' => 'Closed Won']));
