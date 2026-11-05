@@ -19,7 +19,7 @@ final readonly class ChecklistHtml
 
     private const array BLOCK_TAGS = [
         'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'pre', 'div', 'ul', 'ol', 'li', 'dl', 'dt', 'dd',
-        'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'figure', 'section', 'article',
+        'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'figure', 'section', 'article', 'hr',
     ];
 
     public static function fromMarkdownHtml(string $html): string

@@ -136,6 +136,7 @@ it('flattens block content inside a checklist item into plain paragraphs', funct
         ->and($stored)->not->toContain('<p></p>')
         ->not->toContain('<p><p>')
         ->not->toContain('<p><tbody')
+        ->not->toContain('<hr')
         ->and(preg_match('/<li[^>]*>(?:(?!<\/li>).)*<(?:ul|ol)/s', $stored))->toBe(0);
 
     foreach ($words as $word) {
@@ -145,6 +146,7 @@ it('flattens block content inside a checklist item into plain paragraphs', funct
     'blockquote' => ["- [ ] Call\n  > quote", ['<p>Call</p>', '<p>quote</p>']],
     'list in a blockquote' => ["- [ ] Call\n  > - [x] inner", ['<p>Call</p>', 'inner']],
     'table' => ['<ul data-type="taskList"><li data-type="taskItem" data-checked="false"><table><tr><td>a</td><td>b</td></tr></table></li></ul>', ['<p>a</p>', '<p>b</p>']],
+    'horizontal rule' => ["- [ ] a\n\n  ***", ['<p>a</p>']],
 ]);
 
 it('keeps a bullet whose marker follows a code span', function (): void {
