@@ -95,7 +95,8 @@ final readonly class ConversationMessagesQuery
                 ->all();
 
         return $messages->map(function (object $msg) use ($mentionsByMessage, $feedbackByMessage, $toolResultsByMessage, $envelopesByMessage, $records): array {
-            $attachment = $this->attachmentFromMeta($msg->meta === null ? null : (string) $msg->meta);
+            $meta = $this->metaFrom($msg->meta);
+            $attachment = $this->attachmentFromMeta($meta);
 
             return [
                 'id' => (string) $msg->id,
@@ -118,12 +119,9 @@ final readonly class ConversationMessagesQuery
                 'created_at' => $msg->created_at === null ? null : Date::parse((string) $msg->created_at, 'UTC')->toISOString(),
                 'pending_actions' => $this->extractPendingActions($envelopesByMessage[(string) $msg->id] ?? [], $records),
                 'display_blocks' => DisplayBlocks::collect($toolResultsByMessage[(string) $msg->id]),
-                'next_steps' => NextSteps::fromMeta($msg->meta === null ? null : (string) $msg->meta),
-                'sources' => WebSources::fromMeta($msg->meta === null ? null : (string) $msg->meta),
-                'feedback' => isset($feedbackByMessage[$msg->id]) ? [
-                    'rating' => (string) $feedbackByMessage[$msg->id]->rating,
-                    'category' => $feedbackByMessage[$msg->id]->category === null ? null : (string) $feedbackByMessage[$msg->id]->category,
-                ] : null,
+                'next_steps' => NextSteps::fromMeta($meta),
+                'sources' => WebSources::fromMeta($meta),
+                'feedback' => $this->feedbackFrom($feedbackByMessage[$msg->id] ?? null),
                 'mentions' => array_values(
                     ($mentionsByMessage[$msg->id] ?? collect())
                         ->filter(fn (stdClass $row): bool => (string) $row->source !== 'page_context')
@@ -160,16 +158,33 @@ final readonly class ConversationMessagesQuery
     }
 
     /**
+     * @return array{rating: string, category: ?string}|null
+     */
+    private function feedbackFrom(?stdClass $row): ?array
+    {
+        return $row instanceof stdClass ? [
+            'rating' => (string) $row->rating,
+            'category' => $row->category === null ? null : (string) $row->category,
+        ] : null;
+    }
+
+    /**
+     * @return array<mixed>
+     */
+    private function metaFrom(mixed $raw): array
+    {
+        $decoded = $raw === null ? null : json_decode((string) $raw, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * @param  array<mixed>  $meta
      * @return array{id: string, name: string, kind: 'text'|'rows', row_count: int}|null
      */
-    private function attachmentFromMeta(?string $meta): ?array
+    private function attachmentFromMeta(array $meta): ?array
     {
-        if ($meta === null) {
-            return null;
-        }
-
-        $decoded = json_decode($meta, true);
-        $attachment = is_array($decoded) ? ($decoded['attachment'] ?? null) : null;
+        $attachment = $meta['attachment'] ?? null;
 
         if (! is_array($attachment) || ! is_string($attachment['id'] ?? null)) {
             return null;

@@ -330,13 +330,16 @@ final class ChatInterface extends BaseLivewireComponent
             return null;
         }
 
+        $meta = $row->meta === null ? null : json_decode((string) $row->meta, true);
+        $meta = is_array($meta) ? $meta : [];
+
         return [
             'id' => (string) $row->id,
             'content' => (string) $row->content,
             'pending_actions' => $this->pendingActionCards($conversationId),
             'display_blocks' => DisplayBlocks::collect(StoredSteps::toolResults($row->steps)),
-            'next_steps' => NextSteps::fromMeta($row->meta === null ? null : (string) $row->meta),
-            'sources' => WebSources::fromMeta($row->meta === null ? null : (string) $row->meta),
+            'next_steps' => NextSteps::fromMeta($meta),
+            'sources' => WebSources::fromMeta($meta),
         ];
     }
 

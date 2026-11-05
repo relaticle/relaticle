@@ -13,14 +13,12 @@ final readonly class WebSources
     private const int MAX_URL_LENGTH = 2048;
 
     /**
+     * @param  array<mixed>  $meta
      * @return list<array{url: string, title: string|null, domain: string}>
      */
-    public static function fromMeta(?string $meta): array
+    public static function fromMeta(array $meta): array
     {
-        $decoded = $meta === null ? null : json_decode($meta, true);
-        $citations = is_array($decoded) ? ($decoded['citations'] ?? []) : [];
-
-        return is_array($citations) ? self::fromCitations($citations) : [];
+        return is_array($meta['citations'] ?? null) ? self::fromCitations($meta['citations']) : [];
     }
 
     /**
