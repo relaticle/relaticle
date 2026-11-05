@@ -7,6 +7,8 @@ use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Relaticle\EmailIntegration\Actions\AutoCreatePersonAction;
@@ -14,6 +16,7 @@ use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Actions\StoreEmailAction;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
+use Relaticle\EmailIntegration\Enums\AutomatedReason;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailCategory;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
@@ -23,15 +26,17 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Jobs\MergeConversations;
 use Relaticle\EmailIntegration\Jobs\SettleConversation;
+use Relaticle\EmailIntegration\Models\AutomatedSenderOverride;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailConversation;
 use Relaticle\EmailIntegration\Models\EmailThread;
+use Relaticle\EmailIntegration\Services\AutomatedMailDetector;
 use Relaticle\EmailIntegration\Services\ConversationKeyResolver;
 use Relaticle\EmailIntegration\Services\EmailClassifier;
 
-mutates(StoreEmailAction::class, AutoCreatePersonAction::class, ConversationKeyResolver::class, RefreshConversationSummary::class, MergeConversations::class, SettleConversation::class);
+mutates(StoreEmailAction::class, AutoCreatePersonAction::class, ConversationKeyResolver::class, RefreshConversationSummary::class, MergeConversations::class, SettleConversation::class, AutomatedMailDetector::class, AutomatedSenderOverride::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -68,7 +73,9 @@ function makeFetchedEmailData(array $overrides = []): FetchedEmailData
         attachments: $overrides['attachments'] ?? [],
         providerCategory: $overrides['providerCategory'] ?? null,
         reconciliationMessageId: $overrides['reconciliationMessageId'] ?? null,
+        isBulkMail: $overrides['isBulkMail'] ?? false,
         references: $overrides['references'] ?? null,
+        headers: $overrides['headers'] ?? [],
     );
 }
 
@@ -1316,4 +1323,132 @@ it('keeps two conversations apart when they only share a provider thread', funct
     expect($second->conversation_key)->toBe($parent->conversation_key)
         ->and($first->refresh()->conversation_key)->not->toBe($second->refresh()->conversation_key)
         ->and(Email::query()->where('workspace_id', $this->workspace->getKey())->distinct()->count('conversation_key'))->toBe(2);
+});
+
+it('stores why inbound mail is automated', function (array $overrides, ?AutomatedReason $reason): void {
+    $email = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData($overrides));
+
+    expect($email->refresh()->automated_reason)->toBe($reason);
+})->with([
+    'list unsubscribe' => [['headers' => ['list-unsubscribe' => '<https://x.example/u>']], AutomatedReason::List],
+    'list id' => [['headers' => ['list-id' => '<team.acme.example>']], AutomatedReason::List],
+    'auto reply' => [['headers' => ['auto-submitted' => 'auto-replied']], AutomatedReason::AutoSubmitted],
+    'auto submitted no' => [['headers' => ['auto-submitted' => ' No ']], null],
+    'precedence list' => [['headers' => ['precedence' => 'list']], AutomatedReason::Bulk],
+    'precedence first-class' => [['headers' => ['precedence' => 'first-class']], null],
+    'role sender' => [['participants' => [['email_address' => 'noreply@stripe.example', 'name' => null, 'role' => 'from']]], AutomatedReason::RoleSender],
+    'provider category' => [['isBulkMail' => true, 'participants' => [['email_address' => 'news@brand.example', 'name' => null, 'role' => 'from']]], AutomatedReason::ProviderCategory],
+    'list beats role sender' => [['headers' => ['list-id' => '<x>'], 'participants' => [['email_address' => 'noreply@x.example', 'name' => null, 'role' => 'from']]], AutomatedReason::List],
+    'relayed with a list id' => [['headers' => ['list-id' => '<x>'], 'participants' => [
+        ['email_address' => 'noreply@forms.example', 'name' => null, 'role' => 'from'],
+        ['email_address' => 'polly@5forests.example', 'name' => null, 'role' => 'reply_to'],
+    ]], AutomatedReason::List],
+    'auto reply beats precedence' => [['headers' => ['auto-submitted' => 'auto-replied', 'precedence' => 'bulk']], AutomatedReason::AutoSubmitted],
+    'role sender beats provider category' => [['isBulkMail' => true, 'participants' => [['email_address' => 'noreply@x.example', 'name' => null, 'role' => 'from']]], AutomatedReason::RoleSender],
+    'precedence in capitals' => [['headers' => ['precedence' => 'JUNK']], AutomatedReason::Bulk],
+    'auto submitted no with a comment' => [['headers' => ['auto-submitted' => 'no (manual)']], null],
+    'auto submitted no with a parameter' => [['headers' => ['auto-submitted' => 'No; x=y']], null],
+    'empty list headers' => [['headers' => ['list-id' => '', 'list-unsubscribe' => ' ']], null],
+    'a person' => [[], null],
+]);
+
+it('looks up senders marked as a person only for mail a rule marks', function (): void {
+    $queries = [];
+    DB::listen(function (QueryExecuted $query) use (&$queries): void {
+        $queries[] = $query->sql;
+    });
+
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData());
+
+    expect(array_filter($queries, fn (string $sql): bool => str_contains($sql, 'automated_sender_overrides')))->toBeEmpty();
+});
+
+it('never marks mail the mailbox sent as automated', function (): void {
+    $email = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'direction' => EmailDirection::OUTBOUND, 'folder' => EmailFolder::Sent, 'headers' => ['list-id' => '<x>'],
+    ]));
+
+    expect($email->refresh()->automated_reason)->toBeNull();
+});
+
+it('never marks a draft as automated', function (): void {
+    $email = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'folder' => EmailFolder::Drafts, 'participants' => [['email_address' => 'noreply@stripe.example', 'name' => null, 'role' => 'from']],
+    ]));
+
+    expect($email->refresh()->automated_reason)->toBeNull();
+});
+
+it('does not hide a form notification relayed for a visitor', function (): void {
+    $email = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'participants' => [
+            ['email_address' => 'noreply@forms.example', 'name' => null, 'role' => 'from'],
+            ['email_address' => 'polly@5forests.example', 'name' => null, 'role' => 'reply_to'],
+        ],
+    ]));
+
+    expect($email->refresh()->automated_reason)->toBeNull();
+});
+
+it('honours only this workspace marking a sender as a person', function (): void {
+    AutomatedSenderOverride::query()->create(['workspace_id' => $this->workspace->getKey(), 'email_address' => 'NoReply@Founder.example']);
+    AutomatedSenderOverride::query()->create([
+        'workspace_id' => User::factory()->withWorkspace()->create()->currentWorkspace->getKey(),
+        'email_address' => 'noreply@stripe.example',
+    ]);
+    $from = fn (string $address): array => ['participants' => [['email_address' => $address, 'name' => null, 'role' => 'from']]];
+
+    $founder = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        ...$from('noreply@founder.example'), 'providerMessageId' => 'f', 'rfcMessageId' => '<f@x>', 'headers' => ['auto-submitted' => 'auto-generated'],
+    ]));
+    $stripe = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        ...$from('noreply@stripe.example'), 'providerMessageId' => 's', 'rfcMessageId' => '<s@x>',
+    ]));
+
+    expect($founder->refresh()->automated_reason)->toBeNull()
+        ->and($stripe->refresh()->automated_reason)->toBe(AutomatedReason::RoleSender);
+});
+
+it('lets a pricing subject beat the Gmail primary hint', function (): void {
+    $email = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'subject' => 'Pricing for 40 seats',
+        'providerCategory' => EmailCategory::Personal,
+    ]));
+
+    $this->assertDatabaseHas('email_labels', ['email_id' => $email->getKey(), 'label' => EmailCategory::Sales->value]);
+});
+
+it('keeps automated replies out of the external inbound time', function (): void {
+    $this->travelTo(now()->startOfHour());
+    $person = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'p', 'rfcMessageId' => '<p@acme.example>', 'sentAt' => now()->subHour(),
+    ]));
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'a', 'rfcMessageId' => '<a@acme.example>', 'inReplyTo' => '<p@acme.example>',
+        'headers' => ['auto-submitted' => 'auto-replied'], 'sentAt' => now(),
+    ]));
+
+    expect(EmailConversation::query()->where('conversation_key', $person->conversation_key)->sole())
+        ->last_external_inbound_at->equalTo(now()->subHour())->toBeTrue()
+        ->is_automated->toBeFalse();
+});
+
+it('marks a conversation automated when every message in it is', function (): void {
+    $email = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData(['headers' => ['list-id' => '<news>']]));
+
+    expect(EmailConversation::query()->where('conversation_key', $email->conversation_key)->sole()->is_automated)->toBeTrue();
+});
+
+it('keeps a conversation with an outbound message out of automated', function (): void {
+    $sent = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'o', 'rfcMessageId' => '<o@acme.example>', 'direction' => EmailDirection::OUTBOUND, 'folder' => EmailFolder::Sent,
+    ]));
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'a', 'rfcMessageId' => '<a@acme.example>', 'inReplyTo' => '<o@acme.example>',
+        'headers' => ['auto-submitted' => 'auto-replied'],
+    ]));
+
+    expect(EmailConversation::query()->where('conversation_key', $sent->conversation_key)->sole())
+        ->message_count->toBe(2)
+        ->is_automated->toBeFalse();
 });

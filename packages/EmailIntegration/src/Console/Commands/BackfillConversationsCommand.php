@@ -16,6 +16,8 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
+use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Jobs\MergeConversations;
 use Relaticle\EmailIntegration\Models\Email;
@@ -144,7 +146,9 @@ final class BackfillConversationsCommand extends Command
             ->select('workspace_id', 'conversation_key')
             ->selectRaw('count(distinct coalesce(rfc_message_id, id::text)) as message_count')
             ->selectRaw('min(sent_at) as first_message_at, max(sent_at) as last_message_at')
-            ->selectRaw('coalesce(bool_or(has_attachments), false) as has_attachments');
+            ->selectRaw('coalesce(bool_or(has_attachments), false) as has_attachments')
+            ->selectRaw('bool_and(automated_reason is not null) as is_automated')
+            ->selectRaw($this->externalInboundSql(), [EmailDirection::INBOUND->value, EmailParticipantRole::FROM->value]);
 
         $stale = DB::query()->fromSub($live, 'live')
             ->leftJoin('email_conversations as summary', fn (JoinClause $join): JoinClause => $join
@@ -155,7 +159,9 @@ final class BackfillConversationsCommand extends Command
                 ->orWhereColumn('summary.message_count', '!=', 'live.message_count')
                 ->orWhereColumn('summary.first_message_at', '!=', 'live.first_message_at')
                 ->orWhereColumn('summary.last_message_at', '!=', 'live.last_message_at')
-                ->orWhereColumn('summary.has_attachments', '!=', 'live.has_attachments'))
+                ->orWhereColumn('summary.has_attachments', '!=', 'live.has_attachments')
+                ->orWhereColumn('summary.is_automated', '!=', 'live.is_automated')
+                ->orWhereRaw('summary.last_external_inbound_at is distinct from live.last_external_inbound_at'))
             ->select('live.workspace_id', 'live.conversation_key');
 
         $orphans = EmailConversation::query()->toBase()
@@ -166,6 +172,25 @@ final class BackfillConversationsCommand extends Command
             ->select('workspace_id', 'conversation_key');
 
         return $stale->union($orphans);
+    }
+
+    /** @return literal-string */
+    private function externalInboundSql(): string
+    {
+        // The SQL form of RefreshConversationSummary::externalInbound() and memberAddresses(), for every workspace at once.
+        return <<<'SQL'
+            max(sent_at) filter (where direction = ? and automated_reason is null and not exists (
+                select 1 from email_participants as sender
+                where sender.email_id = emails.id and sender.role = ? and lower(sender.email_address) in (
+                    select lower(users.email) from workspace_user join users on users.id = workspace_user.user_id
+                    where workspace_user.workspace_id = emails.workspace_id
+                    union all select lower(users.email) from workspaces join users on users.id = workspaces.user_id
+                    where workspaces.id = emails.workspace_id
+                    union all select lower(connected_accounts.email_address) from connected_accounts
+                    where connected_accounts.workspace_id = emails.workspace_id
+                )
+            )) as last_external_inbound_at
+            SQL;
     }
 
     private function queueRest(string $progress): int

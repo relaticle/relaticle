@@ -1164,3 +1164,15 @@ it('threads a Graph reply onto the stored message it answers', function (): void
 
     expect($reply->conversation_key)->toBe($parent->conversation_key);
 });
+
+it('keeps the headers that mark automated mail from Graph', function (): void {
+    Http::fake([
+        ...graphWellKnownFolderFakes(),
+        'https://graph.microsoft.com/v1.0/me/messages/MSG1*' => Http::response(graphMessagePayload([
+            'internetMessageHeaders' => [['name' => 'Precedence', 'value' => 'list'], ['name' => 'Received', 'value' => 'from mx']],
+        ])),
+    ]);
+
+    expect(resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->fetchMessage('MSG1')->headers)
+        ->toBe(['precedence' => 'list']);
+});

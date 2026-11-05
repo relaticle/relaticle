@@ -8,10 +8,12 @@ use Illuminate\Foundation\Console\QueuedCommand;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Relaticle\EmailIntegration\Console\Commands\BackfillConversationsCommand;
+use Relaticle\EmailIntegration\Enums\AutomatedReason;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailConversation;
+use Relaticle\EmailIntegration\Models\EmailParticipant;
 
 mutates(BackfillConversationsCommand::class);
 
@@ -89,6 +91,7 @@ it('leaves an email unkeyed when its merge fails, so the next run merges it', fu
 });
 
 it('keys without touching updated_at', function (): void {
+    $this->travelTo(now()->startOfSecond());
     $email = ($this->email)(($this->mailbox)(), ['in_reply_to' => ' <p@acme.example> (comment)', 'updated_at' => now()->subWeek()]);
 
     $this->artisan('email:backfill-conversations', ['--force' => true])->assertSuccessful();
@@ -142,6 +145,60 @@ it('rebuilds a summary when a disconnect moves only its first message', function
     $this->artisan('email:backfill-conversations', ['--force' => true])->assertSuccessful();
 
     expect(EmailConversation::query()->sole()->first_message_at->toDateString())->toBe(now()->subDay()->toDateString());
+});
+
+it('rebuilds a summary whose automated flag no longer matches its mail', function (): void {
+    $email = ($this->email)(($this->mailbox)(), ['automated_reason' => AutomatedReason::List]);
+    $this->artisan('email:backfill-conversations', ['--force' => true])->assertSuccessful();
+    EmailConversation::query()->update(['is_automated' => false]);
+
+    $this->artisan('email:backfill-conversations', ['--force' => true])
+        ->expectsOutputToContain('0 email(s) keyed, 1 summary(ies) rebuilt')
+        ->assertSuccessful();
+
+    expect(EmailConversation::query()->where('conversation_key', $email->refresh()->conversation_key)->sole()->is_automated)->toBeTrue();
+});
+
+it('rebuilds a summary whose external inbound time counts an automated message', function (): void {
+    $this->travelTo(now()->startOfHour());
+    $mailbox = ($this->mailbox)();
+    $person = ($this->email)($mailbox, ['rfc_message_id' => '<p@acme.example>', 'sent_at' => now()->subHour()]);
+    ($this->email)($mailbox, ['rfc_message_id' => '<a@acme.example>', 'in_reply_to' => '<p@acme.example>', 'automated_reason' => AutomatedReason::AutoSubmitted]);
+    $this->artisan('email:backfill-conversations', ['--force' => true])->assertSuccessful();
+    EmailConversation::query()->update(['last_external_inbound_at' => now()]);
+
+    $this->artisan('email:backfill-conversations', ['--force' => true])
+        ->expectsOutputToContain('0 email(s) keyed, 1 summary(ies) rebuilt')
+        ->assertSuccessful();
+
+    expect(EmailConversation::query()->where('conversation_key', $person->refresh()->conversation_key)->sole()->last_external_inbound_at->equalTo(now()->subHour()))->toBeTrue();
+});
+
+it('leaves a summary alone when inbound copies come from members and mailboxes', function (): void {
+    $mailbox = ($this->mailbox)();
+    $disconnected = ($this->mailbox)();
+    $disconnected->delete();
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => 'member']);
+    $senders = [
+        strtoupper($mailbox->email_address),
+        $member->email,
+        $this->workspace->owner->email,
+        $disconnected->email_address,
+    ];
+
+    foreach ($senders as $index => $sender) {
+        $email = ($this->email)($mailbox, ['rfc_message_id' => "<m{$index}@acme.example>", 'in_reply_to' => $index === 0 ? null : '<m0@acme.example>']);
+        EmailParticipant::query()->create(['email_id' => $email->getKey(), 'email_address' => $sender, 'role' => 'from']);
+    }
+
+    $this->artisan('email:backfill-conversations', ['--force' => true])->assertSuccessful();
+
+    $this->artisan('email:backfill-conversations', ['--force' => true])
+        ->expectsOutputToContain('0 email(s) keyed, 0 summary(ies) rebuilt')
+        ->assertSuccessful();
+
+    expect(EmailConversation::query()->sole()->last_external_inbound_at)->toBeNull();
 });
 
 it('queues the rest on the imports lane when a run reaches its chunk', function (): void {

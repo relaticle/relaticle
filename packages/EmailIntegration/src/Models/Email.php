@@ -29,6 +29,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
+use Relaticle\EmailIntegration\Enums\AutomatedReason;
 use Relaticle\EmailIntegration\Enums\EmailCategory;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -53,6 +54,7 @@ use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
  * @property string|null $in_reply_to
  * @property string|null $references
  * @property string|null $conversation_key
+ * @property AutomatedReason|null $automated_reason
  * @property string $subject
  * @property string|null $snippet
  * @property CarbonInterface|null $sent_at
@@ -84,6 +86,7 @@ use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
     'in_reply_to',
     'references',
     'conversation_key',
+    'automated_reason',
     'subject',
     'snippet',
     'sent_at',
@@ -569,6 +572,7 @@ final class Email extends Model
             'attempts' => 'integer',
             'linked_at' => 'datetime',
             'priority' => EmailPriority::class,
+            'automated_reason' => AutomatedReason::class,
         ];
     }
 }

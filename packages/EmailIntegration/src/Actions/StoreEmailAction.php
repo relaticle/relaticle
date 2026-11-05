@@ -21,6 +21,7 @@ use Relaticle\EmailIntegration\Models\EmailLabel;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailRead;
 use Relaticle\EmailIntegration\Models\EmailThread;
+use Relaticle\EmailIntegration\Services\AutomatedMailDetector;
 use Relaticle\EmailIntegration\Services\ConversationKeyResolver;
 use Relaticle\EmailIntegration\Services\EmailClassifier;
 use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
@@ -185,6 +186,7 @@ final readonly class StoreEmailAction
             'in_reply_to' => $data->inReplyTo,
             'references' => $data->references,
             'conversation_key' => resolve(ConversationKeyResolver::class)->resolve($data, $connectedAccount),
+            'automated_reason' => resolve(AutomatedMailDetector::class)->detect($data, $connectedAccount->workspace_id),
             'subject' => $data->subject,
             'snippet' => $data->snippet,
             'sent_at' => $data->sentAt,

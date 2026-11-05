@@ -23,10 +23,12 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\GmailService;
 use Relaticle\EmailIntegration\Support\EmailAddressHeaderParser;
 use Relaticle\EmailIntegration\Support\MessageIdList;
+use Relaticle\EmailIntegration\Support\RelayedSender;
 
 mutates(GmailService::class);
 mutates(EmailAddressHeaderParser::class);
 mutates(MessageIdList::class);
+mutates(RelayedSender::class);
 
 /**
  * @param  Closure(Message): void  $capture
@@ -1108,3 +1110,18 @@ it('keeps the root Message-ID when References holds more than fifty ids', functi
         ->and($kept[1])->toBe('<m12@acme.example>')
         ->and(end($kept))->toBe('<m60@acme.example>');
 });
+
+it('keeps the headers that mark automated mail', function (array $extraHeaders, array $kept): void {
+    $data = fetchGmailMessageFromHeader('Ana <ana@acme.example>', extraHeaders: $extraHeaders);
+
+    expect($data->headers)->toBe($kept);
+})->with([
+    'kept and dropped headers' => [
+        ['List-Id' => '<sales.acme.example>', 'Auto-Submitted' => 'auto-replied', 'X-Mailer' => 'Outlook'],
+        ['list-id' => '<sales.acme.example>', 'auto-submitted' => 'auto-replied'],
+    ],
+    'a repeated header and an empty one' => [
+        ['Precedence' => 'bulk', 'precedence' => 'list', 'List-Unsubscribe' => ''],
+        ['precedence' => 'list', 'list-unsubscribe' => ''],
+    ],
+]);
