@@ -21,6 +21,7 @@ use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Tools\CustomField\SetCustomFieldOptionsTool;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
+use Relaticle\CustomFields\Enums\OptionCategory;
 use Relaticle\CustomFields\Services\TenantContextService;
 
 mutates(SetCustomFieldOptionsTool::class, SetCustomFieldOptions::class, CustomFieldOptionPlan::class);
@@ -322,21 +323,30 @@ it('moves multi-select values to the replacement and drops a duplicate', functio
         ->and(CustomFieldOption::query()->withoutGlobalScopes()->find($smbId))->toBeNull();
 });
 
-it('refuses to rename or remove the task Status option Done', function (): void {
-    $renamed = setOptionsPropose($this->convId, [[
+it('renames the task Status option Done and keeps it completed', function (): void {
+    setOptionsPropose($this->convId, [[
         'entity_type' => 'task',
         'code' => 'status',
-        'options' => [['name' => 'To do'], ['name' => 'In progress'], ['name' => 'Completed', 'current' => 'Done']],
+        'options' => [['name' => 'To do'], ['name' => 'In progress'], ['name' => 'Shipped', 'current' => 'Done']],
     ]]);
 
+    resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner);
+
+    $status = setOptionsTaskStatus($this->workspace);
+
+    expect(setOptionsNames($status))->toBe(['To do', 'In progress', 'Shipped'])
+        ->and($status->optionIdsIn(OptionCategory::Completed))
+        ->toBe([(string) $status->options->firstWhere('name', 'Shipped')->getKey()]);
+});
+
+it('refuses to remove the last completed option of the task Status field', function (): void {
     $removed = setOptionsPropose($this->convId, [[
         'entity_type' => 'task',
         'code' => 'status',
         'options' => [['name' => 'To do'], ['name' => 'In progress']],
     ]]);
 
-    expect($renamed['error'])->toContain('"Done" marks a task complete')
-        ->and($removed['error'])->toContain('"Done" marks a task complete')
+    expect($removed['error'])->toContain('A status field needs at least one option in the Completed category.')
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
 });
 

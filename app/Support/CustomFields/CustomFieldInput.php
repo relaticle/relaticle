@@ -62,6 +62,7 @@ final readonly class CustomFieldInput
     {
         return match (CustomFieldType::from($field->type)) {
             CustomFieldType::SELECT,
+            CustomFieldType::STATUS,
             CustomFieldType::RADIO,
             CustomFieldType::TOGGLE_BUTTONS => $this->singleOption($field, $value, $entry),
             CustomFieldType::MULTI_SELECT,
@@ -82,7 +83,8 @@ final readonly class CustomFieldInput
             CustomFieldType::TOGGLE,
             CustomFieldType::CURRENCY,
             CustomFieldType::FILE_UPLOAD,
-            CustomFieldType::RECORD => $value,
+            CustomFieldType::RECORD,
+            CustomFieldType::RELATIONSHIP => $value,
         };
     }
 

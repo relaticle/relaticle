@@ -20,10 +20,9 @@ use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tool;
-use Relaticle\CustomFields\Services\ValidationService;
 
 #[Title('List Custom Fields')]
-#[Description('List workspace custom-field definitions, including inactive fields and configured option labels. Use get-crm-schema-tool for the active write schema.')]
+#[Description('List workspace custom-field definitions, including inactive fields and configured option labels and categories. Use get-crm-schema-tool for the active write schema.')]
 final class ListCustomFieldsTool extends Tool
 {
     use ChecksTokenAbility;
@@ -32,10 +31,6 @@ final class ListCustomFieldsTool extends Tool
     private const int MAX_PER_PAGE = 25;
 
     private const int MAX_PAGE = 1_000_000;
-
-    public function __construct(
-        private readonly ValidationService $validation,
-    ) {}
 
     public function schema(JsonSchema $schema): array
     {
@@ -99,20 +94,7 @@ final class ListCustomFieldsTool extends Tool
             ->orderBy('id')
             ->paginate($perPage, ['*'], 'page', $page);
 
-        $items = $fields->getCollection()->map(fn (CustomField $field): array => [
-            'id' => $field->id,
-            'entity_type' => $field->entity_type,
-            'code' => $field->code,
-            'name' => $field->name,
-            'type' => $field->type,
-            'active' => $field->active,
-            'system_defined' => $field->system_defined,
-            'required' => $this->validation->isRequired($field),
-            'options' => $field->options->map(fn (CustomFieldOption $option): array => [
-                'id' => $option->id,
-                'label' => $option->name,
-            ])->values()->all(),
-        ])->values()->all();
+        $items = $fields->getCollection()->map($this->describeField(...))->values()->all();
 
         return Response::structured([
             'items' => $items,
@@ -122,5 +104,27 @@ final class ListCustomFieldsTool extends Tool
             'has_more' => $fields->hasMorePages(),
             'next_page' => $fields->hasMorePages() ? $fields->currentPage() + 1 : null,
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function describeField(CustomField $field): array
+    {
+        return [
+            'id' => $field->id,
+            'entity_type' => $field->entity_type,
+            'code' => $field->code,
+            'name' => $field->name,
+            'type' => $field->type,
+            'active' => $field->active,
+            'system_defined' => $field->system_defined,
+            'required' => $field->isRequired(),
+            'options' => $field->options->map(fn (CustomFieldOption $option): array => [
+                'id' => $option->id,
+                'label' => $option->name,
+                'category' => $option->settings->category?->value,
+            ])->values()->all(),
+        ];
     }
 }

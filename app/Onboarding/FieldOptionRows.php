@@ -8,6 +8,7 @@ use App\Enums\CustomFieldType;
 use App\Models\CustomFieldOption;
 use Carbon\CarbonImmutable;
 use Relaticle\CustomFields\Data\CustomFieldOptionSettingsData;
+use Relaticle\CustomFields\Enums\OptionCategory;
 use Relaticle\CustomFields\Exceptions\FieldTypeNotOptionableException;
 
 final readonly class FieldOptionRows
@@ -15,9 +16,10 @@ final readonly class FieldOptionRows
     /**
      * @param  array<int|string, string>  $names
      * @param  array<string, string>  $colors
+     * @param  array<string, OptionCategory>  $categories
      * @return list<array<string, mixed>>
      */
-    public static function build(string $workspaceId, string $fieldId, string $fieldType, array $names, array $colors, CarbonImmutable $now): array
+    public static function build(string $workspaceId, string $fieldId, string $fieldType, array $names, array $colors, array $categories, CarbonImmutable $now): array
     {
         if ($names === []) {
             return [];
@@ -34,8 +36,11 @@ final readonly class FieldOptionRows
                 'tenant_id' => $workspaceId,
                 'name' => $name,
                 'sort_order' => $sortOrder,
-                'settings' => isset($colors[$name])
-                    ? json_encode(new CustomFieldOptionSettingsData(color: $colors[$name]))
+                'settings' => isset($colors[$name]) || isset($categories[$name])
+                    ? json_encode(new CustomFieldOptionSettingsData(
+                        color: $colors[$name] ?? null,
+                        category: $categories[$name] ?? null,
+                    ))
                     : null,
                 'created_at' => $now,
                 'updated_at' => $now,

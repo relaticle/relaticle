@@ -5,19 +5,19 @@ declare(strict_types=1);
 namespace App\Support;
 
 use App\Actions\CustomFields\CreateCustomField;
-use App\Enums\CrmEntity;
-use App\Enums\CustomFields\TaskField;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\CustomFieldValue;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
+use Relaticle\CustomFields\Enums\OptionCategory;
+use Relaticle\CustomFields\Rules\RequiresCompletedOption;
 
 final readonly class CustomFieldOptionPlan
 {
     /**
-     * @param  list<array{option: ?CustomFieldOption, name: string}>  $targets
+     * @param  list<array{option: ?CustomFieldOption, name: string, category: ?OptionCategory}>  $targets
      * @param  list<array{option: CustomFieldOption, replacement: ?int}>  $removals
      */
     private function __construct(
@@ -151,7 +151,7 @@ final readonly class CustomFieldOptionPlan
                 throw ValidationException::withMessages(['options' => self::changedSinceProposal($field)]);
             }
 
-            $targets[] = ['option' => $existing, 'name' => $option['name']];
+            $targets[] = ['option' => $existing, 'name' => $option['name'], 'category' => $existing?->settings->category];
         }
 
         if ($vanished !== []) {
@@ -214,9 +214,7 @@ final readonly class CustomFieldOptionPlan
                 : __('The options being removed are used by :count records in total. This assistant moves at most :max records in one approval.', ['count' => number_format($moveTotal), 'max' => number_format($moveCap)]);
         }
 
-        if (self::isTaskStatus($field) && ! self::keepsDone($current, $targets)) {
-            $errors[] = __('The task Status option "Done" marks a task complete, so it cannot be renamed or removed.');
-        }
+        $errors = [...$errors, ...self::completedOptionErrors($field, $targets)];
 
         if ($removals === [] && self::sameList($current, $targets)) {
             $errors[] = __('Nothing to change. The field already has these options in this order.');
@@ -340,7 +338,7 @@ final readonly class CustomFieldOptionPlan
     }
 
     /**
-     * @param  list<array{option: ?CustomFieldOption, name: string}>  $targets
+     * @param  list<array{option: ?CustomFieldOption, name: string, category: ?OptionCategory}>  $targets
      */
     private static function targetIndex(array $targets, mixed $reference): ?int
     {
@@ -361,40 +359,30 @@ final readonly class CustomFieldOptionPlan
         return null;
     }
 
-    private static function isTaskStatus(CustomField $field): bool
-    {
-        return $field->entity_type === CrmEntity::Task->value && $field->code === TaskField::STATUS->value;
-    }
-
     private static function changedSinceProposal(CustomField $field): string
     {
         return (string) __('The options of ":field" changed after this proposal. Ask for a fresh one.', ['field' => $field->name]);
     }
 
     /**
-     * @param  Collection<string, CustomFieldOption>  $current
-     * @param  list<array{option: ?CustomFieldOption, name: string}>  $targets
+     * @param  list<array{option: ?CustomFieldOption, name: string, category: ?OptionCategory}>  $targets
+     * @return list<string>
      */
-    private static function keepsDone(Collection $current, array $targets): bool
+    private static function completedOptionErrors(CustomField $field, array $targets): array
     {
-        $done = $current->first(fn (CustomFieldOption $option): bool => $option->name === TaskField::DONE_STATUS);
+        $options = array_map(
+            static fn (array $target): array => ['name' => $target['name'], 'category' => $target['category']],
+            $targets,
+        );
 
-        if (! $done instanceof CustomFieldOption) {
-            return true;
-        }
-
-        foreach ($targets as $target) {
-            if ($target['option'] instanceof CustomFieldOption && $target['option']->is($done)) {
-                return $target['name'] === TaskField::DONE_STATUS;
-            }
-        }
-
-        return false;
+        return array_values(Validator::make(['options' => $options], ['options' => [new RequiresCompletedOption($field->type)]])
+            ->errors()
+            ->all());
     }
 
     /**
      * @param  Collection<string, CustomFieldOption>  $current
-     * @param  list<array{option: ?CustomFieldOption, name: string}>  $targets
+     * @param  list<array{option: ?CustomFieldOption, name: string, category: ?OptionCategory}>  $targets
      */
     private static function sameList(Collection $current, array $targets): bool
     {

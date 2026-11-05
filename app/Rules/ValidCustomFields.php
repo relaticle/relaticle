@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace App\Rules;
 
-use App\Enums\CustomFieldType;
 use App\Models\CustomField;
+use App\Models\CustomFieldRelationship;
 use Closure;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Translation\PotentiallyTranslatedString;
 use Illuminate\Validation\Rule;
+use Relaticle\CustomFields\Enums\FieldCapability;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\CustomFields\Models\CustomField as BaseCustomField;
 use Relaticle\CustomFields\Services\ValidationService;
@@ -46,7 +47,7 @@ final readonly class ValidCustomFields implements ValidationRule
         if ($customFields->isNotEmpty()) {
             $validationService = resolve(ValidationService::class);
 
-            /** @var BaseCustomField $customField */
+            /** @var CustomField $customField */
             foreach ($customFields as $customField) {
                 $fieldRules = $validationService->getValidationRules($customField, $this->ignoreEntityId);
 
@@ -61,10 +62,7 @@ final readonly class ValidCustomFields implements ValidationRule
                 }
 
                 $this->addChoiceFieldOptionRules($customField, $rules);
-
-                if ($customField->type === CustomFieldType::RECORD->value) {
-                    $rules["custom_fields.{$customField->code}"][] = new OwnedLookupRecords($this->tenantId, (string) $customField->lookup_type, $customField->name);
-                }
+                $this->addLinkTargetRules($customField, $rules);
             }
         }
 
@@ -101,12 +99,25 @@ final readonly class ValidCustomFields implements ValidationRule
         $fail("Unknown custom field keys: {$unknownList}.");
     }
 
+    /** @param  array<string, array<int, mixed>>  $rules */
+    private function addLinkTargetRules(CustomField $customField, array &$rules): void
+    {
+        if (! $customField->relationshipDefinition() instanceof CustomFieldRelationship) {
+            return;
+        }
+
+        $ruleKey = "custom_fields.{$customField->code}";
+
+        $rules[$ruleKey] = array_merge($rules[$ruleKey] ?? [], [new OwnedLinkTargets($customField, $this->tenantId)]);
+    }
+
     /**
      * Add Rule::in validation for choice fields to ensure submitted option IDs actually exist.
      *
      * For single-choice fields (select, radio): validates the scalar value.
      * For multi-choice fields (multi_select, checkbox_list): validates each array element.
-     * Skips fields that accept arbitrary values (e.g., tags) or use a lookup_type.
+     * Skips fields that accept arbitrary values (e.g., tags) and record fields, whose
+     * payload holds target record ids rather than option ids.
      *
      * @param  array<string, array<int, mixed>>  $rules
      */
@@ -122,11 +133,11 @@ final readonly class ValidCustomFields implements ValidationRule
             return;
         }
 
-        if ($fieldTypeData->acceptsArbitraryValues) {
+        if ($fieldTypeData->supports(FieldCapability::AcceptsArbitraryValues)) {
             return;
         }
 
-        if ($customField->lookup_type !== null) {
+        if ($customField->relationshipDefinition() instanceof CustomFieldRelationship) {
             return;
         }
 
@@ -153,7 +164,8 @@ final readonly class ValidCustomFields implements ValidationRule
             ->where('tenant_id', $this->tenantId)
             ->where('entity_type', $this->entityType)
             ->active()
-            ->with('options');
+            ->with('options')
+            ->withRelationshipDefinition();
 
         if ($this->isUpdate) {
             if ($submittedCodes === []) {

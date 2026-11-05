@@ -123,7 +123,7 @@ final class Dashboard extends Page
         $user = Filament::auth()->user();
         $workspace = $user->currentWorkspace;
 
-        return $workspace !== null && resolve(MyTasksService::class)->hasDoneOption($workspace);
+        return $workspace !== null && resolve(MyTasksService::class)->hasCompletedStatusOption($workspace);
     }
 
     #[Computed]

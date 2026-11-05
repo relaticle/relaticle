@@ -37,6 +37,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CurrentSource;
 use App\Support\CurrentWorkspace;
+use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -53,6 +54,8 @@ use Relaticle\Chat\Support\ProposalOwnership;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\ProposalProgress;
 use Relaticle\Chat\Support\RecordReferenceResolver;
+use Relaticle\CustomFields\CustomFields;
+use Relaticle\CustomFields\Enums\WriteSource;
 use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
 use Relaticle\EmailIntegration\Actions\CancelAssistantEmail;
 use Relaticle\EmailIntegration\Actions\DeleteAssistantEmailDraft;
@@ -256,7 +259,7 @@ final readonly class PendingActionService
                 'Batch proposals resolve per item via approveItem()/rejectItem(), not approve().',
             );
 
-            $result = CurrentSource::during(CreationSource::CHAT, fn (): mixed => $this->executeAction($pendingAction, $user, $excludedFields));
+            $result = CurrentSource::during(CreationSource::CHAT, fn (): mixed => $this->asAssistantWrite($pendingAction, $user, fn (): mixed => $this->executeAction($pendingAction, $user, $excludedFields)));
 
             $resultData = $result instanceof Model
                 ? ['id' => $result->getKey(), 'type' => $result->getMorphClass()]
@@ -281,6 +284,21 @@ final readonly class PendingActionService
         $this->broadcastResolution($resolved, PendingActionStatus::Approved->value, null, true);
 
         return $resolved;
+    }
+
+    /**
+     * Who a link written by this approval is credited to. Nothing is signed in when the
+     * resolution runs from a queue or a command, and the proposal's own user is the
+     * answer there; the relation is never read, because a plan approval hydrates every
+     * step and strict lazy loading arms on the second row.
+     */
+    private function actorFor(PendingAction $pendingAction, User $user): User
+    {
+        if ((string) $user->getKey() === (string) $pendingAction->user_id) {
+            return $user;
+        }
+
+        return User::query()->find($pendingAction->user_id) ?? $user;
     }
 
     public function reject(PendingAction $pendingAction, User $user): PendingAction
@@ -376,7 +394,7 @@ final readonly class PendingActionService
                 return [$progress->isComplete(), null, $progress->statusOf($index, 'approved')];
             }
 
-            $model = CurrentSource::during(CreationSource::CHAT, fn (): Model => $this->executeBatchItem($locked, $user, $this->withoutExcludedFields($records[$index], $excludedFields, $locked->entity_type)));
+            $model = CurrentSource::during(CreationSource::CHAT, fn (): Model => $this->asAssistantWrite($locked, $user, fn (): Model => $this->executeBatchItem($locked, $user, $this->withoutExcludedFields($records[$index], $excludedFields, $locked->entity_type))));
 
             // A failure remembered from an earlier attempt is history the
             // moment an item commits; leaving it would report a stale error
@@ -1143,5 +1161,16 @@ final readonly class PendingActionService
                 ->findOrFail($ids)
                 ->all(),
         );
+    }
+
+    /**
+     * @template TResult
+     *
+     * @param  Closure(): TResult  $write
+     * @return TResult
+     */
+    private function asAssistantWrite(PendingAction $pendingAction, User $user, Closure $write): mixed
+    {
+        return CustomFields::writing(WriteSource::Ai, $write, actor: $this->actorFor($pendingAction, $user));
     }
 }

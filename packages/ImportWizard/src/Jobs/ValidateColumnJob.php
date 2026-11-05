@@ -168,27 +168,45 @@ final class ValidateColumnJob implements ShouldQueue
         $link = $context['link'];
         $matcher = $context['matcher'];
 
-        $validValues = array_filter($uniqueValues, fn (string $v): bool => ($errorMap[$v] ?? null) === null);
+        $lookupsByValue = [];
+
+        foreach ($uniqueValues as $value) {
+            if (($errorMap[$value] ?? null) === null) {
+                $lookupsByValue[$value] = $link->lookupValues($matcher, $value);
+            }
+        }
+
+        $lookups = array_values(array_unique(array_merge([], ...array_values($lookupsByValue))));
 
         $resolvedMap = $matcher->behavior === MatchBehavior::Create
-            ? array_fill_keys($validValues, null)
-            : $validator->getResolver()->batchResolve($link, $matcher, $validValues);
+            ? array_fill_keys($lookups, null)
+            : $validator->getResolver()->batchResolve($link, $matcher, $lookups);
 
         $inserts = [];
 
-        foreach ($resolvedMap as $value => $resolvedId) {
-            if (blank($value) || ($resolvedId === null && $matcher->behavior === MatchBehavior::MatchOnly)) {
-                continue;
+        foreach ($lookupsByValue as $value => $valueLookups) {
+            $matches = array_values(array_filter(array_map(
+                fn (string $lookup): ?array => $this->relationshipMatch($link, $matcher, $lookup, $resolvedMap[$lookup] ?? null)?->toArray(),
+                $valueLookups,
+            )));
+
+            if ($matches !== []) {
+                $inserts[(string) $value] = json_encode($matches, JSON_THROW_ON_ERROR);
             }
-
-            $match = $resolvedId !== null
-                ? RelationshipMatch::existing($link->key, (string) $resolvedId, $matcher->behavior, $matcher->field)
-                : RelationshipMatch::create($link->key, (string) $value, $matcher->behavior, $matcher->field);
-
-            $inserts[(string) $value] = json_encode($match->toArray(), JSON_THROW_ON_ERROR);
         }
 
         return $inserts;
+    }
+
+    private function relationshipMatch(EntityLink $link, MatchableField $matcher, string $lookup, int|string|null $resolvedId): ?RelationshipMatch
+    {
+        if (blank($lookup) || ($resolvedId === null && $matcher->behavior === MatchBehavior::MatchOnly)) {
+            return null;
+        }
+
+        return $resolvedId !== null
+            ? RelationshipMatch::existing($link->key, (string) $resolvedId, $matcher->behavior, $matcher->field)
+            : RelationshipMatch::create($link->key, $lookup, $matcher->behavior, $matcher->field);
     }
 
     /**
@@ -225,9 +243,8 @@ final class ValidateColumnJob implements ShouldQueue
                         WHERE json_extract(value, '\$.relationship') != ?
                            OR json_extract(value, '\$.matchField') IS NOT ?
                         UNION ALL
-                        SELECT temp.relationship_json
-                        WHERE temp.relationship_json IS NOT NULL
-                          AND COALESCE(json_extract(import_rows.skipped, ?), 0) = 0
+                        SELECT matches.value FROM json_each(temp.relationship_json) AS matches
+                        WHERE COALESCE(json_extract(import_rows.skipped, ?), 0) = 0
                     )
                 ), '[]')
                 FROM temp_relationships AS temp

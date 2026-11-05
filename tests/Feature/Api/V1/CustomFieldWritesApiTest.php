@@ -11,11 +11,13 @@ use App\Models\CustomFieldSection;
 use App\Models\CustomFieldValue;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\CurrentWorkspace;
 use App\Support\Media\MediaLookup;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use Tests\Helpers\RecordFieldFixture;
 
 mutates(BaseCrmEntityRequest::class, MediaLookup::class);
 
@@ -27,6 +29,7 @@ beforeEach(function (): void {
         ->where('entity_type', 'task')
         ->where('code', 'status')
         ->firstOrFail();
+    resolve(CurrentWorkspace::class)->set($this->workspace);
     Sanctum::actingAs($this->user, ['*']);
 });
 
@@ -63,12 +66,13 @@ it('returns a record field as id and name pairs for an own-workspace company', f
         'code' => 'related_company',
         'name' => 'Related Company',
         'type' => 'record',
-        'lookup_type' => 'company',
         'sort_order' => 91,
         'validation_rules' => [],
         'active' => true,
         'system_defined' => false,
     ]);
+
+    RecordFieldFixture::pointAt($field, 'company');
     $company = Company::factory()->create(['workspace_id' => $this->workspace->getKey(), 'name' => 'Globex']);
     $task = Task::factory()->create(['workspace_id' => $this->workspace->getKey()]);
     $task->saveCustomFieldValue($field, [$company->getKey()]);
@@ -144,19 +148,18 @@ it('resolves record names with a constant number of lookups, not one per row', f
         'code' => 'related_company',
         'name' => 'Related Company',
         'type' => 'record',
-        'lookup_type' => 'company',
         'sort_order' => 92,
         'validation_rules' => [],
         'active' => true,
         'system_defined' => false,
     ]);
 
-    $link = function (int $count) use ($field): void {
-        Company::factory()->count($count)->create(['workspace_id' => $this->workspace->getKey()])
-            ->each(fn (Company $company) => Task::factory()
-                ->create(['workspace_id' => $this->workspace->getKey()])
-                ->saveCustomFieldValue($field, [$company->getKey()]));
-    };
+    RecordFieldFixture::pointAt($field, 'company');
+
+    $link = fn (int $count): mixed => resolve(CurrentWorkspace::class)->within($this->workspace, fn (): mixed => Company::factory()->count($count)->create(['workspace_id' => $this->workspace->getKey()])
+        ->each(fn (Company $company) => Task::factory()
+            ->create(['workspace_id' => $this->workspace->getKey()])
+            ->saveCustomFieldValue($field, [$company->getKey()])));
 
     $listLookups = function () use (&$response): int {
         DB::flushQueryLog();

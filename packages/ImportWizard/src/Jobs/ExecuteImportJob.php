@@ -33,10 +33,13 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use LogicException;
 use Relaticle\CustomFields\CustomFields;
+use Relaticle\CustomFields\Enums\FieldCapability;
 use Relaticle\CustomFields\Enums\FieldDataType;
-use Relaticle\CustomFields\Exceptions\UniqueCustomFieldValueTaken;
+use Relaticle\CustomFields\Enums\WriteSource;
+use Relaticle\CustomFields\Exceptions\UniqueCustomFieldValueTakenException;
 use Relaticle\CustomFields\Filament\Integration\Support\Imports\ImportDataStorage;
 use Relaticle\CustomFields\Models\CustomFieldOption;
+use Relaticle\CustomFields\Models\CustomFieldRelationship;
 use Relaticle\CustomFields\Models\CustomFieldValue;
 use Relaticle\CustomFields\Rules\UniqueCustomFieldValue;
 use Relaticle\CustomFields\Services\TenantContextService;
@@ -225,12 +228,7 @@ final class ExecuteImportJob implements ShouldQueue
         $importer = $import->getImporter();
         $mappings = $import->columnMappings();
 
-        $results = [
-            'created' => $import->created_rows,
-            'updated' => $import->updated_rows,
-            'skipped' => $import->skipped_rows,
-            'failed' => $import->failed_rows,
-        ];
+        $results = $this->resumedCounts($import);
         $allowedKeys = $this->allowedAttributeKeys($importer);
         $customFieldDefs = $this->loadCustomFieldDefinitions($importer);
         $fieldMappings = $mappings->filter(fn (ColumnData $col): bool => $col->isFieldMapping());
@@ -249,7 +247,7 @@ final class ExecuteImportJob implements ShouldQueue
         $handedOff = false;
 
         try {
-            resolve(CauserResolver::class)->withCauser($import->user, function () use ($store, $importer, $fieldMappings, $allowedKeys, $customFieldDefs, $customFieldFormatMap, $matchField, $matchSourceColumn, $context, &$results, &$handedOff, $import, $startedAt): void {
+            $processRows = function () use ($store, $importer, $fieldMappings, $allowedKeys, $customFieldDefs, $customFieldFormatMap, $matchField, $matchSourceColumn, $context, &$results, &$handedOff, $import, $startedAt): void {
                 $store->query()
                     ->where('processed', false)
                     ->orderBy('row_number')
@@ -276,7 +274,9 @@ final class ExecuteImportJob implements ShouldQueue
 
                         return true;
                     });
-            });
+            };
+
+            CustomFields::writing(WriteSource::Import, fn (): mixed => resolve(CauserResolver::class)->withCauser($import->user, $processRows), actor: $import->user);
 
             if ($handedOff) {
                 return true;
@@ -502,9 +502,13 @@ final class ExecuteImportJob implements ShouldQueue
             ->with(['options' => fn (Relation $q): Relation => $q->withoutGlobalScopes()])
             ->where('tenant_id', $this->workspaceId)
             ->where('entity_type', $importer->entityName())
-            ->where('type', '!=', 'record')
             ->active()
+            ->withRelationshipDefinition()
             ->get()
+            // A field that links records is written through the ledger by the importer's
+            // own pass, not upserted as a value row here. Two field types link records,
+            // so the slot decides, never the type key.
+            ->reject(fn (CustomField $field): bool => $field->relationshipDefinition() instanceof CustomFieldRelationship)
             ->keyBy('code');
     }
 
@@ -641,7 +645,7 @@ final class ExecuteImportJob implements ShouldQueue
 
                 throw_if(
                     $this->claimedByAnotherRecord($recordId, $cf, $spellings) || $this->storedOnAnotherRecord($recordId, $cf, $spellings, $candidate),
-                    UniqueCustomFieldValueTaken::class,
+                    UniqueCustomFieldValueTakenException::class,
                     $record,
                     $cf,
                     (string) $candidate,
@@ -813,13 +817,15 @@ final class ExecuteImportJob implements ShouldQueue
         $updateColumns = [
             'string_value', 'text_value', 'integer_value', 'float_value',
             'json_value', 'boolean_value', 'date_value', 'datetime_value',
+            'source', 'updated_at',
         ];
+        $provenance = ['source' => CustomFields::writeContext()->source->value, 'updated_at' => now()];
 
         $deduplicated = [];
 
         foreach ($this->pendingCustomFieldValues as $row) {
             $key = $row['entity_type'].'|'.$row['entity_id'].'|'.$row['custom_field_id'].'|'.$row[$tenantKey];
-            $deduplicated[$key] = $row;
+            $deduplicated[$key] = [...$row, ...$provenance];
         }
 
         foreach (array_chunk(array_values($deduplicated), 500) as $chunk) {
@@ -1139,7 +1145,7 @@ final class ExecuteImportJob implements ShouldQueue
     {
         $items = array_map(trim(...), explode(',', $value));
 
-        if ($cf->typeData->acceptsArbitraryValues) {
+        if ($cf->typeData->supports(FieldCapability::AcceptsArbitraryValues)) {
             return $items;
         }
 
@@ -1306,23 +1312,46 @@ final class ExecuteImportJob implements ShouldQueue
                 continue;
             }
 
-            $resolvedId = $this->resolveGroupedMatches($matches, $link, $context);
+            $resolvedIds = $this->resolveLinkIds($matches, $link, $context);
 
-            if ($resolvedId === null) {
+            if ($resolvedIds === []) {
                 continue;
             }
 
             $storageStrategy = $link->getStorageStrategy();
-            $data = $storageStrategy->prepareData($data, $link, [$resolvedId]);
+            $data = $storageStrategy->prepareData($data, $link, $resolvedIds);
 
             $pending[] = [
                 'link' => $link,
                 'strategy' => $storageStrategy,
-                'ids' => [$resolvedId],
+                'ids' => $resolvedIds,
             ];
         }
 
         return $pending;
+    }
+
+    /**
+     * @param  Collection<int, RelationshipMatch>  $matches
+     * @param  array<string, mixed>  $context
+     * @return array<int, string>
+     */
+    private function resolveLinkIds(Collection $matches, EntityLink $link, array $context): array
+    {
+        $existingIds = $matches
+            ->filter(fn (RelationshipMatch $match): bool => $match->isExisting() && $match->id !== null)
+            ->map(fn (RelationshipMatch $match): string => (string) $match->id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($link->allowMultiple && $existingIds !== []) {
+            return $existingIds;
+        }
+
+        $resolvedId = $this->resolveGroupedMatches($matches, $link, $context);
+
+        return $resolvedId === null ? [] : [$resolvedId];
     }
 
     /**
@@ -1527,5 +1556,21 @@ final class ExecuteImportJob implements ShouldQueue
         foreach ($dedupKeys as $dedupKey) {
             $this->createdRecords[$dedupKey] = $id;
         }
+    }
+
+    /**
+     * Where the previous slice of this import left off, so a handed-off job continues the
+     * tally rather than restarting it.
+     *
+     * @return array<string, int>
+     */
+    private function resumedCounts(Import $import): array
+    {
+        return [
+            'created' => $import->created_rows,
+            'updated' => $import->updated_rows,
+            'skipped' => $import->skipped_rows,
+            'failed' => $import->failed_rows,
+        ];
     }
 }
