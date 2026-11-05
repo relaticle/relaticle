@@ -37,7 +37,7 @@
                     <x-cloud::marketing.eyebrow class="mb-4">{{ __('Other ways in') }}</x-cloud::marketing.eyebrow>
                     <ul class="divide-rail border-rail divide-y border-y">
                         @feature(App\Features\Documentation::class)
-                            <li><a href="{{ route('help.index') }}" class="flex items-center gap-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-gray-950 dark:text-gray-300 dark:hover:text-white"><x-ri-lifebuoy-line class="size-4 text-gray-400"/>Help Centre</a></li>
+                            <li><a href="{{ route('help.index') }}" class="flex items-center gap-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-gray-950 dark:text-gray-300 dark:hover:text-white"><x-ri-lifebuoy-line class="size-4 text-gray-400"/>Help center</a></li>
                             <li><a href="{{ route('documentation.index') }}" class="flex items-center gap-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-gray-950 dark:text-gray-300 dark:hover:text-white"><x-ri-book-open-line class="size-4 text-gray-400"/>Developer Docs</a></li>
                         @endfeature
                         <li><a href="{{ route('discord') }}" target="_blank" class="flex items-center gap-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-gray-950 dark:text-gray-300 dark:hover:text-white"><x-ri-discord-fill class="size-4 text-gray-400"/>Join Discord community</a></li>

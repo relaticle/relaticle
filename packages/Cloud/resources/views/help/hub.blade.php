@@ -1,6 +1,6 @@
 @php
-    $baseTitle = __('Help Centre');
-    $pageTitle = __('Help centre: Records, imports and setup');
+    $baseTitle = __('Help center');
+    $pageTitle = __('Help center: Records, imports and setup');
     $pageDescription = __('Guides for setting up your workspace, importing records, and using Relaticle day to day.');
 @endphp
 
