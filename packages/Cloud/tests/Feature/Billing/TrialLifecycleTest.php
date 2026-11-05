@@ -670,16 +670,45 @@ it('never raises the credit balance during an extension, even across a month bou
     $beforeExtending = $balance();
 
     app(ExtendEndedTrial::class)->execute($owner, $workspace);
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->update(['credits_remaining' => 180, 'credits_used' => 120]);
     $this->travelTo(Date::parse('2026-07-02 09:00:00'));
     $this->artisan('chat:reset-credits')->assertSuccessful();
 
     expect($beforeExtending)->toBe(Plan::Free->credits())
-        ->and($balance())->toBe($beforeExtending);
+        ->and($balance())->toBe(180);
 
     $this->travelTo(Date::parse('2026-07-06 09:00:00'));
     $this->artisan('billing:process-trials')->assertSuccessful();
 
     expect($balance())->toBe(Plan::Free->credits());
+});
+
+it('skips a credit reset when an extension pins the period after the expired balances were read', function (): void {
+    withHostedBilling();
+    [$owner, $workspace] = trialOwnerAndWorkspace();
+    pauseTrialOf($workspace);
+    $balance = AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
+        'credits_remaining' => 180,
+        'credits_used' => 120,
+        'purchased_credits' => 0,
+        'period_starts_at' => now()->subMonth(),
+        'period_ends_at' => now()->subMinute(),
+    ]);
+    $extendedMidRun = false;
+
+    DB::listen(function (QueryExecuted $query) use (&$extendedMidRun, $owner, $workspace): void {
+        if ($extendedMidRun || ! str_contains($query->sql, 'from "ai_credit_balances"')) {
+            return;
+        }
+
+        $extendedMidRun = true;
+        app(ExtendEndedTrial::class)->execute($owner, $workspace);
+    });
+
+    $this->artisan('chat:reset-credits')->assertSuccessful();
+
+    expect($extendedMidRun)->toBeTrue()
+        ->and($balance->refresh()->credits_remaining)->toBe(180);
 });
 
 it('records who extended the trial', function (): void {
