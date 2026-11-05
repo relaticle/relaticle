@@ -212,6 +212,17 @@ it('counts only what was created from the trial start', function (): void {
     endingSoonMail($workspace)->assertSeeInHtml('So far your team has added 1 record.');
 });
 
+it('counts only questions asked from the trial start', function (): void {
+    $workspace = trialWorkspace('UTC', ['pro_trial_used_at' => '2026-09-01 00:00:00']);
+
+    $this->travelTo(CarbonImmutable::parse('2026-08-31 23:59:59'));
+    askRela($workspace, 2);
+    $this->travelTo(CarbonImmutable::parse('2026-09-01 00:00:00'));
+    askRela($workspace, 1);
+
+    endingSoonMail($workspace)->assertSeeInHtml('So far your team has asked Rela 1 question.');
+});
+
 it('ignores questions the user replaced by regenerating or editing', function (): void {
     $workspace = trialWorkspace();
 

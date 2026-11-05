@@ -248,13 +248,15 @@ $packageQueryLayers = [];
 foreach (glob(dirname(__DIR__, 2).'/packages/*/src', GLOB_ONLYDIR) ?: [] as $packageSource) {
     $packageRoots[] = $packageRoot = 'Relaticle\\'.basename(dirname($packageSource));
 
-    if (is_dir($packageSource.'/Queries')) {
-        $packageQueryLayers[$packageRoot] = "{$packageRoot}\Queries";
+    foreach ([$packageSource.'/Queries', ...glob($packageSource.'/*/Queries', GLOB_ONLYDIR) ?: []] as $queryFolder) {
+        if (is_dir($queryFolder)) {
+            $packageQueryLayers[$packageRoot.'\\'.str_replace('/', '\\', substr($queryFolder, strlen($packageSource) + 1))] = $packageRoot;
+        }
     }
 }
 
 $packageServiceLayers = [
-    ...array_values($packageQueryLayers),
+    ...array_keys($packageQueryLayers),
     'Relaticle\Chat\Actions',
     'Relaticle\Chat\Agents',
     'Relaticle\Chat\Services',
@@ -264,7 +266,6 @@ $packageServiceLayers = [
     'Relaticle\Cloud\Billing\CreditPackCatalog',
     'Relaticle\Cloud\Billing\Filament\BillingPanelHooks',
     'Relaticle\Cloud\Billing\Listeners',
-    'Relaticle\Cloud\Billing\Queries',
     'Relaticle\Cloud\Billing\SidebarBillingState',
     'Relaticle\Cloud\Billing\StripeBilling',
     'Relaticle\Cloud\Docs\Support',
@@ -389,14 +390,14 @@ arch('the query language uses no transport')
     ->not
     ->toUse(['App\Mcp', 'App\Http', 'App\Filament', 'App\Livewire', 'App\Scribe', 'Relaticle\Chat']);
 
-foreach ($packageQueryLayers as $packageRoot => $packageQueryLayer) {
+foreach ($packageQueryLayers as $packageQueryLayer => $packageRoot) {
     arch("{$packageQueryLayer} uses no transport of its package")
         ->expect($packageQueryLayer)
         ->not
         ->toUse(["{$packageRoot}\Http", "{$packageRoot}\Livewire", "{$packageRoot}\Tools", "{$packageRoot}\Jobs"]);
 }
 
-foreach (['App\Queries', 'Relaticle\Cloud\Billing\Queries', ...array_values($packageQueryLayers)] as $queryRoot) {
+foreach (['App\Queries', ...array_keys($packageQueryLayers)] as $queryRoot) {
     arch("{$queryRoot} takes the acting user and reads no ambient user, request or workspace")
         ->expect($queryRoot)
         ->not
@@ -416,7 +417,7 @@ foreach (['App', ...$packageRoots] as $codeRoot) {
         ->expect($codeRoot)
         ->not
         ->toUse('Spatie\QueryBuilder\QueryBuilder')
-        ->ignoring(['App\Queries', ...array_values($packageQueryLayers)]);
+        ->ignoring(['App\Queries', ...array_keys($packageQueryLayers)]);
 }
 
 arch('CRM API write requests share the custom field contract')
