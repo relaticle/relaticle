@@ -11,6 +11,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use stdClass;
 
@@ -19,7 +20,8 @@ use stdClass;
     {--force : Write vectors instead of reporting them}
     {--after= : Only emails with an id above this one, the last a queued run read}
     {--workspace= : Only this workspace}
-    {--chunk=20000 : Emails to read in one run before queueing the rest}')]
+    {--chunk=20000 : Emails to read in one run before queueing the rest}
+    {--max-seconds=240 : Seconds one run may write before queueing the rest, inside the 300 s imports timeout}')]
 final class BackfillEmailSearchVectorsCommand extends Command
 {
     private const int PAGE = 1000;
@@ -31,16 +33,17 @@ final class BackfillEmailSearchVectorsCommand extends Command
         }
 
         $budget = max(1, (int) $this->option('chunk'));
+        $deadline = Date::now()->addSeconds(max(1, (int) $this->option('max-seconds')));
         [$filled, $read, $lastId] = [0, 0, null];
 
-        $this->pending()->select('id')->chunkById(min(self::PAGE, $budget), function (Collection $rows) use (&$filled, &$read, &$lastId, $budget): bool {
+        $this->pending()->select('id')->chunkById(min(self::PAGE, $budget), function (Collection $rows) use (&$filled, &$read, &$lastId, $budget, $deadline): bool {
             /** @var list<string> $ids */
             $ids = $rows->pluck('id')->all();
             $filled += $this->fill($ids);
             $read += count($ids);
             $lastId = Arr::last($ids);
 
-            return $read < $budget;
+            return $read < $budget && Date::now()->lessThan($deadline);
         });
 
         if ($lastId !== null && $this->pending()->where('id', '>', $lastId)->exists()) {
@@ -98,6 +101,7 @@ final class BackfillEmailSearchVectorsCommand extends Command
             '--after' => $after,
             '--workspace' => $this->option('workspace'),
             '--chunk' => $this->option('chunk'),
+            '--max-seconds' => $this->option('max-seconds'),
         ]))->onQueue('imports')->delay(now()->addMinute());
 
         $this->comment("{$progress} The rest is queued.");

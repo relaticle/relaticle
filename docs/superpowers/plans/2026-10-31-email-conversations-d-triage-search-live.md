@@ -650,6 +650,14 @@ in `ConversationsQuery`, the record tab list and its sibling copies in
 drops out of the list. The access-request list keeps its own `subject` `ilike`
 (`InteractsWithEmailAccessRequests.php:167`), gated by `whereSubjectVisibleTo()`.
 
+**Review fixes (2026-11-05):** the backfill also stops at `--max-seconds=240` (read through `Date`)
+and passes it on when it queues the rest, so a run of large bodies never reaches the 300 s
+timeout. `EmailSearchService::clean()` owns the search limits: it drops null bytes, trims and
+cuts at `MAX_LENGTH` (200), and `VisibleEmailsQuery::filterRules()` reads `MIN_TEXT_LENGTH` (2)
+and `MAX_LENGTH` from it. Below two characters, or with no positive term (only `-word` or
+`-"phrase"`), the subject and body branches are skipped and participants still match. The MCP
+and chat `list-emails` descriptions now say what search matches.
+
 ### Task 7: One filter owner and typed operators
 
 **Files:** `EmailFilter.php`, `ConversationFilters.php`, `ConversationsQuery.php`, lang.

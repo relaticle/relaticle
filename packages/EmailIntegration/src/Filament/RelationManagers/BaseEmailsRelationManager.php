@@ -161,7 +161,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
         return resolve(ConversationsQuery::class)->paginate(
             $this->authUser(),
             $this->showAutomated ? ConversationView::Automated : ConversationView::All,
-            ConversationFilters::forRecord($this->ownerRecordWithEmails(), $this->search),
+            ConversationFilters::forRecord($this->ownerRecordWithEmails(), EmailSearchService::clean($this->search)),
             20,
             $this->conversationsCursor,
         );
@@ -218,9 +218,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
                     ->scopes(['open']),
             ]);
 
-        if (filled($this->search)) {
-            resolve(EmailSearchService::class)->applyToQuery($query, $user, $this->search);
-        }
+        resolve(EmailSearchService::class)->applyToQuery($query, $user, $this->search);
 
         resolve(PreferredEmailCopyService::class)->restrictToVisiblePreferredCopies($query->getQuery(), $user);
 

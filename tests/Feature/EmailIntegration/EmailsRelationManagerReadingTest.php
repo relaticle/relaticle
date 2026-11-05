@@ -903,4 +903,35 @@ describe('search', function (): void {
 
         ($this->searchTab)('kumq')->assertSeeHtml("email-list-row-{$email->getKey()}");
     });
+
+    it('does not search subjects and bodies for one character', function (): void {
+        $email = ($this->linkedEmail)(['privacy_tier' => EmailPrivacyTier::FULL], 'The kumquat harvest is late this year');
+
+        $sender = ($this->linkedEmail)(['privacy_tier' => EmailPrivacyTier::FULL, 'subject' => 'Hello']);
+        EmailParticipant::query()->create(['email_id' => $sender->id, 'email_address' => 'k@grower.test', 'name' => null, 'role' => EmailParticipantRole::FROM]);
+
+        ($this->searchTab)('ku')->assertSeeHtml("email-list-row-{$email->getKey()}");
+        ($this->searchTab)('k')
+            ->assertDontSeeHtml("email-list-row-{$email->getKey()}")
+            ->assertSeeHtml("email-list-row-{$sender->getKey()}");
+    });
+
+    it('cuts an over-long search at 200 characters and drops null bytes', function (): void {
+        $email = ($this->linkedEmail)(['privacy_tier' => EmailPrivacyTier::FULL], 'The kumquat harvest is late this year');
+
+        ($this->searchTab)('kumquat'.str_repeat(' ', 300).'zebra')->assertSeeHtml("email-list-row-{$email->getKey()}");
+        ($this->searchTab)("kum\0quat")->assertSeeHtml("email-list-row-{$email->getKey()}");
+    });
+
+    it('matches no subject or body for a search of only excluded words', function (): void {
+        $email = ($this->linkedEmail)(['privacy_tier' => EmailPrivacyTier::FULL], 'The kumquat harvest is late this year');
+
+        ($this->searchTab)('-pricing')->assertDontSeeHtml("email-list-row-{$email->getKey()}");
+        ($this->searchTab)('- "price list"')->assertDontSeeHtml("email-list-row-{$email->getKey()}");
+        ($this->searchTab)('orchard -pricing')->assertSeeHtml("email-list-row-{$email->getKey()}");
+
+        EmailParticipant::query()->create(['email_id' => $email->id, 'email_address' => 'orchard-pricing@grower.test', 'name' => null, 'role' => EmailParticipantRole::FROM]);
+
+        ($this->searchTab)('-pricing')->assertSeeHtml("email-list-row-{$email->getKey()}");
+    });
 });

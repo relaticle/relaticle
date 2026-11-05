@@ -14,6 +14,17 @@ use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 
 final readonly class EmailSearchService
 {
+    public const int MIN_TEXT_LENGTH = 2;
+
+    public const int MAX_LENGTH = 200;
+
+    public static function clean(string $search): string
+    {
+        $search = trim(str_replace("\0", '', mb_scrub($search, 'UTF-8')));
+
+        return trim(mb_substr($search, 0, self::MAX_LENGTH));
+    }
+
     /**
      * Match only fields the viewer is allowed to see. Subject and body stay out of
      * metadata-only rows. Participant search skips other people's BCC rows.
@@ -23,6 +34,12 @@ final readonly class EmailSearchService
      */
     public function applyToQuery(Builder|Relation $query, User $viewer, string $search): Builder|Relation
     {
+        $search = self::clean($search);
+
+        if ($search === '') {
+            return $query;
+        }
+
         $textQuery = $this->textQuery($search);
 
         return $query->where(function (Builder $outer) use ($search, $textQuery, $viewer): void {
@@ -52,7 +69,7 @@ final readonly class EmailSearchService
      */
     private function textQuery(string $search): ?array
     {
-        if (preg_match('/[\p{L}\p{N}]/u', $search) !== 1) {
+        if (mb_strlen($search) < self::MIN_TEXT_LENGTH || ! $this->hasPositiveTerm($search)) {
             return null;
         }
 
@@ -68,6 +85,14 @@ final readonly class EmailSearchService
         }
 
         return ["websearch_to_tsquery('simple', ?) && {$prefix[0]}", [$rest, ...$prefix[1]]];
+    }
+
+    // A query of only negated terms matches nearly every row, so it never reaches the text columns.
+    private function hasPositiveTerm(string $search): bool
+    {
+        $positive = preg_replace('/(?:^|\s)-+\s*(?:"[^"]*"?|\S*)/u', ' ', $search) ?? '';
+
+        return preg_match('/[\p{L}\p{N}]/u', $positive) === 1;
     }
 
     /**

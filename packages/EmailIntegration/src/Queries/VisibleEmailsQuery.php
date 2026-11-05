@@ -47,7 +47,7 @@ final readonly class VisibleEmailsQuery
     public static function filterRules(): array
     {
         return [
-            'search' => ['sometimes', 'string', 'min:2', 'max:200'],
+            'search' => ['sometimes', 'string', 'min:'.EmailSearchService::MIN_TEXT_LENGTH, 'max:'.EmailSearchService::MAX_LENGTH],
             'record_type' => ['required_with:record_id', 'string', Rule::in(self::recordTypes())],
             'record_id' => ['required_with:record_type', 'string', 'max:64'],
             'direction' => ['sometimes', 'string', Rule::enum(EmailDirection::class)],
