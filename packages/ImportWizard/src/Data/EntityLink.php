@@ -249,6 +249,19 @@ final class EntityLink extends Data
             ->first(fn (MatchableField $m): bool => $m->field === $field);
     }
 
+    /** @return list<string> */
+    public function lookupValues(MatchableField $matcher, string $cell): array
+    {
+        if (! $this->allowMultiple || ! $matcher->multiValue) {
+            return [trim($cell)];
+        }
+
+        return array_values(array_unique(array_filter(
+            array_map(trim(...), explode(',', $cell)),
+            fn (string $part): bool => $part !== '',
+        )));
+    }
+
     public function matchesHeader(string $header): bool
     {
         $normalized = $this->normalizeHeader($header);
