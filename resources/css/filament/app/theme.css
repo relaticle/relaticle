@@ -1898,7 +1898,7 @@ html.fi:has(body.fi-onboarding-wizard),
     }
 }
 
-.fi-fo-rich-editor .ProseMirror[contenteditable='false'] ul[data-type='taskList'] input {
+.fi-fo-rich-editor .ProseMirror[contenteditable='false'] ul[data-type='taskList'] > li > label {
     @apply pointer-events-none cursor-default;
 }
 

@@ -358,6 +358,7 @@ it('builds, ticks and saves a checklist in a task description', function (): voi
         (() => {
             window.reopenErrors = [];
             window.addEventListener('error', (event) => window.reopenErrors.push(event.message));
+            window.addEventListener('unhandledrejection', (event) => window.reopenErrors.push(event.reason?.message ?? String(event.reason)));
         })();
     JS);
 
