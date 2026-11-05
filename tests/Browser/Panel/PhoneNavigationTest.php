@@ -18,6 +18,8 @@ const OPEN_SHEET = "[...document.querySelectorAll('.fi-dropdown-panel[x-ref=pane
 
 const ROW_MENU_TRIGGER = '.fi-ta-row:first-of-type .fi-ta-actions .fi-dropdown-trigger';
 
+const MODAL_SPANS_SCREEN = "(() => { const r = document.querySelector('.fi-modal-open .fi-modal-window').getBoundingClientRect(); return r.left === 0 && Math.round(r.right) === innerWidth; })()";
+
 const SHEET_HOLDS_BOTTOM_EDGE = '(() => '.OPEN_SHEET.'.contains(document.elementFromPoint(innerWidth / 2, innerHeight - 4)))()';
 
 function phoneCompaniesPage(User $user): mixed
@@ -197,17 +199,19 @@ it('closes the sheet on a tap outside it without opening the record underneath',
         ->assertNoJavaScriptErrors();
 });
 
-it('docks a confirmation dialog to the bottom edge of a phone', function (): void {
+it('docks a confirmation dialog to the bottom edge of a phone, edge to edge on a wide one', function (): void {
     $this->withVite();
 
     $user = User::factory()->withWorkspace()->create();
 
     phoneCompaniesPage($user)
+        ->resize(480, 852)
         ->click(ROW_MENU_TRIGGER)
         ->click(".fi-dropdown-panel[style*='display: block'] .fi-dropdown-list-item:last-child")
         ->assertVisible('.fi-modal-open .fi-modal-window')
         ->wait(0.5)
         ->assertScript("Math.round(document.querySelector('.fi-modal-open .fi-modal-window').getBoundingClientRect().bottom) === innerHeight", true)
+        ->assertScript(MODAL_SPANS_SCREEN, true)
         ->assertNoJavaScriptErrors();
 });
 
