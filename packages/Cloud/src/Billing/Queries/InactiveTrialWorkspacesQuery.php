@@ -12,6 +12,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\LazyCollection;
+use Laravel\Cashier\Subscription;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Cloud\Billing\Commands\ScheduleInactiveTrialDeletionsCommand;
@@ -41,7 +42,7 @@ final readonly class InactiveTrialWorkspacesQuery
     public function isExempt(Workspace $workspace): bool
     {
         return $workspace->hosted_free_grandfathered_at !== null
-            || self::creditPurchases()->where('workspace_id', $workspace->getKey())->exists()
+            || $this->creditPurchases()->where('workspace_id', $workspace->getKey())->exists()
             || self::owesManagedInvoice($workspace);
     }
 
@@ -61,20 +62,20 @@ final readonly class InactiveTrialWorkspacesQuery
         return BillingStatus::TrialEnded->applyToQuery(Workspace::query())
             ->whereNotNull('paused_at')
             ->whereNull('trial_ends_at')
-            ->whereNotIn('id', self::creditPurchases()->select('workspace_id'));
+            ->whereNotIn('id', $this->creditPurchases()->select('workspace_id'));
     }
 
     /**
      * @return Builder<AiCreditTransaction>
      */
-    private static function creditPurchases(): Builder
+    private function creditPurchases(): Builder
     {
         return AiCreditTransaction::query()->where('type', AiCreditType::Purchase);
     }
 
     private static function owesManagedInvoice(Workspace $workspace): bool
     {
-        return $workspace->pendingManagedSubscription() !== null;
+        return $workspace->pendingManagedSubscription() instanceof Subscription;
     }
 
     public function lastActivity(Workspace $workspace): CarbonImmutable
