@@ -21,9 +21,9 @@ use App\Models\Workspace;
 use App\Onboarding\FieldOptionRows;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Relaticle\CustomFields\CustomFields;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Facades\Entities;
-use Relaticle\CustomFields\Services\Visibility\BackendVisibilityService;
 
 final readonly class CreateWorkspaceCustomFields
 {
@@ -76,7 +76,7 @@ final readonly class CreateWorkspaceCustomFields
         });
 
         foreach ($entityTypes as $entityType) {
-            BackendVisibilityService::clearCache($entityType);
+            CustomFields::flushFieldCache($entityType);
         }
     }
 
