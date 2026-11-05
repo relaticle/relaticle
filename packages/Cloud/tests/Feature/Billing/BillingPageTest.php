@@ -442,6 +442,17 @@ it('tells the owner of a paused trial workspace it is kept for 60 days', functio
         ->assertDontSee(__('cloud::billing.paused.owner_body', ['workspace' => $workspace->name]));
 });
 
+it('promises no 60-day deletion to a paused trial workspace already scheduled for deletion', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = pausedTrialWorkspace();
+    $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(30), 'deletion_reason' => DeletionReason::Requested])->save();
+
+    livewire(Billing::class)
+        ->assertSee(__('cloud::billing.paused.owner_body', ['workspace' => $workspace->name]))
+        ->assertDontSee(__('cloud::billing.paused.owner_body_trial', ['workspace' => $workspace->name]));
+});
+
 it('promises no 60-day deletion to a paused trial workspace that bought a credit pack', function (): void {
     withHostedBilling();
 

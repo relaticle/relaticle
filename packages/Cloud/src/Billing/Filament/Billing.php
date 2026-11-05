@@ -249,7 +249,7 @@ final class Billing extends Page
 
         return [
             'billingStatus' => $billingStatus,
-            'deletesWhenInactive' => resolve(InactiveTrialWorkspacesQuery::class)->isEligible($workspace),
+            'deletesWhenInactive' => ! $workspace->isScheduledForDeletion() && resolve(InactiveTrialWorkspacesQuery::class)->isEligible($workspace),
             'lapsedPlan' => $billingStatus === BillingStatus::SubscriptionEnded ? $workspace->lapsedManagedPlan() : null,
             'mailboxSyncPaused' => $workspace->hasConnectedMailbox(),
             'trialExtensionAvailable' => $canManageBilling && $workspace->canExtendTrial(),
