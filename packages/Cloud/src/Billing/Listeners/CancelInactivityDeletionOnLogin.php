@@ -7,6 +7,7 @@ namespace Relaticle\Cloud\Billing\Listeners;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Auth\Events\Login;
+use Illuminate\Database\Eloquent\Builder;
 use Relaticle\Cloud\Billing\Actions\CancelInactivityDeletion;
 
 final readonly class CancelInactivityDeletionOnLogin
@@ -21,11 +22,11 @@ final readonly class CancelInactivityDeletionOnLogin
             return;
         }
 
-        Workspace::query()
+        rescue(fn () => Workspace::query()
             ->scheduledForInactivity()
-            ->where(fn ($workspaces) => $workspaces
+            ->where(fn (Builder $workspaces): Builder => $workspaces
                 ->where('user_id', $user->getKey())
-                ->orWhereHas('users', fn ($members) => $members->whereKey($user->getKey())))
-            ->each($this->cancelInactivityDeletion->execute(...));
+                ->orWhereHas('users', fn (Builder $members): Builder => $members->whereKey($user->getKey())))
+            ->each($this->cancelInactivityDeletion->execute(...)), report: true);
     }
 }

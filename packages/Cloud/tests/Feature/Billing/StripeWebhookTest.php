@@ -959,6 +959,38 @@ it('switches a managed plan on when its first invoice is paid', function (): voi
         ->and($balance->credits_remaining)->toBe(Plan::Enterprise->credits());
 });
 
+it('cancels an inactivity countdown when a managed plan is switched on', function (): void {
+    withHostedBilling();
+
+    $workspace = stripeBillingWorkspace();
+    $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(14), 'deletion_reason' => DeletionReason::Inactivity])->save();
+    pendingManagedSubscription($workspace);
+    stripeManagedSwitch($workspace);
+
+    sendStripeWebhook(invoicePaidEvent($workspace))->assertOk();
+
+    $workspace->refresh();
+
+    expect($workspace->plan)->toBe(Plan::Enterprise)
+        ->and($workspace->scheduled_deletion_at)->toBeNull()
+        ->and($workspace->deletion_reason)->toBeNull();
+});
+
+it('keeps an owner-requested deletion when a managed plan is switched on', function (): void {
+    withHostedBilling();
+
+    $workspace = stripeBillingWorkspace();
+    $deletesAt = now()->addDays(14)->startOfSecond();
+    $workspace->forceFill(['scheduled_deletion_at' => $deletesAt, 'deletion_reason' => DeletionReason::Requested])->save();
+    pendingManagedSubscription($workspace);
+    stripeManagedSwitch($workspace);
+
+    sendStripeWebhook(invoicePaidEvent($workspace))->assertOk();
+
+    expect($workspace->refresh()->deletion_reason)->toBe(DeletionReason::Requested)
+        ->and($workspace->scheduled_deletion_at?->equalTo($deletesAt))->toBeTrue();
+});
+
 it('marks the Stripe subscription as managed once it is paid', function (): void {
     $workspace = stripeBillingWorkspace();
     pendingManagedSubscription($workspace);

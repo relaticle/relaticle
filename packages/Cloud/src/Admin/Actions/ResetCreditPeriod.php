@@ -10,11 +10,15 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditService;
+use Relaticle\Cloud\Billing\Actions\CancelInactivityDeletion;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 final readonly class ResetCreditPeriod
 {
-    public function __construct(private CreditService $credits) {}
+    public function __construct(
+        private CreditService $credits,
+        private CancelInactivityDeletion $cancelInactivityDeletion,
+    ) {}
 
     /**
      * @param  iterable<Workspace>  $workspaces
@@ -27,6 +31,10 @@ final readonly class ResetCreditPeriod
             foreach ($workspaces as $workspace) {
                 $workspace->plan = $plan;
                 $workspace->save();
+
+                if ($plan !== Plan::default()) {
+                    $this->cancelInactivityDeletion->execute($workspace);
+                }
 
                 $this->credits->resetPeriod($workspace, (string) $admin->getKey());
             }

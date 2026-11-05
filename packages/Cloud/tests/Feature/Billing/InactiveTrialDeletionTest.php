@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Enums\AiCreditType;
@@ -545,4 +546,21 @@ it('keeps the launch notice command out of the schedule', function (): void {
         ->contains(fn (Event $event): bool => str_contains((string) $event->command, 'billing:announce-inactivity-rule'));
 
     expect($scheduled)->toBeFalse();
+});
+
+it('does not break sign-in when cancelling a countdown fails, and reports the failure', function (): void {
+    Exceptions::fake();
+    $workspace = inactivePausedWorkspace();
+    inactivityCountdownOn($workspace);
+
+    DB::listen(function (QueryExecuted $query): void {
+        if (str_contains($query->sql, '"deletion_reason"')) {
+            throw new RuntimeException('query failed');
+        }
+    });
+
+    Auth::guard('web')->login($workspace->owner);
+
+    expect(Auth::guard('web')->check())->toBeTrue();
+    Exceptions::assertReported(RuntimeException::class);
 });

@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace Relaticle\Cloud\Billing\Commands;
 
 use App\Enums\DeletionReason;
+use App\Models\Membership;
 use App\Models\User;
 use App\Models\Workspace;
+use Carbon\CarbonImmutable;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletionReminderMail;
@@ -60,6 +63,7 @@ final class ScheduleInactiveTrialDeletionsCommand extends Command
                 $updated = Workspace::query()
                     ->whereKey($workspace->getKey())
                     ->notScheduledForDeletion()
+                    ->whereNotExists($this->signedInSince($lastActiveAt))
                     ->update([
                         'scheduled_deletion_at' => $deletesAt,
                         'deletion_reason' => DeletionReason::Inactivity->value,
@@ -80,6 +84,17 @@ final class ScheduleInactiveTrialDeletionsCommand extends Command
         });
 
         $this->comment("Scheduled {$scheduled} inactive workspace(s) for deletion.");
+    }
+
+    private function signedInSince(CarbonImmutable $lastActiveAt): QueryBuilder
+    {
+        return User::query()
+            ->toBase()
+            ->selectRaw('1')
+            ->where('last_login_at', '>', $lastActiveAt)
+            ->where(fn (QueryBuilder $users): QueryBuilder => $users
+                ->whereColumn('users.id', 'workspaces.user_id')
+                ->orWhereIn('users.id', Membership::query()->toBase()->select('user_id')->whereColumn('workspace_id', 'workspaces.id')));
     }
 
     private function sendReminders(): void

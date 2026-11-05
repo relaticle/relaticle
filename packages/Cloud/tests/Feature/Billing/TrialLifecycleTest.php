@@ -618,6 +618,15 @@ it('refuses to extend a trial that is not ended', function (callable $arrange): 
     }],
 ]);
 
+it('refuses an extension for a workspace scheduled for deletion with no recorded reason', function (): void {
+    [$owner, $workspace] = trialOwnerAndWorkspace();
+    pauseTrialOf($workspace);
+    $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(30), 'deletion_reason' => null])->save();
+
+    expect($workspace->canExtendTrial())->toBeFalse()
+        ->and(app(ExtendEndedTrial::class)->execute($owner, $workspace))->toBeFalse();
+});
+
 it('lets the owner extend during an inactivity countdown and cancels it', function (): void {
     [$owner, $workspace] = trialOwnerAndWorkspace();
     pauseTrialOf($workspace);

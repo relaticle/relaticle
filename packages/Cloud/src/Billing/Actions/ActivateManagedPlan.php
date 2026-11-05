@@ -25,6 +25,7 @@ final readonly class ActivateManagedPlan
     public function __construct(
         private CreditService $credits,
         private CancelWithUnusedTimeRefund $cancelWithRefund,
+        private CancelInactivityDeletion $cancelInactivityDeletion,
     ) {}
 
     public function execute(Workspace $workspace, string $stripeSubscriptionId, string $invoiceId): void
@@ -136,6 +137,7 @@ final readonly class ActivateManagedPlan
             $subscription->forceFill(['type' => SubscriptionType::Managed->value])->save();
 
             $locked->forceFill(['plan' => $plan, 'trial_ends_at' => null])->save();
+            $this->cancelInactivityDeletion->execute($locked);
 
             $this->credits->resetPeriod($locked);
 
