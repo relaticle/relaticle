@@ -8,11 +8,12 @@ use App\Models\CustomField;
 use App\Models\CustomFieldSection;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\PlainText;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\CustomFields\Services\TenantContextService;
 
-mutates(CustomFieldsDisplayFormatter::class);
+mutates(CustomFieldsDisplayFormatter::class, PlainText::class);
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
@@ -108,6 +109,30 @@ it('includes the old value for updates with a current value on the model', funct
         'label' => 'Description',
         'old' => 'Old text',
         'new' => 'New text',
+    ]);
+});
+
+it('shows a ticked checklist item on the proposal card', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $task = Task::factory()->for($workspace)->create(['title' => 'T']);
+    $item = fn (string $checked): string => '<ul data-type="taskList"><li data-checked="'.$checked.'" data-type="taskItem"><label><input type="checkbox"><span></span></label><div><p>Call Bob</p></div></li></ul>';
+
+    $descField = CustomField::query()
+        ->where('tenant_id', $workspace->getKey())
+        ->where('entity_type', 'task')
+        ->where('code', 'description')
+        ->firstOrFail();
+
+    $task->saveCustomFieldValue($descField, $item('false'));
+
+    $rows = resolve(CustomFieldsDisplayFormatter::class)
+        ->format($user, 'task', cleanFields: ['description' => $item('true')], oldModel: $task->fresh());
+
+    expect($rows[0])->toMatchArray([
+        'label' => 'Description',
+        'old' => '[ ] Call Bob',
+        'new' => '[x] Call Bob',
     ]);
 });
 
