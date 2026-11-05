@@ -1,6 +1,7 @@
 @php
     $assistantName = (string) config('chat.assistant_name');
     $billingActive = \Laravel\Pennant\Feature::active(\App\Features\Billing::class);
+    $documentationActive = \Laravel\Pennant\Feature::active(\App\Features\Documentation::class);
     $freeCredits = number_format(\App\Enums\Plan::Free->credits());
     $proCredits = number_format(\App\Enums\Plan::Pro->credits());
     $trialDays = \App\Models\Workspace::PRO_TRIAL_DAYS;
@@ -20,36 +21,43 @@
             ['credits' => $freeCredits]
         );
 
+    $mcpDocsUrl = route('documentation.show', ['type' => 'mcp']);
+
     $checks = [
         [
-            'ri-plug-line',
             __('Can an outside agent work in it?'),
             __('Claude, ChatGPT, or an agent you wrote should get first-class access to records, not a screen-scraper.'),
             __('A first-party MCP server and a REST API. Agents connected over MCP write directly, under the same permissions as the user whose token they use.'),
+            __('The MCP server guide'),
+            $mcpDocsUrl,
         ],
         [
-            'ri-stack-line',
             __('Does the AI see your fields?'),
             __('Your custom fields, option lists, and relations are where the real data lives. An assistant that only sees the defaults is guessing.'),
             __('Every active custom field is readable and settable by the assistant and by agents, with option labels shown as text, not raw IDs.'),
+            __('Custom fields over MCP'),
+            $mcpDocsUrl.'#schema-resources',
         ],
         [
-            'ri-shield-check-line',
             __('Does the in-app assistant ask first?'),
             __('An assistant that can write to your pipeline needs a review step, or one bad prompt rewrites a quarter of deals.'),
             __(':name proposes every change as a card and waits. You approve or reject each record before anything is written.', ['name' => $assistantName]),
+            __('How approvals work'),
+            $documentationActive ? route('help.show', ['category' => 'ai-assistant', 'slug' => 'approve-what-the-assistant-changes']) : route('ai'),
         ],
         [
-            'ri-server-line',
             __('Can it run where your data lives?'),
             __('If the only way to get the AI is the vendor cloud, the CRM is not yours in any way that matters.'),
             __('Self-host the whole thing with Docker Compose. Bring your own key for Claude or GPT, or point it at a local model with Ollama.'),
+            __('Self-hosting'),
+            route('selfHosted'),
         ],
         [
-            'ri-price-tag-3-line',
             __('Do you pay for AI per seat?'),
             __('Per-seat AI add-ons punish the teams that adopt it most.'),
             __('One flat price for unlimited users. AI is metered by what you use, in credits, not by how many people log in.'),
+            __('Pricing'),
+            route('pricing'),
         ],
     ];
 
@@ -64,14 +72,40 @@
         ],
         [
             __('AI-native CRM'),
-            __('A CRM built so that both its own assistant and outside agents work on the data model itself, with permissions and review designed in from the start. Relaticle is built this way. Outside agents write through the MCP server under your permissions, and the built-in assistant is agentic within one rule: it asks before it writes.'),
+            __('A CRM built so that both its own assistant and outside agents work on the data model itself, with permissions and review designed in from the start. Relaticle is built this way. Outside agents write through the MCP server as the user they act for, and the built-in assistant proposes before it writes.'),
+        ],
+    ];
+
+    $paths = [
+        [
+            __('Connect what you already use'),
+            __('Claude and ChatGPT reach your workspace through the built-in MCP server. The setup is a consent screen, with no code and no API keys.'),
+            [
+                [__('Relaticle for Claude'), route('assistants.claude'), 'ri-claude-fill'],
+                [__('Relaticle for ChatGPT'), route('assistants.chatgpt'), 'ri-openai-fill'],
+            ],
+        ],
+        [
+            __('Meet the assistant inside'),
+            __(':name opens beside every page, answers from your records, and proposes every change as a card you approve or reject.', ['name' => $assistantName]),
+            [
+                [__('Meet :name', ['name' => $assistantName]), route('ai'), null],
+            ],
+        ],
+        [
+            __('Run it where the data lives'),
+            __('The self-hosted install runs the same open-source CRM as the cloud, with :name and the MCP server. Bring your own key, or run a local model with Ollama.', ['name' => $assistantName]),
+            [
+                [__('See self-hosting options'), route('selfHosted'), null],
+                [__('Read the MCP server docs'), $mcpDocsUrl, null],
+            ],
         ],
     ];
 
     $faqs = [
         [
             __('Is an AI-native CRM the same as an agentic CRM?'),
-            __('No. Agentic describes what the AI does: it takes multi-step actions toward a goal. AI-native describes how the CRM is built: the data model, permissions, and review step are designed for AI to work in. A CRM can be agentic without being AI-native, and the reverse.'),
+            __('No. Agentic describes what the AI does: it takes multi-step actions toward a goal. AI-native describes how the CRM is built: the data model, permissions, and review step are designed for AI to work in. A CRM can be agentic without being AI-native, and the difference shows the first time an agent writes something wrong.'),
         ],
         [
             __('Can an AI-native CRM run on my own server?'),
@@ -79,13 +113,15 @@
         ],
         [
             __('Does Relaticle work with Claude and ChatGPT?'),
-            __('Yes. Connect either one to the MCP server and it can search, create, and update companies, people, opportunities, tasks, and notes in your workspace, including custom fields. The setup takes a few minutes and is documented in the developer guide.'),
+            __('Yes. Connect either one to the MCP server and it can search, create, and update companies, people, opportunities, tasks, and notes in your workspace, including custom fields. The setup takes a few minutes and is documented for each assistant.'),
         ],
         [
             __('What does the AI cost?'),
             $costAnswer,
         ],
     ];
+
+    $linkClass = 'font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white';
 @endphp
 
 <x-cloud::guest-layout
@@ -94,28 +130,24 @@
     :ogTitle="$title"
     :ogDescription="$description"
     :ogImage="url('/images/open-graph-ai.jpg').'?v=1'"
+    framed
 >
-    {{-- Hero --}}
-    <section class="relative pt-32 pb-20 md:pt-40 md:pb-24 bg-white dark:bg-gray-950 overflow-hidden">
-        <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]"></div>
+    <x-cloud::marketing.hero>
+        <x-slot:eyebrow>
+            <x-cloud::marketing.eyebrow>{{ __('AI-native CRM') }}</x-cloud::marketing.eyebrow>
+        </x-slot:eyebrow>
 
-        <div class="relative max-w-3xl mx-auto px-6 lg:px-8 text-center">
-            <div class="flex justify-center mb-6">
-                <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-gray-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-                    <x-ri-cpu-line class="h-3.5 w-3.5 text-primary dark:text-primary-400"/>
-                    <span class="uppercase tracking-wider text-[10px] font-medium text-gray-500 dark:text-gray-400">{{ __('AI-native CRM') }}</span>
-                </div>
-            </div>
+        <x-slot:title>
+            {{ __('What makes a CRM AI-native.') }}
+            <span class="text-gray-500 dark:text-gray-400">{{ __('Five checks to run before you buy.') }}</span>
+        </x-slot:title>
 
-            <h1 class="font-display text-4xl sm:text-5xl font-bold text-gray-950 dark:text-white tracking-[-0.03em] leading-[1.1]">
-                {{ __('The AI-native CRM you can run on your own server') }}
-            </h1>
-
-            <p class="mt-5 text-base md:text-lg text-gray-500 dark:text-gray-400 leading-relaxed max-w-2xl mx-auto">
-                {{ __('AI-native means the assistant and the agents are part of the CRM, not a plugin on top. Here is what to look for, and how Relaticle does each of it.') }}
+        <x-slot:aside>
+            <p class="text-base leading-relaxed text-gray-500 md:text-lg dark:text-gray-400">
+                {{ __('AI-native means the assistant and the agents are part of the CRM, not a plugin on top. Tick what your CRM does today. The right column is how Relaticle answers each check, with the page that proves it.') }}
             </p>
 
-            <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <div class="mt-7 flex flex-col gap-3 sm:flex-row">
                 <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="hero">
                     {{ __('Start for free') }}
                 </x-cloud::marketing.button>
@@ -123,183 +155,156 @@
                     {{ __('Self-host it') }}
                 </x-cloud::marketing.button>
             </div>
+
+            <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">{{ __(':days-day trial, no card, unlimited users.', ['days' => $trialDays]) }}</p>
+        </x-slot:aside>
+
+        @include('cloud::marketing.partials.ai-native-checklist', ['checks' => $checks])
+    </x-cloud::marketing.hero>
+
+    <x-cloud::marketing.frame id="definitions">
+        <x-cloud::marketing.frame-header :label="__('Three words')" :lead="__('AI-powered, agentic, AI-native.')">
+            {{ __('Vendors use them interchangeably. They are not the same thing.') }}
+        </x-cloud::marketing.frame-header>
+
+        <div class="bg-rail grid grid-cols-1 gap-px md:grid-cols-3">
+            @foreach($definitions as $index => [$term, $meaning])
+                <div class="bg-surface p-6 md:p-10">
+                    <x-cloud::marketing.eyebrow class="mb-4">{{ sprintf('%02d', $index + 1) }}</x-cloud::marketing.eyebrow>
+                    <h3 class="text-lg font-medium text-gray-950 dark:text-white">{{ $term }}</h3>
+                    <p class="type-prose mt-2 text-gray-500 dark:text-gray-400">{{ $meaning }}</p>
+                </div>
+            @endforeach
         </div>
-    </section>
+    </x-cloud::marketing.frame>
 
-    {{-- What AI-native means --}}
-    <section class="py-20 md:py-28 bg-gray-50 dark:bg-gray-950">
-        <div class="max-w-5xl mx-auto px-6 lg:px-8">
-            <div class="max-w-2xl mx-auto text-center mb-14">
-                <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">
-                    {{ __('What AI-native actually means') }}
-                </h2>
-                <p class="mt-4 text-base text-gray-500 dark:text-gray-400 leading-relaxed">
-                    {{ __('Three things have to be true of the CRM itself, before any model is involved.') }}
-                </p>
-            </div>
+    <x-cloud::marketing.frame id="two-doors">
+        <x-cloud::marketing.frame-header :label="__('Two doors')" :lead="__('Agents get a door.')">
+            {{ __('And the door has a lock.') }}
+        </x-cloud::marketing.frame-header>
 
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                @foreach([
-                    ['ri-database-2-line', __('The AI reads the same records you do'), __('Companies, people, opportunities, notes, and every custom field are one data model that your team and your agents share. No export, no sidecar copy.')],
-                    ['ri-door-open-line', __('Agents get a door, and the door has a lock'), __('A standard tool interface lets any agent work in the CRM, and every write passes through the same authorization a person would.')],
-                    ['ri-cpu-line', __('You choose the model'), __('Cloud or local, today or next year. A CRM that only works with one vendor\'s AI has made the choice for you.')],
-                ] as [$icon, $cardTitle, $cardDesc])
-                    <div class="rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-6">
-                        <div class="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/[0.08] dark:bg-primary/[0.15] mb-4">
-                            <x-dynamic-component :component="$icon" class="w-4.5 h-4.5 text-primary dark:text-primary-400"/>
+        <div class="bg-rail grid grid-cols-1 gap-px md:grid-cols-2" data-two-doors>
+            <div class="bg-surface flex flex-col">
+                <div class="feat-card bg-tint bg-dots flex min-h-72 items-center justify-center px-6 py-10">
+                    <x-cloud::marketing.window class="w-full max-w-sm">
+                        <div class="border-rail flex items-center gap-2 border-b px-4 py-2.5">
+                            <x-cloud::marketing.actor as="claude"/>
+                            <span class="ml-auto inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                <span class="size-1.5 rounded-full bg-emerald-500" aria-hidden="true"></span>
+                                {{ __('Relaticle connected') }}
+                            </span>
                         </div>
-                        <h3 class="font-display text-base font-semibold text-gray-900 dark:text-white mb-1.5">
-                            {{ $cardTitle }}
-                        </h3>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                            {{ $cardDesc }}
-                        </p>
-                    </div>
-                @endforeach
-            </div>
-        </div>
-    </section>
-
-    {{-- Five checks --}}
-    <section id="checks" class="py-20 md:py-28 bg-white dark:bg-gray-950">
-        <div class="max-w-4xl mx-auto px-6 lg:px-8">
-            <div class="max-w-2xl mx-auto text-center mb-14">
-                <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">
-                    {{ __('Five checks before you call a CRM AI-native') }}
-                </h2>
-                <p class="mt-4 text-base text-gray-500 dark:text-gray-400 leading-relaxed">
-                    {{ __('Run these against any CRM, including this one. The right-hand column is how Relaticle answers each.') }}
-                </p>
-            </div>
-
-            <div class="space-y-4">
-                @foreach($checks as [$icon, $question, $why, $answer])
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-6">
-                        <div class="flex gap-4">
-                            <div class="flex shrink-0 items-center justify-center w-9 h-9 rounded-lg bg-primary/[0.08] dark:bg-primary/[0.15]">
-                                <x-dynamic-component :component="$icon" class="w-4.5 h-4.5 text-primary dark:text-primary-400"/>
+                        <div class="space-y-3 px-4 py-4">
+                            <div class="flex justify-end">
+                                <p class="max-w-[85%] rounded-2xl rounded-br-md bg-gray-100 px-3.5 py-2.5 text-sm leading-relaxed text-gray-900 dark:bg-white/10 dark:text-gray-100">{{ __('Move the Northwind renewal to Negotiation') }}</p>
                             </div>
-                            <div>
-                                <h3 class="font-display text-base font-semibold text-gray-900 dark:text-white mb-1.5">
-                                    {{ $question }}
-                                </h3>
-                                <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                                    {{ $why }}
-                                </p>
-                            </div>
-                        </div>
-                        <div class="md:border-l md:border-gray-200/80 md:dark:border-white/[0.06] md:pl-6">
-                            <p class="uppercase tracking-wider text-[10px] font-medium text-gray-400 dark:text-gray-500 mb-1.5">{{ __('In Relaticle') }}</p>
-                            <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                                {{ $answer }}
+                            <p class="border-rail inline-flex items-center gap-1.5 rounded-md border bg-tint px-2 py-1 text-xs text-gray-600 dark:text-gray-300">
+                                <x-ri-plug-line class="size-3.5 shrink-0 text-primary dark:text-primary-400"/>
+                                {{ __('Relaticle') }}
+                                <span aria-hidden="true">·</span>
+                                {{ __('Update opportunity') }}
+                                <x-ri-check-line class="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400"/>
                             </p>
+                            <p class="text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ __('Done. Northwind renewal is now in Negotiation.') }}</p>
                         </div>
-                    </div>
-                @endforeach
-            </div>
-
-            <div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3">
-                <x-cloud::marketing.button variant="secondary" href="{{ route('documentation.show', ['type' => 'mcp']) }}">
-                    {{ __('Read the MCP server docs') }}
-                </x-cloud::marketing.button>
-                <x-cloud::marketing.button variant="secondary" href="{{ route('ai') }}">
-                    {{ __('Meet :name', ['name' => $assistantName]) }}
-                </x-cloud::marketing.button>
-            </div>
-
-            <p class="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                {{ __('Connecting an assistant you already use?') }}
-                <a href="{{ route('assistants.claude') }}" class="font-medium text-primary dark:text-primary-400 hover:underline">{{ __('Relaticle for Claude') }}</a>
-                <span aria-hidden="true">·</span>
-                <a href="{{ route('assistants.chatgpt') }}" class="font-medium text-primary dark:text-primary-400 hover:underline">{{ __('Relaticle for ChatGPT') }}</a>
-            </p>
-        </div>
-    </section>
-
-    {{-- Definitions --}}
-    <section class="py-20 md:py-28 bg-gray-50 dark:bg-gray-950">
-        <div class="max-w-3xl mx-auto px-6 lg:px-8">
-            <div class="text-center mb-14">
-                <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">
-                    {{ __('AI-powered, agentic, AI-native: which is which') }}
-                </h2>
-                <p class="mt-4 text-base text-gray-500 dark:text-gray-400 leading-relaxed max-w-xl mx-auto">
-                    {{ __('Vendors use the three interchangeably. They are not the same thing.') }}
-                </p>
-            </div>
-
-            <div class="space-y-4">
-                @foreach($definitions as [$term, $meaning])
-                    <div class="rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-6">
-                        <h3 class="font-display text-base font-semibold text-gray-900 dark:text-white mb-1.5">
-                            {{ $term }}
-                        </h3>
-                        <p class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                            {{ $meaning }}
-                        </p>
-                    </div>
-                @endforeach
-            </div>
-        </div>
-    </section>
-
-    {{-- Self-hosted AI --}}
-    <section class="py-20 md:py-28 bg-white dark:bg-gray-950">
-        <div class="max-w-3xl mx-auto px-6 lg:px-8 text-center">
-            <div class="flex justify-center mb-6">
-                <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-gray-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-                    <x-ri-server-line class="h-3.5 w-3.5 text-primary dark:text-primary-400"/>
-                    <span class="uppercase tracking-wider text-[10px] font-medium text-gray-500 dark:text-gray-400">{{ __('Self-hosted AI') }}</span>
+                    </x-cloud::marketing.window>
+                </div>
+                <div class="border-rail border-t p-6 md:p-10">
+                    <x-cloud::marketing.eyebrow class="mb-4">{{ __('Through the MCP server') }}</x-cloud::marketing.eyebrow>
+                    <h3 class="text-lg font-medium text-gray-950 dark:text-white">{{ __('Outside agents write directly, as you') }}</h3>
+                    <p class="type-prose mt-2 text-gray-500 dark:text-gray-400">{{ __('Claude, ChatGPT, or an agent you wrote acts with the permissions of the user whose token it holds, in the one workspace you picked. Revoke it any time under Settings, Access Tokens.') }}</p>
                 </div>
             </div>
 
-            <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">
-                {{ __('The same AI, on your own server') }}
-            </h2>
-            <p class="mt-4 text-base text-gray-500 dark:text-gray-400 leading-relaxed max-w-xl mx-auto">
-                {{ __('The self-hosted install runs the same open-source CRM as the cloud, with :name and the MCP server. Bring your own API key for Claude or GPT, or run a local model with Ollama, and keep every request on infrastructure you control.', ['name' => $assistantName]) }}
-            </p>
-
-            <div class="mt-8">
-                <x-cloud::marketing.button variant="secondary" href="{{ route('selfHosted') }}">
-                    {{ __('See self-hosting options') }}
-                </x-cloud::marketing.button>
+            <div class="bg-surface flex flex-col">
+                <div class="feat-card bg-tint bg-dots flex min-h-72 items-center justify-center px-6 py-10">
+                    <x-cloud::marketing.window class="w-full max-w-sm">
+                        <div class="border-rail flex items-center gap-2 border-b px-4 py-2.5">
+                            <x-cloud::marketing.actor as="rela"/>
+                        </div>
+                        <div class="space-y-3 px-4 py-4">
+                            <div class="flex justify-end">
+                                <p class="max-w-[85%] rounded-2xl rounded-br-md bg-gray-100 px-3.5 py-2.5 text-sm leading-relaxed text-gray-900 dark:bg-white/10 dark:text-gray-100">{{ __('Move the Northwind renewal to Negotiation') }}</p>
+                            </div>
+                            <div class="border-rail rounded-lg border">
+                                <div class="border-rail flex items-center justify-between gap-3 border-b px-3 py-2">
+                                    <span class="text-sm font-medium text-gray-950 dark:text-white">{{ __('Northwind renewal') }}</span>
+                                    <span class="type-label text-gray-500 dark:text-gray-400">{{ __('Update') }}</span>
+                                </div>
+                                <p class="flex items-center gap-2 px-3 py-2 text-sm">
+                                    <span class="text-gray-500 dark:text-gray-400">{{ __('Stage') }}</span>
+                                    <span class="text-gray-500 line-through dark:text-gray-400">{{ __('Proposal') }}</span>
+                                    <x-ri-arrow-right-line class="size-3.5 text-gray-400" aria-hidden="true"/>
+                                    <span class="font-medium text-gray-950 dark:text-white">{{ __('Negotiation') }}</span>
+                                </p>
+                                <div class="border-rail flex gap-2 border-t px-3 py-2">
+                                    <span class="inline-flex h-7 items-center rounded-md bg-primary px-3 text-xs font-semibold text-white">{{ __('Approve') }}</span>
+                                    <span class="border-rail inline-flex h-7 items-center rounded-md border px-3 text-xs font-medium text-gray-700 dark:text-gray-300">{{ __('Reject') }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </x-cloud::marketing.window>
+                </div>
+                <div class="border-rail border-t p-6 md:p-10">
+                    <x-cloud::marketing.eyebrow class="mb-4">{{ __('Through :name', ['name' => $assistantName]) }}</x-cloud::marketing.eyebrow>
+                    <h3 class="text-lg font-medium text-gray-950 dark:text-white">{{ __('The built-in assistant asks first') }}</h3>
+                    <p class="type-prose mt-2 text-gray-500 dark:text-gray-400">{{ __(':name proposes every change as a card and waits. You approve or reject each record before anything is written, and an unanswered proposal expires on its own.', ['name' => $assistantName]) }}</p>
+                </div>
             </div>
         </div>
-    </section>
+    </x-cloud::marketing.frame>
 
-    {{-- FAQ --}}
-    <section class="py-20 md:py-28 bg-gray-50 dark:bg-gray-950">
-        <div class="max-w-3xl mx-auto px-6 lg:px-8">
-            <div class="text-center mb-10">
-                <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">
-                    {{ __('Questions about AI-native CRMs, answered') }}
-                </h2>
+    <x-cloud::marketing.frame id="paths">
+        <x-cloud::marketing.frame-header :label="__('Where to start')" :lead="__('Three ways in.')">
+            {{ __('Pick the one that matches how you work.') }}
+        </x-cloud::marketing.frame-header>
+
+        <div class="bg-rail grid grid-cols-1 gap-px md:grid-cols-3">
+            @foreach($paths as [$pathTitle, $pathDescription, $pathLinks])
+                <div class="bg-surface flex flex-col gap-6 p-6 md:p-10">
+                    <div>
+                        <h3 class="text-lg font-medium text-gray-950 dark:text-white">{{ $pathTitle }}</h3>
+                        <p class="type-prose mt-2 text-gray-500 dark:text-gray-400">{{ $pathDescription }}</p>
+                    </div>
+                    <div class="mt-auto flex flex-wrap gap-3">
+                        @foreach($pathLinks as [$linkLabel, $linkHref, $linkIcon])
+                            <x-cloud::marketing.button variant="secondary" size="sm" :href="$linkHref" :icon="$linkIcon">
+                                {{ $linkLabel }}
+                            </x-cloud::marketing.button>
+                        @endforeach
+                    </div>
+                </div>
+            @endforeach
+        </div>
+    </x-cloud::marketing.frame>
+
+    <x-cloud::marketing.frame id="ai-native-faq">
+        <div class="bg-rail grid grid-cols-1 gap-px lg:grid-cols-12">
+            <div class="bg-surface px-6 pb-6 pt-16 md:px-10 md:pt-24 lg:col-span-4">
+                <div class="lg:sticky lg:top-28">
+                    <x-cloud::marketing.eyebrow class="mb-5">{{ __('FAQ') }}</x-cloud::marketing.eyebrow>
+                    <h2 class="type-title text-gray-950 dark:text-white">{{ __('Questions about AI-native CRMs, answered') }}</h2>
+                    <p class="mt-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+                        {{ __('Something else on your mind?') }}
+                        <a href="{{ route('contact') }}" class="{{ $linkClass }}">{{ __('Get in touch') }}</a>
+                    </p>
+                </div>
             </div>
 
-            <x-cloud::marketing.faq-accordion :faqs="$faqs" id-prefix="ai-native-faq" />
-        </div>
-    </section>
-
-    {{-- CTA --}}
-    <section class="py-20 md:py-28 bg-white dark:bg-gray-950">
-        <div class="max-w-xl mx-auto px-6 lg:px-8 text-center">
-            <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">
-                {{ __('Run the five checks on Relaticle yourself') }}
-            </h2>
-            <p class="mt-4 text-base text-gray-500 dark:text-gray-400 leading-relaxed">
-                {{ __('Free to start, no credit card required. Self-host it yourself whenever you want.') }}
-            </p>
-            <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-                <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="footer">
-                    {{ __('Start for free') }}
-                </x-cloud::marketing.button>
-                <x-cloud::marketing.button variant="secondary" href="{{ route('pricing') }}">
-                    {{ __('See pricing') }}
-                </x-cloud::marketing.button>
+            <div class="bg-surface px-6 pb-16 md:px-10 lg:col-span-8 lg:pt-20">
+                <x-cloud::marketing.faq-accordion :faqs="$faqs" id-prefix="ai-native-faq" />
             </div>
         </div>
-    </section>
+    </x-cloud::marketing.frame>
+
+    <x-cloud::marketing.closing-band :title="__('Run the five checks on Relaticle yourself.')" :continuation="__('Free to start, self-host whenever you want.')">
+        <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="footer">
+            {{ __('Start for free') }}
+        </x-cloud::marketing.button>
+        <x-cloud::marketing.button variant="secondary" href="{{ route('pricing') }}">
+            {{ __('See pricing') }}
+        </x-cloud::marketing.button>
+    </x-cloud::marketing.closing-band>
 
     @php
         $schema = (new \Spatie\SchemaOrg\Graph())
