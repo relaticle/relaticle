@@ -84,7 +84,7 @@ it('parks the owner when the trial notice bounces', function (): void {
     $workspace = Workspace::factory()->create(['user_id' => $owner->id, 'trial_ends_at' => now()->addDays(3)]);
     useMailcoachAnswering(new MockHttpClient(new MockResponse('', ['http_code' => 406])));
 
-    Mail::mailer('array')->to($owner)->queue(new ProTrialEndingSoonMail($workspace));
+    Mail::mailer('array')->to($owner)->queue(new ProTrialEndingSoonMail($workspace, now()->addDays(3)));
 
     expect($owner->fresh()->email_bounced_at)->not->toBeNull();
 });

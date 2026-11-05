@@ -202,7 +202,7 @@ final class CloudServiceProvider extends ServiceProvider
         MailPreview::register('trial-ending', static function (User $owner, Workspace $workspace): Mailable {
             $workspace->setRelation('owner', $owner);
 
-            return new ProTrialEndingSoonMail($workspace);
+            return new ProTrialEndingSoonMail($workspace, $workspace->trial_ends_at ?? now()->addDays(3));
         });
 
         MailPreview::register('trial-ended', static fn (User $owner, Workspace $workspace): Mailable => ProEndedMail::afterTrial($workspace));

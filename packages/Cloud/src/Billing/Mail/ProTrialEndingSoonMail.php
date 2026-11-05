@@ -7,6 +7,7 @@ namespace Relaticle\Cloud\Billing\Mail;
 use App\Enums\Plan;
 use App\Models\User;
 use App\Models\Workspace;
+use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -15,7 +16,9 @@ use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Str;
 use Relaticle\Cloud\Billing\Filament\Billing;
+use Relaticle\Cloud\Billing\Queries\TrialUsageQuery;
 
 #[Tries(3)]
 #[Backoff(60, 300)]
@@ -25,6 +28,7 @@ final class ProTrialEndingSoonMail extends Mailable implements ShouldQueue
 
     public function __construct(
         public Workspace $workspace,
+        public CarbonImmutable $endsAt,
     ) {}
 
     public function envelope(): Envelope
@@ -38,8 +42,10 @@ final class ProTrialEndingSoonMail extends Mailable implements ShouldQueue
             markdown: 'cloud::mail.pro-trial-ending-soon',
             with: [
                 'credits' => number_format(Plan::Pro->credits()),
-                'endsOn' => $this->endsOn('M j, Y'),
+                'endsOnLong' => $this->endsOn('M j, Y \a\t g:i A'),
                 'endsOnShort' => $this->endsOn('M j'),
+                'zone' => $this->zoneLabel(),
+                'usage' => resolve(TrialUsageQuery::class)->forWorkspace($this->workspace),
                 'billingUrl' => Billing::getUrl(panel: 'app', tenant: $this->workspace),
                 'grandfathered' => $this->workspace->hosted_free_grandfathered_at !== null,
             ],
@@ -48,9 +54,20 @@ final class ProTrialEndingSoonMail extends Mailable implements ShouldQueue
 
     private function endsOn(string $format): string
     {
-        $owner = $this->workspace->owner;
-        $timezone = $owner instanceof User ? $owner->effectiveTimezone() : (string) config('app.timezone');
+        return $this->endsAt->setTimezone($this->ownerTimezone())->format($format);
+    }
 
-        return $this->workspace->trial_ends_at?->setTimezone($timezone)->format($format) ?? '';
+    private function zoneLabel(): string
+    {
+        $timezone = $this->ownerTimezone();
+
+        return $timezone === 'UTC' ? 'UTC' : str_replace('_', ' ', Str::afterLast($timezone, '/'));
+    }
+
+    private function ownerTimezone(): string
+    {
+        $owner = $this->workspace->owner;
+
+        return $owner instanceof User ? $owner->effectiveTimezone() : (string) config('app.timezone');
     }
 }

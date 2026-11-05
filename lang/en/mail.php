@@ -35,14 +35,22 @@ return [
 
     'trial_ending' => [
         'subject' => 'Your Pro trial ends on :date',
-        'preheader' => 'Keep every AI model and :credits credits for one flat price',
+        'preheader' => ':workspace pauses then unless you choose a plan. Your records stay safe.',
         'heading' => 'Pro for :workspace ends on :date',
-        'ends_on' => 'Your Pro trial ends on :date.',
-        'keeps' => 'Pro keeps every AI model, :credits monthly credits, and higher rate limits.',
-        'flat_price' => 'There is no per-seat pricing. One flat price covers the whole workspace.',
+        'ends_at' => 'Your Pro trial ends on :datetime (:zone time).',
+        'pauses' => 'After that, :workspace pauses until you choose a plan.',
+        'keeps' => 'Pro keeps every AI model, :credits monthly credits and higher rate limits. One flat price covers the whole workspace.',
         'grandfathered' => 'If you do nothing, :workspace returns to its grandfathered Cloud Free plan. Your data is untouched.',
-        'paused' => 'If you do nothing, Cloud access pauses when the trial ends. Your data stays stored, and you can subscribe at any time to pick up where you left off.',
-        'cta' => 'Keep Pro',
+        'cta' => 'Choose a plan',
+        'questions' => 'Questions? Reply to this email.',
+    ],
+
+    'trial_usage' => [
+        'so_far' => 'So far your team has :parts.',
+        'during' => 'During the trial your team :parts.',
+        'records' => 'added :count record|added :count records',
+        'questions' => 'asked Rela :count question|asked Rela :count questions',
+        'both' => ':records and :questions',
     ],
 
     'pro_ended' => [

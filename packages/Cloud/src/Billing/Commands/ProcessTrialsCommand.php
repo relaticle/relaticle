@@ -49,12 +49,14 @@ final class ProcessTrialsCommand extends Command
                 $workspaces->each(function (Workspace $workspace) use (&$count): void {
                     $owner = $workspace->owner;
 
-                    if (! $owner instanceof User) {
+                    $endsAt = $workspace->trial_ends_at;
+
+                    if (! $owner instanceof User || $endsAt === null) {
                         return;
                     }
 
-                    Mail::to($owner->email)->queue(new ProTrialEndingSoonMail($workspace));
-                    $workspace->forceFill(['trial_reminded_for' => $workspace->trial_ends_at])->save();
+                    Mail::to($owner->email)->queue(new ProTrialEndingSoonMail($workspace, $endsAt));
+                    $workspace->forceFill(['trial_reminded_for' => $endsAt])->save();
                     $count++;
                 });
             });

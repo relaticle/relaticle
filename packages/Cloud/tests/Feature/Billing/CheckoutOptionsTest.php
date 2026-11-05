@@ -170,7 +170,7 @@ describe('domain-routed app panel', function (): void {
     });
 
     it('links the trial reminder email at the billing route without a panel path prefix', function (): void {
-        expect((string) (new ProTrialEndingSoonMail(unsavedWorkspace()))->render())
+        expect((string) (new ProTrialEndingSoonMail(unsavedWorkspace(), now()->addDays(3)))->render())
             ->toContain('http://app.example.com/acme/billing')
             ->not->toContain('/app/acme/billing');
     });
