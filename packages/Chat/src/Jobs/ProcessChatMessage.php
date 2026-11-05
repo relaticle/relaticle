@@ -31,7 +31,6 @@ use Laravel\Ai\Responses\Data\FinishReason;
 use Laravel\Ai\Responses\Data\ToolCall as ToolCallData;
 use Laravel\Ai\Responses\StreamedAgentResponse;
 use Laravel\Ai\Streaming\Events\Error;
-use Laravel\Ai\Streaming\Events\ProviderToolEvent;
 use Laravel\Ai\Streaming\Events\StreamEnd;
 use Laravel\Ai\Streaming\Events\StreamEvent;
 use Laravel\Ai\Streaming\Events\TextDelta;
@@ -974,9 +973,7 @@ final class ProcessChatMessage implements ShouldQueue
 
     private function ranProviderTool(StreamedAgentResponse $streamedResponse): bool
     {
-        return $streamedResponse->events->contains(
-            fn (StreamEvent $event): bool => $event instanceof ProviderToolEvent && $event->status === 'completed',
-        );
+        return WebSearchCount::in($streamedResponse->events) + WebSearchCount::fetchesIn($streamedResponse->events) > 0;
     }
 
     private function blankTurnMessage(StreamedAgentResponse $streamedResponse): ?string

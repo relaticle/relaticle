@@ -45,7 +45,7 @@ final class RequestWebAccessTool implements Tool
         $workspace = $user->currentWorkspace;
 
         if ($workspace?->ai_web_search_enabled !== true || WebSearchPreference::of($user) === WebSearchPreference::Deny) {
-            return $this->error(__('Web access is unavailable for this user. Answer from the workspace data and say you could not use the web.'));
+            return $this->error('Web access is unavailable for this user. Answer from the workspace data and say you could not use the web.');
         }
 
         $planLimitError = $this->planStepLimitError();
@@ -58,7 +58,7 @@ final class RequestWebAccessTool implements Tool
         $reason = PromptText::sanitize((string) $request->string('reason'), 200);
 
         if ($query === '') {
-            return $this->error(__('Give the web search you plan to run as the query.'));
+            return $this->error('Give the web search you plan to run as the query.');
         }
 
         $pending = resolve(PendingActionService::class)->createProposal(

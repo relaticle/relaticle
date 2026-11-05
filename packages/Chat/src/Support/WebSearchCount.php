@@ -40,10 +40,14 @@ final readonly class WebSearchCount
             'completed' => 'completed',
             default => null,
         };
-        // OpenAI's search start carries no action yet, so it reads as a search.
-        $kind = self::kindOf($event) ?? ($status === 'started' && $event->type === 'web_search_call' ? self::SEARCH : null);
+        $kind = self::kindOf($event);
 
-        if ($status === null || $kind === null || ($status === 'completed' && self::kindOf($event) === null)) {
+        // OpenAI's search start carries no action yet, so it reads as a search.
+        if ($kind === null && $status === 'started' && $event->type === 'web_search_call') {
+            $kind = self::SEARCH;
+        }
+
+        if ($status === null || $kind === null) {
             return null;
         }
 
