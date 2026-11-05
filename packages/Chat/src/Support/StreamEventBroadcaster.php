@@ -16,6 +16,7 @@ use Laravel\Ai\Streaming\Events\StreamStart;
 use Laravel\Ai\Streaming\Events\TextDelta;
 use Laravel\Ai\Streaming\Events\ToolCall;
 use Laravel\Ai\Streaming\Events\ToolResult;
+use Relaticle\Chat\Enums\WebTool;
 use Relaticle\Chat\Models\PendingAction;
 
 final readonly class StreamEventBroadcaster
@@ -169,12 +170,32 @@ final readonly class StreamEventBroadcaster
      */
     private static function payloadForProviderTool(ProviderToolEvent $event): ?array
     {
-        $step = WebSearchCount::step($event);
+        $status = match ($event->status) {
+            'started', 'in_progress' => 'started',
+            'completed' => 'completed',
+            default => null,
+        };
+        $tool = WebTool::of($event);
 
-        if ($step === null) {
+        // OpenAI's search start carries no action yet, so it reads as a search.
+        if (! $tool instanceof WebTool && $status === 'started' && $event->type === 'web_search_call') {
+            $tool = WebTool::Search;
+        }
+
+        if ($status === null || ! $tool instanceof WebTool) {
             return null;
         }
 
-        return ['as' => 'provider_tool', 'with' => ['invocation_id' => $event->invocationId, ...$step]];
+        $input = $event->type === 'server_tool_use' ? ($event->data['input'] ?? []) : ($event->data['action'] ?? []);
+        $query = is_array($input) && is_string($input['query'] ?? null) ? mb_substr($input['query'], 0, 200) : null;
+        $url = is_array($input) && is_string($input['url'] ?? null) ? WebSources::source(['url' => $input['url']])['url'] ?? null : null;
+
+        return ['as' => 'provider_tool', 'with' => [
+            'invocation_id' => $event->invocationId,
+            'name' => $tool->value,
+            'status' => $status,
+            'query' => $tool === WebTool::Search ? $query : null,
+            'url' => $tool === WebTool::Fetch ? $url : null,
+        ]];
     }
 }

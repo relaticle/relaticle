@@ -23,9 +23,11 @@ final class OpenAiSse
         $output = [];
 
         foreach ($calls as $position => $call) {
-            $item = ['id' => "ws_{$position}", 'type' => 'web_search_call', 'status' => 'completed', 'action' => $call['type'] === 'search'
-                ? ['type' => 'search', 'queries' => [$call['value']], 'query' => $call['value']]
-                : ['type' => 'open_page', 'url' => $call['value']]];
+            $item = ['id' => "ws_{$position}", 'type' => 'web_search_call', 'status' => 'completed', 'action' => match ($call['type']) {
+                'search' => ['type' => 'search', 'queries' => [$call['value']], 'query' => $call['value']],
+                'find_in_page' => ['type' => 'find_in_page', 'url' => $call['value'], 'pattern' => 'pricing'],
+                default => ['type' => 'open_page', 'url' => $call['value']],
+            }];
 
             $events[] = ['type' => 'response.output_item.added', 'output_index' => $position, 'item' => ['id' => $item['id'], 'type' => 'web_search_call', 'status' => 'in_progress']];
             $events[] = ['type' => 'response.web_search_call.in_progress', 'output_index' => $position, 'item_id' => $item['id']];

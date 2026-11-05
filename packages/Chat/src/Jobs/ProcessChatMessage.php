@@ -42,6 +42,7 @@ use Relaticle\Chat\Enums\EmailReach;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Enums\WebAccess;
+use Relaticle\Chat\Enums\WebTool;
 use Relaticle\Chat\Events\ChatStreamFailed;
 use Relaticle\Chat\Events\ChatStreamRetrying;
 use Relaticle\Chat\Events\ConversationResolved;
@@ -63,7 +64,6 @@ use Relaticle\Chat\Support\ProviderStreamError;
 use Relaticle\Chat\Support\StoredSteps;
 use Relaticle\Chat\Support\StreamEventBroadcaster;
 use Relaticle\Chat\Support\TurnPresence;
-use Relaticle\Chat\Support\WebSearchCount;
 use Throwable;
 
 #[Timeout(self::TIMEOUT_SECONDS)]
@@ -937,8 +937,8 @@ final class ProcessChatMessage implements ShouldQueue
             model: $this->resolved['model'] ?? $streamedResponse->meta->model ?? 'unknown',
             inputTokens: $streamedResponse->usage->uncachedInputTokens(),
             outputTokens: $streamedResponse->usage->outputTokens,
-            toolCallsCount: $streamedResponse->toolCalls->count() + WebSearchCount::fetchesIn($streamedResponse->events),
-            webSearchCount: WebSearchCount::in($streamedResponse->events),
+            toolCallsCount: $streamedResponse->toolCalls->count() + WebTool::Fetch->countIn($streamedResponse->events),
+            webSearchCount: WebTool::Search->countIn($streamedResponse->events),
             conversationId: $streamedResponse->conversationId,
             resolutionKey: $this->resolutionKey(),
         );
@@ -973,7 +973,7 @@ final class ProcessChatMessage implements ShouldQueue
 
     private function ranProviderTool(StreamedAgentResponse $streamedResponse): bool
     {
-        return WebSearchCount::in($streamedResponse->events) + WebSearchCount::fetchesIn($streamedResponse->events) > 0;
+        return WebTool::anyRanIn($streamedResponse->events);
     }
 
     private function blankTurnMessage(StreamedAgentResponse $streamedResponse): ?string

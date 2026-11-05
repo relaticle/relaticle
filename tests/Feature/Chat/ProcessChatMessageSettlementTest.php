@@ -15,19 +15,19 @@ use Laravel\Ai\Contracts\ConversationStore;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Enums\MessageOrigin;
+use Relaticle\Chat\Enums\WebTool;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Queries\ConversationMessagesQuery;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\ModelRegistry;
-use Relaticle\Chat\Support\WebSearchCount;
 use Relaticle\Chat\Support\WebSources;
 use Relaticle\Cloud\Entitlements\PlanEntitlements;
 use Tests\Helpers\AnthropicSse;
 use Tests\Helpers\OpenAiSse;
 
-mutates(ProcessChatMessage::class, CreditService::class, WebSearchCount::class, WebSources::class, SelfHostedEntitlements::class, PlanEntitlements::class);
+mutates(ProcessChatMessage::class, CreditService::class, WebTool::class, WebSources::class, SelfHostedEntitlements::class, PlanEntitlements::class);
 
 it('refunds the reservation when a job fails without ever streaming', function (): void {
     withHostedBilling();
@@ -624,20 +624,21 @@ it('charges 2 credits per web search', function (): void {
         ->and($resolution->metadata['web_searches_count'])->toBe(3);
 });
 
-it('charges one OpenAI web search once', function (): void {
+it('charges one OpenAI web search once and reads a find in page as a page read', function (): void {
     OpenAiSse::fake(OpenAiSse::webResearchReply(
-        [['type' => 'search', 'value' => 'filaforms'], ['type' => 'open_page', 'value' => 'https://filaforms.com']],
+        [['type' => 'search', 'value' => 'filaforms'], ['type' => 'open_page', 'value' => 'https://filaforms.com'], ['type' => 'find_in_page', 'value' => 'https://filaforms.com']],
         'Filaforms builds forms for Filament.',
         'https://filaforms.com',
         'Filaforms',
     ));
-    $modelAndFetchCost = (int) ceil(resolve(ModelRegistry::class)->multiplierFor('gpt-5.5') + config('chat.tool_call_credit_bonus'));
+    $modelAndFetchCost = (int) ceil(resolve(ModelRegistry::class)->multiplierFor('gpt-5.5') + 2 * config('chat.tool_call_credit_bonus'));
 
     $resolution = settleWebResearchTurn('openai', 'gpt-5.5', 'c-web-2', '01TURNWEBOPENAIAAAAAAAAAAA');
 
-    expect($modelAndFetchCost)->toBe(2)
+    expect($modelAndFetchCost)->toBe(3)
         ->and($resolution->credits_charged)->toBe($modelAndFetchCost + 2)
-        ->and($resolution->metadata['web_searches_count'])->toBe(1);
+        ->and($resolution->metadata['web_searches_count'])->toBe(1)
+        ->and($resolution->metadata['tool_calls_count'])->toBe(2);
 });
 
 it('does not charge a web fetch as a search', function (): void {
