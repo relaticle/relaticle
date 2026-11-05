@@ -67,18 +67,18 @@ final class AssistantSettings extends Page
         return $schema
             ->components([
                 Section::make(__('Web search'))->schema([
-                Radio::make('web_search')
-                    ->label(__('When :name wants to search the web', ['name' => (string) config('chat.assistant_name')]))
-                    ->options(collect(WebSearchPreference::cases())->mapWithKeys(
-                        fn (WebSearchPreference $preference): array => [$preference->value => $preference->getLabel()],
-                    )->all())
-                    ->required()
-                    ->disabled(! $workspaceAllows)
-                    ->helperText($this->helperText($workspaceAllows))
-                    ->live()
-                    ->afterStateUpdated(function (): void {
-                        $this->save();
-                    }),
+                    Radio::make('web_search')
+                        ->label(__('When :name wants to search the web', ['name' => (string) config('chat.assistant_name')]))
+                        ->options(collect(WebSearchPreference::cases())->mapWithKeys(
+                            fn (WebSearchPreference $preference): array => [$preference->value => $preference->getLabel()],
+                        )->all())
+                        ->required()
+                        ->disabled(! $workspaceAllows)
+                        ->helperText($this->helperText($workspaceAllows))
+                        ->live()
+                        ->afterStateUpdated(function (): void {
+                            $this->save();
+                        }),
                 ]),
             ])
             ->statePath('data');
