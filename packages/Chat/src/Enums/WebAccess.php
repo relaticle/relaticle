@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Enums;
 
 use App\Models\User;
 use App\Models\Workspace;
+use Laravel\Ai\Enums\Lab;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\ModelDescriptor;
 
@@ -15,7 +16,9 @@ enum WebAccess
     case Ask;
     case Allowed;
 
-    private const array WEB_PROVIDERS = ['anthropic', 'openai'];
+    public const int MAX_SEARCHES = 5;
+
+    private const array WEB_PROVIDERS = [Lab::Anthropic->value, Lab::OpenAI->value];
 
     public static function for(User $user, Workspace $workspace, ?ModelDescriptor $model, ?string $resumesTurnId): self
     {
@@ -46,7 +49,7 @@ enum WebAccess
         return match ($this) {
             self::Unavailable => 'Web: you cannot open web pages or search the web on this turn. Ask the user to paste the page text or attach it as a .txt file.',
             self::Ask => 'Web: only when answering needs the web (a URL, a website, or something online), call RequestWebAccessTool once with the search you plan, before any web lookup and before any write for that request, then stop. A request the workspace data can answer, and every write that needs nothing from the web, never calls it.',
-            self::Allowed => 'Web: you can search the web and read pages on this turn, up to 5 searches.',
+            self::Allowed => 'Web: you can search the web and read pages on this turn, up to '.self::MAX_SEARCHES.' searches.',
         };
     }
 }

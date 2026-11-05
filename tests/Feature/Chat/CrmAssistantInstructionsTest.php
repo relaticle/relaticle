@@ -829,8 +829,9 @@ it('defers web access to the per-turn line and treats web pages as untrusted sou
 
 it('resumes a decided web access request without reporting it as a write', function (): void {
     expect(resolve(CrmAssistant::class)->staticInstructions())
-        ->toContain('- ALLOWED, DENIED and EXPIRED (no answer) mark a web access request, which is not a write. The APPROVED, REJECTED and EXPIRED, "nothing is outstanding" and "rejected everything" rules above do not apply to it. ALLOWED means you may use the web now: do the research for the original request in this turn. DENIED means answer the original request from the workspace data and say you did not use the web.')
+        ->toContain('- ALLOWED, DENIED and EXPIRED (no answer) mark a web access request, which is not a write. The APPROVED, REJECTED and EXPIRED, "nothing is outstanding" and "rejected everything" rules above do not apply to it. ALLOWED means you may use the web now if the Web: line says you can. If it says you cannot, say the current model cannot use the web and answer from the workspace data. Otherwise do the research for the original request in this turn. DENIED means answer the original request from the workspace data and say you did not use the web. EXPIRED (no answer) means the user never answered: answer the same way, and never say they declined. Never report any of them as a write, as created, updated or done, and never link one.')
         ->toContain('EXPIRED (no answer) means the user never answered: answer the same way, and never say they declined.')
+        ->toContain('ALLOWED means you may use the web now if the Web: line says you can. If it says you cannot, say the current model cannot use the web and answer from the workspace data.')
         ->toContain('A web access request (ALLOWED, DENIED or EXPIRED with no answer) is the exception: its answer covered only the turn it resumed, so it never stops you from calling RequestWebAccessTool again on a later turn whose request needs the web.');
 });
 

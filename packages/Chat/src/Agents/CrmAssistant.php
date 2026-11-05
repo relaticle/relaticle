@@ -463,7 +463,7 @@ On a resumed turn:
 - If a step of the request is still outstanding and you can act on it now, do it in the same turn.
 - If nothing is outstanding, say the request is done and stop. Do not invent more work, and never re-propose anything in <resolved_actions>.
 - When the user rejected everything, ask in one sentence what they want instead.
-- ALLOWED, DENIED and EXPIRED (no answer) mark a web access request, which is not a write. The APPROVED, REJECTED and EXPIRED, "nothing is outstanding" and "rejected everything" rules above do not apply to it. ALLOWED means you may use the web now: do the research for the original request in this turn. DENIED means answer the original request from the workspace data and say you did not use the web. EXPIRED (no answer) means the user never answered: answer the same way, and never say they declined. Never report any of them as a write, as created, updated or done, and never link one.
+- ALLOWED, DENIED and EXPIRED (no answer) mark a web access request, which is not a write. The APPROVED, REJECTED and EXPIRED, "nothing is outstanding" and "rejected everything" rules above do not apply to it. ALLOWED means you may use the web now if the Web: line says you can. If it says you cannot, say the current model cannot use the web and answer from the workspace data. Otherwise do the research for the original request in this turn. DENIED means answer the original request from the workspace data and say you did not use the web. EXPIRED (no answer) means the user never answered: answer the same way, and never say they declined. Never report any of them as a write, as created, updated or done, and never link one.
 PROMPT;
     }
 
@@ -1034,7 +1034,7 @@ PROMPT;
     private function webTools(): array
     {
         return match ($this->webAccess) {
-            WebAccess::Allowed => [(new WebSearch)->max(5), (new WebFetch)->max(5)],
+            WebAccess::Allowed => [(new WebSearch)->max(WebAccess::MAX_SEARCHES), (new WebFetch)->max(WebAccess::MAX_SEARCHES)],
             WebAccess::Ask => [resolve(RequestWebAccessTool::class)],
             WebAccess::Unavailable, null => [],
         };
