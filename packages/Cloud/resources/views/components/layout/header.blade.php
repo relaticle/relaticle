@@ -50,13 +50,13 @@
         ])>
         <div @class([
             'mx-auto',
-            'max-w-6xl px-2 pt-2 sm:px-3 md:px-6 md:pt-3.5' => $framed,
+            'max-w-6xl px-2 pt-2 sm:px-3 md:px-6 md:pt-3' => $framed,
             'max-w-7xl px-4 sm:px-6 lg:px-8' => ! $framed,
         ])>
             <div @class([
                 'pointer-events-auto rounded-2xl bg-white/95 px-2 shadow-navbar backdrop-blur-md sm:px-3 md:rounded-[1.25rem] md:px-4 dark:bg-gray-950/95' => $framed,
             ])>
-            <div @class(['flex h-16 items-center justify-between', 'md:h-17' => $framed])>
+            <div @class(['flex h-16 items-center justify-between', 'md:h-16' => $framed])>
 
                 <div class="flex flex-1 items-center">
                     <a href="{{ url('/') }}" class="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary rounded-sm" aria-label="Relaticle Home">
@@ -358,7 +358,7 @@
     </div>
 
     @if($framed)
-        <div class="bg-surface border-rail h-21 border-b md:h-25" aria-hidden="true">
+        <div class="bg-surface border-rail h-21 border-b md:h-23" aria-hidden="true">
             <div class="border-rail relative mx-auto h-full max-w-6xl sm:border-x">
                 <x-cloud::marketing.cross class="-bottom-3 -left-3"/>
                 <x-cloud::marketing.cross class="-bottom-3 -right-3"/>

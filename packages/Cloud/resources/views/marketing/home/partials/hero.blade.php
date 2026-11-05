@@ -2,7 +2,7 @@
     <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]" aria-hidden="true"></div>
 
     <div class="border-rail relative mx-auto max-w-6xl sm:border-x">
-        <div class="flex flex-col items-center px-6 pb-14 pt-11 text-center md:px-10 md:pb-16 md:pt-13">
+        <div class="flex flex-col items-center px-6 pb-12 pt-10 text-center md:px-10 md:pb-12 md:pt-10">
             <a href="https://github.com/relaticle/relaticle" target="_blank" rel="noopener"
                aria-label="{{ __('Open Source, :count+ GitHub stars', ['count' => $formattedGithubStars]) }}"
                class="group inline-flex items-center gap-2 rounded-full border border-gray-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200 hover:border-gray-300 dark:hover:border-white/[0.15]">
@@ -32,28 +32,20 @@
                 <x-ri-arrow-right-up-line class="h-3 w-3 text-gray-400 dark:text-gray-500"/>
             </a>
 
-            <h1 class="type-display mt-8 max-w-3xl md:mt-10 lg:text-7xl">
+            <h1 class="type-display mt-7 max-w-3xl md:mt-8">
                 <span class="block font-normal text-gray-500">{{ __('The AI CRM for selling') }}</span>
                 <span class="mt-[0.1em] block font-bold tracking-tight text-gray-950 dark:text-white">{{ __('without a sales team') }}</span>
             </h1>
 
-            <p class="mt-6 max-w-3xl text-base leading-relaxed text-gray-500 sm:text-lg dark:text-gray-400">
+            <p class="mt-5 max-w-3xl text-base leading-relaxed text-gray-500 sm:text-lg dark:text-gray-400">
                 {{ __('For people who sell to a named list of companies.') }}<br class="hidden sm:block"/>
-                {{ __('Work from') }}
-                <span class="inline-flex items-baseline">
-                    <span class="sr-only">{{ __('Claude, ChatGPT or Gemini') }}</span>
-                    <span class="inline-grid" aria-hidden="true">
-                        <x-cloud::marketing.actor as="claude" size="lg" class="hero-agent-claude col-start-1 row-start-1"/>
-                        <x-cloud::marketing.actor as="chatgpt" size="lg" class="hero-agent-chatgpt col-start-1 row-start-1"/>
-                        <x-cloud::marketing.actor as="gemini" size="lg" class="hero-agent-gemini col-start-1 row-start-1"/>
-                    </span>,
-                </span>
+                {{ __('Work from') }} <span class="font-medium text-gray-950 dark:text-white">Claude</span> {{ __('or') }} <span class="font-medium text-gray-950 dark:text-white">ChatGPT</span>,
                 {{ __('or ask') }}
                 <span class="inline-flex items-baseline"><x-cloud::marketing.actor as="rela" size="lg"/>,</span>
                 {{ __('the built-in AI assistant.') }}
             </p>
 
-            <div class="mt-8 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
+            <div class="mt-7 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
                 <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="hero">
                     {{ __('Start for free') }}
                 </x-cloud::marketing.button>
@@ -91,10 +83,10 @@
             ];
 
             $panelVariant = match (request()->query('panel')) {
+                '1' => 'warm',
                 '2' => 'violet',
-                '3' => 'indigo',
                 '4' => 'deep',
-                default => 'warm',
+                default => 'indigo',
             };
             $onDeep = $panelVariant === 'deep';
             $tabIdle = $onDeep
@@ -106,7 +98,7 @@
 
     <div class="relative px-2 pb-2 sm:px-3 sm:pb-3 md:px-6 md:pb-6">
         <div @class([
-            'rounded-2xl px-3 pb-4 pt-8 sm:px-6 sm:pb-8 sm:pt-12 md:rounded-3xl md:px-10 md:pb-12 md:pt-14',
+            'rounded-2xl px-3 pb-4 pt-8 sm:px-6 sm:pb-8 sm:pt-11 md:rounded-3xl md:px-10 md:pb-12 md:pt-12',
             'bg-hero-panel' => $panelVariant === 'warm',
             'bg-hero-panel-violet' => $panelVariant === 'violet',
             'bg-hero-panel-indigo' => $panelVariant === 'indigo',

@@ -9,7 +9,6 @@
         'rela' => [(string) config('chat.assistant_name'), 'ri-sparkling-2-fill', 'bg-primary-600 text-white'],
         'claude' => ['Claude', 'ri-claude-fill', 'bg-anthropic text-white'],
         'chatgpt' => ['ChatGPT', 'ri-openai-fill', 'bg-gray-600 text-white dark:bg-gray-300 dark:text-gray-950'],
-        'gemini' => ['Gemini', 'ri-gemini-fill', 'bg-gemini text-white'],
         'mailbox' => [__('Mailbox'), 'ri-mail-fill', 'bg-emerald-700 text-white'],
     ];
 
