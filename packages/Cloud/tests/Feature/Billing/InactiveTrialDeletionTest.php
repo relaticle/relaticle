@@ -425,15 +425,17 @@ it('sends no reminder outside the five-day window or for a deletion the owner re
     Mail::fake();
     $this->travelTo(inactivePausedAt()->addDays(50)->setTime(2, 0));
     $sixDays = inactivePausedWorkspace();
-    $sixDays->forceFill(['scheduled_deletion_at' => now()->addDays(6), 'deletion_reason' => DeletionReason::Inactivity])->save();
+    $sixDays->forceFill(['scheduled_deletion_at' => now()->addDays(6), 'deletion_reason' => DeletionReason::Inactivity, 'paused_at' => now()->addDays(6)->subDays(60)])->save();
     $fourDays = inactivePausedWorkspace();
-    $fourDays->forceFill(['scheduled_deletion_at' => now()->addDays(4), 'deletion_reason' => DeletionReason::Inactivity])->save();
+    $fourDays->forceFill(['scheduled_deletion_at' => now()->addDays(4), 'deletion_reason' => DeletionReason::Inactivity, 'paused_at' => now()->addDays(4)->subDays(60)])->save();
     $requested = inactivePausedWorkspace();
     $requested->forceFill(['scheduled_deletion_at' => now()->addDays(5), 'deletion_reason' => DeletionReason::Requested])->save();
 
     runInactivityCommand();
 
     Mail::assertNothingQueued();
+    expect($sixDays->refresh()->deletion_reason)->toBe(DeletionReason::Inactivity)
+        ->and($fourDays->refresh()->deletion_reason)->toBe(DeletionReason::Inactivity);
 });
 
 it('writes the reminder with the deletion date in the owner timezone', function (): void {
@@ -742,6 +744,7 @@ it('sends no confirmation when the owner is being deleted along with the workspa
 it('purges quietly when the owner row is already gone', function (): void {
     withHostedBilling();
     Mail::fake();
+    Exceptions::fake();
     $workspace = inactivePausedWorkspace();
     DB::table('users')->where('id', $workspace->user_id)->delete();
 
@@ -749,6 +752,7 @@ it('purges quietly when the owner row is already gone', function (): void {
 
     expect(Workspace::query()->whereKey($workspace->getKey())->exists())->toBeFalse();
     Mail::assertNothingQueued();
+    Exceptions::assertNothingReported();
 });
 
 /** @return array<string, Closure(Workspace): mixed> */
