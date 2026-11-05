@@ -17,6 +17,31 @@
 <x-cloud::guest-layout :title="__('Page not found').' - Relaticle'" robots="noindex">
     <x-cloud::marketing.hero align="start">
         <x-slot:eyebrow>
+            <svg viewBox="-35 50 1640 1060" class="not-found-mark mb-10 block h-32 w-auto md:h-44" fill="none" aria-hidden="true">
+                <path d="M579 570.7 L157.9 254.9" stroke="#5D54E8" stroke-width="70" stroke-linecap="round"/>
+                <path d="M579 570.7 L965 886.5" stroke="#5D54E8" stroke-width="70" stroke-linecap="round"/>
+                <path d="M579 570.7 L868.6 392.5" stroke="#5D54E8" stroke-width="70" stroke-linecap="round"/>
+
+                <g class="not-found-mark-trace">
+                    <circle cx="1035.2" cy="290" r="122.8" class="not-found-mark-slot stroke-gray-300 dark:stroke-gray-600" stroke-width="10" stroke-dasharray="26 30"/>
+                    <circle cx="934" cy="364" r="27" fill="#5D54E8" opacity="0.5"/>
+                    <circle cx="978" cy="322" r="18" fill="#5D54E8" opacity="0.35"/>
+                    <path d="M1168 258 Q 1232 206 1296 222" class="stroke-gray-300 dark:stroke-gray-600" stroke-width="14" stroke-linecap="round" stroke-dasharray="0.1 40"/>
+                </g>
+
+                <circle cx="157.9" cy="254.9" r="157.9" fill="#5D54E8" opacity="0.85"/>
+                <circle cx="965" cy="886.5" r="175.5" fill="#5D54E8" opacity="0.9"/>
+                <circle cx="579" cy="570.7" r="298.3" fill="#5D54E8"/>
+
+                <g class="not-found-mark-node">
+                    <g class="not-found-mark-reach">
+                        <g transform="rotate(-22 1435.2 220)">
+                            <path d="M1435.2 220 L1279.5 315.8" stroke="#5D54E8" stroke-width="70" stroke-linecap="round" opacity="0.75"/>
+                            <circle cx="1435.2" cy="220" r="122.8" fill="#5D54E8" opacity="0.75"/>
+                        </g>
+                    </g>
+                </g>
+            </svg>
             <x-cloud::marketing.eyebrow>{{ __('Error 404') }}</x-cloud::marketing.eyebrow>
         </x-slot:eyebrow>
 
