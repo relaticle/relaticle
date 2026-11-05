@@ -29,7 +29,17 @@ async function filamentTiptap() {
     return {
         name: 'filament-tiptap',
         enforce: 'pre',
-        resolveId: (id) => (id in shared ? prefix + id : null),
+        resolveId(id) {
+            if (id in shared) {
+                return prefix + id;
+            }
+
+            if (/^(@tiptap\/(core|pm)|prosemirror-)/.test(id)) {
+                this.error(`${id} would bundle a second TipTap or ProseMirror copy. Only ${Object.keys(shared).join(', ')} resolve to the editor's own.`);
+            }
+
+            return null;
+        },
         load: (id) => (id.startsWith(prefix) ? modules[id.slice(prefix.length)] : null),
     };
 }
@@ -40,6 +50,7 @@ try {
     await build({
         root,
         configFile: false,
+        publicDir: false,
         logLevel: 'warn',
         plugins: [await filamentTiptap()],
         build: {
