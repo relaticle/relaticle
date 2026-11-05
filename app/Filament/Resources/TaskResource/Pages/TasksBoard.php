@@ -16,13 +16,16 @@ use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
+use App\Models\CustomFieldValue;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\ChecklistHtml;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Infolists\Components\ImageEntry;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Size;
 use Filament\Support\Enums\Width;
@@ -117,15 +120,10 @@ final class TasksBoard extends BoardResourcePage
                     ->components([
                         $descriptionCustomField,
                         CardFlex::make([
+                            $this->checklistProgressEntry(),
                             $priorityField,
                             $dueDateField,
-                            ImageEntry::make('assignees.profile_photo_url')
-                                ->hiddenLabel()
-                                ->alignLeft()
-                                ->imageHeight(20)
-                                ->circular()
-                                ->visible(fn (mixed $state): bool => filled($state))
-                                ->stacked(),
+                            $this->assigneeAvatarsEntry(),
                         ])->align('center'),
                     ]);
             })
@@ -137,6 +135,38 @@ final class TasksBoard extends BoardResourcePage
             ->filtersFormWidth(Width::Medium)
             ->filtersTriggerAction(fn (Action $action): Action => $action->button()->labeledFrom('sm')->size(Size::Small)->label(__('filament/pages/boards.filters_button.label')))
             ->headerToolbar();
+    }
+
+    private function assigneeAvatarsEntry(): ImageEntry
+    {
+        return ImageEntry::make('assignees.profile_photo_url')
+            ->hiddenLabel()
+            ->alignLeft()
+            ->imageHeight(20)
+            ->circular()
+            ->visible(fn (mixed $state): bool => filled($state))
+            ->stacked();
+    }
+
+    private function checklistProgressEntry(): TextEntry
+    {
+        return TextEntry::make('checklist_progress')
+            ->hiddenLabel()
+            ->badge()
+            ->color('gray')
+            ->icon('heroicon-o-check-circle')
+            ->grow(false)
+            ->extraAttributes(['data-checklist-progress' => ''])
+            ->state(function (Task $record): ?string {
+                $description = $record->customFieldValues
+                    ->first(fn (CustomFieldValue $value): bool => $value->customField instanceof CustomField && $value->customField->holdsChecklists())
+                    ?->getValue();
+
+                $progress = is_string($description) ? ChecklistHtml::progress($description) : null;
+
+                return $progress === null ? null : "{$progress['checked']}/{$progress['total']}";
+            })
+            ->visible(fn (?string $state): bool => filled($state));
     }
 
     /**

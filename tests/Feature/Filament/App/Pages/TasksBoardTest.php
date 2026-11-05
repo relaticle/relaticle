@@ -11,6 +11,7 @@ use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Models\CustomField;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\ChecklistHtml;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Collection;
@@ -20,7 +21,7 @@ use Relaticle\Flowforge\Board;
 use Relaticle\Flowforge\Grouping;
 use Relaticle\Flowforge\Lane;
 
-mutates(TasksBoard::class, CreateTaskAction::class);
+mutates(TasksBoard::class, CreateTaskAction::class, ChecklistHtml::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -436,4 +437,64 @@ it('links the sidebar to the board on the next page after the user opens it', fu
     $this->get(CompanyResource::getUrl('index'))
         ->assertOk()
         ->assertSee('href="'.TaskResource::getUrl('board').'"', escape: false);
+});
+
+function tasksBoardChecklistHtml(): string
+{
+    return '<ul data-type="taskList">'
+        .'<li data-checked="true" data-type="taskItem"><label><input type="checkbox" checked="checked"><span></span></label><div><p>Call Bob</p></div></li>'
+        .'<li data-checked="false" data-type="taskItem"><label><input type="checkbox"><span></span></label><div><p>Send quote</p></div></li>'
+        .'</ul>';
+}
+
+function tasksBoardCardWithDescription(mixed $test, string $description): Task
+{
+    $descriptionField = CustomField::query()
+        ->forEntity(Task::class)
+        ->where('code', TaskField::DESCRIPTION)
+        ->first();
+
+    $task = Task::factory()->recycle([$test->user, $test->workspace])->create();
+    $task->saveCustomFieldValue($test->statusField, $test->statusField->options->firstWhere('name', 'To do')->getKey());
+    $task->saveCustomFieldValue($descriptionField, $description);
+
+    return $task;
+}
+
+it('shows checklist progress on a task card', function (): void {
+    tasksBoardCardWithDescription($this, tasksBoardChecklistHtml());
+
+    livewire(TasksBoard::class)
+        ->assertSeeHtml('data-checklist-progress')
+        ->assertSee('1/2');
+});
+
+it('shows no checklist badge on a card without a checklist', function (): void {
+    tasksBoardCardWithDescription($this, '<p>Plain</p>');
+
+    livewire(TasksBoard::class)
+        ->assertSee('Plain')
+        ->assertDontSeeHtml('data-checklist-progress');
+});
+
+it('reads checklist progress without a query per card', function (): void {
+    $countQueries = function (): int {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        livewire(TasksBoard::class)->assertSee('1/2');
+        $count = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        return $count;
+    };
+
+    tasksBoardCardWithDescription($this, tasksBoardChecklistHtml());
+    livewire(TasksBoard::class);
+    $withOneCard = $countQueries();
+
+    foreach (range(1, 4) as $ignored) {
+        tasksBoardCardWithDescription($this, tasksBoardChecklistHtml());
+    }
+
+    expect($countQueries())->toBe($withOneCard);
 });

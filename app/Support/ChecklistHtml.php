@@ -56,6 +56,26 @@ final readonly class ChecklistHtml
         return self::rebuild(self::parse($html));
     }
 
+    /** @return array{checked: int, total: int}|null */
+    public static function progress(string $html): ?array
+    {
+        if (! str_contains($html, 'taskItem')) {
+            return null;
+        }
+
+        $document = self::parse($html);
+        $total = $document->querySelectorAll('li[data-type="taskItem"]')->length;
+
+        if ($total === 0) {
+            return null;
+        }
+
+        return [
+            'checked' => $document->querySelectorAll('li[data-type="taskItem"][data-checked="true"]')->length,
+            'total' => $total,
+        ];
+    }
+
     private static function parse(string $html): HTMLDocument
     {
         return HTMLDocument::createFromString('<body>'.$html, LIBXML_NOERROR, 'UTF-8');
