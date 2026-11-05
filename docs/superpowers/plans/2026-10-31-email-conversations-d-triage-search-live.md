@@ -553,6 +553,13 @@ triggers on the test database: `StoreEmailAction` fills both vectors in its tran
 insert carries the snippet vector, and a snippet update rebuilds the body vector. `Email` hides
 both columns from `toArray()`, because the body vector holds the body's words.
 
+**Review fixes (2026-11-05):** two immutable SQL functions own the vector expressions,
+`email_subject_vector(subject)` and `email_body_vector(snippet, body_text)`, and both triggers and
+the backfill call them. The subject is capped at 65,536 characters like the body. The body trigger
+also fires on `delete`: it rebuilds `body_search` from the snippet alone, keyed by
+`coalesce(new.email_id, old.email_id)`, so a deleted body's words stop matching. A cascade delete
+from `emails` finds no row to update and raises nothing.
+
 ### Task 4: Concurrent indexes
 
 **Files:** migration `000002`.

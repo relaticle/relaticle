@@ -81,14 +81,13 @@ final class BackfillEmailSearchVectorsCommand extends Command
     /** @param  list<string>  $ids */
     private function fill(array $ids): int
     {
-        // The same expressions as the search triggers. Coalesce keeps a vector a trigger wrote since
-        // the read, and the query builder leaves updated_at alone.
+        // Coalesce keeps a vector a trigger wrote since the read, and the query builder leaves updated_at alone.
         return DB::table('emails')
             ->whereIn('id', $ids)
             ->where(fn (Builder $query): Builder => $query->whereNull('subject_search')->orWhereNull('body_search'))
             ->update([
-                'subject_search' => DB::raw("coalesce(subject_search, to_tsvector('simple', coalesce(subject, '')))"),
-                'body_search' => DB::raw("coalesce(body_search, to_tsvector('simple', coalesce(snippet, '') || ' ' || left(coalesce((select email_bodies.body_text from email_bodies where email_bodies.email_id = emails.id), ''), 65536)))"),
+                'subject_search' => DB::raw('coalesce(subject_search, email_subject_vector(subject))'),
+                'body_search' => DB::raw('coalesce(body_search, email_body_vector(snippet, (select email_bodies.body_text from email_bodies where email_bodies.email_id = emails.id)))'),
             ]);
     }
 

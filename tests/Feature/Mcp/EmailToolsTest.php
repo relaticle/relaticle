@@ -709,8 +709,16 @@ it('does not match a body word through a metadata share over a full email', func
         'shared_by' => $this->coworker->id,
     ]);
 
-    expect(listedEmails($this->viewer, ['search' => 'kumquat']))->toBe([]);
+    expect(array_column(listedEmails($this->viewer, ['search' => 'acme.test']), 'id'))->toBe([$email->id])
+        ->and(listedEmails($this->viewer, ['search' => 'kumquat']))->toBe([]);
 });
+
+it('matches a body word of a teammate email shared in full', function (): void {
+    $email = ($this->emailFrom)($this->coworker, ['privacy_tier' => EmailPrivacyTier::FULL, 'subject' => 'Orchard update', 'snippet' => 'Notes from the grower']);
+    EmailBody::create(['email_id' => $email->id, 'body_html' => null, 'body_text' => 'The kumquat harvest is late this year']);
+
+    expect(array_column(listedEmails($this->viewer, ['search' => 'kumquat']), 'id'))->toBe([$email->id]);
+})->todo(note: 'Passes once EmailSearchService matches body_search (PR 8 Task 6).');
 
 it('filters by thread', function (): void {
     $inThread = ($this->emailFrom)($this->viewer, ['thread_id' => 'thread-one']);

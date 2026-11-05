@@ -843,8 +843,16 @@ describe('search', function (): void {
             'shared_with' => $this->viewer->id,
         ]);
 
+        EmailParticipant::query()->create([
+            'email_id' => $email->id,
+            'email_address' => 'grower@orchard.test',
+            'name' => 'Grower',
+            'role' => EmailParticipantRole::FROM,
+        ]);
+
         $this->actingAs($this->viewer);
 
+        ($this->searchTab)('orchard.test')->assertSeeHtml("email-list-row-{$email->getKey()}");
         ($this->searchTab)('kumquat')->assertDontSeeHtml("email-list-row-{$email->getKey()}");
     });
 
