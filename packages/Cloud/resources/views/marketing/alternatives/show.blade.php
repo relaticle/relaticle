@@ -141,7 +141,7 @@
                     {{ __('Self-host it free under AGPL-3.0, or start on the hosted plan. Both run the same open-source CRM.') }}
                 </p>
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
-                    <x-cloud::marketing.button href="{{ route('login') }}">
+                    <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="footer">
                         {{ __('Start for free') }}
                     </x-cloud::marketing.button>
                     <x-cloud::marketing.button variant="secondary" href="{{ route('contact') }}">

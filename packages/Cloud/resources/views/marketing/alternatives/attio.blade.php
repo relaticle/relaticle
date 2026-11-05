@@ -55,7 +55,7 @@
                         {{ __('Relaticle keeps the people and companies you sell to, and your sales pipeline, in a CRM you can self-host and modify. Choose our cloud for flat workspace pricing and unlimited users.') }}
                     </p>
                     <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-                        <x-cloud::marketing.button :href="route('login')" icon-trailing="ri-arrow-right-line">
+                        <x-cloud::marketing.button :href="route('login')" icon-trailing="ri-arrow-right-line" data-analytics-intent="signup" data-analytics-placement="hero">
                             {{ __('Start for free') }}
                         </x-cloud::marketing.button>
                         <x-cloud::marketing.button variant="secondary" :href="route('selfHosted')">
@@ -236,7 +236,7 @@
                 <h2 id="try-title" class="font-display text-3xl font-bold tracking-tight sm:text-4xl">{{ __('Make your next CRM an informed choice.') }}</h2>
                 <p class="mx-auto mt-4 max-w-xl leading-relaxed text-gray-600 dark:text-gray-400">{{ __('Start a workspace, bring a few records and try your actual sales workflow. See whether Relaticle fits before you move.') }}</p>
                 <div class="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
-                    <x-cloud::marketing.button :href="route('login')" icon-trailing="ri-arrow-right-line">{{ __('Start for free') }}</x-cloud::marketing.button>
+                    <x-cloud::marketing.button :href="route('login')" icon-trailing="ri-arrow-right-line" data-analytics-intent="signup" data-analytics-placement="footer">{{ __('Start for free') }}</x-cloud::marketing.button>
                     <x-cloud::marketing.button variant="secondary" :href="route('contact')">{{ __('Talk through your migration') }}</x-cloud::marketing.button>
                 </div>
             </div>

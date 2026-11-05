@@ -30,7 +30,7 @@
             </p>
 
             <div class="flex flex-col sm:flex-row items-center justify-center gap-3 mb-6">
-                <x-cloud::marketing.button href="{{ route('login') }}">
+                <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="footer">
                     Start for free
                 </x-cloud::marketing.button>
 

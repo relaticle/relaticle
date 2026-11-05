@@ -110,7 +110,8 @@ describe('Legal pages', function () {
         $response->assertSee('Privacy Policy');
         $response->assertSee('Relaticle');
         $response->assertSee('privacy@relaticle.com');
-        $response->assertSee('October 6, 2026');
+        $response->assertSee('November 4, 2026');
+        $response->assertSee('We honor Do Not Track and Global Privacy Control for Fathom tracking and first-party acquisition capture.');
         $response->assertSee('Data from a self-hosted installation stays on your servers unless you configure an external integration.');
         $response->assertSee('That integration may send authorized data to its provider.');
         $response->assertSee('Relaticle does not sell CRM data.');

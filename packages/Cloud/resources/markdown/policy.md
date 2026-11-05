@@ -1,4 +1,4 @@
-**Effective date:** October 6, 2026
+**Effective date:** November 4, 2026
 
 This Privacy Policy explains how Relaticle ("we", "us", "our") collects, uses, and protects your personal data when you use our services.
 
@@ -12,6 +12,7 @@ This Privacy Policy explains how Relaticle ("we", "us", "our") collects, uses, a
 - **Profile data:** Avatar, workspace name, and role
 - **CRM data:** Companies, people, opportunities, tasks, notes, and custom fields you create
 - **Usage data:** Login timestamps, feature usage, and error reports
+- **Acquisition data:** An approved source and campaign category, landing-page category, and associated signup, setup, checkout, and payment milestones
 - **Technical data:** IP address, browser type, and device information
 
 ### Self-Hosted Users
@@ -21,7 +22,8 @@ Data from a self-hosted installation stays on your servers unless you configure 
 ### Website Visitors (relaticle.com)
 
 - **Contact form submissions:** Name, email, and message content
-- **Analytics:** Anonymous page views and referrer data
+- **Analytics:** Page views and intentional button or completion events through Fathom, without account identifiers or CRM content
+- **First-party attribution:** Limited source and campaign categories in your session, using a 30-day lookback. We associate these with your account and first workspace if you sign up
 
 ## 2. How We Use Your Data
 
@@ -32,6 +34,7 @@ We use your data to:
 - Send transactional emails (password resets, workspace invitations)
 - Send product updates to the email address on a verified account. You can unsubscribe from them at any time
 - Improve the service based on aggregated, anonymized usage patterns
+- Compare acquisition sources with activation and payment outcomes using limited first-party account data
 - Respond to support inquiries
 
 We do **not**:
@@ -50,7 +53,7 @@ The Cloud service uses the following third-party providers:
 - **Error monitoring:** For detecting and fixing bugs. An error report can include data from the request that failed
 - **AI providers:** For AI features you use, such as the assistant and email thread summaries. They receive only the content needed to answer that request.
 - **Payments:** For Cloud plan billing. Card details go to the payment provider directly
-- **Analytics:** For page view counts on the website and in the app, without cookies
+- **Analytics:** Fathom receives normalized page paths and intentional events. We omit query strings, raw referrer URLs, account identifiers, and CRM content
 - **Product updates:** For the update emails described in section 2
 
 The [Security page](/security#providers) names each provider and what it receives.
@@ -70,6 +73,7 @@ We protect your data with:
 ## 5. Data Retention
 
 - **Active accounts:** Data is retained as long as your account is active
+- **Acquisition attribution:** Session data follows your session lifetime. Attribution saved at signup and associated milestones remain until the account is deleted
 - **Scheduled account deletions:** Accounts and their personal data are removed after a 30-day grace period. Records in shared workspaces remain.
 - **Contact form submissions:** Retained for up to 12 months
 - **Server logs:** Retained for up to 90 days
@@ -96,7 +100,9 @@ The Cloud service uses essential cookies for:
 - CSRF protection (security)
 - Theme preferences (light/dark mode)
 
-We do not use tracking cookies or third-party advertising cookies.
+Fathom does not set analytics cookies. Our session cookie also carries limited first-party acquisition attribution before signup.
+The browser temporarily keeps undelivered analytics events in tab storage. We do not use third-party advertising cookies.
+We honor Do Not Track and Global Privacy Control for Fathom tracking and first-party acquisition capture.
 
 ## 8. Children
 

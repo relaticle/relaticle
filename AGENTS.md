@@ -181,6 +181,20 @@ final readonly class CreateOpportunity
   (`Relaticle\ImportWizard\Data\ColumnData`). Use a plain `final readonly` class when code
   builds the object with `new` (`App\Data\ListQuery`). No test tells the two apart, so a
   reviewer reads for a data object that only ever meets `new`
+- Settings that a feature will keep adding to share one nullable `jsonb` column on their
+  owner, named for the feature: `workspaces.ai_settings` holds every workspace-level setting
+  for the assistant. A new setting is a new property, not a migration. Use a boolean or enum
+  column only for a standalone setting that SQL filters or reports on
+- A laravel-data class types that column: `App\Data\AiSettings` is the worked example. The
+  model casts it with `AiSettings::class.':default'`, so a `null` column reads as the
+  defaults. Each property carries its default in the constructor, and
+  `#[MapName(SnakeCaseMapper::class)]` keeps the stored keys snake case. Readers use the typed
+  property (`$workspace->ai_settings->webSearch`) and never index the raw array. The action
+  that writes one setting rebuilds the object from the current values:
+  `AiSettings::from([...$workspace->ai_settings->toArray(), 'web_search' => $enabled])`.
+  `tests/Feature/Chat/AssistantSettingsTest.php` fails when the stored key or a default
+  changes. `users.ai_preferences` and `users.notification_preferences` predate this rule and
+  still use the `array` cast
 - Name domain concepts plainly (`Plan`, not `AiPlan`). Context comes from the
   namespace
 - `Support` holds code with no business rule in it: code that could ship as a standalone
@@ -807,6 +821,10 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
 ## Releases
 
 - Merge to main and tag only on explicit instruction, never on your own.
+- Composer security fixes are the one exception, and a bot runs it. `security-patch.yml` opens
+  and auto-merges the `security/composer-advisories` pull request.
+  `security-release.yml` tags the next patch release when that merge is the only commit since
+  the last tag. Otherwise it comments on the pull request, and a person releases.
 - Procedure: merge → `git checkout main && git pull` → confirm local and remote
   parity (`git log origin/main..main` and the reverse are both empty) → tag
   `vX.Y.Z` (minor for features, patch for fixes) → `git push origin <tag>`.

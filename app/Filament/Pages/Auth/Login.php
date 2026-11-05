@@ -37,6 +37,7 @@ use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\HtmlString;
+use Illuminate\Support\Str;
 use Illuminate\Support\Timebox;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
@@ -377,6 +378,7 @@ final class Login extends \Filament\Auth\Pages\Login
 
         if ($this->authMethod === 'signup') {
             $this->assertNotSigningUpOverTor();
+            $this->dispatch('analytics-event', name: 'signup_started', id: (string) Str::uuid());
         }
     }
 

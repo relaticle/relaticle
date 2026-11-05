@@ -46,7 +46,7 @@ final readonly class ResolvedActionText
         $operation = PendingActionOperation::from($action['operation']);
         $verb = $entity->verb($operation);
         $noun = $entity->noun();
-        $head = '- '.$marker.PendingActionStatus::from($action['status'])->promptWord().": {$verb} ";
+        $head = '- '.$marker.$entity->decisionWord(PendingActionStatus::from($action['status'])).": {$verb} ";
         $notWritten = $entity->notDone($operation);
 
         if (count($records) > 1 || ($records !== [] && $skipped !== [])) {

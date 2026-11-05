@@ -4,18 +4,20 @@ declare(strict_types=1);
 
 namespace App\Actions\Auth;
 
+use App\Enums\AuthMethod;
 use App\Models\User;
 use App\Support\Auth\AuthenticationSession;
 use App\Support\Auth\LoginDestination;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 final readonly class CompleteAuthentication
 {
     private const array PRESERVED_SESSION_KEYS = [
-        'fathom.track_signup',
-        'fathom.track_workspace_created',
+        'fathom',
+        'analytics.acquisition',
         'mcp.oauth.workspace_id',
         'auth.link_suggestion',
     ];
@@ -52,6 +54,10 @@ final readonly class CompleteAuthentication
         $session->regenerateToken();
 
         AuthenticationSession::markComplete($user);
+
+        if ($pending['method'] !== AuthMethod::REMEMBERED->value) {
+            $session->put('fathom.track_login_completed', (string) Str::uuid());
+        }
 
         return $this->loginDestination->resolve($user, is_string($intended) ? $intended : null);
     }
