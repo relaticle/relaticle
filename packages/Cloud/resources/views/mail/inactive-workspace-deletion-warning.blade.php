@@ -1,8 +1,8 @@
 <x-mail::message :reason="__('mail.footer.reason.owner', ['workspace' => $workspace->name])">
-<x-slot:preheader>{{ __('cloud::inactivity.warning.preheader', ['paused' => $paused]) }}</x-slot:preheader>
+<x-slot:preheader>{{ __('cloud::inactivity.warning.preheader', ['since' => $since]) }}</x-slot:preheader>
 # {{ __('cloud::inactivity.warning.heading', ['workspace' => $workspace->name, 'date' => $date]) }}
 
-{{ __('cloud::inactivity.warning.paused', ['workspace' => $workspace->name, 'paused' => $paused]) }}
+{{ __('cloud::inactivity.warning.paused', ['workspace' => $workspace->name, 'since' => $since]) }}
 
 {{ __('cloud::inactivity.warning.rule', ['workspace' => $workspace->name, 'date' => $date]) }}
 

@@ -23,12 +23,13 @@ final readonly class InactiveTrialWorkspacesQuery
     {
         return BillingStatus::TrialEnded->applyToQuery(Workspace::query())
             ->whereNotNull('paused_at')
+            ->whereNull('trial_ends_at')
             ->notScheduledForDeletion()
             ->whereHas('owner')
             ->whereNotIn('id', AiCreditTransaction::query()->where('type', AiCreditType::Purchase)->select('workspace_id'))
             ->with(['owner', 'subscriptions'])
             ->lazyById(100)
-            ->reject(static fn (Workspace $workspace): bool => $workspace->hasChargedSubscription());
+            ->reject(static fn (Workspace $workspace): bool => $workspace->pendingManagedSubscription() !== null);
     }
 
     public function lastActivity(Workspace $workspace): CarbonImmutable

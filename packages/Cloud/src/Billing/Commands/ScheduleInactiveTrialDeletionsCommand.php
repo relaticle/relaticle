@@ -29,13 +29,13 @@ final class ScheduleInactiveTrialDeletionsCommand extends Command
 
         $inactive->candidates()->each(function (Workspace $workspace) use ($inactive, &$scheduled): void {
             $owner = $workspace->owner;
-            $pausedAt = $workspace->paused_at;
 
-            if (! $owner instanceof User || $pausedAt === null) {
+            if (! $owner instanceof User) {
                 return;
             }
 
-            $deletesAt = $inactive->lastActivity($workspace)->addDays(self::KEEP_DAYS);
+            $lastActiveAt = $inactive->lastActivity($workspace);
+            $deletesAt = $lastActiveAt->addDays(self::KEEP_DAYS);
             $earliest = now()->addDays(self::WARNING_DAYS);
 
             if ($deletesAt->greaterThan($earliest)) {
@@ -46,16 +46,27 @@ final class ScheduleInactiveTrialDeletionsCommand extends Command
 
             $this->info("Scheduling deletion of {$workspace->name} for {$deletesAt->toDateString()}...");
 
-            DB::transaction(function () use ($workspace, $owner, $deletesAt, $pausedAt): void {
-                $workspace->forceFill([
-                    'scheduled_deletion_at' => $deletesAt,
-                    'deletion_reason' => DeletionReason::Inactivity,
-                ])->save();
+            $wasScheduled = DB::transaction(function () use ($workspace, $owner, $deletesAt, $lastActiveAt): bool {
+                $updated = Workspace::query()
+                    ->whereKey($workspace->getKey())
+                    ->notScheduledForDeletion()
+                    ->update([
+                        'scheduled_deletion_at' => $deletesAt,
+                        'deletion_reason' => DeletionReason::Inactivity->value,
+                    ]);
 
-                Mail::to($owner->email)->queue(new InactiveWorkspaceDeletionWarningMail($workspace, $deletesAt, $pausedAt));
+                if ($updated !== 1) {
+                    return false;
+                }
+
+                Mail::to($owner->email)->queue(new InactiveWorkspaceDeletionWarningMail($workspace, $deletesAt, $lastActiveAt));
+
+                return true;
             });
 
-            $scheduled++;
+            if ($wasScheduled) {
+                $scheduled++;
+            }
         });
 
         $this->comment("Scheduled {$scheduled} inactive workspace(s) for deletion.");

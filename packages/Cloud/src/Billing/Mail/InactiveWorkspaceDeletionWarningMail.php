@@ -26,7 +26,7 @@ final class InactiveWorkspaceDeletionWarningMail extends Mailable implements Sho
     public function __construct(
         public Workspace $workspace,
         public CarbonImmutable $deletesAt,
-        public CarbonImmutable $pausedAt,
+        public CarbonImmutable $lastActiveAt,
     ) {}
 
     public function envelope(): Envelope
@@ -43,7 +43,7 @@ final class InactiveWorkspaceDeletionWarningMail extends Mailable implements Sho
             markdown: 'cloud::mail.inactive-workspace-deletion-warning',
             with: [
                 'date' => $this->onDate($this->deletesAt),
-                'paused' => $this->onDate($this->pausedAt),
+                'since' => $this->onDate($this->lastActiveAt),
                 'billingUrl' => Billing::getUrl(panel: 'app', tenant: $this->workspace),
             ],
         );

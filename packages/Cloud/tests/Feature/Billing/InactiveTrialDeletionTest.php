@@ -7,7 +7,11 @@ use App\Enums\Plan;
 use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
+use Illuminate\Console\Scheduling\Event;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Enums\AiCreditType;
@@ -164,7 +168,9 @@ function inactiveExclusions(): array
             $workspace->subscriptions()->create(['type' => 'default', 'stripe_id' => 'sub_live', 'stripe_status' => 'active', 'stripe_price' => 'price_pro_monthly_test', 'quantity' => 1]);
         },
         'grandfathered' => fn (Workspace $workspace): bool => $workspace->forceFill(['hosted_free_grandfathered_at' => now()->subYear()])->save(),
-        'once charged' => fn (Workspace $workspace): Model => $workspace->subscriptions()->create(['type' => 'default', 'stripe_id' => 'sub_past', 'stripe_status' => 'canceled', 'stripe_price' => 'price_pro_monthly_test', 'quantity' => 1, 'ends_at' => inactivePausedAt()->subMonth()]),
+        'charged once and since canceled' => fn (Workspace $workspace): Model => $workspace->subscriptions()->create(['type' => 'default', 'stripe_id' => 'sub_past', 'stripe_status' => 'canceled', 'stripe_price' => 'price_pro_monthly_test', 'quantity' => 1, 'ends_at' => inactivePausedAt()->addDays(20)]),
+        'owed an unpaid managed invoice' => fn (Workspace $workspace): Model => $workspace->subscriptions()->create(['type' => 'managed_pending', 'stripe_id' => 'sub_managed', 'stripe_status' => 'incomplete', 'stripe_price' => 'price_pro_monthly_test', 'quantity' => 1]),
+        'on a trial that ended but is not paused yet' => fn (Workspace $workspace): bool => $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => inactivePausedAt()->addDays(90)])->save(),
         'bought a credit pack' => fn (Workspace $workspace): Model => AiCreditTransaction::factory()->create(['workspace_id' => $workspace->getKey(), 'type' => AiCreditType::Purchase]),
         'scheduled on request' => fn (Workspace $workspace): bool => $workspace->forceFill(['scheduled_deletion_at' => inactivePausedAt()->addDays(120), 'deletion_reason' => DeletionReason::Requested])->save(),
         'never paused' => fn (Workspace $workspace): bool => $workspace->forceFill(['paused_at' => null])->save(),
@@ -187,6 +193,53 @@ foreach (inactiveExclusions() as $reason => $arrange) {
     });
 }
 
+it('counts only the owner and members of this workspace as sign-ins', function (): void {
+    Mail::fake();
+    $workspace = inactivePausedWorkspace();
+    $stranger = User::factory()->create(['last_login_at' => inactivePausedAt()->addDays(44)]);
+    inactivePausedWorkspace()->users()->attach($stranger, ['role' => 'admin']);
+
+    $this->travelTo(inactivePausedAt()->addDays(46));
+    runInactivityCommand();
+
+    expect($workspace->refresh()->scheduled_deletion_at?->toDateTimeString())->toBe(inactivePausedAt()->addDays(60)->toDateTimeString());
+});
+
+it('does not overwrite an owner request that lands after the workspace was read', function (): void {
+    Mail::fake();
+    $workspace = inactivePausedWorkspace();
+    $requestedFor = inactivePausedAt()->addDays(120);
+
+    $raced = false;
+    DB::listen(function (QueryExecuted $query) use (&$raced, $workspace, $requestedFor): void {
+        if ($raced || ! str_contains($query->sql, 'max("last_login_at")')) {
+            return;
+        }
+
+        $raced = true;
+        DB::table('workspaces')->where('id', $workspace->getKey())->update(['scheduled_deletion_at' => $requestedFor, 'deletion_reason' => DeletionReason::Requested->value]);
+    });
+
+    $this->travelTo(inactivePausedAt()->addDays(46));
+    runInactivityCommand();
+
+    expect($raced)->toBeTrue();
+    expect($workspace->refresh()->deletion_reason)->toBe(DeletionReason::Requested);
+    Mail::assertNothingQueued();
+});
+
+it('runs daily at 02:00', function (): void {
+    $this->artisan('schedule:list')->assertSuccessful();
+
+    $expressions = collect(resolve(Schedule::class)->events())
+        ->filter(fn (Event $event): bool => str_contains((string) $event->command, 'billing:schedule-inactive-deletions'))
+        ->map(fn (Event $event): string => $event->expression)
+        ->values()
+        ->all();
+
+    expect($expressions)->toBe(['0 2 * * *']);
+});
+
 it('keeps the date and the reason of a deletion the owner requested', function (): void {
     Mail::fake();
     $requestedFor = inactivePausedAt()->addDays(120);
@@ -202,16 +255,16 @@ it('keeps the date and the reason of a deletion the owner requested', function (
 it('writes the warning for the owner with dates in their timezone', function (): void {
     $workspace = inactivePausedWorkspace(timezone: 'Pacific/Auckland');
     $deletesAt = CarbonImmutable::parse('2026-12-31 23:00:00');
-    $mail = new InactiveWorkspaceDeletionWarningMail($workspace, $deletesAt, inactivePausedAt());
+    $mail = new InactiveWorkspaceDeletionWarningMail($workspace, $deletesAt, CarbonImmutable::parse('2026-11-20 12:00:00'));
 
     $mail->assertHasSubject('Acme will be deleted on Jan 1, 2027');
     $mail->assertSeeInHtml('Acme will be deleted on Jan 1, 2027');
-    $mail->assertSeeInHtml('Acme has been paused since Nov 1, 2026, and no one has signed in since.');
+    $mail->assertSeeInHtml('Acme is paused, and no one has signed in since Nov 21, 2026.');
     $mail->assertSeeInHtml('We delete paused workspaces after 60 days. On Jan 1, 2027 we will delete Acme and every record in it. This cannot be undone.');
     $mail->assertSeeInHtml('To keep the workspace, choose a plan before then.');
     $mail->assertSeeInHtml('Signing in also keeps it for another 60 days.');
     $mail->assertSeeInHtml('Questions? Reply to this email.');
-    $mail->assertSeeInHtml('It has been paused since Nov 1, 2026 with no sign-ins. Choose a plan or sign in to keep it.');
+    $mail->assertSeeInHtml('No one has signed in since Nov 21, 2026. Choose a plan or sign in to keep it.');
     $mail->assertSeeInHtml(__('mail.footer.reason.owner', ['workspace' => 'Acme']));
     $mail->assertSeeInText('Choose a plan: '.Billing::getUrl(panel: 'app', tenant: $workspace));
 });
