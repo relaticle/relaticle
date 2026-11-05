@@ -104,6 +104,7 @@ final class ResetDemoAccountCommand extends Command
             'hosted_free_grandfathered_at' => now(),
             'trial_ends_at' => null,
             'scheduled_deletion_at' => null,
+            'deletion_reason' => null,
         ])->save();
 
         $user->forceFill(['current_workspace_id' => $workspace->getKey()])->save();

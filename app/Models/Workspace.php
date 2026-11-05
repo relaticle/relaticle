@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Contracts\Entitlements;
 use App\Enums\BillingStatus;
+use App\Enums\DeletionReason;
 use App\Enums\MediaCollection;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
@@ -72,6 +73,9 @@ use Spatie\Sluggable\SlugOptions;
  * @property ?string $onboarding_referral_prompt
  * @property WorkspaceSetupStep|null $onboarding_step
  * @property CarbonImmutable|null $scheduled_deletion_at
+ * @property DeletionReason|null $deletion_reason
+ * @property CarbonImmutable|null $paused_at
+ * @property CarbonImmutable|null $inactivity_notice_sent_at
  * @property ?string $stripe_id
  * @property ?string $pm_type
  * @property ?string $pm_last_four
@@ -242,6 +246,9 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
             'setup_nudge_sent_at' => 'datetime',
             'invite_link_token_expires_at' => 'datetime',
             'scheduled_deletion_at' => 'datetime',
+            'deletion_reason' => DeletionReason::class,
+            'paused_at' => 'datetime',
+            'inactivity_notice_sent_at' => 'datetime',
             'trial_ends_at' => 'datetime',
             'trial_extended_at' => 'datetime',
             'trial_reminded_for' => 'datetime',
@@ -571,6 +578,29 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
     protected function scheduledForDeletion(Builder $query): Builder
     {
         return $query->whereNotNull('scheduled_deletion_at');
+    }
+
+    /**
+     * @param  Builder<Workspace>  $query
+     * @return Builder<Workspace>
+     */
+    #[Scope]
+    protected function scheduledForInactivity(Builder $query): Builder
+    {
+        return $query->where('deletion_reason', DeletionReason::Inactivity->value);
+    }
+
+    /**
+     * @param  Builder<Workspace>  $query
+     * @return Builder<Workspace>
+     */
+    #[Scope]
+    protected function scheduledOnRequest(Builder $query): Builder
+    {
+        return $query->whereNotNull('scheduled_deletion_at')
+            ->where(fn (Builder $reason): Builder => $reason
+                ->whereNull('deletion_reason')
+                ->orWhere('deletion_reason', '!=', DeletionReason::Inactivity->value));
     }
 
     /**

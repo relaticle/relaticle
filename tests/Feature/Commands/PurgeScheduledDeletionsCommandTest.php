@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\Jetstream\DeleteWorkspace;
+use App\Enums\DeletionReason;
 use App\Enums\MediaCollection;
 use App\Jobs\PurgeUser;
 use App\Jobs\PurgeWorkspace;
@@ -235,6 +236,22 @@ test('day 25 reminder is sent to workspace owner only', function () {
 
     Notification::assertSentTo($owner, WorkspaceDeletionReminderNotification::class);
     Notification::assertNotSentTo($member, WorkspaceDeletionReminderNotification::class);
+});
+
+test('the workspace reminder is sent for an owner-requested deletion and skipped for an inactivity deletion', function () {
+    Notification::fake();
+
+    $requestedOwner = User::factory()->withWorkspace()->create();
+    $requestedOwner->currentWorkspace->forceFill(['scheduled_deletion_at' => now()->addDays(5), 'deletion_reason' => DeletionReason::Requested])->save();
+
+    $inactiveOwner = User::factory()->withWorkspace()->create();
+    $inactiveOwner->currentWorkspace->forceFill(['scheduled_deletion_at' => now()->addDays(5), 'deletion_reason' => DeletionReason::Inactivity])->save();
+
+    $this->artisan('app:purge-scheduled-deletions')
+        ->assertExitCode(0);
+
+    Notification::assertSentTo($requestedOwner, WorkspaceDeletionReminderNotification::class);
+    Notification::assertNotSentTo($inactiveOwner, WorkspaceDeletionReminderNotification::class);
 });
 
 test('ownerless workspaces are skipped without aborting the deletion reminders', function () {

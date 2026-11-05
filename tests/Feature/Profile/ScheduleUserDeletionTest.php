@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Jetstream\CancelUserDeletion;
 use App\Actions\Jetstream\ScheduleUserDeletion;
+use App\Enums\DeletionReason;
 use App\Features\AccountDeletion;
 use App\Models\User;
 use App\Models\Workspace;
@@ -43,7 +44,8 @@ test('personal workspace is scheduled for deletion alongside user', function () 
 
     resolve(ScheduleUserDeletion::class)->schedule($user);
 
-    expect($personalWorkspace->refresh()->scheduled_deletion_at)->not->toBeNull();
+    expect($personalWorkspace->refresh()->scheduled_deletion_at)->not->toBeNull()
+        ->and($personalWorkspace->deletion_reason)->toBe(DeletionReason::Requested);
 });
 
 test('user retains workspace memberships during grace period', function () {
@@ -96,12 +98,13 @@ test('user can cancel scheduled deletion', function () {
 
     $user = User::factory()->withPersonalWorkspace()->scheduledForDeletion()->create();
     $personalWorkspace = $user->personalWorkspace();
-    $personalWorkspace->update(['scheduled_deletion_at' => $user->scheduled_deletion_at]);
+    $personalWorkspace->forceFill(['scheduled_deletion_at' => $user->scheduled_deletion_at, 'deletion_reason' => DeletionReason::Requested])->save();
 
     resolve(CancelUserDeletion::class)->cancel($user);
 
     expect($user->refresh()->scheduled_deletion_at)->toBeNull()
-        ->and($personalWorkspace->refresh()->scheduled_deletion_at)->toBeNull();
+        ->and($personalWorkspace->refresh()->scheduled_deletion_at)->toBeNull()
+        ->and($personalWorkspace->deletion_reason)->toBeNull();
 
     Notification::assertSentTo($user, UserDeletionCancelledNotification::class);
 });

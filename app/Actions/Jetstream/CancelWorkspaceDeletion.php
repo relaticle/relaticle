@@ -16,7 +16,7 @@ final readonly class CancelWorkspaceDeletion
     {
         throw_unless($user->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::WorkspaceManage), AuthorizationException::class);
 
-        $workspace->forceFill(['scheduled_deletion_at' => null])->save();
+        $workspace->forceFill(['scheduled_deletion_at' => null, 'deletion_reason' => null])->save();
 
         /** @var User $owner */
         $owner = $workspace->owner;

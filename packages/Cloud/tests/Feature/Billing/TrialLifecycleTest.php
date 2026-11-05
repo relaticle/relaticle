@@ -110,6 +110,7 @@ it('does not start a trial when the workspace ever had a subscription', function
 
 it('downgrades expired trials and resets the allowance', function (): void {
     withHostedBilling();
+    $this->freezeTime();
 
     [, $workspace] = trialOwnerAndWorkspace();
     $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subDay()])->save();
@@ -120,6 +121,7 @@ it('downgrades expired trials and resets the allowance', function (): void {
 
     expect($workspace->refresh()->plan)->toBe(Plan::Free)
         ->and($workspace->trial_ends_at)->toBeNull()
+        ->and($workspace->paused_at?->toDateTimeString())->toBe(now()->toDateTimeString())
         ->and($balance->credits_remaining)->toBe(Plan::Free->credits());
 });
 
@@ -137,7 +139,8 @@ it('does not downgrade an expired trial that converted to a subscription', funct
     $this->artisan('billing:process-trials')->assertSuccessful();
 
     expect($workspace->refresh()->plan)->toBe(Plan::Pro)
-        ->and($workspace->trial_ends_at)->toBeNull();
+        ->and($workspace->trial_ends_at)->toBeNull()
+        ->and($workspace->paused_at)->toBeNull();
 });
 
 it('downgrades an expired trial whose only subscription never started', function (string $status): void {

@@ -73,7 +73,7 @@ final class PurgeScheduledDeletionsCommand extends Command
             });
 
         Workspace::query()
-            ->scheduledForDeletion()
+            ->scheduledOnRequest()
             ->whereBetween('scheduled_deletion_at', [$reminderStart, $reminderEnd])
             ->with('owner')
             ->chunkById(100, function (Collection $workspaces): void {
