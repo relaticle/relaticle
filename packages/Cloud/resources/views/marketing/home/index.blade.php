@@ -51,10 +51,10 @@
     @include('cloud::marketing.home.partials.works-with')
     @include('cloud::marketing.home.partials.features')
     @include(match (request()->query('story')) {
+        '0' => 'cloud::marketing.home.partials.story',
         'a' => 'cloud::marketing.home.partials.story-a',
-        'b' => 'cloud::marketing.home.partials.story-b',
         'c' => 'cloud::marketing.home.partials.story-c',
-        default => 'cloud::marketing.home.partials.story',
+        default => 'cloud::marketing.home.partials.story-b',
     })
     @if($emailIntegrationActive)
         @include('cloud::marketing.home.partials.email')

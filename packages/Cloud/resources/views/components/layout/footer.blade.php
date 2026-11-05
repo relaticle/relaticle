@@ -13,10 +13,12 @@
     ];
 @endphp
 
-@if($framed && in_array(request()->query('footer'), ['b', 'c', 'd'], true))
+@php($footerVariant = request()->query('footer', 'b'))
+
+@if($framed && in_array($footerVariant, ['b', 'c', 'd'], true))
     @include('cloud::components.layout.footer-quiet', [
-        'dark' => request()->query('footer') === 'c',
-        'wordmark' => request()->query('footer') === 'd',
+        'dark' => $footerVariant === 'c',
+        'wordmark' => $footerVariant === 'd',
     ])
 @elseif($framed)
     <footer class="bg-surface">
