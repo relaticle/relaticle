@@ -137,13 +137,13 @@
         </x-slot:eyebrow>
 
         <x-slot:title>
-            {{ __('What makes a CRM') }} <span class="whitespace-nowrap">{{ __('AI-native.') }}</span>
+            {{ __('What makes a CRM') }} <span class="whitespace-nowrap">{{ __('AI-native?') }}</span>
             <span class="text-gray-500 dark:text-gray-400">{{ __('Five checks.') }}</span>
         </x-slot:title>
 
         <x-slot:aside>
             <p class="text-base leading-relaxed text-gray-500 md:text-lg dark:text-gray-400">
-                {{ __('The assistant and the agents are part of the CRM, not a plugin on top. Score yours against five checks.') }}
+                {{ __('In an AI-native CRM, the assistant and outside agents work on the data itself, not through a plugin on top.') }}
             </p>
 
             <div class="mt-7 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">

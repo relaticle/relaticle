@@ -20,7 +20,7 @@ it('renders the AI-native CRM page with its structured data', function (): void 
     $html = $this->get('/ai-native-crm')->assertOk()->getContent();
 
     expect($html)->toContain(__('What makes a CRM'))
-        ->and($html)->toContain(__('AI-native.'))
+        ->and($html)->toContain(__('AI-native?'))
         ->and($html)->toContain(__('Five checks.'))
         ->and($html)->toContain(__('AI-native checklist'))
         ->and($html)->toContain('data-ai-native-toggle')

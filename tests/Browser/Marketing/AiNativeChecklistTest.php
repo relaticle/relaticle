@@ -21,14 +21,14 @@ it('scores the visitor\'s CRM as checks are ticked and unticked', function (): v
     $page->click('[data-ai-native-check]:nth-child(4) [data-ai-native-toggle]');
     $page->wait(0.3);
 
-    expect(aiNativeChecklist($page, "root.querySelector('[data-ai-native-score] span span').innerText"))->toBe('2')
+    expect(aiNativeChecklist($page, "root.querySelector('[data-ai-native-yours]').innerText"))->toBe('2')
         ->and(aiNativeChecklist($page, "[...root.querySelectorAll('[data-ai-native-toggle]')].map((toggle) => toggle.getAttribute('aria-pressed'))"))->toBe(['true', 'false', 'true', 'false', 'false'])
         ->and(aiNativeChecklist($page, "root.querySelector('[data-ai-native-check]:nth-child(2) [data-ai-native-toggle]').innerText.trim()"))->toContain('Yes');
 
     $page->click('[data-ai-native-check]:nth-child(2) [data-ai-native-toggle]');
     $page->wait(0.3);
 
-    expect(aiNativeChecklist($page, "root.querySelector('[data-ai-native-score] span span').innerText"))->toBe('1');
+    expect(aiNativeChecklist($page, "root.querySelector('[data-ai-native-yours]').innerText"))->toBe('1');
 
     $page->assertNoJavaScriptErrors();
 });
