@@ -62,7 +62,7 @@ use Spatie\Sluggable\SlugOptions;
  * @property EmailPrivacyTier|null $default_email_sharing_tier
  * @property ContactCreationMode $contact_creation_mode
  * @property bool $auto_create_companies
- * @property array<string, mixed>|null $ai_settings
+ * @property AiSettings $ai_settings
  * @property Plan $plan
  * @property ?string $invite_link_token
  * @property ?CarbonImmutable $invite_link_token_expires_at
@@ -232,7 +232,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
             'default_email_sharing_tier' => EmailPrivacyTier::class,
             'contact_creation_mode' => ContactCreationMode::class,
             'auto_create_companies' => 'boolean',
-            'ai_settings' => 'array',
+            'ai_settings' => AiSettings::class.':default',
             'plan' => Plan::class,
             'onboarding_use_case' => OnboardingUseCase::class,
             'onboarding_context' => 'array',
@@ -256,11 +256,6 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
                 $workspace->invite_link_token_expires_at = now()->addDays(self::INVITE_LINK_TTL_DAYS);
             }
         });
-    }
-
-    public function aiSettings(): AiSettings
-    {
-        return new AiSettings($this->ai_settings ?? []);
     }
 
     public function rotateInviteLink(): void

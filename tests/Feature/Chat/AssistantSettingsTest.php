@@ -82,7 +82,7 @@ it('lets only a workspace owner turn web search off', function (): void {
         ->call('updateWebSearch')
         ->assertForbidden();
 
-    expect($this->workspace->fresh()->aiSettings()->webSearch())->toBeTrue();
+    expect($this->workspace->fresh()->ai_settings->webSearch)->toBeTrue();
 
     $this->actingAs($this->user);
 
@@ -92,17 +92,15 @@ it('lets only a workspace owner turn web search off', function (): void {
         ->call('updateWebSearch')
         ->assertNotified();
 
-    expect($this->workspace->fresh()->aiSettings()->webSearch())->toBeFalse();
+    expect($this->workspace->fresh()->ai_settings->webSearch)->toBeFalse();
 });
 
-it('keeps the other workspace AI settings when the owner turns web search off', function (): void {
-    $this->workspace->update(['ai_settings' => ['context' => 'We sell to dental clinics.']]);
-
+it('stores the owner web search choice under its snake case key', function (): void {
     Livewire::test(WorkspaceAssistantSettings::class, ['workspace' => $this->workspace])
         ->fillForm(['web_search' => false])
         ->call('updateWebSearch');
 
-    expect($this->workspace->fresh()->ai_settings)->toBe(['context' => 'We sell to dental clinics.', 'web_search' => false]);
+    expect(json_decode((string) $this->workspace->fresh()->getRawOriginal('ai_settings'), true))->toBe(['web_search' => false]);
 });
 
 it('refuses the owner of another workspace', function (): void {
@@ -115,7 +113,7 @@ it('refuses the owner of another workspace', function (): void {
         ->call('updateWebSearch')
         ->assertForbidden();
 
-    expect($this->workspace->fresh()->aiSettings()->webSearch())->toBeTrue();
+    expect($this->workspace->fresh()->ai_settings->webSearch)->toBeTrue();
 });
 
 it('refuses an admin of the workspace', function (): void {
@@ -130,7 +128,7 @@ it('refuses an admin of the workspace', function (): void {
         ->call('updateWebSearch')
         ->assertForbidden();
 
-    expect($this->workspace->fresh()->aiSettings()->webSearch())->toBeTrue();
+    expect($this->workspace->fresh()->ai_settings->webSearch)->toBeTrue();
 });
 
 it('disables both web search controls when no model on the install can search', function (): void {

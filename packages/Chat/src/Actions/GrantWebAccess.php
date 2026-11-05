@@ -13,7 +13,7 @@ final readonly class GrantWebAccess
 {
     public function execute(User $user, Workspace $workspace): void
     {
-        throw_unless($workspace->aiSettings()->webSearch(), RuntimeException::class, __('Your workspace owner turned web search off.'));
+        throw_unless($workspace->ai_settings->webSearch, RuntimeException::class, __('Your workspace owner turned web search off.'));
 
         throw_if(
             WebSearchPreference::of($user) === WebSearchPreference::Deny,

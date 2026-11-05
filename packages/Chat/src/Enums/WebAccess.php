@@ -26,7 +26,7 @@ enum WebAccess
         return match (true) {
             $affordableSearches < 1 => self::Unavailable,
             ! $model instanceof ModelDescriptor, ! in_array($model->provider, self::WEB_PROVIDERS, true) => self::Unavailable,
-            ! $workspace->aiSettings()->webSearch() => self::Unavailable,
+            ! $workspace->ai_settings->webSearch => self::Unavailable,
             WebSearchPreference::of($user) === WebSearchPreference::Deny => self::Unavailable,
             WebSearchPreference::of($user) === WebSearchPreference::Allow => self::Allowed,
             self::resumesApprovedRequest($user, $workspace, $resumesTurnId) => self::Allowed,

@@ -29,7 +29,7 @@ final class WorkspaceAssistantSettings extends BaseLivewireComponent
     {
         $this->workspace = $workspace;
 
-        $this->form->fill(['web_search' => $workspace->aiSettings()->webSearch()]);
+        $this->form->fill(['web_search' => $workspace->ai_settings->webSearch]);
     }
 
     public function form(Schema $schema): Schema

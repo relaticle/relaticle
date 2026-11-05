@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Data;
 
-final readonly class AiSettings
-{
-    /** @param array<string, mixed> $stored */
-    public function __construct(private array $stored = []) {}
+use Spatie\LaravelData\Attributes\MapName;
+use Spatie\LaravelData\Data;
+use Spatie\LaravelData\Mappers\SnakeCaseMapper;
 
-    public function webSearch(): bool
-    {
-        return (bool) ($this->stored['web_search'] ?? true);
-    }
+#[MapName(SnakeCaseMapper::class)]
+final class AiSettings extends Data
+{
+    public function __construct(
+        public readonly bool $webSearch = true,
+    ) {}
 }
