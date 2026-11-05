@@ -1,12 +1,9 @@
-@props(['row', 'selectable' => false])
+@props(['row', 'selectable' => false, 'current' => false])
 
 @php
-    use App\Filament\Resources\CompanyResource;
-    use App\Filament\Resources\OpportunityResource;
-    use App\Filament\Resources\PeopleResource;
     use Filament\Support\Facades\FilamentTimezone;
 
-    $opens = $selectable && $row->access->showsBody();
+    $opens = $selectable;
     $sentAt = $row->lastMessageAt->setTimezone(FilamentTimezone::get());
     $timestamp = match (true) {
         $sentAt->isToday() => $sentAt->format('g:i A'),
@@ -27,25 +24,24 @@
         ->take(2)
         ->map(fn (string $word): string => mb_strtoupper(mb_substr($word, 0, 1)))
         ->implode('');
-    $recordUrl = fn (array $record): string => match ($record['type']) {
-        'company' => CompanyResource::getUrl('view', ['record' => $record['id']]),
-        'opportunity' => OpportunityResource::getUrl('view', ['record' => $record['id']]),
-        'people' => PeopleResource::getUrl('view', ['record' => $record['id']]),
-    };
-    $chipClass = 'pointer-events-auto max-w-[9rem] items-center truncate rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium leading-4 text-gray-600 hover:bg-gray-200 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10';
 @endphp
 
 <div
     data-conversation="{{ $row->conversationKey }}" data-unread="{{ $row->isUnread ? 'true' : 'false' }}" data-message-count="{{ $row->messageCount }}"
+    @if ($current) aria-current="true" @endif
     {{ $attributes->class([
         'relative flex w-full items-start gap-2 px-4 py-3 transition-colors sm:px-6',
         'hover:bg-gray-50 dark:hover:bg-white/5' => $opens,
+        'bg-gray-50 before:absolute before:inset-y-0 before:start-0 before:w-0.5 before:bg-primary-500 dark:bg-white/5' => $current,
     ]) }}
 >
     @if ($opens)
         <button
             type="button"
-            wire:click="selectEmail('{{ $row->viewerCopyEmailId }}')"
+            x-on:click="
+                const open = () => $wire.selectEmail('{{ $row->viewerCopyEmailId }}')
+                window.dispatchEvent(new CustomEvent('email-reader-leave', { cancelable: true, detail: { then: open } })) && open()
+            "
             wire:loading.attr="disabled"
             wire:target="selectEmail('{{ $row->viewerCopyEmailId }}')"
             aria-label="{{ $subject }}"
@@ -101,10 +97,10 @@
             <span class="flex shrink-0 items-center gap-1">
                 @forelse ($row->records as $index => $record)
                     @if ($index < 2)
-                        <a
-                            href="{{ $recordUrl($record) }}"
-                            @class([$chipClass, 'inline-flex' => $index === 0, 'hidden sm:inline-flex' => $index === 1])
-                        >{{ $record['name'] }}</a>
+                        <x-email-integration::record-chip
+                            :record="$record"
+                            :class="\Illuminate\Support\Arr::toCssClasses(['pointer-events-auto', 'inline-flex' => $index === 0, 'hidden sm:inline-flex' => $index === 1])"
+                        />
                     @endif
                 @empty
                     <span class="inline-flex items-center rounded-md px-1.5 py-0.5 text-[11px] font-medium leading-4 text-gray-400 ring-1 ring-inset ring-gray-200 dark:text-gray-500 dark:ring-white/10">

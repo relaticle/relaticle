@@ -9,6 +9,7 @@ use App\Filament\Resources\CompanyResource\RelationManagers\EmailsRelationManage
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\User;
+use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
@@ -19,10 +20,12 @@ use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Enums\MailboxHealth;
+use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManager;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
+use Relaticle\EmailIntegration\Models\EmailRead;
 use Relaticle\EmailIntegration\Models\WorkspaceEmailBlocklist;
 use Relaticle\EmailIntegration\Queries\ConversationsQuery;
 
@@ -155,7 +158,7 @@ it('opens a conversation from the record tab through the viewer readable copy', 
         ->assertSet('selectedEmailId', null)
         ->call('selectEmail', $email->id)
         ->assertSet('selectedEmailId', $email->id)
-        ->assertSeeHtml('fi-email-reader-panel');
+        ->assertSeeHtml('fi-email-reader-drawer');
 });
 
 it('opens the reader from the email in the URL only while conversations are on', function (): void {
@@ -165,7 +168,7 @@ it('opens the reader from the email in the URL only while conversations are on',
     Livewire::withQueryParams(['email' => $email->id])
         ->test(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
         ->assertSet('selectedEmailId', $email->id)
-        ->assertSeeHtml('fi-email-reader-panel');
+        ->assertSeeHtml('fi-email-reader-drawer');
 
     Feature::for($this->workspace)->deactivate(EmailConversations::class);
 
@@ -223,10 +226,10 @@ it('opens the queued send on the record and drops an id it cannot open', functio
     livewire(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
         ->dispatch('composer:sent', emailId: $queued->id)
         ->assertSet('selectedEmailId', $queued->id)
-        ->assertSeeHtml('fi-email-reader-panel')
+        ->assertSeeHtml('fi-email-reader-drawer')
         ->dispatch('composer:sent', emailId: (string) Str::ulid())
         ->assertSet('selectedEmailId', null)
-        ->assertDontSeeHtml('fi-email-reader-panel');
+        ->assertDontSeeHtml('fi-email-reader-drawer');
 });
 
 it('opens only this record conversations from the email in the URL', function (): void {
@@ -235,5 +238,112 @@ it('opens only this record conversations from the email in the URL', function ()
     Livewire::withQueryParams(['email' => $elsewhere->id])
         ->test(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
         ->assertSet('selectedEmailId', null)
-        ->assertDontSeeHtml('fi-email-reader-panel');
+        ->assertDontSeeHtml('fi-email-reader-drawer');
+});
+
+it('keeps the list visible beside the open reader', function (): void {
+    $email = conversationsRecordMessage($this->ownerMailbox, 'conv-open', 'brian@airbnb.test', ['subject' => 'Kickoff agenda']);
+    $other = conversationsRecordMessage($this->ownerMailbox, 'conv-other', 'kim@airbnb.test', ['subject' => 'Invoice question']);
+    $this->company->emails()->attach([$email->id, $other->id]);
+
+    livewire(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
+        ->call('selectEmail', $email->id)
+        ->assertSeeHtml('fi-email-reader-drawer')
+        ->assertDontSeeHtml('fi-email-reader-backdrop')
+        ->assertSeeHtml('data-conversation="conv-other"')
+        ->assertDontSeeHtml('flex flex-col invisible');
+});
+
+it('opens a locked teammate conversation at the gate without its subject', function (): void {
+    $email = conversationsRecordMessage($this->teammateMailbox, 'conv-gate', 'olivia@airbnb.test', [
+        'subject' => 'Contract redlines',
+        'snippet' => 'Clause 7 is a blocker',
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+    ]);
+    $this->company->emails()->attach($email->id);
+
+    livewire(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
+        ->call('selectEmail', $email->id)
+        ->assertSeeHtml('fi-email-reader-drawer')
+        ->assertSee(__('filament/pages/email-inbox.subject.hidden'))
+        ->assertDontSee('Contract redlines')
+        ->assertDontSee('Clause 7 is a blocker')
+        ->assertActionVisible('requestAccess', ['emailId' => $email->id]);
+
+    expect(EmailRead::query()->where('email_id', $email->id)->exists())->toBeFalse();
+});
+
+it('deep links to a locked email land on the gate, and to hidden mail on the not available state', function (): void {
+    $locked = conversationsRecordMessage($this->teammateMailbox, 'conv-locked', 'olivia@airbnb.test', [
+        'subject' => 'Contract redlines',
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+    ]);
+    $this->company->emails()->attach($locked->id);
+    $hidden = conversationsRecordMessage($this->teammateMailbox, 'conv-hidden', 'olivia@airbnb.test', ['subject' => 'Ben side project']);
+
+    Livewire::withQueryParams(['email' => $locked->id])
+        ->test(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
+        ->assertSeeHtml('fi-email-reader-drawer')
+        ->assertDontSee('Contract redlines');
+
+    Livewire::withQueryParams(['email' => $hidden->id])
+        ->test(EmailInboxPage::class)
+        ->assertSee(__('filament/pages/email-inbox.drawer.not_available'))
+        ->assertDontSee('Ben side project');
+});
+
+it('reads the same not available line for missing, private, unlinked teammate and other workspace mail', function (): void {
+    $private = conversationsRecordMessage($this->teammateMailbox, 'conv-private', 'olivia@airbnb.test', [
+        'subject' => 'Private compensation thread',
+        'privacy_tier' => EmailPrivacyTier::PRIVATE,
+    ]);
+    $this->company->emails()->attach($private->id);
+    $unlinked = conversationsRecordMessage($this->teammateMailbox, 'conv-unlinked', 'olivia@airbnb.test', ['subject' => 'Ben side project']);
+    $otherWorkspace = Workspace::factory()->create();
+    $otherWorkspace->users()->attach($this->owner, ['role' => 'member']);
+    $otherMailbox = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $otherWorkspace->id,
+        'user_id' => $this->owner->id,
+        'email_address' => 'ana@other.test',
+        'status' => 'active',
+    ]));
+    $elsewhere = conversationsRecordMessage($otherMailbox, 'conv-elsewhere', 'kim@other.test', ['subject' => 'Other workspace deal']);
+    $this->company->emails()->attach($elsewhere->id);
+
+    foreach ([(string) Str::ulid(), $private->id, $unlinked->id, $elsewhere->id] as $id) {
+        Livewire::withQueryParams(['email' => $id])
+            ->test(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
+            ->assertSet('selectedEmailId', $id)
+            ->assertSee(__('filament/pages/email-inbox.drawer.not_available'))
+            ->assertDontSee('Private compensation thread')
+            ->assertDontSee('Ben side project')
+            ->assertDontSee('Other workspace deal')
+            ->call('deselectEmail')
+            ->assertSet('selectedEmailId', null)
+            ->assertDontSee(__('filament/pages/email-inbox.drawer.not_available'));
+    }
+});
+
+it('saves the reply draft when the client clears the email open on the record', function (): void {
+    $email = conversationsRecordMessage($this->ownerMailbox, 'conv-back', 'brian@airbnb.test');
+    $this->company->emails()->attach($email->id);
+
+    livewire(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
+        ->call('selectEmail', $email->id)
+        ->set('selectedEmailId', null)
+        ->assertDispatched('composer:dismiss-inline')
+        ->assertDontSeeHtml('fi-email-reader-drawer');
+});
+
+it('shows the not available line for mail no conversation holds yet', function (): void {
+    $unkeyed = conversationsRecordMessage($this->ownerMailbox, 'conv-unkeyed', 'brian@airbnb.test', ['subject' => 'Unkeyed renewal']);
+    $unkeyed->forceFill(['conversation_key' => null])->saveQuietly();
+    $this->company->emails()->attach($unkeyed->id);
+
+    Livewire::withQueryParams(['email' => $unkeyed->id])
+        ->test(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
+        ->assertNoRedirect()
+        ->assertSet('selectedEmailId', $unkeyed->id)
+        ->assertSee(__('filament/pages/email-inbox.drawer.not_available'))
+        ->assertDontSee('Unkeyed renewal');
 });

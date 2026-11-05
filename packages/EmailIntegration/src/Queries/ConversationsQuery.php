@@ -126,10 +126,26 @@ final readonly class ConversationsQuery
 
         return $this->preferredCopies->restrictToVisiblePreferredCopies($query, $viewer)
             ->withRecordLinkState()
+            ->selectSub($this->viewerSyncedCopy($viewer), 'viewer_has_synced_copy')
+            ->selectSub($this->viewerMessageShareTier($viewer), 'viewer_message_share_tier')
             ->with(['participants', 'shares', 'user'])
             ->oldest('sent_at')
             ->oldest('id')
             ->get();
+    }
+
+    // A link may name any copy of a message; the viewer opens their own preferred copy of it.
+    public function viewerCopy(User $viewer, Email $email): ?Email
+    {
+        if (blank($email->conversation_key)) {
+            return null;
+        }
+
+        $copies = $this->messages($viewer, (string) $email->conversation_key);
+
+        return filled($email->rfc_message_id)
+            ? $copies->firstWhere('rfc_message_id', $email->rfc_message_id)
+            : $copies->first(fn (Email $copy): bool => $copy->is($email));
     }
 
     /**

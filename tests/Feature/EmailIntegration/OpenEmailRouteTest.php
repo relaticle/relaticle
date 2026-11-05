@@ -6,12 +6,16 @@ use App\Enums\CustomFields\CompanyField;
 use App\Features\EmailConversations;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Resources\CompanyResource;
+use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
 use App\Filament\Resources\CompanyResource\RelationManagers\EmailsRelationManager as CompanyEmailsRelationManager;
+use App\Filament\Resources\CompanyResource\RelationManagers\NotesRelationManager;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\User;
+use Filament\Facades\Filament;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
+use Livewire\Livewire;
 use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
 use Relaticle\EmailIntegration\Controllers\OpenEmailController;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -158,10 +162,11 @@ it('renders one reader when the Emails page opens a resolved link', function ():
 
     $html = $this->followingRedirects()->get(route('email.open', $email))->assertOk()->getContent();
 
-    expect(substr_count($html, 'fi-email-reader-panel'))->toBe(1);
+    expect(substr_count($html, 'fi-email-reader-drawer'))->toBe(1)
+        ->and(substr_count($html, 'fi-email-reader-panel'))->toBe(0);
 });
 
-it('leaves a resolved link to the record Emails tab instead of the panel reader', function (bool $conversations, int $panelReaders): void {
+it('leaves a resolved link to the record Emails tab instead of the panel reader', function (bool $conversations, int $panelReaders, int $tabDrawers): void {
     $email = conversationsRouteMessage($this->ownerMailbox, 'conv-route', 'brian@airbnb.test');
     $this->company->emails()->attach($email->id);
     $relation = (string) array_search(CompanyEmailsRelationManager::class, CompanyResource::getRelations(), true);
@@ -170,14 +175,22 @@ it('leaves a resolved link to the record Emails tab instead of the panel reader'
         Feature::for($this->workspace)->deactivate(EmailConversations::class);
     }
 
-    $html = $this->get(CompanyResource::getUrl('view', ['record' => $this->company, 'relation' => $relation, 'email' => $email->id], tenant: $this->workspace))
+    $html = (string) $this->get(CompanyResource::getUrl('view', ['record' => $this->company, 'relation' => $relation, 'email' => $email->id], tenant: $this->workspace))
         ->assertOk()
         ->getContent();
 
-    expect(substr_count($html, 'fi-email-reader-panel'))->toBe($panelReaders);
+    Filament::setCurrentPanel(Filament::getPanel('app'));
+    Filament::setTenant($this->workspace);
+    $tab = Livewire::withQueryParams(['email' => $email->id])
+        ->test(CompanyEmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
+        ->html();
+
+    expect(substr_count($html, 'fi-email-reader-panel'))->toBe($panelReaders)
+        ->and(substr_count($html, 'fi-email-reader-drawer'))->toBe(0)
+        ->and(substr_count($tab, 'fi-email-reader-drawer'))->toBe($tabDrawers);
 })->with([
-    'conversations on' => [true, 0],
-    'conversations off' => [false, 1],
+    'conversations on' => [true, 0, 1],
+    'conversations off' => [false, 1, 0],
 ]);
 
 it('skips a linked record whose Emails tab hides the mailbox', function (): void {
@@ -216,4 +229,43 @@ it('answers a hidden or trashed email with not found while conversations are off
 
     $this->get(route('email.open', $private))->assertNotFound();
     $this->get(route('email.open', $trashed))->assertNotFound();
+});
+
+it('follows a link to a locked email to the gate with its subject hidden everywhere', function (): void {
+    $locked = conversationsRouteMessage($this->teammateMailbox, 'conv-locked', 'olivia@airbnb.test', [
+        'subject' => 'Contract redlines',
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+    ]);
+    $this->company->emails()->attach($locked->id);
+
+    $target = (string) $this->get(route('email.open', $locked))->assertRedirect()->headers->get('Location');
+    parse_str((string) parse_url($target, PHP_URL_QUERY), $query);
+    $html = (string) $this->followingRedirects()->get(route('email.open', $locked))->assertOk()->getContent();
+    preg_match('/<title>(.*?)<\\/title>/s', $html, $title);
+
+    expect($query['email'] ?? null)->toBe($locked->id)
+        ->and($html)->not->toContain('Contract redlines')
+        ->and($title[1] ?? '')->toContain('Airbnb')->not->toContain('Contract redlines');
+
+    Filament::setCurrentPanel(Filament::getPanel('app'));
+    Filament::setTenant($this->workspace);
+
+    Livewire::withQueryParams($query)
+        ->test(CompanyEmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
+        ->assertSeeHtml("data-reader-gate=\"{$locked->id}\"")
+        ->assertSee(__('filament/pages/email-inbox.subject.hidden'))
+        ->assertDontSee('Contract redlines');
+});
+
+it('leaves a link on another record tab to the Emails tab so the page never opens two readers', function (): void {
+    $email = conversationsRouteMessage($this->ownerMailbox, 'conv-route', 'brian@airbnb.test');
+    $this->company->emails()->attach($email->id);
+    $notes = (string) array_search(NotesRelationManager::class, CompanyResource::getRelations(), true);
+
+    $html = (string) $this->get(CompanyResource::getUrl('view', ['record' => $this->company, 'relation' => $notes, 'email' => $email->id], tenant: $this->workspace))
+        ->assertOk()
+        ->getContent();
+
+    expect(substr_count($html, 'fi-email-reader-drawer'))->toBe(0)
+        ->and(substr_count($html, 'fi-email-reader-panel'))->toBe(0);
 });

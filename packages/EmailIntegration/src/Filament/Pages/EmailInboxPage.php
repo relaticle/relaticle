@@ -13,15 +13,18 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Relaticle\EmailIntegration\Data\ConversationFilters;
 use Relaticle\EmailIntegration\Data\ConversationPage;
+use Relaticle\EmailIntegration\Data\ConversationRow;
 use Relaticle\EmailIntegration\Enums\ConversationView;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPageTab;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Enums\OutboxTab;
 use Relaticle\EmailIntegration\Filament\Actions\ConnectMailboxAction;
+use Relaticle\EmailIntegration\Filament\Concerns\HasConversationReader;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConversationsFlag;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
@@ -40,6 +43,7 @@ use Relaticle\EmailIntegration\Queries\ConversationsQuery;
  */
 final class EmailInboxPage extends Page
 {
+    use HasConversationReader;
     use HasConversationsFlag;
     use HasEmailFeatureFlag;
     use HasEmailReaderActions;
@@ -119,7 +123,7 @@ final class EmailInboxPage extends Page
         }
 
         if ($this->selectedEmailId !== null) {
-            $this->openEmailReader($this->selectedEmailId);
+            $this->openLinkedEmail($this->selectedEmailId);
         }
     }
 
@@ -169,6 +173,12 @@ final class EmailInboxPage extends Page
     {
         $this->conversationView ??= $this->activeView;
         $this->moveConversationsCursor($this->conversations->previousCursor);
+    }
+
+    /** @return list<ConversationRow> */
+    protected function conversationRows(): array
+    {
+        return $this->conversations->rows;
     }
 
     private function moveConversationsCursor(?string $cursor): void
@@ -224,14 +234,14 @@ final class EmailInboxPage extends Page
             return null;
         }
 
-        return $this->readableConversationCopy($this->selectedEmailId);
+        return $this->conversationCopy($this->selectedEmailId);
     }
 
     /** @return SupportCollection<int, EmailAccessRequest> */
     #[Computed]
     public function pendingAccessRequests(): SupportCollection
     {
-        $email = $this->selectedEmail();
+        $email = $this->selectedEmail;
 
         if (! $email instanceof Email) {
             return collect();
@@ -242,7 +252,13 @@ final class EmailInboxPage extends Page
 
     public function selectEmail(string $id): void
     {
-        $this->openEmailReader($id);
+        $this->openConversationReader($id);
+    }
+
+    #[On('email:open')]
+    public function openRequestedEmail(string $emailId): void
+    {
+        $this->openLinkedEmail($emailId);
     }
 
     public function deselectEmail(): void

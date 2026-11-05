@@ -18,7 +18,7 @@
     @else
         <div @class([
             'flex flex-col',
-            'invisible' => $this->selectedEmail !== null,
+            'invisible' => ! $this->showsConversations && $this->selectedEmail !== null,
         ])>
             <x-email-integration::mailbox-health-banner :mailboxes="$this->unhealthyMailboxes" class="pb-0 sm:px-6" />
 
@@ -49,7 +49,7 @@
             @if ($this->showsConversations)
                 <div class="flex min-h-[20rem] flex-col divide-y divide-gray-100 border-t border-gray-200 dark:divide-white/5 dark:border-white/10">
                     @forelse ($this->conversations->rows as $row)
-                        <x-email-integration::conversation-row :row="$row" selectable wire:key="record-conversation-{{ $row->conversationKey }}" />
+                        <x-email-integration::conversation-row :row="$row" selectable :current="$row->conversationKey === $this->selectedEmail?->conversation_key" wire:key="record-conversation-{{ $row->conversationKey }}" />
                     @empty
                         <x-email-integration::list-empty
                             class="flex-1"
@@ -130,11 +130,24 @@
 
         {{-- A hand-rolled overlay rather than <x-filament::modal>: that component owns its
              open state in Alpine and races a Livewire response that renders and opens it at once. --}}
-        <x-email-integration::reader-overlay
-            :email="$this->selectedEmail"
-            :pending-access-requests="$this->pendingAccessRequests"
-            layer="z-50"
-        />
+        @if ($this->showsConversations)
+            <x-email-integration::reader-drawer
+                :email="$this->selectedEmail"
+                :pending-access-requests="$this->pendingAccessRequests"
+                :thread="$this->thread"
+                :bodies="$this->expandedBodies"
+                :expanded="[...$expandedEmailIds, $selectedEmailId]"
+                :row="$this->selectedConversationRow"
+                :adjacent="$this->adjacentConversations"
+                :unavailable="$this->selectedEmailUnavailable"
+            />
+        @else
+            <x-email-integration::reader-overlay
+                :email="$this->selectedEmail"
+                :pending-access-requests="$this->pendingAccessRequests"
+                layer="z-50"
+            />
+        @endif
     @endif
 
     <x-filament-panels::unsaved-action-changes-alert />

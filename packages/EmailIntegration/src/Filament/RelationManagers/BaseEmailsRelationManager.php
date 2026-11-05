@@ -23,9 +23,11 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Relaticle\EmailIntegration\Data\ConversationFilters;
 use Relaticle\EmailIntegration\Data\ConversationPage;
+use Relaticle\EmailIntegration\Data\ConversationRow;
 use Relaticle\EmailIntegration\Enums\ConversationView;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Actions\ConnectMailboxAction;
+use Relaticle\EmailIntegration\Filament\Concerns\HasConversationReader;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConversationsFlag;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailComposeActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
@@ -48,6 +50,7 @@ use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
  */
 abstract class BaseEmailsRelationManager extends RelationManager
 {
+    use HasConversationReader;
     use HasConversationsFlag;
     use HasEmailComposeActions;
     use HasEmailReaderActions;
@@ -104,17 +107,17 @@ abstract class BaseEmailsRelationManager extends RelationManager
         parent::mount();
 
         if ($this->selectedEmailId !== null && $this->showsConversations()) {
-            $this->openEmailReader($this->selectedEmailId);
+            $this->openLinkedEmail($this->selectedEmailId);
         }
     }
 
     // The flag-off tab keeps today's URL, where the panel's own reader opens `?email=`.
     /**
-     * @return array<string, array{as: string}>
+     * @return array<string, array{as: string, history: bool}>
      */
     protected function queryString(): array
     {
-        return $this->showsConversations() ? ['selectedEmailId' => ['as' => 'email']] : [];
+        return $this->showsConversations() ? ['selectedEmailId' => ['as' => 'email', 'history' => false]] : [];
     }
 
     public function table(Table $table): Table
@@ -136,7 +139,8 @@ abstract class BaseEmailsRelationManager extends RelationManager
         }
 
         $this->conversationsCursor = null;
-        unset($this->emails, $this->conversations, $this->automatedCount, $this->selectedEmail);
+        $this->expandedEmailIds = [];
+        unset($this->emails, $this->conversations, $this->automatedCount, $this->selectedEmail, $this->thread, $this->expandedBodies, $this->selectedConversationRow, $this->adjacentConversations);
     }
 
     #[Computed]
@@ -304,7 +308,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
     private function recordConversationCopy(string $emailId): ?Email
     {
-        $email = $this->readableConversationCopy($emailId);
+        $email = $this->conversationCopy($emailId);
 
         if (! $email instanceof Email || ! resolve(ConversationsQuery::class)->contains($this->authUser(), (string) $email->conversation_key, ConversationFilters::forRecord($this->ownerRecordWithEmails()))) {
             return null;
@@ -342,7 +346,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
     #[Computed]
     public function pendingAccessRequests(): Collection
     {
-        $email = $this->selectedEmail();
+        $email = $this->selectedEmail;
 
         if (! $email instanceof Email) {
             return collect();
@@ -353,6 +357,12 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
     public function selectEmail(string $id): void
     {
+        if ($this->showsConversations()) {
+            $this->openConversationReader($id);
+
+            return;
+        }
+
         $this->openEmailReader($id);
     }
 
@@ -371,6 +381,12 @@ abstract class BaseEmailsRelationManager extends RelationManager
         $this->resetPage();
         $this->conversationsCursor = null;
         unset($this->emails, $this->conversations);
+    }
+
+    /** @return list<ConversationRow> */
+    protected function conversationRows(): array
+    {
+        return $this->conversations->rows;
     }
 
     private function moveConversationsCursor(?string $cursor): void

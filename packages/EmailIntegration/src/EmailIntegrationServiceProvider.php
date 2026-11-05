@@ -8,11 +8,8 @@ use App\Contracts\Inbox\RequestSource;
 use App\Features\EmailConversations;
 use App\Features\EmailIntegration;
 use App\Filament\Pages\Dashboard;
-use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
-use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\OpportunityResource\Pages\ViewOpportunity;
-use App\Filament\Resources\PeopleResource;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Models\CustomFieldValue;
 use App\Models\User;
@@ -43,7 +40,6 @@ use Relaticle\EmailIntegration\Console\Commands\IncrementalEmailSyncCommand;
 use Relaticle\EmailIntegration\Console\Commands\RemoveOwnDomainRecordsCommand;
 use Relaticle\EmailIntegration\Console\Commands\RenewCalendarPushChannelsCommand;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
-use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManager;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages\ManageEmailTemplates;
 use Relaticle\EmailIntegration\Inbox\EmailAccessRequestSource;
 use Relaticle\EmailIntegration\Listeners\CancelRemovedMemberAccessRequestsListener;
@@ -188,39 +184,27 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
             'pageRecordType' => ComposerPageTo::recordType(),
             'pageRecordId' => $pageRecordId,
             'composerKey' => 'email-composer-'.($pageRecordId ?? '').'-'.($pageTo ?? ''),
-        ]).Blade::render('@livewire(\''.EmailAccessNotificationHandler::LIVEWIRE_ALIAS.'\', [\'hostsReader\' => $hostsReader])', [
-            'hostsReader' => $this->pageHostsReader($scopes),
+        ]).Blade::render('@livewire(\''.EmailAccessNotificationHandler::LIVEWIRE_ALIAS.'\', [\'hostsReader\' => $hostsReader, \'readerOnRecordPage\' => $readerOnRecordPage])', [
+            'hostsReader' => $this->conversationsOn() && (in_array(EmailInboxPage::class, $scopes, true) || $this->isRecordPage($scopes)),
+            'readerOnRecordPage' => $this->conversationsOn() && $this->isRecordPage($scopes),
         ]);
     }
 
-    /**
-     * @param  array<string>  $scopes
-     */
-    private function pageHostsReader(array $scopes): bool
+    private function conversationsOn(): bool
     {
         $workspace = filament()->getTenant();
 
-        if (! $workspace instanceof Workspace || ! Feature::for($workspace)->active(EmailConversations::class)) {
-            return false;
-        }
+        return $workspace instanceof Workspace && Feature::for($workspace)->active(EmailConversations::class);
+    }
 
-        if (in_array(EmailInboxPage::class, $scopes, true)) {
-            return true;
-        }
-
-        $recordResources = [
-            ViewCompany::class => CompanyResource::class,
-            ViewPeople::class => PeopleResource::class,
-            ViewOpportunity::class => OpportunityResource::class,
-        ];
-
-        foreach ($recordResources as $recordPage => $resource) {
-            if (in_array($recordPage, $scopes, true)) {
-                return request()->query('relation') === BaseEmailsRelationManager::relationKeyOn($resource);
-            }
-        }
-
-        return false;
+    // Filament mounts only the active relation tab and switches tabs over Livewire, so a record
+    // page hosts the reader on every tab: its Emails tab opens `?email=` whenever it mounts.
+    /**
+     * @param  array<string>  $scopes
+     */
+    private function isRecordPage(array $scopes): bool
+    {
+        return array_intersect([ViewCompany::class, ViewPeople::class, ViewOpportunity::class], $scopes) !== [];
     }
 
     public static function enabled(): bool
