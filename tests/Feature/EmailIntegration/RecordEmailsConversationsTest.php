@@ -347,3 +347,19 @@ it('shows the not available line for mail no conversation holds yet', function (
         ->assertSee(__('filament/pages/email-inbox.drawer.not_available'))
         ->assertDontSee('Unkeyed renewal');
 });
+
+it('keeps the conversations, the automated count and the open email of a trashed company', function (): void {
+    $human = conversationsRecordMessage($this->ownerMailbox, 'conv-human', 'brian@airbnb.test');
+    $invoice = conversationsRecordMessage($this->ownerMailbox, 'conv-invoice', 'billing@airbnb.test', ['automated_reason' => AutomatedReason::RoleSender]);
+    $this->company->emails()->attach([$human->id, $invoice->id]);
+    $this->company->delete();
+
+    $tab = Livewire::withQueryParams(['email' => $human->id])
+        ->test(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
+        ->assertSet('selectedEmailId', $human->id)
+        ->assertSeeHtml('fi-email-reader-drawer')
+        ->assertDontSee(__('filament/pages/email-inbox.drawer.not_available'))
+        ->assertSee(trans_choice('filament/pages/record-emails.automated_toggle', 1, ['count' => 1]));
+
+    expect(conversationsRecordKeys($tab->html()))->toBe(['conv-human']);
+});

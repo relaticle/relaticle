@@ -206,7 +206,7 @@ final class EmailInboxPage extends Page
     #[Computed]
     public function viewCounts(): array
     {
-        return resolve(ConversationsQuery::class)->counts($this->authUser());
+        return resolve(ConversationsQuery::class)->counts($this->authUser(), $this->conversationFilters);
     }
 
     #[Computed]

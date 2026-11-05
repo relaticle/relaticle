@@ -13,6 +13,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Database\Query\Builder as BaseBuilder;
 use Illuminate\Pagination\Cursor;
 use Illuminate\Support\Collection;
@@ -285,9 +286,11 @@ final readonly class ConversationsQuery
         $records = $model::query()
             ->withoutGlobalScope(WorkspaceScope::class)
             ->where('workspace_id', $viewer->current_workspace_id)
-            ->when($filters->recordIds !== [], fn (Builder $named): Builder => $named->whereKey($filters->recordIds))
+            ->when($filters->recordIds !== [], fn (Builder $named): Builder => $named->withoutGlobalScope(SoftDeletingScope::class)->whereKey($filters->recordIds))
             ->when($filters->recordName, fn (Builder $named, string $name): Builder => $named
                 ->whereLike($type->titleColumn(), LikePattern::escape($name).'%')
+                ->orderBy($type->titleColumn())
+                ->orderBy((new $model)->getQualifiedKeyName())
                 ->limit(CustomFieldFilterSchema::MAX_LIST_VALUES))
             ->select((new $model)->getQualifiedKeyName());
 

@@ -367,7 +367,7 @@ final readonly class ConversationFilters
     private function typed(string $word, string $value, string $viewerZone): ?array
     {
         $filter = EmailFilter::forTypedWord($word);
-        $value = trim($value);
+        $value = trim(ltrim($value, '"'));
 
         if (! $filter instanceof EmailFilter || $value === '') {
             return null;

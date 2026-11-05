@@ -73,7 +73,7 @@ final readonly class EmailSearchService
             return null;
         }
 
-        if (preg_match('/(?:^|\s)([\p{L}\p{N}]+)$/u', $search, $match, PREG_OFFSET_CAPTURE) !== 1) {
+        if (preg_match('/(?:^|\s)([\p{L}\p{N}]{2,})$/u', $search, $match, PREG_OFFSET_CAPTURE) !== 1) {
             return ["websearch_to_tsquery('simple', ?)", [$search]];
         }
 

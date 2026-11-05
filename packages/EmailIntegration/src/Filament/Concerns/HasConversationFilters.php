@@ -18,12 +18,14 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Support\Enums\Size;
 use Filament\Support\Enums\Width;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 use Relaticle\EmailIntegration\Data\ConversationFilters;
+use Relaticle\EmailIntegration\Enums\ConversationView;
 use Relaticle\EmailIntegration\Enums\EmailCategory;
 use Relaticle\EmailIntegration\Enums\EmailFilter;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -33,6 +35,7 @@ use Relaticle\EmailIntegration\Services\EmailSearchService;
  * @property-read ConversationFilters $conversationFilters
  * @property-read string|null $filterError
  * @property-read array<string, string> $filterChips
+ * @property-read ConversationView $activeView
  */
 trait HasConversationFilters
 {
@@ -169,11 +172,11 @@ trait HasConversationFilters
             ])
             ->fillForm(fn (): array => [
                 'after' => $this->filterTree()->sentAfter?->setTimezone($this->viewerZone())->format('Y-m-d'),
-                'before' => $this->filterTree()->sentBefore?->setTimezone($this->viewerZone())->format('Y-m-d'),
+                'before' => $this->filterTree()->sentBefore?->setTimezone($this->viewerZone())->subDay()->format('Y-m-d'),
             ])
             ->action(fn (array $data): bool => $this->setFilter(EmailFilter::SentAt, array_filter([
                 '$gte' => filled($data['after']) ? Date::parse($data['after'], $this->viewerZone())->toIso8601String() : null,
-                '$lt' => filled($data['before']) ? Date::parse($data['before'], $this->viewerZone())->toIso8601String() : null,
+                '$lt' => filled($data['before']) ? Date::parse($data['before'], $this->viewerZone())->addDay()->toIso8601String() : null,
             ]) ?: null));
     }
 
@@ -249,8 +252,9 @@ trait HasConversationFilters
 
     private function refreshConversationList(): void
     {
+        $this->conversationView ??= $this->activeView;
         $this->conversationsCursor = null;
-        unset($this->conversations, $this->conversationFilters, $this->filterError, $this->filterChips);
+        unset($this->conversations, $this->conversationFilters, $this->filterError, $this->filterChips, $this->viewCounts);
     }
 
     private function filterTree(): ConversationFilters
@@ -318,7 +322,7 @@ trait HasConversationFilters
         }
 
         $names = $type->model()::query()
-            ->withoutGlobalScope(WorkspaceScope::class)
+            ->withoutGlobalScopes([SoftDeletingScope::class, WorkspaceScope::class])
             ->where('workspace_id', $this->authUser()->current_workspace_id)
             ->whereKey($filters->recordIds)
             ->pluck($type->titleColumn())

@@ -34,7 +34,7 @@ return [
         'fields' => [
             'mailboxes' => 'Mailboxes',
             'after' => 'On or after',
-            'before' => 'Before',
+            'before' => 'On or before',
             'records' => 'Records',
             'categories' => 'Categories',
         ],
