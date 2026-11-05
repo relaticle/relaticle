@@ -9,10 +9,12 @@ use App\Enums\StripeSubscriptionStatus;
 use App\Enums\SubscriptionType;
 use App\Models\User;
 use App\Models\Workspace;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Laravel\Cashier\Subscription;
+use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Cloud\Billing\Mail\ProEndedMail;
 
@@ -41,6 +43,8 @@ final readonly class SyncWorkspacePlanFromSubscription
         }
 
         if ($workspace->plan === $target) {
+            $this->releaseExtensionCredits($workspace);
+
             return;
         }
 
@@ -48,7 +52,9 @@ final readonly class SyncWorkspacePlanFromSubscription
             $workspace->plan = $target;
             $workspace->save();
 
-            $this->credits->resetPeriod($workspace);
+            if (! $workspace->onExtendedTrial()) {
+                $this->credits->resetPeriod($workspace);
+            }
 
             Log::info('Workspace plan synced from Stripe subscription', [
                 'workspace_id' => $workspace->getKey(),
@@ -142,5 +148,26 @@ final readonly class SyncWorkspacePlanFromSubscription
         }
 
         return null;
+    }
+
+    private function releaseExtensionCredits(Workspace $workspace): void
+    {
+        if ($workspace->onExtendedTrial() || ! $this->holdsExtensionCredits($workspace)) {
+            return;
+        }
+
+        $this->credits->resetPeriod($workspace);
+    }
+
+    private function holdsExtensionCredits(Workspace $workspace): bool
+    {
+        $extensionEndsAt = $workspace->extensionEndsAt();
+
+        return $extensionEndsAt instanceof CarbonImmutable
+            && $extensionEndsAt->isFuture()
+            && AiCreditBalance::query()
+                ->where('workspace_id', $workspace->getKey())
+                ->where('period_ends_at', $extensionEndsAt)
+                ->exists();
     }
 }

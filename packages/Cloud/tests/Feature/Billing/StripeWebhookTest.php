@@ -31,6 +31,7 @@ use Relaticle\Cloud\Analytics\Listeners\CaptureSubscriptionOutcome;
 use Relaticle\Cloud\Analytics\Models\Acquisition;
 use Relaticle\Cloud\Billing\Actions\ActivateManagedPlan;
 use Relaticle\Cloud\Billing\Actions\CancelWithUnusedTimeRefund;
+use Relaticle\Cloud\Billing\Actions\ExtendEndedTrial;
 use Relaticle\Cloud\Billing\Actions\GrantPurchasedCredits;
 use Relaticle\Cloud\Billing\Actions\NotifyWorkspaceOfPaymentFailure;
 use Relaticle\Cloud\Billing\Actions\StartProTrial;
@@ -456,6 +457,72 @@ it('never double-grants across a mid-trial conversion', function (): void {
     expect($balance->period_starts_at->toDateTimeString())->toBe('2026-07-01 12:00:00')
         ->and($balance->period_ends_at->toDateTimeString())->toBe('2026-08-01 12:00:00')
         ->and($grantsQuery->count())->toBe(2); // trial start + first anniversary cycle, never a third
+});
+
+function extendedTrialWorkspaceWithSpentCredits(): Workspace
+{
+    $workspace = stripeBillingWorkspace();
+    $workspace->forceFill(['plan' => Plan::Free, 'trial_ends_at' => null, 'pro_trial_used_at' => now()->subDays(20)])->save();
+
+    /** @var User $owner */
+    $owner = $workspace->owner;
+    app(ExtendEndedTrial::class)->execute($owner, $workspace);
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->update(['credits_remaining' => 180, 'credits_used' => 120]);
+
+    return $workspace->refresh();
+}
+
+it('keeps the extension balance frozen when the owner subscribes during the extension', function (): void {
+    withHostedBilling();
+    $workspace = extendedTrialWorkspaceWithSpentCredits();
+    $extensionEndsAt = $workspace->trial_ends_at;
+    $this->travel(2)->days();
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created', ['status' => 'trialing', 'trial_end' => $extensionEndsAt->getTimestamp()]))->assertSuccessful();
+
+    $balance = fn (): AiCreditBalance => AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
+
+    expect(resolve(Entitlements::class)->creditAllowance($workspace->refresh()))->toBe(Plan::Free->credits())
+        ->and($balance()->credits_remaining)->toBe(180);
+
+    $this->travelTo($extensionEndsAt->addHour());
+    $this->artisan('chat:reset-credits')->assertSuccessful();
+
+    expect($balance()->credits_remaining)->toBe(Plan::Pro->credits());
+});
+
+it('releases the extension balance at once when a subscription bought during the extension charges immediately', function (): void {
+    withHostedBilling();
+    $workspace = extendedTrialWorkspaceWithSpentCredits();
+    $this->travel(6)->days();
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created'))->assertSuccessful();
+
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
+
+    expect(resolve(Entitlements::class)->creditAllowance($workspace->refresh()))->toBe(Plan::Pro->credits())
+        ->and($balance->credits_remaining)->toBe(Plan::Pro->credits());
+});
+
+it('keeps the extension balance frozen when the owner picks Scale during the extension', function (): void {
+    withHostedBilling();
+    config()->set('services.stripe.prices.scale_monthly', 'price_scale_monthly_test');
+    $workspace = extendedTrialWorkspaceWithSpentCredits();
+    $extensionEndsAt = $workspace->trial_ends_at;
+    $this->travel(2)->days();
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created', ['price' => 'price_scale_monthly_test', 'status' => 'trialing', 'trial_end' => $extensionEndsAt->getTimestamp()]))->assertSuccessful();
+
+    $balance = fn (): AiCreditBalance => AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
+
+    expect($workspace->refresh()->plan)->toBe(Plan::Scale)
+        ->and(resolve(Entitlements::class)->creditAllowance($workspace))->toBe(Plan::Free->credits())
+        ->and($balance()->credits_remaining)->toBe(180);
+
+    $this->travelTo($extensionEndsAt->addHour());
+    $this->artisan('chat:reset-credits')->assertSuccessful();
+
+    expect($balance()->credits_remaining)->toBe(Plan::Scale->credits());
 });
 
 /** @return array<string, mixed> */
