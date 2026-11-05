@@ -20,7 +20,6 @@ use Illuminate\Support\Facades\Route;
 use Laravel\Pennant\Feature;
 use Livewire\Features\SupportTesting\Testable;
 use Relaticle\Cloud\Billing\StripeBilling;
-use Relaticle\CustomFields\Livewire\ManageFieldsTable;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountSettingsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailPrivacySettingsPage;
@@ -191,7 +190,7 @@ test('a workspace admin can open the custom fields tab, and a member cannot', fu
 });
 
 test('the custom fields form refuses the domain type and still creates a text field', function (): void {
-    $create = fn (string $name, string $type): Testable => livewire(ManageFieldsTable::class, ['entityType' => 'company'])
+    $create = fn (string $name, string $type): Testable => livewire('manage-fields-table', ['entityType' => 'company'])
         ->callAction('createField', ['name' => $name, 'type' => $type, 'entity_type' => 'company']);
 
     $create('Second domains', 'domain')->assertHasActionErrors(['type']);
@@ -214,7 +213,7 @@ test('the custom fields table renders a field name as text, never as markup', fu
         'name' => $name,
     ]);
 
-    livewire(ManageFieldsTable::class, ['entityType' => 'company'])
+    livewire('manage-fields-table', ['entityType' => 'company'])
         ->assertSeeHtml($escaped)
         ->assertDontSeeHtml($name);
 })->with([

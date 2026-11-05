@@ -82,12 +82,7 @@ enum OnboardingUseCase: string implements HasLabel
         };
     }
 
-    /**
-     * Where each stage this use case seeds sits in the pipeline, so won and lost value
-     * reads the same for every preset.
-     *
-     * @return array<string, OptionCategory>
-     */
+    /** @return array<string, OptionCategory> */
     public function stageCategories(): array
     {
         return match ($this) {

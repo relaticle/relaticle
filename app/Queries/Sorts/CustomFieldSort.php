@@ -32,9 +32,8 @@ final readonly class CustomFieldSort implements Sort
             // first record it points at, and unlinked rows sort last either way.
             resolve(RecordLinkQuery::class)->orderByLinkedAttribute(
                 $query,
-                $definition,
-                $definition->readDirectionFor($this->field),
-                CrmEntity::tryFrom($definition->targetEntityTypeFor($this->field))?->titleColumn() ?? 'name',
+                $this->field,
+                CrmEntity::tryFrom($definition->farEnd($this->field)->entityType)?->titleColumn() ?? 'name',
                 $descending ? 'desc' : 'asc',
             );
 

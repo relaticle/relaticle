@@ -17,8 +17,11 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
 use Illuminate\Validation\ValidationException;
 use Relaticle\CustomFields\Data\FieldTypeData;
+use Relaticle\CustomFields\Enums\FieldCapability;
+use Relaticle\CustomFields\Enums\OptionCategory;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\CustomFields\Facades\Entities;
+use Relaticle\CustomFields\Rules\RequiresCompletedOption;
 
 /**
  * The single rule set for custom-field definitions written outside a Filament form.
@@ -50,7 +53,8 @@ final readonly class CustomFieldDefinitionValidator
         $maxOptions = self::maxOptions();
         $creatableTypes = self::creatableTypes();
         $lookupTypes = array_keys(Entities::getLookupOptions());
-        $requiresLookupType = in_array($type, $creatableTypes, true) && CustomFieldsType::getFieldType($type)?->requiresRelationship === true;
+        $requiresLookupType = in_array($type, $creatableTypes, true) && CustomFieldsType::getFieldType($type)?->supports(FieldCapability::RequiresRelationship) === true;
+        $carriesCategories = CustomFieldsType::getFieldType($type)?->supports(FieldCapability::CarriesOptionCategories) === true;
 
         $validated = Validator::make(self::normalize($data), [
             'entity_type' => ['required', Rule::in(CrmEntity::morphAliases()), self::withinFieldCap($tenantId, $entityType, $proposedAlongside)],
@@ -62,8 +66,9 @@ final readonly class CustomFieldDefinitionValidator
             )],
             'code' => ['nullable', 'string', 'max:50', 'alpha_dash', self::uniqueDefinition('code', $tenantId, $entityType)],
             'lookup_type' => ['nullable', $requiresLookupType ? 'required' : 'prohibited', 'string', Rule::in($lookupTypes)],
-            'options' => ['nullable', self::expectsOptions($type) ? 'required' : 'prohibited', 'array', "max:{$maxOptions}"],
+            'options' => ['nullable', self::expectsOptions($type) ? 'required' : 'prohibited', 'array', "max:{$maxOptions}", new RequiresCompletedOption($type)],
             'options.*.name' => ['required', 'string', 'max:255', 'distinct:ignore_case'],
+            'options.*.category' => [$carriesCategories ? 'nullable' : 'prohibited', Rule::enum(OptionCategory::class)],
             'settings' => ['nullable', 'array'],
         ], [
             'entity_type.in' => 'Invalid entity type ":input". Must be one of: '.implode(', ', CrmEntity::morphAliases()).'.',
@@ -301,8 +306,8 @@ final readonly class CustomFieldDefinitionValidator
 
     /**
      * Trims the free-text attributes and reshapes options to a uniform
-     * `[{name: string}]` so the `options.*.name` rules apply whether the caller
-     * sent objects or bare strings.
+     * `[{name: string, category?: string}]` so the option rules apply whether the
+     * caller sent objects or bare strings.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
@@ -317,9 +322,10 @@ final readonly class CustomFieldDefinitionValidator
 
         if (is_array($data['options'] ?? null)) {
             $data['options'] = array_values(array_map(
-                static fn (mixed $option): array => [
+                static fn (mixed $option): array => array_filter([
                     'name' => trim(is_array($option) ? (string) ($option['name'] ?? '') : (string) $option),
-                ],
+                    'category' => is_array($option) ? ($option['category'] ?? null) : null,
+                ], static fn (mixed $value): bool => $value !== null),
                 $data['options'],
             ));
         }

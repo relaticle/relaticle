@@ -13,7 +13,7 @@ use App\Enums\CrmEntity;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CanonicalRecordUrl;
-use App\Support\OptionsInCategory;
+use App\Support\CustomFields\WorkspaceCustomFields;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\JoinClause;
@@ -184,7 +184,9 @@ final readonly class DigestService
         return [
             'due_field_id' => $row?->due_field_id !== null ? (string) $row->due_field_id : null,
             'status_field_id' => $statusFieldId,
-            'terminal_option_ids' => OptionsInCategory::terminalIds($workspace->getKey(), 'status', $statusFieldId),
+            'terminal_option_ids' => $statusFieldId === null
+                ? []
+                : resolve(WorkspaceCustomFields::class)->forEntity($workspace, CrmEntity::Task->value)->firstWhere('id', $statusFieldId)?->terminalOptionIds() ?? [],
             'priority_field_id' => $row?->priority_field_id !== null ? (string) $row->priority_field_id : null,
             'priority_colors' => (bool) $row?->priority_colors,
         ];

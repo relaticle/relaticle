@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "077aca8bd45fa37d10828d0c4bdd5455",
+    "content-hash": "b6f99ae0a51ab62399a0397d23041c53",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -10536,23 +10536,24 @@
         },
         {
             "name": "relaticle/custom-fields",
-            "version": "dev-feat/4.0",
+            "version": "v4.0.0-beta.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/relaticle/custom-fields.git",
-                "reference": "b3cd80fcc6b28bc229b9203aa1e7c59859fe7d5f"
+                "reference": "a00369535bd37a60591c714b5dc0be8e12aa006d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/relaticle/custom-fields/zipball/b3cd80fcc6b28bc229b9203aa1e7c59859fe7d5f",
-                "reference": "b3cd80fcc6b28bc229b9203aa1e7c59859fe7d5f",
+                "url": "https://api.github.com/repos/relaticle/custom-fields/zipball/a00369535bd37a60591c714b5dc0be8e12aa006d",
+                "reference": "a00369535bd37a60591c714b5dc0be8e12aa006d",
                 "shasum": ""
             },
             "require": {
                 "filament/filament": "^5.0",
+                "illuminate/contracts": "^13.0",
                 "kirschbaum-development/eloquent-power-joins": "^4.0",
                 "manukminasyan/blade-mdi": "^1.0",
-                "php": "^8.3",
+                "php": "^8.4",
                 "propaganistas/laravel-phone": "^6.0",
                 "spatie/laravel-data": "^4.0.0",
                 "spatie/laravel-package-tools": "^1.15.0"
@@ -10561,7 +10562,7 @@
                 "larastan/larastan": "^3.0",
                 "laravel/pint": "^1.0",
                 "nunomaduro/collision": "^8.1",
-                "orchestra/testbench": "^10.0|^11.0",
+                "orchestra/testbench": "^11.0",
                 "pestphp/pest": "^4.0|^5.0",
                 "pestphp/pest-plugin-arch": "^4.0|^5.0",
                 "pestphp/pest-plugin-laravel": "^4.0|^5.0",
@@ -10628,8 +10629,8 @@
                 "issues": "https://github.com/relaticle/custom-fields/issues",
                 "source": "https://github.com/relaticle/custom-fields"
             },
-            "time": "2026-11-04T23:38:00+00:00",
-            "published-time": "2026-11-04T23:38:06+00:00"
+            "time": "2026-11-05T10:30:34+00:00",
+            "published-time": "2026-11-05T13:56:54+00:00"
         },
         {
             "name": "relaticle/flowforge",

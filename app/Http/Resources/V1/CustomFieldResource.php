@@ -9,7 +9,6 @@ use App\Models\CustomFieldOption;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\JsonApi\JsonApiResource;
-use Relaticle\CustomFields\Services\ValidationService;
 
 /**
  * @mixin CustomField
@@ -24,14 +23,12 @@ final class CustomFieldResource extends JsonApiResource
      */
     public function toAttributes(Request $request): array
     {
-        $validationService = resolve(ValidationService::class);
-
         return [
             'code' => $this->code,
             'name' => $this->name,
             'type' => $this->type,
             'entity_type' => $this->entity_type,
-            'required' => $validationService->isRequired($this->resource),
+            'required' => $this->resource->isRequired(),
             'unique' => $this->settings->unique_per_entity_type,
             'options' => $this->whenLoaded('options', fn () => $this->options->map(fn (CustomFieldOption $option): array => [
                 'label' => $option->name,

@@ -6,17 +6,17 @@ use App\Models\Company;
 use App\Models\CustomFieldLink;
 use App\Models\People;
 use App\Models\User;
-use App\Support\LinkActorResolver;
 use Filament\Facades\Filament;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\CustomFields\CustomFields;
 use Relaticle\CustomFields\Enums\RelationshipCardinality;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Tests\Helpers\RecordFieldFixture;
 
-mutates(LinkActorResolver::class);
+mutates(PendingActionService::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -70,5 +70,5 @@ it('stamps the proposal owner on a link written by an approval with no session',
 
     expect($link->created_by_type)->toBe('user')
         ->and($link->created_by_id)->toBe($this->user->getKey())
-        ->and(resolve(LinkActorResolver::class)->resolve())->toBeNull();
+        ->and(CustomFields::writeContext()->actor)->toBeNull();
 });

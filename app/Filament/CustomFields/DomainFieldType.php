@@ -6,6 +6,7 @@ namespace App\Filament\CustomFields;
 
 use App\Enums\CustomFieldType;
 use Illuminate\Support\Str;
+use Relaticle\CustomFields\Enums\FieldCapability;
 use Relaticle\CustomFields\FieldTypeSystem\BaseFieldType;
 use Relaticle\CustomFields\FieldTypeSystem\Definitions\LinkFieldType;
 use Relaticle\CustomFields\FieldTypeSystem\FieldSchema;
@@ -28,11 +29,15 @@ final class DomainFieldType extends BaseFieldType
             ->tableColumn(LinkColumn::class)
             ->infolistEntry(LinkEntry::class)
             ->priority(61)
-            ->supportsMultiValue()
-            ->supportsUniqueConstraint()
-            ->withArbitraryValues()
-            ->withoutUserOptions()
-            ->systemOnly()
+            ->capabilities(
+                FieldCapability::Searchable,
+                FieldCapability::Sortable,
+                FieldCapability::WithoutUserOptions,
+                FieldCapability::AcceptsArbitraryValues,
+                FieldCapability::SupportsMultiValue,
+                FieldCapability::SupportsUniqueConstraint,
+                FieldCapability::SystemOnly,
+            )
             ->defaultItemValidationRules(['max:2048', 'regex:/^(https?:\/\/)?([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(\/.*)?$/']);
     }
 

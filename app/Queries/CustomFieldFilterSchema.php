@@ -241,7 +241,7 @@ final readonly class CustomFieldFilterSchema
         return Cache::remember($cacheKey, CustomFieldSchemaCache::TTL, fn (): Collection => resolve(WorkspaceCustomFields::class)
             ->forEntity($workspace, $entityType)
             ->filter(self::isFilterable(...))
-            ->map(fn (CustomField $field): CustomField => $field->withoutRelations())
+            ->map(fn (CustomField $field): CustomField => $field->withoutRelations()->setRelations(Arr::only($field->getRelations(), ['fromEndDefinition', 'toEndDefinition'])))
             ->values());
     }
 }

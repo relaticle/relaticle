@@ -9,6 +9,7 @@ use App\Models\CustomField;
 use App\Models\CustomFieldRelationship;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Relaticle\CustomFields\Enums\FieldCapability;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 
 final readonly class CustomFieldOptionMap
@@ -75,6 +76,6 @@ final readonly class CustomFieldOptionMap
 
     private static function picksFromOptions(CustomFieldType $type): bool
     {
-        return $type->isChoice() && CustomFieldsType::getFieldType($type->value)?->acceptsArbitraryValues === false;
+        return $type->isChoice() && CustomFieldsType::getFieldType($type->value)?->supports(FieldCapability::AcceptsArbitraryValues) === false;
     }
 }

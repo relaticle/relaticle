@@ -8,13 +8,14 @@ use App\Enums\CrmEntity;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\CustomFields\TaskField;
 use App\Models\Company;
+use App\Models\CustomField;
 use App\Models\Note;
 use App\Models\People;
 use App\Models\Scopes\WorkspaceScope;
 use App\Models\Task;
 use App\Models\User;
 use App\Queries\Opportunities\OpportunityAggregatesQuery;
-use App\Support\OptionsInCategory;
+use App\Support\CustomFields\WorkspaceCustomFields;
 use DateTimeInterface;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\Query\JoinClause;
@@ -76,18 +77,14 @@ final readonly class CrmSummaryQuery
         });
     }
 
-    /**
-     * Amount closed, split by how the stage ended: won is a completed stage option,
-     * lost a cancelled one. Reporting on the category is what makes the figure survive
-     * a renamed or translated stage.
-     *
-     * @return array{total_won_value: float, total_lost_value: float}
-     */
+    // Won is a completed stage option and lost a cancelled one, so a renamed or translated stage still counts.
+    /** @return array{total_won_value: float, total_lost_value: float} */
     private function outcomeValues(string $workspaceId): array
     {
         $fields = $this->opportunityFieldMetadata($workspaceId);
-        $wonOptionIds = OptionsInCategory::ids($fields['stage_field_id'], OptionCategory::Completed);
-        $lostOptionIds = OptionsInCategory::ids($fields['stage_field_id'], OptionCategory::Cancelled);
+        $stage = $this->field($workspaceId, CrmEntity::Opportunity->value, $fields['stage_field_id']);
+        $wonOptionIds = $stage?->optionIdsIn(OptionCategory::Completed) ?? [];
+        $lostOptionIds = $stage?->optionIdsIn(OptionCategory::Cancelled) ?? [];
         $closedOptionIds = [...$wonOptionIds, ...$lostOptionIds];
 
         if ($fields['amount_field_id'] === null || $closedOptionIds === []) {
@@ -210,7 +207,16 @@ final readonly class CrmSummaryQuery
         return [
             'due_field_id' => $row?->due_field_id !== null ? (string) $row->due_field_id : null,
             'status_field_id' => $statusFieldId,
-            'terminal_option_ids' => OptionsInCategory::terminalIds($workspaceId, TaskField::STATUS->value, $statusFieldId),
+            'terminal_option_ids' => $this->field($workspaceId, CrmEntity::Task->value, $statusFieldId)?->terminalOptionIds() ?? [],
         ];
+    }
+
+    private function field(string $workspaceId, string $entityType, ?string $fieldId): ?CustomField
+    {
+        if ($fieldId === null) {
+            return null;
+        }
+
+        return resolve(WorkspaceCustomFields::class)->forEntity($workspaceId, $entityType)->firstWhere('id', $fieldId);
     }
 }

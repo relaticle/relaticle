@@ -742,7 +742,7 @@ it('applies every operator of every custom field type alike on the api and mcp',
         [['$not_in' => ['Bronze']], ['High', 'Unset']],
         [['$not_in' => ['Bronze'], '$is_empty' => false], ['High']],
     ], 'Bronze'],
-    'status' => ['status', ['Bronze', 'Gold'], 'Bronze', 'Gold', [
+    'status' => ['status', [['name' => 'Bronze', 'category' => 'unstarted'], ['name' => 'Gold', 'category' => 'completed']], 'Bronze', 'Gold', [
         [['$eq' => 'Bronze'], ['Low']],
         [['$in' => ['Gold']], ['High']],
         [['$not_in' => ['Bronze']], ['High', 'Unset']],

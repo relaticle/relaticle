@@ -242,12 +242,8 @@ final readonly class CustomFieldFilter implements Filter
         };
     }
 
-    /**
-     * A link field holds no value row: its condition rides the edge ledger. `$eq` and `$in`
-     * name the linked records by id, `$contains` matches the name of the record on the far end.
-     *
-     * @param  Builder<Model>  $query
-     */
+    // `$eq` and `$in` name the linked records by id, `$contains` matches the far record's name.
+    /** @param  Builder<Model>  $query */
     private function applyLinkCondition(
         Builder $query,
         CustomField $field,
@@ -256,17 +252,16 @@ final readonly class CustomFieldFilter implements Filter
         mixed $operand,
     ): void {
         $links = resolve(RecordLinkQuery::class);
-        $direction = $definition->readDirectionFor($field);
 
         if ($operator === '$contains') {
-            $titleColumn = CrmEntity::tryFrom($definition->targetEntityTypeFor($field))?->titleColumn() ?? 'name';
+            $titleColumn = CrmEntity::tryFrom($definition->farEnd($field)->entityType)?->titleColumn() ?? 'name';
 
-            $links->whereLinkedMatching($query, $definition, $direction, [$titleColumn], (string) $operand);
+            $links->whereLinkedMatching($query, $field, [$titleColumn], (string) $operand);
 
             return;
         }
 
-        $links->whereLinkedTo($query, $definition, $direction, is_array($operand) ? $operand : [$operand]);
+        $links->whereLinkedTo($query, $field, is_array($operand) ? $operand : [$operand]);
     }
 
     /**
