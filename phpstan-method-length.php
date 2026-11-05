@@ -91,7 +91,7 @@ return [
                 'Relaticle\EmailIntegration\Services\EmailInlineImageEmbedder::embed' => 77,
                 'Relaticle\EmailIntegration\Services\EmailVisibilityService::connectionFor' => 70,
                 'Relaticle\EmailIntegration\Services\Factories\NormalizedMeetingPayloadFactory::fromCalendarEvent' => 73,
-                'Relaticle\EmailIntegration\Services\GmailService::buildMimeMessage' => 89,
+                'Relaticle\EmailIntegration\Services\GmailService::buildMimeMessage' => 87,
                 'Relaticle\EmailIntegration\Services\GmailService::fetchDelta' => 87,
                 'Relaticle\EmailIntegration\Services\MicrosoftCalendarService::drainOnePage' => 99,
                 'Relaticle\ImportWizard\Enums\DateFormat::getParseFormats' => 73,

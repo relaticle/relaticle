@@ -48,6 +48,29 @@ it('uses a white composer surface in light mode', function (): void {
         ->and($colors['dark'])->not->toBe($colors['light']);
 });
 
+it('keeps paragraphs in the chat composer flush', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->assertNoJavaScriptErrors();
+
+    $gap = $page->script(<<<'JS'
+        (() => {
+            const surface = document.querySelector('[data-chat-context=dashboard] [contenteditable="true"]');
+
+            surface.editor.commands.setContent('<p>Find my open opportunities</p><p>Sort them by close date</p>');
+
+            const [first, second] = surface.querySelectorAll(':scope > p');
+
+            return second.getBoundingClientRect().top - first.getBoundingClientRect().bottom;
+        })();
+    JS);
+
+    expect($gap)->toEqualWithDelta(0, 0.5);
+});
+
 it('shows greeting on the dashboard', function (): void {
     $user = User::factory()->withWorkspace()->create(['timezone' => 'UTC']);
     $workspace = $user->ownedWorkspaces()->first();

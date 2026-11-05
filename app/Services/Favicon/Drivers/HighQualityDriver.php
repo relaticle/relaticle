@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Favicon\Drivers;
 
+use App\Models\Company;
 use App\Support\Http\HostResolver;
 use App\Support\Http\SsrfGuard;
 use AshAllenDesign\FaviconFetcher\Collections\FaviconCollection;
@@ -208,9 +209,9 @@ final class HighQualityDriver implements Fetcher
 
             $iconUrl = $this->stripPathFromUrl($url).'/apple-touch-icon.png';
             /** @var Response $testResponse */
-            $testResponse = $this->guardedHttpClient()->head($iconUrl);
+            $testResponse = $this->guardedHttpClient()->get($iconUrl);
 
-            if ($testResponse->successful()) {
+            if ($this->servesStorableIcon($testResponse)) {
                 return new Favicon(
                     url: $url,
                     faviconUrl: $iconUrl,
@@ -286,7 +287,7 @@ final class HighQualityDriver implements Fetcher
                 fn () => $this->guardedHttpClient()->get($faviconUrl)
             );
 
-            if ($response->successful()) {
+            if ($this->servesStorableIcon($response)) {
                 return new Favicon(
                     url: $url,
                     faviconUrl: $faviconUrl,
@@ -320,7 +321,7 @@ final class HighQualityDriver implements Fetcher
                 fn () => $this->guardedHttpClient()->get($faviconUrl)
             );
 
-            if ($response->successful()) {
+            if ($this->servesStorableIcon($response)) {
                 return new Favicon(
                     url: $url,
                     faviconUrl: $faviconUrl,
@@ -358,12 +359,19 @@ final class HighQualityDriver implements Fetcher
 
         try {
             /** @var Response $response */
-            $response = $this->guardedHttpClient()->head($faviconUrl);
+            $response = $this->guardedHttpClient()->get($faviconUrl);
 
-            return $response->successful();
+            return $this->servesStorableIcon($response);
         } catch (\Exception) {
             return false;
         }
+    }
+
+    // Many sites answer a missing path with 200 and their own HTML page, and a Content-Type
+    // header is only the server's claim about the bytes.
+    private function servesStorableIcon(Response $response): bool
+    {
+        return $response->successful() && Company::logoExtensionFor($response->body()) !== null;
     }
 
     private function convertToAbsoluteUrl(string $baseUrl, string $path): string

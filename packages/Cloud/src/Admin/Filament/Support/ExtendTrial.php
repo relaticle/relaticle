@@ -7,6 +7,7 @@ namespace Relaticle\Cloud\Admin\Filament\Support;
 use App\Enums\BillingStatus;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
+use Closure;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Notifications\Notification;
@@ -32,8 +33,9 @@ final class ExtendTrial
                     ->label(__('cloud::admin.trials.trial_ends'))
                     ->seconds(false)
                     ->default(fn (Workspace $record): CarbonImmutable => self::defaultEnd($record))
+                    ->helperText(__('cloud::admin.trials.latest_end', ['days' => ExtendWorkspaceTrial::MAX_DAYS_AHEAD]))
                     ->required()
-                    ->after('now'),
+                    ->rule(fn (DateTimePicker $component): Closure => self::endsInWindow($component)),
             ])
             ->action(function (array $data, Workspace $record): void {
                 $administrator = auth('sysadmin')->user();
@@ -59,6 +61,30 @@ final class ExtendTrial
             ? $workspace->trial_ends_at
             : now();
 
-        return $from->addDays(Workspace::PRO_TRIAL_DAYS);
+        return $from->addDays(Workspace::PRO_TRIAL_DAYS)->min(self::latestEnd());
+    }
+
+    // Not maxDate()/after(): Filament compares the picked wall-clock time with a UTC
+    // limit, which moves the window by the administrator's offset.
+    private static function endsInWindow(DateTimePicker $component): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail) use ($component): void {
+            $endsAt = Date::parse((string) $value, $component->getTimezone());
+
+            if (! $endsAt->isFuture()) {
+                $fail(__('cloud::admin.trials.must_end_in_future'));
+
+                return;
+            }
+
+            if ($endsAt->isAfter(now()->addDays(ExtendWorkspaceTrial::MAX_DAYS_AHEAD))) {
+                $fail(__('cloud::admin.trials.latest_end', ['days' => ExtendWorkspaceTrial::MAX_DAYS_AHEAD]));
+            }
+        };
+    }
+
+    private static function latestEnd(): CarbonImmutable
+    {
+        return now()->addDays(ExtendWorkspaceTrial::MAX_DAYS_AHEAD)->startOfMinute();
     }
 }

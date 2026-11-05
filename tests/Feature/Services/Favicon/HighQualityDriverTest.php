@@ -19,7 +19,7 @@ test('captures favicon-512x512 from minified html where href comes before sizes'
 
     Http::fake([
         'https://1.1.1.1' => Http::response($html, 200),
-        'https://1.1.1.1/favicon-512x512.png' => Http::response('', 200),
+        'https://1.1.1.1/favicon-512x512.png' => Http::response(onePixelPng()),
     ]);
 
     $driver = new HighQualityDriver;
@@ -34,7 +34,7 @@ test('captures favicon-512x512 when sizes comes before href', function (): void 
 
     Http::fake([
         'https://1.1.1.1' => Http::response($html, 200),
-        'https://1.1.1.1/favicon-512x512.png' => Http::response('', 200),
+        'https://1.1.1.1/favicon-512x512.png' => Http::response(onePixelPng()),
     ]);
 
     $driver = new HighQualityDriver;
@@ -50,7 +50,7 @@ test('does not span across multiple link tags when matching sizes', function ():
 
     Http::fake([
         'https://1.1.1.1' => Http::response($html, 200),
-        'https://1.1.1.1/icon.png' => Http::response('', 200),
+        'https://1.1.1.1/icon.png' => Http::response(onePixelPng()),
     ]);
 
     $driver = new HighQualityDriver;
@@ -67,7 +67,7 @@ test('falls through to apple-touch-icon when no sized icon present', function ()
 
     Http::fake([
         'https://1.1.1.1' => Http::response($html, 200),
-        'https://1.1.1.1/apple.png' => Http::response('', 200),
+        'https://1.1.1.1/apple.png' => Http::response(onePixelPng()),
     ]);
 
     $driver = new HighQualityDriver;
@@ -81,7 +81,7 @@ test('apple-touch-icon pattern is not fooled by data-href attribute', function (
 
     Http::fake([
         'https://1.1.1.1' => Http::response($html, 200),
-        'https://1.1.1.1/correct.png' => Http::response('', 200),
+        'https://1.1.1.1/correct.png' => Http::response(onePixelPng()),
     ]);
 
     $driver = new HighQualityDriver;
@@ -95,7 +95,7 @@ test('apple-touch-icon pattern matches when href comes before rel', function ():
 
     Http::fake([
         'https://1.1.1.1' => Http::response($html, 200),
-        'https://1.1.1.1/apple.png' => Http::response('', 200),
+        'https://1.1.1.1/apple.png' => Http::response(onePixelPng()),
     ]);
 
     $driver = new HighQualityDriver;
@@ -110,14 +110,84 @@ test('high-res pattern prefers larger sizes when multiple are present', function
 
     Http::fake([
         'https://1.1.1.1' => Http::response($html, 200),
-        'https://1.1.1.1/icon-512.png' => Http::response('', 200),
-        'https://1.1.1.1/icon-256.png' => Http::response('', 200),
+        'https://1.1.1.1/icon-512.png' => Http::response(onePixelPng()),
+        'https://1.1.1.1/icon-256.png' => Http::response(onePixelPng()),
     ]);
 
     $driver = new HighQualityDriver;
     $favicon = $driver->fetch('https://1.1.1.1');
 
     expect($favicon->getFaviconUrl())->toBe('https://1.1.1.1/icon-512.png');
+});
+
+test('passes over a linked icon whose bytes the logo collection cannot store', function (string $body, string $contentType): void {
+    app()->instance(HostResolver::class, new HostResolver(fn (): array => ['93.184.216.34']));
+
+    Http::fake([
+        'https://1.1.1.1' => Http::response('<link rel="apple-touch-icon" href="/apple.png">', 200, ['Content-Type' => 'text/html']),
+        'https://1.1.1.1/*' => Http::response($body, 200, ['Content-Type' => $contentType]),
+        'https://www.google.com/*' => Http::response(onePixelPng(), 200, ['Content-Type' => 'image/png']),
+    ]);
+
+    expect((new HighQualityDriver)->fetch('https://1.1.1.1')?->getFaviconUrl())
+        ->toBe('https://www.google.com/s2/favicons?sz=256&domain=1.1.1.1');
+})->with([
+    'html page' => ['<!DOCTYPE html><html><body>Not found</body></html>', 'text/html; charset=utf-8'],
+    'html page declared as png' => ['<!DOCTYPE html><html><body>Not found</body></html>', 'image/png'],
+    'json error' => ['{"error":"not found"}', 'application/json'],
+    'svg' => ['<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>', 'image/svg+xml'],
+    'empty body' => ['', 'image/png'],
+]);
+
+test('accepts a linked icon by its bytes whatever type the server declares', function (string $contentType): void {
+    Http::fake([
+        'https://1.1.1.1' => Http::response('<link rel="apple-touch-icon" href="/apple.png">', 200, ['Content-Type' => 'text/html']),
+        'https://1.1.1.1/apple.png' => Http::response(onePixelPng(), 200, ['Content-Type' => $contentType]),
+    ]);
+
+    expect((new HighQualityDriver)->fetch('https://1.1.1.1')?->getFaviconUrl())->toBe('https://1.1.1.1/apple.png');
+})->with([
+    'png' => ['image/png'],
+    'misspelled type' => ['image/jpg'],
+    'undeclared binary' => ['application/octet-stream'],
+    'html' => ['text/html'],
+]);
+
+test('passes over a guessed apple touch icon the site answers with its own page', function (): void {
+    app()->instance(HostResolver::class, new HostResolver(fn (): array => ['93.184.216.34']));
+
+    Http::fake([
+        'https://www.google.com/*' => Http::response(onePixelPng()),
+        '*' => Http::response('<html><body>Home</body></html>', 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    expect((new HighQualityDriver)->fetch('https://1.1.1.1')?->getFaviconUrl())
+        ->toBe('https://www.google.com/s2/favicons?sz=256&domain=1.1.1.1');
+});
+
+test('passes over a linked icon that redirects to a page', function (): void {
+    app()->instance(HostResolver::class, new HostResolver(fn (): array => ['93.184.216.34']));
+
+    Http::fake([
+        'https://1.1.1.1' => Http::response('<link rel="apple-touch-icon" href="/apple.png">'),
+        'https://1.1.1.1/apple.png' => Http::response('', 302, ['Location' => 'https://1.1.1.1/login']),
+        'https://1.1.1.1/login' => Http::response('<html><body>Sign in</body></html>', 200, ['Content-Type' => 'text/html']),
+        'https://www.google.com/*' => Http::response(onePixelPng()),
+        '*' => Http::response('', 404),
+    ]);
+
+    expect((new HighQualityDriver)->fetch('https://1.1.1.1')?->getFaviconUrl())
+        ->toBe('https://www.google.com/s2/favicons?sz=256&domain=1.1.1.1');
+});
+
+test('accepts a linked icon from a server that refuses head requests', function (): void {
+    Http::fake(fn (HttpClientRequest $request) => match (true) {
+        $request->method() === 'HEAD' => Http::response('', 405),
+        $request->url() === 'https://1.1.1.1/apple.png' => Http::response(onePixelPng()),
+        default => Http::response('<link rel="apple-touch-icon" href="/apple.png">'),
+    });
+
+    expect((new HighQualityDriver)->fetch('https://1.1.1.1')?->getFaviconUrl())->toBe('https://1.1.1.1/apple.png');
 });
 
 test('refuses to fetch from private addresses', function (): void {
@@ -181,7 +251,7 @@ test('uses another source when the site is unreachable', function (): void {
 
     Http::fake([
         'https://1.1.1.1' => Http::failedConnection(),
-        'https://www.google.com/*' => Http::response('', 200),
+        'https://www.google.com/*' => Http::response(onePixelPng()),
         '*' => Http::response('', 404),
     ]);
 
@@ -200,7 +270,7 @@ test('keeps a path and query in the page url out of the google lookup', function
 
     Http::fake([
         'https://1.1.1.1/*' => Http::response('', 404),
-        'https://www.google.com/*' => Http::response('', 200),
+        'https://www.google.com/*' => Http::response(onePixelPng()),
         '*' => Http::response('', 404),
     ]);
 
@@ -215,7 +285,7 @@ test('keeps a path and query in the page url out of the duckduckgo lookup', func
     app()->instance(HostResolver::class, new HostResolver(fn (): array => ['93.184.216.34']));
 
     Http::fake([
-        'https://icons.duckduckgo.com/*' => Http::response('', 200),
+        'https://icons.duckduckgo.com/*' => Http::response(onePixelPng()),
         '*' => Http::response('', 404),
     ]);
 
@@ -238,7 +308,7 @@ test('keeps the third party lookups for a fully qualified host with a trailing d
     app()->instance(HostResolver::class, new HostResolver(fn (): array => ['93.184.216.34']));
 
     Http::fake([
-        'https://icons.duckduckgo.com/*' => Http::response('', 200),
+        'https://icons.duckduckgo.com/*' => Http::response(onePixelPng()),
         '*' => Http::response('', 404),
     ]);
 

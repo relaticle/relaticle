@@ -804,6 +804,10 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
 ## Releases
 
 - Merge to main and tag only on explicit instruction, never on your own.
+- Composer security fixes are the one exception, and a bot runs it. `security-patch.yml` opens
+  and auto-merges the `security/composer-advisories` pull request.
+  `security-release.yml` tags the next patch release when that merge is the only commit since
+  the last tag. Otherwise it comments on the pull request, and a person releases.
 - Procedure: merge → `git checkout main && git pull` → confirm local and remote
   parity (`git log origin/main..main` and the reverse are both empty) → tag
   `vX.Y.Z` (minor for features, patch for fixes) → `git push origin <tag>`.

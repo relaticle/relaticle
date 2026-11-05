@@ -377,6 +377,28 @@ test('resolves each host once per job run', function (): void {
         ->and($lookups)->toBe(1);
 });
 
+test('stores an icon from another source when the site answers every path with its own page', function (): void {
+    Storage::fake('public');
+
+    $company = Company::factory()->for($this->user->currentWorkspace)->create([
+        'custom_fields' => [CompanyField::DOMAINS->value => ['soft-404.example']],
+    ]);
+
+    resolveHostsTo(['93.184.216.34']);
+
+    Http::fake([
+        'https://www.google.com/*' => Http::response(onePixelPng(), 200, ['Content-Type' => 'image/png']),
+        '*' => Http::response('<html><link rel="icon" href="/icon.png"></html>', 200, ['Content-Type' => 'text/html; charset=utf-8']),
+    ]);
+
+    new FetchFaviconForCompany($company->fresh())->handle();
+
+    expect($company->fresh()->getFirstMedia('logo')?->file_name)->toBe('logo.png');
+
+    Http::assertSent(fn (HttpClientRequest $request): bool => $request->method() === 'GET'
+        && $request->url() === 'https://www.google.com/s2/favicons?sz=256&domain=soft-404.example');
+});
+
 test('stops following redirects once the time budget has passed', function (): void {
     Storage::fake('public');
 
