@@ -114,6 +114,49 @@ it('repairs a malformed checklist item sent as html', function (): void {
         ->and(preg_match('/<li[^>]*>(?:(?!<\/li>).)*<ul/s', $stored))->toBe(0);
 });
 
+it('keeps the label text and a stray paragraph of a checklist sent as html', function (): void {
+    $stored = $this->postJson('/api/v1/tasks', [
+        'title' => 'Label',
+        'custom_fields' => ['description' => '<ul data-type="taskList"><p>Intro</p><li data-type="taskItem" data-checked="true"><label><input type="checkbox" checked> Call Bob</label></li></ul>'],
+    ])->assertCreated()->json('data.attributes.custom_fields.description');
+
+    expect(substr_count($stored, 'data-type="taskItem"'))->toBe(2)
+        ->and($stored)->toContain('<div><p>Intro</p></div>')
+        ->toContain('<div><p>Call Bob</p></div>')
+        ->and(substr_count($stored, 'data-checked="true"'))->toBe(1);
+});
+
+it('flattens block content inside a checklist item into plain paragraphs', function (string $description, array $words): void {
+    $stored = $this->postJson('/api/v1/tasks', [
+        'title' => 'Blocks',
+        'custom_fields' => ['description' => $description],
+    ])->assertCreated()->json('data.attributes.custom_fields.description');
+
+    expect(substr_count($stored, 'data-type="taskItem"'))->toBe(1)
+        ->and($stored)->not->toContain('<p></p>')
+        ->not->toContain('<p><p>')
+        ->not->toContain('<p><tbody')
+        ->and(preg_match('/<li[^>]*>(?:(?!<\/li>).)*<(?:ul|ol)/s', $stored))->toBe(0);
+
+    foreach ($words as $word) {
+        expect($stored)->toContain($word);
+    }
+})->with([
+    'blockquote' => ["- [ ] Call\n  > quote", ['<p>Call</p>', '<p>quote</p>']],
+    'list in a blockquote' => ["- [ ] Call\n  > - [x] inner", ['<p>Call</p>', 'inner']],
+    'table' => ['<ul data-type="taskList"><li data-type="taskItem" data-checked="false"><table><tr><td>a</td><td>b</td></tr></table></li></ul>', ['<p>a</p>', '<p>b</p>']],
+]);
+
+it('keeps a bullet whose marker follows a code span', function (): void {
+    $stored = $this->postJson('/api/v1/tasks', [
+        'title' => 'Mid marker',
+        'custom_fields' => ['description' => '- `npm` [ ] run'],
+    ])->assertCreated()->json('data.attributes.custom_fields.description');
+
+    expect($stored)->not->toContain('taskList')
+        ->toContain('<code>npm</code> [ ] run');
+});
+
 it('stores a well-formed checklist sent as html byte for byte', function (): void {
     $html = '<ul data-type="taskList"><li data-checked="true" data-type="taskItem"><label><input type="checkbox" checked="checked"><span></span></label><div><p>Call Bob</p></div></li><li data-checked="false" data-type="taskItem"><label><input type="checkbox"><span></span></label><div><p>Send quote</p></div></li></ul>';
 

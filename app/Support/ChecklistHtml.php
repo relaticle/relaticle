@@ -13,11 +13,14 @@ final readonly class ChecklistHtml
 {
     private const string MARKER = '/^\s*\[([ xX])\] /';
 
-    private const string TASK_LIST_ATTRIBUTE = '/data-type\s*=\s*["\']?taskList/i';
+    private const string TASK_LIST_ATTRIBUTE = '/data-type\s*=\s*["\']?taskList/';
 
     private const array LIST_TAGS = ['ul', 'ol'];
 
-    private const array BLOCK_TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'pre', 'table'];
+    private const array BLOCK_TAGS = [
+        'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'pre', 'div', 'ul', 'ol', 'li', 'dl', 'dt', 'dd',
+        'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'figure', 'section', 'article',
+    ];
 
     public static function fromMarkdownHtml(string $html): string
     {
@@ -33,7 +36,7 @@ final readonly class ChecklistHtml
                 continue;
             }
 
-            self::tagItems($list);
+            self::tagItems($document, $list);
             $converted = true;
         }
 
@@ -66,7 +69,7 @@ final readonly class ChecklistHtml
             }
 
             $items = [];
-            self::collectItems($list, $items);
+            self::collectItems($document, $list, $items);
 
             $list->replaceChildren(...array_map(
                 fn (Element $item): Element => self::buildItem($document, $item),
@@ -88,11 +91,14 @@ final readonly class ChecklistHtml
         return false;
     }
 
-    private static function tagItems(Element $list): void
+    private static function tagItems(HTMLDocument $document, Element $list): void
     {
+        $items = [];
+        self::collectItems($document, $list, $items);
+
         $list->setAttribute('data-type', 'taskList');
 
-        foreach ($list->querySelectorAll('li') as $item) {
+        foreach ($items as $item) {
             $item->setAttribute('data-checked', self::consumeMarker($item) ? 'true' : 'false');
             $item->setAttribute('data-type', 'taskItem');
         }
@@ -125,14 +131,8 @@ final readonly class ChecklistHtml
                 return $child;
             }
 
-            if (! $child instanceof Element || in_array($child->localName, [...self::LIST_TAGS, 'code', 'pre'], true)) {
-                continue;
-            }
-
-            $found = self::firstText($child);
-
-            if ($found instanceof Text) {
-                return $found;
+            if ($child instanceof Element) {
+                return $child->localName === 'p' ? self::firstText($child) : null;
             }
         }
 
@@ -140,25 +140,51 @@ final readonly class ChecklistHtml
     }
 
     /** @param list<Element> $items */
-    private static function collectItems(Element $list, array &$items): void
+    private static function collectItems(HTMLDocument $document, Element $list, array &$items): void
     {
-        foreach ($list->children as $child) {
-            if (in_array($child->localName, self::LIST_TAGS, true)) {
-                self::collectItems($child, $items);
+        $stray = null;
+
+        foreach (iterator_to_array($list->childNodes, false) as $child) {
+            $isElement = $child instanceof Element;
+
+            if ($isElement && $child->localName === 'li') {
+                $stray = null;
+                $items[] = $child;
+                self::collectNestedLists($document, $child, $items);
 
                 continue;
             }
 
-            if ($child->localName !== 'li') {
+            if ($isElement && in_array($child->localName, self::LIST_TAGS, true)) {
+                $stray = null;
+                self::collectItems($document, $child, $items);
+
                 continue;
             }
 
-            $items[] = $child;
+            if (! $isElement && ! $child instanceof Text) {
+                continue;
+            }
 
-            foreach (self::contentNodes($child) as $node) {
-                if ($node instanceof Element && in_array($node->localName, self::LIST_TAGS, true)) {
-                    self::collectItems($node, $items);
-                }
+            if ($stray === null && $child instanceof Text && trim($child->data) === '') {
+                continue;
+            }
+
+            if ($stray === null) {
+                $stray = $document->createElement('li');
+                $items[] = $stray;
+            }
+
+            $stray->append($child);
+        }
+    }
+
+    /** @param list<Element> $items */
+    private static function collectNestedLists(HTMLDocument $document, Element $item, array &$items): void
+    {
+        foreach (self::contentNodes($item) as $node) {
+            if ($node instanceof Element && in_array($node->localName, self::LIST_TAGS, true)) {
+                self::collectItems($document, $node, $items);
             }
         }
     }
@@ -195,6 +221,8 @@ final readonly class ChecklistHtml
 
         foreach (iterator_to_array($item->childNodes, false) as $child) {
             if ($child instanceof Element && $child->localName === 'label' && $child->querySelector('input[type="checkbox"]') instanceof Element) {
+                array_push($nodes, ...self::labelText($child));
+
                 continue;
             }
 
@@ -210,32 +238,41 @@ final readonly class ChecklistHtml
         return $nodes;
     }
 
+    /** @return list<Node> */
+    private static function labelText(Element $label): array
+    {
+        return array_values(array_filter(
+            iterator_to_array($label->childNodes, false),
+            fn (Node $part): bool => ! ($part instanceof Element && ($part->localName === 'input' || ($part->localName === 'span' && ! $part->hasChildNodes()))),
+        ));
+    }
+
     /**
      * @param  list<Node>  $nodes
      * @return list<Element>
      */
-    private static function paragraphs(HTMLDocument $document, array $nodes): array
+    private static function paragraphs(HTMLDocument $document, array $nodes, bool $liftLists = true): array
     {
         $paragraphs = [];
         $loose = [];
         $current = null;
 
         foreach ($nodes as $node) {
-            if ($node instanceof Element && in_array($node->localName, self::LIST_TAGS, true)) {
+            $tag = $node instanceof Element ? $node->localName : null;
+
+            if ($liftLists && in_array($tag, self::LIST_TAGS, true)) {
                 continue;
             }
 
-            if ($node instanceof Element && $node->localName === 'p') {
+            if ($tag === 'p') {
                 $paragraphs[] = $node;
                 $current = null;
 
                 continue;
             }
 
-            if ($node instanceof Element && in_array($node->localName, self::BLOCK_TAGS, true)) {
-                $block = $document->createElement('p');
-                $block->append(...iterator_to_array($node->childNodes, false));
-                $paragraphs[] = $block;
+            if (in_array($tag, self::BLOCK_TAGS, true)) {
+                array_push($paragraphs, ...self::paragraphs($document, iterator_to_array($node->childNodes, false), false));
                 $current = null;
 
                 continue;
@@ -256,7 +293,7 @@ final readonly class ChecklistHtml
 
         array_map(self::trimEdges(...), $loose);
 
-        return $paragraphs === [] ? [$document->createElement('p')] : $paragraphs;
+        return $paragraphs === [] && $liftLists ? [$document->createElement('p')] : $paragraphs;
     }
 
     private static function trimEdges(Element $paragraph): void
