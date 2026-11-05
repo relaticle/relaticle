@@ -354,21 +354,8 @@ it('builds, ticks and saves a checklist in a task description', function (): voi
     expect(substr_count((string) $description, 'data-checked="true"'))->toBe(1)
         ->and(substr_count((string) $description, 'data-checked="false"'))->toBe(2);
 
-    $page->script(<<<'JS'
-        (() => {
-            window.reopenErrors = [];
-            window.addEventListener('error', (event) => window.reopenErrors.push(event.message));
-            window.addEventListener('unhandledrejection', (event) => window.reopenErrors.push(event.reason?.message ?? String(event.reason)));
-        })();
-    JS);
-
     $page->click('Prepare the offsite')
         ->assertVisible($editor)
-        ->assertScript("document.querySelector('{$editor} input[aria-label=\"Task item checkbox for Call Bob\"]')?.checked === true");
-
-    $errors = json_decode((string) $page->script(<<<'JS'
-        JSON.stringify(window.reopenErrors.filter((message) => ! message.includes('ResizeObserver loop')));
-    JS), true, 512, JSON_THROW_ON_ERROR);
-
-    expect($errors)->toBeEmpty();
+        ->assertScript("document.querySelector('{$editor} input[aria-label=\"Task item checkbox for Call Bob\"]')?.checked === true")
+        ->assertNoJavaScriptErrors();
 });

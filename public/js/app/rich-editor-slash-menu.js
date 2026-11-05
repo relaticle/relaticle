@@ -73,6 +73,7 @@ class CanvasFitView {
     constructor(view) {
         this.content = view.dom.closest('.fi-fo-rich-editor-seamless .fi-fo-rich-editor-content')
         this.fit = this.fit.bind(this)
+        this.scheduleFit = this.scheduleFit.bind(this)
 
         // Only a modal form has slack to fill. Outside one (the chat proposal dock) the
         // viewport is no limit, and filling it overflows the card the editor sits in.
@@ -98,10 +99,15 @@ class CanvasFitView {
 
         window.addEventListener('resize', this.fit)
 
-        // Each pass closes the gap exactly, so the observer settles in one more frame.
-        // It also catches the fields above changing height without a window resize.
-        this.observer = new ResizeObserver(this.fit)
+        // Writing the height inside the observer's own callback is the loop Chromium
+        // reports, so the pass waits for the next frame. It also catches fields above resizing.
+        this.observer = new ResizeObserver(this.scheduleFit)
         this.observer.observe(this.extent)
+    }
+
+    scheduleFit() {
+        cancelAnimationFrame(this.frame)
+        this.frame = requestAnimationFrame(this.fit)
     }
 
     fit() {
@@ -120,6 +126,7 @@ class CanvasFitView {
     destroy() {
         window.removeEventListener('resize', this.fit)
         this.observer?.disconnect()
+        cancelAnimationFrame(this.frame)
     }
 }
 
