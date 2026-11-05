@@ -28,6 +28,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\EmailCategory;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -191,6 +192,20 @@ final class Email extends Model
     protected function withReadStateFor(Builder $query, string $userId): Builder
     {
         return $query->withExists(['reads as is_read' => fn (Builder $readQuery): Builder => $readQuery->where('user_id', $userId)]);
+    }
+
+    /**
+     * @param  Builder<Email>  $query
+     * @return Builder<Email>
+     */
+    #[Scope]
+    protected function withRecordLinkState(Builder $query): Builder
+    {
+        if ($query->getQuery()->columns === null) {
+            $query->select($query->qualifyColumn('*'));
+        }
+
+        return $query->selectRaw('exists (select 1 from emailables where emailables.email_id = emails.id) as is_linked_to_record');
     }
 
     // Relations
@@ -464,6 +479,19 @@ final class Email extends Model
             panel: 'app',
             tenant: $this->workspace,
         );
+    }
+
+    public function isLinkedToRecord(): bool
+    {
+        if (array_key_exists('is_linked_to_record', $this->attributes)) {
+            return (bool) $this->attributes['is_linked_to_record'];
+        }
+
+        if ($this->relationLoaded('pivot')) {
+            return true;
+        }
+
+        return DB::table('emailables')->where('email_id', $this->getKey())->exists();
     }
 
     public function hasPendingAccessRequestFrom(User $viewer): bool

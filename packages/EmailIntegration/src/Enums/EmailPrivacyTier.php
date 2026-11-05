@@ -36,6 +36,12 @@ enum EmailPrivacyTier: string implements HasDescription, HasIcon, HasLabel
         };
     }
 
+    /** @return list<self> */
+    public function moreOpenTiers(): array
+    {
+        return array_values(array_filter(self::cases(), fn (self $tier): bool => $tier->openness() > $this->openness()));
+    }
+
     public static function opennessRanking(): string
     {
         $tiers = self::cases();

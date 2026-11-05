@@ -44,6 +44,7 @@ final readonly class EmailThreadSummaryService
     private function buildPrompt(EmailThread $thread, User $viewer): string
     {
         $emails = $thread->emails()
+            ->withRecordLinkState()
             ->with(['from', 'participants', 'body', 'labels', 'shares'])
             ->oldest('sent_at')
             ->get();
