@@ -79,7 +79,7 @@ final class ProcessTrialsCommand extends Command
                     // Only revert what the trial granted. A converted
                     // subscription, or a plan assigned outside the trial (e.g. a
                     // sysadmin Enterprise grant), outlives the trial window, so
-                    // clear the stale timestamp so it is not reprocessed daily.
+                    // clear the stale timestamp so it is not reprocessed on every run.
                     if ($hasLiveSubscription || $workspace->plan !== Plan::Pro) {
                         $workspace->forceFill(['trial_ends_at' => null])->save();
 

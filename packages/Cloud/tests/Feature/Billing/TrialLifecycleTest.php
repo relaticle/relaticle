@@ -289,6 +289,7 @@ it('reminds again when the trial end moves after a reminder', function (): void 
 
     $workspace->forceFill(['trial_ends_at' => now()->addHours(30)])->save();
     $this->artisan('billing:process-trials')->assertSuccessful();
+    $this->artisan('billing:process-trials')->assertSuccessful();
 
     Mail::assertQueued(ProTrialEndingSoonMail::class, 2);
 });

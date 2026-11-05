@@ -16,8 +16,15 @@ return new class extends Migration
             $table->timestamp('trial_reminded_for')->nullable();
         });
 
+        // The retired daily reminder ran at 00:15 UTC and covered the whole day three days out.
+        $lastRun = now()->setTime(0, 15);
+
+        if (now()->lessThan($lastRun)) {
+            $lastRun = $lastRun->subDay();
+        }
+
         DB::table('workspaces')
-            ->whereBetween('trial_ends_at', [now(), now()->addDays(3)->endOfDay()])
+            ->whereBetween('trial_ends_at', [now(), $lastRun->startOfDay()->addDays(3)->endOfDay()])
             ->update(['trial_reminded_for' => DB::raw('trial_ends_at')]);
     }
 };
