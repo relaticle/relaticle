@@ -23,8 +23,7 @@ enum WebAccess
     public static function for(User $user, Workspace $workspace, ?ModelDescriptor $model, ?string $resumesTurnId): self
     {
         return match (true) {
-            ! $model instanceof ModelDescriptor || $model->selfHosted => self::Unavailable,
-            ! in_array($model->provider, self::WEB_PROVIDERS, true) => self::Unavailable,
+            ! $model instanceof ModelDescriptor, ! in_array($model->provider, self::WEB_PROVIDERS, true) => self::Unavailable,
             ! $workspace->ai_web_search_enabled => self::Unavailable,
             WebSearchPreference::of($user) === WebSearchPreference::Deny => self::Unavailable,
             WebSearchPreference::of($user) === WebSearchPreference::Allow => self::Allowed,
