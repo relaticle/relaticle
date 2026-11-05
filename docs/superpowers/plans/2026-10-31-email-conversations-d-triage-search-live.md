@@ -497,7 +497,7 @@ text above the viewer's tier. Chips and typed operators narrow the list through 
 
 **Files:** `EmailsRelationManagerReadingTest.php`, `tests/Feature/Mcp/EmailToolsTest.php`.
 
-- [ ] Add, through the record tab's `search` property and the MCP `list-emails` tool:
+- [x] Add, through the record tab's `search` property and the MCP `list-emails` tool:
   - `it('matches a body word for the owner but not for a metadata-tier teammate')`: Alice's
     mailbox at `metadata_only`, the email linked to a company both can see (PR 3's rule), body
     contains "kumquat". Alice's search for `kumquat` finds it; Bob's returns nothing on the tab
@@ -512,9 +512,16 @@ text above the viewer's tier. Chips and typed operators narrow the list through 
     then search a body word. Proves the body trigger, not a backfill.
   - `it('matches the last word as a prefix')`: `kumq` finds "kumquat".
   - `it('does not match another member's bcc row')`: unchanged gate, kept as a regression.
-- [ ] Update any existing assertion that searches a mid-word fragment of a subject or snippet to
+- [x] Update any existing assertion that searches a mid-word fragment of a subject or snippet to
   a whole word or prefix (Plan note 19). Name each changed test in the PR body.
-- [ ] Run: the new body, prefix and trigger tests fail against `ILIKE` on `snippet` only.
+- [x] Run: the new body, prefix and trigger tests fail against `ILIKE` on `snippet` only.
+
+**Done (2026-11-05):** the record tab tests sit in a `describe('search')` block. The MCP file
+covers the body tier gate, the subject tier and the metadata share. The four tests that need
+`body_search` carry `->todo(note: ...)`, so every commit stays green; Task 6 removes the
+markers. The BCC regression is the existing `RecordEmailsEmptyStateTest` test "does not match
+a teammate's BCC participant when searching record emails", not a copy. No existing assertion
+searched a mid-word fragment of a subject or snippet, so none changed.
 
 ### Task 3: Columns, triggers and the extension
 

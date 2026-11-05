@@ -66,12 +66,13 @@ use Relaticle\EmailIntegration\Models\WorkspaceEmailBlocklist;
 use Relaticle\EmailIntegration\Notifications\EmailSendHeldNotification;
 use Relaticle\EmailIntegration\Policies\EmailPolicy;
 use Relaticle\EmailIntegration\Queries\VisibleEmailsQuery;
+use Relaticle\EmailIntegration\Services\EmailSearchService;
 use Relaticle\EmailIntegration\Support\AgentEmailBody;
 use Relaticle\EmailIntegration\Support\EmailForAgent;
 use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class, UpdateEmailDraftTool::class, DeleteEmailDraftTool::class, SendEmailTool::class, SendEmailDraftTool::class, CancelEmailTool::class, RescheduleEmailTool::class, RetryEmailTool::class, SendAgentEmailDraft::class, PrepareAgentDraftSend::class, HoldAgentEmail::class, PickAgentSendTime::class, QueueAgentEmailAction::class, PrepareAgentEmail::class, PrepareAgentEmailDraft::class, SaveAgentEmailDraft::class, QueuedSendNotifier::class, EmailSendHeldNotification::class, AgentEmailBody::class, SignatureBlock::class, VisibleEmailsQuery::class, EmailForAgent::class, EmailPolicy::class);
+mutates(ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class, UpdateEmailDraftTool::class, DeleteEmailDraftTool::class, SendEmailTool::class, SendEmailDraftTool::class, CancelEmailTool::class, RescheduleEmailTool::class, RetryEmailTool::class, SendAgentEmailDraft::class, PrepareAgentDraftSend::class, HoldAgentEmail::class, PickAgentSendTime::class, QueueAgentEmailAction::class, PrepareAgentEmail::class, PrepareAgentEmailDraft::class, SaveAgentEmailDraft::class, QueuedSendNotifier::class, EmailSendHeldNotification::class, AgentEmailBody::class, SignatureBlock::class, VisibleEmailsQuery::class, EmailForAgent::class, EmailPolicy::class, EmailSearchService::class);
 
 beforeEach(function (): void {
     $this->viewer = User::factory()->withWorkspace()->create();
@@ -679,6 +680,36 @@ it('does not let search guess a subject or snippet the viewer cannot see', funct
 
     expect(listedEmails($this->viewer, ['search' => 'Acquisition plan']))->toBe([])
         ->and(listedEmails($this->viewer, ['search' => 'Layoffs']))->toBe([]);
+});
+
+it('matches a body word for the mailbox owner but not for a metadata-tier teammate', function (): void {
+    $email = ($this->emailFrom)($this->coworker, ['privacy_tier' => EmailPrivacyTier::METADATA_ONLY, 'subject' => 'Orchard update', 'snippet' => 'Notes from the grower']);
+    EmailBody::create(['email_id' => $email->id, 'body_html' => null, 'body_text' => 'The kumquat harvest is late this year']);
+
+    expect(array_column(listedEmails($this->coworker, ['search' => 'kumquat']), 'id'))->toBe([$email->id])
+        ->and(listedEmails($this->viewer, ['search' => 'kumquat']))->toBe([]);
+})->todo(note: 'Passes once EmailSearchService matches body_search (PR 8 Task 6).');
+
+it('matches a subject word at subject tier but not a body word', function (): void {
+    $email = ($this->emailFrom)($this->coworker, ['privacy_tier' => EmailPrivacyTier::SUBJECT, 'subject' => 'Orchard pricing', 'snippet' => 'Notes from the grower']);
+    EmailBody::create(['email_id' => $email->id, 'body_html' => null, 'body_text' => 'The kumquat harvest is late this year']);
+
+    expect(array_column(listedEmails($this->viewer, ['search' => 'pricing']), 'id'))->toBe([$email->id])
+        ->and(listedEmails($this->viewer, ['search' => 'kumquat']))->toBe([]);
+});
+
+it('does not match a body word through a metadata share over a full email', function (): void {
+    $email = ($this->emailFrom)($this->coworker, ['privacy_tier' => EmailPrivacyTier::FULL, 'subject' => 'Orchard update', 'snippet' => 'Notes from the grower']);
+    EmailBody::create(['email_id' => $email->id, 'body_html' => null, 'body_text' => 'The kumquat harvest is late this year']);
+
+    EmailShare::factory()->tier(EmailPrivacyTier::METADATA_ONLY)->create([
+        'workspace_id' => $this->workspace->id,
+        'email_id' => $email->id,
+        'shared_with' => $this->viewer->id,
+        'shared_by' => $this->coworker->id,
+    ]);
+
+    expect(listedEmails($this->viewer, ['search' => 'kumquat']))->toBe([]);
 });
 
 it('filters by thread', function (): void {
