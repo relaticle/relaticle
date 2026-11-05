@@ -377,6 +377,11 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
         return $this->scheduled_deletion_at !== null;
     }
 
+    public function isScheduledOnRequest(): bool
+    {
+        return $this->isScheduledForDeletion() && $this->deletion_reason !== DeletionReason::Inactivity;
+    }
+
     public function isDeletionDue(): bool
     {
         return $this->scheduled_deletion_at?->lessThanOrEqualTo(now()) ?? false;
@@ -434,7 +439,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
             && $this->pro_trial_used_at !== null
             && $this->trial_ends_at === null
             && $this->trial_extended_at === null
-            && ! $this->isScheduledForDeletion()
+            && ! $this->isScheduledOnRequest()
             && ! $this->hasChargedSubscription();
     }
 

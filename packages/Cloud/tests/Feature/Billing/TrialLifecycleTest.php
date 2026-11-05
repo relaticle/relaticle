@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Contracts\Entitlements;
 use App\Enums\BillingStatus;
+use App\Enums\DeletionReason;
 use App\Enums\Plan;
 use App\Enums\WorkspaceRole;
 use App\Models\User;
@@ -616,6 +617,35 @@ it('refuses to extend a trial that is not ended', function (callable $arrange): 
         $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(30)])->save();
     }],
 ]);
+
+it('lets the owner extend during an inactivity countdown and cancels it', function (): void {
+    [$owner, $workspace] = trialOwnerAndWorkspace();
+    pauseTrialOf($workspace);
+    $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(14), 'deletion_reason' => DeletionReason::Inactivity])->save();
+
+    expect($workspace->canExtendTrial())->toBeTrue();
+
+    $extended = app(ExtendEndedTrial::class)->execute($owner, $workspace);
+
+    expect($extended)->toBeTrue()
+        ->and($workspace->scheduled_deletion_at)->toBeNull()
+        ->and($workspace->deletion_reason)->toBeNull()
+        ->and($workspace->billingStatus())->toBe(BillingStatus::Trialing);
+});
+
+it('refuses to extend a deletion the owner requested and keeps it scheduled', function (): void {
+    [$owner, $workspace] = trialOwnerAndWorkspace();
+    pauseTrialOf($workspace);
+    $deletesAt = now()->addDays(30)->startOfSecond();
+    $workspace->forceFill(['scheduled_deletion_at' => $deletesAt, 'deletion_reason' => DeletionReason::Requested])->save();
+
+    $extended = app(ExtendEndedTrial::class)->execute($owner, $workspace);
+
+    expect($extended)->toBeFalse()
+        ->and($workspace->refresh()->scheduled_deletion_at?->equalTo($deletesAt))->toBeTrue()
+        ->and($workspace->deletion_reason)->toBe(DeletionReason::Requested)
+        ->and($workspace->trial_extended_at)->toBeNull();
+});
 
 it('extends an ended trial whose only subscription never started', function (): void {
     [$owner, $workspace] = trialOwnerAndWorkspace();

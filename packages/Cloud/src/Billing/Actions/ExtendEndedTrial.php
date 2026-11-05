@@ -15,7 +15,10 @@ use Relaticle\Cloud\Admin\Actions\RecordTrialChange;
 
 final readonly class ExtendEndedTrial
 {
-    public function __construct(private RecordTrialChange $recordTrialChange) {}
+    public function __construct(
+        private RecordTrialChange $recordTrialChange,
+        private CancelInactivityDeletion $cancelInactivityDeletion,
+    ) {}
 
     /** @throws AuthorizationException */
     public function execute(User $user, Workspace $workspace): bool
@@ -50,6 +53,7 @@ final readonly class ExtendEndedTrial
                 ->update(['period_ends_at' => $endsAt]);
 
             $this->recordTrialChange->execute($user, $lockedWorkspace, 'trial_self_extended', $before);
+            $this->cancelInactivityDeletion->execute($lockedWorkspace);
 
             return true;
         });

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Contracts\Entitlements;
 use App\Enums\BillingStatus;
+use App\Enums\DeletionReason;
 use App\Enums\Plan;
 use App\Models\ActivityLog\Activity;
 use Carbon\CarbonImmutable;
@@ -173,6 +174,29 @@ it('restarts a trial the pause step already downgraded and grants the pro allowa
         ->and($balance->credits_remaining)->toBe(Plan::Pro->credits())
         ->and($transaction->metadata['sysadmin_id'])->toBe((string) $admin->getKey());
 });
+
+it('an admin restart cancels an inactivity countdown and keeps an owner request', function (DeletionReason $reason, bool $cancelled): void {
+    withHostedBilling();
+    $workspace = OverviewData::trial(OverviewData::workspaceOf(OverviewData::owner()));
+
+    $this->travelTo(now()->addDays(15));
+    $this->artisan('billing:process-trials')->assertSuccessful();
+    $deletesAt = now()->addDays(14)->startOfSecond();
+    $workspace->forceFill(['scheduled_deletion_at' => $deletesAt, 'deletion_reason' => $reason])->save();
+
+    livewire(ListWorkspaces::class)
+        ->callAction(TestAction::make('extendTrial')->table($workspace), ['trial_ends_at' => now()->addDays(7)->startOfMinute()->toDateTimeString()])
+        ->assertHasNoActionErrors();
+
+    $workspace->refresh();
+
+    expect($workspace->billingStatus())->toBe(BillingStatus::Trialing)
+        ->and($workspace->scheduled_deletion_at?->equalTo($deletesAt) ?? false)->toBe(! $cancelled)
+        ->and($workspace->deletion_reason)->toBe($cancelled ? null : $reason);
+})->with([
+    'inactivity' => [DeletionReason::Inactivity, true],
+    'requested' => [DeletionReason::Requested, false],
+]);
 
 it('an admin restart after a self-extension grants the Pro allowance', function (): void {
     withHostedBilling();

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\BillingStatus;
+use App\Enums\DeletionReason;
 use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
 use App\Models\User;
@@ -352,6 +353,34 @@ it('offers the owner a seven-day extension on the paused screen', function (): v
         ->assertOk()
         ->assertSee(__('cloud::billing.paused.extend', ['days' => Workspace::TRIAL_EXTENSION_DAYS]))
         ->assertSee(__('cloud::billing.paused.extend_once'));
+});
+
+it('offers the extension during an inactivity countdown but not after an owner request', function (DeletionReason $reason, bool $offered): void {
+    withHostedBilling();
+
+    [, $workspace] = pausedTrialWorkspace();
+    $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(14), 'deletion_reason' => $reason])->save();
+
+    $page = $this->get(Billing::getUrl(panel: 'app', tenant: $workspace))->assertOk();
+
+    $offered
+        ? $page->assertSee(__('cloud::billing.paused.extend', ['days' => Workspace::TRIAL_EXTENSION_DAYS]))
+        : $page->assertDontSee(__('cloud::billing.paused.extend', ['days' => Workspace::TRIAL_EXTENSION_DAYS]));
+})->with([
+    'inactivity' => [DeletionReason::Inactivity, true],
+    'requested' => [DeletionReason::Requested, false],
+]);
+
+it('cancels an inactivity countdown when the owner extends from the paused screen', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = pausedTrialWorkspace();
+    $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(14), 'deletion_reason' => DeletionReason::Inactivity])->save();
+
+    livewire(Billing::class)->call('extendTrial');
+
+    expect($workspace->refresh()->scheduled_deletion_at)->toBeNull()
+        ->and($workspace->deletion_reason)->toBeNull();
 });
 
 it('extends the trial from the paused screen and reopens the workspace', function (): void {

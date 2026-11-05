@@ -18,6 +18,7 @@ use App\Support\Mail\MailPreview;
 use Carbon\CarbonImmutable;
 use Filament\Panel;
 use Filament\View\PanelsRenderHook;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\View\View as ViewContract;
@@ -37,6 +38,7 @@ use Relaticle\Cloud\Billing\Commands\ScheduleInactiveTrialDeletionsCommand;
 use Relaticle\Cloud\Billing\Filament\Billing as BillingPage;
 use Relaticle\Cloud\Billing\Filament\BillingPanelHooks;
 use Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal;
+use Relaticle\Cloud\Billing\Listeners\CancelInactivityDeletionOnLogin;
 use Relaticle\Cloud\Billing\Listeners\SyncPlanOnStripeSubscriptionChange;
 use Relaticle\Cloud\Billing\Livewire\UpgradeModal;
 use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletionWarningMail;
@@ -94,6 +96,7 @@ final class CloudServiceProvider extends ServiceProvider
         Livewire::component('App\\Filament\\Pages\\Billing', BillingPage::class);
 
         Event::listen(WebhookHandled::class, [SyncPlanOnStripeSubscriptionChange::class, 'handle']);
+        Event::listen(Login::class, [CancelInactivityDeletionOnLogin::class, 'handle']);
 
         $this->commands([ProcessTrialsCommand::class, ScheduleInactiveTrialDeletionsCommand::class, GenerateSitemapCommand::class, ReportStaleCompetitorFactsCommand::class]);
 

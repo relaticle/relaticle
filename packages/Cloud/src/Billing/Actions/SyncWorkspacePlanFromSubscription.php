@@ -18,7 +18,10 @@ use Relaticle\Cloud\Billing\Mail\ProEndedMail;
 
 final readonly class SyncWorkspacePlanFromSubscription
 {
-    public function __construct(private CreditService $credits) {}
+    public function __construct(
+        private CreditService $credits,
+        private CancelInactivityDeletion $cancelInactivityDeletion,
+    ) {}
 
     public function execute(Workspace $workspace, Subscription $subscription): void
     {
@@ -49,6 +52,10 @@ final readonly class SyncWorkspacePlanFromSubscription
             $workspace->save();
 
             $this->credits->resetPeriod($workspace);
+
+            if ($target !== Plan::default()) {
+                $this->cancelInactivityDeletion->execute($workspace);
+            }
 
             Log::info('Workspace plan synced from Stripe subscription', [
                 'workspace_id' => $workspace->getKey(),

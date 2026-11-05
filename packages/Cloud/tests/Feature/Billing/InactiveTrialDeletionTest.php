@@ -7,23 +7,29 @@ use App\Enums\Plan;
 use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditTransaction;
+use Relaticle\Cloud\Billing\Actions\CancelInactivityDeletion;
 use Relaticle\Cloud\Billing\Commands\ScheduleInactiveTrialDeletionsCommand;
 use Relaticle\Cloud\Billing\Filament\Billing;
+use Relaticle\Cloud\Billing\Listeners\CancelInactivityDeletionOnLogin;
 use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletionWarningMail;
 use Relaticle\Cloud\Billing\Queries\InactiveTrialWorkspacesQuery;
 
 mutates(ScheduleInactiveTrialDeletionsCommand::class);
 mutates(InactiveTrialWorkspacesQuery::class);
 mutates(InactiveWorkspaceDeletionWarningMail::class);
+mutates(CancelInactivityDeletion::class);
+mutates(CancelInactivityDeletionOnLogin::class);
 
 const INACTIVE_PAUSED_AT = '2026-11-01 10:00:00';
 
@@ -267,4 +273,88 @@ it('writes the warning for the owner with dates in their timezone', function ():
     $mail->assertSeeInHtml('No one has signed in since Nov 21, 2026. Choose a plan or sign in to keep it.');
     $mail->assertSeeInHtml(__('mail.footer.reason.owner', ['workspace' => 'Acme']));
     $mail->assertSeeInText('Choose a plan: '.Billing::getUrl(panel: 'app', tenant: $workspace));
+});
+
+function inactivityCountdownOn(Workspace $workspace, DeletionReason $reason = DeletionReason::Inactivity): CarbonImmutable
+{
+    $deletesAt = now()->addDays(14)->startOfSecond();
+    $workspace->forceFill(['scheduled_deletion_at' => $deletesAt, 'deletion_reason' => $reason])->save();
+
+    return $deletesAt;
+}
+
+it('cancels the countdown when the owner signs in', function (): void {
+    $workspace = inactivePausedWorkspace();
+    inactivityCountdownOn($workspace);
+
+    Auth::guard('web')->login($workspace->owner);
+
+    expect($workspace->refresh()->scheduled_deletion_at)->toBeNull()
+        ->and($workspace->deletion_reason)->toBeNull();
+});
+
+it('cancels the countdown when a member who is not the owner signs in', function (): void {
+    $workspace = inactivePausedWorkspace();
+    inactivityCountdownOn($workspace);
+    $member = User::factory()->create();
+    $workspace->users()->attach($member, ['role' => 'member']);
+
+    Auth::guard('web')->login($member);
+
+    expect($workspace->refresh()->scheduled_deletion_at)->toBeNull()
+        ->and($workspace->deletion_reason)->toBeNull();
+});
+
+it('cancels every countdown the user belongs to', function (): void {
+    $owned = inactivePausedWorkspace();
+    $joined = inactivePausedWorkspace();
+    inactivityCountdownOn($owned);
+    inactivityCountdownOn($joined);
+    $joined->users()->attach($owned->owner, ['role' => 'admin']);
+
+    event(new Login('web', $owned->owner, false));
+
+    expect($owned->refresh()->scheduled_deletion_at)->toBeNull()
+        ->and($joined->refresh()->scheduled_deletion_at)->toBeNull();
+});
+
+it('leaves the countdown of a workspace the user does not belong to', function (): void {
+    $workspace = inactivePausedWorkspace();
+    $deletesAt = inactivityCountdownOn($workspace);
+
+    Auth::guard('web')->login(User::factory()->create());
+
+    expect($workspace->refresh()->scheduled_deletion_at?->equalTo($deletesAt))->toBeTrue()
+        ->and($workspace->deletion_reason)->toBe(DeletionReason::Inactivity);
+});
+
+it('keeps an owner-requested deletion when the owner or a member signs in', function (): void {
+    $workspace = inactivePausedWorkspace();
+    $deletesAt = inactivityCountdownOn($workspace, DeletionReason::Requested);
+    $member = User::factory()->create();
+    $workspace->users()->attach($member, ['role' => 'admin']);
+
+    Auth::guard('web')->login($workspace->owner);
+    Auth::guard('web')->login($member);
+
+    expect($workspace->refresh()->scheduled_deletion_at?->equalTo($deletesAt))->toBeTrue()
+        ->and($workspace->deletion_reason)->toBe(DeletionReason::Requested);
+});
+
+it('keeps a deletion that has no recorded reason when the owner signs in', function (): void {
+    $workspace = inactivePausedWorkspace();
+    $deletesAt = inactivityCountdownOn($workspace);
+    DB::table('workspaces')->where('id', $workspace->getKey())->update(['deletion_reason' => null]);
+
+    Auth::guard('web')->login($workspace->owner);
+
+    expect($workspace->refresh()->scheduled_deletion_at?->equalTo($deletesAt))->toBeTrue();
+});
+
+it('does nothing for a workspace that has no countdown', function (): void {
+    $workspace = inactivePausedWorkspace();
+
+    resolve(CancelInactivityDeletion::class)->execute($workspace);
+
+    expect($workspace->refresh()->scheduled_deletion_at)->toBeNull();
 });

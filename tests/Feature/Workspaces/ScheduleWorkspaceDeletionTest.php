@@ -91,6 +91,19 @@ test('non-owner cannot schedule workspace deletion', function () {
         ->toThrow(AuthorizationException::class);
 });
 
+test('workspace owner can cancel an inactivity deletion', function () {
+    Notification::fake();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(14), 'deletion_reason' => DeletionReason::Inactivity])->save();
+
+    resolve(CancelWorkspaceDeletion::class)->cancel($user, $workspace);
+
+    expect($workspace->refresh()->scheduled_deletion_at)->toBeNull()
+        ->and($workspace->deletion_reason)->toBeNull();
+});
+
 test('workspace owner can cancel workspace deletion', function () {
     Notification::fake();
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Contracts\Entitlements;
 use App\Enums\BillingStatus;
+use App\Enums\DeletionReason;
 use App\Enums\Notifications\NotificationReason;
 use App\Enums\Plan;
 use App\Enums\SubscriptionType;
@@ -217,6 +218,35 @@ it('downgrades the workspace to Free when the subscription is deleted', function
 
     expect($workspace->refresh()->plan)->toBe(Plan::Free)
         ->and($balance->credits_remaining)->toBe(Plan::Free->credits());
+});
+
+it('cancels an inactivity countdown when a subscription activates and keeps an owner request', function (DeletionReason $reason, bool $cancelled): void {
+    withHostedBilling();
+    $workspace = stripeBillingWorkspace();
+    $deletesAt = now()->addDays(14)->startOfSecond();
+    $workspace->forceFill(['scheduled_deletion_at' => $deletesAt, 'deletion_reason' => $reason])->save();
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created'))->assertSuccessful();
+
+    $workspace->refresh();
+
+    expect($workspace->plan)->toBe(Plan::Pro)
+        ->and($workspace->scheduled_deletion_at?->equalTo($deletesAt) ?? false)->toBe(! $cancelled)
+        ->and($workspace->deletion_reason)->toBe($cancelled ? null : $reason);
+})->with([
+    'inactivity' => [DeletionReason::Inactivity, true],
+    'requested' => [DeletionReason::Requested, false],
+]);
+
+it('keeps an inactivity countdown when a subscription that never charged is created', function (): void {
+    $workspace = stripeBillingWorkspace();
+    $deletesAt = now()->addDays(14)->startOfSecond();
+    $workspace->forceFill(['scheduled_deletion_at' => $deletesAt, 'deletion_reason' => DeletionReason::Inactivity])->save();
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created', ['status' => 'incomplete']))->assertSuccessful();
+
+    expect($workspace->refresh()->deletion_reason)->toBe(DeletionReason::Inactivity)
+        ->and($workspace->scheduled_deletion_at?->equalTo($deletesAt))->toBeTrue();
 });
 
 it('emails the owner once when the subscription ends', function (): void {

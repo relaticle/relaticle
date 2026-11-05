@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Relaticle\Chat\Services\CreditService;
+use Relaticle\Cloud\Billing\Actions\CancelInactivityDeletion;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 final readonly class ExtendWorkspaceTrial
@@ -21,6 +22,7 @@ final readonly class ExtendWorkspaceTrial
     public function __construct(
         private CreditService $credits,
         private RecordTrialChange $recordTrialChange,
+        private CancelInactivityDeletion $cancelInactivityDeletion,
     ) {}
 
     public function execute(SystemAdministrator $admin, Workspace $workspace, CarbonImmutable $endsAt): void
@@ -55,6 +57,7 @@ final readonly class ExtendWorkspaceTrial
             }
 
             $this->recordTrialChange->execute($admin, $locked, $this->event($restarting, $previousEnd, $endsAt), $before);
+            $this->cancelInactivityDeletion->execute($locked);
         });
 
         $workspace->refresh();
