@@ -74,7 +74,8 @@ reach it. Change the header height and the token together. `html` also carries `
 
 ## Components (`components/marketing`)
 
-- `hero`: the centred stack every page opens on: the eyebrow, a two-tone `type-display` headline
+- `hero`: the stack every page opens on, centred on the product pages and left-aligned (`align="start"`)
+  on the rest: the eyebrow, a two-tone `type-display` headline
   capped at `max-w-3xl`, the `aside` (one subline under 25 words, the buttons, a small-print line)
   capped at `max-w-2xl`, then the page's visual below, on a `bg-hero-panel` cell inside the rails. The
   headline runs two lines at 1440 and its gray continuation is one short clause. The subline says
