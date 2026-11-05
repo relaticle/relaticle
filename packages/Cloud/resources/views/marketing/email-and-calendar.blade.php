@@ -85,7 +85,7 @@
 
         <x-slot:title>
             {{ __('Your inbox fills in your CRM.') }}
-            <span class="text-gray-500">{{ __('No typing, no copy and paste.') }}</span>
+            <span class="text-gray-500 dark:text-gray-400">{{ __('Nothing to type.') }}</span>
         </x-slot:title>
 
         <x-slot:aside>
@@ -93,7 +93,7 @@
                 {{ __('Connect Gmail or Outlook. Every email and meeting lands on the person, company and opportunity it involves, and you decide what your team sees.') }}
             </p>
 
-            <div class="mt-7 flex flex-col gap-3 sm:flex-row">
+            <div class="mt-7 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
                 <x-cloud::marketing.button href="{{ route('login') }}">
                     {{ __('Start for free') }}
                 </x-cloud::marketing.button>

@@ -107,16 +107,16 @@
         </x-slot:eyebrow>
 
         <x-slot:title>
-            {{ __('The same CRM, on your server.') }}
+            {{ __('Your CRM, on your server.') }}
             <span class="text-gray-500 dark:text-gray-400">{{ __('AGPL-3.0, :name included.', ['name' => $assistantName]) }}</span>
         </x-slot:title>
 
         <x-slot:aside>
             <p class="text-base leading-relaxed text-gray-500 md:text-lg dark:text-gray-400">
-                {{ __('Download the compose file, add two secrets, start it. Type your address below and copy an install that is ready to paste. Unlimited users, no per-seat cost.') }}
+                {{ __('Download the compose file, add two secrets, start it. Unlimited users, no per-seat cost, and an install below that is ready to paste.') }}
             </p>
 
-            <div class="mt-7 flex flex-col gap-3 sm:flex-row">
+            <div class="mt-7 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
                 @if($documentationActive)
                     <x-cloud::marketing.button href="{{ route('documentation.show', ['type' => 'self-hosting']) }}">
                         {{ __('Read the guide') }}

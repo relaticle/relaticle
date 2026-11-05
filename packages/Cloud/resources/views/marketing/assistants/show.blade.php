@@ -89,10 +89,10 @@
 
         <x-slot:aside>
             <p class="text-base leading-relaxed text-gray-500 md:text-lg dark:text-gray-400">
-                {{ __('For founders who sell to a named list of companies. Connect :name once, then ask about your pipeline, add the people you met, and log the next step from the chat you already have open.', ['name' => $name]) }}
+                {{ __('For founders who sell to a named list of companies. Connect :name once, then work your pipeline from the chat you already have open.', ['name' => $name]) }}
             </p>
 
-            <div class="mt-7 flex flex-col gap-3 sm:flex-row">
+            <div class="mt-7 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
                 <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="hero">
                     {{ __('Start for free') }}
                 </x-cloud::marketing.button>

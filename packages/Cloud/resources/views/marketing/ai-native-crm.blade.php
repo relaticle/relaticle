@@ -138,16 +138,16 @@
         </x-slot:eyebrow>
 
         <x-slot:title>
-            {{ __('What makes a CRM AI-native.') }}
-            <span class="text-gray-500 dark:text-gray-400">{{ __('Five checks to run before you buy.') }}</span>
+            {{ __('What makes a CRM') }} <span class="whitespace-nowrap">{{ __('AI-native.') }}</span>
+            <span class="text-gray-500 dark:text-gray-400">{{ __('Five checks.') }}</span>
         </x-slot:title>
 
         <x-slot:aside>
             <p class="text-base leading-relaxed text-gray-500 md:text-lg dark:text-gray-400">
-                {{ __('AI-native means the assistant and the agents are part of the CRM, not a plugin on top. Tick what your CRM does today. The right column is how Relaticle answers each check, with the page that proves it.') }}
+                {{ __('The assistant and the agents are part of the CRM, not a plugin on top. Score yours against five checks.') }}
             </p>
 
-            <div class="mt-7 flex flex-col gap-3 sm:flex-row">
+            <div class="mt-7 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
                 <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="hero">
                     {{ __('Start for free') }}
                 </x-cloud::marketing.button>
@@ -156,7 +156,7 @@
                 </x-cloud::marketing.button>
             </div>
 
-            <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">{{ __(':days-day trial, no card, unlimited users.', ['days' => $trialDays]) }}</p>
+            <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">{{ __(':days-day trial, no card, unlimited users.', ['days' => $trialDays]) }}</p>
         </x-slot:aside>
 
         @include('cloud::marketing.partials.ai-native-checklist', ['checks' => $checks])

@@ -13,6 +13,7 @@
     <x-cloud::marketing.window class="mx-auto w-full max-w-5xl">
         <div class="border-rail flex flex-wrap items-center gap-x-6 gap-y-2 border-b px-5 py-3.5 md:px-6">
             <span class="type-label text-gray-500 dark:text-gray-400">{{ __('AI-native checklist') }}</span>
+            <span class="text-sm text-gray-500 dark:text-gray-400">{{ __('Tick what your CRM does today.') }}</span>
 
             <p class="ml-auto text-sm text-gray-700 dark:text-gray-300" aria-live="polite" data-ai-native-score>
                 {{ __('Your CRM') }}

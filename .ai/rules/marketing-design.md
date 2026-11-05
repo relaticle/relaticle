@@ -75,19 +75,24 @@ reach it. Change the header height and the token together. `html` also carries `
 
 ## Components (`components/marketing`)
 
-- `hero`: the split hero for inner pages. The `h1` on the left, the subline and CTAs on the right,
-  then the page's visual below on a `bg-hero-panel` cell. On a product page that visual cell is the
-  page's signature, and it is interactive when the page's job is: the install configurator on
-  `/self-hosted`, the checklist on `/ai-native-crm`, the ask gallery on `/crm-for-{assistant}`. A static
-  screenshot there is the drift a reviewer reads for. `align="center"` stacks the same parts
-  centred, for a page whose visual is a grid rather than one window: `/pricing` uses it with the
-  price in the headline and the billing toggle under the line. The homepage hero is centered and built from
-  the same parts: the open-source pill, a two-tone `type-display` headline, one subline with Claude
-  and ChatGPT in plain text and Rela as the only chip, two buttons, the trial line, then the demo on
-  a rounded `bg-hero-panel` that sits outside the rails, with joined tabs on a `mac-window`. The copy
-  gaps are 32, 20, 28 and 16px, so the product window starts near 660px at 1440x900. The demo plays
-  once per visit and again on each return to its tab. Nothing in the hero loops: a looping badge was
-  removed for WCAG 2.2.2.
+- `hero`: the centred stack every page opens on: the eyebrow, a two-tone `type-display` headline
+  capped at `max-w-3xl`, the `aside` (one subline under 25 words, the buttons, a small-print line)
+  capped at `max-w-2xl`, then the page's visual below, on a `bg-hero-panel` cell inside the rails. The
+  headline runs two lines at 1440 and its gray continuation is one short clause. The subline says
+  what the page is for; how to use the visual is said inside the visual, as the checklist's
+  "Tick what your CRM does today" does. On a product page that visual cell is the page's signature,
+  interactive when the page's job is: the install configurator on `/self-hosted`, the checklist on
+  `/ai-native-crm`, the ask gallery on `/crm-for-{assistant}`. A static screenshot there is the drift
+  a reviewer reads for. This shape was chosen on 2026-11-06 over the split hero (headline left,
+  paragraph right): no site in the ten-site gallery uses a bottom-aligned split, the stack feeds a
+  wide centred panel on one reading axis, and it is the homepage's and `/pricing`'s own shape. The
+  argument pages (`/security`, `/compare/*`, `/alternatives/*`) get a left-aligned stack with their
+  opening paragraph as the subline when they move onto the frame; the utility pages get a title only.
+  The homepage hero is built from the same parts with the open-source pill above the headline, Claude
+  and ChatGPT in plain text and Rela as the only chip, and the demo on a rounded `bg-hero-panel` that
+  sits outside the rails, with joined tabs on a `mac-window`. Its copy gaps are 32, 20, 28 and 16px,
+  so the product window starts near 660px at 1440x900. The demo plays once per visit and again on
+  each return to its tab. Nothing in the hero loops: a looping badge was removed for WCAG 2.2.2.
 - `mac-window`: the browser chrome around a full app screen (traffic lights, a gray frame, a white
   inner panel). The homepage demo and the `/ai` playground use it. An optional `address` slot puts a
   URL in the title bar, which `/self-hosted` binds to the address the visitor types. A record fragment

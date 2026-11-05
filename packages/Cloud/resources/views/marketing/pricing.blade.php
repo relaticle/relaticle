@@ -161,7 +161,7 @@
         ]);
     @endphp
 
-    <x-cloud::marketing.hero x-data="{ yearly: true }" align="center">
+    <x-cloud::marketing.hero x-data="{ yearly: true }">
         <x-slot:eyebrow>
             <x-cloud::marketing.eyebrow>{{ __('Pricing') }}</x-cloud::marketing.eyebrow>
         </x-slot:eyebrow>
