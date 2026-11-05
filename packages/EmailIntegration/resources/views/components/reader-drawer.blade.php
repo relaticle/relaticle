@@ -142,8 +142,8 @@
         ></div>
 
         <header class="shrink-0 border-b border-gray-200 px-4 py-3 sm:px-6 dark:border-gray-700">
-            <div class="flex items-start gap-3">
-                <h2 id="email-reader-heading" tabindex="-1" class="min-w-0 flex-1 break-words text-base font-semibold leading-snug text-gray-900 outline-none dark:text-white">
+            <div class="flex flex-wrap items-start gap-x-3 gap-y-2">
+                <h2 id="email-reader-heading" tabindex="-1" class="min-w-48 flex-1 break-words text-base font-semibold leading-snug text-gray-900 outline-none dark:text-white">
                     @if ($authUser->can('viewSubject', $newest))
                         {{ $subject ?: __('filament/pages/email-inbox.subject.none') }}
                     @else
@@ -151,7 +151,7 @@
                     @endif
                 </h2>
 
-                <div class="flex shrink-0 items-center gap-2">
+                <div class="ms-auto flex shrink-0 items-center gap-2">
                     @if ($adjacent !== null)
                         <div class="flex items-center">
                             @foreach (['previous' => 'ri-arrow-up-s-line', 'next' => 'ri-arrow-down-s-line'] as $direction => $icon)
