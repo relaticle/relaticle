@@ -557,20 +557,25 @@ both columns from `toArray()`, because the body vector holds the body's words.
 
 **Files:** migration `000002`.
 
-- [ ] Copy the shape of `2026_10_21_000002_index_inbox_columns_on_notifications_table.php`:
+- [x] Copy the shape of `2026_10_21_000002_index_inbox_columns_on_notifications_table.php`:
   `public $withinTransaction = false;`, an `INDEXES` constant, and `dropInvalidIndex()` before each
   statement.
   - `emails_subject_search_idx`: `create index concurrently if not exists ... on emails using gin (subject_search)`.
   - `emails_body_search_idx`: same on `body_search`.
   - `email_participants_email_address_trgm_idx`: `using gin (email_address gin_trgm_ops)`.
   - `email_participants_name_trgm_idx`: `using gin (name gin_trgm_ops)`.
-- [ ] No partial index on `workspace_id`: every query already bounds the workspace through the
+- [x] No partial index on `workspace_id`: every query already bounds the workspace through the
   btree on `(workspace_id, ...)` (`create_emails_table.php:61-63`) and the planner combines them
   with a bitmap AND. `btree_gin` is not added; revisit only if the rehearsal shows the bitmap AND
   over a large workspace above the 400 ms budget.
 
 **Check:** `php artisan migrate` on a local copy runs both migrations; `\d emails` shows the
 columns, triggers and indexes.
+
+**Done (2026-11-05):** the shape is `2026_11_04_202608_index_email_conversations_for_views`, with
+its schema-scoped invalid-index cleanup. On the dev database all four indexes are valid, and with
+`enable_seqscan = off` the planner serves `email_address ilike '%irbnb%'` from the trigram index
+and `body_search @@ ...` from the body GIN index.
 
 ### Task 5: The backfill command, queued from a migration
 
