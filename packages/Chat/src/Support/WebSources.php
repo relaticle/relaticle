@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Support;
 
+use Illuminate\Support\Str;
+
 final readonly class WebSources
 {
     public const int LIMIT = 10;
+
+    private const int MAX_URL_LENGTH = 2048;
 
     /**
      * @return list<array{url: string, title: string|null, domain: string}>
@@ -55,7 +59,7 @@ final readonly class WebSources
     {
         $citation = is_object($citation) && method_exists($citation, 'toArray') ? $citation->toArray() : $citation;
 
-        if (! is_array($citation) || ! is_string($citation['url'] ?? null)) {
+        if (! is_array($citation) || ! is_string($citation['url'] ?? null) || strlen($citation['url']) > self::MAX_URL_LENGTH) {
             return null;
         }
 
@@ -76,17 +80,15 @@ final readonly class WebSources
 
     private static function withoutTracking(string $url): string
     {
-        $query = parse_url($url, PHP_URL_QUERY);
+        $url = Str::before($url, '#');
 
-        if (! is_string($query)) {
+        if (! str_contains($url, '?')) {
             return $url;
         }
 
-        parse_str($query, $params);
-        $kept = array_filter($params, fn (int|string $key): bool => ! str_starts_with((string) $key, 'utm_'), ARRAY_FILTER_USE_KEY);
-        $base = strstr($url, '?', true);
-        $fragment = parse_url($url, PHP_URL_FRAGMENT);
+        [$base, $query] = explode('?', $url, 2);
+        $kept = array_filter(explode('&', $query), fn (string $pair): bool => $pair !== '' && ! str_starts_with($pair, 'utm_'));
 
-        return $base.($kept === [] ? '' : '?'.http_build_query($kept)).(is_string($fragment) ? "#{$fragment}" : '');
+        return $kept === [] ? $base : $base.'?'.implode('&', $kept);
     }
 }

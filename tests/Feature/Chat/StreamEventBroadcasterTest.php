@@ -260,5 +260,7 @@ it('broadcasts a citation as a source and drops one that is not a web page', fun
 
     expect($citation('https://www.filaforms.app/pricing?utm_source=openai&plan=pro', 'Pricing')['with'])
         ->toMatchArray(['url' => 'https://www.filaforms.app/pricing?plan=pro', 'title' => 'Pricing', 'domain' => 'filaforms.app'])
+        ->and($citation('https://ex.com/p?a.b=1&tag=a&tag=b&flag&utm_medium=web#section', null)['with']['url'])->toBe('https://ex.com/p?a.b=1&tag=a&tag=b&flag')
+        ->and($citation('https://ex.com/?q='.str_repeat('x', 2100), 'Long'))->toBeNull()
         ->and($citation('javascript:alert(1)', 'x'))->toBeNull();
 });
