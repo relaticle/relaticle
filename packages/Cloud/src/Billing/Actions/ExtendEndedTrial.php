@@ -44,7 +44,7 @@ final readonly class ExtendEndedTrial
                 'trial_extended_at' => $now,
             ])->save();
 
-            // Pinned so chat:reset-credits cannot grant the Pro allowance mid-extension.
+            // Pinned so a month-boundary chat:reset-credits cannot refill the balance mid-extension.
             AiCreditBalance::query()
                 ->where('workspace_id', $lockedWorkspace->getKey())
                 ->update(['period_ends_at' => $endsAt]);
