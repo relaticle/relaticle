@@ -117,7 +117,8 @@ describe('Legal pages', function () {
         $response->assertSeeText('Deleted with their records after 60 days without a sign-in or a plan. The owner is emailed 14 days and 5 days before.');
         $response->assertSee('Relaticle');
         $response->assertSee('privacy@relaticle.com');
-        $response->assertSee('October 6, 2026');
+        $response->assertSee('November 4, 2026');
+        $response->assertSee('We honor Do Not Track and Global Privacy Control for Fathom tracking and first-party acquisition capture.');
         $response->assertSee('Data from a self-hosted installation stays on your servers unless you configure an external integration.');
         $response->assertSee('That integration may send authorized data to its provider.');
         $response->assertSee('Relaticle does not sell CRM data.');

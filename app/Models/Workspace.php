@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Contracts\Entitlements;
+use App\Data\AiSettings;
 use App\Enums\BillingStatus;
 use App\Enums\DeletionReason;
 use App\Enums\MediaCollection;
@@ -62,6 +63,7 @@ use Spatie\Sluggable\SlugOptions;
  * @property EmailPrivacyTier|null $default_email_sharing_tier
  * @property ContactCreationMode $contact_creation_mode
  * @property bool $auto_create_companies
+ * @property AiSettings $ai_settings
  * @property Plan $plan
  * @property ?string $invite_link_token
  * @property ?CarbonImmutable $invite_link_token_expires_at
@@ -95,6 +97,7 @@ use Spatie\Sluggable\SlugOptions;
     'default_email_sharing_tier',
     'contact_creation_mode',
     'auto_create_companies',
+    'ai_settings',
     'onboarding_use_case',
     'onboarding_other_use_case',
     'onboarding_context',
@@ -219,7 +222,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
     /**
      * The model's default attribute values.
      *
-     * @var array<string, string>
+     * @var array<string, string|bool>
      */
     protected $attributes = [
         'invite_link_default_role' => WorkspaceRole::Member->value,
@@ -237,6 +240,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
             'default_email_sharing_tier' => EmailPrivacyTier::class,
             'contact_creation_mode' => ContactCreationMode::class,
             'auto_create_companies' => 'boolean',
+            'ai_settings' => AiSettings::class.':default',
             'plan' => Plan::class,
             'onboarding_use_case' => OnboardingUseCase::class,
             'onboarding_context' => 'array',

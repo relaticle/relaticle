@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Onboarding;
 
 use App\Enums\WorkspaceSetupStep;
+use App\Events\WorkspaceSetupCompleted;
 use App\Models\User;
 use App\Models\Workspace;
 
@@ -20,6 +21,10 @@ final readonly class MoveWorkspaceSetup
             ->update(['onboarding_step' => $to, 'updated_at' => now()]) === 1;
 
         $workspace->refresh();
+
+        if ($moved && ! $to instanceof WorkspaceSetupStep) {
+            event(new WorkspaceSetupCompleted($workspace));
+        }
 
         return $moved;
     }

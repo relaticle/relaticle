@@ -13,6 +13,7 @@ use Illuminate\Support\Str;
 use Laravel\Ai\Ai;
 use Laravel\Ai\Responses\Data\TextUsage;
 use Relaticle\Chat\Enums\AiCreditType;
+use Relaticle\Chat\Enums\WebAccess;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
@@ -114,6 +115,18 @@ final readonly class CreditService
             conversationId: $conversationId,
             metadata: ['reason' => 'reservation_refund'],
         );
+    }
+
+    // The turn's own credit is already reserved, so what remains pays for searches.
+    public function affordableWebSearches(Workspace $workspace): int
+    {
+        if (! $this->entitlements->metersCredits($workspace)) {
+            return WebAccess::MAX_SEARCHES;
+        }
+
+        $cost = (int) config('chat.web_search_credit_cost');
+
+        return min(WebAccess::MAX_SEARCHES, intdiv(max(0, $this->getBalance($workspace)), max(1, $cost)));
     }
 
     public function getBalance(Workspace $workspace): int
@@ -292,6 +305,7 @@ final readonly class CreditService
         int $inputTokens,
         int $outputTokens,
         int $toolCallsCount = 0,
+        int $webSearchCount = 0,
         ?string $conversationId = null,
         int $reservedCredits = 1,
         string $resolutionKey = '',
@@ -300,7 +314,7 @@ final readonly class CreditService
             return;
         }
 
-        $creditsCharged = $this->calculateCredits($model, $toolCallsCount);
+        $creditsCharged = $this->calculateCredits($model, $toolCallsCount, $webSearchCount);
         $adjustment = $creditsCharged - $reservedCredits;
 
         $this->recordResolution(
@@ -315,7 +329,7 @@ final readonly class CreditService
             usedDelta: $adjustment,
             userId: (string) $user->getKey(),
             conversationId: $conversationId,
-            metadata: ['tool_calls_count' => $toolCallsCount],
+            metadata: ['tool_calls_count' => $toolCallsCount, 'web_searches_count' => $webSearchCount],
         );
     }
 
@@ -398,14 +412,15 @@ final readonly class CreditService
         ]);
     }
 
-    public function calculateCredits(string $model, int $toolCallsCount): int
+    public function calculateCredits(string $model, int $toolCallsCount, int $webSearchCount = 0): int
     {
         $multiplier = $this->registry->multiplierFor($model);
         $toolBonus = (float) config('chat.tool_call_credit_bonus', 0.5);
+        $searchCost = (int) config('chat.web_search_credit_cost');
 
         $raw = ($multiplier) + ($toolCallsCount * $toolBonus);
 
-        return max(1, (int) ceil($raw));
+        return max(1, (int) ceil($raw)) + ($webSearchCount * $searchCost);
     }
 
     /**

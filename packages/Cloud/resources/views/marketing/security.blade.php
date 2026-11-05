@@ -98,7 +98,7 @@
         ['Sentry', __('Reports application errors'), $errorReportsCarryIdentity
             ? __('Error reports, which can include your account identity and data from the request that failed.')
             : __('Error reports without your account identity. A report can include data from the request that failed.')],
-        ['Fathom Analytics', __('Counts page views on the website and in the app'), __('Page, referrer and signup events, without cookies')],
+        ['Fathom Analytics', __('Counts page views and intentional events on the website and in the app'), __('Normalized page paths and events, without query strings, account identifiers or CRM content')],
         $aiProviders->isEmpty() ? null : [$aiProviders->join(', '), __('Run the AI models behind the assistant, voice input and email summaries'), __('The content of that request')],
         $signupChallenge ? ['Cloudflare', __('Checks that a new account is created by a person'), __('Signals from your browser on the create-account step')] : null,
         ['Google, DuckDuckGo', __('Look up a company logo'), __('The company domain')],

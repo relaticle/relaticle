@@ -53,7 +53,7 @@
 
             {{-- ── CTA Buttons ── --}}
             <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto max-w-sm sm:max-w-none mx-auto -mt-2 px-2 sm:px-0">
-                <x-cloud::marketing.button href="{{ route('login') }}" class="group">
+                <x-cloud::marketing.button href="{{ route('login') }}" class="group" data-analytics-intent="signup" data-analytics-placement="hero">
                     Start for free
                 </x-cloud::marketing.button>
 

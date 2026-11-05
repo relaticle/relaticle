@@ -28,9 +28,7 @@
         'resources/js/app.js',
     ])
 
-    @if(app()->isProduction() && !empty(config('services.fathom.site_id')))
-        <script src="https://cdn.usefathom.com/script.js" data-site="{{ config('services.fathom.site_id') }}" defer></script>
-    @endif
+    @include('filament.app.analytics', ['panel' => false])
 </head>
 <body class="min-h-screen bg-white font-sans text-gray-700 antialiased dark:bg-gray-950 dark:text-gray-300">
 
@@ -146,11 +144,11 @@
 
                 <span aria-hidden="true" class="mx-1 hidden h-5 w-px bg-gray-200 sm:block dark:bg-white/10"></span>
 
-                <a href="{{ route('login') }}" referrerpolicy="no-referrer-when-downgrade"
+                <a href="{{ route('login') }}" referrerpolicy="no-referrer-when-downgrade" data-analytics-intent="login" data-analytics-placement="docs"
                    class="hidden rounded-lg px-2 py-1.5 text-[13px] font-medium text-gray-600 transition-colors hover:text-gray-900 sm:block dark:text-gray-400 dark:hover:text-white">
                     {{ __('Sign in') }}
                 </a>
-                <x-cloud::marketing.button size="sm" href="{{ route('login') }}" class="whitespace-nowrap">
+                <x-cloud::marketing.button size="sm" href="{{ route('login') }}" class="whitespace-nowrap" data-analytics-intent="signup" data-analytics-placement="docs">
                     {{ __('Start for free') }}
                 </x-cloud::marketing.button>
             </div>

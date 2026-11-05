@@ -2,7 +2,7 @@
 title: AI credits and rate limits
 description: How assistant messages spend credits on Relaticle Cloud, what each plan includes, and what happens at zero. Self-hosted installs have no credit limit.
 order: 4
-updated: "2026-10-30"
+updated: "2026-11-04"
 related: [help/ai-assistant/choose-an-ai-model, help/workspace/billing-and-plans]
 ---
 
@@ -23,8 +23,10 @@ On Relaticle Cloud, the cost scales with the model's multiplier (see
 [Choose an AI model](/help/ai-assistant/choose-an-ai-model)) plus a little
 for each tool the assistant uses while answering. Searching records, reading
 a company, and drafting a proposal each count. A simple question on the default
-model costs 1 credit; a multi-step request on a 3x model costs more. The
-final cost settles after the answer completes.
+model costs 1 credit; a multi-step request on a 3x model costs more. Each
+web search adds 2 credits (see
+[Research a company with Rela](/help/ai-assistant/research-a-company-with-rela)).
+The final cost settles after the answer completes.
 
 ## What each plan includes
 
