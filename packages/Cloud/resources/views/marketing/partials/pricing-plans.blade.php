@@ -5,12 +5,7 @@
     $featureList = 'space-y-3 text-sm leading-5 text-gray-700 dark:text-gray-300';
 @endphp
 
-<div x-data="{ yearly: true }">
-    <div class="border-rail flex flex-col gap-4 border-t px-6 py-5 sm:flex-row sm:items-center sm:justify-between md:px-10">
-        <p class="text-sm text-gray-600 dark:text-gray-400">{{ __('Every price is per workspace, with unlimited users and records.') }}</p>
-        <x-cloud::billing.interval-toggle class="sm:items-end" />
-    </div>
-
+<div>
     <div id="pricing-plans" class="border-rail bg-rail grid gap-px border-t lg:grid-cols-3">
         @foreach([\App\Enums\Plan::Pro, \App\Enums\Plan::Scale] as $plan)
             @php
@@ -43,7 +38,11 @@
                     <x-cloud::marketing.button :variant="$isScale ? 'primary' : 'secondary'" :href="route('login')" class="mt-8 w-full" data-analytics-intent="signup" data-analytics-placement="pricing">
                         {{ __('Start for free') }}
                     </x-cloud::marketing.button>
-                    <p class="mt-3 text-center text-sm text-gray-500 dark:text-gray-400">{{ __(':days-day Cloud Pro trial. No card required.', ['days' => \App\Models\Workspace::PRO_TRIAL_DAYS]) }}</p>
+                    <p class="mt-3 text-center text-sm text-gray-500 dark:text-gray-400">
+                        {{ $isScale
+                            ? __('Starts as a :days-day Cloud Pro trial. Switch plans in Billing.', ['days' => \App\Models\Workspace::PRO_TRIAL_DAYS])
+                            : __(':days-day trial, no card.', ['days' => \App\Models\Workspace::PRO_TRIAL_DAYS]) }}
+                    </p>
                 </div>
 
                 <div class="border-rail flex flex-1 flex-col border-t p-6 md:px-10">
@@ -66,10 +65,11 @@
                 <h2 class="text-lg font-medium text-gray-950 dark:text-white">{{ __('billing.plans.enterprise') }}</h2>
                 <p class="mt-1.5 text-base text-gray-500 dark:text-gray-400">{{ __('cloud::billing.enterprise.tagline') }}</p>
 
+                @php($enterprisePriceShort = '$'.rtrim(rtrim(number_format(config('relaticle.enterprise.starting_price_yearly') / 1000, 1), '0'), '.').'K')
                 <div class="mt-8" aria-label="{{ __('cloud::billing.enterprise.starting_price', ['price' => $enterprisePrice]) }}">
                     <p class="{{ $priceLabel }}">{{ __('Starting at') }}</p>
                     <p class="mt-3 flex flex-wrap items-baseline gap-x-1.5">
-                        <span class="{{ $price }}">${{ $enterprisePrice }}</span>
+                        <span class="{{ $price }}">{{ $enterprisePriceShort }}</span>
                         <span class="text-sm text-gray-500 dark:text-gray-400">{{ __('/ year') }}</span>
                     </p>
                     <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ __('cloud::billing.enterprise.billing') }}</p>
