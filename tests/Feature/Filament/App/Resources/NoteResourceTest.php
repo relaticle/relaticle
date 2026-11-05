@@ -339,7 +339,7 @@ it('keeps the checklist out of the note slash menu', function (): void {
     expect(collect($menu['items'])->pluck('id')->all())->not->toContain('taskList');
 });
 
-it('versions the rich editor scripts by the newest published file so an edit changes the url', function (): void {
+it('versions both rich editor scripts by the newest published file', function (): void {
     $newest = max(
         filemtime(public_path('js/app/rich-editor-slash-menu.js')),
         filemtime(public_path('js/app/rich-editor-checklist.js')),
