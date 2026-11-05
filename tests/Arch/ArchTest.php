@@ -264,6 +264,7 @@ $packageServiceLayers = [
     'Relaticle\Cloud\Billing\CreditPackCatalog',
     'Relaticle\Cloud\Billing\Filament\BillingPanelHooks',
     'Relaticle\Cloud\Billing\Listeners',
+    'Relaticle\Cloud\Billing\Queries',
     'Relaticle\Cloud\Billing\SidebarBillingState',
     'Relaticle\Cloud\Billing\StripeBilling',
     'Relaticle\Cloud\Docs\Support',
@@ -395,7 +396,7 @@ foreach ($packageQueryLayers as $packageRoot => $packageQueryLayer) {
         ->toUse(["{$packageRoot}\Http", "{$packageRoot}\Livewire", "{$packageRoot}\Tools", "{$packageRoot}\Jobs"]);
 }
 
-foreach (['App\Queries', ...array_values($packageQueryLayers)] as $queryRoot) {
+foreach (['App\Queries', 'Relaticle\Cloud\Billing\Queries', ...array_values($packageQueryLayers)] as $queryRoot) {
     arch("{$queryRoot} takes the acting user and reads no ambient user, request or workspace")
         ->expect($queryRoot)
         ->not

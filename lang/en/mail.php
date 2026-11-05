@@ -36,6 +36,7 @@ return [
     'trial_ending' => [
         'subject' => 'Your Pro trial ends on :date',
         'preheader' => ':workspace pauses then unless you choose a plan. Your records stay safe.',
+        'preheader_grandfathered' => ':workspace returns to its Cloud Free plan then. Your records stay safe.',
         'heading' => 'Pro for :workspace ends on :date',
         'ends_at' => 'Your Pro trial ends on :datetime (:zone time).',
         'pauses' => 'After that, :workspace pauses until you choose a plan.',

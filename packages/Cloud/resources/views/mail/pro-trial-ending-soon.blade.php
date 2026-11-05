@@ -1,5 +1,5 @@
 <x-mail::message :reason="__('mail.footer.reason.owner', ['workspace' => $workspace->name])">
-<x-slot:preheader>{{ __('mail.trial_ending.preheader', ['workspace' => $workspace->name]) }}</x-slot:preheader>
+<x-slot:preheader>{{ __($grandfathered ? 'mail.trial_ending.preheader_grandfathered' : 'mail.trial_ending.preheader', ['workspace' => $workspace->name]) }}</x-slot:preheader>
 # {{ __('mail.trial_ending.heading', ['workspace' => $workspace->name, 'date' => $endsOnShort]) }}
 
 {{ __('mail.trial_ending.ends_at', ['datetime' => $endsOnLong, 'zone' => $zone]) }}

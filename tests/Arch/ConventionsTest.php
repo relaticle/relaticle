@@ -1167,7 +1167,11 @@ it('names a class in a domain folder of Queries with the Query suffix', function
     );
 
     $offenders = array_filter(
-        phpFilesUnder([...$domainFolders, ...glob($root.'/packages/*/src/Queries', GLOB_ONLYDIR) ?: []]),
+        phpFilesUnder([
+            ...$domainFolders,
+            ...glob($root.'/packages/*/src/Queries', GLOB_ONLYDIR) ?: [],
+            ...glob($root.'/packages/*/src/*/Queries', GLOB_ONLYDIR) ?: [],
+        ]),
         static fn (string $file): bool => ! str_ends_with(basename($file, '.php'), 'Query'),
     );
 
@@ -1196,8 +1200,11 @@ it('guards every Queries folder against writes in phpstan.neon', function (): vo
     $namespaces = [
         'App\\Queries',
         ...array_map(
-            static fn (string $folder): string => 'Relaticle\\'.basename(dirname($folder, 2)).'\\Queries',
-            glob($root.'/packages/*/src/Queries', GLOB_ONLYDIR) ?: [],
+            static fn (string $folder): string => 'Relaticle\\'.str_replace('/', '\\', str_replace('/src/', '/', substr($folder, strlen($root.'/packages/')))),
+            [
+                ...glob($root.'/packages/*/src/Queries', GLOB_ONLYDIR) ?: [],
+                ...glob($root.'/packages/*/src/*/Queries', GLOB_ONLYDIR) ?: [],
+            ],
         ),
     ];
 

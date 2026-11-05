@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 use App\Enums\CreationSource;
 use App\Models\Company;
+use App\Models\Note;
+use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Enums\MessageOrigin;
@@ -33,7 +37,7 @@ function trialWorkspace(string $timezone = 'UTC', array $attributes = []): Works
     ]);
 }
 
-function askRela(Workspace $workspace, int $times): void
+function askRela(Workspace $workspace, int $times, MessageOrigin $origin = MessageOrigin::Typed, string $role = 'user', ?CarbonImmutable $supersededAt = null): void
 {
     $owner = $workspace->owner;
     $conversationId = (string) Str::uuid7();
@@ -55,13 +59,14 @@ function askRela(Workspace $workspace, int $times): void
             'participant_type' => $owner->getMorphClass(),
             'participant_id' => (string) $owner->getKey(),
             'agent' => 'test',
-            'role' => 'user',
+            'role' => $role,
             'content' => 'question',
             'attachments' => '[]',
             'steps' => '[]',
             'usage' => '[]',
             'meta' => '[]',
-            'origin' => MessageOrigin::Typed->value,
+            'origin' => $origin->value,
+            'superseded_at' => $supersededAt,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -79,6 +84,9 @@ it('renders the trial end time in the owner timezone with the paused-access outc
     $mail->assertSeeInHtml('After that, Acme pauses until you choose a plan.');
     $mail->assertSeeInHtml('Questions? Reply to this email.');
     $mail->assertSeeInHtml('Choose a plan');
+    $mail->assertSeeInHtml('One flat price covers the whole workspace.');
+    $mail->assertSeeInHtml('Acme pauses then unless you choose a plan. Your records stay safe.');
+    $mail->assertDontSeeInHtml('returns to its Cloud Free plan then');
     $mail->assertDontSeeInHtml(__('mail.trial_ending.grandfathered', ['workspace' => 'Acme']));
     $mail->assertSeeInHtml(__('mail.footer.reason.owner', ['workspace' => 'Acme']));
     $mail->assertSeeInText('Choose a plan: '.Billing::getUrl(panel: 'app', tenant: $workspace));
@@ -102,6 +110,13 @@ it('describes the grandfathered outcome for grandfathered workspaces', function 
 
     $mail->assertSeeInHtml(__('mail.trial_ending.grandfathered', ['workspace' => 'Acme']));
     $mail->assertDontSeeInHtml('After that, Acme pauses');
+});
+
+it('promises a return to Cloud Free in the preheader of a grandfathered workspace', function (): void {
+    $mail = endingSoonMail(trialWorkspace('UTC', ['hosted_free_grandfathered_at' => now()->subMonth()]));
+
+    $mail->assertSeeInHtml('Acme returns to its Cloud Free plan then. Your records stay safe.');
+    $mail->assertDontSeeInHtml('pauses then unless');
 });
 
 it('names the end date and no fixed length on an extended trial', function (): void {
@@ -158,4 +173,62 @@ it('prints only the half that is not zero', function (): void {
 
     endingSoonMail($records)->assertSeeInHtml('So far your team has added 1 record.');
     endingSoonMail($questions)->assertSeeInHtml('So far your team has asked Rela 1 question.');
+});
+
+it('counts every record type and question kind that belongs to the trial, and nothing else', function (): void {
+    $workspace = trialWorkspace();
+    $attributes = fn (CreationSource $source): array => ['workspace_id' => $workspace->id, 'creation_source' => $source];
+
+    foreach ([CreationSource::WEB, CreationSource::SAMPLE] as $source) {
+        Company::factory()->create($attributes($source));
+        People::factory()->create($attributes($source));
+        Opportunity::factory()->create($attributes($source));
+        Task::factory()->create($attributes($source));
+        Note::factory()->create($attributes($source));
+    }
+
+    Company::factory()->create($attributes(CreationSource::WEB))->delete();
+    askRela($workspace, 2);
+    askRela($workspace, 1, MessageOrigin::Greeting);
+    askRela($workspace, 1, role: 'assistant');
+
+    endingSoonMail($workspace)->assertSeeInHtml('So far your team has added 5 records and asked Rela 2 questions.');
+});
+
+it('counts only what was created from the trial start', function (): void {
+    $workspace = trialWorkspace('UTC', ['pro_trial_used_at' => '2026-09-01 00:00:00']);
+
+    Company::factory()->create([
+        'workspace_id' => $workspace->id,
+        'creation_source' => CreationSource::WEB,
+        'created_at' => '2026-08-31 23:59:59',
+    ]);
+    Company::factory()->create([
+        'workspace_id' => $workspace->id,
+        'creation_source' => CreationSource::WEB,
+        'created_at' => '2026-09-01 00:00:00',
+    ]);
+
+    endingSoonMail($workspace)->assertSeeInHtml('So far your team has added 1 record.');
+});
+
+it('ignores questions the user replaced by regenerating or editing', function (): void {
+    $workspace = trialWorkspace();
+
+    askRela($workspace, 1);
+    askRela($workspace, 2, supersededAt: now());
+
+    endingSoonMail($workspace)->assertSeeInHtml('So far your team has asked Rela 1 question.');
+});
+
+it('groups thousands in the record count', function (): void {
+    $workspace = trialWorkspace();
+
+    DB::insert(
+        "insert into notes (id, workspace_id, title, creation_source, created_at, updated_at)
+        select substr(md5(n::text), 1, 26), ?, 'Note', 'web', ?, ? from generate_series(1, 12500) as n",
+        [$workspace->id, now(), now()],
+    );
+
+    endingSoonMail($workspace)->assertSeeInHtml('So far your team has added 12,500 records.');
 });
