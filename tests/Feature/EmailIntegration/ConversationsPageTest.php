@@ -10,13 +10,16 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Facade;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
+use Relaticle\EmailIntegration\Data\ConversationFilters;
 use Relaticle\EmailIntegration\Enums\AutomatedReason;
 use Relaticle\EmailIntegration\Enums\ConversationView;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Enums\EmailFilter;
 use Relaticle\EmailIntegration\Enums\EmailPageTab;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
@@ -31,11 +34,12 @@ use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailRead;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Queries\ConversationsQuery;
+use Relaticle\EmailIntegration\Services\EmailSearchService;
 use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
 
 use function Pest\Laravel\actingAs;
 
-mutates(EmailInboxPage::class, HasConversationReader::class, ConversationsQuery::class, MarkEmailAsReadAction::class, ConversationView::class, PreferredEmailCopyService::class);
+mutates(EmailInboxPage::class, HasConversationReader::class, ConversationsQuery::class, MarkEmailAsReadAction::class, ConversationView::class, PreferredEmailCopyService::class, ConversationFilters::class, EmailFilter::class, EmailSearchService::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withWorkspace()->create();
@@ -752,4 +756,96 @@ it('shows the not available line on the page for mail no conversation holds yet'
         ->assertSet('selectedEmailId', $unkeyed->id)
         ->assertSee(__('filament/pages/email-inbox.drawer.not_available'))
         ->assertDontSee('Unkeyed renewal');
+});
+
+/**
+ * @return list<string>
+ */
+function conversationsPageFilteredKeys(User $viewer, ConversationFilters $filters): array
+{
+    return array_map(
+        fn (object $row): string => $row->conversationKey,
+        resolve(ConversationsQuery::class)->paginate($viewer, ConversationView::All, $filters)->rows,
+    );
+}
+
+it('turns from and has attachment operators into filters and keeps the rest as words', function (): void {
+    conversationsPageMessage($this->ownerMailbox, 'conv-match', 'brian@airbnb.com', ['subject' => 'Pricing for foo:bar rollout', 'has_attachments' => true]);
+    conversationsPageMessage($this->ownerMailbox, 'conv-no-attachment', 'brian@airbnb.com', ['subject' => 'Pricing for foo:bar rollout', 'has_attachments' => false]);
+    conversationsPageMessage($this->ownerMailbox, 'conv-other-sender', 'olivia@stripe.com', ['subject' => 'Pricing for foo:bar rollout', 'has_attachments' => true]);
+
+    $filters = (new ConversationFilters)->withTyped('from:airbnb.com has:attachment pricing foo:bar', 'UTC');
+
+    expect($filters->from)->toBe('airbnb.com')
+        ->and($filters->hasAttachment)->toBeTrue()
+        ->and($filters->search)->toBe('pricing foo:bar')
+        ->and(conversationsPageFilteredKeys($this->owner, $filters))->toBe(['conv-match']);
+});
+
+it('keeps an invalid date operator as free text', function (): void {
+    $invalid = (new ConversationFilters)->withTyped('after:soon pricing', 'America/Los_Angeles');
+    $valid = (new ConversationFilters)->withTyped('after:2026-10-01 pricing', 'America/Los_Angeles');
+
+    expect($invalid->sentAfter)->toBeNull()
+        ->and($invalid->search)->toBe('after:soon pricing')
+        ->and($valid->sentAfter?->utc()->toDateTimeString())->toBe('2026-10-01 07:00:00')
+        ->and($valid->search)->toBe('pricing');
+});
+
+it('rejects an unknown filter field with a validation message', function (array $tree, string $path, string $message): void {
+    expect(fn (): ConversationFilters => ConversationFilters::fromTree($tree, 'UTC'))
+        ->toThrow(fn (ValidationException $exception) => expect($exception->errors())->toBe([$path => [$message]]));
+})->with([
+    'unknown field' => fn (): array => [
+        ['subject' => ['$contains' => 'x']],
+        'filter.subject',
+        __('validation.filter.unknown_name', ['name' => 'subject', 'available' => implode(', ', EmailFilter::fields())]),
+    ],
+    'unsupported operator' => fn (): array => [
+        ['from' => ['$eq' => 'x']],
+        'filter.from.$eq',
+        __('validation.filter.unsupported_operator', ['name' => 'from', 'operator' => '$eq', 'supported' => '$contains']),
+    ],
+    'invalid direction' => fn (): array => [
+        ['direction' => ['$in' => ['sideways']]],
+        'filter.direction.$in',
+        __('validation.filter.enum_value', ['name' => 'direction $in', 'value' => 'sideways', 'values' => 'inbound, outbound']),
+    ],
+]);
+
+it('reads back the filter tree it writes', function (): void {
+    $tree = [
+        'mailbox' => ['$in' => [$this->ownerMailbox->id]],
+        'from' => ['$contains' => 'airbnb.com'],
+        'has_attachment' => ['$eq' => true],
+        'sent_at' => ['$gte' => '2026-10-01T00:00:00-07:00', '$lt' => '2026-10-08T00:00:00-07:00'],
+        'record' => ['company' => ['$in' => [$this->company->id]]],
+    ];
+
+    expect(ConversationFilters::fromTree($tree, 'America/Los_Angeles')->toTree())->toEqual($tree);
+});
+
+it('does not match another member\'s bcc address through to', function (): void {
+    $teammateCopy = conversationsPageMessage($this->teammateMailbox, 'conv-bcc', 'olivia@stripe.com');
+    EmailParticipant::factory()->to()->create(['email_id' => $teammateCopy->id, 'email_address' => 'customer@stripe.com']);
+    EmailParticipant::factory()->bcc()->create(['email_id' => $teammateCopy->id, 'email_address' => 'secret@stripe.com']);
+    $this->company->emails()->attach($teammateCopy->id);
+
+    $to = fn (User $viewer, string $address): array => conversationsPageFilteredKeys($viewer, (new ConversationFilters)->withTyped("to:{$address}", 'UTC'));
+
+    expect($to($this->owner, 'customer@stripe.com'))->toBe(['conv-bcc'])
+        ->and($to($this->owner, 'secret@stripe.com'))->toBe([])
+        ->and($to($this->teammate, 'secret@stripe.com'))->toBe(['conv-bcc']);
+});
+
+it('filters to one company through company:', function (): void {
+    $stripe = Company::factory()->create(['workspace_id' => $this->workspace->id, 'name' => 'Stripe']);
+    $foreign = Company::factory()->create(['name' => 'Airbnb Labs']);
+
+    $this->company->emails()->attach(conversationsPageMessage($this->ownerMailbox, 'conv-airbnb', 'brian@airbnb.com')->id);
+    $stripe->emails()->attach(conversationsPageMessage($this->ownerMailbox, 'conv-stripe', 'olivia@stripe.com')->id);
+    $foreign->emails()->attach(conversationsPageMessage($this->ownerMailbox, 'conv-foreign-link', 'anna@labs.test')->id);
+
+    expect(conversationsPageFilteredKeys($this->owner, (new ConversationFilters)->withTyped('company:air', 'UTC')))->toBe(['conv-airbnb'])
+        ->and(conversationsPageFilteredKeys($this->owner, ConversationFilters::fromTree(['record' => ['company' => ['$in' => [$foreign->id]]]], 'UTC')))->toBe([]);
 });

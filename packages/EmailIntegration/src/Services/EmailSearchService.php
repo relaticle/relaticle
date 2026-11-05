@@ -8,10 +8,8 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Query\Builder as BaseBuilder;
-use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\Email;
-use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 
 final readonly class EmailSearchService
@@ -25,11 +23,10 @@ final readonly class EmailSearchService
      */
     public function applyToQuery(Builder|Relation $query, User $viewer, string $search): Builder|Relation
     {
-        $needle = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search).'%';
         $textQuery = $this->textQuery($search);
 
-        return $query->where(function (Builder $outer) use ($needle, $textQuery, $viewer): void {
-            $outer->whereHas('participants', fn (Builder $participants): Builder => $this->whereParticipantMatches($participants, $viewer, $needle));
+        return $query->where(function (Builder $outer) use ($search, $textQuery, $viewer): void {
+            $outer->whereHas('participants', fn (Builder $participants): Builder => $participants->matchingSearch($viewer, $search));
 
             if ($textQuery === null) {
                 return;
@@ -45,21 +42,6 @@ final readonly class EmailSearchService
                 ->whereRaw("emails.body_search @@ ({$sql})", $bindings)
                 ->where(fn (Builder $access): Builder => $this->whereViewerCanSeeBody($access, $viewer)));
         });
-    }
-
-    /**
-     * @param  Builder<EmailParticipant>  $query
-     * @return Builder<EmailParticipant>
-     */
-    private function whereParticipantMatches(Builder $query, User $viewer, string $needle): Builder
-    {
-        return $query
-            ->where(fn (Builder $roleGate): Builder => $roleGate
-                ->where('email_participants.role', '!=', EmailParticipantRole::BCC)
-                ->orWhereHas('email', fn (Builder $ownedEmail): Builder => $ownedEmail->where('emails.user_id', $viewer->getKey())))
-            ->where(fn (Builder $match): Builder => $match
-                ->where('email_participants.name', 'ilike', $needle)
-                ->orWhere('email_participants.email_address', 'ilike', $needle));
     }
 
     /**

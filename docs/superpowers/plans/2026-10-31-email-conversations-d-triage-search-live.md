@@ -654,7 +654,7 @@ drops out of the list. The access-request list keeps its own `subject` `ilike`
 
 **Files:** `EmailFilter.php`, `ConversationFilters.php`, `ConversationsQuery.php`, lang.
 
-- [ ] `EmailFilter` cases: `Mailbox`, `From`, `To`, `Direction`, `HasAttachment`, `SentAt`,
+- [x] `EmailFilter` cases: `Mailbox`, `From`, `To`, `Direction`, `HasAttachment`, `SentAt`,
   `Record` (company, person or opportunity), `Category`. Each a `match` with no `default`:
   - `field(): string` for the tree (`mailbox`, `from`, `to`, `direction`, `has_attachment`,
     `sent_at`, `record`, `category`).
@@ -664,7 +664,7 @@ drops out of the list. The access-request list keeps its own `subject` `ilike`
   - `typedWords(): list<string>`: `from`, `to`, `has` (only `attachment`), `after` and `before`
     (to `SentAt`), `company`, `person`, `opportunity` (to `Record`).
   - `label(): string` for the chip.
-- [ ] `ConversationFilters` keeps PR 5's fields and adds:
+- [x] `ConversationFilters` keeps PR 5's fields and adds:
   - static `fromTree(array $tree, string $viewerZone): self`. Validates against `EmailFilter`
     only, throws `FilterErrors::at('filter.<field>', ...)` with `validation.filter.*` messages,
     parses operands with `Operand::date()`, `Operand::boolean()` and `Operand::stringList()`,
@@ -675,7 +675,7 @@ drops out of the list. The access-request list keeps its own `subject` `ilike`
     words, and known words with an invalid value such as `after:soon`, stay in `search` as free
     text, per the spec.
   - `toTree(): array` for the URL and the chips.
-- [ ] `ConversationsQuery` compiles each filter inside its copies subquery, after the visibility
+- [x] `ConversationsQuery` compiles each filter inside its copies subquery, after the visibility
   bound, so a filter can only narrow what the viewer may see:
   - `From` and `To`: `whereHas('participants')` with the role (`from`, or `to`/`cc`, plus `bcc`
     only for the viewer's own copies) and the same `ilike` as search. A metadata-tier row shows
@@ -685,7 +685,7 @@ drops out of the list. The access-request list keeps its own `subject` `ilike`
   - `company:Acme` resolves the name to company ids through `Company::query()` bound to the
     viewer's workspace, `ilike` prefix, at most `MAX_LIST_VALUES`.
   - `search`: `EmailSearchService::applyToQuery()`. Never a raw `where` on text (D14 risk).
-- [ ] Tests in `ConversationsPageTest.php`:
+- [x] Tests in `ConversationsPageTest.php`:
   - `it('turns from and has attachment operators into filters and keeps the rest as words')`:
     `from:airbnb.com has:attachment pricing foo:bar` filters to the one matching conversation,
     and `search` holds `pricing foo:bar`.
@@ -694,6 +694,21 @@ drops out of the list. The access-request list keeps its own `subject` `ilike`
     `?filter[subject][$contains]=x` renders the error, not a 500, and lists nothing extra.
   - `it('does not match another member's bcc address through to')`.
   - `it('filters to one company through company:')`.
+
+**Done (2026-11-05):** operators are `$in` for mailbox, direction and category, `$contains` for
+from and to, `$eq` for has_attachment, `$gte` and `$lt` for sent_at (`before:` is exclusive, so
+`$lt`, not `$lte`), and for record `{company|person|opportunity: {$in: [ids]}}` or
+`{...: {$starts_with: name}}`. A typed `company:Acme` keeps the name in the tree and the query
+resolves it to at most `MAX_LIST_VALUES` records of the viewer's workspace, because a data class
+reads no database and the URL keeps what was typed. `withTyped()` takes the viewer's zone, for
+`after:` and `before:`. `ConversationFilters` now holds lists (`mailboxIds`, `recordIds`,
+`categories`) plus `from`, `to` and `recordName`; `forRecord()` moved to `recordIds`, and
+`sentAfter` is inclusive. The participant match is a `#[Scope]` on `EmailParticipant`
+(`matchingSearch()`), shared by search and by `from:`/`to:`, because `ConventionsTest` fails a
+new public method that takes a builder. Tests run through `ConversationsQuery` and
+`ConversationFilters`, because the page has no `filter` or `q` state until Task 8. The test
+"rejects an unknown filter field with a validation message" checks `fromTree()`, and Task 8 adds
+the URL case, which renders the message and lists as if no filter were set.
 
 ### Task 8: The search box and chip bar on the page
 

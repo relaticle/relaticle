@@ -8,6 +8,16 @@ return [
         'nav_badge' => '!',
         'nav_tooltip' => 'One of your mailboxes needs attention',
     ],
+    'filters' => [
+        'mailbox' => 'Mailbox',
+        'from' => 'From',
+        'to' => 'To',
+        'direction' => 'Direction',
+        'has_attachment' => 'Has attachment',
+        'sent_at' => 'Date',
+        'record' => 'Linked to',
+        'category' => 'Category',
+    ],
     'account_filter' => [
         'label' => 'Account',
     ],
