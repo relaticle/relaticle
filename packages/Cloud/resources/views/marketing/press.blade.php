@@ -11,6 +11,7 @@
         ['id' => 'companies', 'title' => __('Companies'), 'alt' => __('Relaticle companies list with account owners, ICP status, and website domains')],
         ['id' => 'custom-fields', 'title' => __('Custom fields'), 'alt' => __('Relaticle custom field settings for opportunities')],
     ];
+    $socialClass = 'inline-flex min-h-11 items-center gap-2 rounded-sm text-primary-700 focus-visible:outline-2 focus-visible:outline-primary dark:text-primary-300';
     $downloadClass = 'inline-flex min-h-11 items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 transition hover:border-primary-300 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-primary-400 dark:hover:text-primary-300';
 @endphp
 
@@ -74,9 +75,9 @@
                     @endforeach
                 </div>
             <div class="border-rail mt-6 grid gap-5 border-t pt-6 text-sm sm:grid-cols-3">
-<div><h3 class="font-semibold">{{ __('Give it room') }}</h3><p class="mt-2 leading-relaxed text-gray-600 dark:text-gray-400">{{ __('Keep the supplied padding. Leave space between the logo and surrounding text or graphics.') }}</p></div>
-                    <div><h3 class="font-semibold">{{ __('Keep it recognizable') }}</h3><p class="mt-2 leading-relaxed text-gray-600 dark:text-gray-400">{{ __('Preserve the proportions and colors. Avoid stretching, rotating, or adding effects.') }}</p></div>
-                    <div><h3 class="font-semibold">{{ __('Choose the right format') }}</h3><p class="mt-2 leading-relaxed text-gray-600 dark:text-gray-400">{{ __('Use SVG for layouts that need to scale. Use PNG for uploads, slides, and video overlays.') }}</p></div>
+<div><h3 class="font-semibold">{{ __('Give it room') }}</h3><p class="type-prose text-gray-700 dark:text-gray-200 mt-2">{{ __('Keep the supplied padding. Leave space between the logo and surrounding text or graphics.') }}</p></div>
+                    <div><h3 class="font-semibold">{{ __('Keep it recognizable') }}</h3><p class="type-prose text-gray-700 dark:text-gray-200 mt-2">{{ __('Preserve the proportions and colors. Avoid stretching, rotating, or adding effects.') }}</p></div>
+                    <div><h3 class="font-semibold">{{ __('Choose the right format') }}</h3><p class="type-prose text-gray-700 dark:text-gray-200 mt-2">{{ __('Use SVG for layouts that need to scale. Use PNG for uploads, slides, and video overlays.') }}</p></div>
                 </div>
         </div>
     </x-cloud::marketing.frame>
@@ -177,26 +178,27 @@
         <x-cloud::marketing.frame-header :label="__('Company facts')" :lead="__('About Relaticle.')">
             {{ __('The facts behind the product, verified and dated.') }}
         </x-cloud::marketing.frame-header>
+        <h2 id="facts-title" class="sr-only">{{ __('About Relaticle') }}</h2>
         <div class="bg-rail grid grid-cols-1 gap-px lg:grid-cols-12">
             <div class="bg-surface p-6 md:p-10 lg:col-span-4">
-                <h2 id="facts-title" class="sr-only">{{ __('About Relaticle') }}</h2>
-                <p class="mt-4 text-sm leading-relaxed text-gray-600 dark:text-gray-400">{{ __('Relaticle is an open-source CRM for managing companies, people, opportunities, tasks, and notes. Its built-in AI assistant, :name, proposes changes for you to review and approve.', ['name' => config('chat.assistant_name')]) }}</p>
-                        <p class="mt-3 text-sm leading-relaxed text-gray-600 dark:text-gray-400">{{ __('Choose Relaticle Cloud or run it on your own server.') }}</p>
-                        <div class="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium">
-                            <a href="{{ $facts['source_urls']['repository'] }}" target="_blank" rel="noopener noreferrer" class="inline-flex min-h-11 items-center gap-2 rounded-sm text-primary focus-visible:outline-2 focus-visible:outline-primary dark:text-primary-400"><x-ri-github-fill class="size-4" aria-hidden="true"/>{{ __('GitHub') }}</a>
-                            <a href="{{ route('discord') }}" target="_blank" rel="noopener noreferrer" class="inline-flex min-h-11 items-center gap-2 rounded-sm text-primary focus-visible:outline-2 focus-visible:outline-primary dark:text-primary-400"><x-ri-discord-fill class="size-4" aria-hidden="true"/>{{ __('Discord') }}</a>
-                            <a href="https://x.com/relaticle" target="_blank" rel="noopener noreferrer" class="inline-flex min-h-11 items-center gap-2 rounded-sm text-primary focus-visible:outline-2 focus-visible:outline-primary dark:text-primary-400"><x-ri-twitter-x-fill class="size-4" aria-hidden="true"/>{{ __('X') }}</a>
-                        </div>
-            </div>
-            <div class="bg-surface p-6 md:p-10 lg:col-span-8">
-                <ul class="grid gap-px overflow-hidden rounded-2xl border border-gray-200 bg-gray-200 dark:border-gray-800 dark:bg-gray-800 sm:grid-cols-2">
-                            @foreach ([__('Founded') => '2024', __('License') => $facts['license'], __('Tech stack') => $facts['stack'], __('GitHub stars') => $starsLabel, __('Pricing') => $facts['pricing'], __('AI & MCP') => __(':name, a built-in AI assistant, and an MCP server. Both support self-hosting.', ['name' => config('chat.assistant_name')])] as $label => $value)
-                                <li class="bg-white p-5 dark:bg-gray-950"><p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ $label }}</p><p class="mt-2 text-sm leading-relaxed text-gray-800 dark:text-gray-200">{{ $value }}</p></li>
-                            @endforeach
-                        </ul>
-                        <p class="mt-4 text-xs leading-relaxed text-gray-500 dark:text-gray-400">{{ __('Company facts verified :date.', ['date' => $factsVerifiedAt]) }} <a href="{{ route('pricing') }}" class="underline underline-offset-4">{{ __('See current pricing') }}</a>.</p>
-                    </div>
+                <p class="type-prose text-gray-700 dark:text-gray-200">{{ __('Relaticle is an open-source CRM for managing companies, people, opportunities, tasks, and notes. Its built-in AI assistant, :name, proposes changes for you to review and approve.', ['name' => config('chat.assistant_name')]) }}</p>
+                <p class="type-prose text-gray-700 dark:text-gray-200 mt-3">{{ __('Choose Relaticle Cloud or run it on your own server.') }}</p>
+                <div class="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium">
+                    <a href="{{ $facts['source_urls']['repository'] }}" target="_blank" rel="noopener noreferrer" class="{{ $socialClass }}"><x-ri-github-fill class="size-4" aria-hidden="true"/>{{ __('GitHub') }}</a>
+                    <a href="{{ route('discord') }}" target="_blank" rel="noopener noreferrer" class="{{ $socialClass }}"><x-ri-discord-fill class="size-4" aria-hidden="true"/>{{ __('Discord') }}</a>
+                    <a href="https://x.com/relaticle" target="_blank" rel="noopener noreferrer" class="{{ $socialClass }}"><x-ri-twitter-x-fill class="size-4" aria-hidden="true"/>{{ __('X') }}</a>
                 </div>
+            </div>
+            <div class="bg-surface lg:col-span-8">
+                <ul class="bg-rail grid gap-px sm:grid-cols-2">
+                    @foreach ([__('Founded') => '2024', __('License') => $facts['license'], __('Tech stack') => $facts['stack'], __('GitHub stars') => $starsLabel, __('Pricing') => $facts['pricing'], __('AI & MCP') => __(':name, a built-in AI assistant, and an MCP server. Both support self-hosting.', ['name' => config('chat.assistant_name')])] as $label => $value)
+                        <li class="bg-surface p-6 md:p-8">
+                            <x-cloud::marketing.eyebrow>{{ $label }}</x-cloud::marketing.eyebrow>
+                            <p class="mt-2 text-base leading-relaxed text-gray-950 dark:text-white">{{ $value }}</p>
+                        </li>
+                    @endforeach
+                </ul>
+                <p class="border-rail border-t px-6 py-5 text-sm text-gray-500 md:px-8 dark:text-gray-400">{{ __('Company facts verified :date.', ['date' => $factsVerifiedAt]) }} <a href="{{ route('pricing') }}" class="underline underline-offset-4">{{ __('See current pricing') }}</a>.</p>
             </div>
         </div>
     </x-cloud::marketing.frame>
@@ -204,8 +206,9 @@
     <x-cloud::marketing.frame id="contact" aria-labelledby="contact-title">
         <div class="bg-rail grid grid-cols-1 gap-px lg:grid-cols-12">
             <div class="bg-surface p-6 md:p-10 lg:col-span-8">
-                <div class="max-w-xl"><h2 id="contact-title" class="font-display text-2xl font-bold tracking-tight">{{ __('Working on a story?') }}</h2><p class="mt-3 text-sm leading-relaxed text-gray-600 dark:text-gray-400">{{ __('Get in touch for interviews, product questions, or help finding the right assets.') }}</p>
-                <p class="mt-6 text-xs leading-relaxed text-gray-500 dark:text-gray-400">{{ __('Use these assets to identify or cover Relaticle. Do not imply a partnership or endorsement without our agreement.') }}</p>
+                <h2 id="contact-title" class="type-title text-gray-950 dark:text-white">{{ __('Working on a story?') }}</h2>
+                <p class="type-prose text-gray-700 dark:text-gray-200 mt-3">{{ __('Get in touch for interviews, product questions, or help finding the right assets.') }}</p>
+                <p class="mt-6 text-sm text-gray-500 dark:text-gray-400">{{ __('Use these assets to identify or cover Relaticle. Do not imply a partnership or endorsement without our agreement.') }}</p>
             </div>
             <div class="bg-surface flex items-center p-6 md:p-10 lg:col-span-4">
                 <x-cloud::marketing.button variant="secondary" href="{{ route('contact') }}" iconTrailing="ri-arrow-right-line">{{ __('Contact the team') }}</x-cloud::marketing.button>

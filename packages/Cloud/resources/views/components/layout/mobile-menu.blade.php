@@ -65,9 +65,7 @@
                             <div class="pb-3 space-y-0.5 px-4">
                             @foreach($item->children as $child)
                                 @if($child->url === null && count($child->children) > 0)
-                                    <p class="pt-4 pb-1.5 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                                        {{ $child->label }}
-                                    </p>
+                                    <x-cloud::marketing.eyebrow class="pt-4 pb-1.5">{{ $child->label }}</x-cloud::marketing.eyebrow>
                                     @foreach($child->children as $grandchild)
                                         <x-cloud::layout.mobile-menu-link :item="$grandchild"/>
                                     @endforeach
