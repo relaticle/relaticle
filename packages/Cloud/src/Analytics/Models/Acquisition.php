@@ -6,11 +6,16 @@ namespace Relaticle\Cloud\Analytics\Models;
 
 use App\Models\User;
 use App\Models\Workspace;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property CarbonImmutable $captured_at
+ * @property CarbonImmutable|null $first_paid_at
+ */
 #[Table(key: 'user_id', keyType: 'string', incrementing: false, timestamps: false)]
 #[Unguarded]
 final class Acquisition extends Model

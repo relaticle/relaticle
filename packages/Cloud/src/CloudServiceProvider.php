@@ -41,6 +41,7 @@ use Relaticle\Cloud\Analytics\Actions\CompleteAcquisitionSetup;
 use Relaticle\Cloud\Analytics\Actions\RecordAcquisition;
 use Relaticle\Cloud\Analytics\Attribution;
 use Relaticle\Cloud\Analytics\Http\Middleware\CaptureAcquisition;
+use Relaticle\Cloud\Analytics\Listeners\CaptureSubscriptionOutcome;
 use Relaticle\Cloud\Billing\Commands\ProcessTrialsCommand;
 use Relaticle\Cloud\Billing\Filament\Billing as BillingPage;
 use Relaticle\Cloud\Billing\Filament\BillingPanelHooks;
@@ -104,6 +105,7 @@ final class CloudServiceProvider extends ServiceProvider
         Livewire::component('App\\Filament\\Pages\\Billing', BillingPage::class);
 
         Event::listen(WebhookHandled::class, [SyncPlanOnStripeSubscriptionChange::class, 'handle']);
+        Event::listen(WebhookHandled::class, [CaptureSubscriptionOutcome::class, 'handle']);
 
         $this->commands([ProcessTrialsCommand::class, GenerateSitemapCommand::class, ReportStaleCompetitorFactsCommand::class]);
 

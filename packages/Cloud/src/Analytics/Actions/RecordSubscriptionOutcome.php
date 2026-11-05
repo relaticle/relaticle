@@ -92,7 +92,7 @@ final readonly class RecordSubscriptionOutcome
 
         return $stripeSubscription->id === $subscriptionId
             && $stripeSubscription->customer === $workspace->stripe_id
-            && SubscriptionType::tryFrom($stripeSubscription->metadata->type ?? '') !== null
+            && SubscriptionType::tryFrom($stripeSubscription->metadata->type ?? $stripeSubscription->metadata->name ?? 'default') !== null
             && ($workspaceId === null || $workspaceId === (string) $workspace->getKey());
     }
 
@@ -114,7 +114,9 @@ final readonly class RecordSubscriptionOutcome
 
     private function verifyPriorPayment(Workspace $workspace, string $subscriptionId, int $failedAt): void
     {
-        if (Acquisition::query()->where('workspace_id', $workspace->getKey())->where('first_paid_at', '<=', Date::createFromTimestampUTC($failedAt))->exists()) {
+        $acquisition = Acquisition::query()->where('workspace_id', $workspace->getKey())->first();
+
+        if (! $acquisition instanceof Acquisition || ($acquisition->first_paid_at !== null && $acquisition->first_paid_at->getTimestamp() <= $failedAt)) {
             return;
         }
 
@@ -123,17 +125,24 @@ final readonly class RecordSubscriptionOutcome
             'subscription' => $subscriptionId,
             'status' => 'paid',
             'limit' => 100,
+            'expand' => ['data.amount_paid_off_stripe'],
         ]);
+        $earliest = null;
 
         foreach ($invoices->autoPagingIterator() as $invoice) {
             $data = $invoice->toArray();
             $paidAt = $this->paidTimestamp($data);
 
-            if ($paidAt !== null && $paidAt <= $failedAt && $invoice->customer === $workspace->stripe_id
+            if ($paidAt !== null && $paidAt >= $acquisition->captured_at->getTimestamp() && $paidAt <= $failedAt && $invoice->customer === $workspace->stripe_id
                 && ($data['parent']['subscription_details']['subscription'] ?? null) === $subscriptionId
-                && $this->paidThroughStripe($data)) {
-                $this->record($workspace, true, $invoice->id, Date::createFromTimestampUTC($paidAt));
+                && $this->paidThroughStripe($data)
+                && ($earliest === null || [$paidAt, $invoice->id] < [$earliest['at'], $earliest['id']])) {
+                $earliest = ['at' => $paidAt, 'id' => $invoice->id];
             }
+        }
+
+        if ($earliest !== null) {
+            $this->record($workspace, true, $earliest['id'], Date::createFromTimestampUTC($earliest['at']));
         }
     }
 

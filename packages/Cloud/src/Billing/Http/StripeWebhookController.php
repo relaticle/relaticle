@@ -12,7 +12,6 @@ use Illuminate\Support\Facades\Log;
 use Laravel\Cashier\Cashier;
 use Laravel\Cashier\Http\Controllers\WebhookController as CashierWebhookController;
 use Laravel\Cashier\Subscription;
-use Relaticle\Cloud\Analytics\Actions\RecordSubscriptionOutcome;
 use Relaticle\Cloud\Billing\Actions\ActivateManagedPlan;
 use Relaticle\Cloud\Billing\Actions\GrantPurchasedCredits;
 use Relaticle\Cloud\Billing\Actions\NotifyWorkspaceOfPaymentFailure;
@@ -42,7 +41,6 @@ final class StripeWebhookController extends CashierWebhookController
         private readonly NotifyWorkspaceOfPaymentFailure $notifyPaymentFailure,
         private readonly ActivateManagedPlan $activateManagedPlan,
         private readonly VoidOpenInvoices $voidOpenInvoices,
-        private readonly RecordSubscriptionOutcome $recordSubscriptionOutcome,
     ) {
         parent::__construct();
     }
@@ -178,8 +176,6 @@ final class StripeWebhookController extends CashierWebhookController
      */
     protected function handleInvoicePaymentFailed(array $payload): Response
     {
-        $this->recordSubscriptionOutcome->execute($payload);
-
         /** @var array<string, mixed> $object */
         $object = $payload['data']['object'] ?? [];
         $customer = $object['customer'] ?? null;
@@ -210,8 +206,6 @@ final class StripeWebhookController extends CashierWebhookController
     /** @param  array<string, mixed>  $payload */
     protected function handleInvoicePaid(array $payload): Response
     {
-        $this->recordSubscriptionOutcome->execute($payload);
-
         /** @var array<string, mixed> $invoice */
         $invoice = $payload['data']['object'] ?? [];
         $stripeSubscriptionId = $invoice['parent']['subscription_details']['subscription'] ?? null;

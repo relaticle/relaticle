@@ -11,11 +11,13 @@ use App\Livewire\App\AppDatabaseNotifications;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CurrentWorkspace;
+use Illuminate\Events\CallQueuedListener;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Laravel\Cashier\Subscription;
@@ -25,6 +27,7 @@ use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Cloud\Admin\Actions\TransferWorkspaceBilling;
 use Relaticle\Cloud\Analytics\Actions\RecordSubscriptionOutcome;
+use Relaticle\Cloud\Analytics\Listeners\CaptureSubscriptionOutcome;
 use Relaticle\Cloud\Analytics\Models\Acquisition;
 use Relaticle\Cloud\Billing\Actions\ActivateManagedPlan;
 use Relaticle\Cloud\Billing\Actions\CancelWithUnusedTimeRefund;
@@ -54,6 +57,7 @@ mutates(PaymentFailedNotification::class);
 mutates(ManagedInvoiceOverdueNotification::class);
 mutates(StripeWebhookController::class);
 mutates(RecordSubscriptionOutcome::class);
+mutates(CaptureSubscriptionOutcome::class);
 
 beforeEach(function (): void {
     config()->set('cashier.webhook.secret', 'whsec_test_secret');
@@ -2051,4 +2055,60 @@ it('does not count a historic payment from before acquisition capture', function
     ]))->assertOk();
 
     expect($acquisition->refresh()->first_paid_at)->toBeNull();
+});
+
+it('finishes payment history verification before remembering its earliest payment', function (): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    proSubscriptionOn($workspace, 'sub_test_1');
+    $invoice = acquisitionPaidEvent($workspace, [
+        'customer' => $workspace->stripe_id,
+        'status_transitions' => ['paid_at' => now()->subDays(10)->getTimestamp()],
+        'parent' => ['type' => 'subscription_details', 'subscription_details' => ['subscription' => 'sub_test_1']],
+    ])['data']['object'];
+    $earlier = array_replace($invoice, ['id' => 'in_earlier', 'status_transitions' => ['paid_at' => now()->subDays(30)->getTimestamp()]]);
+    unset($earlier['amount_paid_off_stripe']);
+    $recorder = StripeRecorder::install()
+        ->respondTo('GET /v1/invoices/in_earlier', ['error' => ['type' => 'invalid_request_error', 'message' => 'Unavailable']], 400)
+        ->respondTo('GET /v1/invoices', ['object' => 'list', 'has_more' => false, 'data' => [$invoice, $earlier]]);
+    $event = invoicePaymentFailedEvent($workspace, ['id' => 'in_failed']);
+    $event['created'] = now()->getTimestamp();
+
+    sendStripeWebhook($event)->assertStatus(500);
+    expect($acquisition->refresh()->first_paid_at)->toBeNull();
+
+    $recorder->respondTo('GET /v1/invoices/in_earlier', ['id' => 'in_earlier', 'object' => 'invoice', 'amount_paid_off_stripe' => 0]);
+    sendStripeWebhook($event)->assertOk();
+
+    expect($acquisition->refresh()->first_paid_invoice_id)->toBe('in_earlier')
+        ->and($acquisition->first_paid_at->getTimestamp())->toBe(now()->subDays(30)->getTimestamp())
+        ->and($acquisition->first_renewal_failed_invoice_id)->toBe('in_failed');
+});
+
+it('uses Cashier subscription types regardless of invoice delivery order', function (array $metadata): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    $body = stripeSubscriptionEvent($workspace, 'created', ['id' => 'sub_pro_1', 'metadata' => $metadata])['data']['object'];
+    StripeRecorder::install()->respondTo('/v1/subscriptions/sub_pro_1', $body);
+
+    sendStripeWebhook(acquisitionPaidEvent($workspace))->assertOk();
+
+    expect($acquisition->refresh()->first_paid_invoice_id)->toBe('in_acquisition');
+})->with(['dashboard subscription' => [[]], 'legacy name metadata' => [['name' => 'default']]]);
+
+it('notifies an acquired workspace of failed payment without waiting for analytics recovery', function (): void {
+    $workspace = stripeBillingWorkspace();
+    acquiredBillingWorkspace($workspace);
+    proSubscriptionOn($workspace, 'sub_test_1');
+    Queue::fake([CallQueuedListener::class]);
+    StripeRecorder::install()->respondTo('GET /v1/invoices', [
+        'error' => ['type' => 'invalid_request_error', 'message' => 'History unavailable'],
+    ], 400);
+    $event = invoicePaymentFailedEvent($workspace);
+    $event['created'] = now()->getTimestamp();
+
+    sendStripeWebhook($event)->assertOk();
+
+    expect($workspace->owner->notifications()->sole()->type)->toBe(PaymentFailedNotification::class);
+    Queue::assertPushed(CallQueuedListener::class);
 });
