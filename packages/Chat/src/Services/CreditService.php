@@ -403,7 +403,7 @@ final readonly class CreditService
     {
         $multiplier = $this->registry->multiplierFor($model);
         $toolBonus = (float) config('chat.tool_call_credit_bonus', 0.5);
-        $searchCost = (int) config('chat.web_search_credit_cost', 2);
+        $searchCost = (int) config('chat.web_search_credit_cost');
 
         $raw = ($multiplier) + ($toolCallsCount * $toolBonus);
 

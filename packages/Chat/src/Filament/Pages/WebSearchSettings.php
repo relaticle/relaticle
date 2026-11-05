@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Filament\Pages;
 
+use App\Contracts\Entitlements;
 use App\Filament\Clusters\Settings;
 use App\Models\User;
 use App\Models\Workspace;
@@ -70,9 +71,7 @@ final class WebSearchSettings extends Page
                     )->all())
                     ->required()
                     ->disabled(! $workspaceAllows)
-                    ->helperText($workspaceAllows
-                        ? __('Search queries go to the AI provider\'s web search. Each search uses 2 credits.')
-                        : __('Your workspace owner turned web search off.'))
+                    ->helperText($this->helperText($workspaceAllows))
                     ->live()
                     ->afterStateUpdated(function (): void {
                         $this->save();
@@ -93,6 +92,17 @@ final class WebSearchSettings extends Page
         resolve(SetWebSearchPreference::class)->execute($this->user(), WebSearchPreference::from($state['web_search']));
 
         Notification::make()->title(__('Saved'))->success()->send();
+    }
+
+    private function helperText(bool $workspaceAllows): string
+    {
+        $workspace = Filament::getTenant();
+
+        return match (true) {
+            ! $workspaceAllows => __('Your workspace owner turned web search off.'),
+            $workspace instanceof Workspace && resolve(Entitlements::class)->metersCredits($workspace) => __('Search queries go to the AI provider\'s web search. Each search uses :count credits.', ['count' => (int) config('chat.web_search_credit_cost')]),
+            default => __('Search queries go to the AI provider\'s web search.'),
+        };
     }
 
     private function workspaceAllowsWebSearch(): bool

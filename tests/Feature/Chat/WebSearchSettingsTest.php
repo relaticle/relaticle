@@ -41,8 +41,21 @@ it('shows Always ask to a user who never chose', function (): void {
         ->assertSee('Always ask')
         ->assertSee('Always allow')
         ->assertSee("Don't allow")
-        ->assertSee('Each search uses 2 credits.');
+        ->assertSee("Search queries go to the AI provider's web search.");
 });
+
+it('names the search price only where the workspace meters credits', function (bool $metered): void {
+    if ($metered) {
+        withHostedBilling();
+    }
+    config(['chat.web_search_credit_cost' => 3]);
+
+    $page = Livewire::test(WebSearchSettings::class);
+
+    $metered
+        ? $page->assertSee('Each search uses 3 credits.')
+        : $page->assertDontSee('Each search uses');
+})->with(['metered' => true, 'unmetered' => false]);
 
 it('disables the preference when the workspace turned web search off', function (): void {
     $this->workspace->update(['ai_web_search_enabled' => false]);
