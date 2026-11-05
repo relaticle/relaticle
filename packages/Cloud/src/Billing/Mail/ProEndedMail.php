@@ -16,6 +16,7 @@ use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\SerializesModels;
 use Relaticle\Cloud\Billing\Filament\Billing;
+use Relaticle\Cloud\Billing\Queries\TrialUsageQuery;
 
 #[Tries(3)]
 #[Backoff(60, 300)]
@@ -55,6 +56,12 @@ final class ProEndedMail extends Mailable implements ShouldQueue
             markdown: 'cloud::mail.pro-ended',
             with: [
                 'heading' => __("mail.pro_ended.{$this->copyKey()}.heading", $this->replacements()),
+                'preheader' => $this->preheader(),
+                'isTrial' => $this->isTrial(),
+                'usage' => resolve(TrialUsageQuery::class)->forWorkspace($this->workspace),
+                'credits' => number_format(Plan::Pro->credits()),
+                'offersExtension' => $this->offersExtension(),
+                'billingUrl' => Billing::getUrl(panel: 'app', tenant: $this->workspace),
                 'ctaUrl' => $this->ctaUrl(),
                 'ctaLabel' => $this->ctaLabel(),
                 'managedPlan' => $this->plan?->marketingLabel(),
@@ -62,6 +69,31 @@ final class ProEndedMail extends Mailable implements ShouldQueue
                 'mailboxSyncPaused' => $this->workspace->hasConnectedMailbox(),
             ],
         );
+    }
+
+    private function isTrial(): bool
+    {
+        return in_array($this->copyKey(), ['trial_ended', 'extension_ended'], true);
+    }
+
+    private function offersExtension(): bool
+    {
+        return $this->copyKey() === 'trial_ended' && ! $this->isGrandfathered();
+    }
+
+    private function preheader(): string
+    {
+        if ($this->plan instanceof Plan) {
+            return __('mail.pro_ended.managed_ended.preheader', ['plan' => $this->plan->marketingLabel()]);
+        }
+
+        if ($this->isGrandfathered()) {
+            return __('mail.pro_ended.preheader_grandfathered');
+        }
+
+        return $this->isTrial()
+            ? __("mail.pro_ended.{$this->copyKey()}.preheader", $this->replacements())
+            : __('mail.pro_ended.preheader');
     }
 
     private function isGrandfathered(): bool
@@ -87,7 +119,13 @@ final class ProEndedMail extends Mailable implements ShouldQueue
 
     private function copyKey(): string
     {
-        return $this->plan instanceof Plan ? 'managed_ended' : $this->status->value;
+        if ($this->plan instanceof Plan) {
+            return 'managed_ended';
+        }
+
+        $extended = $this->status === BillingStatus::TrialEnded && $this->workspace->trial_extended_at !== null;
+
+        return $extended ? 'extension_ended' : $this->status->value;
     }
 
     /** @return array<string, string> */
@@ -96,6 +134,7 @@ final class ProEndedMail extends Mailable implements ShouldQueue
         return [
             'workspace' => $this->workspace->name,
             'plan' => $this->plan?->marketingLabel() ?? '',
+            'days' => (string) Workspace::TRIAL_EXTENSION_DAYS,
         ];
     }
 }

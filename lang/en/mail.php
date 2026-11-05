@@ -56,8 +56,14 @@ return [
 
     'pro_ended' => [
         'trial_ended' => [
-            'subject' => 'Your Pro trial has ended',
+            'subject' => 'Your Pro trial for :workspace has ended',
             'heading' => 'Your Pro trial for :workspace has ended',
+            'preheader' => 'Your records are safe. Choose a plan, or extend the trial by :days days.',
+        ],
+        'extension_ended' => [
+            'subject' => 'Your extended trial for :workspace has ended',
+            'heading' => 'Your extended trial for :workspace has ended',
+            'preheader' => 'Your records are safe. Choose a plan to pick up where you left off.',
         ],
         'subscription_ended' => [
             'subject' => 'Your Cloud subscription has ended',
@@ -72,6 +78,9 @@ return [
             'cta' => 'Talk to us',
             'mailbox_sync_paused' => 'Email and calendar sync are paused too, and resume when :plan restarts.',
         ],
+        'trial_paused' => ':workspace is paused. Your records are safe.',
+        'extend' => 'Need more time? [Extend your trial by :days days](:url) from the billing page. You can do this once.',
+        'questions' => 'Questions? Reply to this email.',
         'preheader' => 'Your records are safe. Subscribe to reopen the workspace.',
         'preheader_grandfathered' => 'Your workspace is back on its Cloud Free plan.',
         'paused' => 'Cloud access to :workspace is now paused. Your records are safe, and nothing has been deleted.',
