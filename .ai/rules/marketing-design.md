@@ -10,8 +10,9 @@ paths:
 
 The marketing site is a framed grid: one `max-w-6xl` frame with continuous hairline rails, flat
 cells inside it, depth from a surface ladder instead of shadows, and real product UI at 1:1 scale.
-The homepage and `/email-and-calendar` are built on it. No test reads for these rules, so a
-reviewer reads for a hand-rolled section, a raw gray pair, or a heading class outside the roles.
+The homepage, `/ai`, `/email-and-calendar`, `/pricing` and `/self-hosted` are built on it. No test reads
+for these rules, so a reviewer reads for a hand-rolled section, a raw gray pair, or a heading class
+outside the roles.
 
 ## Tokens (`packages/Cloud/resources/css/cloud.css`)
 
@@ -84,8 +85,9 @@ reach it. Change the header height and the token together. `html` also carries `
   once per visit and again on each return to its tab. Nothing in the hero loops: a looping badge was
   removed for WCAG 2.2.2.
 - `mac-window`: the browser chrome around a full app screen (traffic lights, a gray frame, a white
-  inner panel). The homepage demo and the `/ai` playground use it. A record fragment such as
-  `record-emails-mock` keeps the plain `window`.
+  inner panel). The homepage demo and the `/ai` playground use it. An optional `address` slot puts a
+  URL in the title bar, which `/self-hosted` binds to the address the visitor types. A record fragment
+  such as `record-emails-mock` keeps the plain `window`.
 - `closing-band`: the page's ending and its one dark moment on the homepage, `/ai` and
   `/email-and-calendar`: a 48px spacer row, then a dark band the page above hangs into as a tab, a
   two-tone `type-title`, an optional `lead`, buttons in the slot (Start for free and Get in touch by
@@ -102,12 +104,23 @@ reach it. Change the header height and the token together. `html` also carries `
 - `window`: the frame around a product fragment.
 - `chat-window`: a `window` with the Rela chip and the sample workspace name in its header. Every chat
   fragment in the `/ai` showcases sits in one, so they read as the same product.
+- The `/self-hosted` hero is that page's signature: an install configurator
+  (`partials/self-hosted-install.blade.php`). A light terminal `window` holds the guide's quick start
+  with an `APP_KEY` and `DB_PASSWORD` the browser generates through `crypto.getRandomValues`, and an
+  address field that rewrites `APP_URL` and the URL in the `mac-window` beside it, which shows the
+  board from a real screenshot. The server renders the `$(openssl ...)` form, so the markup stays
+  runnable shell without JavaScript, and Copy puts commands only on the clipboard. The terminal is
+  never dark in light mode, so the band stays the page's one dark moment.
+  `tests/Browser/Marketing/SelfHostedInstallTest.php` pins the secrets, the address and the clipboard.
+  Below it, the six containers come from `compose.yml`, and every number in the page comes from the
+  self-hosting guide.
 - The `/ai` hero is that page's signature: a list page with Rela's side panel docked beside it, as the
   app renders it. An approved proposal changes the row in the list, because `ListOpportunities`,
   `ListPeople` and `ManageTasks` re-render on `ai-write-completed`. A record page does not re-render, so
   the hero never shows one changing live. `tests/Browser/Marketing/AiPlaygroundTest.php` pins the rows.
 - `theme-image`: a light and a dark WebP of a real app screenshot. It loads only the current
-  theme's file and swaps on theme change.
+  theme's file and swaps on theme change. It lazy-loads unless `loading="eager"` is passed, which a
+  hero image needs, because the LCP image is never lazy-loaded.
 - `actor`: the You, Rela, Claude, ChatGPT and Mailbox chips, in `sm` and `lg`. They are the site's
   signature: every place that shows who did something uses them, and nothing else uses those colors.
   ChatGPT stays neutral gray, as the works-with strip draws it, and differs from You by its icon. A

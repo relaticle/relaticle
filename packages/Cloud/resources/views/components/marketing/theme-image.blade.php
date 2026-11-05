@@ -5,6 +5,7 @@
     'sizes' => '100vw',
     'width' => 1440,
     'height' => 1116,
+    'loading' => 'lazy',
 ])
 
 @php
@@ -24,7 +25,7 @@
     alt="{{ $alt }}"
     width="{{ $width }}"
     height="{{ $height }}"
-    loading="lazy"
+    loading="{{ $loading }}"
     decoding="async"
     {{ $attributes }}
 >

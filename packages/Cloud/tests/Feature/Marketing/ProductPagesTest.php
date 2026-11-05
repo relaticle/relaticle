@@ -174,11 +174,38 @@ it('offers a copy control whose payload is runnable shell without prompt glyphs'
 it('keeps the comment marker selectable so a select-and-copy stays runnable shell', function (): void {
     $html = $this->get('/self-hosted')->assertOk()->getContent();
 
-    // The `$`/`>` prompts are select-none because they are not part of the command.
-    // The `#` is the opposite: drop it from the selection and the comment text
-    // pastes into a shell as a bare command.
     expect($html)->toContain('<span>#</span>')
         ->and($html)->not->toContain('<span class="select-none" aria-hidden="true">#</span>');
+});
+
+it('renders the install with shell-generated secrets before the browser generates its own', function (): void {
+    $html = $this->get('/self-hosted')->assertOk()->getContent();
+
+    expect($html)->toContain('APP_KEY=base64:$(openssl rand -base64 32)')
+        ->and($html)->toContain('DB_PASSWORD=$(openssl rand -hex 24)')
+        ->and($html)->toContain('APP_URL=https://crm.example.com')
+        ->and($html)->toContain('docker compose exec app php artisan make:filament-user')
+        ->and($html)->toContain('data-self-hosted-host')
+        ->and($html)->toContain('https://crm.example.com/app');
+});
+
+it('names the six containers the compose file starts', function (): void {
+    $html = $this->get('/self-hosted')->assertOk()->getContent();
+
+    foreach (['app', 'horizon', 'scheduler', 'reverb', 'postgres', 'redis'] as $container) {
+        expect($html)->toContain('<h3 class="font-mono text-sm font-semibold text-gray-950 dark:text-white">'.$container.'</h3>');
+    }
+
+    expect($html)->toContain('postgres:17-alpine')
+        ->and($html)->toContain('redis:7-alpine');
+});
+
+it('ends the self-hosted page on the closing band with a cloud signup', function (): void {
+    $html = $this->get('/self-hosted')->assertOk()->getContent();
+
+    expect($html)->toContain('Run it your way.')
+        ->and($html)->toContain('Try Relaticle Cloud')
+        ->and($html)->toContain('Deploy self-hosted');
 });
 
 it('gives each product page its own social card instead of the sitewide one', function (string $path, string $image): void {
