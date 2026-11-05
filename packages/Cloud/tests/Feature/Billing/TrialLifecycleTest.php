@@ -13,6 +13,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -234,6 +235,24 @@ it('emails the owner when the trial ends within 72 hours', function (): void {
     $this->artisan('billing:process-trials')->assertSuccessful();
 
     Mail::assertQueued(ProTrialEndingSoonMail::class, 1);
+});
+
+it('still pauses expired trials when sending a reminder fails', function (): void {
+    withHostedBilling();
+    Mail::fake();
+
+    [, $endingSoon] = trialOwnerAndWorkspace();
+    $endingSoon->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addHours(71)])->save();
+
+    [, $expired] = trialOwnerAndWorkspace();
+    $expired->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subDay()])->save();
+
+    Workspace::saving(function (Workspace $workspace): void {
+        throw_if($workspace->isDirty('trial_reminded_for'), RuntimeException::class, 'Queue unavailable');
+    });
+
+    expect(fn (): int => Artisan::call('billing:process-trials'))->toThrow(RuntimeException::class, 'Queue unavailable')
+        ->and($expired->refresh()->plan)->toBe(Plan::Free);
 });
 
 it('sends no trial reminder to a workspace scheduled for deletion', function (): void {
@@ -693,16 +712,45 @@ it('never raises the credit balance during an extension, even across a month bou
     $beforeExtending = $balance();
 
     app(ExtendEndedTrial::class)->execute($owner, $workspace);
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->update(['credits_remaining' => 180, 'credits_used' => 120]);
     $this->travelTo(Date::parse('2026-07-02 09:00:00'));
     $this->artisan('chat:reset-credits')->assertSuccessful();
 
     expect($beforeExtending)->toBe(Plan::Free->credits())
-        ->and($balance())->toBe($beforeExtending);
+        ->and($balance())->toBe(180);
 
     $this->travelTo(Date::parse('2026-07-06 09:00:00'));
     $this->artisan('billing:process-trials')->assertSuccessful();
 
     expect($balance())->toBe(Plan::Free->credits());
+});
+
+it('skips a credit reset when an extension pins the period after the expired balances were read', function (): void {
+    withHostedBilling();
+    [$owner, $workspace] = trialOwnerAndWorkspace();
+    pauseTrialOf($workspace);
+    $balance = AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
+        'credits_remaining' => 180,
+        'credits_used' => 120,
+        'purchased_credits' => 0,
+        'period_starts_at' => now()->subMonth(),
+        'period_ends_at' => now()->subMinute(),
+    ]);
+    $extendedMidRun = false;
+
+    DB::listen(function (QueryExecuted $query) use (&$extendedMidRun, $owner, $workspace): void {
+        if ($extendedMidRun || ! str_contains($query->sql, 'from "ai_credit_balances"')) {
+            return;
+        }
+
+        $extendedMidRun = true;
+        app(ExtendEndedTrial::class)->execute($owner, $workspace);
+    });
+
+    $this->artisan('chat:reset-credits')->assertSuccessful();
+
+    expect($extendedMidRun)->toBeTrue()
+        ->and($balance->refresh()->credits_remaining)->toBe(180);
 });
 
 it('records who extended the trial', function (): void {

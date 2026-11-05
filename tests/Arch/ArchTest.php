@@ -250,13 +250,13 @@ foreach (glob(dirname(__DIR__, 2).'/packages/*/src', GLOB_ONLYDIR) ?: [] as $pac
 
     foreach ([$packageSource.'/Queries', ...glob($packageSource.'/*/Queries', GLOB_ONLYDIR) ?: []] as $queryFolder) {
         if (is_dir($queryFolder)) {
-            $packageQueryLayers[$packageRoot.'\\'.str_replace('/', '\\', substr($queryFolder, strlen($packageSource) + 1))] = $packageRoot;
+            $packageQueryLayers[] = $packageRoot.'\\'.str_replace('/', '\\', substr($queryFolder, strlen($packageSource) + 1));
         }
     }
 }
 
 $packageServiceLayers = [
-    ...array_keys($packageQueryLayers),
+    ...$packageQueryLayers,
     'Relaticle\Chat\Actions',
     'Relaticle\Chat\Agents',
     'Relaticle\Chat\Services',
@@ -390,14 +390,16 @@ arch('the query language uses no transport')
     ->not
     ->toUse(['App\Mcp', 'App\Http', 'App\Filament', 'App\Livewire', 'App\Scribe', 'Relaticle\Chat']);
 
-foreach ($packageQueryLayers as $packageQueryLayer => $packageRoot) {
+foreach ($packageQueryLayers as $packageQueryLayer) {
+    $transportRoot = Str::beforeLast($packageQueryLayer, '\\');
+
     arch("{$packageQueryLayer} uses no transport of its package")
         ->expect($packageQueryLayer)
         ->not
-        ->toUse(["{$packageRoot}\Http", "{$packageRoot}\Livewire", "{$packageRoot}\Tools", "{$packageRoot}\Jobs"]);
+        ->toUse(["{$transportRoot}\Http", "{$transportRoot}\Livewire", "{$transportRoot}\Filament", "{$transportRoot}\Tools", "{$transportRoot}\Jobs"]);
 }
 
-foreach (['App\Queries', ...array_keys($packageQueryLayers)] as $queryRoot) {
+foreach (['App\Queries', ...$packageQueryLayers] as $queryRoot) {
     arch("{$queryRoot} takes the acting user and reads no ambient user, request or workspace")
         ->expect($queryRoot)
         ->not
@@ -417,7 +419,7 @@ foreach (['App', ...$packageRoots] as $codeRoot) {
         ->expect($codeRoot)
         ->not
         ->toUse('Spatie\QueryBuilder\QueryBuilder')
-        ->ignoring(['App\Queries', ...array_keys($packageQueryLayers)]);
+        ->ignoring(['App\Queries', ...$packageQueryLayers]);
 }
 
 arch('CRM API write requests share the custom field contract')

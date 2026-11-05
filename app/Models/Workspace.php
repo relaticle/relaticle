@@ -420,31 +420,20 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
         return BillingStatus::fromWorkspace($this);
     }
 
-    public function hasChargedSubscription(): bool
-    {
-        return $this->subscriptions->contains(
-            fn (Model $subscription): bool => $subscription instanceof Subscription
-                && $subscription->type !== SubscriptionType::ManagedPending->value
-                && ! in_array($subscription->stripe_status, StripeSubscriptionStatus::neverGranted(), true),
-        );
-    }
-
     public function onExtendedTrial(): bool
     {
-        return $this->billingStatus() === BillingStatus::Trialing
-            && $this->trial_extended_at !== null
+        return $this->trial_extended_at !== null
             && $this->trial_ends_at !== null
-            && $this->trial_ends_at <= $this->trial_extended_at->addDays(self::TRIAL_EXTENSION_DAYS);
+            && $this->trial_ends_at <= $this->trial_extended_at->addDays(self::TRIAL_EXTENSION_DAYS)
+            && $this->billingStatus() === BillingStatus::Trialing;
     }
 
     public function canExtendTrial(): bool
     {
-        return $this->billingStatus() === BillingStatus::TrialEnded
-            && $this->pro_trial_used_at !== null
-            && $this->trial_ends_at === null
+        return $this->trial_ends_at === null
             && $this->trial_extended_at === null
             && ! $this->isScheduledOnRequest()
-            && ! $this->hasChargedSubscription();
+            && $this->billingStatus() === BillingStatus::TrialEnded;
     }
 
     /**

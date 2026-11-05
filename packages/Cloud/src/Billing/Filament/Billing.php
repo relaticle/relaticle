@@ -197,14 +197,13 @@ final class Billing extends Page
         $hasHostedAccess = resolve(Entitlements::class)->allowsAccess($workspace);
         $isGrandfathered = $workspace->hosted_free_grandfathered_at !== null;
         $managedSubscription = $workspace->managedSubscription();
-        $canManageBilling = $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage);
 
         return [
             'workspace' => $workspace,
             // Not $workspace->plan->credits(): a past-due workspace refills at the Free
             // allowance, so the plan's figure would name credits it never gets.
             'allowance' => resolve(CreditService::class)->allowanceFor($workspace),
-            'canManageBilling' => $canManageBilling,
+            'canManageBilling' => $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage),
             'subscription' => $subscription,
             'managedSubscription' => $managedSubscription,
             'managedPastDue' => $managedSubscription?->pastDue() ?? false,
@@ -218,7 +217,7 @@ final class Billing extends Page
             'activating' => in_array($this->checkout, [self::CHECKOUT_SUCCESS, self::CHECKOUT_REOPENED], true) && ! $workspace->subscribed() && ! $workspace->plan->isManaged(),
             'creditsFulfilling' => $this->credits === 'success',
             'availablePacks' => resolve(CreditPackCatalog::class)->purchasable(),
-            ...($hasHostedAccess ? [] : $this->pausedViewData($workspace, $canManageBilling)),
+            ...($hasHostedAccess ? [] : $this->pausedViewData($workspace)),
         ];
     }
 
@@ -243,7 +242,7 @@ final class Billing extends Page
     }
 
     /** @return array{billingStatus: BillingStatus, deletesWhenInactive: bool, lapsedPlan: ?Plan, mailboxSyncPaused: bool, trialExtensionAvailable: bool, otherWorkspaces: Collection<int, Workspace>} */
-    private function pausedViewData(Workspace $workspace, bool $canManageBilling): array
+    private function pausedViewData(Workspace $workspace): array
     {
         $billingStatus = $workspace->billingStatus();
 
@@ -252,7 +251,7 @@ final class Billing extends Page
             'deletesWhenInactive' => ! $workspace->isScheduledForDeletion() && resolve(InactiveTrialWorkspacesQuery::class)->isEligible($workspace),
             'lapsedPlan' => $billingStatus === BillingStatus::SubscriptionEnded ? $workspace->lapsedManagedPlan() : null,
             'mailboxSyncPaused' => $workspace->hasConnectedMailbox(),
-            'trialExtensionAvailable' => $canManageBilling && $workspace->canExtendTrial(),
+            'trialExtensionAvailable' => $workspace->canExtendTrial(),
             'otherWorkspaces' => $this->user()->allWorkspaces()
                 ->reject(fn (Workspace $other): bool => $other->is($workspace))
                 ->values(),
