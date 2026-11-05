@@ -82,8 +82,8 @@
                 await $wire.deselectEmail()
 
                 const returnTo = Alpine.store('emailReader')?.returnTo
-                const row = (returnTo && document.querySelector(`[data-conversation='${CSS.escape(returnTo)}'] button`))
-                    || document.querySelector('[data-conversation] button')
+                const row = (returnTo && document.querySelector(`[data-conversation='${CSS.escape(returnTo)}'] > button`))
+                    || document.querySelector('[data-conversation] > button')
 
                 row?.focus()
             },
