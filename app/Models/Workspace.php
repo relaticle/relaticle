@@ -424,7 +424,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
         $subscription = $this->subscription();
 
         if ($subscription?->valid() === true) {
-            return $subscription->onTrial() && $subscription->trial_ends_at <= $extensionEndsAt;
+            return $subscription->onTrial() && $subscription->created_at <= $extensionEndsAt;
         }
 
         return $this->trial_ends_at !== null

@@ -43,7 +43,9 @@ final readonly class SyncWorkspacePlanFromSubscription
         }
 
         if ($workspace->plan === $target) {
-            $this->releaseExtensionCredits($workspace);
+            if ($this->holdsExtensionCredits($workspace)) {
+                $this->settleExtensionCredits($workspace, $subscription);
+            }
 
             return;
         }
@@ -52,9 +54,7 @@ final readonly class SyncWorkspacePlanFromSubscription
             $workspace->plan = $target;
             $workspace->save();
 
-            if (! $workspace->onExtendedTrial()) {
-                $this->credits->resetPeriod($workspace);
-            }
+            $this->grantPlanCredits($workspace, $subscription);
 
             Log::info('Workspace plan synced from Stripe subscription', [
                 'workspace_id' => $workspace->getKey(),
@@ -150,13 +150,29 @@ final readonly class SyncWorkspacePlanFromSubscription
         return null;
     }
 
-    private function releaseExtensionCredits(Workspace $workspace): void
+    private function grantPlanCredits(Workspace $workspace, Subscription $subscription): void
     {
-        if ($workspace->onExtendedTrial() || ! $this->holdsExtensionCredits($workspace)) {
+        if (! $this->holdsExtensionCredits($workspace)) {
+            $this->credits->resetPeriod($workspace);
+
             return;
         }
 
-        $this->credits->resetPeriod($workspace);
+        $this->settleExtensionCredits($workspace, $subscription);
+    }
+
+    private function settleExtensionCredits(Workspace $workspace, Subscription $subscription): void
+    {
+        if (! $workspace->onExtendedTrial()) {
+            $this->credits->resetPeriod($workspace);
+
+            return;
+        }
+
+        // Stays frozen until Stripe first charges, which Cashier can set past the extension end.
+        AiCreditBalance::query()
+            ->where('workspace_id', $workspace->getKey())
+            ->update(['period_ends_at' => $subscription->trial_ends_at]);
     }
 
     private function holdsExtensionCredits(Workspace $workspace): bool

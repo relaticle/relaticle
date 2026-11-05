@@ -504,6 +504,41 @@ it('releases the extension balance at once when a subscription bought during the
         ->and($balance->credits_remaining)->toBe(Plan::Pro->credits());
 });
 
+it('keeps the extension balance frozen until the first charge when Stripe extends a late trial past the extension', function (): void {
+    withHostedBilling();
+    $workspace = extendedTrialWorkspaceWithSpentCredits();
+    $this->travel(6)->days();
+    $firstChargeAt = now()->addHours(48)->addSeconds(10);
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created', ['status' => 'trialing', 'trial_end' => $firstChargeAt->getTimestamp()]))->assertSuccessful();
+
+    $balance = fn (): AiCreditBalance => AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
+
+    expect(resolve(Entitlements::class)->creditAllowance($workspace->refresh()))->toBe(Plan::Free->credits())
+        ->and($balance()->credits_remaining)->toBe(180);
+
+    $this->travelTo($firstChargeAt->subHour());
+    $this->artisan('chat:reset-credits')->assertSuccessful();
+
+    expect($balance()->credits_remaining)->toBe(180);
+
+    $this->travelTo($firstChargeAt->addHour());
+    $this->artisan('chat:reset-credits')->assertSuccessful();
+
+    expect($balance()->credits_remaining)->toBe(Plan::Pro->credits());
+});
+
+it('grants the plan allowance to a trial subscription bought long after an extension ended', function (): void {
+    withHostedBilling();
+    $workspace = extendedTrialWorkspaceWithSpentCredits();
+    $this->travel(60)->days();
+    $workspace->forceFill(['plan' => Plan::Free, 'trial_ends_at' => null])->save();
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created', ['status' => 'trialing', 'trial_end' => now()->addDays(10)->getTimestamp()]))->assertSuccessful();
+
+    expect(resolve(Entitlements::class)->creditAllowance($workspace->refresh()))->toBe(Plan::Pro->credits());
+});
+
 it('keeps the extension balance frozen when the owner picks Scale during the extension', function (): void {
     withHostedBilling();
     config()->set('services.stripe.prices.scale_monthly', 'price_scale_monthly_test');
