@@ -23,7 +23,7 @@ TipTap instance. Filament ships no task list, up to and including v5.11.1, the l
 | 4 | How the official extension loads | Add `@tiptap/extension-list`. Build it as an ES module whose `@tiptap/*` imports resolve to `window.FilamentRichEditor.tiptap`, and commit the output under `public/js/app/` |
 | 5 | Board card | A "checked/total" progress badge beside priority and due date. The stripped description text stays as it is |
 | 6 | Agents | `- [ ]` and `- [x]` markdown becomes a real checklist in the task description. Reads stay HTML |
-| 7 | Read-only rendering | Boxes drawn in CSS from `data-checked`, ticked items muted. The sanitizer allows that one attribute |
+| 7 | Read-only rendering | Ticked state visible, ticked items muted. Revised while planning: the read-only task view is the disabled editor, so boxes come from TipTap and CSS, with no sanitizer change |
 | 8 | Ticks in plain text | `App\Support\PlainText` writes `[x] ` or `[ ] ` before each task item's text. The activity log, Rela's approval card, notifications and email snippets inherit it |
 | 9 | Existing descriptions | Count first, then decide. The count was near zero, so no backfill: old rows keep literal `[ ]` bullets |
 
@@ -99,16 +99,18 @@ Each was run in this checkout on 2026-11-06.
   It must also change when the checklist bundle changes.
 - The output must contain no ProseMirror class definitions. The build or a check fails if it does.
 
-### Server rendering and the sanitizer
+### Read-only rendering (revised while planning)
 
-- `RichContentEntry` registers the task-list PHP nodes on its renderer for every rich-text field. They
-  match only `data-type="taskList"` markup, so other fields render as before. This keeps one renderer
-  and keeps decision 2 about editing, not reading.
-- `AppServiceProvider` extends Filament's `HtmlSanitizerConfig` binding to allow `data-checked` on `li`.
-  Nothing else widens. `<input>` stays stripped.
-- CSS draws the box from `li[data-type="taskItem"][data-checked]` in read-only prose and styles the live
-  checkbox in the editor. Filament ships no task-item styles. Styles go in core `theme.css` so Cloud's
-  panel themes inherit them.
+- Tasks have no record page. A member who cannot edit opens the task through `ViewAction`, which shows
+  the same form disabled. A disabled `RichEditor` still runs TipTap with `editable: false`
+  (`vendor/filament/forms/resources/js/components/rich-editor.js:268`). The official task item there
+  shows disabled checkboxes and reverts a click. So the read-only view comes from the same JS node and
+  CSS as the editor.
+- The only server-rendered task description is the board card, which strips tags. So no task surface
+  needs the sanitizer change or the PHP nodes on `RichContentEntry` that decision 7 assumed. Both are
+  dropped as unused code. If a task record page arrives later, it adds them with its own test.
+- CSS styles the checkbox, the item layout and the muted ticked text in the editor, disabled or not.
+  Filament ships no task-item styles. Styles go in core `theme.css`, so Cloud's panel themes inherit them.
 
 ### Board card
 
@@ -157,7 +159,7 @@ Entry points only, per `.ai/rules` testing rules. Extend the existing files that
 - **MCP and chat:** the same markdown through their create tools, if `SurfaceParityTest` or the existing
   tool tests do not already cover rich-text conversion for them.
 - **Board:** a card shows "1/2" for that task and no badge for a task without a checklist.
-- **Read-only view:** the rendered entry keeps `data-checked` and drops `<input>`.
+- **Read-only view:** a viewer opening the task gets form state that keeps both items and the tick.
 - **Activity log:** a Save that only ticks one item records an activity whose old and new text differ
   by `[ ]` and `[x]`.
 - **Rela approval card:** a proposal that ticks an item shows `[ ] Call Bob` before and `[x] Call Bob`
