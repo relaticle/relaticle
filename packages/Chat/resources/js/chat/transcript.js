@@ -274,11 +274,6 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         }
     },
 
-    // Calendar-day comparison uses the BROWSER's local timezone. No user
-    // timezone is threaded to any chat view today (users.timezone is only
-    // ever read server-side, to seed the agent's system prompt in
-    // ProcessChatMessage): adding a new server-to-client channel just for
-    // this would be new plumbing the task does not call for.
     sourceLabel(sources, source) {
         if (sources.filter((s) => s.domain === source.domain).length < 2) {
             return source.domain;
@@ -297,6 +292,11 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         }
     },
 
+    // Calendar-day comparison uses the BROWSER's local timezone. No user
+    // timezone is threaded to any chat view today (users.timezone is only
+    // ever read server-side, to seed the agent's system prompt in
+    // ProcessChatMessage): adding a new server-to-client channel just for
+    // this would be new plumbing the task does not call for.
     sameCalendarDay(a, b) {
         if (!a || !b) return false;
         const da = new Date(a);

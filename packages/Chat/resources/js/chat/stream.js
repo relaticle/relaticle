@@ -4,6 +4,10 @@
 // chat-interface.blade.php for the composition and the `pendingLabel`
 // accessor that stays inline there because a `get` property cannot survive
 // an object spread.
+
+// Matches WebSources::LIMIT, which caps the persisted list the stream end reconciles to.
+const SOURCES_LIMIT = 10;
+
 export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
     channel: null,
     // Per-instance view of the shared (memoised) Echo channel. Never written onto the
@@ -524,9 +528,9 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
         if (event?.name === 'web_fetch' && event?.url) {
             let domain = event.url;
             try { domain = new URL(event.url).hostname.replace(/^www\./, ''); } catch { /* keep the url */ }
-            this.currentToolStatus = this.streamTexts.readingDomain.replace(':domain', domain);
+            this.currentToolStatus = this.streamTexts.readingDomain.replace(':domain', () => domain);
         } else if (event?.name === 'web_search' && event?.query) {
-            this.currentToolStatus = this.streamTexts.searchingWebFor.replace(':query', event.query);
+            this.currentToolStatus = this.streamTexts.searchingWebFor.replace(':query', () => event.query);
         } else {
             this.currentToolStatus = this.friendlyToolStatus(event?.name);
         }
@@ -537,9 +541,13 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
     handleCitation(event) {
         if (!this.isForCurrentConversation() || !event?.url) return;
         const assistantMsg = this.targetBubbleFor(event.invocation_id ?? null);
-        assistantMsg.sources = assistantMsg.sources || [];
-        if (assistantMsg.sources.length >= 10 || assistantMsg.sources.some((s) => s.url === event.url)) return;
-        assistantMsg.sources.push({ url: event.url, title: event.title ?? null, domain: event.domain ?? event.url });
+        const existing = assistantMsg.sources.find((source) => source.url === event.url);
+        if (existing) {
+            existing.title ??= event.title ?? null;
+            return;
+        }
+        if (assistantMsg.sources.length >= SOURCES_LIMIT) return;
+        assistantMsg.sources.push({ url: event.url, title: event.title ?? null, domain: event.domain });
     },
 
     handleToolResult(event) {

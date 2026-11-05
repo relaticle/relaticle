@@ -396,7 +396,7 @@
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         :title="source.title || source.url"
-                                        :aria-label="source.title ? source.title + ' (' + source.domain + ')' : source.domain"
+                                        :aria-label="sourceLabel(msg.sources, source)"
                                         class="inline-flex max-w-[14rem] items-center gap-1 rounded-md border border-gray-200 bg-[var(--surface-card-bg)] px-1.5 py-0.5 text-xs text-gray-600 transition hover:border-gray-300 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:border-white/10 dark:text-gray-300 dark:hover:border-white/20 dark:hover:text-white"
                                     >
                                         <x-ri-global-line class="h-3 w-3 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
