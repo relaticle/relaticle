@@ -25,7 +25,7 @@ return [
         'workspace_logo' => [
             'label' => 'Workspace logo',
         ],
-        'ai_web_search_enabled' => [
+        'web_search' => [
             'label' => 'Let :assistant search the web',
             'helper_text' => 'Search queries go to the AI provider\'s web search.',
             'unavailable' => 'No model on this install can search the web.',

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Contracts\Entitlements;
+use App\Data\AiSettings;
 use App\Enums\BillingStatus;
 use App\Enums\MediaCollection;
 use App\Enums\OnboardingReferralSource;
@@ -61,7 +62,7 @@ use Spatie\Sluggable\SlugOptions;
  * @property EmailPrivacyTier|null $default_email_sharing_tier
  * @property ContactCreationMode $contact_creation_mode
  * @property bool $auto_create_companies
- * @property bool $ai_web_search_enabled
+ * @property array<string, mixed>|null $ai_settings
  * @property Plan $plan
  * @property ?string $invite_link_token
  * @property ?CarbonImmutable $invite_link_token_expires_at
@@ -90,7 +91,7 @@ use Spatie\Sluggable\SlugOptions;
     'default_email_sharing_tier',
     'contact_creation_mode',
     'auto_create_companies',
-    'ai_web_search_enabled',
+    'ai_settings',
     'onboarding_use_case',
     'onboarding_other_use_case',
     'onboarding_context',
@@ -217,7 +218,6 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
      */
     protected $attributes = [
         'invite_link_default_role' => WorkspaceRole::Member->value,
-        'ai_web_search_enabled' => true,
     ];
 
     /**
@@ -232,7 +232,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
             'default_email_sharing_tier' => EmailPrivacyTier::class,
             'contact_creation_mode' => ContactCreationMode::class,
             'auto_create_companies' => 'boolean',
-            'ai_web_search_enabled' => 'boolean',
+            'ai_settings' => 'array',
             'plan' => Plan::class,
             'onboarding_use_case' => OnboardingUseCase::class,
             'onboarding_context' => 'array',
@@ -256,6 +256,11 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
                 $workspace->invite_link_token_expires_at = now()->addDays(self::INVITE_LINK_TTL_DAYS);
             }
         });
+    }
+
+    public function aiSettings(): AiSettings
+    {
+        return new AiSettings($this->ai_settings ?? []);
     }
 
     public function rotateInviteLink(): void

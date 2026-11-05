@@ -44,7 +44,7 @@ final class RequestWebAccessTool implements Tool
         $user = auth()->user();
         $workspace = $user->currentWorkspace;
 
-        if ($workspace?->ai_web_search_enabled !== true || WebSearchPreference::of($user) === WebSearchPreference::Deny) {
+        if ($workspace?->aiSettings()->webSearch() !== true || WebSearchPreference::of($user) === WebSearchPreference::Deny) {
             return $this->error('Web access is unavailable for this user. Answer from the workspace data and say you could not use the web.');
         }
 

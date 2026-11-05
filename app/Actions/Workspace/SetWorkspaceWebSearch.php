@@ -14,6 +14,6 @@ final readonly class SetWorkspaceWebSearch
     {
         abort_unless($user->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::WorkspaceManage), 403);
 
-        $workspace->update(['ai_web_search_enabled' => $enabled]);
+        $workspace->update(['ai_settings' => [...$workspace->ai_settings ?? [], 'web_search' => $enabled]]);
     }
 }

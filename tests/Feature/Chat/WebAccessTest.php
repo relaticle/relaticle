@@ -98,7 +98,7 @@ function webToolClasses(CrmAssistant $agent): array
 it('resolves web access per turn and gives the assistant only the matching tools', function (?string $preference, bool $workspaceEnabled, string $provider, string $modelId, array $expectedTools, string $expectedLine): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $user->update(['ai_preferences' => $preference === null ? null : ['web_search' => $preference]]);
-    $user->currentWorkspace->update(['ai_web_search_enabled' => $workspaceEnabled]);
+    $user->currentWorkspace->update(['ai_settings' => ['web_search' => $workspaceEnabled]]);
 
     $agent = agentForWebTurn($user->fresh(), ['provider' => $provider, 'model' => $modelId, 'id' => $modelId, 'source' => 'explicit']);
 
@@ -358,7 +358,7 @@ it('refuses the grant when the workspace turned web search off between request a
     Queue::fake();
     $request = requestWebAccess($user, (string) str()->ulid());
 
-    $user->currentWorkspace->update(['ai_web_search_enabled' => false]);
+    $user->currentWorkspace->update(['ai_settings' => ['web_search' => false]]);
 
     openWebAccessDock($request)
         ->call('approveAlways', (string) $request->getKey())

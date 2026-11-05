@@ -11,7 +11,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('workspaces', function (Blueprint $table): void {
-            $table->boolean('ai_web_search_enabled')->default(true);
+            $table->jsonb('ai_settings')->nullable();
         });
     }
 };

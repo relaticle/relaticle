@@ -114,7 +114,7 @@ final class AssistantSettings extends Page
     {
         $workspace = Filament::getTenant();
 
-        return $workspace instanceof Workspace && $workspace->ai_web_search_enabled && WebAccess::availableOnThisInstall();
+        return $workspace instanceof Workspace && $workspace->aiSettings()->webSearch() && WebAccess::availableOnThisInstall();
     }
 
     private function user(): User

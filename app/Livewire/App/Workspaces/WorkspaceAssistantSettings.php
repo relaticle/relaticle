@@ -29,7 +29,7 @@ final class WorkspaceAssistantSettings extends BaseLivewireComponent
     {
         $this->workspace = $workspace;
 
-        $this->form->fill($workspace->only(['ai_web_search_enabled']));
+        $this->form->fill(['web_search' => $workspace->aiSettings()->webSearch()]);
     }
 
     public function form(Schema $schema): Schema
@@ -40,12 +40,12 @@ final class WorkspaceAssistantSettings extends BaseLivewireComponent
                     ->aside()
                     ->description(__('workspaces.sections.assistant.description', ['assistant' => (string) config('chat.assistant_name')]))
                     ->schema([
-                        Toggle::make('ai_web_search_enabled')
-                            ->label(__('workspaces.form.ai_web_search_enabled.label', ['assistant' => (string) config('chat.assistant_name')]))
+                        Toggle::make('web_search')
+                            ->label(__('workspaces.form.web_search.label', ['assistant' => (string) config('chat.assistant_name')]))
                             ->disabled(! WebAccess::availableOnThisInstall())
                             ->helperText(WebAccess::availableOnThisInstall()
-                                ? __('workspaces.form.ai_web_search_enabled.helper_text')
-                                : __('workspaces.form.ai_web_search_enabled.unavailable')),
+                                ? __('workspaces.form.web_search.helper_text')
+                                : __('workspaces.form.web_search.unavailable')),
                         Actions::make([
                             Action::make('save')
                                 ->label(__('workspaces.actions.save'))
@@ -66,10 +66,10 @@ final class WorkspaceAssistantSettings extends BaseLivewireComponent
             return;
         }
 
-        /** @var array{ai_web_search_enabled: bool} $data */
+        /** @var array{web_search: bool} $data */
         $data = $this->form->getState();
 
-        resolve(SetWorkspaceWebSearch::class)->execute($this->authUser(), $this->workspace, (bool) $data['ai_web_search_enabled']);
+        resolve(SetWorkspaceWebSearch::class)->execute($this->authUser(), $this->workspace, (bool) $data['web_search']);
 
         $this->sendNotification();
     }

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\Workspace\SetWorkspaceWebSearch;
+use App\Data\AiSettings;
 use App\Livewire\App\Workspaces\WorkspaceAssistantSettings;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -13,7 +14,7 @@ use Relaticle\Chat\Enums\WebSearchPreference;
 use Relaticle\Chat\Filament\Pages\AssistantSettings;
 use Relaticle\Chat\Services\ModelRegistry;
 
-mutates(AssistantSettings::class, WebAccess::class, WebSearchPreference::class, SetWebSearchPreference::class, WorkspaceAssistantSettings::class, SetWorkspaceWebSearch::class);
+mutates(AssistantSettings::class, AiSettings::class, WebAccess::class, WebSearchPreference::class, SetWebSearchPreference::class, WorkspaceAssistantSettings::class, SetWorkspaceWebSearch::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -60,7 +61,7 @@ it('names the search price only where the workspace meters credits', function (b
 })->with(['metered' => true, 'unmetered' => false]);
 
 it('disables the preference when the workspace turned web search off', function (): void {
-    $this->workspace->update(['ai_web_search_enabled' => false]);
+    $this->workspace->update(['ai_settings' => ['web_search' => false]]);
 
     Livewire::test(AssistantSettings::class)
         ->assertFormFieldDisabled('web_search')
@@ -77,21 +78,31 @@ it('lets only a workspace owner turn web search off', function (): void {
     $this->actingAs($member);
 
     Livewire::test(WorkspaceAssistantSettings::class, ['workspace' => $this->workspace])
-        ->fillForm(['ai_web_search_enabled' => false])
+        ->fillForm(['web_search' => false])
         ->call('updateWebSearch')
         ->assertForbidden();
 
-    expect($this->workspace->fresh()->ai_web_search_enabled)->toBeTrue();
+    expect($this->workspace->fresh()->aiSettings()->webSearch())->toBeTrue();
 
     $this->actingAs($this->user);
 
     Livewire::test(WorkspaceAssistantSettings::class, ['workspace' => $this->workspace])
-        ->assertFormSet(['ai_web_search_enabled' => true])
-        ->fillForm(['ai_web_search_enabled' => false])
+        ->assertFormSet(['web_search' => true])
+        ->fillForm(['web_search' => false])
         ->call('updateWebSearch')
         ->assertNotified();
 
-    expect($this->workspace->fresh()->ai_web_search_enabled)->toBeFalse();
+    expect($this->workspace->fresh()->aiSettings()->webSearch())->toBeFalse();
+});
+
+it('keeps the other workspace AI settings when the owner turns web search off', function (): void {
+    $this->workspace->update(['ai_settings' => ['context' => 'We sell to dental clinics.']]);
+
+    Livewire::test(WorkspaceAssistantSettings::class, ['workspace' => $this->workspace])
+        ->fillForm(['web_search' => false])
+        ->call('updateWebSearch');
+
+    expect($this->workspace->fresh()->ai_settings)->toBe(['context' => 'We sell to dental clinics.', 'web_search' => false]);
 });
 
 it('refuses the owner of another workspace', function (): void {
@@ -100,11 +111,11 @@ it('refuses the owner of another workspace', function (): void {
     $this->actingAs($otherOwner);
 
     Livewire::test(WorkspaceAssistantSettings::class, ['workspace' => $this->workspace])
-        ->fillForm(['ai_web_search_enabled' => false])
+        ->fillForm(['web_search' => false])
         ->call('updateWebSearch')
         ->assertForbidden();
 
-    expect($this->workspace->fresh()->ai_web_search_enabled)->toBeTrue();
+    expect($this->workspace->fresh()->aiSettings()->webSearch())->toBeTrue();
 });
 
 it('refuses an admin of the workspace', function (): void {
@@ -115,11 +126,11 @@ it('refuses an admin of the workspace', function (): void {
     $this->actingAs($admin);
 
     Livewire::test(WorkspaceAssistantSettings::class, ['workspace' => $this->workspace])
-        ->fillForm(['ai_web_search_enabled' => false])
+        ->fillForm(['web_search' => false])
         ->call('updateWebSearch')
         ->assertForbidden();
 
-    expect($this->workspace->fresh()->ai_web_search_enabled)->toBeTrue();
+    expect($this->workspace->fresh()->aiSettings()->webSearch())->toBeTrue();
 });
 
 it('disables both web search controls when no model on the install can search', function (): void {
@@ -135,7 +146,7 @@ it('disables both web search controls when no model on the install can search', 
         ->assertSee('No model on this install can search the web.');
 
     Livewire::test(WorkspaceAssistantSettings::class, ['workspace' => $this->workspace])
-        ->assertFormFieldDisabled('ai_web_search_enabled')
+        ->assertFormFieldDisabled('web_search')
         ->assertSee('No model on this install can search the web.');
 });
 
@@ -148,5 +159,5 @@ it('keeps the web search controls enabled while one web model is available', fun
         ->assertDontSee('No model on this install can search the web.');
 
     Livewire::test(WorkspaceAssistantSettings::class, ['workspace' => $this->workspace])
-        ->assertFormFieldEnabled('ai_web_search_enabled');
+        ->assertFormFieldEnabled('web_search');
 });
