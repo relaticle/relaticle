@@ -10,6 +10,7 @@ use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
+use Relaticle\EmailIntegration\Enums\MailboxHealth;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 /**
@@ -34,6 +35,7 @@ final class ConnectedAccountFactory extends Factory
             'access_token' => 'fake-token',
             'is_default' => false,
             'status' => EmailAccountStatus::ACTIVE,
+            'health_changed_at' => now()->subMonth(),
         ];
     }
 
@@ -70,6 +72,14 @@ final class ConnectedAccountFactory extends Factory
         return $this->state(fn (): array => [
             'status' => EmailAccountStatus::ERROR,
             'last_error' => 'Token refresh failed',
+        ]);
+    }
+
+    public function health(MailboxHealth $health): static
+    {
+        return $this->state(fn (): array => [
+            'health' => $health,
+            'health_changed_at' => now(),
         ]);
     }
 

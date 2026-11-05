@@ -12,6 +12,7 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Notification;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Enums\MailboxHealth;
 use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManager;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -762,4 +763,16 @@ it('omits the emails tab badge when the viewer cannot see the linked mail', func
     $this->actingAs($this->viewer);
 
     expect(EmailsRelationManager::getBadge($this->person, ViewPeople::class))->toBeNull();
+});
+
+it('warns on the record tab about the viewer own stale mailbox', function (): void {
+    $this->account->forceFill(['health' => MailboxHealth::Stale, 'health_changed_at' => now(), 'last_synced_at' => now()->subDays(2)])->save();
+
+    livewire(EmailsRelationManager::class, ['ownerRecord' => $this->person, 'pageClass' => ViewPeople::class])
+        ->assertSeeHtml('data-mailbox-health="stale"');
+
+    $this->actingAs($this->viewer);
+
+    livewire(EmailsRelationManager::class, ['ownerRecord' => $this->person, 'pageClass' => ViewPeople::class])
+        ->assertDontSeeHtml('data-mailbox-health');
 });

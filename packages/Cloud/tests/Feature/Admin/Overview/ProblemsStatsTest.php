@@ -18,6 +18,7 @@ use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Models\ChatMessageFeedback;
 use Relaticle\Cloud\Admin\Filament\Widgets\Overview\ProblemsStats;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Enums\MailboxHealth;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\SystemAdmin\Filament\Resources\ChatMessageFeedbackResource\Pages\ListChatMessageFeedback;
 use Relaticle\SystemAdmin\Filament\Resources\ConnectedAccountResource\Pages\ListConnectedAccounts;
@@ -305,7 +306,7 @@ it('counts mailboxes needing attention exactly as the mailbox list shows them', 
     $healthy = ConnectedAccount::factory()->create(['sync_cursor' => 'cursor', 'last_synced_at' => now()->subMinutes(5)]);
     $failed = ConnectedAccount::factory()->error()->create();
     $needsSignIn = ConnectedAccount::factory()->create(['status' => EmailAccountStatus::REAUTH_REQUIRED]);
-    $late = ConnectedAccount::factory()->create(['sync_cursor' => 'cursor', 'last_synced_at' => now()->subHours(2)]);
+    $late = ConnectedAccount::factory()->health(MailboxHealth::Stale)->create(['sync_cursor' => 'cursor', 'last_synced_at' => now()->subDays(2)]);
 
     livewire(ProblemsStats::class)
         ->assertSee('Mailboxes needing attention')
@@ -324,7 +325,7 @@ it('reports healthy mailboxes in green and a late sync alone in amber', function
     $html = livewire(ProblemsStats::class)->assertSee('Every connected mailbox is syncing')->html();
     preg_match('/Mailboxes needing attention(.*?)Every connected mailbox is syncing/s', $html, $healthy);
 
-    ConnectedAccount::factory()->create(['sync_cursor' => 'cursor', 'last_synced_at' => now()->subHours(2)]);
+    ConnectedAccount::factory()->health(MailboxHealth::Stale)->create(['sync_cursor' => 'cursor', 'last_synced_at' => now()->subDays(2)]);
     Cache::flush();
 
     $html = livewire(ProblemsStats::class)->assertSee('0 failing, 1 late to sync')->html();

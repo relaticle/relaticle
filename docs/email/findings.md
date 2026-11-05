@@ -20,8 +20,8 @@ Paths are relative to `packages/EmailIntegration/` unless they start with `app/`
 | # | Finding | Evidence | Fix |
 |---|---|---|---|
 | 1 | Replying to a thread whose subject already starts with "Re:" produces "Re: Re: ..." | Seen. `src/Livewire/EmailComposer.php:322` always prepends `Re: ` or `Fwd: ` | **Closed in PR 1.** Skip the prefix when the subject already carries one, case-insensitively. Cover `Re`, `RE`, `Fwd`, `FW`, `Aw`, `Sv`, `Wg`. Add one regression test through the composer |
-| 2 | An `active` mailbox can stop syncing for days with no error. One production mailbox shows 375 hours since `last_synced_at` | Data | Watchdog marks a mailbox degraded after 24 h without a sync. Show it on the Emails page and the nav item (decision 26) |
-| 3 | 3 of 32 mailboxes sit in `error` or `reauth_required`, visible only on the accounts page | Data, Code (`resources/views/filament/pages/email-accounts.blade.php`) | Banner with Reconnect on the Emails page and the record Emails tabs |
+| 2 | An `active` mailbox can stop syncing for days with no error. One production mailbox shows 375 hours since `last_synced_at` | Data | **Closed in PR 10.** A watchdog marks a mailbox stale after 24 h without a successful sync and tells its owner. A banner shows it on the Emails page, with a badge on the nav item (decision 26) |
+| 3 | 3 of 32 mailboxes sit in `error` or `reauth_required`, visible only on the accounts page | Data, Code (`resources/views/filament/pages/email-accounts.blade.php`) | **Closed in PR 10.** Banner with Reconnect on the Emails page and the record Emails tabs |
 | 4 | The import-complete notification's "Open inbox" button leads to a page that shows no received mail, only an empty Drafts table | Code, `src/Notifications/MailboxHistoryImportCompletedNotification.php:162`; Seen (page opens on Drafts) | Point it at the Conversations list once it exists (decision 1). Until then, point it at the People list sorted by last interaction |
 
 ## P1

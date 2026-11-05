@@ -27,6 +27,7 @@ use Relaticle\EmailIntegration\Actions\PurgeStoredMailboxData;
 use Relaticle\EmailIntegration\Console\Commands\BackfillAutomatedReasonsCommand;
 use Relaticle\EmailIntegration\Console\Commands\BackfillConversationsCommand;
 use Relaticle\EmailIntegration\Console\Commands\BackfillEmailThreadsCommand;
+use Relaticle\EmailIntegration\Console\Commands\CheckMailboxHealthCommand;
 use Relaticle\EmailIntegration\Console\Commands\DisconnectFormerMemberMailboxesCommand;
 use Relaticle\EmailIntegration\Console\Commands\DispatchOutboxCommand;
 use Relaticle\EmailIntegration\Console\Commands\ExpireEmailAccessRequestsCommand;
@@ -188,6 +189,7 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
 
         $this->commands([
             BackfillEmailThreadsCommand::class,
+            CheckMailboxHealthCommand::class,
             DispatchOutboxCommand::class,
             ExpireEmailAccessRequestsCommand::class,
             IncrementalCalendarSyncCommand::class,
