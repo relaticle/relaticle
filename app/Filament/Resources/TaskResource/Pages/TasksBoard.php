@@ -94,11 +94,7 @@ final class TasksBoard extends BoardResourcePage
             ->searchable(['title'])
             ->columns($this->getColumns())
             ->cardSchema(function (Schema $schema) use ($customFields): Schema {
-                $descriptionCustomField = $customFields->get('custom_fields.description')
-                    ?->columnSpanFull()
-                    ->visible(fn (?string $state): bool => filled($state))
-                    ->formatStateUsing(fn (Task $record): string => Str::limit(PlainText::fromHtml($this->descriptionHtml($record) ?? '')))
-                    ->extraAttributes(['class' => 'mb-4']);
+                $descriptionCustomField = $this->descriptionPreview($customFields->get('custom_fields.description'));
 
                 $priorityField = $customFields->get('custom_fields.priority')
                     ?->visible(fn (?string $state): bool => filled($state))
@@ -147,6 +143,15 @@ final class TasksBoard extends BoardResourcePage
             ->circular()
             ->visible(fn (mixed $state): bool => filled($state))
             ->stacked();
+    }
+
+    private function descriptionPreview(?TextEntry $entry): ?TextEntry
+    {
+        return $entry?->columnSpanFull()
+            ->html(false)
+            ->visible(fn (?string $state): bool => filled($state))
+            ->formatStateUsing(fn (Task $record): string => Str::limit(PlainText::fromHtml($this->descriptionHtml($record) ?? '')))
+            ->extraAttributes(['class' => 'mb-4']);
     }
 
     private function descriptionHtml(Task $record): ?string

@@ -476,6 +476,14 @@ it('reads a card description as separate words and checklist items', function ()
         ->assertSee('Agenda Venue [x] Call Bob [ ] Send quote');
 });
 
+it('shows markup typed into a card description as text', function (): void {
+    tasksBoardCardWithDescription($this, '<p>&lt;b&gt;literal&lt;/b&gt;</p>');
+
+    livewire(TasksBoard::class)
+        ->assertSeeHtml('&lt;b&gt;literal&lt;/b&gt;')
+        ->assertDontSeeHtml('<b>literal</b>');
+});
+
 it('shows no checklist badge on a card without a checklist', function (): void {
     tasksBoardCardWithDescription($this, '<p>Plain</p>');
 
