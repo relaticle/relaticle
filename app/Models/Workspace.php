@@ -76,6 +76,8 @@ use Spatie\Sluggable\SlugOptions;
  * @property ?string $pm_type
  * @property ?string $pm_last_four
  * @property CarbonImmutable|null $trial_ends_at
+ * @property CarbonImmutable|null $trial_extended_at
+ * @property CarbonImmutable|null $trial_reminded_for
  * @property CarbonImmutable|null $pro_trial_used_at
  * @property CarbonImmutable|null $hosted_free_grandfathered_at
  * @property string $invite_link_default_role
@@ -239,6 +241,8 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
             'invite_link_token_expires_at' => 'datetime',
             'scheduled_deletion_at' => 'datetime',
             'trial_ends_at' => 'datetime',
+            'trial_extended_at' => 'datetime',
+            'trial_reminded_for' => 'datetime',
             'pro_trial_used_at' => 'datetime',
             'hosted_free_grandfathered_at' => 'datetime',
         ];

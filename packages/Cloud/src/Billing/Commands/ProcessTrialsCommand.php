@@ -21,34 +21,27 @@ use Relaticle\Chat\Services\CreditService;
 use Relaticle\Cloud\Billing\Mail\ProEndedMail;
 use Relaticle\Cloud\Billing\Mail\ProTrialEndingSoonMail;
 
-#[Description('Send trial-ending reminders, or pause expired Pro trials')]
-#[Signature('billing:process-trials {step : remind or pause}')]
+#[Description('Send trial-ending reminders and pause expired Pro trials')]
+#[Signature('billing:process-trials')]
 final class ProcessTrialsCommand extends Command
 {
     public function handle(CreditService $credits): int
     {
-        return match ($this->argument('step')) {
-            'remind' => $this->sendEndingSoonReminders(),
-            'pause' => $this->pauseExpired($credits),
-            default => $this->unknownStep(),
-        };
+        $this->sendEndingSoonReminders();
+        $this->pauseExpired($credits);
+
+        return self::SUCCESS;
     }
 
-    private function unknownStep(): int
+    private function sendEndingSoonReminders(): void
     {
-        $this->error('The step must be remind or pause.');
-
-        return self::INVALID;
-    }
-
-    private function sendEndingSoonReminders(): int
-    {
-        $windowStart = now()->addDays(3)->startOfDay();
-        $windowEnd = now()->addDays(3)->endOfDay();
         $count = 0;
 
         Workspace::query()
-            ->whereBetween('trial_ends_at', [$windowStart, $windowEnd])
+            ->whereBetween('trial_ends_at', [now(), now()->addHours(72)])
+            ->where(fn (Builder $query): Builder => $query
+                ->whereNull('trial_reminded_for')
+                ->orWhereColumn('trial_reminded_for', '!=', 'trial_ends_at'))
             ->notScheduledForDeletion()
             ->whereDoesntHave('subscriptions', $this->live(...))
             ->with('owner')
@@ -61,16 +54,15 @@ final class ProcessTrialsCommand extends Command
                     }
 
                     Mail::to($owner->email)->queue(new ProTrialEndingSoonMail($workspace));
+                    $workspace->forceFill(['trial_reminded_for' => $workspace->trial_ends_at])->save();
                     $count++;
                 });
             });
 
         $this->comment("Sent {$count} trial-ending reminder(s).");
-
-        return self::SUCCESS;
     }
 
-    private function pauseExpired(CreditService $credits): int
+    private function pauseExpired(CreditService $credits): void
     {
         $count = 0;
 
@@ -109,8 +101,6 @@ final class ProcessTrialsCommand extends Command
             });
 
         $this->comment("Paused {$count} expired trial(s).");
-
-        return self::SUCCESS;
     }
 
     /**

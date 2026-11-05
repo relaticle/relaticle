@@ -129,7 +129,7 @@ it('extends a running trial and leaves its credit balance alone', function (): v
         ->assertNotified('Trial extended');
 
     $this->travelTo(CarbonImmutable::parse('2026-10-28 12:00:00'));
-    $this->artisan('billing:process-trials pause')->assertSuccessful();
+    $this->artisan('billing:process-trials')->assertSuccessful();
 
     expect($workspace->refresh()->trial_ends_at?->toDateTimeString())->toBe('2026-11-10 12:00:00')
         ->and($workspace->plan)->toBe(Plan::Pro)
@@ -145,7 +145,7 @@ it('restarts a trial the pause step already downgraded and grants the pro allowa
     $workspace = OverviewData::trial(OverviewData::workspaceOf(OverviewData::owner()));
 
     $this->travelTo(now()->addDays(15));
-    $this->artisan('billing:process-trials pause')->assertSuccessful();
+    $this->artisan('billing:process-trials')->assertSuccessful();
 
     expect($workspace->refresh()->plan)->toBe(Plan::Free)
         ->and(resolve(Entitlements::class)->allowsAccess($workspace))->toBeFalse();
@@ -315,7 +315,7 @@ it('records who extended a trial and the dates it moved between', function (): v
 it('records a restart with the plan it brought back', function (): void {
     $workspace = OverviewData::trial(OverviewData::workspaceOf(OverviewData::owner()));
     $this->travelTo(now()->addDays(15));
-    $this->artisan('billing:process-trials pause')->assertSuccessful();
+    $this->artisan('billing:process-trials')->assertSuccessful();
 
     livewire(ListWorkspaces::class)
         ->callAction(TestAction::make('extendTrial')->table($workspace), ['trial_ends_at' => now()->addDays(7)->toDateTimeString()])

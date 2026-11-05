@@ -168,7 +168,7 @@ it('does not send the trial ended notice to an owner parked by the trial reminde
     $owner = User::factory()->withPersonalWorkspace()->create(['email_bounced_at' => now()]);
     $owner->currentWorkspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subHour()])->save();
 
-    $this->artisan('billing:process-trials pause')->assertSuccessful();
+    $this->artisan('billing:process-trials')->assertSuccessful();
 
     expect(Mail::mailer('array')->getSymfonyTransport()->messages())->toBeEmpty();
 });
