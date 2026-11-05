@@ -86,6 +86,21 @@ it('tracks live discovery immediately and distinguishes explicit signup and logi
         ->assertNoJavaScriptErrors();
 });
 
+it('names the homepage capabilities signup click by its own placement', function (): void {
+    $script = analyticsBrowserScript(false);
+    $page = $this->visit('/');
+    $page->script(analyticsBrowserTracker());
+    $page->script($script);
+    $page->script(<<<'JS'
+        const link = document.querySelector('[data-analytics-placement="capabilities"]');
+        link.addEventListener('click', event => event.preventDefault());
+        link.click();
+        JS);
+
+    $page->assertScript('window.analyticsCalls.map(call => call.name).filter(Boolean)', ['signup_cta_capabilities'])
+        ->assertNoJavaScriptErrors();
+});
+
 it('bounds app path metadata and strips queries and referrer details from every transport', function (): void {
     $script = analyticsBrowserScript();
     $page = $this->visit('/up');

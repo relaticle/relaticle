@@ -14,12 +14,22 @@
         {{ __('Simple enough that your team keeps it current.') }}
     </x-cloud::marketing.frame-header>
 
-    <div class="grid grid-cols-1 gap-x-10 gap-y-10 px-6 py-12 sm:grid-cols-2 md:px-10 md:py-16 lg:grid-cols-3">
+    <ul class="bg-rail grid gap-px">
         @foreach($capabilities as [$title, $description])
-            <div class="border-rail border-t pt-5">
-                <h3 class="text-base font-medium text-gray-950 dark:text-white">{{ $title }}</h3>
-                <p class="type-prose mt-1.5 text-gray-500 dark:text-gray-400">{{ $description }}</p>
-            </div>
+            <li class="bg-surface grid grid-cols-1 gap-x-10 gap-y-1.5 px-6 py-6 md:grid-cols-12 md:items-baseline md:px-10">
+                <h3 class="text-base font-medium text-gray-950 md:col-span-4 dark:text-white">{{ $title }}</h3>
+                <p class="type-prose text-gray-500 md:col-span-8 dark:text-gray-400">{{ $description }}</p>
+            </li>
         @endforeach
-    </div>
+
+        <li class="bg-tint grid grid-cols-1 items-center gap-x-10 gap-y-4 px-6 py-6 md:grid-cols-12 md:px-10">
+            <p class="text-base font-medium text-gray-950 md:col-span-4 dark:text-white">{{ __('Try every part of it.') }}</p>
+            <p class="type-prose text-gray-700 md:col-span-5 dark:text-gray-300">{{ __(':days-day Cloud Pro trial, no card, unlimited users.', ['days' => \App\Models\Workspace::PRO_TRIAL_DAYS]) }}</p>
+            <div class="md:col-span-3 md:justify-self-end">
+                <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="capabilities">
+                    {{ __('Start for free') }}
+                </x-cloud::marketing.button>
+            </div>
+        </li>
+    </ul>
 </x-cloud::marketing.frame>
