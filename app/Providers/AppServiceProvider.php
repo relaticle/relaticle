@@ -848,7 +848,14 @@ final class AppServiceProvider extends ServiceProvider
         $this->registerPanelScripts();
 
         // App assets are otherwise versioned with Filament's release, so an edit would keep its cached URL.
-        FilamentAsset::appVersion((string) filemtime(public_path('js/app/rich-editor-slash-menu.js')));
+        FilamentAsset::appVersion($this->richEditorScriptsVersion());
+    }
+
+    private function richEditorScriptsVersion(): string
+    {
+        return (string) collect(glob(public_path('js/app/rich-editor-*.js')) ?: [])
+            ->map(filemtime(...))
+            ->max();
     }
 
     private function registerPanelScripts(): void
@@ -856,6 +863,8 @@ final class AppServiceProvider extends ServiceProvider
         // The browser loads the published copy: run `php artisan filament:assets` after editing it.
         FilamentAsset::register([
             Js::make('rich-editor-slash-menu', resource_path('js/filament/rich-content-plugins/slash-menu.js'))
+                ->loadedOnRequest(),
+            Js::make('rich-editor-checklist', resource_path('js/filament/rich-content-plugins/dist/checklist.js'))
                 ->loadedOnRequest(),
             Js::make('payload-guard', resource_path('js/filament/payload-guard.js')),
             Js::make('linked-records-picker', resource_path('js/filament/linked-records-picker.js')),

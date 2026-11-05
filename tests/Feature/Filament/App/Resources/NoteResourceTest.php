@@ -326,6 +326,19 @@ it('drives note body formatting from the slash menu rather than a toolbar', func
         ->and(collect($items)->pluck('icon')->filter()->all())->toHaveSameSize($items);
 });
 
+it('keeps the checklist out of the note slash menu', function (): void {
+    $page = livewire(ManageNotes::class)
+        ->mountAction('create')
+        ->instance();
+
+    $editor = collect($page->getSchema($page->getMountedActionSchemaName())->getFlatComponents(withHidden: true))
+        ->first(fn (Component $component): bool => $component instanceof RichEditor);
+
+    $menu = json_decode(base64_decode(SlashMenuPlugin::attributes($editor)['data-slash-menu']), associative: true);
+
+    expect(collect($menu['items'])->pluck('id')->all())->not->toContain('taskList');
+});
+
 it('versions the slash menu script by its published file so an edit changes the url', function (): void {
     $published = filemtime(public_path('js/app/rich-editor-slash-menu.js'));
 

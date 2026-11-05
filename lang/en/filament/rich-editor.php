@@ -46,6 +46,10 @@ return [
                 'label' => 'Numbered list',
                 'description' => 'Create a list with numbering',
             ],
+            'taskList' => [
+                'label' => 'Checklist',
+                'description' => 'Track steps with checkboxes',
+            ],
             'blockquote' => [
                 'label' => 'Quote',
                 'description' => 'Set a passage apart',

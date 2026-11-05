@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\CrmEntity;
+use App\Enums\CustomFields\TaskField;
 use Database\Factories\CustomFieldFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
@@ -40,6 +42,12 @@ final class CustomField extends BaseCustomField
     public function hasValues(): bool
     {
         return CustomFieldValue::query()->holdingAValue($this)->exists();
+    }
+
+    public function holdsChecklists(): bool
+    {
+        return $this->entity_type === CrmEntity::Task->value
+            && $this->code === TaskField::DESCRIPTION->value;
     }
 
     /** @return CustomFieldFactory */

@@ -7,11 +7,14 @@ namespace App\Filament\CustomFields;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\NoteField;
 use App\Enums\CustomFields\TaskField;
+use App\Filament\RichEditor\ChecklistPlugin;
 use App\Filament\RichEditor\SlashMenuPlugin;
+use App\Models\CustomField as AppCustomField;
 use App\Support\Media\RichContentAttachments;
 use App\Support\Media\UploadAllowlist;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\RichEditor;
+use Filament\Forms\Components\RichEditor\Plugins\Contracts\RichContentPlugin;
 use Filament\Forms\Components\RichEditor\ToolbarButtonGroup;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Relaticle\CustomFields\FieldTypeSystem\BaseFieldType;
@@ -36,7 +39,7 @@ final class RichEditorFieldType extends BaseFieldType
     {
         return (new PackageRichEditorFieldType)->configure()
             ->formComponent(fn (CustomField $customField): RichEditor => RichEditorComponent::make($customField->getFieldName())
-                ->plugins([SlashMenuPlugin::make()])
+                ->plugins($this->plugins($customField))
                 ->toolbarButtons([])
                 // Filament decides attachments by whether `attachFiles` sits in the toolbar,
                 // and there is no toolbar: without this, an uploaded image saves as null.
@@ -67,6 +70,18 @@ final class RichEditorFieldType extends BaseFieldType
                     ...($this->isDocument($customField) ? ['class' => 'fi-fo-rich-editor-seamless'] : []),
                 ]))
             ->infolistEntry(RichContentEntry::class);
+    }
+
+    /** @return list<RichContentPlugin> */
+    private function plugins(CustomField $customField): array
+    {
+        $plugins = [SlashMenuPlugin::make()];
+
+        if ($customField instanceof AppCustomField && $customField->holdsChecklists()) {
+            $plugins[] = ChecklistPlugin::make();
+        }
+
+        return $plugins;
     }
 
     private function attachments(): RichContentAttachments
