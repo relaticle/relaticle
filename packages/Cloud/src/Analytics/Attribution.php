@@ -65,7 +65,7 @@ final readonly class Attribution
         return match (true) {
             $request->is('/') => 'home',
             $request->is('pricing') => 'pricing',
-            $request->is('docs', 'docs/*') => 'docs',
+            $request->is('developers', 'developers/*', 'docs', 'docs/*', 'documentation', 'documentation/*') => 'docs',
             $request->is('help', 'help/*') => 'help',
             $request->is('blog', 'blog/*') => 'blog',
             $request->is('compare/*', 'alternatives/*') => 'comparison',

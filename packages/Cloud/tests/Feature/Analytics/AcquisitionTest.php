@@ -55,6 +55,21 @@ it('keeps the first vetted acquisition across pages and registration', function 
     expect(session()->has('analytics.acquisition'))->toBeFalse();
 });
 
+it('attributes signups arriving directly on developer documentation', function (string $path, int $status): void {
+    $this->get($path.'?utm_source=github')->assertStatus($status);
+
+    $user = registerAcquiredUser();
+
+    $this->assertDatabaseHas('acquisitions', [
+        'user_id' => $user->getKey(), 'source' => 'github', 'landing' => 'docs',
+    ]);
+})->with([
+    'canonical index' => ['/developers', 200],
+    'canonical guide' => ['/developers/mcp', 200],
+    'legacy docs' => ['/docs', 301],
+    'legacy documentation' => ['/documentation', 301],
+]);
+
 it('drops unvetted campaign values and never stores raw referrers or landing paths', function (): void {
     $this->withHeader('referer', 'https://github.com.evil.test/private/person@example.com')
         ->get('/pricing?utm_source[]=github&utm_medium=person@example.com&utm_campaign=person@example.com')->assertOk();
