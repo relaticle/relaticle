@@ -10,7 +10,9 @@
         "prebuild": "rm -f public/hot",
         "build": "vite build",
         "brand:build": "node bin/build-brand-assets.mjs",
-        "brand:check": "node bin/build-brand-assets.mjs --check"
+        "brand:check": "node bin/build-brand-assets.mjs --check",
+        "rich-editor:build": "node bin/build-rich-editor-plugins.mjs",
+        "rich-editor:check": "node bin/build-rich-editor-plugins.mjs --check"
     },
     "devDependencies": {
         "@tailwindcss/forms": "^0.5.11",
@@ -31,6 +33,7 @@
         "@tiptap/core": "^3.32.2",
         "@tiptap/extension-document": "^3.32.2",
         "@tiptap/extension-hard-break": "^3.32.2",
+        "@tiptap/extension-list": "^3.32.2",
         "@tiptap/extension-mention": "^3.32.2",
         "@tiptap/extension-paragraph": "^3.32.2",
         "@tiptap/extension-placeholder": "^3.32.2",
