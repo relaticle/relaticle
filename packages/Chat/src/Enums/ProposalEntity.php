@@ -101,6 +101,14 @@ enum ProposalEntity: string
         };
     }
 
+    public function approvesFromKeyboard(): bool
+    {
+        return match ($this) {
+            self::Email, self::EmailDraftSend, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation => false,
+            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::EmailDraft, self::EmailDraftDelete, self::CustomField, self::SampleData, self::WebAccess => true,
+        };
+    }
+
     public function createTitle(): string
     {
         return Str::ucfirst($this->verb(PendingActionOperation::Create)).' '.$this->singularName();

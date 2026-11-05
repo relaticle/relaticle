@@ -392,14 +392,15 @@ it('never names the search price on the request', function (bool $metered): void
         ->assertDontSee('credits');
 })->with(['metered' => true, 'unmetered' => false]);
 
-it('ignores the shortcut on a lone web access request', function (): void {
+it('allows a lone web access request from the keyboard shortcut', function (): void {
     $user = webAccessUser();
     Queue::fake();
     $request = requestWebAccess($user, (string) str()->ulid());
 
     openWebAccessDock($request)->dispatch('proposal:create-current', context: 'conversation');
 
-    expect($request->fresh()->status)->toBe(PendingActionStatus::Pending);
+    expect($request->fresh()->status)->toBe(PendingActionStatus::Approved);
+    Queue::assertPushed(ProcessChatMessage::class);
 });
 
 it('keeps asking for the web on a later typed turn after an allowed request', function (): void {

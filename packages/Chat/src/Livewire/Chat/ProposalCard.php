@@ -893,7 +893,15 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         }
 
-        if ($this->loadStep($this->activeStepId())?->needsOwnApproval() === true) {
+        $step = $this->loadStep($this->activeStepId());
+
+        if ($step?->entity_type->approvesFromKeyboard() !== true) {
+            return;
+        }
+
+        if ($step->needsOwnApproval()) {
+            $this->approveStep((string) $step->getKey(), resolve(ProposalPlanService::class));
+
             return;
         }
 
