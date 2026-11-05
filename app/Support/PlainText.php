@@ -64,11 +64,11 @@ final readonly class PlainText
 
     private static function markTaskItems(string $html): string
     {
-        return (string) preg_replace_callback(
+        return preg_replace_callback(
             '/<li\b(?=[^>]*(?<![\w-])data-type\s*=\s*["\']?taskItem(?![\w-]))[^>]*>/i',
             fn (array $tag): string => $tag[0].self::taskMarker(preg_match('/(?<![\w-])data-checked\s*=\s*(["\']?)true\1(?![\w-])/i', $tag[0]) === 1),
             $html,
-        );
+        ) ?? $html;
     }
 
     private static function taskMarker(bool $checked): string
