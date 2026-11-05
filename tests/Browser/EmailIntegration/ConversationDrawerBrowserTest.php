@@ -80,13 +80,15 @@ it('reads a conversation beside a live list and closes with Escape', function (s
 
     $page = loginViaBrowser($this->owner, $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
+        ->assertScript('document.documentElement.classList.contains("dark")', $theme === 'inDarkMode')
         ->navigate("/app/{$this->workspace->slug}/email?view=all")
         ->resize(1440, 900)
         ->click('[data-conversation="conv-first"] > button')
         ->assertVisible('.fi-email-reader-drawer')
         ->assertMissing('.fi-email-reader-backdrop')
         ->assertScript('new URL(location.href).searchParams.get("email")', $first->id)
-        ->assertScript('document.activeElement.id', 'email-reader-heading');
+        ->assertScript('document.activeElement.id', 'email-reader-heading')
+        ->assertAttribute('.fi-email-reader-drawer [role="separator"]', 'aria-valuetext', '55%');
 
     $page->screenshot(filename: "conversation-drawer-{$theme}");
 
@@ -105,6 +107,7 @@ it('lands a resolver link on the company tab with exactly one reader open', func
 
     loginViaBrowser($this->owner, $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
+        ->assertScript('document.documentElement.classList.contains("dark")', $theme === 'inDarkMode')
         ->navigate(route('email.open', $email, absolute: false))
         ->assertPathIs("/app/{$this->workspace->slug}/companies/{$this->company->id}")
         ->assertSee('Renewal terms')
@@ -120,6 +123,7 @@ it('opens one reader when a record page switches from another tab to Emails', fu
 
     loginViaBrowser($this->owner, $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
+        ->assertScript('document.documentElement.classList.contains("dark")', $theme === 'inDarkMode')
         ->navigate("/app/{$this->workspace->slug}/companies/{$this->company->id}?relation={$notes}&email={$email->id}")
         ->assertScript('document.querySelectorAll(".fi-email-reader-drawer, .fi-email-reader-panel").length', 0)
         ->click("[role=\"tab\"][data-tab-key=\"{$emails}\"]")
@@ -137,6 +141,7 @@ it('opens a locked row at the gate with Request access', function (string $theme
 
     $page = loginViaBrowser($this->owner, $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
+        ->assertScript('document.documentElement.classList.contains("dark")', $theme === 'inDarkMode')
         ->navigate("/app/{$this->workspace->slug}/email?view=all")
         ->click('[data-conversation="conv-locked"] > button')
         ->assertVisible('.fi-email-reader-drawer')
@@ -152,10 +157,12 @@ it('fills the screen on a phone and saves a typed reply when it closes', functio
 
     $page = loginViaBrowser($this->owner, $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
+        ->assertScript('document.documentElement.classList.contains("dark")', $theme === 'inDarkMode')
         ->resize(390, 844)
         ->navigate("/app/{$this->workspace->slug}/email?view=all")
         ->click('[data-conversation="conv-phone"] > button')
-        ->assertScript('Math.round(document.querySelector(".fi-email-reader-drawer").getBoundingClientRect().width) === window.innerWidth', true);
+        ->assertScript('Math.round(document.querySelector(".fi-email-reader-drawer").getBoundingClientRect().width) === window.innerWidth', true)
+        ->assertScript('Math.round(document.querySelector(".fi-email-reader-drawer").getBoundingClientRect().height) === window.innerHeight', true);
 
     $page->screenshot(filename: "conversation-drawer-phone-{$theme}");
 
@@ -167,5 +174,30 @@ it('fills the screen on a phone and saves a typed reply when it closes', functio
         ->assertScript('new Promise((resolve) => { const poll = () => document.querySelector(".fi-email-reader-drawer") ? setTimeout(poll, 50) : resolve(true); poll() })', true)
         ->assertNoJavaScriptErrors();
 
-    expect(Email::query()->where('user_id', $this->owner->id)->where('status', EmailStatus::DRAFT)->exists())->toBeTrue();
+    expect(Email::query()->where('user_id', $this->owner->id)->where('status', EmailStatus::DRAFT)->sole()->body?->body_text)
+        ->toContain('Monday at 10 works');
+})->with(['inLightMode', 'inDarkMode']);
+
+it('saves a typed reply when Next opens another conversation and replies there', function (string $theme): void {
+    drawerBrowserMessage($this->ownerMailbox, 'conv-first', 'brian@airbnb.test', ['subject' => 'Pricing for 40 seats']);
+    drawerBrowserMessage($this->ownerMailbox, 'conv-second', 'kim@notion.test', ['subject' => 'Security questionnaire', 'sent_at' => now()->subHour()]);
+
+    $page = loginViaBrowser($this->owner, $theme)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->assertScript('document.documentElement.classList.contains("dark")', $theme === 'inDarkMode')
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/email?view=all")
+        ->click('[data-conversation="conv-first"] > button')
+        ->click('[data-reader-action="reply"]')
+        ->type('[data-inline-composer] [contenteditable="true"]', 'Forty seats from March')
+        ->click('[data-reader-action="next"]')
+        ->assertSeeIn('#email-reader-heading', 'Security questionnaire');
+
+    $page->script('document.querySelector(\'[data-reader-action="reply"]\').click()');
+
+    $page->assertVisible('[data-inline-composer] [contenteditable="true"]')
+        ->assertNoJavaScriptErrors();
+
+    expect(Email::query()->where('user_id', $this->owner->id)->where('status', EmailStatus::DRAFT)->sole()->body?->body_text)
+        ->toContain('Forty seats from March');
 })->with(['inLightMode', 'inDarkMode']);

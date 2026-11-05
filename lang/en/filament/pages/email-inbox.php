@@ -231,6 +231,7 @@ return [
         'previous' => 'Previous conversation',
         'next' => 'Next conversation',
         'resize' => 'Resize the reader',
+        'resize_value' => ':width%',
         'not_available' => 'This email is not available to you.',
         'gate' => [
             'metadata_only' => [

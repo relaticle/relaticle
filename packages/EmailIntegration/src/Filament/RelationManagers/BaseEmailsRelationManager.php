@@ -366,21 +366,6 @@ abstract class BaseEmailsRelationManager extends RelationManager
         $this->openEmailReader($id);
     }
 
-    // Mail the bell names that this record does not hold opens on the record or page that does.
-    #[On('email:open')]
-    public function openRequestedEmail(string $emailId): void
-    {
-        if (! $this->showsConversations()) {
-            return;
-        }
-
-        $this->openLinkedEmail($emailId);
-
-        if ($this->selectedEmailId === null) {
-            $this->redirect(route('email.open', $emailId));
-        }
-    }
-
     public function deselectEmail(): void
     {
         $this->selectedEmailId = null;

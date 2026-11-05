@@ -31,6 +31,7 @@ return [
         'previous' => 'Conversation précédente',
         'next' => 'Conversation suivante',
         'resize' => 'Redimensionner le lecteur',
+        'resize_value' => ':width %',
         'not_available' => 'Cet e-mail ne vous est pas accessible.',
         'gate' => [
             'metadata_only' => [

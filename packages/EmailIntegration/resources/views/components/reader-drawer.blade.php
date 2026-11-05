@@ -10,7 +10,7 @@
 ])
 
 @php
-    $storedWidth = "Math.min(70, Math.max(40, Number(localStorage.getItem('relaticle.emailReader.width')) || 55))";
+    $storedWidth = "(() => { try { return Math.min(70, Math.max(40, Number(localStorage.getItem('relaticle.emailReader.width')) || 55)) } catch { return 55 } })()";
 @endphp
 
 @if ($email === null && $unavailable)
@@ -52,6 +52,8 @@
          not survive Livewire morphing this element. --}}
     <aside
         x-data="{
+            leaving: null,
+
             closing: false,
 
             width: {{ $storedWidth }},
@@ -62,8 +64,28 @@
                 this.width = Math.round(Math.min(70, Math.max(40, vw)))
 
                 if (persist) {
-                    localStorage.setItem('relaticle.emailReader.width', this.width)
+                    try {
+                        localStorage.setItem('relaticle.emailReader.width', this.width)
+                    } catch {}
                 }
+            },
+
+            leaveReader(then) {
+                this.leaving ??= (async () => {
+                    try {
+                        const dock = $el.querySelector('[data-inline-composer][wire\\:id]')
+
+                        if (dock) {
+                            await window.Livewire.find(dock.getAttribute('wire:id')).call('close')
+                        }
+
+                        await then()
+                    } finally {
+                        this.leaving = null
+                    }
+                })()
+
+                return this.leaving
             },
 
             async closeReader() {
@@ -72,17 +94,17 @@
                 }
 
                 this.closing = true
+                let conversationKey = $el.dataset.conversationKey
 
-                const dock = $el.querySelector('[data-inline-composer][wire\\:id]')
-
-                if (dock) {
-                    await window.Livewire.find(dock.getAttribute('wire:id')).call('close')
+                if (this.leaving) {
+                    await this.leaving
+                    conversationKey = document.querySelector('[data-conversation-key]')?.dataset.conversationKey
+                    await $wire.deselectEmail()
+                } else {
+                    await this.leaveReader(() => $wire.deselectEmail())
                 }
 
-                await $wire.deselectEmail()
-
-                const returnTo = Alpine.store('emailReader')?.returnTo
-                const row = (returnTo && document.querySelector(`[data-conversation='${CSS.escape(returnTo)}'] > button`))
+                const row = (conversationKey && document.querySelector(`[data-conversation='${CSS.escape(conversationKey)}'] > button`))
                     || document.querySelector('[data-conversation] > button')
 
                 row?.focus()
@@ -90,10 +112,12 @@
         }"
         x-init="$nextTick(() => document.getElementById('email-reader-heading')?.focus())"
         wire:key="email-reader-{{ $email->getKey() }}"
+        data-conversation-key="{{ $email->conversation_key }}"
         style="--ei-reader-width: 55vw"
         x-bind:style="{ '--ei-reader-width': width + 'vw', ...(closing ? { display: 'none' } : {}) }"
         x-bind:class="resizing && 'select-none'"
         x-on:keydown.escape.window="$event.defaultPrevented || document.querySelector('.fi-modal-open, .fi-dropdown-panel[style*=\'display: block\']') || closeReader()"
+        x-on:email-reader-leave.window="$event.preventDefault(); leaveReader($event.detail.then)"
         role="dialog"
         aria-modal="false"
         aria-labelledby="email-reader-heading"
@@ -106,6 +130,7 @@
             aria-valuemin="40"
             aria-valuemax="70"
             x-bind:aria-valuenow="width"
+            x-bind:aria-valuetext="@js(__('filament/pages/email-inbox.drawer.resize_value')).replace(':width', width)"
             tabindex="0"
             x-on:pointerdown="resizing = true; $el.setPointerCapture($event.pointerId)"
             x-on:pointermove="resizing && resizeTo((window.innerWidth - $event.clientX) / window.innerWidth * 100, false)"
@@ -133,10 +158,7 @@
                                 <button
                                     type="button"
                                     data-reader-action="{{ $direction }}"
-                                    wire:click="openAdjacentConversation('{{ $direction }}')"
-                                    @if ($adjacent[$direction] !== null)
-                                        x-on:click="Alpine.store('emailReader', { returnTo: @js($adjacent[$direction]->conversationKey) })"
-                                    @endif
+                                    x-on:click="leaveReader(() => $wire.openAdjacentConversation('{{ $direction }}'))"
                                     @disabled($adjacent[$direction] === null)
                                     aria-label="{{ __("filament/pages/email-inbox.drawer.{$direction}") }}"
                                     class="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 disabled:pointer-events-none disabled:opacity-40 dark:hover:bg-gray-800 dark:hover:text-gray-200"
@@ -190,7 +212,7 @@
         <x-email-integration::reader-access-bar :pending-access-requests="$pendingAccessRequests" />
 
         <div class="min-h-0 flex-1 overflow-y-auto motion-safe:scroll-smooth" data-email-scroll-region>
-            <x-email-integration::reader-thread :thread="$thread" :bodies="$bodies" :expanded="$expanded" :reply-target="$replyTarget" />
+            <x-email-integration::reader-thread :thread="$thread" :bodies="$bodies" :expanded="$expanded" :reply-target="$replyTarget" :email="$email" />
         </div>
     </aside>
 @endif

@@ -603,7 +603,7 @@ it('expands and replies to the newest message the viewer can read when the newes
         ->assertSeeHtml("data-reader-action=\"reply\" x-on:click=\"\$dispatch('composer:reply', { emailId: '{$mine->id}'")
         ->assertSeeHtmlInOrder([
             "data-thread-message=\"{$mine->id}\"",
-            'wire:key="inline-reply-composer"',
+            "wire:key=\"inline-reply-composer-{$bens->id}\"",
             "data-reader-gate=\"{$bens->id}\"",
         ]);
 });
@@ -667,14 +667,14 @@ it('moves to the next and previous conversation in list order', function (): voi
 
     preg_match_all('/data-conversation="([^"]+)"[^>]*aria-current="true"/', $page->html(), $current);
     expect($current[1])->toBe(['conv-c'])
-        ->and($page->html())->toMatch('/data-reader-action="next"[^>]*\sdisabled\s/')
-        ->not->toMatch('/data-reader-action="previous"[^>]*\sdisabled\s/');
+        ->and($page->html())->toMatch('/data-reader-action="next"\s+x-on:click="[^"]*"\s+disabled\s/')
+        ->not->toMatch('/data-reader-action="previous"\s+x-on:click="[^"]*"\s+disabled\s/');
 
     $page->call('openAdjacentConversation', 'previous')
         ->call('openAdjacentConversation', 'previous')
         ->assertSet('selectedEmailId', $newest->id);
 
-    expect($page->html())->toMatch('/data-reader-action="previous"[^>]*\sdisabled\s/');
+    expect($page->html())->toMatch('/data-reader-action="previous"\s+x-on:click="[^"]*"\s+disabled\s/');
 });
 
 it('opens the viewer own preferred copy when the bell names another copy they may see', function (): void {

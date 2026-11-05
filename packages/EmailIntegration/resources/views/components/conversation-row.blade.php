@@ -37,8 +37,10 @@
     @if ($opens)
         <button
             type="button"
-            wire:click="selectEmail('{{ $row->viewerCopyEmailId }}')"
-            x-on:click="Alpine.store('emailReader', { returnTo: @js($row->conversationKey) })"
+            x-on:click="
+                const open = () => $wire.selectEmail('{{ $row->viewerCopyEmailId }}')
+                window.dispatchEvent(new CustomEvent('email-reader-leave', { cancelable: true, detail: { then: open } })) && open()
+            "
             wire:loading.attr="disabled"
             wire:target="selectEmail('{{ $row->viewerCopyEmailId }}')"
             aria-label="{{ $subject }}"

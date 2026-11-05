@@ -1,4 +1,4 @@
-@props(['thread', 'bodies', 'expanded', 'replyTarget'])
+@props(['thread', 'bodies', 'expanded', 'replyTarget', 'email'])
 
 @php
     $authUser = auth()->user();
@@ -41,7 +41,7 @@
         @endif
 
         @if ($replyTarget?->is($message))
-            @livewire('email-integration.composer', ['dock' => 'inline'], key('inline-reply-composer'))
+            @livewire('email-integration.composer', ['dock' => 'inline'], key('inline-reply-composer-'.$email->getKey()))
         @endif
     @endforeach
 </div>
