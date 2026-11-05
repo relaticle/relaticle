@@ -55,6 +55,15 @@ it('links a page for every connectable assistant from the footer', function (): 
     }
 });
 
+it('links the AI-native CRM page from the footer', function (): void {
+    $html = $this->get('/pricing')->assertOk()->getContent();
+
+    preg_match('/<footer[\s\S]*?<\/footer>/', $html, $footer);
+
+    expect($footer[0])->toContain('href="'.route('aiNativeCrm').'"')
+        ->and($footer[0])->toContain(__('AI-native CRM'));
+});
+
 it('names the assistant from config in both the header and the footer', function (): void {
     config()->set('chat.assistant_name', 'Testbot');
 

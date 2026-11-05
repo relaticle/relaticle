@@ -99,6 +99,7 @@ final readonly class MarketingNavigation
             ]))),
             new NavItem(__('Resources'), children: [
                 ...$this->resourceItems(),
+                new NavItem(__('AI-native CRM'), route('aiNativeCrm')),
                 new NavItem(__('Press kit'), route('press')),
             ]),
             new NavItem(__('Compare'), children: $this->comparisonItems()),
