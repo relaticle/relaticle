@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\RichEditor;
 
+use DOMElement;
 use Tiptap\Nodes\TaskItem as BaseTaskItem;
 
 final class TaskItem extends BaseTaskItem
@@ -15,8 +16,8 @@ final class TaskItem extends BaseTaskItem
         return [
             'checked' => [
                 'default' => false,
-                'parseHTML' => fn ($DOMNode): bool => $DOMNode->getAttribute('data-checked') === 'true',
-                'renderHTML' => fn ($attributes): array => [
+                'parseHTML' => fn (DOMElement $DOMNode): bool => $DOMNode->getAttribute('data-checked') === 'true',
+                'renderHTML' => fn (object $attributes): array => [
                     'data-checked' => ($attributes->checked ?? false) ? 'true' : 'false',
                 ],
             ],
