@@ -10,6 +10,7 @@ use App\Models\CustomField;
 use App\Models\Workspace;
 use App\Support\CustomFields\WorkspaceCustomFields;
 use Relaticle\Chat\Support\PromptText;
+use Relaticle\CustomFields\Enums\LinkSide;
 use Relaticle\CustomFields\Enums\OptionCategory;
 use Relaticle\CustomFields\Models\CustomField as BaseCustomField;
 use Relaticle\CustomFields\Models\CustomFieldOption;
@@ -123,7 +124,7 @@ final readonly class CustomFieldsSchemaDescriber
      */
     private function describeLink(CustomField $field, CustomFieldRelationship $definition): string
     {
-        $target = $definition->targetEntityTypeFor($field);
+        $target = $definition->farEnd($field)->entityType;
 
         $parts = [$field->allowsMultipleRecords()
             ? "links to {$target} records, an array of record ids"
@@ -154,9 +155,7 @@ final readonly class CustomFieldsSchemaDescriber
      */
     private function farField(CustomFieldRelationship $definition, CustomField $field): ?BaseCustomField
     {
-        $farId = $definition->directionFor($field) === CustomFieldRelationship::DIRECTION_FROM
-            ? $definition->to_field_id
-            : $definition->from_field_id;
+        $farId = $definition->farEnd($field)->fieldId;
 
         if ($farId === null || (string) $farId === (string) $field->getKey()) {
             return null;
@@ -167,7 +166,7 @@ final readonly class CustomFieldsSchemaDescriber
 
     private function farSideHoldsOne(CustomFieldRelationship $definition, CustomField $field): bool
     {
-        return $definition->directionFor($field) === CustomFieldRelationship::DIRECTION_FROM
+        return $definition->nearEnd($field)->side === LinkSide::From
             ? $definition->cardinality->toSideIsSingle()
             : $definition->cardinality->fromSideIsSingle();
     }

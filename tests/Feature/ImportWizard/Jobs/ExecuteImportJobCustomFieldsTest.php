@@ -10,6 +10,7 @@ use Filament\Events\TenantSet;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Support\Facades\Event;
+use Relaticle\CustomFields\Enums\WriteSource;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Enums\DateFormat;
 use Relaticle\ImportWizard\Enums\ImportStatus;
@@ -41,7 +42,7 @@ afterEach(function (): void {
 
 // --- Custom Field Import Tests ---
 
-it('imports text custom field value', function (): void {
+it('imports a text custom field value stamped as written by the import', function (): void {
     $cf = ImportExecutionFixture::customField($this, 'website_notes', 'text');
 
     ImportExecutionFixture::readyStore($this, ['Name', 'Notes'], [
@@ -58,7 +59,8 @@ it('imports text custom field value', function (): void {
 
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull()
-        ->and($cfv->text_value)->toBe('Some important text');
+        ->and($cfv->text_value)->toBe('Some important text')
+        ->and($cfv->source)->toBe(WriteSource::Import);
 });
 
 it('imports number custom field as integer', function (): void {

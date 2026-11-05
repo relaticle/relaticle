@@ -12,7 +12,6 @@ use App\Models\CustomFieldValue;
 use App\Models\Task;
 use App\Models\User;
 use App\Notifications\TaskAssignedNotification;
-use App\Support\OptionsInCategory;
 use Filament\Facades\Filament;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\Date;
@@ -25,7 +24,7 @@ use Relaticle\Chat\Services\MyTasksService;
 use Relaticle\CustomFields\Enums\OptionCategory;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(CompleteTask::class, Dashboard::class, MyTasksService::class, NotifyTaskAssignees::class, OptionsInCategory::class, UpdateTask::class);
+mutates(CompleteTask::class, Dashboard::class, MyTasksService::class, NotifyTaskAssignees::class, UpdateTask::class);
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);

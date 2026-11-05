@@ -14,7 +14,6 @@ use App\Support\ActivityLog\CustomFieldChangeLog;
 use App\Support\CurrentSource;
 use App\Support\CurrentWorkspace;
 use App\Support\CustomFields\CanonicalValue;
-use App\Support\LinkActorResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Bus\Batch;
 use Illuminate\Bus\Batchable;
@@ -34,7 +33,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use LogicException;
 use Relaticle\CustomFields\CustomFields;
+use Relaticle\CustomFields\Enums\FieldCapability;
 use Relaticle\CustomFields\Enums\FieldDataType;
+use Relaticle\CustomFields\Enums\WriteSource;
 use Relaticle\CustomFields\Exceptions\UniqueCustomFieldValueTakenException;
 use Relaticle\CustomFields\Filament\Integration\Support\Imports\ImportDataStorage;
 use Relaticle\CustomFields\Models\CustomFieldOption;
@@ -245,10 +246,8 @@ final class ExecuteImportJob implements ShouldQueue
         $currentImport->set($import->id, $import->file_name);
         $handedOff = false;
 
-        [$previousTenantId, $previousActor] = $this->enterImportContext($import);
-
         try {
-            resolve(CauserResolver::class)->withCauser($import->user, function () use ($store, $importer, $fieldMappings, $allowedKeys, $customFieldDefs, $customFieldFormatMap, $matchField, $matchSourceColumn, $context, &$results, &$handedOff, $import, $startedAt): void {
+            $processRows = function () use ($store, $importer, $fieldMappings, $allowedKeys, $customFieldDefs, $customFieldFormatMap, $matchField, $matchSourceColumn, $context, &$results, &$handedOff, $import, $startedAt): void {
                 $store->query()
                     ->where('processed', false)
                     ->orderBy('row_number')
@@ -275,7 +274,9 @@ final class ExecuteImportJob implements ShouldQueue
 
                         return true;
                     });
-            });
+            };
+
+            CustomFields::writing(WriteSource::Import, fn (): mixed => resolve(CauserResolver::class)->withCauser($import->user, $processRows), actor: $import->user);
 
             if ($handedOff) {
                 return true;
@@ -314,7 +315,6 @@ final class ExecuteImportJob implements ShouldQueue
             throw $e;
         } finally {
             $currentImport->clear();
-            $this->leaveImportContext($previousTenantId, $previousActor);
         }
     }
 
@@ -503,6 +503,7 @@ final class ExecuteImportJob implements ShouldQueue
             ->where('tenant_id', $this->workspaceId)
             ->where('entity_type', $importer->entityName())
             ->active()
+            ->withRelationshipDefinition()
             ->get()
             // A field that links records is written through the ledger by the importer's
             // own pass, not upserted as a value row here. Two field types link records,
@@ -816,13 +817,15 @@ final class ExecuteImportJob implements ShouldQueue
         $updateColumns = [
             'string_value', 'text_value', 'integer_value', 'float_value',
             'json_value', 'boolean_value', 'date_value', 'datetime_value',
+            'source', 'updated_at',
         ];
+        $provenance = ['source' => CustomFields::writeContext()->source->value, 'updated_at' => now()];
 
         $deduplicated = [];
 
         foreach ($this->pendingCustomFieldValues as $row) {
             $key = $row['entity_type'].'|'.$row['entity_id'].'|'.$row['custom_field_id'].'|'.$row[$tenantKey];
-            $deduplicated[$key] = $row;
+            $deduplicated[$key] = [...$row, ...$provenance];
         }
 
         foreach (array_chunk(array_values($deduplicated), 500) as $chunk) {
@@ -1142,7 +1145,7 @@ final class ExecuteImportJob implements ShouldQueue
     {
         $items = array_map(trim(...), explode(',', $value));
 
-        if ($cf->typeData->acceptsArbitraryValues) {
+        if ($cf->typeData->supports(FieldCapability::AcceptsArbitraryValues)) {
             return $items;
         }
 
@@ -1530,27 +1533,6 @@ final class ExecuteImportJob implements ShouldQueue
         foreach ($dedupKeys as $dedupKey) {
             $this->createdRecords[$dedupKey] = $id;
         }
-    }
-
-    /**
-     * The job runs with no panel request, so the custom-fields package has no ambient
-     * tenant and no signed-in user: without both, its field lookups span every tenant
-     * and the links this import writes are credited to nobody.
-     *
-     * @return array{0: int|string|null, 1: mixed}
-     */
-    private function enterImportContext(Import $import): array
-    {
-        $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($this->workspaceId);
-
-        return [$previousTenantId, resolve(LinkActorResolver::class)->override($import->user)];
-    }
-
-    private function leaveImportContext(int|string|null $previousTenantId, mixed $previousActor): void
-    {
-        TenantContextService::setTenantId($previousTenantId);
-        resolve(LinkActorResolver::class)->override($previousActor);
     }
 
     /**

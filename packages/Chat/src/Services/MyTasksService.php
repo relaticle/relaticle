@@ -8,7 +8,7 @@ use App\Enums\CrmEntity;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CanonicalRecordUrl;
-use App\Support\OptionsInCategory;
+use App\Support\CustomFields\WorkspaceCustomFields;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\JoinClause;
@@ -140,7 +140,10 @@ final readonly class MyTasksService
         $meta = new MyTasksFieldMetadata(
             dueFieldId: $row?->due_field_id !== null ? (string) $row->due_field_id : null,
             statusFieldId: $statusFieldId,
-            terminalOptionIds: OptionsInCategory::terminalIds($workspace->getKey(), 'status', $statusFieldId),
+            terminalOptionIds: $statusFieldId === null ? [] : resolve(WorkspaceCustomFields::class)
+                ->forEntity($workspace, CrmEntity::Task->value)
+                ->firstWhere('id', $statusFieldId)
+                ?->terminalOptionIds() ?? [],
         );
 
         app()->instance($cacheKey, $meta);

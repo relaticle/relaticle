@@ -12,6 +12,7 @@ use App\Support\CustomFieldDefinitionValidator;
 use App\Support\CustomFieldSettingsSchema;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
@@ -23,9 +24,9 @@ use Relaticle\Chat\Tools\Concerns\LimitsPlanSteps;
 use Relaticle\Chat\Tools\Concerns\ReportsSkippedRecords;
 use Relaticle\Chat\Tools\Concerns\RequiresWorkspaceCapability;
 use Relaticle\Chat\Tools\Concerns\WithConversationContext;
+use Relaticle\CustomFields\Enums\OptionCategory;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\CustomFields\Facades\Entities;
-use Relaticle\CustomFields\Support\CodeGenerator;
 
 final class CreateCustomFieldTool implements Tool
 {
@@ -66,8 +67,11 @@ final class CreateCustomFieldTool implements Tool
                     'options' => $schema->array()
                         ->items($schema->object([
                             'name' => $schema->string()->description('The option label.')->required(),
+                            'category' => $schema->string()
+                                ->enum(array_column(OptionCategory::cases(), 'value'))
+                                ->description('Status fields only: what the option means. A status field needs at least one completed option.'),
                         ]))
-                        ->description('Required for choice types (select, multi-select, radio, checkbox-list, toggle-buttons). Must not be provided for other types.'),
+                        ->description('Required for choice types (select, multi-select, radio, checkbox-list, toggle-buttons, status). Must not be provided for other types.'),
                     'lookup_type' => $schema->string()
                         ->description("Required for a record field, and only there: the record type it links to. One of: {$lookupTypes}."),
                     'settings' => $schema->object()
@@ -154,7 +158,7 @@ final class CreateCustomFieldTool implements Tool
             }
 
             $explicitCode = (string) ($validated['code'] ?? '');
-            $code = $explicitCode !== '' ? $explicitCode : CodeGenerator::generateFromName($name);
+            $code = $explicitCode !== '' ? $explicitCode : Str::slug($name, '_');
             $codeKey = $entityType.':'.$code;
             if (isset($explicitByCode[$codeKey]) && ($explicitByCode[$codeKey] || $explicitCode !== '')) {
                 $skipped[] = $this->skippedRecord($record, $index, "A field with code \"{$code}\" is already in this batch on {$entityType}.");

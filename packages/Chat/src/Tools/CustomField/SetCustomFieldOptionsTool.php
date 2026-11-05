@@ -39,7 +39,7 @@ final class SetCustomFieldOptionsTool implements Tool
 
     public function description(): string
     {
-        return 'Propose changing the options of existing choice fields (select, multi-select, radio, checkbox-list, toggle-buttons): rename, reorder, add and remove them in ONE proposal. Pass the complete list each field should end with, in order. An existing option you leave out is removed, so list every option that stays. Owners and admins only. Call ListCustomFieldsTool first: it returns each field\'s current options. The task Status option "Done" can be neither renamed nor removed. Returns a proposal for user approval.';
+        return 'Propose changing the options of existing choice fields (select, multi-select, radio, checkbox-list, toggle-buttons): rename, reorder, add and remove them in ONE proposal. Pass the complete list each field should end with, in order. An existing option you leave out is removed, so list every option that stays. Owners and admins only. Call ListCustomFieldsTool first: it returns each field\'s current options. A status field keeps at least one Completed option: renaming one keeps its category, and removing the last one is refused. Returns a proposal for user approval.';
     }
 
     public function schema(JsonSchema $schema): array

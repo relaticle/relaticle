@@ -17,6 +17,7 @@ use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Tools\CustomField\CreateCustomFieldTool;
+use Relaticle\CustomFields\Enums\OptionCategory;
 use Relaticle\CustomFields\Enums\RelationshipCardinality;
 use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
 use Relaticle\CustomFields\Services\TenantContextService;
@@ -804,7 +805,7 @@ it('creates a status field with its options', function (): void {
         'entity_type' => 'task',
         'name' => 'Workflow',
         'type' => 'status',
-        'options' => [['name' => 'Open'], ['name' => 'Shipped']],
+        'options' => [['name' => 'Open', 'category' => 'unstarted'], ['name' => 'Shipped', 'category' => 'completed']],
     ]);
 
     expect($decoded)->not->toHaveKey('error');
@@ -824,7 +825,21 @@ it('creates a status field with its options', function (): void {
 
     expect($field->type)->toBe('status')
         ->and(CustomFieldOption::query()->where('custom_field_id', $field->getKey())->pluck('name')->sort()->values()->all())
-        ->toBe(['Open', 'Shipped']);
+        ->toBe(['Open', 'Shipped'])
+        ->and($field->optionIdsIn(OptionCategory::Completed))
+        ->toBe([(string) $field->options->firstWhere('name', 'Shipped')->getKey()]);
+});
+
+it('refuses a status field with no completed option', function (): void {
+    $decoded = proposeCustomFields($this->convId, [
+        'entity_type' => 'task',
+        'name' => 'Workflow',
+        'type' => 'status',
+        'options' => [['name' => 'Open', 'category' => 'unstarted'], ['name' => 'Shipped', 'category' => 'started']],
+    ]);
+
+    expect($decoded['error'])->toContain('A status field needs at least one option in the Completed category.')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->exists())->toBeFalse();
 });
 
 it('rejects a status field with no options', function (): void {

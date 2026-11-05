@@ -13,7 +13,6 @@ use App\Queries\CustomFieldFilterSchema;
 use App\Queries\EntityFilters;
 use App\Queries\FilterErrors;
 use App\Queries\FilterTree;
-use App\Support\CustomFields\RecordNameResolver;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -551,8 +550,6 @@ abstract class BaseReadListTool implements Tool
         $resolver = resolve(RecordReferenceResolver::class);
         $formatter = resolve(CustomFieldsDisplayFormatter::class);
         $citationType = $this->citationType();
-
-        resolve(RecordNameResolver::class)->prime($records);
 
         // One pass for the whole page: the link rows are already loaded, and their far
         // ends load in one query per record type, which is what lets a link field render

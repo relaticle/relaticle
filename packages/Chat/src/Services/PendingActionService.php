@@ -37,7 +37,6 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CurrentSource;
 use App\Support\CurrentWorkspace;
-use App\Support\LinkActorResolver;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -56,6 +55,8 @@ use Relaticle\Chat\Support\ProposalOwnership;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\ProposalProgress;
 use Relaticle\Chat\Support\RecordReferenceResolver;
+use Relaticle\CustomFields\CustomFields;
+use Relaticle\CustomFields\Enums\WriteSource;
 use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
 use Relaticle\EmailIntegration\Actions\CancelAssistantEmail;
 use Relaticle\EmailIntegration\Actions\DeleteAssistantEmailDraft;
@@ -111,10 +112,6 @@ final readonly class PendingActionService
         RetryAssistantEmail::class,
         GrantWebAccess::class,
     ];
-
-    public function __construct(
-        private LinkActorResolver $linkActor,
-    ) {}
 
     /**
      * @param  array<string, mixed>  $actionData
@@ -263,7 +260,7 @@ final readonly class PendingActionService
                 'Batch proposals resolve per item via approveItem()/rejectItem(), not approve().',
             );
 
-            $result = CurrentSource::during(CreationSource::CHAT, fn (): mixed => $this->asLinkActor($pendingAction, $user, fn (): mixed => $this->executeAction($pendingAction, $user, $excludedFields)));
+            $result = CurrentSource::during(CreationSource::CHAT, fn (): mixed => $this->asAssistantWrite($pendingAction, $user, fn (): mixed => $this->executeAction($pendingAction, $user, $excludedFields)));
 
             $resultData = $result instanceof Model
                 ? ['id' => $result->getKey(), 'type' => $result->getMorphClass()]
@@ -398,7 +395,7 @@ final readonly class PendingActionService
                 return [$progress->isComplete(), null, $progress->statusOf($index, 'approved')];
             }
 
-            $model = CurrentSource::during(CreationSource::CHAT, fn (): Model => $this->asLinkActor($locked, $user, fn (): Model => $this->executeBatchItem($locked, $user, $this->withoutExcludedFields($records[$index], $excludedFields, $locked->entity_type))));
+            $model = CurrentSource::during(CreationSource::CHAT, fn (): Model => $this->asAssistantWrite($locked, $user, fn (): Model => $this->executeBatchItem($locked, $user, $this->withoutExcludedFields($records[$index], $excludedFields, $locked->entity_type))));
 
             // A failure remembered from an earlier attempt is history the
             // moment an item commits; leaving it would report a stale error
@@ -1174,14 +1171,8 @@ final readonly class PendingActionService
      * @param  Closure(): TResult  $write
      * @return TResult
      */
-    private function asLinkActor(PendingAction $pendingAction, User $user, Closure $write): mixed
+    private function asAssistantWrite(PendingAction $pendingAction, User $user, Closure $write): mixed
     {
-        $previousActor = $this->linkActor->override($this->actorFor($pendingAction, $user));
-
-        try {
-            return $write();
-        } finally {
-            $this->linkActor->override($previousActor);
-        }
+        return CustomFields::writing(WriteSource::Ai, $write, actor: $this->actorFor($pendingAction, $user));
     }
 }
