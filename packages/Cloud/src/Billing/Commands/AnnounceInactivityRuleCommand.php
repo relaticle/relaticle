@@ -25,7 +25,7 @@ final class AnnounceInactivityRuleCommand extends Command
 
         $inactive->candidates()
             ->filter(static fn (Workspace $workspace): bool => $workspace->inactivity_notice_sent_at === null)
-            ->each(function (Workspace $workspace) use ($inactive, $force, &$count): void {
+            ->each(function (Workspace $workspace) use ($force, &$count): void {
                 $owner = $workspace->owner;
 
                 if (! $owner instanceof User) {
@@ -39,14 +39,15 @@ final class AnnounceInactivityRuleCommand extends Command
                     return;
                 }
 
-                $deletesAt = $inactive->lastActivity($workspace)->addDays(ScheduleInactiveTrialDeletionsCommand::KEEP_DAYS);
+                $startsAt = now()->startOfSecond();
+                $deletesAt = $startsAt->addDays(ScheduleInactiveTrialDeletionsCommand::KEEP_DAYS);
 
-                $notified = DB::transaction(function () use ($workspace, $owner, $deletesAt): bool {
+                $notified = DB::transaction(function () use ($workspace, $owner, $startsAt, $deletesAt): bool {
                     $updated = Workspace::query()
                         ->whereKey($workspace->getKey())
                         ->whereNull('inactivity_notice_sent_at')
                         ->notScheduledForDeletion()
-                        ->update(['inactivity_notice_sent_at' => now()]);
+                        ->update(['inactivity_notice_sent_at' => $startsAt, 'paused_at' => $startsAt]);
 
                     if ($updated !== 1) {
                         $this->warn("Skipping {$workspace->name}: it changed while the command ran.");

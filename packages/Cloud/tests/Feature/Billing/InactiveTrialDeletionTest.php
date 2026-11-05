@@ -593,10 +593,29 @@ it('dates the launch notice from a member sign-in ten days after the pause', fun
     $this->artisan('billing:announce-inactivity-rule', ['--force' => true])->assertSuccessful();
 
     Mail::assertQueued(InactivityRuleNoticeMail::class, function (InactivityRuleNoticeMail $mail): bool {
-        $mail->assertSeeInText('we will delete Acme on Jan 10, 2027.');
+        $mail->assertSeeInText('we will delete Acme on Jan 11, 2027.');
 
-        return $mail->deletesAt->toDateTimeString() === inactivePausedAt()->addDays(70)->toDateTimeString();
+        return $mail->deletesAt->toDateTimeString() === inactivePausedAt()->addDays(71)->toDateTimeString();
     });
+});
+
+it('starts the 60 days on the day the launch notice goes out, not the day of the migration', function (): void {
+    Mail::fake();
+    $workspace = inactivePausedWorkspace();
+    $noticeDay = inactivePausedAt()->addDays(3);
+
+    $this->travelTo($noticeDay);
+    $this->artisan('billing:announce-inactivity-rule', ['--force' => true])->assertSuccessful();
+
+    foreach (range(1, 63) as $day) {
+        $this->travelTo(inactivityRunOn($day));
+        runInactivityCommand();
+    }
+
+    $promised = Mail::queued(InactivityRuleNoticeMail::class)->sole()->deletesAt;
+
+    expect($promised->toDateTimeString())->toBe($noticeDay->addDays(60)->toDateTimeString())
+        ->and($workspace->refresh()->scheduled_deletion_at?->toDateTimeString())->toBe($promised->toDateTimeString());
 });
 
 it('never sends the launch notice twice', function (): void {
@@ -652,7 +671,7 @@ it('does not send the launch notice to a workspace noticed after it was read', f
 
     $raced = false;
     DB::listen(function (QueryExecuted $query) use (&$raced, $workspace, $noticedAt): void {
-        if ($raced || ! str_contains($query->sql, 'max("last_login_at")')) {
+        if ($raced || ! str_contains($query->sql, 'from "subscriptions"')) {
             return;
         }
 
@@ -677,7 +696,7 @@ it('does not send the launch notice to a workspace the owner asked to delete aft
 
     $raced = false;
     DB::listen(function (QueryExecuted $query) use (&$raced, $workspace, $requestedFor): void {
-        if ($raced || ! str_contains($query->sql, 'max("last_login_at")')) {
+        if ($raced || ! str_contains($query->sql, 'from "subscriptions"')) {
             return;
         }
 
