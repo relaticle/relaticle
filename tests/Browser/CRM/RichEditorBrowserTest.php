@@ -6,6 +6,7 @@ use App\Filament\CustomFields\RichEditorFieldType;
 use App\Filament\RichEditor\SlashMenuPlugin;
 use App\Models\CustomField;
 use App\Models\Note;
+use App\Models\Task;
 use App\Models\User;
 
 mutates(RichEditorFieldType::class, SlashMenuPlugin::class);
@@ -291,4 +292,49 @@ it('spaces paragraphs apart in the note editor', function (): void {
     JS);
 
     expect($gap)->toBeGreaterThan(0);
+});
+
+it('builds, ticks and saves a checklist in a task description', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $editor = '.fi-fo-rich-editor-seamless .ProseMirror';
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/tasks")
+        ->press('New task')
+        ->type('[id="mountedActionSchema0.title"]', 'Prepare the offsite')
+        ->assertVisible($editor)
+        ->typeSlowly($editor, '/checklist', 20)
+        ->keys($editor, 'Enter')
+        ->typeSlowly($editor, 'Call Bob', 20)
+        ->keys($editor, 'Enter')
+        ->typeSlowly($editor, 'Send quote', 20)
+        ->keys($editor, ['Enter', 'Enter'])
+        ->typeSlowly($editor, '[ ] Book room', 20)
+        ->assertScript("document.querySelectorAll('{$editor} ul[data-type=\"taskList\"] > li').length === 3")
+        ->click("{$editor} input[aria-label=\"Task item checkbox for Call Bob\"]")
+        ->assertScript("document.querySelectorAll('{$editor} li[data-checked=\"true\"]').length === 1")
+        ->press('Create')
+        ->assertSee('Prepare the offsite')
+        ->assertNoJavaScriptErrors();
+
+    $task = Task::query()
+        ->where('title', 'Prepare the offsite')
+        ->with('customFieldValues.customField.options')
+        ->firstOrFail();
+    $description = $task->getCustomFieldValue(
+        CustomField::query()
+            ->where('tenant_id', $workspace->getKey())
+            ->where('entity_type', 'task')
+            ->where('code', 'description')
+            ->firstOrFail()
+    );
+
+    expect(substr_count((string) $description, 'data-checked="true"'))->toBe(1)
+        ->and(substr_count((string) $description, 'data-checked="false"'))->toBe(2);
+
+    $page->click('Prepare the offsite')
+        ->assertVisible($editor)
+        ->assertScript("document.querySelector('{$editor} input[aria-label=\"Task item checkbox for Call Bob\"]')?.checked === true");
 });

@@ -1873,6 +1873,35 @@ html.fi:has(body.fi-onboarding-wizard),
     }
 }
 
+.fi-fo-rich-editor .ProseMirror ul[data-type='taskList'] {
+    @apply list-none ps-0;
+
+    > li {
+        @apply flex items-start gap-2.5 ps-0;
+
+        > label {
+            @apply flex shrink-0 select-none;
+            margin-top: calc((1lh - 1rem) / 2);
+
+            input {
+                @apply size-4 cursor-pointer accent-primary-600 dark:accent-primary-500;
+            }
+        }
+
+        > div {
+            @apply mt-0 min-w-0 flex-1;
+        }
+
+        &[data-checked='true'] > div {
+            @apply text-gray-500 dark:text-gray-400;
+        }
+    }
+}
+
+.fi-fo-rich-editor .ProseMirror[contenteditable='false'] ul[data-type='taskList'] input {
+    @apply cursor-default;
+}
+
 /* The editor draws its own placeholder so the trigger can be a key cap, which
    Filament's `content: attr(data-placeholder)` cannot style. */
 .fi-slash-placeholder {
