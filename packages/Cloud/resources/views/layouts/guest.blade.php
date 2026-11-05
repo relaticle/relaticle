@@ -7,7 +7,6 @@
     'ogType' => 'website',
     'canonical' => null,
     'robots' => null,
-    'framed' => false,
 ])
 
 <!DOCTYPE html>
@@ -38,13 +37,13 @@
     </a>
 </nav>
 
-<x-cloud::layout.header :framed="$framed"/>
+<x-cloud::layout.header/>
 
 <main id="main-content" tabindex="-1">
     {{ $slot }}
 </main>
 
-<x-cloud::layout.footer :framed="$framed"/>
+<x-cloud::layout.footer/>
 
 </body>
 </html>

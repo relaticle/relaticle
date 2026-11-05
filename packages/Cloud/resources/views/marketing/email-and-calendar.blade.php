@@ -72,7 +72,6 @@
     :description="$description"
     :ogTitle="$title"
     :ogDescription="$description"
-    framed
 >
     @push('header')
         @vite('packages/Cloud/resources/js/motion.js')

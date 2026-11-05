@@ -42,7 +42,7 @@
     :description="'Open-source AI CRM for people who sell without a sales team. Work from Claude or ChatGPT, or ask '.$assistantName.', the built-in assistant. Free to self-host.'"
     :ogTitle="config('app.name') . ' - ' . __('Open-Source AI CRM for Claude and ChatGPT')"
     :ogDescription="'The open-source AI CRM for selling without a sales team. Work from Claude or ChatGPT, or ask '.$assistantName.', the built-in assistant.'"
-    framed>
+>
     @push('header')
         @vite('packages/Cloud/resources/js/motion.js')
     @endpush

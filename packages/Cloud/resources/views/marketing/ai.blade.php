@@ -138,7 +138,6 @@
     :ogTitle="$title"
     :ogDescription="$description"
     :ogImage="url('/images/open-graph-ai.jpg').'?v=1'"
-    framed
 >
     <x-cloud::marketing.hero>
         <x-slot:eyebrow>

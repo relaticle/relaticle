@@ -13,7 +13,6 @@
         ? __('Cloud Pro is $:pro/mo and Cloud Scale $:scale/mo, billed yearly. Enterprise from $:price/year. Unlimited users and records on every plan.', ['pro' => $proPlan->yearlyPricePerMonth(), 'scale' => $scalePlan->yearlyPricePerMonth(), 'price' => $enterprisePrice])
         : __('Self-host for free, or let us run Relaticle for you. Unlimited users and records. No per-seat pricing.')"
     :ogTitle="$pageTitle"
-    framed
 >
     @php
         $proCredits = number_format(\App\Enums\Plan::Pro->credits());

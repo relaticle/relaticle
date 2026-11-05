@@ -1,7 +1,3 @@
-@props([
-    'framed' => false,
-])
-
 {{-- The mobile overlay is `fixed inset-0`, which does not stop the page behind it
      from scrolling, and does not stop Tab from walking into the page behind it
      either. `bodyLock` handles the first, `trapTab` the second.
@@ -42,21 +38,11 @@
         @resize.window="if (window.innerWidth >= 768) mobileMenu = false">
     <div
         id="main-header"
-        @if($framed) data-framed @endif
-        @class([
-            'fixed w-full top-0 z-50',
-            'pointer-events-none' => $framed,
-            'bg-white/80 dark:bg-gray-950/90 backdrop-blur-md border-b border-gray-200/60 dark:border-white/[0.06]' => ! $framed,
-        ])>
-        <div @class([
-            'mx-auto',
-            'max-w-6xl px-2 pt-2 sm:px-3 md:px-6 md:pt-3' => $framed,
-            'max-w-7xl px-4 sm:px-6 lg:px-8' => ! $framed,
-        ])>
-            <div @class([
-                'pointer-events-auto rounded-2xl bg-white/95 px-2 shadow-navbar backdrop-blur-md sm:px-3 md:rounded-[1.25rem] md:px-4 dark:bg-gray-950/95' => $framed,
-            ])>
-            <div @class(['flex h-16 items-center justify-between', 'md:h-16' => $framed])>
+        data-framed
+        class="pointer-events-none fixed w-full top-0 z-50">
+        <div class="mx-auto max-w-6xl px-2 pt-2 sm:px-3 md:px-6 md:pt-3">
+            <div class="pointer-events-auto rounded-2xl bg-white/95 px-2 shadow-navbar backdrop-blur-md sm:px-3 md:rounded-[1.25rem] md:px-4 dark:bg-gray-950/95">
+            <div class="flex h-16 items-center justify-between">
 
                 <div class="flex flex-1 items-center">
                     <a href="{{ url('/') }}" class="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary rounded-sm" aria-label="Relaticle Home">
@@ -197,7 +183,7 @@
                                         aria-haspopup="true"
                                         :aria-expanded="openDropdown === '{{ $slug }}'"
                                         aria-controls="menu-{{ $slug }}"
-                                        class="px-4 py-1.5 rounded-full text-gray-600 dark:text-gray-400 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-white dark:hover:bg-white/[0.08] {{ $framed ? 'text-sm' : 'text-[13px]' }} font-medium transition-colors duration-200 flex items-center gap-1 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                                        class="px-4 py-1.5 rounded-full text-gray-600 dark:text-gray-400 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-white dark:hover:bg-white/[0.08] text-sm font-medium transition-colors duration-200 flex items-center gap-1 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                                         :class="openDropdown === '{{ $slug }}' && 'text-gray-900 bg-gray-100 dark:text-white dark:bg-white/[0.08]'">
                                     {{ $item->label }}
                                     <x-ri-arrow-down-s-line class="w-3.5 h-3.5 transition-transform duration-200"
@@ -208,7 +194,7 @@
                             <a href="{{ $item->url }}"
                                @if($item->external) target="_blank" rel="noopener noreferrer" @endif
                                @if(url()->current() === $item->url) aria-current="page" @endif
-                               class="px-4 py-1.5 rounded-full text-gray-600 dark:text-gray-400 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-white dark:hover:bg-white/[0.08] {{ $framed ? 'text-sm' : 'text-[13px]' }} font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                               class="px-4 py-1.5 rounded-full text-gray-600 dark:text-gray-400 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-white dark:hover:bg-white/[0.08] text-sm font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
                                 {{ $item->label }}
                             </a>
                         @endif
@@ -357,14 +343,12 @@
         </div>
     </div>
 
-    @if($framed)
-        <div class="bg-surface border-rail h-21 border-b md:h-23" aria-hidden="true">
-            <div class="border-rail relative mx-auto h-full max-w-6xl sm:border-x">
-                <x-cloud::marketing.cross class="-bottom-3 -left-3"/>
-                <x-cloud::marketing.cross class="-bottom-3 -right-3"/>
-            </div>
+    <div class="bg-surface border-rail h-21 border-b md:h-23" aria-hidden="true">
+        <div class="border-rail relative mx-auto h-full max-w-6xl sm:border-x">
+            <x-cloud::marketing.cross class="-bottom-3 -left-3"/>
+            <x-cloud::marketing.cross class="-bottom-3 -right-3"/>
         </div>
-    @endif
+    </div>
 
-    <x-cloud::layout.mobile-menu :framed="$framed"/>
+    <x-cloud::layout.mobile-menu/>
 </header>

@@ -10,8 +10,7 @@ paths:
 
 The marketing site is a framed grid: one `max-w-6xl` frame with continuous hairline rails, flat
 cells inside it, depth from a surface ladder instead of shadows, and real product UI at 1:1 scale.
-The homepage, `/ai`, `/email-and-calendar`, `/pricing`, `/self-hosted`, `/ai-native-crm` and the two
-`/crm-for-{assistant}` pages are built on it. No test reads
+Every page the guest layout renders is built on it: the marketing pages, the blog and the 404 page. No test reads
 for these rules, so a reviewer reads for a hand-rolled section, a raw gray pair, or a heading class
 outside the roles.
 
@@ -86,8 +85,10 @@ reach it. Change the header height and the token together. `html` also carries `
   a reviewer reads for. This shape was chosen on 2026-11-06 over the split hero (headline left,
   paragraph right): no site in the ten-site gallery uses a bottom-aligned split, the stack feeds a
   wide centred panel on one reading axis, and it is the homepage's and `/pricing`'s own shape. The
-  argument pages (`/security`, `/compare/*`, `/alternatives/*`) get a left-aligned stack with their
-  opening paragraph as the subline when they move onto the frame; the utility pages get a title only.
+  argument pages (`/security`, `/compare/*`, `/alternatives/*`) and the utility pages (`/contact`,
+  `/press`, the legal pages) pass `align="start"`: the same stack, left-aligned, with the page's opening
+  paragraph as the subline. The visual cell under it is a row of cells on the rails (the security
+  answers, the ownership points), or nothing.
   The homepage hero is built from the same parts with the open-source pill above the headline, Claude
   and ChatGPT in plain text and Rela as the only chip, and the demo on a rounded `bg-hero-panel` that
   sits outside the rails, with joined tabs on a `mac-window`. Its copy gaps are 32, 20, 28 and 16px,
@@ -170,8 +171,8 @@ reach it. Change the header height and the token together. `html` also carries `
 
 ## Header and footer
 
-A page passes `framed` to `x-cloud::guest-layout`, and the header and footer then sit on the same
-`max-w-6xl` rails, so the logo, the `h1` and every section edge line up.
+The header and footer sit on the same `max-w-6xl` rails as every section, so the logo, the `h1` and
+every section edge line up. `x-cloud::guest-layout` has no other layout.
 
 The framed header is a floating card: 64px tall (the height of the app's top bar) with a 12px gap
 above it at `md`, a 1px `gray-200` ring and one soft shadow (`shadow-navbar`). A 92px band on the
@@ -182,8 +183,7 @@ as a card under the header instead of a full screen.
 The framed footer is quiet: the logo and blurb with four small social icons, four link columns,
 then the copyright row with the theme switcher. No cells, no wordmark.
 
-Pages not yet rebuilt on this system omit the flag and keep the old layout. Flip the default once
-every page is framed.
+The old full-width header and footer are gone; the `framed` flag went with them on 2026-11-06.
 
 ## Motion (`packages/Cloud/resources/js/motion.js`)
 
