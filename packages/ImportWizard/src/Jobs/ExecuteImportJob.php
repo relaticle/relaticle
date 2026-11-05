@@ -1312,23 +1312,46 @@ final class ExecuteImportJob implements ShouldQueue
                 continue;
             }
 
-            $resolvedId = $this->resolveGroupedMatches($matches, $link, $context);
+            $resolvedIds = $this->resolveLinkIds($matches, $link, $context);
 
-            if ($resolvedId === null) {
+            if ($resolvedIds === []) {
                 continue;
             }
 
             $storageStrategy = $link->getStorageStrategy();
-            $data = $storageStrategy->prepareData($data, $link, [$resolvedId]);
+            $data = $storageStrategy->prepareData($data, $link, $resolvedIds);
 
             $pending[] = [
                 'link' => $link,
                 'strategy' => $storageStrategy,
-                'ids' => [$resolvedId],
+                'ids' => $resolvedIds,
             ];
         }
 
         return $pending;
+    }
+
+    /**
+     * @param  Collection<int, RelationshipMatch>  $matches
+     * @param  array<string, mixed>  $context
+     * @return array<int, string>
+     */
+    private function resolveLinkIds(Collection $matches, EntityLink $link, array $context): array
+    {
+        $existingIds = $matches
+            ->filter(fn (RelationshipMatch $match): bool => $match->isExisting() && $match->id !== null)
+            ->map(fn (RelationshipMatch $match): string => (string) $match->id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($link->allowMultiple && $existingIds !== []) {
+            return $existingIds;
+        }
+
+        $resolvedId = $this->resolveGroupedMatches($matches, $link, $context);
+
+        return $resolvedId === null ? [] : [$resolvedId];
     }
 
     /**
