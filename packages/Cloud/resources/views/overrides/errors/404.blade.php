@@ -15,24 +15,15 @@
 @endphp
 
 <x-cloud::guest-layout :title="__('Page not found').' - Relaticle'" robots="noindex">
-    <section class="relative flex min-h-[calc(100svh-4rem)] items-center overflow-hidden bg-white py-24 dark:bg-gray-950">
-        <div class="pointer-events-none absolute inset-x-0 top-0 h-96" aria-hidden="true">
-            <svg width="100%" height="100%" class="absolute inset-0 opacity-40 dark:opacity-30">
-                <pattern id="dots-not-found" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.2" fill="#6B7280"/></pattern>
-                <rect width="100%" height="100%" fill="url(#dots-not-found)"/>
-            </svg>
-            <x-cloud::marketing.interactive-dot-grid-glow/>
-            <div class="absolute inset-0 bg-gradient-to-b from-transparent via-white/70 to-white dark:via-gray-950/70 dark:to-gray-950"></div>
-        </div>
+    <x-cloud::marketing.hero align="start">
+        <x-slot:eyebrow>
+            <x-cloud::marketing.eyebrow>{{ __('Error 404') }}</x-cloud::marketing.eyebrow>
+        </x-slot:eyebrow>
 
-        <div class="relative mx-auto max-w-xl px-6 text-center">
-            <p class="font-mono text-sm font-medium text-primary dark:text-primary-400">404</p>
+        <x-slot:title>{{ __('Page not found') }}</x-slot:title>
 
-            <h1 class="mt-4 font-display text-4xl font-bold tracking-[-0.02em] text-gray-950 sm:text-5xl dark:text-white">
-                {{ __('Page not found') }}
-            </h1>
-
-            <p class="mx-auto mt-5 max-w-sm text-base leading-relaxed text-gray-500 md:text-lg dark:text-gray-400">
+        <x-slot:aside>
+            <p class="text-base leading-relaxed text-gray-500 md:text-lg dark:text-gray-400">
                 @if($suggestion)
                     {{ __('Nothing lives at this address. You were probably looking for :page.', ['page' => $suggestion->label]) }}
                 @else
@@ -40,7 +31,7 @@
                 @endif
             </p>
 
-            <div class="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <div class="mt-7 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
                 @if($suggestion)
                     <x-cloud::marketing.button :href="$suggestion->url" icon-trailing="ri-arrow-right-line">
                         {{ __('Go to :page', ['page' => $suggestion->label]) }}
@@ -54,16 +45,24 @@
                     </x-cloud::marketing.button>
                 @endif
             </div>
+        </x-slot:aside>
 
-            <nav aria-label="{{ __('Popular pages') }}" class="mt-14 border-t border-gray-100 pt-8 dark:border-white/[0.06]">
-                <ul class="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
-                    @foreach($links as $label => $url)
-                        <li>
-                            <a href="{{ $url }}" class="text-gray-500 transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary dark:text-gray-400 dark:hover:text-primary-300">{{ $label }}</a>
-                        </li>
-                    @endforeach
-                </ul>
-            </nav>
-        </div>
-    </section>
+        <nav aria-label="{{ __('Popular pages') }}">
+            <ul @class([
+                'bg-rail border-rail grid grid-cols-1 gap-px border-t sm:grid-cols-2',
+                'lg:grid-cols-3' => count($links) === 3,
+                'lg:grid-cols-4' => count($links) === 4,
+                'lg:grid-cols-5' => count($links) >= 5,
+            ])>
+                @foreach($links as $label => $url)
+                    <li class="bg-surface">
+                        <a href="{{ $url }}" class="hover:bg-tint group flex h-full items-center justify-between gap-3 p-6 text-base font-medium text-gray-950 transition-colors md:p-8 dark:text-white">
+                            {{ $label }}
+                            <x-ri-arrow-right-line class="size-4 shrink-0 text-gray-400 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true"/>
+                        </a>
+                    </li>
+                @endforeach
+            </ul>
+        </nav>
+    </x-cloud::marketing.hero>
 </x-cloud::guest-layout>
