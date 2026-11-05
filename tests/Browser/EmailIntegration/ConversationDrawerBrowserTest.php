@@ -115,6 +115,35 @@ it('lands a resolver link on the company tab with exactly one reader open', func
         ->assertNoJavaScriptErrors();
 })->with(['inLightMode', 'inDarkMode']);
 
+it('folds the record details away while the drawer is open so a second row stays clickable', function (string $theme): void {
+    foreach (['conv-first' => 'Pricing for 40 seats', 'conv-second' => 'Security questionnaire'] as $key => $subject) {
+        $email = drawerBrowserMessage($this->ownerMailbox, $key, 'brian@airbnb.test', ['subject' => $subject, 'sent_at' => $key === 'conv-first' ? now() : now()->subHour()]);
+        $this->company->emails()->attach($email->id);
+    }
+    $emails = (string) array_search(EmailsRelationManager::class, CompanyResource::getRelations(), true);
+
+    $page = loginViaBrowser($this->owner, $theme)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->assertScript('document.documentElement.classList.contains("dark")', $theme === 'inDarkMode')
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies/{$this->company->id}?relation={$emails}")
+        ->assertVisible('.fi-record-rail')
+        ->click('[data-conversation="conv-first"] > button')
+        ->assertSeeIn('#email-reader-heading', 'Pricing for 40 seats')
+        ->assertMissing('.fi-record-rail')
+        ->assertMissing('.fi-record-rail-resize-handle')
+        ->assertScript('Math.round(document.querySelector(".fi-email-reader-drawer").getBoundingClientRect().width) === Math.round(window.innerWidth * 0.55)', true);
+
+    $page->page()->locator('[data-conversation="conv-second"] > button')->click(['position' => ['x' => 40, 'y' => 20]]);
+
+    $page->assertSeeIn('#email-reader-heading', 'Security questionnaire')
+        ->assertMissing('.fi-record-rail')
+        ->click('.fi-email-reader-drawer button[aria-label="'.__('filament/emails/composer.actions.close').'"]')
+        ->assertMissing('.fi-email-reader-drawer')
+        ->assertVisible('.fi-record-rail')
+        ->assertNoJavaScriptErrors();
+})->with(['inLightMode', 'inDarkMode']);
+
 it('opens one reader when a record page switches from another tab to Emails', function (string $theme): void {
     $email = drawerBrowserMessage($this->ownerMailbox, 'conv-tabs', 'brian@airbnb.test', ['subject' => 'Renewal terms']);
     $this->company->emails()->attach($email->id);
