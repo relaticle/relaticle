@@ -12,6 +12,12 @@ return [
 
     'move_denied' => 'You do not have permission to move this card.',
 
+    'move_to' => [
+        'label' => 'Move to',
+        'current' => 'Current',
+        'moved' => 'Moved to :column',
+    ],
+
     'filters_button' => [
         'label' => 'Filters',
         'clear' => 'Clear filters',

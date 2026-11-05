@@ -6,6 +6,7 @@ use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\WorkspaceRole;
+use App\Filament\Actions\MoveCardAction;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
@@ -21,7 +22,7 @@ use Relaticle\Flowforge\Board;
 use Relaticle\Flowforge\Grouping;
 use Relaticle\Flowforge\Lane;
 
-mutates(OpportunitiesBoard::class);
+mutates(OpportunitiesBoard::class, MoveCardAction::class);
 
 beforeEach(function () {
     $this->user = User::factory()->withWorkspace()->create();
@@ -261,6 +262,51 @@ it('refuses a move with a message when the user cannot update the card', functio
     livewire(OpportunitiesBoard::class)
         ->call('moveCard', (string) $opportunity->id, (string) $qualification->getKey())
         ->assertNotified(__('filament/pages/boards.move_denied'))
+        ->assertNotDispatched('kanban-card-moved');
+
+    $storedValue = $opportunity->fresh()->customFieldValues()
+        ->where('custom_field_id', $this->stageField->getKey())
+        ->value($this->stageField->getValueColumn());
+
+    expect($storedValue)->toBe($prospecting->getKey());
+});
+
+it('moves a card to the stage picked from its move to sheet', function (): void {
+    $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');
+    $closedWon = $this->stageField->options->firstWhere('name', 'Closed Won');
+
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
+    $opportunity->saveCustomFieldValue($this->stageField, $prospecting->getKey());
+
+    livewire(OpportunitiesBoard::class)
+        ->call('mountAction', 'moveTo', [], ['recordKey' => (string) $opportunity->id])
+        ->assertMountedActionModalSee(__('filament/pages/boards.move_to.current'))
+        ->call('callMountedAction', ['to' => (string) $closedWon->getKey()])
+        ->assertHasNoActionErrors()
+        ->assertNotified(__('filament/pages/boards.move_to.moved', ['column' => 'Closed Won']));
+
+    $storedValue = $opportunity->fresh()->customFieldValues()
+        ->where('custom_field_id', $this->stageField->getKey())
+        ->value($this->stageField->getValueColumn());
+
+    expect($storedValue)->toBe($closedWon->getKey());
+});
+
+it('keeps a card in its stage when a viewer picks another from the move to sheet', function (): void {
+    $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');
+    $qualification = $this->stageField->options->firstWhere('name', 'Qualification');
+
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
+    $opportunity->saveCustomFieldValue($this->stageField, $prospecting->getKey());
+
+    $viewer = User::factory()->create();
+    $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
+    $viewer->switchWorkspace($this->workspace);
+    $this->actingAs($viewer);
+
+    livewire(OpportunitiesBoard::class)
+        ->call('mountAction', 'moveTo', [], ['recordKey' => (string) $opportunity->id])
+        ->call('callMountedAction', ['to' => (string) $qualification->getKey()])
         ->assertNotDispatched('kanban-card-moved');
 
     $storedValue = $opportunity->fresh()->customFieldValues()

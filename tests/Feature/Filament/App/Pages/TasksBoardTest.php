@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\CustomFields\TaskField;
 use App\Filament\Actions\CreateTaskAction;
+use App\Filament\Actions\MoveCardAction;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
@@ -21,7 +22,7 @@ use Relaticle\Flowforge\Board;
 use Relaticle\Flowforge\Grouping;
 use Relaticle\Flowforge\Lane;
 
-mutates(TasksBoard::class, CreateTaskAction::class, ChecklistHtml::class);
+mutates(TasksBoard::class, CreateTaskAction::class, ChecklistHtml::class, MoveCardAction::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -144,6 +145,27 @@ it('moves a card between columns via moveCard', function (): void {
         ->value($this->statusField->getValueColumn());
 
     expect($updatedValue)->toBe($inProgress->getKey());
+});
+
+it('moves a card to the status picked from its move to sheet', function (): void {
+    $todo = $this->statusField->options->firstWhere('name', 'To do');
+    $inProgress = $this->statusField->options->firstWhere('name', 'In progress');
+
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
+    $task->saveCustomFieldValue($this->statusField, $todo->getKey());
+
+    livewire(TasksBoard::class)
+        ->call('mountAction', 'moveTo', [], ['recordKey' => (string) $task->id])
+        ->assertMountedActionModalSee(__('filament/pages/boards.move_to.current'))
+        ->call('callMountedAction', ['to' => (string) $inProgress->getKey()])
+        ->assertHasNoActionErrors()
+        ->assertNotified(__('filament/pages/boards.move_to.moved', ['column' => 'In progress']));
+
+    $storedValue = $task->fresh()->customFieldValues()
+        ->where('custom_field_id', $this->statusField->getKey())
+        ->value($this->statusField->getValueColumn());
+
+    expect($storedValue)->toBe($inProgress->getKey());
 });
 
 it('moves a card between two cards of another column', function (): void {

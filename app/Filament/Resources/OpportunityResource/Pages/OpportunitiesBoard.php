@@ -6,6 +6,7 @@ namespace App\Filament\Resources\OpportunityResource\Pages;
 
 use App\Actions\Opportunity\UpdateOpportunity;
 use App\Enums\CustomFields\OpportunityField as OpportunityCustomField;
+use App\Filament\Actions\MoveCardAction;
 use App\Filament\Components\Forms\RecordSelect;
 use App\Filament\Components\Infolists\RecordChipEntry;
 use App\Filament\Components\Tables\Filters\RecordSelectFilter;
@@ -121,37 +122,46 @@ final class OpportunitiesBoard extends BoardResourcePage
             })
             ->createCardAction($this->cardCreation())
             ->cardAction('edit')
-            ->cardActions([
-                Action::make('edit')
-                    ->authorize(fn (?Opportunity $record): bool => $record instanceof Opportunity && Gate::allows('update', $record))
-                    ->label(__('filament/pages/boards.opportunities.actions.edit'))
-                    ->slideOver()
-                    ->modalWidth(Width::ExtraLarge)
-                    ->icon('heroicon-o-pencil-square')
-                    ->schema(OpportunityForm::get(...))
-                    ->fillForm(fn (Opportunity $record): array => [
-                        'name' => $record->name,
-                        'company_id' => $record->company_id,
-                        'contact_id' => $record->contact_id,
-                    ])
-                    ->action(function (Opportunity $record, array $data): void {
-                        $record->update($data);
-                    }),
-                Action::make('delete')
-                    ->authorize(fn (?Opportunity $record): bool => $record instanceof Opportunity && Gate::allows('delete', $record))
-                    ->label(__('filament/pages/boards.opportunities.actions.delete'))
-                    ->icon('heroicon-o-trash')
-                    ->color('danger')
-                    ->requiresConfirmation()
-                    ->action(function (Opportunity $record): void {
-                        $record->delete();
-                    }),
-            ])
+            ->cardActions($this->cardActions())
             ->groupings([$this->companyGrouping()])
             ->filters($this->boardFilters())
             ->filtersFormWidth(Width::Medium)
             ->filtersTriggerAction(fn (Action $action): Action => $action->button()->labeledFrom('sm')->size(Size::Small)->label(__('filament/pages/boards.filters_button.label')))
             ->headerToolbar();
+    }
+
+    /**
+     * @return array<int, Action>
+     */
+    private function cardActions(): array
+    {
+        return [
+            Action::make('edit')
+                ->authorize(fn (?Opportunity $record): bool => $record instanceof Opportunity && Gate::allows('update', $record))
+                ->label(__('filament/pages/boards.opportunities.actions.edit'))
+                ->slideOver()
+                ->modalWidth(Width::ExtraLarge)
+                ->icon('heroicon-o-pencil-square')
+                ->schema(OpportunityForm::get(...))
+                ->fillForm(fn (Opportunity $record): array => [
+                    'name' => $record->name,
+                    'company_id' => $record->company_id,
+                    'contact_id' => $record->contact_id,
+                ])
+                ->action(function (Opportunity $record, array $data): void {
+                    $record->update($data);
+                }),
+            MoveCardAction::make(),
+            Action::make('delete')
+                ->authorize(fn (?Opportunity $record): bool => $record instanceof Opportunity && Gate::allows('delete', $record))
+                ->label(__('filament/pages/boards.opportunities.actions.delete'))
+                ->icon('heroicon-o-trash')
+                ->color('danger')
+                ->requiresConfirmation()
+                ->action(function (Opportunity $record): void {
+                    $record->delete();
+                }),
+        ];
     }
 
     /**
