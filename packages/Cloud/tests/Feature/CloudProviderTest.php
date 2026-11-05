@@ -118,8 +118,8 @@ it('links the documentation to its own public root', function (): void {
     expect(config('documentation.public_url'))->toBe(url()->getPublicUrl());
 });
 
-it('lets an inactivity deletion proceed when billing is off', function (): void {
+it('never lets an inactivity deletion proceed when billing is off', function (): void {
     Feature::define(Billing::class, false);
 
-    expect(resolve(BillingContract::class)->inactivityDeletionStands(Workspace::factory()->make()))->toBeTrue();
+    expect(resolve(BillingContract::class)->inactivityDeletionStands(Workspace::factory()->make()))->toBeFalse();
 });

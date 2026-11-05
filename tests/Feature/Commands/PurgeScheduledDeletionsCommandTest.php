@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Jetstream\DeleteWorkspace;
 use App\Enums\DeletionReason;
 use App\Enums\MediaCollection;
+use App\Features\Billing;
 use App\Jobs\PurgeUser;
 use App\Jobs\PurgeWorkspace;
 use App\Models\Note;
@@ -17,6 +18,7 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Billing\Notifications\PaymentFailedNotification;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -340,4 +342,17 @@ it('keeps attachment bytes when permanent workspace deletion rolls back', functi
     expect($workspace->fresh())->not->toBeNull()
         ->and($attachment->fresh())->not->toBeNull();
     Storage::disk('local')->assertExists($attachment->getPathRelativeToRoot());
+});
+
+it('keeps a workspace on an inactivity countdown when hosted billing is off', function (): void {
+    Feature::define(Billing::class, false);
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+    $workspace->forceFill(['scheduled_deletion_at' => now()->subMinute(), 'deletion_reason' => DeletionReason::Inactivity])->save();
+
+    $this->artisan('app:purge-scheduled-deletions')->assertSuccessful();
+
+    $workspace->refresh();
+
+    expect($workspace->scheduled_deletion_at)->toBeNull()
+        ->and($workspace->deletion_reason)->toBeNull();
 });
