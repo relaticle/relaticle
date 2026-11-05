@@ -21,6 +21,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\ChecklistHtml;
+use App\Support\PlainText;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -38,6 +39,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\Flowforge\Board;
 use Relaticle\Flowforge\Column;
@@ -95,7 +97,7 @@ final class TasksBoard extends BoardResourcePage
                 $descriptionCustomField = $customFields->get('custom_fields.description')
                     ?->columnSpanFull()
                     ->visible(fn (?string $state): bool => filled($state))
-                    ->formatStateUsing(fn (string $state): string => str($state)->stripTags()->limit()->toString())
+                    ->formatStateUsing(fn (Task $record): string => Str::limit(PlainText::fromHtml($this->descriptionHtml($record) ?? '')))
                     ->extraAttributes(['class' => 'mb-4']);
 
                 $priorityField = $customFields->get('custom_fields.priority')
@@ -115,7 +117,6 @@ final class TasksBoard extends BoardResourcePage
                     ->formatStateUsing(fn (?string $state): string => $this->formatDueDateBadge($state));
 
                 return $schema
-                    ->inline()
                     ->gap(false)
                     ->components([
                         $descriptionCustomField,
@@ -148,6 +149,15 @@ final class TasksBoard extends BoardResourcePage
             ->stacked();
     }
 
+    private function descriptionHtml(Task $record): ?string
+    {
+        $description = $record->customFieldValues
+            ->first(fn (CustomFieldValue $value): bool => $value->customField instanceof CustomField && $value->customField->holdsChecklists())
+            ?->getValue();
+
+        return is_string($description) ? $description : null;
+    }
+
     private function checklistProgressEntry(): TextEntry
     {
         return TextEntry::make('checklist_progress')
@@ -158,11 +168,8 @@ final class TasksBoard extends BoardResourcePage
             ->grow(false)
             ->extraAttributes(['data-checklist-progress' => ''])
             ->state(function (Task $record): ?string {
-                $description = $record->customFieldValues
-                    ->first(fn (CustomFieldValue $value): bool => $value->customField instanceof CustomField && $value->customField->holdsChecklists())
-                    ?->getValue();
-
-                $progress = is_string($description) ? ChecklistHtml::progress($description) : null;
+                $description = $this->descriptionHtml($record);
+                $progress = $description === null ? null : ChecklistHtml::progress($description);
 
                 return $progress === null ? null : "{$progress['checked']}/{$progress['total']}";
             })

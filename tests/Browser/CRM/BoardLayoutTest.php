@@ -64,6 +64,47 @@ it('scrolls a long column inside the board without scrolling the page', function
     'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, OpportunityField::CLOSE_DATE->value, 'opportunities/board'],
 ]);
 
+it('puts the badges of a task card below a short description', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    TenantContextService::setTenantId($workspace->getKey());
+
+    $statusField = CustomField::query()->forEntity(Task::class)->where('code', TaskField::STATUS->value)->firstOrFail();
+    $descriptionField = CustomField::query()->forEntity(Task::class)->where('code', TaskField::DESCRIPTION->value)->firstOrFail();
+
+    $task = Task::factory()->recycle([$user, $workspace])->create(['title' => 'Short card']);
+    $task->saveCustomFieldValue($statusField, $statusField->options->first()->getKey());
+    $task->saveCustomFieldValue($descriptionField, '<p>Short</p>');
+    $task->assignees()->attach($user);
+
+    TenantContextService::setTenantId(null);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/tasks/board")
+        ->assertVisible("[data-card-id=\"{$task->getKey()}\"] .ff-card-flex")
+        ->assertNoJavaScriptErrors();
+
+    $layout = $page->script(<<<JS
+        (() => {
+            const card = document.querySelector('[data-card-id="{$task->getKey()}"]');
+            const description = [...card.querySelectorAll('.fi-in-text-item')].find((item) => item.textContent.trim() === 'Short');
+            const badges = card.querySelector('.ff-card-flex');
+
+            return {
+                badgesBelowText: badges.getBoundingClientRect().top >= description.getBoundingClientRect().bottom,
+                sameLeftEdge: Math.round(badges.getBoundingClientRect().left) === Math.round(description.getBoundingClientRect().left),
+            };
+        })();
+    JS);
+
+    expect($layout)->toBe(['badgesBelowText' => true, 'sameLeftEdge' => true]);
+});
+
 it('fills the viewport with a grouped board and lines its headers up with the flat board', function (): void {
     $this->withVite();
 

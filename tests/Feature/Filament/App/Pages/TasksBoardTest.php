@@ -469,6 +469,13 @@ it('shows checklist progress on a task card', function (): void {
         ->assertSee('1/2');
 });
 
+it('reads a card description as separate words and checklist items', function (): void {
+    tasksBoardCardWithDescription($this, '<p>Agenda</p><p>Venue</p>'.tasksBoardChecklistHtml());
+
+    livewire(TasksBoard::class)
+        ->assertSee('Agenda Venue [x] Call Bob [ ] Send quote');
+});
+
 it('shows no checklist badge on a card without a checklist', function (): void {
     tasksBoardCardWithDescription($this, '<p>Plain</p>');
 
