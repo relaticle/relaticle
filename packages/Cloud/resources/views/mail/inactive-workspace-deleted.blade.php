@@ -1,4 +1,4 @@
-<x-mail::message :reason="__('mail.footer.reason.owner', ['workspace' => $workspaceName])">
+<x-mail::message :reason="__('mail.footer.reason.former_owner', ['workspace' => $workspaceName])">
 <x-slot:preheader>{{ __('cloud::inactivity.deleted.preheader') }}</x-slot:preheader>
 # {{ __('cloud::inactivity.deleted.heading', ['workspace' => $workspaceName]) }}
 

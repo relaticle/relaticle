@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Contracts\Billing as BillingContract;
 use App\Contracts\Entitlements;
 use App\Features\Billing;
+use App\Models\Workspace;
 use App\Services\NoBilling;
 use App\Services\SelfHostedEntitlements;
 use Laravel\Pennant\Feature;
@@ -115,4 +116,10 @@ it('keeps a legal link the operator configured', function (): void {
 
 it('links the documentation to its own public root', function (): void {
     expect(config('documentation.public_url'))->toBe(url()->getPublicUrl());
+});
+
+it('lets an inactivity deletion proceed when billing is off', function (): void {
+    Feature::define(Billing::class, false);
+
+    expect(resolve(BillingContract::class)->inactivityDeletionStands(Workspace::factory()->make()))->toBeTrue();
 });

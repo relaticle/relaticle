@@ -389,7 +389,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
 
     public function queuePurge(): void
     {
-        $this->forceFill(['scheduled_deletion_at' => now()])->save();
+        $this->forceFill(['scheduled_deletion_at' => now(), 'deletion_reason' => DeletionReason::Requested])->save();
 
         dispatch(new PurgeWorkspace($this));
     }

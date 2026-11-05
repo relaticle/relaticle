@@ -8,11 +8,13 @@ use App\Filament\Pages\CreateWorkspace;
 use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
+use Filament\Facades\Filament;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
@@ -373,7 +375,7 @@ it('does nothing for a workspace that has no countdown', function (): void {
 it('reminds the owner of an inactivity deletion five days before it', function (): void {
     Mail::fake();
     $this->travelTo(inactivePausedAt()->addDays(50)->setTime(2, 0));
-    $workspace = inactivePausedWorkspace();
+    $workspace = inactivePausedWorkspace(['paused_at' => now()->subDays(55)]);
     $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(5)->setTime(17, 30), 'deletion_reason' => DeletionReason::Inactivity])->save();
 
     runInactivityCommand();
@@ -422,6 +424,8 @@ it('writes the deleted confirmation from the workspace name alone', function ():
 
 function purgeDueDeletion(Workspace $workspace, DeletionReason $reason): void
 {
+    test()->travelTo(inactivePausedAt()->addDays(60)->addMinute());
+
     $workspace->forceFill(['scheduled_deletion_at' => now()->subMinute(), 'deletion_reason' => $reason])->save();
 
     test()->artisan('app:purge-scheduled-deletions')->assertSuccessful();
@@ -563,4 +567,142 @@ it('does not break sign-in when cancelling a countdown fails, and reports the fa
 
     expect(Auth::guard('web')->check())->toBeTrue();
     Exceptions::assertReported(RuntimeException::class);
+});
+
+it('sends no confirmation when an admin purges a workspace that was on an inactivity countdown', function (): void {
+    Mail::fake();
+    $workspace = inactivePausedWorkspace();
+    inactivityCountdownOn($workspace);
+
+    $workspace->refresh()->queuePurge();
+
+    expect(Workspace::query()->whereKey($workspace->getKey())->exists())->toBeFalse();
+    Mail::assertNothingQueued();
+});
+
+it('sends no confirmation when the owner is being deleted along with the workspace', function (): void {
+    Mail::fake();
+    $workspace = inactivePausedWorkspace();
+    inactivityCountdownOn($workspace);
+    $workspace->update(['scheduled_deletion_at' => now()->subMinute()]);
+
+    $workspace->owner->queuePurge();
+
+    expect(Workspace::query()->whereKey($workspace->getKey())->exists())->toBeFalse();
+    Mail::assertNothingQueued();
+});
+
+it('purges quietly when the owner row is already gone', function (): void {
+    withHostedBilling();
+    Mail::fake();
+    $workspace = inactivePausedWorkspace();
+    DB::table('users')->where('id', $workspace->user_id)->delete();
+
+    purgeDueDeletion($workspace, DeletionReason::Inactivity);
+
+    expect(Workspace::query()->whereKey($workspace->getKey())->exists())->toBeFalse();
+    Mail::assertNothingQueued();
+});
+
+/** @return array<string, Closure(Workspace): mixed> */
+function deletionsThatNoLongerStand(): array
+{
+    $reasons = Arr::only(inactiveExclusions(), ['subscribed', 'grandfathered', 'charged once and since canceled', 'owed an unpaid managed invoice', 'bought a credit pack']);
+
+    return [
+        ...$reasons,
+        'on an active managed plan' => function (Workspace $workspace): void {
+            $workspace->forceFill(['plan' => Plan::Pro])->save();
+            $workspace->subscriptions()->create(['type' => 'managed', 'stripe_id' => 'sub_managed_live', 'stripe_status' => 'active', 'stripe_price' => 'price_pro_monthly_test', 'quantity' => 1]);
+        },
+        'signed in to after the countdown began' => fn (Workspace $workspace): bool => $workspace->owner->forceFill(['last_login_at' => inactivePausedAt()->addDays(59)])->save(),
+    ];
+}
+
+foreach (deletionsThatNoLongerStand() as $reason => $arrange) {
+    it("keeps a workspace marked for inactivity deletion that is {$reason}", function () use ($arrange): void {
+        withHostedBilling();
+        Mail::fake();
+        $workspace = inactivePausedWorkspace();
+        $arrange($workspace);
+
+        purgeDueDeletion($workspace, DeletionReason::Inactivity);
+
+        $workspace->refresh();
+
+        expect($workspace->scheduled_deletion_at)->toBeNull()
+            ->and($workspace->deletion_reason)->toBeNull();
+        Mail::assertNothingQueued();
+    });
+}
+
+it('purges a workspace marked for inactivity deletion that is still eligible', function (): void {
+    withHostedBilling();
+    Mail::fake();
+    $workspace = inactivePausedWorkspace();
+
+    purgeDueDeletion($workspace, DeletionReason::Inactivity);
+
+    expect(Workspace::query()->whereKey($workspace->getKey())->exists())->toBeFalse();
+    Mail::assertQueued(InactiveWorkspaceDeletedMail::class, 1);
+});
+
+it('cancels a countdown that no longer stands instead of reminding the owner', function (): void {
+    Mail::fake();
+    $this->travelTo(inactivePausedAt()->addDays(50)->setTime(2, 0));
+    $workspace = inactivePausedWorkspace(['paused_at' => now()->subDays(55), 'hosted_free_grandfathered_at' => now()->subYear()]);
+    $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(5)->setTime(17, 30), 'deletion_reason' => DeletionReason::Inactivity])->save();
+
+    runInactivityCommand();
+
+    $workspace->refresh();
+
+    expect($workspace->scheduled_deletion_at)->toBeNull()
+        ->and($workspace->deletion_reason)->toBeNull();
+    Mail::assertNothingQueued();
+});
+
+it('warns a late-found workspace when it is scheduled, reminds once nine days later and not again', function (): void {
+    Mail::fake();
+    $workspace = inactivePausedWorkspace();
+
+    $this->travelTo(inactivePausedAt()->addDays(100)->setTime(2, 0));
+    runInactivityCommand();
+
+    Mail::assertQueued(InactiveWorkspaceDeletionWarningMail::class, 1);
+    Mail::assertNotQueued(InactiveWorkspaceDeletionReminderMail::class);
+
+    $this->travelTo(now()->addDays(8));
+    runInactivityCommand();
+    Mail::assertNotQueued(InactiveWorkspaceDeletionReminderMail::class);
+
+    $this->travelTo(now()->addDay());
+    runInactivityCommand();
+    Mail::assertQueued(InactiveWorkspaceDeletionReminderMail::class, 1);
+
+    $this->travelTo(now()->addDay());
+    runInactivityCommand();
+    Mail::assertQueued(InactiveWorkspaceDeletionReminderMail::class, 1);
+    Mail::assertQueued(InactiveWorkspaceDeletionWarningMail::class, 1);
+    expect($workspace->refresh()->deletion_reason)->toBe(DeletionReason::Inactivity);
+});
+
+it('sends a purged owner from the app panel to workspace setup, where a personal workspace starts', function (): void {
+    withHostedBilling();
+    Mail::fake();
+    $workspace = inactivePausedWorkspace();
+    $owner = $workspace->owner;
+
+    purgeDueDeletion($workspace, DeletionReason::Inactivity);
+
+    $this->actingAs($owner->refresh())
+        ->get(Filament::getPanel('app')->getUrl())
+        ->assertRedirect(Filament::getPanel('app')->getTenantRegistrationUrl());
+
+    livewire(CreateWorkspace::class)
+        ->fillForm(['name' => 'Acme Again'])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    expect($owner->ownedWorkspaces()->sole()->personal_workspace)->toBeTrue();
 });

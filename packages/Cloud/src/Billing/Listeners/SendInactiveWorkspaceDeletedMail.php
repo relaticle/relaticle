@@ -7,6 +7,7 @@ namespace Relaticle\Cloud\Billing\Listeners;
 use App\Enums\DeletionReason;
 use App\Events\WorkspaceDeleted;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletedMail;
 
@@ -20,12 +21,14 @@ final readonly class SendInactiveWorkspaceDeletedMail
             return;
         }
 
-        $email = User::query()->whereKey($workspace->user_id)->value('email');
+        $email = User::query()->whereKey($workspace->user_id)->whereNull('scheduled_deletion_at')->value('email');
 
         if (! is_string($email)) {
             return;
         }
 
-        Mail::to($email)->queue((new InactiveWorkspaceDeletedMail($workspace->name))->afterCommit());
+        $name = $workspace->name;
+
+        DB::afterCommit(fn (): mixed => rescue(fn () => Mail::to($email)->queue(new InactiveWorkspaceDeletedMail($name)), report: true));
     }
 }

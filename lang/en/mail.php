@@ -13,6 +13,7 @@ return [
             'owner' => 'You received this because you own the :workspace workspace.',
             'member' => 'You received this because you are a member of :workspace.',
             'former_member' => 'You received this because you were a member of :workspace.',
+            'former_owner' => 'You received this because you owned the :workspace workspace.',
             'digest' => 'You received this because you enabled the daily digest.',
             'assignee' => 'You received this because a task in :workspace was assigned to you.',
             'invitee' => 'You received this because :email was invited to :workspace.',

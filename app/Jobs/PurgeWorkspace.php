@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Contracts\Billing;
+use App\Enums\DeletionReason;
 use App\Models\Workspace;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -35,9 +37,17 @@ final class PurgeWorkspace implements ShouldBeUnique, ShouldQueue
         return $this->workspace->getKey();
     }
 
-    public function handle(DeletesTeams $deletesWorkspaces): void
+    public function handle(DeletesTeams $deletesWorkspaces, Billing $billing): void
     {
         if (! $this->workspace->isDeletionDue()) {
+            return;
+        }
+
+        if ($this->workspace->deletion_reason === DeletionReason::Inactivity && ! $billing->inactivityDeletionStands($this->workspace)) {
+            $this->workspace->forceFill(['scheduled_deletion_at' => null, 'deletion_reason' => null])->save();
+
+            Log::info('Cancelled an inactivity deletion that no longer stands', ['workspace_id' => $this->workspace->getKey()]);
+
             return;
         }
 

@@ -12,6 +12,7 @@ use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Billing\Actions\CancelWorkspaceSubscription;
 use Relaticle\Cloud\Billing\Actions\StartProTrial;
 use Relaticle\Cloud\Billing\Filament\Billing as BillingPage;
+use Relaticle\Cloud\Billing\Queries\InactiveTrialWorkspacesQuery;
 
 final readonly class StripeBilling implements Billing
 {
@@ -19,6 +20,7 @@ final readonly class StripeBilling implements Billing
         private StartProTrial $startProTrial,
         private CancelWorkspaceSubscription $cancelSubscription,
         private CreditPackCatalog $creditPacks,
+        private InactiveTrialWorkspacesQuery $inactive,
     ) {}
 
     public function url(Workspace $workspace): ?string
@@ -57,5 +59,10 @@ final readonly class StripeBilling implements Billing
         }
 
         return __('cloud::billing.deletion_notice');
+    }
+
+    public function inactivityDeletionStands(Workspace $workspace): bool
+    {
+        return $this->inactive->stillDue($workspace);
     }
 }

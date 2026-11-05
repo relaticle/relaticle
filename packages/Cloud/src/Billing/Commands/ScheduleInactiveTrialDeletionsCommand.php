@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Relaticle\Cloud\Billing\Actions\CancelInactivityDeletion;
 use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletionReminderMail;
 use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletionWarningMail;
 use Relaticle\Cloud\Billing\Queries\InactiveTrialWorkspacesQuery;
@@ -28,10 +29,10 @@ final class ScheduleInactiveTrialDeletionsCommand extends Command
 
     public const int WARNING_DAYS = 14;
 
-    public function handle(InactiveTrialWorkspacesQuery $inactive): int
+    public function handle(InactiveTrialWorkspacesQuery $inactive, CancelInactivityDeletion $cancel): int
     {
         $this->scheduleDeletions($inactive);
-        $this->sendReminders();
+        $this->sendReminders($inactive, $cancel);
 
         return self::SUCCESS;
     }
@@ -97,7 +98,7 @@ final class ScheduleInactiveTrialDeletionsCommand extends Command
                 ->orWhereIn('users.id', Membership::query()->toBase()->select('user_id')->whereColumn('workspace_id', 'workspaces.id')));
     }
 
-    private function sendReminders(): void
+    private function sendReminders(InactiveTrialWorkspacesQuery $inactive, CancelInactivityDeletion $cancel): void
     {
         $reminderDate = now()->addDays(config('relaticle.deletion.reminder_days_before'));
         $reminded = 0;
@@ -106,11 +107,18 @@ final class ScheduleInactiveTrialDeletionsCommand extends Command
             ->scheduledForInactivity()
             ->whereBetween('scheduled_deletion_at', [$reminderDate->startOfDay(), $reminderDate->endOfDay()])
             ->with('owner')
-            ->chunkById(100, function (Collection $workspaces) use (&$reminded): void {
-                $workspaces->each(function (Workspace $workspace) use (&$reminded): void {
+            ->chunkById(100, function (Collection $workspaces) use ($inactive, $cancel, &$reminded): void {
+                $workspaces->each(function (Workspace $workspace) use ($inactive, $cancel, &$reminded): void {
                     $owner = $workspace->owner;
 
                     if (! $owner instanceof User || $workspace->scheduled_deletion_at === null) {
+                        return;
+                    }
+
+                    if (! $inactive->stillDue($workspace)) {
+                        $this->info("Cancelling the deletion of {$workspace->name}, which no longer stands.");
+                        $cancel->execute($workspace);
+
                         return;
                     }
 

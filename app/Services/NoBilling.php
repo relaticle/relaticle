@@ -33,4 +33,9 @@ final readonly class NoBilling implements Billing
     {
         return null;
     }
+
+    public function inactivityDeletionStands(Workspace $workspace): bool
+    {
+        return true;
+    }
 }
