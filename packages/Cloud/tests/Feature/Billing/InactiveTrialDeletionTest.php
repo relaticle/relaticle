@@ -69,16 +69,21 @@ function inactivePausedAt(): CarbonImmutable
     return CarbonImmutable::parse(INACTIVE_PAUSED_AT);
 }
 
+function inactivityRunOn(int $day): CarbonImmutable
+{
+    return inactivePausedAt()->startOfDay()->addDays($day)->setTime(2, 0);
+}
+
 function runInactivityCommand(): void
 {
     test()->artisan('billing:schedule-inactive-deletions')->assertSuccessful();
 }
 
-it('schedules a paused trial 46 days in and warns the owner once', function (): void {
+it('schedules a paused trial on the 46th daily run and warns the owner once', function (): void {
     Mail::fake();
     $workspace = inactivePausedWorkspace();
 
-    $this->travelTo(inactivePausedAt()->addDays(46));
+    $this->travelTo(inactivityRunOn(46));
     runInactivityCommand();
 
     $workspace->refresh();
@@ -91,11 +96,11 @@ it('schedules a paused trial 46 days in and warns the owner once', function (): 
         && $mail->workspace->is($workspace));
 });
 
-it('waits until the deletion date is 14 days away', function (): void {
+it('waits until the deletion date is within 15 days of the daily run', function (): void {
     Mail::fake();
     $workspace = inactivePausedWorkspace();
 
-    $this->travelTo(inactivePausedAt()->addDays(45));
+    $this->travelTo(inactivityRunOn(45));
     runInactivityCommand();
 
     expect($workspace->refresh()->scheduled_deletion_at)->toBeNull()
@@ -125,12 +130,17 @@ it('restarts the clock from a member sign-in', function (): void {
     $member = User::factory()->create(['last_login_at' => inactivePausedAt()->addDays(30)]);
     $workspace->users()->attach($member, ['role' => 'admin']);
 
-    $this->travelTo(inactivePausedAt()->addDays(46));
+    $this->travelTo(inactivityRunOn(46));
     runInactivityCommand();
 
     expect($workspace->refresh()->scheduled_deletion_at)->toBeNull();
 
-    $this->travelTo(inactivePausedAt()->addDays(30 + 46));
+    $this->travelTo(inactivityRunOn(30 + 45));
+    runInactivityCommand();
+
+    expect($workspace->refresh()->scheduled_deletion_at)->toBeNull();
+
+    $this->travelTo(inactivityRunOn(30 + 46));
     runInactivityCommand();
 
     expect($workspace->refresh()->scheduled_deletion_at?->toDateTimeString())->toBe(inactivePausedAt()->addDays(30 + 60)->toDateTimeString());
@@ -144,13 +154,13 @@ it('restarts the clock from an owner sign-in on day 59 and schedules nothing bef
     $this->travelTo(inactivePausedAt()->addDays(60));
     runInactivityCommand();
 
-    $this->travelTo(inactivePausedAt()->addDays(59 + 45));
+    $this->travelTo(inactivityRunOn(59 + 45));
     runInactivityCommand();
 
     expect($workspace->refresh()->scheduled_deletion_at)->toBeNull();
     Mail::assertNothingQueued();
 
-    $this->travelTo(inactivePausedAt()->addDays(59 + 46));
+    $this->travelTo(inactivityRunOn(59 + 46));
     runInactivityCommand();
 
     expect($workspace->refresh()->scheduled_deletion_at?->toDateTimeString())->toBe(inactivePausedAt()->addDays(59 + 60)->toDateTimeString());
@@ -533,16 +543,38 @@ it('sends one launch notice per paused owner, dated 60 days from the last activi
     $workspace = inactivePausedWorkspace(timezone: 'Pacific/Kiritimati');
 
     $this->travelTo(inactivePausedAt());
-    $this->artisan('billing:announce-inactivity-rule', ['--force' => true])->assertSuccessful();
+    $this->artisan('billing:announce-inactivity-rule', ['--force' => true])
+        ->expectsOutputToContain('Notifying the owner of Acme...')
+        ->assertSuccessful();
 
     expect($workspace->refresh()->inactivity_notice_sent_at?->toDateTimeString())->toBe(inactivePausedAt()->toDateTimeString());
 
     Mail::assertQueued(InactivityRuleNoticeMail::class, 1);
     Mail::assertQueued(InactivityRuleNoticeMail::class, function (InactivityRuleNoticeMail $mail) use ($workspace): bool {
         $mail->assertHasSubject('We now keep paused workspaces for 60 days');
-        $mail->assertSeeInHtml('Jan 1, 2027');
+        $mail->assertSeeInText('We now keep paused workspaces for 60 days');
+        $mail->assertSeeInText('Acme has been paused since its trial ended. From today, we delete a paused workspace after 60 days without a sign-in.');
+        $mail->assertSeeInText('Your 60 days start today. If no one signs in and you choose no plan, we will delete Acme on Jan 1, 2027.');
+        $mail->assertSeeInText('We will email you 14 days and 5 days before that.');
+        $mail->assertSeeInText('Choose a plan: '.Billing::getUrl(panel: 'app', tenant: $workspace));
 
         return $mail->hasTo($workspace->owner->email) && $mail->workspace->is($workspace);
+    });
+});
+
+it('dates the launch notice from a member sign-in ten days after the pause', function (): void {
+    Mail::fake();
+    $workspace = inactivePausedWorkspace();
+    $member = User::factory()->create(['last_login_at' => inactivePausedAt()->addDays(10)]);
+    $workspace->users()->attach($member, ['role' => 'admin']);
+
+    $this->travelTo(inactivePausedAt()->addDays(11));
+    $this->artisan('billing:announce-inactivity-rule', ['--force' => true])->assertSuccessful();
+
+    Mail::assertQueued(InactivityRuleNoticeMail::class, function (InactivityRuleNoticeMail $mail): bool {
+        $mail->assertSeeInText('we will delete Acme on Jan 10, 2027.');
+
+        return $mail->deletesAt->toDateTimeString() === inactivePausedAt()->addDays(70)->toDateTimeString();
     });
 });
 
@@ -572,10 +604,99 @@ it('skips a workspace already scheduled for deletion on request when announcing 
 });
 
 it('keeps the launch notice command out of the schedule', function (): void {
-    $scheduled = collect(app(Schedule::class)->events())
-        ->contains(fn (Event $event): bool => str_contains((string) $event->command, 'billing:announce-inactivity-rule'));
+    $commands = collect(app(Schedule::class)->events())->map(fn (Event $event): string => (string) $event->command);
 
-    expect($scheduled)->toBeFalse();
+    expect($commands->contains(fn (string $command): bool => str_contains($command, 'billing:schedule-inactive-deletions')))->toBeTrue()
+        ->and($commands->contains(fn (string $command): bool => str_contains($command, 'billing:announce-inactivity-rule')))->toBeFalse();
+});
+
+it('never sends the launch notice to a trial paused after launch', function (): void {
+    withHostedBilling();
+    Mail::fake();
+    $this->freezeTime();
+    $workspace = inactivePausedWorkspace(['plan' => Plan::Pro, 'trial_ends_at' => now()->subDay(), 'paused_at' => null, 'inactivity_notice_sent_at' => null]);
+
+    $this->artisan('billing:process-trials')->assertSuccessful();
+    $this->artisan('billing:announce-inactivity-rule', ['--force' => true])->assertSuccessful();
+
+    expect($workspace->refresh()->paused_at)->not->toBeNull()
+        ->and($workspace->inactivity_notice_sent_at)->not->toBeNull();
+    Mail::assertNotQueued(InactivityRuleNoticeMail::class);
+});
+
+it('does not send the launch notice to a workspace noticed after it was read', function (): void {
+    Mail::fake();
+    $workspace = inactivePausedWorkspace();
+    $noticedAt = inactivePausedAt()->addHour();
+
+    $raced = false;
+    DB::listen(function (QueryExecuted $query) use (&$raced, $workspace, $noticedAt): void {
+        if ($raced || ! str_contains($query->sql, 'max("last_login_at")')) {
+            return;
+        }
+
+        $raced = true;
+        DB::table('workspaces')->where('id', $workspace->getKey())->update(['inactivity_notice_sent_at' => $noticedAt]);
+    });
+
+    $this->travelTo(inactivePausedAt()->addDays(2));
+    $this->artisan('billing:announce-inactivity-rule', ['--force' => true])
+        ->expectsOutputToContain('Skipping Acme')
+        ->assertSuccessful();
+
+    expect($raced)->toBeTrue()
+        ->and($workspace->refresh()->inactivity_notice_sent_at?->toDateTimeString())->toBe($noticedAt->toDateTimeString());
+    Mail::assertNothingQueued();
+});
+
+it('does not send the launch notice to a workspace the owner asked to delete after it was read', function (): void {
+    Mail::fake();
+    $workspace = inactivePausedWorkspace();
+    $requestedFor = inactivePausedAt()->addDays(30);
+
+    $raced = false;
+    DB::listen(function (QueryExecuted $query) use (&$raced, $workspace, $requestedFor): void {
+        if ($raced || ! str_contains($query->sql, 'max("last_login_at")')) {
+            return;
+        }
+
+        $raced = true;
+        DB::table('workspaces')->where('id', $workspace->getKey())->update(['scheduled_deletion_at' => $requestedFor, 'deletion_reason' => DeletionReason::Requested->value]);
+    });
+
+    $this->travelTo(inactivePausedAt()->addDays(2));
+    $this->artisan('billing:announce-inactivity-rule', ['--force' => true])
+        ->expectsOutputToContain('Skipping Acme')
+        ->assertSuccessful();
+
+    expect($raced)->toBeTrue()
+        ->and($workspace->refresh()->deletion_reason)->toBe(DeletionReason::Requested)
+        ->and($workspace->scheduled_deletion_at?->toDateTimeString())->toBe($requestedFor->toDateTimeString())
+        ->and($workspace->inactivity_notice_sent_at)->toBeNull();
+    Mail::assertNothingQueued();
+});
+
+it('stores the deletion date the launch notice promised, whatever hour the workspace was paused', function (): void {
+    Mail::fake();
+    $workspaces = collect(['2026-11-01 00:30:00', '2026-11-01 09:59:00', INACTIVE_PAUSED_AT])
+        ->map(fn (string $pausedAt): Workspace => inactivePausedWorkspace(['paused_at' => $pausedAt]));
+
+    $this->travelTo(inactivePausedAt());
+    $this->artisan('billing:announce-inactivity-rule', ['--force' => true])->assertSuccessful();
+
+    foreach (range(1, 60) as $day) {
+        $this->travelTo(inactivityRunOn($day));
+        runInactivityCommand();
+    }
+
+    $inactive = resolve(InactiveTrialWorkspacesQuery::class);
+
+    foreach ($workspaces as $workspace) {
+        $promised = Mail::queued(InactivityRuleNoticeMail::class, fn (InactivityRuleNoticeMail $mail): bool => $mail->workspace->is($workspace))->sole()->deletesAt;
+
+        expect($workspace->refresh()->scheduled_deletion_at?->toDateTimeString())->toBe($promised->toDateTimeString())
+            ->and($inactive->stillDue($workspace))->toBeTrue();
+    }
 });
 
 it('does not break sign-in when cancelling a countdown fails, and reports the failure', function (): void {

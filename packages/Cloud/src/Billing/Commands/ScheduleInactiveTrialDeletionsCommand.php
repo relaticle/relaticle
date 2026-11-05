@@ -52,7 +52,7 @@ final class ScheduleInactiveTrialDeletionsCommand extends Command
             $deletesAt = $lastActiveAt->addDays(self::KEEP_DAYS);
             $earliest = now()->addDays(self::WARNING_DAYS);
 
-            if ($deletesAt->greaterThan($earliest)) {
+            if ($deletesAt->greaterThan($earliest->addDay())) {
                 return;
             }
 

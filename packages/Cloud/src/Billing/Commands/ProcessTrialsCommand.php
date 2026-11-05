@@ -89,7 +89,7 @@ final class ProcessTrialsCommand extends Command
                     }
 
                     DB::transaction(function () use ($workspace, $credits): void {
-                        $workspace->forceFill(['plan' => Plan::Free, 'trial_ends_at' => null, 'paused_at' => now()])->save();
+                        $workspace->forceFill(['plan' => Plan::Free, 'trial_ends_at' => null, 'paused_at' => now(), 'inactivity_notice_sent_at' => now()])->save();
                         $credits->resetPeriod($workspace);
                     });
 

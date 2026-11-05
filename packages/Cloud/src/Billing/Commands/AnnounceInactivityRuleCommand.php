@@ -39,8 +39,6 @@ final class AnnounceInactivityRuleCommand extends Command
                     return;
                 }
 
-                $this->info("Notifying the owner of {$workspace->name}...");
-
                 $deletesAt = $inactive->lastActivity($workspace)->addDays(ScheduleInactiveTrialDeletionsCommand::KEEP_DAYS);
 
                 $notified = DB::transaction(function () use ($workspace, $owner, $deletesAt): bool {
@@ -51,8 +49,12 @@ final class AnnounceInactivityRuleCommand extends Command
                         ->update(['inactivity_notice_sent_at' => now()]);
 
                     if ($updated !== 1) {
+                        $this->warn("Skipping {$workspace->name}: it changed while the command ran.");
+
                         return false;
                     }
+
+                    $this->info("Notifying the owner of {$workspace->name}...");
 
                     Mail::to($owner->email)->queue(new InactivityRuleNoticeMail($workspace, $deletesAt));
 
