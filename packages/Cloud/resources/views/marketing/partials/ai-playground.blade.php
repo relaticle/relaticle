@@ -56,16 +56,41 @@
 
     $approvalRule = "Every write needs the user's approval.";
 
+    $batchReplies = [
+        __('Okay, I left all :count opportunities as they were.', ['count' => count($deals)]),
+        ...array_map(
+            fn (int $saved): string => $saved === count($deals)
+                ? __('Done. Moved all :count opportunities to Negotiation.', ['count' => $saved])
+                : __('Done. Moved :saved of :count opportunities to Negotiation.', ['saved' => $saved, 'count' => count($deals)]),
+            range(1, count($deals)),
+        ),
+    ];
+
+    $widestStage = array_reduce(array_column($deals, 'from'), fn (string $widest, string $stage): string => mb_strlen($stage) > mb_strlen($widest) ? $stage : $widest, '');
+
+    $batchPrompt = __('Review the proposal below to update 3 opportunities.');
+
+    $personReplies = [
+        'prompt' => __('Review the proposal below to add her to Kovra Systems.'),
+        'linked' => __('Sarah Chen has been created at Kovra Systems.'),
+        'created' => __('Sarah Chen has been created.'),
+        'discarded' => __('Okay, I did not add Sarah Chen.'),
+    ];
+
+    $fade = 'transition duration-300 ease-out motion-reduce:transition-none';
+    $fadeOpacity = 'transition-opacity duration-300 ease-out motion-reduce:transition-none';
+    $ghost = 'invisible col-start-1 row-start-1';
+
     $chip = 'inline-flex shrink-0 cursor-pointer items-center rounded-full px-3 py-1.5 text-xs font-medium text-gray-600 ring-1 ring-gray-200 transition-colors hover:text-gray-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary aria-selected:bg-gray-950 aria-selected:text-white aria-selected:ring-gray-950 dark:text-gray-300 dark:ring-white/10 dark:hover:text-white dark:aria-selected:bg-white dark:aria-selected:text-gray-950 dark:aria-selected:ring-white';
-    $panel = 'col-start-1 row-start-1 flex flex-col gap-4 transition duration-300 ease-out motion-reduce:transition-none';
-    $page = 'col-start-1 row-start-1 flex min-w-0 flex-col transition-opacity duration-300 ease-out motion-reduce:transition-none';
+    $panel = 'col-start-1 row-start-1 flex flex-col gap-4';
+    $page = 'col-start-1 row-start-1 flex min-w-0 flex-col';
     $row = 'relative grid items-center gap-3 border-b border-gray-100 px-4 py-2.5 text-sm last:border-b-0 dark:border-white/5';
     $head = 'grid gap-3 border-b border-gray-100 px-4 py-2 text-xs font-medium text-gray-500 dark:border-white/5 dark:text-gray-400';
     $flash = 'pointer-events-none absolute inset-0 bg-primary-500/10 transition-opacity duration-[450ms] ease-out motion-reduce:transition-none dark:bg-primary-400/15';
     $bubble = 'ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-gray-100 px-4 py-2.5 text-sm leading-relaxed text-gray-900 dark:bg-white/10 dark:text-gray-100';
-    $reply = 'px-1 text-sm leading-relaxed text-gray-900 transition duration-300 ease-out motion-reduce:transition-none dark:text-gray-100';
-    $tool = 'flex items-center gap-2 px-1 text-xs text-gray-600 transition-opacity duration-200 dark:text-gray-300';
-    $card = 'overflow-hidden rounded-xl border border-primary-200 bg-[var(--surface-block-bg)] ring-[3px] ring-primary-100 transition duration-300 ease-out motion-reduce:transition-none dark:border-primary-400/30 dark:ring-primary-400/10';
+    $reply = 'px-1 text-sm leading-relaxed text-gray-900 dark:text-gray-100';
+    $tool = 'flex items-center gap-2 px-1 text-xs text-gray-600 dark:text-gray-300';
+    $card = 'overflow-hidden rounded-xl border border-primary-200 bg-[var(--surface-block-bg)] ring-[3px] ring-primary-100 dark:border-primary-400/30 dark:ring-primary-400/10';
     $tile = 'flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400';
     $footerButton = 'inline-flex h-7 cursor-pointer items-center rounded-md px-2.5 text-xs font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-50';
     $discardButton = $footerButton.' text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white';
@@ -84,8 +109,11 @@
         order: @js(array_keys($scenarios)),
         reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
         thinking: false,
+        swapping: false,
         timer: null,
         deals: @js(array_map(fn (array $deal): array => $deal + ['decision' => null, 'flash' => false], $deals)),
+        batchReplies: @js($batchReplies),
+        personReplies: @js($personReplies),
         cursor: 0,
         person: { decision: null, title: true, company: true, flash: false },
         get undecided() {
@@ -95,33 +123,30 @@
             return this.undecided[Math.min(this.cursor, this.undecided.length - 1)] ?? null
         },
         get batchSummary() {
-            const list = (names) => new Intl.ListFormat('en', { type: 'conjunction' }).format(names)
-            const saved = this.deals.filter((deal) => deal.decision === 'saved').map((deal) => deal.name)
-            const kept = this.deals.filter((deal) => deal.decision === 'discarded').map((deal) => deal.name)
-
-            if (saved.length === 0) {
-                return @js(__('Okay, I left all three deals as they were.'));
-            }
-
-            return @js(__('Done. Moved :deals to Negotiation.')).replace(':deals', list(saved))
-                + (kept.length ? ' ' + @js(__('Left :deals as it was.')).replace(':deals', list(kept)) : '')
+            return this.batchReplies[this.deals.filter((deal) => deal.decision === 'saved').length]
         },
         get personReply() {
-            if (this.person.decision === 'discarded') {
-                return @js(__('Okay, I did not add Sarah Chen.'));
+            if (this.person.decision === null) {
+                return this.personReplies.prompt
             }
 
-            return this.person.company
-                ? @js(__('Sarah Chen has been created and linked to Kovra Systems.'))
-                : @js(__('Sarah Chen has been created.'));
+            if (this.person.decision === 'discarded') {
+                return this.personReplies.discarded
+            }
+
+            return this.person.company ? this.personReplies.linked : this.personReplies.created
         },
-        init() {
-            new IntersectionObserver(([entry], observer) => {
-                if (entry.isIntersecting) {
-                    observer.disconnect()
-                    this.reset()
-                }
-            }, { threshold: 0.3 }).observe(this.$el)
+        swap() {
+            if (this.reducedMotion) {
+                return
+            }
+
+            this.swapping = true
+            requestAnimationFrame(() => requestAnimationFrame(() => this.swapping = false))
+        },
+        page(step) {
+            this.cursor = Math.min(this.undecided.length - 1, Math.max(0, this.cursor + step))
+            this.swap()
         },
         select(key) {
             if (key === this.scenario) {
@@ -156,6 +181,7 @@
             const deal = this.activeDeal
             deal.decision = decision
             this.cursor = Math.min(this.cursor, Math.max(0, this.undecided.length - 1))
+            this.swap()
 
             if (decision === 'saved') {
                 this.land(deal)
@@ -176,7 +202,7 @@
 
                 <div class="grid min-w-0 border-b border-gray-100 lg:border-r lg:border-b-0 dark:border-white/[0.06]" aria-hidden="true">
                     @foreach($pages as $key => [$pageTitle, $newLabel, $pageIcon])
-                        <div class="{{ $page }} {{ $key === 'batch' ? '' : 'invisible opacity-0' }}" x-bind:class="{ 'invisible opacity-0': scenario !== '{{ $key }}' }" data-ai-page="{{ $key }}">
+                        <div class="{{ $page }} {{ $key === 'batch' ? $fadeOpacity : 'invisible opacity-0' }}" x-bind:class="{ 'invisible opacity-0': scenario !== '{{ $key }}', '{{ $fadeOpacity }}': scenario === '{{ $key }}' }" data-ai-page="{{ $key }}">
                             <div class="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-white/[0.06]">
                                 <span class="flex min-w-0 items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-4 w-4 shrink-0 text-gray-400"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons[$pageIcon] }}"/></svg>
@@ -238,7 +264,7 @@
                                             <span class="hidden truncate text-gray-600 sm:block dark:text-gray-300">{{ $jobTitle }}</span>
                                         </div>
                                     @endforeach
-                                    <div class="{{ $row }} invisible translate-y-1 grid-cols-2 opacity-0 transition duration-300 ease-out motion-reduce:transition-none sm:grid-cols-3" x-bind:class="{ 'invisible translate-y-1 opacity-0': person.decision !== 'created' }" data-ai-person-row>
+                                    <div class="{{ $row }} invisible translate-y-1 grid-cols-2 opacity-0 sm:grid-cols-3" x-bind:class="{ 'invisible translate-y-1 opacity-0': person.decision !== 'created', '{{ $fade }}': person.decision === 'created' }" data-ai-person-row>
                                         <span class="{{ $flash }} opacity-0" x-bind:class="{ 'opacity-0': ! person.flash }"></span>
                                         <span class="relative truncate font-medium text-gray-900 dark:text-white">Sarah Chen</span>
                                         <span class="relative truncate text-gray-600 dark:text-gray-300" x-text="person.company ? 'Kovra Systems' : ''">Kovra Systems</span>
@@ -280,19 +306,22 @@
                     <div id="ai-ask-panel" role="tabpanel" x-bind:aria-labelledby="'ai-ask-' + scenario" class="grid flex-1 content-start p-4" aria-live="polite">
 
                         {{-- Batch update: one record at a time, as a standalone batch card shows it. --}}
-                        <div class="{{ $panel }}" x-bind:class="{ 'invisible opacity-0': scenario !== 'batch' }" data-ai-scenario="batch">
+                        <div class="{{ $panel }} {{ $fadeOpacity }}" x-bind:class="{ 'invisible opacity-0': scenario !== 'batch', '{{ $fadeOpacity }}': scenario === 'batch' }" data-ai-scenario="batch">
                             <p class="{{ $bubble }}">{{ $scenarios['batch'][1] }}</p>
 
                             <div class="grid">
-                                <p class="{{ $tool }} col-start-1 row-start-1 opacity-0" x-bind:class="{ 'opacity-0': ! thinking }" aria-hidden="true">
+                                <p class="{{ $tool }} col-start-1 row-start-1 opacity-0" x-bind:class="{ 'opacity-0': ! thinking, '{{ $fadeOpacity }}': thinking }" aria-hidden="true">
                                     <span class="size-1.5 rounded-full bg-gray-400 motion-safe:animate-pulse dark:bg-gray-500"></span>
                                     {{ __('Preparing opportunity changes…') }}
                                 </p>
-                                <p class="{{ $reply }} col-start-1 row-start-1" x-bind:class="{ 'opacity-0': thinking }" x-text="undecided.length ? @js(__('Review the proposal below to update 3 opportunities.')) : batchSummary">{{ __('Review the proposal below to update 3 opportunities.') }}</p>
+                                <p class="{{ $reply }} {{ $fade }} col-start-1 row-start-1" x-bind:class="{ 'opacity-0': thinking, '{{ $fade }}': ! thinking }" x-text="undecided.length ? @js($batchPrompt) : batchSummary">{{ $batchPrompt }}</p>
+                                @foreach([$batchPrompt, ...$batchReplies] as $variant)
+                                    <p class="{{ $reply }} {{ $ghost }}" aria-hidden="true">{{ $variant }}</p>
+                                @endforeach
                             </div>
 
                             <div class="grid">
-                                <div class="{{ $card }} col-start-1 row-start-1" x-bind:class="{ 'translate-y-2 opacity-0': thinking, 'invisible opacity-0': ! thinking && ! undecided.length }" data-ai-batch-card>
+                                <div class="{{ $card }} {{ $fade }} col-start-1 row-start-1" x-bind:class="{ 'translate-y-2 opacity-0': thinking, 'invisible opacity-0': ! thinking && ! undecided.length, '{{ $fade }}': ! thinking && undecided.length > 0 }" data-ai-batch-card>
                                     <div class="flex items-center gap-2 px-4 pt-3 text-xs font-medium text-gray-500 dark:text-gray-400">
                                         <span class="min-w-0 flex-1 truncate">{{ __('Update Opportunity') }}</span>
                                         <span class="tabular-nums text-gray-400 dark:text-gray-500" x-show="undecided.length > 1" x-text="undecided.length + ' ' + @js(__('records'))">3 {{ __('records') }}</span>
@@ -302,7 +331,7 @@
                                         <span class="{{ $tile }}" aria-hidden="true">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons['opportunity'] }}"/></svg>
                                         </span>
-                                        <p class="min-w-0 truncate text-sm font-semibold text-gray-900 dark:text-white" x-text="activeDeal?.name" data-ai-batch-record>{{ $deals[0]['name'] }}</p>
+                                        <p class="min-w-0 truncate text-sm font-semibold text-gray-900 dark:text-white" x-bind:class="{ 'translate-x-1.5 opacity-0': swapping, '{{ $fade }}': ! swapping }" x-text="activeDeal?.name" data-ai-batch-record>{{ $deals[0]['name'] }}</p>
                                     </div>
 
                                     <div class="divide-y divide-gray-100 border-t border-gray-100 dark:divide-white/5 dark:border-white/5">
@@ -312,8 +341,11 @@
                                         </div>
                                         <div class="flex items-start gap-3 px-4 py-2.5 text-sm">
                                             <span class="w-20 shrink-0 leading-5 text-gray-700 dark:text-gray-300">{{ __('Stage') }}</span>
-                                            <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5">
-                                                <span class="text-gray-500 line-through decoration-gray-300 dark:text-gray-400 dark:decoration-gray-600" x-text="activeDeal?.from">{{ $deals[0]['from'] }}</span>
+                                            <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5" x-bind:class="{ 'translate-x-1.5 opacity-0': swapping, '{{ $fade }}': ! swapping }">
+                                                <span class="grid">
+                                                    <span class="col-start-1 row-start-1 text-gray-500 line-through decoration-gray-300 dark:text-gray-400 dark:decoration-gray-600" x-text="activeDeal?.from">{{ $deals[0]['from'] }}</span>
+                                                    <span class="{{ $ghost }}" aria-hidden="true">{{ $widestStage }}</span>
+                                                </span>
                                                 <x-heroicon-m-arrow-right class="size-3 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true"/>
                                                 <span class="font-medium text-gray-900 dark:text-white">{{ __('Negotiation') }}</span>
                                             </span>
@@ -322,11 +354,11 @@
 
                                     <div class="flex items-center gap-2 border-t border-gray-100 px-4 py-2 dark:border-white/5">
                                         <div class="flex items-center gap-1 text-xs font-medium tabular-nums text-gray-500 dark:text-gray-400" x-show="undecided.length > 1">
-                                            <button type="button" class="{{ $pageButton }}" x-on:click="cursor = Math.max(0, cursor - 1)" x-bind:disabled="cursor === 0" aria-label="{{ __('Previous record') }}">
+                                            <button type="button" class="{{ $pageButton }}" x-on:click="page(-1)" x-bind:disabled="cursor === 0" aria-label="{{ __('Previous record') }}">
                                                 <x-heroicon-m-chevron-left class="h-3.5 w-3.5" aria-hidden="true"/>
                                             </button>
                                             <span class="select-none px-0.5" x-text="(cursor + 1) + '/' + undecided.length">1/3</span>
-                                            <button type="button" class="{{ $pageButton }}" x-on:click="cursor = Math.min(undecided.length - 1, cursor + 1)" x-bind:disabled="cursor >= undecided.length - 1" aria-label="{{ __('Next record') }}">
+                                            <button type="button" class="{{ $pageButton }}" x-on:click="page(1)" x-bind:disabled="cursor >= undecided.length - 1" aria-label="{{ __('Next record') }}">
                                                 <x-heroicon-m-chevron-right class="h-3.5 w-3.5" aria-hidden="true"/>
                                             </button>
                                         </div>
@@ -338,7 +370,7 @@
                                     </div>
                                 </div>
 
-                                <ul class="col-start-1 row-start-1 self-start overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] transition duration-300 ease-out motion-reduce:transition-none invisible opacity-0" x-bind:class="{ 'invisible opacity-0': undecided.length > 0 }" data-ai-batch-decided>
+                                <ul class="col-start-1 row-start-1 self-start overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] invisible opacity-0" x-bind:class="{ 'invisible opacity-0': undecided.length > 0, '{{ $fade }}': undecided.length === 0 }" data-ai-batch-decided>
                                     @foreach($deals as $index => $deal)
                                         <li class="flex items-center gap-2.5 border-b border-gray-100 px-4 py-2.5 last:border-b-0 dark:border-white/5">
                                             <span class="chat-chip min-w-0" data-record-type="opportunity">
@@ -356,18 +388,21 @@
                         </div>
 
                         {{-- Create: the fields it will write, with the identity field locked. --}}
-                        <div class="{{ $panel }} invisible opacity-0" x-bind:class="{ 'invisible opacity-0': scenario !== 'create' }" data-ai-scenario="create">
+                        <div class="{{ $panel }} invisible opacity-0" x-bind:class="{ 'invisible opacity-0': scenario !== 'create', '{{ $fadeOpacity }}': scenario === 'create' }" data-ai-scenario="create">
                             <p class="{{ $bubble }}">{{ $scenarios['create'][1] }}</p>
 
                             <div class="grid">
-                                <p class="{{ $tool }} col-start-1 row-start-1 opacity-0" x-bind:class="{ 'opacity-0': ! thinking }" aria-hidden="true">
+                                <p class="{{ $tool }} col-start-1 row-start-1 opacity-0" x-bind:class="{ 'opacity-0': ! thinking, '{{ $fadeOpacity }}': thinking }" aria-hidden="true">
                                     <span class="size-1.5 rounded-full bg-gray-400 motion-safe:animate-pulse dark:bg-gray-500"></span>
                                     {{ __('Drafting a person…') }}
                                 </p>
-                                <p class="{{ $reply }} col-start-1 row-start-1" x-bind:class="{ 'opacity-0': thinking }" x-text="person.decision ? personReply : @js(__('Review the proposal below to add her to Kovra Systems.'))">{{ __('Review the proposal below to add her to Kovra Systems.') }}</p>
+                                <p class="{{ $reply }} col-start-1 row-start-1" x-bind:class="{ 'opacity-0': thinking, '{{ $fade }}': ! thinking }" x-text="personReply">{{ $personReplies['prompt'] }}</p>
+                                @foreach($personReplies as $variant)
+                                    <p class="{{ $reply }} {{ $ghost }}" aria-hidden="true">{{ $variant }}</p>
+                                @endforeach
                             </div>
 
-                            <div class="{{ $card }}" x-bind:class="{ 'translate-y-2 opacity-0': thinking }">
+                            <div class="{{ $card }}" x-bind:class="{ 'translate-y-2 opacity-0': thinking, '{{ $fade }}': ! thinking }">
                                 <div class="px-4 pt-3 text-xs font-medium text-gray-500 dark:text-gray-400">{{ __('Create Person') }}</div>
 
                                 <div class="flex min-w-0 items-center gap-2.5 px-4 pb-2.5 pt-1.5">
@@ -417,18 +452,18 @@
                         </div>
 
                         {{-- Read: answered at once, nothing to approve. --}}
-                        <div class="{{ $panel }} invisible opacity-0" x-bind:class="{ 'invisible opacity-0': scenario !== 'read' }" data-ai-scenario="read">
+                        <div class="{{ $panel }} invisible opacity-0" x-bind:class="{ 'invisible opacity-0': scenario !== 'read', '{{ $fadeOpacity }}': scenario === 'read' }" data-ai-scenario="read">
                             <p class="{{ $bubble }}">{{ $scenarios['read'][1] }}</p>
 
                             <div class="grid">
-                                <p class="{{ $tool }} col-start-1 row-start-1 opacity-0" x-bind:class="{ 'opacity-0': ! thinking }" aria-hidden="true">
+                                <p class="{{ $tool }} col-start-1 row-start-1 opacity-0" x-bind:class="{ 'opacity-0': ! thinking, '{{ $fadeOpacity }}': thinking }" aria-hidden="true">
                                     <span class="size-1.5 rounded-full bg-gray-400 motion-safe:animate-pulse dark:bg-gray-500"></span>
                                     {{ __('Searching tasks…') }}
                                 </p>
-                                <p class="{{ $reply }} col-start-1 row-start-1" x-bind:class="{ 'opacity-0': thinking }">{{ __('You have 3 overdue tasks. Reading never needs your approval.') }}</p>
+                                <p class="{{ $reply }} col-start-1 row-start-1" x-bind:class="{ 'opacity-0': thinking, '{{ $fade }}': ! thinking }">{{ __('You have 3 overdue tasks. Reading never needs your approval.') }}</p>
                             </div>
 
-                            <div class="overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] transition duration-300 ease-out motion-reduce:transition-none" x-bind:class="{ 'translate-y-2 opacity-0': thinking }">
+                            <div class="overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)]" x-bind:class="{ 'translate-y-2 opacity-0': thinking, '{{ $fade }}': ! thinking }">
                                 <div class="flex items-center gap-2 border-b border-gray-100 px-4 py-2.5 dark:border-white/5">
                                     <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400" aria-hidden="true">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons['task'] }}"/></svg>
