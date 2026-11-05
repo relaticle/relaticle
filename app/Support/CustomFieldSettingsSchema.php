@@ -19,7 +19,7 @@ use Relaticle\CustomFields\Support\CurrencyProvider;
 
 final readonly class CustomFieldSettingsSchema
 {
-    private const array OPTION_COLOR_TYPES = ['select', 'multi_select', 'tags-input'];
+    private const array OPTION_COLOR_TYPES = ['select', 'multi-select', 'status', 'tags-input'];
 
     private const array CURRENCY_DISPLAY_TYPES = ['symbol', 'code'];
 

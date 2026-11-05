@@ -366,6 +366,28 @@ it('applies a list visibility setting on a regular field', function (): void {
     expect($this->field->fresh()->settings->visible_in_list)->toBeFalse();
 });
 
+it('turns on option colours for every type whose options the panel colours', function (string $type): void {
+    $field = CustomField::factory()->create([
+        config('custom-fields.database.column_names.tenant_foreign_key') => $this->workspace->getKey(),
+        'entity_type' => 'company',
+        'name' => 'Coloured field',
+        'type' => $type,
+        'system_defined' => false,
+        'active' => true,
+    ]);
+
+    makeUpdateFieldTool($this->convId)->handle(new Request(['records' => [[
+        'entity_type' => 'company',
+        'code' => $field->code,
+        'settings' => ['enable_option_colors' => true],
+    ]]]));
+
+    $pending = PendingAction::query()->where('conversation_id', $this->convId)->latest('id')->firstOrFail();
+    resolve(PendingActionService::class)->approve($pending, $this->owner);
+
+    expect($field->fresh()->settings->enable_option_colors)->toBeTrue();
+})->with(['select', 'multi-select', 'status', 'tags-input']);
+
 it('refuses a setting that does not apply to the field type and names the ones that do', function (): void {
     $result = makeUpdateFieldTool($this->convId)->handle(new Request(['records' => [[
         'entity_type' => 'company',
