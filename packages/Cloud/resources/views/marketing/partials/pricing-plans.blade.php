@@ -46,7 +46,7 @@
                         <p class="mt-2 text-sm text-gray-500 dark:text-gray-400" x-text="yearly ? @js(__('cloud::billing.billed_yearly', ['price' => number_format($plan->yearlyPrice())])) : @js(__('cloud::billing.billed_monthly'))">{{ __('cloud::billing.billed_yearly', ['price' => number_format($plan->yearlyPrice())]) }}</p>
                     </div>
 
-                    <x-cloud::marketing.button :variant="$isScale ? 'primary' : 'secondary'" :href="route('login')" iconTrailing="ri-arrow-right-line" class="mt-8 w-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
+                    <x-cloud::marketing.button :variant="$isScale ? 'primary' : 'secondary'" :href="route('login')" iconTrailing="ri-arrow-right-line" class="mt-8 w-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary" data-analytics-intent="signup" data-analytics-placement="pricing">
                         {{ __('Start for free') }}
                     </x-cloud::marketing.button>
                     <p class="mt-3 text-center text-xs text-gray-500 dark:text-gray-400">{{ __('14-day trial. No card required.') }}</p>

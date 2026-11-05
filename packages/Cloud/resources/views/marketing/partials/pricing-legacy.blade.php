@@ -69,7 +69,7 @@
             </div>
         </div>
 
-        <x-cloud::marketing.button href="{{ route('login') }}">
+        <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="pricing">
             Start for free
         </x-cloud::marketing.button>
         </div>

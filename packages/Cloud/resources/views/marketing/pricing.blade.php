@@ -294,7 +294,7 @@
                     : __('Unlimited users and records. Hosted by us, or on your own server.') }}
             </p>
             <div class="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <x-cloud::marketing.button :href="route('login')">
+                <x-cloud::marketing.button :href="route('login')" data-analytics-intent="signup" data-analytics-placement="pricing">
                     {{ __('Start for free') }}
                 </x-cloud::marketing.button>
                 @if($billingActive)

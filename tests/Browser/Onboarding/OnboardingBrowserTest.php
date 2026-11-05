@@ -15,7 +15,6 @@ use Laravel\Pennant\Feature;
 use Pest\Browser\Api\AwaitableWebpage;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
-use Symfony\Component\DomCrawler\Crawler;
 
 mutates(CreateWorkspace::class, SetupWorkspace::class);
 
@@ -39,7 +38,18 @@ function walkToMailboxStep(User $user, string $name, string $slug): AwaitableWeb
 
 it('records onboarding conversions after navigation without counting them again', function (string $event): void {
     $page = visit('/app/login');
-    $page->script('window.fathomEvents = []; window.fathomPageviews = []; window.fathom = { trackEvent: event => window.fathomEvents.push(event), trackPageview: options => window.fathomPageviews.push(options.url) };');
+    $page->script(<<<'JS'
+        window.fathomEvents = [];
+        window.fathomPageviews = [];
+        const capture = payload => {
+            if (payload.name) {
+                window.fathomEvents.push(payload.name);
+            } else if (!payload.dp) {
+                window.fathomPageviews.push(payload.p);
+            }
+        };
+        window.fathom = { send: capture, beacon: capture, isTrackingEnabled: () => true };
+        JS);
 
     $environment = app()->environment();
     app()->instance('env', 'production');
@@ -47,25 +57,36 @@ it('records onboarding conversions after navigation without counting them again'
     session()->put('fathom.track_'.$event, true);
 
     try {
-        $html = view('filament.app.analytics')->render();
+        $html = json_encode(view('filament.app.analytics')->render(), JSON_THROW_ON_ERROR);
     } finally {
         app()->instance('env', $environment);
     }
 
-    foreach (new Crawler($html)->filter('script:not([src])') as $script) {
-        $source = json_encode($script->textContent, JSON_THROW_ON_ERROR);
-        $page->script('(() => { const script = document.createElement("script"); script.textContent = '.$source.'; document.head.append(script); })()');
-    }
+    $page->script(<<<JS
+        (() => {
+            const append = document.head.appendChild.bind(document.head);
+            document.head.appendChild = element => element.src === 'https://cdn.usefathom.com/script.js' ? element : append(element);
+            const markup = new DOMParser().parseFromString({$html}, 'text/html');
+            document.head.appendChild(markup.querySelector('[data-relaticle-analytics]'));
+            const script = document.createElement('script');
+            script.textContent = markup.querySelector('script:not([type])').textContent;
+            document.head.appendChild(script);
+            document.head.appendChild = append;
+        })();
+        JS);
+
+    $page->assertScript('window.fathomEvents', [$event])
+        ->assertScript('window.fathomPageviews', ['/login']);
 
     $page->script('Livewire.navigate("/app/login?tracking=first")');
     $page->assertScript('window.location.search', '?tracking=first')
         ->assertScript('window.fathomEvents', [$event])
-        ->assertScript('window.fathomPageviews.map(url => new URL(url).pathname + new URL(url).search)', ['/login']);
+        ->assertScript('window.fathomPageviews', ['/login', '/login']);
 
     $page->script('Livewire.navigate("/app/login?tracking=second")');
     $page->assertScript('window.location.search', '?tracking=second')
         ->assertScript('window.fathomEvents', [$event])
-        ->assertScript('window.fathomPageviews.map(url => new URL(url).pathname + new URL(url).search)', ['/login', '/login'])
+        ->assertScript('window.fathomPageviews', ['/login', '/login', '/login'])
         ->assertNoJavaScriptErrors();
 })->with(['signup', 'workspace_created']);
 

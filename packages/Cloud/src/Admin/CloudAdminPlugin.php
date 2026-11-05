@@ -15,6 +15,7 @@ use Relaticle\Cloud\Admin\Filament\Resources\SubscriptionResource;
 use Relaticle\Cloud\Admin\Filament\Support\EndTrial;
 use Relaticle\Cloud\Admin\Filament\Support\ExtendTrial;
 use Relaticle\Cloud\Admin\Filament\Support\ManagedPlan;
+use Relaticle\Cloud\Admin\Filament\Widgets\Overview\AcquisitionTable;
 use Relaticle\Cloud\Admin\Filament\Widgets\Overview\CohortTable;
 use Relaticle\Cloud\Admin\Filament\Widgets\Overview\MoneyStats;
 use Relaticle\Cloud\Admin\Filament\Widgets\Overview\ProblemsStats;
@@ -45,6 +46,7 @@ final class CloudAdminPlugin implements Plugin
                 MoneyStats::class,
                 ValueStats::class,
                 CohortTable::class,
+                AcquisitionTable::class,
                 SalesLeads::class,
                 ProblemsStats::class,
             ])

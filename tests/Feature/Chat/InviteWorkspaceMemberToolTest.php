@@ -252,7 +252,7 @@ describe('an invitation proposal', function (): void {
             ->assertDontSee('Invite alex@example.com as Member');
     });
 
-    it('counts only the steps approve all will approve, and says each send has its own button', function (): void {
+    it('counts only the steps approve all will approve, and says some steps have their own button', function (): void {
         ($this->planTask)('First task');
         ($this->planTask)('Second task');
         $invite = ($this->planInvite)();
@@ -260,7 +260,7 @@ describe('an invitation proposal', function (): void {
         openInvitationDock($invite)
             ->assertSee('Approve all 2')
             ->assertSee('Send invitation')
-            ->assertSee(__('Each send has its own button'))
+            ->assertSee(__('Some steps have their own button'))
             ->assertDontSee(__('Approved together, in order'));
     });
 
