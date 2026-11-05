@@ -3,13 +3,15 @@
 declare(strict_types=1);
 
 use App\Filament\CustomFields\RichEditorFieldType;
+use App\Filament\RichEditor\ChecklistPlugin;
 use App\Filament\RichEditor\SlashMenuPlugin;
+use App\Filament\RichEditor\TaskItem;
 use App\Models\CustomField;
 use App\Models\Note;
 use App\Models\Task;
 use App\Models\User;
 
-mutates(RichEditorFieldType::class, SlashMenuPlugin::class);
+mutates(RichEditorFieldType::class, SlashMenuPlugin::class, ChecklistPlugin::class, TaskItem::class);
 
 it('hides the heading toolbar when the caret has no text selection', function (): void {
     $user = User::factory()->withWorkspace()->create();
@@ -299,6 +301,14 @@ it('builds, ticks and saves a checklist in a task description', function (): voi
     $workspace = $user->ownedWorkspaces()->first();
     $editor = '.fi-fo-rich-editor-seamless .ProseMirror';
 
+    $toggleBold = <<<'JS'
+        (() => {
+            const root = document.querySelector('.fi-fo-rich-editor-seamless [x-data^="richEditorFormComponent"]');
+
+            Alpine.$data(root).getEditor().chain().focus().toggleBold().run();
+        })();
+    JS;
+
     $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")
         ->navigate("/app/{$workspace->slug}/tasks")
@@ -307,14 +317,24 @@ it('builds, ticks and saves a checklist in a task description', function (): voi
         ->assertVisible($editor)
         ->typeSlowly($editor, '/checklist', 20)
         ->keys($editor, 'Enter')
-        ->typeSlowly($editor, 'Call Bob', 20)
-        ->keys($editor, 'Enter')
+        ->typeSlowly($editor, 'Call ', 20);
+
+    $page->script($toggleBold);
+
+    $page->typeSlowly($editor, 'Bob', 20);
+
+    $page->script($toggleBold);
+
+    $page->keys($editor, 'Enter')
         ->typeSlowly($editor, 'Send quote', 20)
         ->keys($editor, ['Enter', 'Enter'])
         ->typeSlowly($editor, '[ ] Book room', 20)
         ->assertScript("document.querySelectorAll('{$editor} ul[data-type=\"taskList\"] > li').length === 3")
+        ->assertScript("getComputedStyle(document.querySelector('{$editor} ul[data-type=\"taskList\"]')).listStyleType === 'none'")
+        ->assertScript("getComputedStyle(document.querySelector('{$editor} ul[data-type=\"taskList\"] > li')).display === 'flex'")
         ->click("{$editor} input[aria-label=\"Task item checkbox for Call Bob\"]")
         ->assertScript("document.querySelectorAll('{$editor} li[data-checked=\"true\"]').length === 1")
+        ->assertScript("(() => { const bold = document.querySelector('{$editor} li[data-checked=\"true\"] strong'); return getComputedStyle(bold).color === getComputedStyle(bold.closest('p')).color; })()")
         ->press('Create')
         ->assertSee('Prepare the offsite')
         ->assertNoJavaScriptErrors();
@@ -334,7 +354,20 @@ it('builds, ticks and saves a checklist in a task description', function (): voi
     expect(substr_count((string) $description, 'data-checked="true"'))->toBe(1)
         ->and(substr_count((string) $description, 'data-checked="false"'))->toBe(2);
 
+    $page->script(<<<'JS'
+        (() => {
+            window.reopenErrors = [];
+            window.addEventListener('error', (event) => window.reopenErrors.push(event.message));
+        })();
+    JS);
+
     $page->click('Prepare the offsite')
         ->assertVisible($editor)
         ->assertScript("document.querySelector('{$editor} input[aria-label=\"Task item checkbox for Call Bob\"]')?.checked === true");
+
+    $errors = json_decode((string) $page->script(<<<'JS'
+        JSON.stringify(window.reopenErrors.filter((message) => ! message.includes('ResizeObserver loop')));
+    JS), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($errors)->toBeEmpty();
 });
