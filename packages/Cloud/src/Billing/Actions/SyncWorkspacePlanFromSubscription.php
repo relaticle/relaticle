@@ -9,10 +9,12 @@ use App\Enums\StripeSubscriptionStatus;
 use App\Enums\SubscriptionType;
 use App\Models\User;
 use App\Models\Workspace;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Laravel\Cashier\Subscription;
+use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Cloud\Billing\Mail\ProEndedMail;
 
@@ -44,6 +46,10 @@ final readonly class SyncWorkspacePlanFromSubscription
         }
 
         if ($workspace->plan === $target) {
+            if ($this->holdsExtensionCredits($workspace)) {
+                $this->settleExtensionCredits($workspace, $subscription);
+            }
+
             return;
         }
 
@@ -51,7 +57,7 @@ final readonly class SyncWorkspacePlanFromSubscription
             $workspace->plan = $target;
             $workspace->save();
 
-            $this->credits->resetPeriod($workspace);
+            $this->grantPlanCredits($workspace, $subscription);
 
             if ($target !== Plan::default()) {
                 $this->cancelInactivityDeletion->execute($workspace);
@@ -149,5 +155,42 @@ final readonly class SyncWorkspacePlanFromSubscription
         }
 
         return null;
+    }
+
+    private function grantPlanCredits(Workspace $workspace, Subscription $subscription): void
+    {
+        if (! $this->holdsExtensionCredits($workspace)) {
+            $this->credits->resetPeriod($workspace);
+
+            return;
+        }
+
+        $this->settleExtensionCredits($workspace, $subscription);
+    }
+
+    private function settleExtensionCredits(Workspace $workspace, Subscription $subscription): void
+    {
+        if (! $workspace->onExtendedTrial()) {
+            $this->credits->resetPeriod($workspace);
+
+            return;
+        }
+
+        // Stays frozen until Stripe first charges, which Cashier can set past the extension end.
+        AiCreditBalance::query()
+            ->where('workspace_id', $workspace->getKey())
+            ->update(['period_ends_at' => $subscription->trial_ends_at]);
+    }
+
+    private function holdsExtensionCredits(Workspace $workspace): bool
+    {
+        $extensionEndsAt = $workspace->extensionEndsAt();
+
+        return $extensionEndsAt instanceof CarbonImmutable
+            && $extensionEndsAt->isFuture()
+            && AiCreditBalance::query()
+                ->where('workspace_id', $workspace->getKey())
+                ->where('period_ends_at', $extensionEndsAt)
+                ->exists();
     }
 }

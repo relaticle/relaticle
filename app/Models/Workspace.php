@@ -420,11 +420,27 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
         return BillingStatus::fromWorkspace($this);
     }
 
+    public function extensionEndsAt(): ?CarbonImmutable
+    {
+        return $this->trial_extended_at?->addDays(self::TRIAL_EXTENSION_DAYS);
+    }
+
     public function onExtendedTrial(): bool
     {
-        return $this->trial_extended_at !== null
-            && $this->trial_ends_at !== null
-            && $this->trial_ends_at <= $this->trial_extended_at->addDays(self::TRIAL_EXTENSION_DAYS)
+        $extensionEndsAt = $this->extensionEndsAt();
+
+        if (! $extensionEndsAt instanceof CarbonImmutable) {
+            return false;
+        }
+
+        $subscription = $this->subscription();
+
+        if ($subscription?->valid() === true) {
+            return $subscription->onTrial() && $subscription->created_at <= $extensionEndsAt;
+        }
+
+        return $this->trial_ends_at !== null
+            && $this->trial_ends_at <= $extensionEndsAt
             && $this->billingStatus() === BillingStatus::Trialing;
     }
 
