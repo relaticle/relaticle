@@ -32,7 +32,7 @@ same way as any other. See
 
 ## Choose when Rela may search
 
-Open **Settings**, then **Web search**, and pick one:
+Open **Settings** from your avatar menu, then **Web search**, and pick one:
 
 | Choice | What happens |
 |--------|--------------|
@@ -44,8 +44,8 @@ The choice is yours alone. Teammates pick their own.
 
 ## Turn web search off for the whole workspace
 
-The workspace owner can turn web search off for every member on the workspace
-settings page, under **Web search**. While it is off, Rela never asks to search,
+The workspace owner can turn web search off for every member on **Workspace
+Settings** (click your workspace name in the sidebar), under **Web search**. While it is off, Rela never asks to search,
 and each member's setting shows that the owner turned it off.
 
 ## What leaves your workspace
@@ -66,7 +66,7 @@ normal cost. Reading a page counts like any other tool. See
 
 ## Which models can search
 
-Claude and GPT models can search the web. Self-hosted models (Ollama or an
-OpenAI-compatible endpoint) cannot, so Rela never asks to search while one of
-them is selected. Pick a Claude or GPT model in the model picker to research a
-company. See [Choose an AI model](/help/ai-assistant/choose-an-ai-model).
+Only Claude and GPT models can search the web. Rela never asks to search while
+another model is selected, such as Gemini or a self-hosted model (Ollama or an
+OpenAI-compatible endpoint). Pick a Claude or GPT model in the model picker to
+research a company. See [Choose an AI model](/help/ai-assistant/choose-an-ai-model).
