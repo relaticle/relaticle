@@ -527,7 +527,7 @@ searched a mid-word fragment of a subject or snippet, so none changed.
 
 **Files:** migration `000001`.
 
-- [ ] One transactional migration, `up()` only:
+- [x] One transactional migration, `up()` only:
   - `set local lock_timeout = '5s'`, so the `alter table` fails fast instead of queueing every
     write behind a long read. A failed deploy is retried.
   - `create extension if not exists pg_trgm`.
@@ -538,12 +538,20 @@ searched a mid-word fragment of a subject or snippet, so none changed.
   - Function `emails_body_search_refresh()`, `AFTER INSERT OR UPDATE OF body_text ON email_bodies`:
     `update emails set body_search = to_tsvector('simple', coalesce(emails.snippet, '') || ' ' || left(coalesce(new.body_text, ''), 65536)) where emails.id = new.email_id`.
     The snippet joins the body vector because the spec gates snippet and body at FULL together.
-  - Function `emails_snippet_search_refresh()`, `BEFORE UPDATE OF snippet ON emails`: recompute
-    `new.body_search` from the stored body, so a changed snippet never leaves a stale vector.
+  - Function `emails_snippet_search_refresh()`, `BEFORE INSERT OR UPDATE OF snippet ON emails`:
+    recompute `new.body_search` from the stored body, so a changed snippet never leaves a stale
+    vector. On insert no body exists yet, so a new email carries its snippet vector at once and
+    never waits on the backfill, even when it never gets a body row.
   - Use `create or replace trigger` (Postgres 14 and later) so a rerun is safe.
-- [ ] `StoreEmailAction` needs no change: it inserts the email, then the body
+- [x] `StoreEmailAction` needs no change: it inserts the email, then the body
   (`StoreEmailAction.php:62-90`), so the body trigger fills `body_search` in the same transaction.
 - [ ] Run the Task 2 tests: the trigger test passes; others may still fail on the service.
+
+**Done (2026-11-05):** the trigger test searches through `EmailSearchService`, which still reads
+`snippet` with `ILIKE`, so it stays `todo` until Task 6. A throwaway probe proved all three
+triggers on the test database: `StoreEmailAction` fills both vectors in its transaction, a bare
+insert carries the snippet vector, and a snippet update rebuilds the body vector. `Email` hides
+both columns from `toArray()`, because the body vector holds the body's words.
 
 ### Task 4: Concurrent indexes
 

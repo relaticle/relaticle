@@ -13,6 +13,7 @@ use Carbon\CarbonInterface;
 use Database\Factories\EmailFactory;
 use Filament\Support\Facades\FilamentTimezone;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
@@ -104,6 +105,7 @@ use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
     'linked_at',
     'priority',
 ])]
+#[Hidden(['subject_search', 'body_search'])]
 final class Email extends Model
 {
     /**
