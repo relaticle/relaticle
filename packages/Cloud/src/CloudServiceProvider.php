@@ -6,6 +6,7 @@ namespace Relaticle\Cloud;
 
 use App\Contracts\Billing as BillingContract;
 use App\Contracts\Entitlements;
+use App\Enums\Plan;
 use App\Features\Billing;
 use App\Features\Documentation;
 use App\Models\User;
@@ -14,6 +15,7 @@ use App\Providers\Filament\AppPanelProvider;
 use App\Services\NoBilling;
 use App\Services\SelfHostedEntitlements;
 use App\Support\Mail\MailPreview;
+use Carbon\CarbonImmutable;
 use Filament\Panel;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Console\Scheduling\Schedule;
@@ -205,7 +207,9 @@ final class CloudServiceProvider extends ServiceProvider
             return new ProTrialEndingSoonMail($workspace, $workspace->trial_ends_at ?? now()->addDays(3));
         });
 
-        MailPreview::register('trial-ended', static fn (User $owner, Workspace $workspace): Mailable => ProEndedMail::afterTrial($workspace));
+        MailPreview::register('trial-ended', static fn (User $owner, Workspace $workspace): Mailable => ProEndedMail::afterTrial(self::pausedTrial($workspace)));
+
+        MailPreview::register('extension-ended', static fn (User $owner, Workspace $workspace): Mailable => ProEndedMail::afterTrial(self::pausedTrial($workspace, now()->subWeek())));
 
         MailPreview::register('subscription-ended', static fn (User $owner, Workspace $workspace): Mailable => ProEndedMail::afterSubscription($workspace));
 
@@ -215,6 +219,17 @@ final class CloudServiceProvider extends ServiceProvider
             'company' => 'Acme Robotics',
             'message' => 'We are evaluating CRMs for a 12-person sales workspace and need SSO. Can we talk this week?',
         ]));
+    }
+
+    private static function pausedTrial(Workspace $workspace, ?CarbonImmutable $extendedAt = null): Workspace
+    {
+        return $workspace->forceFill([
+            'plan' => Plan::Free,
+            'trial_ends_at' => null,
+            'pro_trial_used_at' => now()->subDay(),
+            'trial_extended_at' => $extendedAt,
+            'scheduled_deletion_at' => null,
+        ]);
     }
 
     private function registerCommunityCounts(): void

@@ -28,11 +28,12 @@ final class ProEndedMail extends Mailable implements ShouldQueue
         public Workspace $workspace,
         public BillingStatus $status,
         public ?Plan $plan = null,
+        public bool $extended = false,
     ) {}
 
     public static function afterTrial(Workspace $workspace): self
     {
-        return new self($workspace, BillingStatus::TrialEnded);
+        return new self($workspace, BillingStatus::TrialEnded, extended: $workspace->trial_extended_at !== null);
     }
 
     public static function afterSubscription(Workspace $workspace): self
@@ -78,7 +79,7 @@ final class ProEndedMail extends Mailable implements ShouldQueue
 
     private function offersExtension(): bool
     {
-        return $this->copyKey() === 'trial_ended' && ! $this->isGrandfathered();
+        return $this->copyKey() === 'trial_ended' && $this->workspace->canExtendTrial();
     }
 
     private function preheader(): string
@@ -123,9 +124,7 @@ final class ProEndedMail extends Mailable implements ShouldQueue
             return 'managed_ended';
         }
 
-        $extended = $this->status === BillingStatus::TrialEnded && $this->workspace->trial_extended_at !== null;
-
-        return $extended ? 'extension_ended' : $this->status->value;
+        return $this->extended ? 'extension_ended' : $this->status->value;
     }
 
     /** @return array<string, string> */

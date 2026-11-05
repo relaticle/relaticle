@@ -37,6 +37,6 @@
 @endif
 @if($isTrial)
 
-{{ __('mail.pro_ended.questions') }}
+{{ __('mail.trial_ending.questions') }}
 @endif
 </x-mail::message>

@@ -80,7 +80,6 @@ return [
         ],
         'trial_paused' => ':workspace is paused. Your records are safe.',
         'extend' => 'Need more time? [Extend your trial by :days days](:url) from the billing page. You can do this once.',
-        'questions' => 'Questions? Reply to this email.',
         'preheader' => 'Your records are safe. Subscribe to reopen the workspace.',
         'preheader_grandfathered' => 'Your workspace is back on its Cloud Free plan.',
         'paused' => 'Cloud access to :workspace is now paused. Your records are safe, and nothing has been deleted.',
