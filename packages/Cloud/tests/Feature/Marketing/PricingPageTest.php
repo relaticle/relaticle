@@ -35,7 +35,8 @@ it('shows the pro tier when billing is on', function (): void {
         ->assertSee('Cloud Pro')
         ->assertSee('Prefer to self-host? It’s free.')
         ->assertSee('Start for free')
-        ->assertSee('14-day Cloud Pro trial. No card required.')
+        ->assertSee('14-day trial, no card.')
+        ->assertSee('Starts as a 14-day Cloud Pro trial. Switch plans in Billing.')
         ->assertDontSee('One workspace price as your workspace grows')
         ->assertDontSee('300 AI credits')
         ->assertDontSee('Generous free tier');

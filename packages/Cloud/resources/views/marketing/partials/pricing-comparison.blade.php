@@ -5,18 +5,17 @@
         'enterprise' => __('billing.plans.enterprise'),
     ];
 
+    $emailActive = \Laravel\Pennant\Feature::active(\App\Features\EmailIntegration::class);
     $rows = array_values(array_filter([
         [__(':name, the AI assistant', ['name' => config('chat.assistant_name')]), __(':credits credits each month', ['credits' => $proCredits]), __(':credits credits each month', ['credits' => $scaleCredits]), __('Agreed in your contract')],
-        \Laravel\Pennant\Feature::active(\App\Features\EmailIntegration::class)
-            ? [__('Email and calendar'), __('Up to :count connected mailboxes', ['count' => $proPlan->connectedMailboxes()]), __('Up to :count connected mailboxes', ['count' => $scalePlan->connectedMailboxes()]), __('Unlimited connected mailboxes')]
-            : null,
-        [__('cloud::billing.comparison.integrations'), __('REST API and MCP server'), __(':multiplierx REST API and MCP throughput', ['multiplier' => $scalePlan->throughputMultiplier()]), __('Custom integrations and API limits by agreement')],
-        [__('Getting started'), __('Self-service setup'), __('Self-service setup'), __('A scoped implementation project')],
-        [__('Hosting and updates'), __('Managed by Relaticle'), __('Managed by Relaticle'), __('Agreed deployment and maintenance')],
-        [__('cloud::billing.comparison.support'), __('Email support'), __('Priority support'), __('Agreed support with the founding team')],
+        $emailActive ? [__('Connected mailboxes'), __('Up to :count', ['count' => $proPlan->connectedMailboxes()]), __('Up to :count', ['count' => $scalePlan->connectedMailboxes()]), __('Unlimited')] : null,
+        [__('Connect your own tools'), __('REST API and MCP server'), __('REST API and MCP server, :multiplierx the request limit', ['multiplier' => $scalePlan->throughputMultiplier()]), __('Custom integrations and limits by agreement')],
+        [__('Setup'), __('You set it up yourself'), __('You set it up yourself'), __('A scoped implementation project')],
+        [__('Hosting and updates'), __('Relaticle runs it'), __('Relaticle runs it'), __('Agreed deployment and maintenance')],
+        [__('cloud::billing.comparison.support'), __('Email'), __('Priority email'), __('Agreed support with the founding team')],
     ]));
 
-    $headerCell = 'bg-surface border-rail sticky top-16 z-10 border-b px-6 py-4 text-left md:px-8';
+    $headerCell = 'bg-surface border-rail sticky top-(--header-height) z-10 border-b px-6 py-4 text-left md:px-8';
     $rowHeader = 'block px-6 pt-5 pb-2 text-left text-sm font-medium text-gray-950 sm:table-cell sm:px-6 sm:py-5 sm:align-top md:px-10 dark:text-white';
     $valueCell = 'border-rail block px-6 py-1 text-sm leading-relaxed text-gray-600 before:mr-1.5 before:font-medium before:text-gray-950 before:content-[attr(data-label)] last:pb-5 sm:table-cell sm:border-l sm:px-6 sm:py-5 lg:px-8 sm:align-top sm:before:content-none dark:text-gray-400 dark:before:text-white';
 @endphp
@@ -44,9 +43,14 @@
         @foreach($rows as [$feature, $pro, $scale, $enterprise])
             <tr class="border-rail block border-b last:border-b-0 sm:table-row">
                 <th scope="row" @class([$rowHeader, 'sm:border-rail sm:border-b' => ! $loop->last])>{{ $feature }}</th>
-                @foreach(array_combine(array_keys($plans), [$pro, $scale, $enterprise]) as $key => $value)
-                    <td data-label="{{ $plans[$key] }}:" @class([$valueCell, 'sm:border-b' => ! $loop->parent->last])>{{ $value }}</td>
-                @endforeach
+                @if($pro === $scale)
+                    <td colspan="2" data-label="{{ __('Cloud Pro and Cloud Scale') }}:" @class([$valueCell, 'sm:border-b' => ! $loop->last])>{{ $pro }}</td>
+                    <td data-label="{{ $plans['enterprise'] }}:" @class([$valueCell, 'sm:border-b' => ! $loop->last])>{{ $enterprise }}</td>
+                @else
+                    @foreach(array_combine(array_keys($plans), [$pro, $scale, $enterprise]) as $key => $value)
+                        <td data-label="{{ $plans[$key] }}:" @class([$valueCell, 'sm:border-b' => ! $loop->parent->last])>{{ $value }}</td>
+                    @endforeach
+                @endif
             </tr>
         @endforeach
     </tbody>

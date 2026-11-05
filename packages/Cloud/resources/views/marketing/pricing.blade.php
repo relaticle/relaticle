@@ -161,7 +161,7 @@
         ]);
     @endphp
 
-    <x-cloud::marketing.hero>
+    <x-cloud::marketing.hero x-data="{ yearly: true }" align="center">
         <x-slot:eyebrow>
             <x-cloud::marketing.eyebrow>{{ __('Pricing') }}</x-cloud::marketing.eyebrow>
         </x-slot:eyebrow>
@@ -178,10 +178,16 @@
 
         <x-slot:aside>
             <p class="text-base leading-relaxed text-gray-500 md:text-lg dark:text-gray-400">
-                {{ $billingActive
-                    ? __('Unlimited users and records on every plan. Run it yourself, or let us host it for you.')
-                    : __('Unlimited users. Unlimited records. Self-host for free, or let us run it for you.') }}
+                @if($billingActive)
+                    {{ __('Add teammates without the bill changing.') }}<br class="hidden sm:block"/>
+                    {{ __('Hosted by us, or self-hosted for free.') }}
+                @else
+                    {{ __('Unlimited users. Unlimited records. Self-host for free, or let us run it for you.') }}
+                @endif
             </p>
+            @if($billingActive)
+                <x-cloud::billing.interval-toggle class="mt-6 items-center" />
+            @endif
         </x-slot:aside>
 
         @if($billingActive)

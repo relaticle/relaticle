@@ -74,7 +74,9 @@ reach it. Change the header height and the token together. `html` also carries `
 ## Components (`components/marketing`)
 
 - `hero`: the split hero for inner pages. The `h1` on the left, the subline and CTAs on the right,
-  then the page's visual below on a `bg-hero-panel` cell. The homepage hero is centered and built from
+  then the page's visual below on a `bg-hero-panel` cell. `align="center"` stacks the same parts
+  centred, for a page whose visual is a grid rather than one window: `/pricing` uses it with the
+  price in the headline and the billing toggle under the line. The homepage hero is centered and built from
   the same parts: the open-source pill, a two-tone `type-display` headline, one subline with Claude
   and ChatGPT in plain text and Rela as the only chip, two buttons, the trial line, then the demo on
   a rounded `bg-hero-panel` that sits outside the rails, with joined tabs on a `mac-window`. The copy
