@@ -234,16 +234,15 @@ it('does not overwrite an owner request that lands after the workspace was read'
     Mail::assertNothingQueued();
 });
 
-it('runs daily at 02:00', function (): void {
+it('runs daily at 02:00 without overlapping itself', function (): void {
     $this->artisan('schedule:list')->assertSuccessful();
 
-    $expressions = collect(resolve(Schedule::class)->events())
+    $events = collect(resolve(Schedule::class)->events())
         ->filter(fn (Event $event): bool => str_contains((string) $event->command, 'billing:schedule-inactive-deletions'))
-        ->map(fn (Event $event): string => $event->expression)
-        ->values()
-        ->all();
+        ->values();
 
-    expect($expressions)->toBe(['0 2 * * *']);
+    expect($events->map(fn (Event $event): string => $event->expression)->all())->toBe(['0 2 * * *'])
+        ->and($events->map(fn (Event $event): bool => $event->withoutOverlapping)->all())->toBe([true]);
 });
 
 it('keeps the date and the reason of a deletion the owner requested', function (): void {
