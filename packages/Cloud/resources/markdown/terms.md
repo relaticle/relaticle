@@ -23,10 +23,12 @@ You must be at least 16 years old to use our services.
 
 You own your data. We do not claim any intellectual property rights over the data you store in Relaticle.
 
-- **Cloud users:** Your data is stored on our servers. You can export your data at any time via the application or the REST API. To request account deletion, email privacy@relaticle.com or contact us.
+- **Cloud users:** Your data is stored on our servers. You can export it through the application or the REST API while your workspace is active. To request account deletion, email privacy@relaticle.com or contact us.
 - **Self-hosted users:** Your data never touches our servers. You have full control.
 
 Account deletion uses a 30-day grace period once scheduled. Signing in before the deletion date lets you cancel. Records in shared workspaces remain after your account is removed.
+
+A workspace whose free trial ended without a plan pauses. If no member signs in and no plan is chosen for 60 days, we delete the workspace and its records. We email the owner 14 days and 5 days before. A paused workspace cannot be exported.
 
 ## 4. Acceptable Use
 

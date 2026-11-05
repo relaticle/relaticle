@@ -82,6 +82,7 @@ it('renders the trial end time in the owner timezone with the paused-access outc
     $mail->assertSeeInHtml('Pro for Acme ends on Sep 9');
     $mail->assertSeeInHtml('Your Pro trial ends on Sep 9, 2026 at 2:30 PM (Berlin time).');
     $mail->assertSeeInHtml('After that, Acme pauses until you choose a plan.');
+    $mail->assertSeeInHtml('We keep a paused workspace for 60 days after that.');
     $mail->assertSeeInHtml('Questions? Reply to this email.');
     $mail->assertSeeInHtml('Choose a plan');
     $mail->assertSeeInHtml('One flat price covers the whole workspace.');
@@ -110,6 +111,7 @@ it('describes the grandfathered outcome for grandfathered workspaces', function 
 
     $mail->assertSeeInHtml(__('mail.trial_ending.grandfathered', ['workspace' => 'Acme']));
     $mail->assertDontSeeInHtml('After that, Acme pauses');
+    $mail->assertDontSeeInHtml('60 days');
 });
 
 it('promises a return to Cloud Free in the preheader of a grandfathered workspace', function (): void {

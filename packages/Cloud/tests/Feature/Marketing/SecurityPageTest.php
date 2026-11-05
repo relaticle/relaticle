@@ -47,6 +47,12 @@ it('gives the provider table the anchor the privacy policy links to', function (
     $this->get('/security')->assertOk()->assertSee('id="providers"', false);
 });
 
+it('states the 60-day deletion rule beside the deletion on request', function (): void {
+    $text = securityPageText($this->get('/security')->assertOk()->getContent());
+
+    expect($text)->toContain('A paused trial workspace that nobody signs in to for 60 days is deleted with its records, after two emails to the owner.');
+});
+
 it('names each service provider on a hosted install', function (string $provider): void {
     withHostedBilling();
 

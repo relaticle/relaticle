@@ -20,6 +20,7 @@ Data from a self-hosted installation stays on your servers unless you configure 
 
 ### Website Visitors (relaticle.com)
 
+- **Paused trial workspaces:** Deleted with their records after 60 days without a sign-in or a plan. The owner is emailed 14 days and 5 days before.
 - **Contact form submissions:** Name, email, and message content
 - **Analytics:** Anonymous page views and referrer data
 

@@ -8,6 +8,8 @@
 {{ __('mail.trial_ending.grandfathered', ['workspace' => $workspace->name]) }}
 @else
 {{ __('mail.trial_ending.pauses', ['workspace' => $workspace->name]) }}
+
+{{ __('mail.trial_ending.kept') }}
 @endif
 
 @unless($usage->isEmpty())

@@ -27,7 +27,8 @@ function proEndedWorkspace(array $attributes = []): Workspace
 }
 
 it('tells the owner the trial ended, the workspace is paused, and how to reopen it', function (): void {
-    $workspace = proEndedWorkspace();
+    $this->travelTo('2026-09-06 12:00:00');
+    $workspace = proEndedWorkspace(['paused_at' => now()]);
     $billingUrl = Billing::getUrl(panel: 'app', tenant: $workspace);
 
     $mail = ProEndedMail::afterTrial($workspace);
@@ -36,6 +37,7 @@ it('tells the owner the trial ended, the workspace is paused, and how to reopen 
     $mail->assertSeeInHtml('Your Pro trial for Acme has ended');
     $mail->assertSeeInHtml('Your records are safe. Choose a plan, or extend the trial by 7 days.');
     $mail->assertSeeInHtml('Acme is paused. Your records are safe.');
+    $mail->assertSeeInHtml('We keep a paused workspace for 60 days. Choose a plan by Nov 5, 2026 to keep it.');
     $mail->assertSeeInHtml(__('mail.trial_ending.keeps', ['credits' => number_format(Plan::Pro->credits())]));
     $mail->assertSeeInHtml('Choose a plan');
     $mail->assertSeeInHtml('Need more time?');
@@ -48,6 +50,42 @@ it('tells the owner the trial ended, the workspace is paused, and how to reopen 
     $mail->assertDontSeeInHtml('mail.pro_ended.');
 
     expect($mail->envelope()->subject)->not->toStartWith('mail.');
+});
+
+it('dates the 60-day line from the pause in the owner timezone', function (): void {
+    $workspace = proEndedWorkspace(['paused_at' => '2026-09-06 23:30:00']);
+    $workspace->owner->forceFill(['timezone' => 'Pacific/Auckland'])->save();
+
+    ProEndedMail::afterTrial($workspace->refresh())->assertSeeInHtml('Choose a plan by Nov 6, 2026 to keep it.');
+});
+
+it('counts 60 days from now when the pause date is missing', function (): void {
+    $this->travelTo('2026-09-06 12:00:00');
+
+    ProEndedMail::afterTrial(proEndedWorkspace())->assertSeeInHtml('Choose a plan by Nov 5, 2026 to keep it.');
+});
+
+it('keeps the date chosen when the mail was built, even if the pause date moves before it renders', function (): void {
+    $workspace = proEndedWorkspace(['paused_at' => '2026-09-06 12:00:00']);
+    $mail = ProEndedMail::afterTrial($workspace);
+
+    $workspace->forceFill(['paused_at' => '2026-09-20 12:00:00'])->save();
+
+    $mail->assertSeeInHtml('Choose a plan by Nov 5, 2026 to keep it.');
+});
+
+it('states the 60-day rule on an extended trial that ended', function (): void {
+    $mail = ProEndedMail::afterTrial(proEndedWorkspace(['trial_extended_at' => now()->subWeek()]));
+
+    $mail->assertSeeInHtml('We keep a paused workspace for 60 days.');
+});
+
+it('states no 60-day rule for a grandfathered workspace, a subscription or a managed plan', function (): void {
+    $grandfathered = proEndedWorkspace(['hosted_free_grandfathered_at' => now()->subYear()]);
+
+    ProEndedMail::afterTrial($grandfathered)->assertDontSeeInHtml('60 days');
+    ProEndedMail::afterSubscription(proEndedWorkspace())->assertDontSeeInHtml('60 days');
+    ProEndedMail::afterManagedPlan(proEndedWorkspace(), Plan::Enterprise)->assertDontSeeInHtml('60 days');
 });
 
 it('drops the extension offer once the trial was extended', function (): void {

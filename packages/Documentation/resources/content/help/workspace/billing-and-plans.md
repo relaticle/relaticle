@@ -2,7 +2,7 @@
 title: Billing and plans
 description: Relaticle Cloud is priced per workspace, never per seat. Trials, subscriptions, credits, and pausing explained.
 order: 3
-updated: "2026-11-05"
+updated: "2026-11-06"
 related: [help/ai-assistant/ai-credits-and-limits, help/workspace/rename-or-delete-your-workspace]
 ---
 
@@ -47,6 +47,9 @@ When it ends, subscribe from the Billing page to keep Cloud access; without
 a subscription the workspace pauses. If you need more time, the owner can
 extend the trial by 7 days once from the Billing page. AI credits do not
 refill during the extension. Relaticle Cloud has no free plan.
+
+A paused workspace is kept for 60 days. If no one signs in and no plan is
+chosen, it is deleted with its records, after two emails to the owner.
 
 ## Managing the subscription
 

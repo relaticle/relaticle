@@ -34,6 +34,12 @@ it('renders an article with its rendered body', function (): void {
         ->assertSee('Create your first company', false);
 });
 
+it('tells the reader a paused trial workspace is kept for 60 days', function (): void {
+    $this->get('/help/workspace/billing-and-plans')
+        ->assertOk()
+        ->assertSeeText('A paused workspace is kept for 60 days. If no one signs in and no plan is chosen, it is deleted with its records, after two emails to the owner.');
+});
+
 it('offers a direct contact path from the hub and the article footer', function (): void {
     $this->get('/help')
         ->assertOk()

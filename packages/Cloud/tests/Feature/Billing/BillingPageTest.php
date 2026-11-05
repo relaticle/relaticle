@@ -150,7 +150,7 @@ it('replaces the app shell with a standalone paused screen when the trial ends',
         ->assertOk()
         ->assertSee(__('cloud::billing.paused.heading.trial_ended'))
         ->assertDontSee('cloud::billing.paused.heading.', false)
-        ->assertSee(__('cloud::billing.paused.owner_body', ['workspace' => $workspace->name]))
+        ->assertSee(__('cloud::billing.paused.owner_body_trial', ['workspace' => $workspace->name]))
         ->assertSee(__('cloud::billing.paused.continue'))
         ->assertSee('href="https://marketing.test/contact"', false)
         ->assertSee(__('cloud::billing.paused.sign_out'))
@@ -217,6 +217,8 @@ it('names the ended subscription on the paused screen', function (): void {
 
     livewire(Billing::class)
         ->assertSee(__('cloud::billing.paused.heading.subscription_ended'))
+        ->assertSee(__('cloud::billing.paused.owner_body', ['workspace' => $workspace->name]))
+        ->assertDontSee(__('cloud::billing.paused.owner_body_trial', ['workspace' => $workspace->name]))
         ->assertDontSee('cloud::billing.paused.heading.', false)
         ->assertDontSee(__('cloud::billing.paused.heading.trial_ended'));
 });
@@ -317,7 +319,7 @@ it('tells a member of a paused workspace who can reopen it, without checkout con
     Filament::setTenant($workspace->refresh());
 
     livewire(Billing::class)
-        ->assertSee(__('cloud::billing.paused.member_body', ['owner' => $workspace->owner->name, 'workspace' => $workspace->name]))
+        ->assertSee(__('cloud::billing.paused.member_body_trial', ['owner' => $workspace->owner->name, 'workspace' => $workspace->name]))
         ->assertDontSee(__('cloud::billing.paused.continue'));
 });
 
@@ -434,7 +436,7 @@ it('hides the extension from a member', function (): void {
     actingAsMemberOf($workspace);
 
     livewire(Billing::class)
-        ->assertSee(__('cloud::billing.paused.member_body', ['owner' => $workspace->owner->name, 'workspace' => $workspace->name]))
+        ->assertSee(__('cloud::billing.paused.member_body_trial', ['owner' => $workspace->owner->name, 'workspace' => $workspace->name]))
         ->assertDontSee(__('cloud::billing.paused.extend', ['days' => Workspace::TRIAL_EXTENSION_DAYS]))
         ->assertDontSee(__('cloud::billing.paused.extend_once'));
 });
