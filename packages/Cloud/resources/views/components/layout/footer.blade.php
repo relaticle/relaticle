@@ -13,7 +13,12 @@
     ];
 @endphp
 
-@if($framed)
+@if($framed && in_array(request()->query('footer'), ['b', 'c', 'd'], true))
+    @include('cloud::components.layout.footer-quiet', [
+        'dark' => request()->query('footer') === 'c',
+        'wordmark' => request()->query('footer') === 'd',
+    ])
+@elseif($framed)
     <footer class="bg-surface">
         <div class="border-rail mx-auto max-w-6xl sm:border-x">
             <div class="bg-rail grid grid-cols-2 gap-px md:grid-cols-4">

@@ -50,7 +50,12 @@
     @include('cloud::marketing.home.partials.hero')
     @include('cloud::marketing.home.partials.works-with')
     @include('cloud::marketing.home.partials.features')
-    @include('cloud::marketing.home.partials.story')
+    @include(match (request()->query('story')) {
+        'a' => 'cloud::marketing.home.partials.story-a',
+        'b' => 'cloud::marketing.home.partials.story-b',
+        'c' => 'cloud::marketing.home.partials.story-c',
+        default => 'cloud::marketing.home.partials.story',
+    })
     @if($emailIntegrationActive)
         @include('cloud::marketing.home.partials.email')
     @endif

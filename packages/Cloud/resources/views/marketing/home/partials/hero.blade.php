@@ -1,8 +1,8 @@
-<section x-data="heroTabs()" x-init="init()" class="bg-surface relative overflow-hidden pt-16">
+<section x-data="heroTabs()" x-init="init()" class="bg-surface relative overflow-hidden">
     <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]" aria-hidden="true"></div>
 
     <div class="border-rail relative mx-auto max-w-6xl sm:border-x">
-        <div class="flex flex-col items-center px-6 pb-14 pt-16 text-center md:px-10 md:pb-16 md:pt-24">
+        <div class="flex flex-col items-center px-6 pb-14 pt-11 text-center md:px-10 md:pb-16 md:pt-13">
             <a href="https://github.com/relaticle/relaticle" target="_blank" rel="noopener"
                aria-label="{{ __('Open Source, :count+ GitHub stars', ['count' => $formattedGithubStars]) }}"
                class="group inline-flex items-center gap-2 rounded-full border border-gray-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200 hover:border-gray-300 dark:hover:border-white/[0.15]">
@@ -32,14 +32,25 @@
                 <x-ri-arrow-right-up-line class="h-3 w-3 text-gray-400 dark:text-gray-500"/>
             </a>
 
-            <h1 class="type-display mt-8 max-w-3xl md:mt-10">
+            <h1 class="type-display mt-8 max-w-3xl md:mt-10 lg:text-7xl">
                 <span class="block font-normal text-gray-500">{{ __('The AI CRM for selling') }}</span>
-                <span class="block text-gray-950 dark:text-white">{{ __('without a sales team') }}</span>
+                <span class="mt-[0.1em] block font-bold tracking-tight text-gray-950 dark:text-white">{{ __('without a sales team') }}</span>
             </h1>
 
-            <p class="mt-6 max-w-xl text-base leading-relaxed text-gray-500 sm:text-lg dark:text-gray-400">
+            <p class="mt-6 max-w-3xl text-base leading-relaxed text-gray-500 sm:text-lg dark:text-gray-400">
                 {{ __('For people who sell to a named list of companies.') }}<br class="hidden sm:block"/>
-                {{ __('Work from Claude or ChatGPT, or ask :name, the built-in AI assistant.', ['name' => config('chat.assistant_name')]) }}
+                {{ __('Work from') }}
+                <span class="inline-flex items-baseline">
+                    <span class="sr-only">{{ __('Claude, ChatGPT or Gemini') }}</span>
+                    <span class="inline-grid" aria-hidden="true">
+                        <x-cloud::marketing.actor as="claude" size="lg" class="hero-agent-claude col-start-1 row-start-1"/>
+                        <x-cloud::marketing.actor as="chatgpt" size="lg" class="hero-agent-chatgpt col-start-1 row-start-1"/>
+                        <x-cloud::marketing.actor as="gemini" size="lg" class="hero-agent-gemini col-start-1 row-start-1"/>
+                    </span>,
+                </span>
+                {{ __('or ask') }}
+                <span class="inline-flex items-baseline"><x-cloud::marketing.actor as="rela" size="lg"/>,</span>
+                {{ __('the built-in AI assistant.') }}
             </p>
 
             <div class="mt-8 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
@@ -78,37 +89,60 @@
                 'companies' => [__('Companies'), __('Companies')],
                 'custom-fields' => [__('Fields'), __('Custom fields')],
             ];
+
+            $panelVariant = match (request()->query('panel')) {
+                '2' => 'violet',
+                '3' => 'indigo',
+                '4' => 'deep',
+                default => 'warm',
+            };
+            $onDeep = $panelVariant === 'deep';
+            $tabIdle = $onDeep
+                ? 'text-white/80 hover:text-white'
+                : 'text-gray-600 hover:text-gray-950 dark:text-gray-400 dark:hover:text-white';
         @endphp
 
-        <div id="hero-tabs" role="tablist" class="border-rail divide-rail grid grid-cols-4 divide-x border-t">
-            @foreach($heroTabs as $id => [$short, $long])
-                <button type="button"
-                        id="tab-{{ $id }}"
-                        role="tab"
-                        :aria-selected="(activeTab === '{{ $id }}').toString()"
-                        :tabindex="activeTab === '{{ $id }}' ? 0 : -1"
-                        aria-controls="panel-{{ $id }}"
-                        x-ref="tab-{{ $id }}"
-                        x-on:click="switchTab('{{ $id }}')"
-                        x-on:keydown="handleTabKeydown($event)"
-                        :class="activeTab === '{{ $id }}' ? 'bg-tint/70 text-gray-950 dark:text-white' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'"
-                        class="relative cursor-pointer py-3.5 text-xs font-medium transition-colors sm:text-sm">
-                    <span class="sm:hidden">{{ $short }}</span><span class="hidden sm:inline">{{ $long }}</span>
-                    <span class="absolute inset-x-0 bottom-0 h-px bg-primary" x-show="activeTab === '{{ $id }}'" aria-hidden="true"></span>
-                </button>
-            @endforeach
-        </div>
+    </div>
 
-        <div class="bg-tint/60 border-rail relative border-t p-6 sm:p-8 md:p-10">
-
-            <div class="rounded-2xl border border-gray-200 bg-gray-100 p-1.5 pt-0 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_16px_40px_-16px_rgba(0,0,0,0.14)] dark:border-white/[0.1] dark:bg-gray-900 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_16px_40px_-16px_rgba(0,0,0,0.6)]">
-                <div class="flex h-9 items-center gap-1.5 px-2.5" aria-hidden="true">
-                    <span class="size-3 rounded-full bg-[#ff5c5a]"></span>
-                    <span class="size-3 rounded-full bg-[#f5b902]"></span>
-                    <span class="size-3 rounded-full bg-[#10c27b]"></span>
+    <div class="relative px-2 pb-2 sm:px-3 sm:pb-3 md:px-6 md:pb-6">
+        <div @class([
+            'rounded-2xl px-3 pb-4 pt-8 sm:px-6 sm:pb-8 sm:pt-12 md:rounded-3xl md:px-10 md:pb-12 md:pt-14',
+            'bg-hero-panel' => $panelVariant === 'warm',
+            'bg-hero-panel-violet' => $panelVariant === 'violet',
+            'bg-hero-panel-indigo' => $panelVariant === 'indigo',
+            'bg-hero-panel-deep' => $onDeep,
+        ])>
+            <div class="mx-auto max-w-6xl">
+                <div id="hero-tabs" role="tablist" @class([
+                    'mx-auto flex w-fit rounded-t-xl px-1 pt-1 backdrop-blur-sm',
+                    'bg-white/50 dark:bg-white/[0.05]' => ! $onDeep,
+                    'bg-white/15' => $onDeep,
+                ])>
+                    @foreach($heroTabs as $id => [$short, $long])
+                        <button type="button"
+                                id="tab-{{ $id }}"
+                                role="tab"
+                                :aria-selected="(activeTab === '{{ $id }}').toString()"
+                                :tabindex="activeTab === '{{ $id }}' ? 0 : -1"
+                                aria-controls="panel-{{ $id }}"
+                                x-ref="tab-{{ $id }}"
+                                x-on:click="switchTab('{{ $id }}')"
+                                x-on:keydown="handleTabKeydown($event)"
+                                :class="activeTab === '{{ $id }}' ? 'z-10 border-gray-200 bg-gray-100 text-gray-950 dark:border-white/[0.1] dark:bg-gray-900 dark:text-white' : 'border-transparent {{ $tabIdle }}'"
+                                class="relative -mb-px cursor-pointer rounded-t-lg border border-b-0 px-3 py-2 text-xs font-medium transition-colors sm:px-5 sm:text-sm md:px-6 md:py-2.5 md:text-base">
+                            <span class="sm:hidden">{{ $short }}</span><span class="hidden sm:inline">{{ $long }}</span>
+                        </button>
+                    @endforeach
                 </div>
 
-                <div class="relative overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.06] dark:bg-gray-950">
+                <div class="rounded-xl border border-gray-200 bg-gray-100 px-1.5 pb-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_24px_48px_-24px_rgba(0,0,0,0.18)] sm:rounded-2xl sm:px-2 sm:pb-2 dark:border-white/[0.1] dark:bg-gray-900 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_24px_48px_-24px_rgba(0,0,0,0.6)]">
+                    <div class="flex h-8 items-center gap-1.5 px-1 sm:h-9 sm:px-1.5" aria-hidden="true">
+                        <span class="size-2.5 rounded-full bg-[#ff5c5a] sm:size-3"></span>
+                        <span class="size-2.5 rounded-full bg-[#f5b902] sm:size-3"></span>
+                        <span class="size-2.5 rounded-full bg-[#10c27b] sm:size-3"></span>
+                    </div>
+
+                <div class="relative overflow-hidden rounded-md border border-gray-200 bg-white sm:rounded-lg dark:border-white/[0.06] dark:bg-gray-950">
                     {{-- The frame keeps the chat panel's height on every tab, so the screenshots cover it from
                          their top-left corner and crop the rest instead of resizing the frame. --}}
                     <div class="relative h-[520px] sm:h-[580px] md:h-[640px]">
@@ -152,6 +186,7 @@
                         {{-- Bottom fade overlay --}}
                         <div class="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white/60 via-white/20 to-transparent dark:from-gray-950/60 dark:via-gray-950/20 dark:to-transparent pointer-events-none"></div>
                     </div>
+                </div>
                 </div>
             </div>
         </div>
