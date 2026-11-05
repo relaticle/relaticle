@@ -22,7 +22,7 @@ final readonly class CancelInactivityDeletionOnLogin
             return;
         }
 
-        rescue(fn () => Workspace::query()
+        rescue(fn (): bool => Workspace::query()
             ->scheduledForInactivity()
             ->where(fn (Builder $workspaces): Builder => $workspaces
                 ->where('user_id', $user->getKey())

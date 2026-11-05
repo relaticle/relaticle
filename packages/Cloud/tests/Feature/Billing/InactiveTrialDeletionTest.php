@@ -248,6 +248,32 @@ it('does not overwrite an owner request that lands after the workspace was read'
     Mail::assertNothingQueued();
 });
 
+it('does not schedule a workspace someone signs in to after it was read', function (string $who): void {
+    Mail::fake();
+    $workspace = inactivePausedWorkspace();
+    $member = User::factory()->create(['last_login_at' => null]);
+    $workspace->users()->attach($member, ['role' => 'admin']);
+    $signer = $who === 'owner' ? $workspace->owner : $member;
+
+    $raced = false;
+    DB::listen(function (QueryExecuted $query) use (&$raced, $signer): void {
+        if ($raced || ! str_contains($query->sql, 'max("last_login_at")')) {
+            return;
+        }
+
+        $raced = true;
+        DB::table('users')->where('id', $signer->getKey())->update(['last_login_at' => now()]);
+    });
+
+    $this->travelTo(inactivePausedAt()->addDays(46));
+    runInactivityCommand();
+
+    expect($raced)->toBeTrue()
+        ->and($workspace->refresh()->scheduled_deletion_at)->toBeNull()
+        ->and($workspace->deletion_reason)->toBeNull();
+    Mail::assertNothingQueued();
+})->with(['owner', 'member']);
+
 it('runs daily at 02:00 without overlapping itself', function (): void {
     $this->artisan('schedule:list')->assertSuccessful();
 
