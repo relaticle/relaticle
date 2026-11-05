@@ -6,12 +6,14 @@ namespace Relaticle\ImportWizard\Importers;
 
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
-use App\Models\CustomFieldLink;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use Relaticle\CustomFields\CustomFields as CustomFieldsWrites;
 use Relaticle\CustomFields\Data\RecordLinkPayload;
+use Relaticle\CustomFields\Enums\FieldCapability;
+use Relaticle\CustomFields\Enums\WriteSource;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\CustomFields\Filament\Integration\Support\Imports\ImportDataStorage;
 use Relaticle\CustomFields\Models\CustomFieldOption;
@@ -127,6 +129,7 @@ abstract class BaseImporter implements ImporterContract
             ->where('entity_type', $this->entityName())
             ->active()
             ->with('options')
+            ->withRelationshipDefinition()
             ->orderBy('sort_order')
             ->get();
     }
@@ -191,7 +194,7 @@ abstract class BaseImporter implements ImporterContract
             // For multi-value arbitrary fields (email, phone), use item-level rules
             // since CSV values are strings that may be comma-separated
             $isMultiChoiceArbitrary = $customField->typeData->dataType->isMultiChoiceField()
-                && $customField->typeData->acceptsArbitraryValues;
+                && $customField->typeData->supports(FieldCapability::AcceptsArbitraryValues);
 
             $rules = $isMultiChoiceArbitrary
                 ? $validationService->getItemValidationRules($customField)
@@ -208,13 +211,13 @@ abstract class BaseImporter implements ImporterContract
             return ImportField::make("custom_fields_{$customField->code}")
                 ->label($customField->name)
                 ->guess($this->buildCustomFieldGuesses($customField->code, $customField->name))
-                ->required($validationService->isRequired($customField))
+                ->required($customField->isRequired())
                 ->rules($importRules)
                 ->asCustomField()
                 ->type($customField->typeData->dataType)
                 ->icon(CustomFieldType::tryFrom($customField->type)?->icon())
                 ->sortOrder($customField->sort_order)
-                ->acceptsArbitraryValues($customField->typeData->acceptsArbitraryValues)
+                ->acceptsArbitraryValues($customField->typeData->supports(FieldCapability::AcceptsArbitraryValues))
                 ->options($options);
         });
 
@@ -224,7 +227,7 @@ abstract class BaseImporter implements ImporterContract
     private function shouldLoadOptions(CustomField $customField): bool
     {
         return $customField->typeData->dataType->isChoiceField()
-            && ! $customField->typeData->acceptsArbitraryValues;
+            && ! $customField->typeData->supports(FieldCapability::AcceptsArbitraryValues);
     }
 
     /**
@@ -271,15 +274,16 @@ abstract class BaseImporter implements ImporterContract
             return;
         }
 
-        ImportDataStorage::setMultiple($record, $this->writeLinks($record, ImportDataStorage::pull($record)));
+        CustomFieldsWrites::writing(WriteSource::Import, function () use ($record, $workspace): void {
+            ImportDataStorage::setMultiple($record, $this->writeLinks($record, ImportDataStorage::pull($record)));
 
-        CustomFields::importer()->forModel($record)->saveValues($workspace);
+            CustomFields::importer()->forModel($record)->saveValues($workspace);
+        }, actor: CustomFieldsWrites::writeContext()->actor);
     }
 
     /**
-     * Links are written here rather than through the value path, so the ledger records
-     * that an import made them. A file is the caller's statement of what the record links
-     * to, so a target held elsewhere moves instead of failing the row.
+     * A file is the caller's statement of what the record links to, so a target held
+     * elsewhere moves instead of failing the row.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
@@ -295,13 +299,7 @@ abstract class BaseImporter implements ImporterContract
 
             unset($data[$field->code]);
 
-            resolve(LinkWriter::class)->apply(
-                $record,
-                $field,
-                $ids,
-                CustomFieldLink::SOURCE_IMPORT,
-                array_map(strval(...), $ids),
-            );
+            resolve(LinkWriter::class)->apply($record, $field, $ids, array_map(strval(...), $ids));
         }
 
         return $data;

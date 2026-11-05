@@ -6,6 +6,7 @@ use App\Features\OnboardSeed;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldSection;
+use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Support\CurrentWorkspace;
@@ -246,4 +247,32 @@ it('names the record on a stored record card, not its id', function (): void {
     expect($rows)->toHaveCount(1)
         ->and($rows[0]['value'])->toBe('Initech')
         ->and($rows[0]['values'])->toBe(['Initech']);
+});
+
+it('names both sides of a paired relationship field on an update proposal, never their ids', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    resolve(CurrentWorkspace::class)->set($workspace);
+    $current = Company::factory()->create(['workspace_id' => $workspace->getKey(), 'name' => 'Hooli']);
+    $proposed = Company::factory()->create(['workspace_id' => $workspace->getKey(), 'name' => 'Pied Piper']);
+
+    [$employers] = RecordFieldFixture::paired($workspace, 'people', 'company', 'employers', 'staff');
+
+    $person = People::factory()->create(['workspace_id' => $workspace->getKey()]);
+    $person->update(['custom_fields' => [$employers->code => [$current->getKey()]]]);
+
+    try {
+        $rows = resolve(CustomFieldsDisplayFormatter::class)
+            ->format($user, 'people', [$employers->code => [$proposed->getKey()]], $person->fresh());
+    } finally {
+        TenantContextService::setTenantId(null);
+    }
+
+    expect($rows)->toHaveCount(1)
+        ->and($rows[0])->toMatchArray([
+            'old' => 'Hooli',
+            'new' => 'Pied Piper',
+            'values' => ['Pied Piper'],
+            'type' => 'badges',
+        ]);
 });

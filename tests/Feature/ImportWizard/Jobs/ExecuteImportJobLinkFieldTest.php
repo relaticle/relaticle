@@ -11,6 +11,7 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Event;
 use Laravel\Jetstream\Events\TeamCreated;
 use Relaticle\CustomFields\Enums\RelationshipCardinality;
+use Relaticle\CustomFields\Enums\WriteSource;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
@@ -65,7 +66,7 @@ it('links a record through a relationship column and stamps the import as its so
 
     expect($link->from_entity_id)->toBe($person->getKey())
         ->and($link->to_entity_id)->toBe($this->company->getKey())
-        ->and($link->source)->toBe('import')
+        ->and($link->source)->toBe(WriteSource::Import)
         ->and($link->created_by_id)->toBe($this->user->getKey())
         ->and($person->getCustomFieldValue($this->field))->toBe([(string) $this->company->getKey()]);
 });

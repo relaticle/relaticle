@@ -9,7 +9,6 @@ use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\User;
 use App\Support\CustomFields\CanonicalValue;
-use App\Support\CustomFields\RecordNameResolver as CustomFieldRecordNames;
 use App\Support\PlainText;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
@@ -21,6 +20,7 @@ use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Support\RecordNameResolver;
 use Relaticle\CustomFields\Data\RecordLinkPayload;
+use Relaticle\CustomFields\Enums\FieldCapability;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\CustomFields\Models\CustomFieldLink;
@@ -52,6 +52,7 @@ final readonly class CustomFieldsDisplayFormatter
             ->active()
             ->whereIn('code', array_keys($cleanFields))
             ->with('options')
+            ->withRelationshipDefinition()
             ->get()
             ->keyBy('code');
 
@@ -64,10 +65,13 @@ final readonly class CustomFieldsDisplayFormatter
             }
 
             $newValue = $this->storedForm($field, $proposedValue);
-            $definition = $field->relationshipDefinition();
 
-            if ($definition instanceof CustomFieldRelationship) {
-                $rows[] = $this->linkRow($user, $field, $definition, (string) $code, $newValue, $oldModel);
+            if ($this->isLinkField($field)) {
+                $definition = $field->relationshipDefinition();
+
+                if ($definition instanceof CustomFieldRelationship) {
+                    $rows[] = $this->linkRow($user, $field, $definition, (string) $code, $newValue, $oldModel);
+                }
 
                 continue;
             }
@@ -116,10 +120,8 @@ final readonly class CustomFieldsDisplayFormatter
         $rows = [];
 
         foreach ($fields as $field) {
-            $definition = $field->relationshipDefinition();
-
-            if ($definition instanceof CustomFieldRelationship) {
-                $linkRow = $this->storedLinkRow($model, $field, $definition);
+            if ($this->isLinkField($field)) {
+                $linkRow = $this->storedLinkRow($model, $field);
 
                 if ($linkRow !== null) {
                     $rows[] = $linkRow;
@@ -156,10 +158,6 @@ final readonly class CustomFieldsDisplayFormatter
     {
         if (CustomFieldType::tryFrom($field->type)?->isLinkList()) {
             return is_array($value) ? $this->optionNames($field, $value) : null;
-        }
-
-        if ($field->type === CustomFieldType::RECORD->value) {
-            return $this->storedRecordNames($field, $value);
         }
 
         if ($dataType === FieldDataType::MULTI_CHOICE) {
@@ -245,7 +243,7 @@ final readonly class CustomFieldsDisplayFormatter
      */
     private function recordNames(User $user, CustomFieldRelationship $definition, CustomField $field, array $ids): array
     {
-        $entityType = $definition->targetEntityTypeFor($field);
+        $entityType = $definition->farEnd($field)->entityType;
         $modelClass = Relation::getMorphedModel($entityType);
 
         if ($modelClass === null || ! is_subclass_of($modelClass, Model::class)) {
@@ -265,13 +263,7 @@ final readonly class CustomFieldsDisplayFormatter
      */
     private function currentLinkIds(Model $model, CustomField $field): array
     {
-        if (! method_exists($model, 'getCustomFieldValue')) {
-            return [];
-        }
-
-        $ids = $model->getCustomFieldValue($field);
-
-        return is_array($ids) ? array_values($ids) : [];
+        return resolve(LinkReader::class)->orderedIdsFor($model, $field);
     }
 
     /**
@@ -281,15 +273,19 @@ final readonly class CustomFieldsDisplayFormatter
      *
      * @return list<string>
      */
-    private function loadedLinkNames(Model $model, CustomField $field, CustomFieldRelationship $definition): array
+    private function loadedLinkNames(Model $model, CustomField $field): array
     {
+        if (! $field->relationshipDefinition() instanceof CustomFieldRelationship) {
+            return [];
+        }
+
         if (! $model->relationLoaded('outgoingLinks') || ! $model->relationLoaded('incomingLinks')) {
             return [];
         }
 
         $names = [];
 
-        foreach (resolve(LinkReader::class)->orderedLinksFor($model, $definition, $definition->readDirectionFor($field)) as $link) {
+        foreach (resolve(LinkReader::class)->orderedLinksFor($model, $field) as $link) {
             $relation = $this->farEndRelation($link, $model);
 
             if (! $link->relationLoaded($relation)) {
@@ -321,14 +317,15 @@ final readonly class CustomFieldsDisplayFormatter
         return $isFromEnd ? 'toEntity' : 'fromEntity';
     }
 
+    private function isLinkField(CustomField $field): bool
+    {
+        return $field->typeData->supports(FieldCapability::RequiresRelationship);
+    }
+
     private function renderValue(CustomField $field, mixed $value, string $timezone): ?string
     {
         if (in_array($value, [null, '', []], true)) {
             return null;
-        }
-
-        if ($field->type === CustomFieldType::RECORD->value) {
-            return $this->renderRecords($field, $value);
         }
 
         if ($field->type === CustomFieldType::RICH_EDITOR->value) {
@@ -373,20 +370,6 @@ final readonly class CustomFieldsDisplayFormatter
         $option = $field->options->firstWhere('id', (string) $value);
 
         return $option instanceof CustomFieldOption ? $option->name : (string) $value;
-    }
-
-    private function renderRecords(CustomField $field, mixed $value): string
-    {
-        return implode(', ', $this->storedRecordNames($field, $value));
-    }
-
-    /** @return list<string> */
-    private function storedRecordNames(CustomField $field, mixed $value): array
-    {
-        return array_map(
-            fn (array $record): string => $record['name'] ?? $record['id'],
-            resolve(CustomFieldRecordNames::class)->resolve((string) $field->targetEntityType(), $value),
-        );
     }
 
     private function renderMultiChoice(CustomField $field, mixed $value): string
@@ -497,9 +480,7 @@ final readonly class CustomFieldsDisplayFormatter
             'type' => $this->displayType($field, $dataType),
         ];
 
-        if ($field->type === CustomFieldType::RECORD->value) {
-            $row['values'] = $this->storedRecordNames($field, $newValue);
-        } elseif ($dataType === FieldDataType::MULTI_CHOICE && is_array($newValue)) {
+        if ($dataType === FieldDataType::MULTI_CHOICE && is_array($newValue)) {
             $row['values'] = $this->optionNames($field, $newValue);
         }
 
@@ -517,9 +498,9 @@ final readonly class CustomFieldsDisplayFormatter
      *
      * @return array{label: string, code: string, value: string, type: string, values: list<string>}|null
      */
-    private function storedLinkRow(Model $model, CustomField $field, CustomFieldRelationship $definition): ?array
+    private function storedLinkRow(Model $model, CustomField $field): ?array
     {
-        $names = $this->loadedLinkNames($model, $field, $definition);
+        $names = $this->loadedLinkNames($model, $field);
 
         if ($names === []) {
             return null;

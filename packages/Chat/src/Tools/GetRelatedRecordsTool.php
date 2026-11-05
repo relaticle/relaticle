@@ -7,22 +7,24 @@ namespace Relaticle\Chat\Tools;
 use App\Enums\CrmEntity;
 use App\Models\CustomField;
 use App\Models\CustomFieldRelationship;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\DB;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Tools\Concerns\NormalizesToolInput;
+use Relaticle\CustomFields\Data\ReachedRecord;
 use Relaticle\CustomFields\Models\CustomField as BaseCustomField;
+use Relaticle\CustomFields\Services\Relationships\LinkReader;
 
 /**
- * What a record is connected to, one or two links out, grouped by the relationship each
- * connection was made through.
+ * What a record is connected to, up to three links out, grouped by the relationship each
+ * record was first reached through.
  *
- * The edges live in one ledger, so the traversal is a single recursive query rather than
- * a read per hop. It renders no block of its own: the answer spans entity types, which no
- * record table can show, so the assistant presents it as the sanctioned cross-entity view.
+ * It renders no block of its own: the answer spans entity types, which no record table
+ * can show, so the assistant presents it as the sanctioned cross-entity view.
  */
 final class GetRelatedRecordsTool implements Tool
 {
@@ -69,7 +71,7 @@ final class GetRelatedRecordsTool implements Tool
         }
 
         $depth = max(1, min((int) ($request['depth'] ?? 1), self::MAX_DEPTH));
-        $edges = $this->traverse($entity->value, (string) $root->getKey(), (string) $workspace->getKey(), $depth);
+        $reached = resolve(LinkReader::class)->reachable($root, $depth, self::MAX_RECORDS);
 
         return (string) json_encode([
             'root' => [
@@ -78,117 +80,38 @@ final class GetRelatedRecordsTool implements Tool
                 'name' => (string) $root->getAttribute($entity->titleColumn()),
             ],
             'depth' => $depth,
-            'relationships' => $this->group($user, $edges),
-            'truncated' => count($edges) === self::MAX_RECORDS,
+            'relationships' => $this->group($user, $workspace, $reached),
+            'truncated' => count($reached) === self::MAX_RECORDS,
         ], JSON_UNESCAPED_SLASHES);
     }
 
     /**
-     * Every record reachable from the root, with the relationship it was reached through
-     * and the fewest links it took. The path column is the cycle guard: a record already
-     * on the way here is never followed again, so a mutual link cannot loop.
+     * The reached records, named and grouped by the relationship each was first reached
+     * through. A record outside the workspace or one the caller may not view is dropped
+     * here, so the walk can cross a link the reader cannot follow without naming its far end.
      *
-     * @return list<array{relationship_id: string, entity_type: string, entity_id: string, depth: int}>
-     */
-    private function traverse(string $entityType, string $recordId, string $tenantId, int $depth): array
-    {
-        $rows = DB::select($this->traversalSql(), [
-            $entityType, $recordId,
-            $entityType, $recordId,
-            $recordId,
-            $tenantId,
-            $entityType, $recordId,
-            $entityType, $recordId,
-            $tenantId,
-            $depth,
-            self::MAX_RECORDS,
-        ]);
-
-        return array_values(array_map(static function (object $row): array {
-            /** @var array<string, mixed> $edge */
-            $edge = (array) $row;
-
-            return [
-                'relationship_id' => (string) $edge['relationship_id'],
-                'entity_type' => (string) $edge['entity_type'],
-                'entity_id' => (string) $edge['entity_id'],
-                'depth' => (int) $edge['depth'],
-            ];
-        }, $rows));
-    }
-
-    /**
-     * Walks the link ledger outward from one record, both directions, shortest depth per
-     * record, refusing to revisit a record already on the path.
-     */
-    private function traversalSql(): string
-    {
-        $links = (string) config('custom-fields.database.table_names.custom_field_links');
-        $tenant = (string) config('custom-fields.database.column_names.tenant_foreign_key');
-
-        return <<<SQL
-            with recursive graph as (
-                select
-                    l.relationship_id as relationship_id,
-                    case when l.from_entity_type = ? and l.from_entity_id = ? then l.to_entity_type else l.from_entity_type end as entity_type,
-                    case when l.from_entity_type = ? and l.from_entity_id = ? then l.to_entity_id else l.from_entity_id end as entity_id,
-                    1 as depth,
-                    array[?::text] as path
-                from {$links} l
-                where l.active_until is null
-                    and l.{$tenant} = ?
-                    and ((l.from_entity_type = ? and l.from_entity_id = ?) or (l.to_entity_type = ? and l.to_entity_id = ?))
-
-                union all
-
-                select
-                    l.relationship_id,
-                    case when l.from_entity_type = g.entity_type and l.from_entity_id = g.entity_id then l.to_entity_type else l.from_entity_type end,
-                    case when l.from_entity_type = g.entity_type and l.from_entity_id = g.entity_id then l.to_entity_id else l.from_entity_id end,
-                    g.depth + 1,
-                    g.path || g.entity_id::text
-                from {$links} l
-                inner join graph g
-                    on ((l.from_entity_type = g.entity_type and l.from_entity_id = g.entity_id)
-                        or (l.to_entity_type = g.entity_type and l.to_entity_id = g.entity_id))
-                where l.active_until is null
-                    and l.{$tenant} = ?
-                    and g.depth < ?
-                    and (case when l.from_entity_type = g.entity_type and l.from_entity_id = g.entity_id then l.to_entity_id else l.from_entity_id end)::text <> all(g.path)
-            )
-            select relationship_id, entity_type, entity_id, min(depth) as depth
-            from graph
-            group by relationship_id, entity_type, entity_id
-            order by min(depth), entity_type, entity_id
-            limit ?
-            SQL;
-    }
-
-    /**
-     * The reached records, named and grouped by relationship. A record the caller may not
-     * view is dropped here, so the traversal can cross a link the reader cannot follow
-     * without ever naming what is on the other side.
-     *
-     * @param  list<array{relationship_id: string, entity_type: string, entity_id: string, depth: int}>  $edges
+     * @param  list<ReachedRecord>  $reached
      * @return list<array{code: string, field: ?string, records: list<array{type: string, id: string, name: string, depth: int}>}>
      */
-    private function group(User $user, array $edges): array
+    private function group(User $user, Workspace $workspace, array $reached): array
     {
-        if ($edges === []) {
+        if ($reached === []) {
             return [];
         }
 
         $definitions = CustomFieldRelationship::query()
-            ->whereKey(array_unique(array_column($edges, 'relationship_id')))
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $workspace->getKey())
+            ->whereKey(array_unique(array_map(static fn (ReachedRecord $record): string => (string) $record->relationshipId, $reached)))
             ->get()
             ->keyBy(static fn (CustomFieldRelationship $definition): string => (string) $definition->getKey());
 
-        $records = $this->records($edges);
+        $records = $this->records($workspace, $reached);
         $grouped = [];
 
-        foreach ($edges as $edge) {
-            $definition = $definitions->get($edge['relationship_id']);
-            $record = $records[$edge['entity_type'].'|'.$edge['entity_id']] ?? null;
+        foreach ($reached as $reachedRecord) {
+            $definition = $definitions->get((string) $reachedRecord->relationshipId);
+            $record = $records[$reachedRecord->entityType.'|'.$reachedRecord->entityId] ?? null;
 
             if (! $definition instanceof CustomFieldRelationship || ! $record instanceof Model || $user->cannot('view', $record)) {
                 continue;
@@ -203,10 +126,10 @@ final class GetRelatedRecordsTool implements Tool
             ];
 
             $grouped[$code]['records'][] = [
-                'type' => $edge['entity_type'],
-                'id' => $edge['entity_id'],
-                'name' => (string) $record->getAttribute(CrmEntity::from($edge['entity_type'])->titleColumn()),
-                'depth' => $edge['depth'],
+                'type' => $reachedRecord->entityType,
+                'id' => (string) $reachedRecord->entityId,
+                'name' => (string) $record->getAttribute(CrmEntity::from($reachedRecord->entityType)->titleColumn()),
+                'depth' => $reachedRecord->depth,
             ];
         }
 
@@ -214,17 +137,18 @@ final class GetRelatedRecordsTool implements Tool
     }
 
     /**
-     * One query per entity type for the whole traversal, keyed by type and id.
+     * One query per entity type for the whole walk, keyed by type and id, bounded to the
+     * workspace whatever happens to be bound.
      *
-     * @param  list<array{relationship_id: string, entity_type: string, entity_id: string, depth: int}>  $edges
+     * @param  list<ReachedRecord>  $reached
      * @return array<string, Model>
      */
-    private function records(array $edges): array
+    private function records(Workspace $workspace, array $reached): array
     {
         $byType = [];
 
-        foreach ($edges as $edge) {
-            $byType[$edge['entity_type']][] = $edge['entity_id'];
+        foreach ($reached as $reachedRecord) {
+            $byType[$reachedRecord->entityType][] = $reachedRecord->entityId;
         }
 
         $records = [];
@@ -237,8 +161,12 @@ final class GetRelatedRecordsTool implements Tool
             }
 
             $modelClass = $entity->model();
+            $query = $modelClass::query()
+                ->withoutGlobalScope(WorkspaceScope::class)
+                ->where('workspace_id', $workspace->getKey())
+                ->whereKey(array_unique($ids));
 
-            foreach ($modelClass::query()->whereKey(array_unique($ids))->get() as $record) {
+            foreach ($query->get() as $record) {
                 $records[$entityType.'|'.$record->getKey()] = $record;
             }
         }

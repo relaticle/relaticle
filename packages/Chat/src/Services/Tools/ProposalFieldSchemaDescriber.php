@@ -9,10 +9,10 @@ use App\Models\CustomField;
 use App\Models\User;
 use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Support\WorkspaceMembersContext;
+use Relaticle\CustomFields\Enums\FieldCapability;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\CustomFields\Models\CustomFieldOption;
-use Relaticle\CustomFields\Services\ValidationService;
 
 /**
  * Produces the structured, editable field schema for a single create-proposal
@@ -108,7 +108,7 @@ final readonly class ProposalFieldSchemaDescriber
                 'label' => $field->name,
                 'kind' => $kind,
                 'value' => $customFields[$field->code] ?? null,
-                'required' => $this->isRequired($field),
+                'required' => $field->isRequired(),
             ];
 
             if (in_array($kind, ['select', 'multiselect'], true)) {
@@ -133,7 +133,7 @@ final readonly class ProposalFieldSchemaDescriber
             || $dataType === FieldDataType::FILE
             // Every field type that points at records, whether or not a definition was
             // ever created for this one: the picker behind it needs the record page.
-            || CustomFieldsType::getFieldType($field->type)?->requiresRelationship === true;
+            || CustomFieldsType::getFieldType($field->type)?->supports(FieldCapability::RequiresRelationship) === true;
     }
 
     private function kindFor(CustomField $field, ?FieldDataType $dataType): ?string
@@ -152,18 +152,5 @@ final readonly class ProposalFieldSchemaDescriber
             FieldDataType::STRING => 'text',
             default => null,
         };
-    }
-
-    /**
-     * Delegated to the custom-fields package rather than re-derived here.
-     * `validation_rules` casts to a key-value collection (`['required' => true]`),
-     * so the old `['name' => 'required']` scan matched nothing and marked every
-     * field optional. The dock then built its schema without ->required(), and a
-     * cleared value was refused at the action layer after the card called it
-     * optional. Commit 5e43ca287 fixed the same predicate on the MCP path.
-     */
-    private function isRequired(CustomField $field): bool
-    {
-        return resolve(ValidationService::class)->isRequired($field);
     }
 }

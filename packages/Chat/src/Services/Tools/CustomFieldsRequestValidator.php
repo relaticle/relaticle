@@ -110,6 +110,7 @@ final readonly class CustomFieldsRequestValidator
             ->where('entity_type', $entityType)
             ->active()
             ->whereIn('code', $codes)
+            ->withRelationshipDefinition()
             ->get();
     }
 
@@ -138,7 +139,7 @@ final readonly class CustomFieldsRequestValidator
                 continue;
             }
 
-            $modelClass = Relation::getMorphedModel($definition->targetEntityTypeFor($field));
+            $modelClass = Relation::getMorphedModel($definition->farEnd($field)->entityType);
 
             if ($modelClass === null || ! is_subclass_of($modelClass, Model::class)) {
                 return "custom_fields.{$code} points at a record type this workspace does not have.";
