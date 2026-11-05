@@ -31,5 +31,5 @@ jobs:
           path-to-signatures: signatures/v1.0/cla.json
           # main is protected, so signatures live on their own unprotected branch.
           branch: cla-signatures
-          allowlist: ManukMinasyan,dependabot[bot],github-actions[bot]
+          allowlist: ManukMinasyan,Ilyapashayan20,dependabot[bot],github-actions[bot]
           lock-pullrequest-aftermerge: ${{ github.event.pull_request.merged == true }}
