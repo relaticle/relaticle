@@ -126,6 +126,32 @@ final readonly class ConversationFilters
         ], static fn (?array $condition): bool => $condition !== null);
     }
 
+    /** The words that type this filter back into the search box, or null when it has none. */
+    public function typedFor(EmailFilter $filter, string $viewerZone): ?string
+    {
+        $quote = static fn (string $value): string => preg_match('/\s/u', $value) === 1 ? "\"{$value}\"" : $value;
+        $day = static function (CarbonImmutable $instant) use ($viewerZone): string {
+            $local = $instant->setTimezone($viewerZone);
+
+            return $local->eq($local->startOfDay()) ? $local->format('Y-m-d') : $instant->toIso8601String();
+        };
+        $word = array_search($this->recordType, EmailFilter::RECORD_WORDS, true);
+
+        $typed = match ($filter) {
+            EmailFilter::From => $this->from === null ? null : 'from:'.$quote($this->from),
+            EmailFilter::To => $this->to === null ? null : 'to:'.$quote($this->to),
+            EmailFilter::HasAttachment => $this->hasAttachment === true ? 'has:attachment' : null,
+            EmailFilter::SentAt => implode(' ', array_filter([
+                $this->sentAfter instanceof CarbonImmutable ? 'after:'.$day($this->sentAfter) : null,
+                $this->sentBefore instanceof CarbonImmutable ? 'before:'.$day($this->sentBefore) : null,
+            ])),
+            EmailFilter::Record => is_string($word) && $this->recordName !== null && $this->recordIds === [] ? "{$word}:".$quote($this->recordName) : null,
+            EmailFilter::Mailbox, EmailFilter::Direction, EmailFilter::Category => null,
+        };
+
+        return $typed === '' ? null : $typed;
+    }
+
     /** @param  array<string, mixed>  $changes */
     private function with(array $changes): self
     {

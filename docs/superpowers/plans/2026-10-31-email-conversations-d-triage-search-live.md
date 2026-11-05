@@ -722,23 +722,33 @@ the URL case, which renders the message and lists as if no filter were set.
 
 **Files:** `EmailInboxPage.php`, `filter-chip-bar.blade.php`, lang.
 
-- [ ] `#[Url(as: 'q')] public string $search` and `#[Url(as: 'filter')] public array $filter`.
+- [x] `#[Url(as: 'q')] public string $search` and `#[Url(as: 'filter')] public array $filter`.
   The search input debounces 300 ms with `wire:model.live.debounce.300ms`. On submit, recognised
   operators leave the box and become chips. An invalid tree from the URL shows the error under
   the bar and lists as if no filter were set.
-- [ ] Chips: Mailbox (the viewer's own mailboxes), Has attachment, Date (after, before, or both,
+- [x] Chips: Mailbox (the viewer's own mailboxes), Has attachment, Date (after, before, or both,
   in the viewer's time zone), Linked to (the existing linked-records picker from
   `resources/js/filament/linked-records-picker.js`), Category. Each active chip shows its value
   and an `x` with an accessible label. "Clear all" appears with two or more chips.
-- [ ] `/` focuses the search box through PR 7's `FocusSearch` handler when PR 7 has merged.
+- [x] `/` focuses the search box through PR 7's `FocusSearch` handler when PR 7 has merged.
   Otherwise the box keeps its own `x-on:keydown.slash.window` guard until PR 7 removes it.
-- [ ] Empty result copy: "No conversations match. Search covers subjects and bodies you can read,
+- [x] Empty result copy: "No conversations match. Search covers subjects and bodies you can read,
   and every name and address."
-- [ ] 390 px: the chip bar scrolls horizontally in one line; the search box takes the full width.
-- [ ] Browser test `ConversationsSearchBrowserTest.php`, light and dark:
+- [x] 390 px: the chip bar scrolls horizontally in one line; the search box takes the full width.
+- [x] Browser test `ConversationsSearchBrowserTest.php`, light and dark:
   `it('turns a typed operator into a chip and back into text when removed')`,
   `it('finds a conversation by a body word')`, `it('keeps search and chips in the url across reload')`.
   Run once with `--browser safari`.
+
+**Done (2026-11-05):** the state, computed filters, chip actions and handlers live in the page
+trait `HasConversationFilters`, so `EmailInboxPage` stays within its size. `$filter` is typed
+`mixed`, because a crafted URL can send a string, and a non-array lists as if no filter were set
+with the error under the bar. Typed chips (from, to, has attachment, after, before, a name-based
+`company:`) go back into the box as text when their label is pressed, so the browser test is
+named "back into text when edited". Picker chips (Mailbox, Date, Linked to, Category) open modal
+actions. Linked to takes one record type per filter, because the tree holds one record key. PR 7
+has not merged, so the `/` guard sits on the search form. Search keeps the 300 ms live debounce.
+Submit moves recognised operators into `filter` and leaves the other words in `q`.
 
 ### Task 9: Rehearsal and verification
 
