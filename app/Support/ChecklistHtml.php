@@ -186,11 +186,11 @@ final readonly class ChecklistHtml
                 continue;
             }
 
-            if ($stray === null && $child instanceof Text && trim($child->data) === '') {
+            if (! $stray instanceof Element && $child instanceof Text && trim($child->data) === '') {
                 continue;
             }
 
-            if ($stray === null) {
+            if (! $stray instanceof Element) {
                 $stray = $document->createElement('li');
                 $items[] = $stray;
             }
@@ -263,7 +263,7 @@ final readonly class ChecklistHtml
     {
         return array_values(array_filter(
             iterator_to_array($label->childNodes, false),
-            fn (Node $part): bool => ! ($part instanceof Element && ($part->localName === 'input' || ($part->localName === 'span' && ! $part->hasChildNodes()))),
+            fn (Node $part): bool => ! $part instanceof Element || $part->localName !== 'input' && ($part->localName !== 'span' || $part->hasChildNodes()),
         ));
     }
 
@@ -298,7 +298,7 @@ final readonly class ChecklistHtml
                 continue;
             }
 
-            if ($current === null) {
+            if (! $current instanceof Element) {
                 if ($node instanceof Text && trim($node->data) === '') {
                     continue;
                 }
