@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Actions;
 
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Data\ConnectAccountData;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
@@ -90,23 +91,7 @@ final readonly class ConnectAccountAction
             }
 
             if ($account->trashed()) {
-                // Disconnect promotes a successor but leaves is_default set while trashed.
-                // Demote before restore so the live-default unique index is not violated.
-                if ($account->is_default) {
-                    $hasOtherDefault = ConnectedAccount::query()
-                        ->where('user_id', $data->userId)
-                        ->where('workspace_id', $data->workspaceId)
-                        ->where('is_default', true)
-                        ->whereKeyNot($account->getKey())
-                        ->exists();
-
-                    if ($hasOtherDefault) {
-                        $account->update(['is_default' => false]);
-                    }
-                }
-
-                $account->restore();
-                $account->update(['history_import_batch_id' => null]);
+                $this->restore($account, $data);
             }
 
             // The first account a user connects becomes their default. This also
@@ -131,5 +116,30 @@ final readonly class ConnectAccountAction
         }
 
         return $account;
+    }
+
+    private function restore(ConnectedAccount $account, ConnectAccountData $data): void
+    {
+        // Disconnect promotes a successor but leaves is_default set while trashed.
+        // Demote before restore so the live-default unique index is not violated.
+        if ($account->is_default) {
+            $hasOtherDefault = ConnectedAccount::query()
+                ->where('user_id', $data->userId)
+                ->where('workspace_id', $data->workspaceId)
+                ->where('is_default', true)
+                ->whereKeyNot($account->getKey())
+                ->exists();
+
+            if ($hasOtherDefault) {
+                $account->update(['is_default' => false]);
+            }
+        }
+
+        $account->restore();
+        $account->update(['history_import_batch_id' => null]);
+
+        Artisan::queue('email:backfill-conversations', ['--force' => true, '--workspace' => $account->workspace_id])
+            ->onQueue('imports')
+            ->afterCommit();
     }
 }
