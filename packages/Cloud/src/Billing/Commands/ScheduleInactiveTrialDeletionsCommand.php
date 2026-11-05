@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Cloud\Billing\Commands;
 
 use App\Enums\DeletionReason;
+use App\Features\Billing;
 use App\Models\Membership;
 use App\Models\User;
 use App\Models\Workspace;
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Billing\Actions\CancelInactivityDeletion;
 use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletionReminderMail;
 use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletionWarningMail;
@@ -31,6 +33,12 @@ final class ScheduleInactiveTrialDeletionsCommand extends Command
 
     public function handle(InactiveTrialWorkspacesQuery $inactive, CancelInactivityDeletion $cancel): int
     {
+        if (Feature::inactive(Billing::class)) {
+            $this->comment('Hosted billing is off, so no workspace is deleted for inactivity.');
+
+            return self::SUCCESS;
+        }
+
         $this->scheduleDeletions($inactive);
         $this->sendReminders($inactive, $cancel);
 

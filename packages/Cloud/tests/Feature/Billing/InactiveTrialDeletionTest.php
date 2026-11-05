@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\DeletionReason;
 use App\Enums\Plan;
+use App\Features\Billing as BillingFeature;
 use App\Filament\Pages\CreateWorkspace;
 use App\Jobs\PurgeWorkspace;
 use App\Models\User;
@@ -21,6 +22,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Cloud\Billing\Actions\CancelInactivityDeletion;
@@ -45,6 +47,10 @@ mutates(CancelInactivityDeletionOnLogin::class);
 mutates(InactiveWorkspaceDeletionReminderMail::class);
 mutates(InactiveWorkspaceDeletedMail::class);
 mutates(SendInactiveWorkspaceDeletedMail::class);
+
+beforeEach(function (): void {
+    withHostedBilling();
+});
 
 const INACTIVE_PAUSED_AT = '2026-11-01 10:00:00';
 
@@ -95,6 +101,18 @@ it('schedules a paused trial on the 46th daily run and warns the owner once', fu
     Mail::assertQueued(InactiveWorkspaceDeletionWarningMail::class, 1);
     Mail::assertQueued(InactiveWorkspaceDeletionWarningMail::class, fn (InactiveWorkspaceDeletionWarningMail $mail): bool => $mail->hasTo($workspace->owner->email)
         && $mail->workspace->is($workspace));
+});
+
+it('schedules nothing while hosted billing is off', function (): void {
+    Feature::define(BillingFeature::class, false);
+    Mail::fake();
+    $workspace = inactivePausedWorkspace();
+
+    $this->travelTo(inactivityRunOn(46));
+    runInactivityCommand();
+
+    expect($workspace->refresh()->scheduled_deletion_at)->toBeNull();
+    Mail::assertNothingQueued();
 });
 
 it('waits until the deletion date is within 15 days of the daily run', function (): void {
