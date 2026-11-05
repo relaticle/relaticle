@@ -74,7 +74,7 @@ final class ProEndedMail extends Mailable implements ShouldQueue
 
     private function isTrial(): bool
     {
-        return in_array($this->copyKey(), ['trial_ended', 'extension_ended'], true);
+        return ! $this->plan instanceof Plan && $this->status === BillingStatus::TrialEnded;
     }
 
     private function offersExtension(): bool
