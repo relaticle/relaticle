@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\BillingStatus;
 use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
 use App\Models\User;
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\Storage;
 use Laravel\Cashier\Subscription;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Cloud\Billing\Actions\ExtendEndedTrial;
 use Relaticle\Cloud\Billing\Actions\StartProTrial;
 use Relaticle\Cloud\Billing\CreditPackCatalog;
 use Relaticle\Cloud\Billing\Filament\Billing;
@@ -26,6 +28,7 @@ use Tests\Helpers\StripeRecorder;
 mutates(
     Billing::class,
     CreditPackCatalog::class,
+    ExtendEndedTrial::class,
     PlanEntitlements::class,
     StartProTrial::class,
 );
@@ -315,6 +318,113 @@ it('tells a member of a paused workspace who can reopen it, without checkout con
     livewire(Billing::class)
         ->assertSee(__('cloud::billing.paused.member_body', ['owner' => $workspace->owner->name, 'workspace' => $workspace->name]))
         ->assertDontSee(__('cloud::billing.paused.continue'));
+});
+
+/** @return array{0: User, 1: Workspace} */
+function pausedTrialWorkspace(): array
+{
+    [$owner, $workspace] = billingPageOwner();
+    $workspace->forceFill([
+        'hosted_free_grandfathered_at' => null,
+        'plan' => Plan::Free,
+        'trial_ends_at' => null,
+        'pro_trial_used_at' => now()->subDays(15),
+    ])->save();
+
+    return [$owner, $workspace];
+}
+
+function actingAsMemberOf(Workspace $workspace): void
+{
+    $member = User::factory()->create();
+    $workspace->users()->attach($member, ['role' => 'member']);
+
+    test()->actingAs($member);
+    Filament::setTenant($workspace->refresh());
+}
+
+it('offers the owner a seven-day extension on the paused screen', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = pausedTrialWorkspace();
+
+    $this->get(Billing::getUrl(panel: 'app', tenant: $workspace))
+        ->assertOk()
+        ->assertSee(__('cloud::billing.paused.extend'))
+        ->assertSee(__('cloud::billing.paused.extend_once'));
+});
+
+it('extends the trial from the paused screen and reopens the workspace', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = pausedTrialWorkspace();
+
+    livewire(Billing::class)
+        ->call('extendTrial')
+        ->assertNotified(__('cloud::billing.paused.extended'))
+        ->assertRedirect(Billing::getUrl());
+
+    expect($workspace->refresh()->billingStatus())->toBe(BillingStatus::Trialing);
+
+    $this->get(Billing::getUrl(panel: 'app', tenant: $workspace))
+        ->assertOk()
+        ->assertDontSee(__('cloud::billing.paused.extend'))
+        ->assertSee(__('cloud::billing.usage.title'));
+});
+
+it('hides the extension once it was used', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = pausedTrialWorkspace();
+    $workspace->forceFill(['trial_extended_at' => now()->subDay()])->save();
+
+    livewire(Billing::class)
+        ->assertSee(__('cloud::billing.paused.continue'))
+        ->assertDontSee(__('cloud::billing.paused.extend'))
+        ->assertDontSee(__('cloud::billing.paused.extend_once'));
+});
+
+it('hides the extension from a member', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = pausedTrialWorkspace();
+    actingAsMemberOf($workspace);
+
+    livewire(Billing::class)
+        ->assertDontSee(__('cloud::billing.paused.extend'))
+        ->assertDontSee(__('cloud::billing.paused.extend_once'));
+});
+
+it('refuses a member who calls the extension directly', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = pausedTrialWorkspace();
+    actingAsMemberOf($workspace);
+
+    livewire(Billing::class)
+        ->call('extendTrial')
+        ->assertNotified()
+        ->assertNoRedirect();
+
+    $workspace->refresh();
+
+    expect($workspace->trial_extended_at)->toBeNull()
+        ->and($workspace->trial_ends_at)->toBeNull()
+        ->and($workspace->plan)->toBe(Plan::Free);
+});
+
+it('refuses a second extension called directly', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = pausedTrialWorkspace();
+    $workspace->forceFill(['trial_extended_at' => now()->subDay()])->save();
+
+    livewire(Billing::class)
+        ->call('extendTrial')
+        ->assertNotified(__('cloud::billing.trial.not_available'))
+        ->assertNoRedirect();
+
+    expect($workspace->refresh()->trial_ends_at)->toBeNull();
 });
 
 it('tells a member of a paused workspace whose owner was deleted who can reopen it', function (): void {

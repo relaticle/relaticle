@@ -60,6 +60,12 @@
                             <x-filament::button size="lg" :color="$lapsedPlan ? 'gray' : 'primary'" icon="ri-arrow-up-circle-line" class="w-full justify-center" x-on:click="$dispatch('open-modal', { id: {{ \Illuminate\Support\Js::from(\Relaticle\Cloud\Billing\Livewire\UpgradeModal::MODAL_ID) }} })">
                                 {{ __('cloud::billing.paused.continue') }}
                             </x-filament::button>
+                            @if($trialExtensionAvailable)
+                                <x-filament::button size="lg" color="gray" class="w-full justify-center" wire:click="extendTrial">
+                                    {{ __('cloud::billing.paused.extend') }}
+                                </x-filament::button>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('cloud::billing.paused.extend_once') }}</p>
+                            @endif
                         </div>
                     @endif
 

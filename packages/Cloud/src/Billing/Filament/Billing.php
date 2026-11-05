@@ -27,6 +27,7 @@ use Override;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Cloud\Billing\Actions\CreateCreditPackCheckout;
+use Relaticle\Cloud\Billing\Actions\ExtendEndedTrial;
 use Relaticle\Cloud\Billing\Actions\StartProTrial;
 use Relaticle\Cloud\Billing\CreditPackCatalog;
 use Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal;
@@ -121,6 +122,27 @@ final class Billing extends Page
         Notification::make()->title(__('cloud::billing.trial.started'))->success()->send();
     }
 
+    public function extendTrial(ExtendEndedTrial $extendEndedTrial): void
+    {
+        try {
+            $extended = $extendEndedTrial->execute($this->user(), $this->workspace());
+        } catch (AuthorizationException $exception) {
+            Notification::make()->title($exception->getMessage())->danger()->send();
+
+            return;
+        }
+
+        if (! $extended) {
+            Notification::make()->title(__('cloud::billing.trial.not_available'))->danger()->send();
+
+            return;
+        }
+
+        Notification::make()->title(__('cloud::billing.paused.extended'))->success()->send();
+
+        $this->redirect(self::getUrl());
+    }
+
     public function managePortal(): void
     {
         $workspace = $this->workspace();
@@ -174,13 +196,14 @@ final class Billing extends Page
         $hasHostedAccess = resolve(Entitlements::class)->allowsAccess($workspace);
         $isGrandfathered = $workspace->hosted_free_grandfathered_at !== null;
         $managedSubscription = $workspace->managedSubscription();
+        $canManageBilling = $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage);
 
         return [
             'workspace' => $workspace,
             // Not $workspace->plan->credits(): a past-due workspace refills at the Free
             // allowance, so the plan's figure would name credits it never gets.
             'allowance' => resolve(CreditService::class)->allowanceFor($workspace),
-            'canManageBilling' => $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage),
+            'canManageBilling' => $canManageBilling,
             'subscription' => $subscription,
             'managedSubscription' => $managedSubscription,
             'managedPastDue' => $managedSubscription?->pastDue() ?? false,
@@ -194,7 +217,7 @@ final class Billing extends Page
             'activating' => in_array($this->checkout, [self::CHECKOUT_SUCCESS, self::CHECKOUT_REOPENED], true) && ! $workspace->subscribed() && ! $workspace->plan->isManaged(),
             'creditsFulfilling' => $this->credits === 'success',
             'availablePacks' => resolve(CreditPackCatalog::class)->purchasable(),
-            ...($hasHostedAccess ? [] : $this->pausedViewData($workspace)),
+            ...($hasHostedAccess ? [] : $this->pausedViewData($workspace, $canManageBilling)),
         ];
     }
 
@@ -218,8 +241,8 @@ final class Billing extends Page
         ]);
     }
 
-    /** @return array{billingStatus: BillingStatus, lapsedPlan: ?Plan, mailboxSyncPaused: bool, otherWorkspaces: Collection<int, Workspace>} */
-    private function pausedViewData(Workspace $workspace): array
+    /** @return array{billingStatus: BillingStatus, lapsedPlan: ?Plan, mailboxSyncPaused: bool, trialExtensionAvailable: bool, otherWorkspaces: Collection<int, Workspace>} */
+    private function pausedViewData(Workspace $workspace, bool $canManageBilling): array
     {
         $billingStatus = $workspace->billingStatus();
 
@@ -227,6 +250,7 @@ final class Billing extends Page
             'billingStatus' => $billingStatus,
             'lapsedPlan' => $billingStatus === BillingStatus::SubscriptionEnded ? $workspace->lapsedManagedPlan() : null,
             'mailboxSyncPaused' => $workspace->hasConnectedMailbox(),
+            'trialExtensionAvailable' => $canManageBilling && $workspace->canExtendTrial(),
             'otherWorkspaces' => $this->user()->allWorkspaces()
                 ->reject(fn (Workspace $other): bool => $other->is($workspace))
                 ->values(),

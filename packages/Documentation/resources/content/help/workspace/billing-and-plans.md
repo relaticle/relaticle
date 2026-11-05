@@ -44,7 +44,8 @@ Every new Cloud workspace starts a **14-day Pro trial automatically, with no
 card**. The trial includes everything in Cloud Pro, with 2,000 AI credits.
 Premium AI models unlock once the workspace holds a record of its own.
 When it ends, subscribe from the Billing page to keep Cloud access; without
-a subscription the workspace pauses. Relaticle Cloud has no free plan.
+a subscription the workspace pauses. If you need more time, the owner can
+extend the trial by 7 days once from the Billing page. Relaticle Cloud has no free plan.
 
 ## Managing the subscription
 
