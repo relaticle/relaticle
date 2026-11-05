@@ -14,6 +14,7 @@ use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Components\Section;
 use Filament\Support\Enums\Width;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
 use Laravel\Ai\Exceptions\AiException;
@@ -35,11 +36,13 @@ use Relaticle\EmailIntegration\Services\EmailThreadSummaryService;
  * used by the emails relation manager and the access notification handler.
  *
  * @property ?string $selectedEmailId
- *
- * @method Email|null selectedEmail()
+ * @property-read Email|null $selectedEmail
  */
 trait HasEmailReaderActions
 {
+    /** @var EloquentCollection<int, Email>|null */
+    private ?EloquentCollection $copyConversation = null;
+
     /**
      * Open the reader on the host's selected copy. A copy below the body tier opens only
      * where the host's selection allows it (the conversations drawer), and is never marked read.
@@ -48,7 +51,7 @@ trait HasEmailReaderActions
     {
         $this->selectedEmailId = $id;
         unset($this->selectedEmail);
-        $email = $this->selectedEmail();
+        $email = $this->selectedEmail;
 
         if (! $email instanceof Email) {
             $this->selectedEmailId = null;
@@ -61,7 +64,7 @@ trait HasEmailReaderActions
         $this->dispatch('composer:resume-draft', emailId: $id);
 
         if ($this->readerUser()->can('viewBody', $email)) {
-            resolve(MarkEmailAsReadAction::class)->execute($id, $this->readerUser());
+            resolve(MarkEmailAsReadAction::class)->execute([$id], $this->readerUser());
         }
 
         return true;
@@ -82,9 +85,19 @@ trait HasEmailReaderActions
             return null;
         }
 
-        $email = resolve(ConversationsQuery::class)->messages($user, $conversationKey)->find($emailId);
+        $this->copyConversation = resolve(ConversationsQuery::class)->messages($user, $conversationKey);
+        $email = $this->copyConversation->find($emailId);
 
         return $email instanceof Email ? $email->loadMissing(['labels', 'from']) : null;
+    }
+
+    // The conversation this request already loaded the copy from, so the thread need not query it again.
+    /** @return EloquentCollection<int, Email>|null */
+    protected function loadedConversationOf(Email $copy): ?EloquentCollection
+    {
+        return $this->copyConversation?->contains(fn (Email $message): bool => $message === $copy) === true
+            ? $this->copyConversation
+            : null;
     }
 
     /**

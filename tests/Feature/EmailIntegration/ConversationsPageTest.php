@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Facade;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
+use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
 use Relaticle\EmailIntegration\Enums\AutomatedReason;
 use Relaticle\EmailIntegration\Enums\ConversationView;
@@ -34,7 +35,7 @@ use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
 
 use function Pest\Laravel\actingAs;
 
-mutates(EmailInboxPage::class, HasConversationReader::class, ConversationsQuery::class, ConversationView::class, PreferredEmailCopyService::class);
+mutates(EmailInboxPage::class, HasConversationReader::class, ConversationsQuery::class, MarkEmailAsReadAction::class, ConversationView::class, PreferredEmailCopyService::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withWorkspace()->create();
@@ -435,6 +436,31 @@ it('renders a page of conversations in the same number of queries for 3 or 20 ro
     $seed(4, 20);
 
     expect($render(20))->toBe($few);
+});
+
+it('opens a conversation in the same number of queries for 3 or 20 messages', function (): void {
+    $open = function (string $key, int $messages): int {
+        $newest = null;
+        foreach (range(1, $messages) as $index) {
+            $newest = conversationsPageMessage(($messages - $index) % 2 === 0 ? $this->ownerMailbox : $this->teammateMailbox, $key, "c{$index}@client.test", ['sent_at' => now()->subMinutes(100 - $index)]);
+            EmailBody::factory()->create(['email_id' => $newest->id, 'body_html' => null, 'body_text' => "Body {$index}"]);
+            $this->company->emails()->attach($newest->id);
+        }
+
+        $page = livewire(EmailInboxPage::class);
+        $queries = 0;
+        DB::listen(function () use (&$queries): void {
+            $queries++;
+        });
+
+        $page->call('selectEmail', $newest->id)->assertSee("Body {$messages}");
+
+        return $queries;
+    };
+
+    $open('conv-warm-up', 3);
+
+    expect($open('conv-long', 20))->toBe($open('conv-short', 3));
 });
 
 it('opens the viewer own copy when a teammate copy of the newest message synced a second later', function (): void {

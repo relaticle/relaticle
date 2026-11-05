@@ -346,7 +346,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
     #[Computed]
     public function pendingAccessRequests(): Collection
     {
-        $email = $this->selectedEmail();
+        $email = $this->selectedEmail;
 
         if (! $email instanceof Email) {
             return collect();

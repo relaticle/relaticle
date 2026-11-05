@@ -40,9 +40,9 @@ trait HasConversationReader
         }
 
         // A send just queued is not delivered yet, so no conversation holds it.
-        $messages = is_string($selected->conversation_key)
+        $messages = $this->loadedConversationOf($selected) ?? (is_string($selected->conversation_key)
             ? resolve(ConversationsQuery::class)->messages($this->readerUser(), $selected->conversation_key)
-            : new EloquentCollection;
+            : new EloquentCollection);
 
         return $messages->contains($selected) ? $messages : new EloquentCollection([$selected]);
     }
@@ -163,15 +163,12 @@ trait HasConversationReader
         return array_values(array_unique(array_filter([$repliedTo?->getKey(), $newest?->getKey(), $this->selectedEmailId])));
     }
 
+    // The reader has already marked the opened email read.
     private function markThreadRead(): void
     {
         $user = $this->readerUser();
-        $markRead = resolve(MarkEmailAsReadAction::class);
+        $unmarked = $this->thread->filter(fn (Email $message): bool => $message->getKey() !== $this->selectedEmailId && $user->can('viewBody', $message));
 
-        foreach ($this->thread as $message) {
-            if ($user->can('viewBody', $message)) {
-                $markRead->execute($message->getKey(), $user);
-            }
-        }
+        resolve(MarkEmailAsReadAction::class)->execute(array_values($unmarked->modelKeys()), $user);
     }
 }

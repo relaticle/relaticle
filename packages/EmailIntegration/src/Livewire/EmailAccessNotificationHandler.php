@@ -144,7 +144,7 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
     #[Computed]
     public function pendingAccessRequests(): Collection
     {
-        $email = $this->selectedEmail();
+        $email = $this->selectedEmail;
 
         if (! $email instanceof Email || $email->user_id !== $this->authUser()->getKey()) {
             return collect();

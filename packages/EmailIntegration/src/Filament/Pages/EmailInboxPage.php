@@ -241,7 +241,7 @@ final class EmailInboxPage extends Page
     #[Computed]
     public function pendingAccessRequests(): SupportCollection
     {
-        $email = $this->selectedEmail();
+        $email = $this->selectedEmail;
 
         if (! $email instanceof Email) {
             return collect();

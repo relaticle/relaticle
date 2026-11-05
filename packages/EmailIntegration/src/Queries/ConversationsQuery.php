@@ -126,6 +126,8 @@ final readonly class ConversationsQuery
 
         return $this->preferredCopies->restrictToVisiblePreferredCopies($query, $viewer)
             ->withRecordLinkState()
+            ->selectSub($this->viewerSyncedCopy($viewer), 'viewer_has_synced_copy')
+            ->selectSub($this->viewerMessageShareTier($viewer), 'viewer_message_share_tier')
             ->with(['participants', 'shares', 'user'])
             ->oldest('sent_at')
             ->oldest('id')
