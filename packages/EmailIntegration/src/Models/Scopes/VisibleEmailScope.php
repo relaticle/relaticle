@@ -202,6 +202,19 @@ final readonly class VisibleEmailScope implements Scope
     }
 
     /**
+     * @template TBuilder of Builder<covariant Model>
+     *
+     * @param  TBuilder  $builder
+     * @return TBuilder
+     */
+    public function excludeBlocked(Builder $builder): Builder
+    {
+        self::excludeBlockedEmails($builder, $this->viewer->current_workspace_id, $this->appliesMailboxBlocklist, $this->appliesWorkspaceBlocklist);
+
+        return $builder;
+    }
+
+    /**
      * @param  Builder<covariant Model>  $builder
      */
     private static function excludeBlockedEmails(Builder $builder, ?string $workspaceId, bool $mailboxRules, bool $workspaceRules): void

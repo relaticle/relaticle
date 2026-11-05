@@ -13,6 +13,7 @@ use Filament\Schemas\Contracts\HasSchemas;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -45,9 +46,13 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
     #[Url(as: 'email')]
     public ?string $selectedEmailId = null;
 
+    // The page opens `?email=` in its own reader, so this one stays shut until the bell asks.
+    #[Locked]
+    public bool $hostsReader = false;
+
     public function mount(): void
     {
-        if ($this->selectedEmailId !== null) {
+        if ($this->selectedEmailId !== null && ! $this->hostsReader) {
             $this->openEmailReader($this->selectedEmailId);
         }
     }
@@ -57,6 +62,7 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
     {
         $this->closeNotificationsPanel();
 
+        $this->hostsReader = false;
         $this->openEmailReader($emailId);
     }
 
@@ -80,6 +86,10 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
     #[Computed]
     public function selectedEmail(): ?Email
     {
+        if ($this->hostsReader) {
+            return null;
+        }
+
         $email = $this->resolveWorkspaceEmail($this->selectedEmailId, 'viewBody');
 
         if (! $email instanceof Email) {

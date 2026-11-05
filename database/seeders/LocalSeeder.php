@@ -39,6 +39,8 @@ final class LocalSeeder extends Seeder
         $this->call(ViewerTimezoneBoundarySeeder::class);
 
         $this->seedPersonas(PersonaCatalog::only($this->slugs()));
+
+        $this->call(EmailConversationsSeeder::class);
     }
 
     /**

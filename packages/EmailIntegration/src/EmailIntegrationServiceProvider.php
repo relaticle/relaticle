@@ -5,8 +5,15 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration;
 
 use App\Contracts\Inbox\RequestSource;
+use App\Features\EmailConversations;
 use App\Features\EmailIntegration;
 use App\Filament\Pages\Dashboard;
+use App\Filament\Resources\CompanyResource;
+use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
+use App\Filament\Resources\OpportunityResource;
+use App\Filament\Resources\OpportunityResource\Pages\ViewOpportunity;
+use App\Filament\Resources\PeopleResource;
+use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Models\CustomFieldValue;
 use App\Models\User;
 use App\Models\Workspace;
@@ -35,6 +42,8 @@ use Relaticle\EmailIntegration\Console\Commands\IncrementalCalendarSyncCommand;
 use Relaticle\EmailIntegration\Console\Commands\IncrementalEmailSyncCommand;
 use Relaticle\EmailIntegration\Console\Commands\RemoveOwnDomainRecordsCommand;
 use Relaticle\EmailIntegration\Console\Commands\RenewCalendarPushChannelsCommand;
+use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
+use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManager;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages\ManageEmailTemplates;
 use Relaticle\EmailIntegration\Inbox\EmailAccessRequestSource;
 use Relaticle\EmailIntegration\Listeners\CancelRemovedMemberAccessRequestsListener;
@@ -156,24 +165,62 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         // active panel, an authenticated user, and a resolved tenant.
         FilamentView::registerRenderHook(
             PanelsRenderHook::BODY_END,
-            function (): string {
-                if (filament()->getId() !== 'app' || ! auth()->check() || ! filament()->getTenant() instanceof Model) {
-                    return '';
-                }
-
-                $pageTo = ComposerPageTo::email();
-                $pageRecordId = ComposerPageTo::recordId();
-
-                return Blade::render('@livewire(\'email-integration.composer\', [\'pageTo\' => $pageTo, \'pageRecordType\' => $pageRecordType, \'pageRecordId\' => $pageRecordId], key($composerKey))', [
-                    'pageTo' => $pageTo,
-                    'pageRecordType' => ComposerPageTo::recordType(),
-                    'pageRecordId' => $pageRecordId,
-                    'composerKey' => 'email-composer-'.($pageRecordId ?? '').'-'.($pageTo ?? ''),
-                ]).Blade::render('@livewire(\''.EmailAccessNotificationHandler::LIVEWIRE_ALIAS.'\')');
-            },
+            fn (array $scopes): string => $this->renderBodyEnd($scopes),
         );
 
         $this->registerCommands();
+    }
+
+    /**
+     * @param  array<string>  $scopes
+     */
+    private function renderBodyEnd(array $scopes): string
+    {
+        if (filament()->getId() !== 'app' || ! auth()->check() || ! filament()->getTenant() instanceof Model) {
+            return '';
+        }
+
+        $pageTo = ComposerPageTo::email();
+        $pageRecordId = ComposerPageTo::recordId();
+
+        return Blade::render('@livewire(\'email-integration.composer\', [\'pageTo\' => $pageTo, \'pageRecordType\' => $pageRecordType, \'pageRecordId\' => $pageRecordId], key($composerKey))', [
+            'pageTo' => $pageTo,
+            'pageRecordType' => ComposerPageTo::recordType(),
+            'pageRecordId' => $pageRecordId,
+            'composerKey' => 'email-composer-'.($pageRecordId ?? '').'-'.($pageTo ?? ''),
+        ]).Blade::render('@livewire(\''.EmailAccessNotificationHandler::LIVEWIRE_ALIAS.'\', [\'hostsReader\' => $hostsReader])', [
+            'hostsReader' => $this->pageHostsReader($scopes),
+        ]);
+    }
+
+    /**
+     * @param  array<string>  $scopes
+     */
+    private function pageHostsReader(array $scopes): bool
+    {
+        $workspace = filament()->getTenant();
+
+        if (! $workspace instanceof Workspace || ! Feature::for($workspace)->active(EmailConversations::class)) {
+            return false;
+        }
+
+        if (in_array(EmailInboxPage::class, $scopes, true)) {
+            return true;
+        }
+
+        $recordResources = [
+            ViewCompany::class => CompanyResource::class,
+            ViewPeople::class => PeopleResource::class,
+            ViewOpportunity::class => OpportunityResource::class,
+        ];
+
+        foreach ($recordResources as $recordPage => $resource) {
+            if (in_array($recordPage, $scopes, true)) {
+                return request()->query('relation') === BaseEmailsRelationManager::relationKeyOn($resource);
+            }
+        }
+
+        return false;
     }
 
     public static function enabled(): bool

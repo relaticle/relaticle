@@ -77,4 +77,6 @@ return [
             'title' => 'Access request denied.',
         ],
     ],
+    'automated_toggle' => '{1}Show 1 automated|[2,*]Show :count automated',
+    'automated_toggle_hide' => 'Hide automated',
 ];

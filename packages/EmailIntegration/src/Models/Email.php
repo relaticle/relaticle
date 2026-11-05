@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Models;
 
-use App\Filament\Pages\Dashboard;
 use App\Models\Company;
 use App\Models\Concerns\HasWorkspace;
 use App\Models\Opportunity;
@@ -470,18 +469,9 @@ final class Email extends Model
         return filled($this->subject) ? $this->subject : __('filament/pages/email-inbox.subject.none');
     }
 
-    public function appUrlFor(User $viewer): string
+    public function appUrl(): string
     {
-        return $this->appUrl($viewer->can('viewBody', $this));
-    }
-
-    public function appUrl(bool $openReader): string
-    {
-        return Dashboard::getUrl(
-            $openReader ? ['email' => $this->getKey()] : [],
-            panel: 'app',
-            tenant: $this->workspace,
-        );
+        return route('email.open', $this);
     }
 
     public function isLinkedToRecord(): bool

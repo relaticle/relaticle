@@ -203,4 +203,26 @@ return [
         'role_sender' => 'Sent from a role address like no-reply or marketing',
         'provider_category' => 'Filed under a Gmail category',
     ],
+    'views' => [
+        'needs_reply' => 'Needs reply',
+        'awaiting_reply' => 'Awaiting reply',
+        'all' => 'All',
+        'unlinked' => 'Unlinked',
+        'automated' => 'Automated',
+        'newer' => 'Newer',
+        'older' => 'Older',
+        'empty' => [
+            'needs_reply' => 'Nothing is waiting on you.',
+            'awaiting_reply' => 'No one owes you a reply.',
+            'all' => 'No conversations yet.',
+            'unlinked' => 'Every conversation is linked to a record.',
+            'automated' => 'No automated mail.',
+        ],
+    ],
+    'conversation_row' => [
+        'me' => 'Me',
+        'unread' => 'Unread',
+        'unlinked' => 'Unlinked',
+        'more_records' => '+:count',
+    ],
 ];

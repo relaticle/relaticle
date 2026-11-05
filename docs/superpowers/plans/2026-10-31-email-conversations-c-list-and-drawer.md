@@ -343,7 +343,7 @@ by a minimal row. Later tasks deepen each layer.
   `automatedReason` (`?AutomatedReason`). Docblock carries the array shapes only.
 - [ ] `ConversationsQuery` (`final readonly`), constructor-injected `PrivacyService`,
   `PreferredEmailCopyService`, `EmailSearchService`. Public:
-  `paginate(User $viewer, ConversationView $view, ConversationFilters $filters, int $perPage = 50, ?string $cursor = null): CursorPaginator`,
+  `paginate(User $viewer, ConversationView $view, ConversationFilters $filters, int $perPage = 50, ?string $cursor = null): ConversationPage`,
   `counts(User $viewer): array`, `messages(User $viewer, string $conversationKey): Collection`.
   First line of each: `Gate::forUser($viewer)->authorize('viewAny', Email::class)`, the sibling of
   the `viewAny` rule in `.ai/rules/queries.md`. Private steps, each under 60 lines:
@@ -368,14 +368,16 @@ by a minimal row. Later tasks deepen each layer.
   - `visibleMessageStats(User, list<string>)`: one grouped query returning per key the count of
     `distinct coalesce(rfc_message_id, id)` and `max(sent_at)` among visible copies.
 - [ ] Order `last_message_at desc, id desc` and call `cursorPaginate($perPage, ['*'], 'cursor', $cursor ? Cursor::fromEncoded($cursor) : null)`.
-  Then replace the collection with `rows()`. `simplePaginate` and `paginate` are not used: both page
+  Then return a `ConversationPage` of `rows()` with the paginator's encoded next and previous cursors: a
+  `CursorPaginator` over rows cannot build a cursor, because rows lack `last_message_at` and `id`. `simplePaginate` and `paginate` are not used: both page
   by offset.
 - [ ] `PrivacyService::effectiveTier()` calls `PreferredEmailCopyService::viewerHasSyncedCopy()`
   (`src/Services/PrivacyService.php:40`), which queries per teammate row
   (`src/Services/PreferredEmailCopyService.php:54-69`). Make `viewerHasSyncedCopy()` return the
   loaded `viewer_has_synced_copy` attribute when the model has it. That keeps one owner of the tier
   rule and removes the per-row query. Task 5's query-count test proves it.
-- [ ] Page: add `use HasConversationsFlag`, `#[Url(as: 'view')] public ?ConversationView $view = null`,
+- [ ] Page: add `use HasConversationsFlag`, `#[Url(as: 'view')] public ?ConversationView $conversationView = null`
+  (Filament's `Page` already declares `$view`, the Blade view name),
   change `#[Url(as: 'tab')] public ?EmailPageTab $tab = null`, and in `mount()` set
   `$this->tab ??= EmailPageTab::DRAFTS` when the flag is off, so the flag-off page and
   `DestinationResolver`'s `?tab=drafts` links (`packages/Chat/src/Support/DestinationResolver.php:103-104`)
@@ -444,16 +446,17 @@ PR 3's rule is missing from the visibility predicate.
   view:
   - `requiresOwnCopy()` views add `whereExists(emails where workspace_id, conversation_key match and user_id = viewer)`.
   - NeedsReply: `last_external_inbound_at is not null and (last_member_outbound_at is null or last_external_inbound_at > last_member_outbound_at) and is_automated = false`.
-  - AwaitingReply: `last_member_outbound_at < :cutoff`, `(last_external_inbound_at is null or last_external_inbound_at < last_member_outbound_at)`,
+  - AwaitingReply: `last_member_outbound_at <= :cutoff`, `(last_external_inbound_at is null or last_external_inbound_at < last_member_outbound_at)`,
     `is_automated = false`, and an exists over the viewer's own outbound copy whose `sent_at` equals
     `last_member_outbound_at`. `:cutoff` is
-    `now()->setTimezone($viewer->timezone ?? config('app.timezone'))->subWeekdays(ConversationView::AWAITING_REPLY_BUSINESS_DAYS)->utc()`.
+    `now()->setTimezone($viewer->effectiveTimezone())->subWeekdays(ConversationView::AWAITING_REPLY_BUSINESS_DAYS)->endOfDay()->utc()`:
+    whole business days on the viewer's calendar, so the test's Wednesday 16:00 mail ages by Monday 10:00.
   - Unlinked: `whereNotExists(emailables join emails on email_id where emails.workspace_id and conversation_key match)`, automated excluded.
   - Automated: `is_automated = true`.
 - [ ] `counts()` returns `['needs_reply' => int, 'unlinked' => int, 'automated' => int]`, three
   `count()` calls over `conversations()` with an empty `ConversationFilters`. No caching here: PR 11
   owns the cache.
-- [ ] Page: computed `viewCounts()` and `activeView()`. `activeView()` returns `$this->view` when set,
+- [ ] Page: computed `viewCounts()` and `activeView()`. `activeView()` returns `$this->conversationView` when set,
   else `NeedsReply` when `viewCounts['needs_reply'] > 0`, else `All`. The resolved default is not
   written to the URL, so a shared link without `?view=` always opens on the default (D2 drops
   "remember the last view").

@@ -166,6 +166,7 @@ it('shows the caller their own email in full', function (): void {
         ->and($items[0]['access'])->toBe('full')
         ->and($items[0]['subject'])->toBe('Renewal terms')
         ->and($items[0]['snippet'])->toBe('Here is the draft contract')
+        ->and($items[0]['url'])->toBe(route('email.open', $email))
         ->and($items[0]['participants'][0])->toBe(['role' => 'from', 'name' => 'Acme Client', 'email' => 'client@acme.test']);
 });
 

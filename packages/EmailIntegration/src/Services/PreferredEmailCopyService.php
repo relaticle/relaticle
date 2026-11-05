@@ -57,6 +57,10 @@ final readonly class PreferredEmailCopyService
             return true;
         }
 
+        if (array_key_exists('viewer_has_synced_copy', $email->getAttributes())) {
+            return (bool) $email->getAttribute('viewer_has_synced_copy');
+        }
+
         if (blank($email->rfc_message_id)) {
             return false;
         }
