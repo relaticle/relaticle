@@ -98,7 +98,7 @@ final readonly class PreferredEmailCopyService
                 ->with(['connectedAccount.user'])
                 ->withGlobalScope('visible', new VisibleEmailScope($viewer))
                 ->whereIn('rfc_message_id', $messageIds)
-                ->get();
+                ->get(Email::listColumns());
 
         $grouped = $copies->groupBy('rfc_message_id');
 

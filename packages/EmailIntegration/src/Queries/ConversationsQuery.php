@@ -7,10 +7,13 @@ namespace Relaticle\EmailIntegration\Queries;
 use App\Enums\CrmEntity;
 use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
+use App\Queries\CustomFieldFilterSchema;
+use App\Support\LikePattern;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Database\Query\Builder as BaseBuilder;
 use Illuminate\Pagination\Cursor;
 use Illuminate\Support\Collection;
@@ -21,7 +24,6 @@ use Relaticle\EmailIntegration\Data\ConversationFilters;
 use Relaticle\EmailIntegration\Data\ConversationPage;
 use Relaticle\EmailIntegration\Data\ConversationRow;
 use Relaticle\EmailIntegration\Enums\ConversationView;
-use Relaticle\EmailIntegration\Enums\EmailCategory;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -105,9 +107,12 @@ final readonly class ConversationsQuery
     private function cappedCount(User $viewer, VisibleEmailScope $visible, ConversationView $view, ConversationFilters $filters): BaseBuilder
     {
         // The view order keeps the planner on the view indexes; unordered, Unlinked hashes every email first.
+        // A listed search drives from its ids instead, and a capped count needs no order.
         $matches = $this->conversations($viewer, $visible, $view, $filters)
-            ->latest('last_message_at')
-            ->orderByDesc('id')
+            ->unless(
+                filled($filters->search) && $this->search->listsMatches($viewer, $filters->search),
+                fn (Builder $ordered): Builder => $ordered->latest('last_message_at')->orderByDesc('id'),
+            )
             ->toBase()
             ->select('email_conversations.id')
             ->limit(ConversationView::COUNT_CAP);
@@ -243,21 +248,19 @@ final readonly class ConversationsQuery
     private function visibleCopiesOf(User $viewer, VisibleEmailScope $visible, ConversationFilters $filters): Builder
     {
         $query = $this->delivered(Email::query()->withGlobalScope('visible', $visible))
-            ->when($filters->mailboxId, fn (Builder $copies, string $mailboxId): Builder => $copies->where('emails.connected_account_id', $mailboxId))
+            ->when($filters->mailboxIds !== [], fn (Builder $copies): Builder => $copies->whereIn('emails.connected_account_id', $filters->mailboxIds))
             ->when($filters->direction, fn (Builder $copies, EmailDirection $direction): Builder => $copies->where('emails.direction', $direction))
             ->when($filters->hasAttachment !== null, fn (Builder $copies): Builder => $copies->where('emails.has_attachments', $filters->hasAttachment))
-            ->when($filters->sentAfter, fn (Builder $copies, CarbonImmutable $after): Builder => $copies->where('emails.sent_at', '>', $after->utc()))
+            ->when($filters->sentAfter, fn (Builder $copies, CarbonImmutable $after): Builder => $copies->where('emails.sent_at', '>=', $after->utc()))
             ->when($filters->sentBefore, fn (Builder $copies, CarbonImmutable $before): Builder => $copies->where('emails.sent_at', '<', $before->utc()))
-            ->when($filters->category, fn (Builder $copies, EmailCategory $category): Builder => $copies->whereHas('labels', fn (Builder $labels): Builder => $labels
+            ->when($filters->categories !== [], fn (Builder $copies): Builder => $copies->whereHas('labels', fn (Builder $labels): Builder => $labels
                 ->where('source', 'system')
-                ->where('label', $category)));
+                ->whereIn('label', $filters->categories)))
+            ->when($filters->from, fn (Builder $copies, string $from): Builder => $this->whereParticipant($copies, $viewer, $from, [EmailParticipantRole::FROM]))
+            ->when($filters->to, fn (Builder $copies, string $to): Builder => $this->whereParticipant($copies, $viewer, $to, [EmailParticipantRole::TO, EmailParticipantRole::CC, EmailParticipantRole::BCC]));
 
-        if ($filters->recordType instanceof CrmEntity && $filters->recordId !== null) {
-            $query->whereExists(fn (BaseBuilder $link): BaseBuilder => $link
-                ->from('emailables')
-                ->whereColumn('emailables.email_id', 'emails.id')
-                ->where('emailables.emailable_type', $filters->recordType->value)
-                ->where('emailables.emailable_id', $filters->recordId));
+        if ($filters->recordType instanceof CrmEntity) {
+            $this->whereLinkedTo($query, $viewer, $filters->recordType, $filters);
         }
 
         if (filled($filters->search)) {
@@ -265,6 +268,40 @@ final readonly class ConversationsQuery
         }
 
         return $query;
+    }
+
+    /**
+     * @param  Builder<Email>  $query
+     * @param  list<EmailParticipantRole>  $roles
+     * @return Builder<Email>
+     */
+    private function whereParticipant(Builder $query, User $viewer, string $term, array $roles): Builder
+    {
+        return $query->whereHas('participants', fn (Builder $participants): Builder => $participants
+            ->whereIn('email_participants.role', $roles)
+            ->matchingSearch($viewer, $term));
+    }
+
+    /** @param  Builder<Email>  $query */
+    private function whereLinkedTo(Builder $query, User $viewer, CrmEntity $type, ConversationFilters $filters): void
+    {
+        $model = $type->model();
+        $records = $model::query()
+            ->withoutGlobalScope(WorkspaceScope::class)
+            ->where('workspace_id', $viewer->current_workspace_id)
+            ->when($filters->recordIds !== [], fn (Builder $named): Builder => $named->withoutGlobalScope(SoftDeletingScope::class)->whereKey($filters->recordIds))
+            ->when($filters->recordName, fn (Builder $named, string $name): Builder => $named
+                ->whereLike($type->titleColumn(), LikePattern::escape($name).'%')
+                ->orderBy($type->titleColumn())
+                ->orderBy((new $model)->getQualifiedKeyName())
+                ->limit(CustomFieldFilterSchema::MAX_LIST_VALUES))
+            ->select((new $model)->getQualifiedKeyName());
+
+        $query->whereExists(fn (BaseBuilder $link): BaseBuilder => $link
+            ->from('emailables')
+            ->whereColumn('emailables.email_id', 'emails.id')
+            ->where('emailables.emailable_type', $type->value)
+            ->whereIn('emailables.emailable_id', $records->toBase()));
     }
 
     /**
@@ -368,7 +405,8 @@ final readonly class ConversationsQuery
     {
         return $this->visibleCopiesOf($viewer, $visible, new ConversationFilters)
             ->whereIn('emails.conversation_key', $keys)
-            ->selectRaw('distinct on (emails.conversation_key) emails.*')
+            ->selectRaw('distinct on (emails.conversation_key) emails.id')
+            ->addSelect(Email::listColumns())
             ->withRecordLinkState()
             ->selectSub($this->viewerSyncedCopy($viewer), 'viewer_has_synced_copy')
             ->selectSub($this->viewerMessageShareTier($viewer), 'viewer_message_share_tier')

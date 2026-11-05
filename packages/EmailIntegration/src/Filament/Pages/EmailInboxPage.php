@@ -15,7 +15,6 @@ use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
-use Relaticle\EmailIntegration\Data\ConversationFilters;
 use Relaticle\EmailIntegration\Data\ConversationPage;
 use Relaticle\EmailIntegration\Data\ConversationRow;
 use Relaticle\EmailIntegration\Enums\ConversationView;
@@ -24,6 +23,7 @@ use Relaticle\EmailIntegration\Enums\EmailPageTab;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Enums\OutboxTab;
 use Relaticle\EmailIntegration\Filament\Actions\ConnectMailboxAction;
+use Relaticle\EmailIntegration\Filament\Concerns\HasConversationFilters;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConversationReader;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConversationsFlag;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
@@ -43,6 +43,7 @@ use Relaticle\EmailIntegration\Queries\ConversationsQuery;
  */
 final class EmailInboxPage extends Page
 {
+    use HasConversationFilters;
     use HasConversationReader;
     use HasConversationsFlag;
     use HasEmailFeatureFlag;
@@ -205,7 +206,7 @@ final class EmailInboxPage extends Page
     #[Computed]
     public function viewCounts(): array
     {
-        return resolve(ConversationsQuery::class)->counts($this->authUser());
+        return resolve(ConversationsQuery::class)->counts($this->authUser(), $this->conversationFilters);
     }
 
     #[Computed]
@@ -222,7 +223,7 @@ final class EmailInboxPage extends Page
         return resolve(ConversationsQuery::class)->paginate(
             $this->authUser(),
             $this->activeView,
-            new ConversationFilters,
+            $this->conversationFilters,
             cursor: $this->conversationsCursor,
         );
     }

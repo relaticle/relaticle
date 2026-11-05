@@ -10,7 +10,13 @@ use Carbon\CarbonImmutable;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Notification;
+use Livewire\Features\SupportTesting\Testable;
+use Relaticle\EmailIntegration\Actions\StoreEmailAction;
+use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
+use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Enums\EmailFolder;
+use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\MailboxHealth;
 use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManager;
@@ -18,12 +24,14 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailBody;
+use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailRead;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
+use Relaticle\EmailIntegration\Services\EmailSearchService;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 
-mutates(BaseEmailsRelationManager::class, EmailVisibilityService::class);
+mutates(BaseEmailsRelationManager::class, EmailVisibilityService::class, EmailSearchService::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withWorkspace()->create();
@@ -775,4 +783,163 @@ it('warns on the record tab about the viewer own stale mailbox', function (): vo
 
     livewire(EmailsRelationManager::class, ['ownerRecord' => $this->person, 'pageClass' => ViewPeople::class])
         ->assertDontSeeHtml('data-mailbox-health');
+});
+
+describe('search', function (): void {
+    beforeEach(function (): void {
+        $this->linkedEmail = function (array $attributes = [], ?string $bodyText = null): Email {
+            $email = Email::factory()->create([
+                'workspace_id' => $this->workspace->id,
+                'user_id' => $this->owner->id,
+                'connected_account_id' => $this->account->getKey(),
+                'subject' => 'Orchard update',
+                'snippet' => 'Notes from the grower',
+                ...$attributes,
+            ]);
+
+            if ($bodyText !== null) {
+                EmailBody::create(['email_id' => $email->id, 'body_html' => null, 'body_text' => $bodyText]);
+            }
+
+            $this->person->emails()->syncWithoutDetaching([$email->getKey()]);
+
+            return $email;
+        };
+
+        $this->searchTab = fn (string $search): Testable => livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])->set('search', $search);
+    });
+
+    it('matches a body word for the owner but not for a metadata-tier teammate', function (): void {
+        $email = ($this->linkedEmail)(['privacy_tier' => EmailPrivacyTier::METADATA_ONLY], 'The kumquat harvest is late this year');
+
+        ($this->searchTab)('kumquat')->assertSeeHtml("email-list-row-{$email->getKey()}");
+
+        $this->actingAs($this->viewer);
+
+        ($this->searchTab)('kumquat')
+            ->assertDontSeeHtml("email-list-row-{$email->getKey()}")
+            ->assertSee(__('filament/pages/email-inbox.list_empty.no_results', ['search' => 'kumquat']));
+    });
+
+    it('matches a body word within the first 20,000 characters and not one past them', function (): void {
+        $filler = str_repeat('a ', 9_995);
+        $email = ($this->linkedEmail)([], $filler.'kumquat '.str_repeat('b ', 10).'quince');
+
+        ($this->searchTab)('kumquat')->assertSeeHtml("email-list-row-{$email->getKey()}");
+        ($this->searchTab)('quince')->assertDontSeeHtml("email-list-row-{$email->getKey()}");
+    });
+
+    it('matches a subject word at subject tier but not a body word', function (): void {
+        $email = ($this->linkedEmail)(['privacy_tier' => EmailPrivacyTier::SUBJECT, 'subject' => 'Orchard pricing'], 'The kumquat harvest is late this year');
+
+        $this->actingAs($this->viewer);
+
+        ($this->searchTab)('pricing')->assertSeeHtml("email-list-row-{$email->getKey()}");
+        ($this->searchTab)('kumquat')->assertDontSeeHtml("email-list-row-{$email->getKey()}");
+    });
+
+    it('applies a metadata share over a full email default', function (): void {
+        $email = ($this->linkedEmail)(['privacy_tier' => EmailPrivacyTier::FULL], 'The kumquat harvest is late this year');
+
+        EmailShare::factory()->tier(EmailPrivacyTier::METADATA_ONLY)->create([
+            'email_id' => $email->getKey(),
+            'workspace_id' => $this->workspace->id,
+            'shared_by' => $this->owner->id,
+            'shared_with' => $this->viewer->id,
+        ]);
+
+        EmailParticipant::query()->create([
+            'email_id' => $email->id,
+            'email_address' => 'grower@orchard.test',
+            'name' => 'Grower',
+            'role' => EmailParticipantRole::FROM,
+        ]);
+
+        $this->actingAs($this->viewer);
+
+        ($this->searchTab)('orchard.test')->assertSeeHtml("email-list-row-{$email->getKey()}");
+        ($this->searchTab)('kumquat')->assertDontSeeHtml("email-list-row-{$email->getKey()}");
+    });
+
+    it('finds an address by a fragment in the middle', function (): void {
+        $email = ($this->linkedEmail)(['privacy_tier' => EmailPrivacyTier::METADATA_ONLY]);
+
+        EmailParticipant::query()->create([
+            'email_id' => $email->id,
+            'email_address' => 'brian.chesky@airbnb.com',
+            'name' => 'Brian Chesky',
+            'role' => EmailParticipantRole::FROM,
+        ]);
+
+        $this->actingAs($this->viewer);
+
+        ($this->searchTab)('irbnb')->assertSeeHtml("email-list-row-{$email->getKey()}");
+        ($this->searchTab)('AIRBNB')->assertSeeHtml("email-list-row-{$email->getKey()}");
+    });
+
+    it('finds a word stored after the email was created', function (): void {
+        $email = resolve(StoreEmailAction::class)->execute($this->account, new FetchedEmailData(
+            providerMessageId: 'msg-kumquat',
+            rfcMessageId: '<kumquat@example.com>',
+            threadId: 'thread-kumquat',
+            inReplyTo: null,
+            subject: 'Orchard update',
+            snippet: 'Notes from the grower',
+            sentAt: now(),
+            direction: EmailDirection::INBOUND,
+            folder: EmailFolder::Inbox,
+            hasAttachments: false,
+            isRead: false,
+            bodyText: 'The kumquat harvest is late this year',
+            bodyHtml: null,
+            participants: [['email_address' => 'grower@orchard.test', 'name' => 'Grower', 'role' => 'from']],
+            attachments: [],
+        ));
+
+        $this->person->emails()->syncWithoutDetaching([$email->getKey()]);
+
+        ($this->searchTab)('kumquat')->assertSeeHtml("email-list-row-{$email->getKey()}");
+    });
+
+    it('matches the last word as a prefix', function (): void {
+        $email = ($this->linkedEmail)(['privacy_tier' => EmailPrivacyTier::FULL], 'The kumquat harvest is late this year');
+
+        $this->actingAs($this->viewer);
+
+        ($this->searchTab)('kumq')->assertSeeHtml("email-list-row-{$email->getKey()}");
+    });
+
+    it('does not search subjects and bodies for one character', function (): void {
+        $email = ($this->linkedEmail)(['privacy_tier' => EmailPrivacyTier::FULL], 'The kumquat harvest is late this year');
+
+        $sender = ($this->linkedEmail)(['privacy_tier' => EmailPrivacyTier::FULL, 'subject' => 'Hello']);
+        EmailParticipant::query()->create(['email_id' => $sender->id, 'email_address' => 'k@grower.test', 'name' => null, 'role' => EmailParticipantRole::FROM]);
+
+        ($this->searchTab)('ku')->assertSeeHtml("email-list-row-{$email->getKey()}");
+        ($this->searchTab)('k')
+            ->assertDontSeeHtml("email-list-row-{$email->getKey()}")
+            ->assertSeeHtml("email-list-row-{$sender->getKey()}");
+    });
+
+    it('cuts an over-long search at 200 characters and drops null bytes', function (): void {
+        $email = ($this->linkedEmail)(['privacy_tier' => EmailPrivacyTier::FULL], 'The kumquat harvest is late this year');
+
+        ($this->searchTab)('kumquat'.str_repeat(' ', 300).'zebra')->assertSeeHtml("email-list-row-{$email->getKey()}");
+        ($this->searchTab)("kum\0quat")->assertSeeHtml("email-list-row-{$email->getKey()}");
+    });
+
+    it('matches no subject or body for a search of only excluded words', function (): void {
+        $email = ($this->linkedEmail)(['privacy_tier' => EmailPrivacyTier::FULL], 'The kumquat harvest is late this year');
+
+        ($this->searchTab)('-pricing')->assertDontSeeHtml("email-list-row-{$email->getKey()}");
+        ($this->searchTab)('- "price list"')->assertDontSeeHtml("email-list-row-{$email->getKey()}");
+        ($this->searchTab)('orchard -pricing')->assertSeeHtml("email-list-row-{$email->getKey()}");
+
+        EmailParticipant::query()->create(['email_id' => $email->id, 'email_address' => 'orchard-pricing@grower.test', 'name' => null, 'role' => EmailParticipantRole::FROM]);
+
+        ($this->searchTab)('-pricing')->assertSeeHtml("email-list-row-{$email->getKey()}");
+    });
 });

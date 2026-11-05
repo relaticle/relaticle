@@ -30,6 +30,7 @@ use Livewire\Livewire;
 use Relaticle\EmailIntegration\Actions\PurgeStoredMailboxData;
 use Relaticle\EmailIntegration\Console\Commands\BackfillAutomatedReasonsCommand;
 use Relaticle\EmailIntegration\Console\Commands\BackfillConversationsCommand;
+use Relaticle\EmailIntegration\Console\Commands\BackfillEmailSearchVectorsCommand;
 use Relaticle\EmailIntegration\Console\Commands\BackfillEmailThreadsCommand;
 use Relaticle\EmailIntegration\Console\Commands\CheckMailboxHealthCommand;
 use Relaticle\EmailIntegration\Console\Commands\DisconnectFormerMemberMailboxesCommand;
@@ -250,6 +251,7 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
             $this->commands([
                 BackfillAutomatedReasonsCommand::class,
                 BackfillConversationsCommand::class,
+                BackfillEmailSearchVectorsCommand::class,
                 DisconnectFormerMemberMailboxesCommand::class,
                 RemoveOwnDomainRecordsCommand::class,
             ]);

@@ -57,13 +57,49 @@
     </div>
 
     @if ($pageTabShown === null)
+        <div class="flex flex-col gap-2 border-b border-gray-200/60 px-4 py-3 sm:flex-row sm:items-center lg:px-6 dark:border-white/10">
+            <form
+                wire:submit="submitSearch"
+                x-data
+                x-on:keydown.slash.window="
+                    if ($event.ctrlKey || $event.metaKey || $event.altKey || $event.target.closest('input, textarea, select, [contenteditable], [role=dialog]')) return
+                    $event.preventDefault()
+                    $el.querySelector('input').focus()
+                "
+                class="w-full sm:max-w-sm sm:shrink-0"
+                data-conversation-search
+            >
+                <x-email-integration::search-bar :search="$search" :framed="false" />
+            </form>
+
+            <div class="min-w-0 flex-1">
+                <x-email-integration::filter-chip-bar
+                    :chips="$this->filterChips"
+                    :editable="$this->editableFilters()"
+                    :actions="[
+                        'mailbox' => $this->mailboxFilterAction,
+                        'sent_at' => $this->sentAtFilterAction,
+                        'record' => $this->recordFilterAction,
+                        'category' => $this->categoryFilterAction,
+                    ]"
+                />
+            </div>
+        </div>
+
+        @if ($this->filterError !== null)
+            <p role="alert" class="border-b border-gray-200/60 px-4 py-2 text-sm text-danger-600 lg:px-6 dark:border-white/10 dark:text-danger-400" data-filter-error>
+                {{ $this->filterError }}
+            </p>
+        @endif
+
         <div class="divide-y divide-gray-200/60 dark:divide-white/10">
             @forelse ($this->conversations->rows as $row)
                 <x-email-integration::conversation-row :row="$row" selectable :current="$row->conversationKey === $this->selectedEmail?->conversation_key" wire:key="conversation-{{ $row->conversationKey }}" />
             @empty
                 <x-filament::empty-state
-                    :heading="__('filament/pages/email-inbox.views.empty.'.$this->activeView->value)"
-                    icon="heroicon-o-envelope"
+                    :heading="$this->isFiltering() ? __('filament/pages/email-inbox.views.no_match') : __('filament/pages/email-inbox.views.empty.'.$this->activeView->value)"
+                    :description="$this->isFiltering() ? __('filament/pages/email-inbox.views.no_match_hint') : null"
+                    :icon="$this->isFiltering() ? 'heroicon-o-magnifying-glass' : 'heroicon-o-envelope'"
                     icon-color="gray"
                     :contained="false"
                 />

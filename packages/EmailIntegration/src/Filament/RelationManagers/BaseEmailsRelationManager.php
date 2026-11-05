@@ -161,7 +161,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
         return resolve(ConversationsQuery::class)->paginate(
             $this->authUser(),
             $this->showAutomated ? ConversationView::Automated : ConversationView::All,
-            ConversationFilters::forRecord($this->ownerRecordWithEmails(), $this->search),
+            ConversationFilters::forRecord($this->ownerRecordWithEmails(), EmailSearchService::clean($this->search)),
             20,
             $this->conversationsCursor,
         );
@@ -208,6 +208,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
         $query = $this->ownerRecordWithEmails()
             ->emails()
+            ->select(Email::listColumns())
             // participants + shares are read per row by the privacy policy; eager-load to avoid N+1.
             ->with(['from', 'labels', 'participants', 'shares', 'user', 'connectedAccount.user'])
             ->withReadStateFor($user->getKey())
@@ -217,13 +218,12 @@ abstract class BaseEmailsRelationManager extends RelationManager
                     ->scopes(['open']),
             ]);
 
-        if (filled($this->search)) {
-            resolve(EmailSearchService::class)->applyToQuery($query, $user, $this->search);
-        }
+        resolve(EmailSearchService::class)->applyToQuery($query, $user, $this->search);
 
         resolve(PreferredEmailCopyService::class)->restrictToVisiblePreferredCopies($query->getQuery(), $user);
 
-        $paginator = $query->latest('sent_at')->paginate(20, pageName: $this->getTablePaginationPageName());
+        // The select above names the email columns, so paginate adds only the pivot's.
+        $paginator = $query->latest('sent_at')->paginate(20, [], $this->getTablePaginationPageName());
 
         resolve(PreferredEmailCopyService::class)->hydrateMailboxAccess($paginator->getCollection(), $user, $this->ownerRecordWithEmails());
 

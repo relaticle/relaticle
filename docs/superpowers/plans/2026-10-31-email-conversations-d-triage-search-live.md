@@ -484,7 +484,7 @@ text above the viewer's tier. Chips and typed operators narrow the list through 
 
 - [ ] Run the spec's one read-only aggregate in production (open question 4):
   `select count(*), avg(octet_length(body_text)), percentile_cont(array[0.5,0.95,0.99]) within group (order by octet_length(body_text)) from email_bodies`.
-  Record the numbers in the PR body. They size the index and decide whether the 64 KB cap
+  Record the numbers in the PR body. They size the index and decide whether the body cap
   matters.
 - [ ] Confirm on production with a read-only query that the migration role may create
   extensions: `select has_database_privilege(current_user, current_database(), 'CREATE')` and
@@ -497,7 +497,7 @@ text above the viewer's tier. Chips and typed operators narrow the list through 
 
 **Files:** `EmailsRelationManagerReadingTest.php`, `tests/Feature/Mcp/EmailToolsTest.php`.
 
-- [ ] Add, through the record tab's `search` property and the MCP `list-emails` tool:
+- [x] Add, through the record tab's `search` property and the MCP `list-emails` tool:
   - `it('matches a body word for the owner but not for a metadata-tier teammate')`: Alice's
     mailbox at `metadata_only`, the email linked to a company both can see (PR 3's rule), body
     contains "kumquat". Alice's search for `kumquat` finds it; Bob's returns nothing on the tab
@@ -512,15 +512,22 @@ text above the viewer's tier. Chips and typed operators narrow the list through 
     then search a body word. Proves the body trigger, not a backfill.
   - `it('matches the last word as a prefix')`: `kumq` finds "kumquat".
   - `it('does not match another member's bcc row')`: unchanged gate, kept as a regression.
-- [ ] Update any existing assertion that searches a mid-word fragment of a subject or snippet to
+- [x] Update any existing assertion that searches a mid-word fragment of a subject or snippet to
   a whole word or prefix (Plan note 19). Name each changed test in the PR body.
-- [ ] Run: the new body, prefix and trigger tests fail against `ILIKE` on `snippet` only.
+- [x] Run: the new body, prefix and trigger tests fail against `ILIKE` on `snippet` only.
+
+**Done (2026-11-05):** the record tab tests sit in a `describe('search')` block. The MCP file
+covers the body tier gate, the subject tier and the metadata share. The four tests that need
+`body_search` carry `->todo(note: ...)`, so every commit stays green; Task 6 removes the
+markers. The BCC regression is the existing `RecordEmailsEmptyStateTest` test "does not match
+a teammate's BCC participant when searching record emails", not a copy. No existing assertion
+searched a mid-word fragment of a subject or snippet, so none changed.
 
 ### Task 3: Columns, triggers and the extension
 
 **Files:** migration `000001`.
 
-- [ ] One transactional migration, `up()` only:
+- [x] One transactional migration, `up()` only:
   - `set local lock_timeout = '5s'`, so the `alter table` fails fast instead of queueing every
     write behind a long read. A failed deploy is retried.
   - `create extension if not exists pg_trgm`.
@@ -529,27 +536,42 @@ text above the viewer's tier. Chips and typed operators narrow the list through 
   - Function `emails_subject_search_refresh()`, `BEFORE INSERT OR UPDATE OF subject ON emails`:
     `new.subject_search := to_tsvector('simple', coalesce(new.subject, ''))`.
   - Function `emails_body_search_refresh()`, `AFTER INSERT OR UPDATE OF body_text ON email_bodies`:
-    `update emails set body_search = to_tsvector('simple', coalesce(emails.snippet, '') || ' ' || left(coalesce(new.body_text, ''), 65536)) where emails.id = new.email_id`.
+    `update emails set body_search = to_tsvector('simple', coalesce(emails.snippet, '') || ' ' || left(coalesce(new.body_text, ''), 20000)) where emails.id = new.email_id`.
     The snippet joins the body vector because the spec gates snippet and body at FULL together.
-  - Function `emails_snippet_search_refresh()`, `BEFORE UPDATE OF snippet ON emails`: recompute
-    `new.body_search` from the stored body, so a changed snippet never leaves a stale vector.
+  - Function `emails_snippet_search_refresh()`, `BEFORE INSERT OR UPDATE OF snippet ON emails`:
+    recompute `new.body_search` from the stored body, so a changed snippet never leaves a stale
+    vector. On insert no body exists yet, so a new email carries its snippet vector at once and
+    never waits on the backfill, even when it never gets a body row.
   - Use `create or replace trigger` (Postgres 14 and later) so a rerun is safe.
-- [ ] `StoreEmailAction` needs no change: it inserts the email, then the body
+- [x] `StoreEmailAction` needs no change: it inserts the email, then the body
   (`StoreEmailAction.php:62-90`), so the body trigger fills `body_search` in the same transaction.
 - [ ] Run the Task 2 tests: the trigger test passes; others may still fail on the service.
+
+**Done (2026-11-05):** the trigger test searches through `EmailSearchService`, which still reads
+`snippet` with `ILIKE`, so it stays `todo` until Task 6. A throwaway probe proved all three
+triggers on the test database: `StoreEmailAction` fills both vectors in its transaction, a bare
+insert carries the snippet vector, and a snippet update rebuilds the body vector. `Email` hides
+both columns from `toArray()`, because the body vector holds the body's words.
+
+**Review fixes (2026-11-05):** two immutable SQL functions own the vector expressions,
+`email_subject_vector(subject)` and `email_body_vector(snippet, body_text)`, and both triggers and
+the backfill call them. The subject is capped at 65,536 characters and the body at 20,000. The body trigger
+also fires on `delete`: it rebuilds `body_search` from the snippet alone, keyed by
+`coalesce(new.email_id, old.email_id)`, so a deleted body's words stop matching. A cascade delete
+from `emails` finds no row to update and raises nothing.
 
 ### Task 4: Concurrent indexes
 
 **Files:** migration `000002`.
 
-- [ ] Copy the shape of `2026_10_21_000002_index_inbox_columns_on_notifications_table.php`:
+- [x] Copy the shape of `2026_10_21_000002_index_inbox_columns_on_notifications_table.php`:
   `public $withinTransaction = false;`, an `INDEXES` constant, and `dropInvalidIndex()` before each
   statement.
   - `emails_subject_search_idx`: `create index concurrently if not exists ... on emails using gin (subject_search)`.
   - `emails_body_search_idx`: same on `body_search`.
   - `email_participants_email_address_trgm_idx`: `using gin (email_address gin_trgm_ops)`.
   - `email_participants_name_trgm_idx`: `using gin (name gin_trgm_ops)`.
-- [ ] No partial index on `workspace_id`: every query already bounds the workspace through the
+- [x] No partial index on `workspace_id`: every query already bounds the workspace through the
   btree on `(workspace_id, ...)` (`create_emails_table.php:61-63`) and the planner combines them
   with a bitmap AND. `btree_gin` is not added; revisit only if the rehearsal shows the bitmap AND
   over a large workspace above the 400 ms budget.
@@ -557,11 +579,32 @@ text above the viewer's tier. Chips and typed operators narrow the list through 
 **Check:** `php artisan migrate` on a local copy runs both migrations; `\d emails` shows the
 columns, triggers and indexes.
 
+**Done (2026-11-05):** the shape is `2026_11_04_202608_index_email_conversations_for_views`, with
+its schema-scoped invalid-index cleanup. On the dev database all four indexes are valid, and with
+`enable_seqscan = off` the planner serves `email_address ilike '%irbnb%'` from the trigram index
+and `body_search @@ ...` from the body GIN index.
+
+**Changed after the rehearsal (2026-11-05):** no search query used these indexes, because the
+access gates drove every plan. The subject and body indexes are now
+`emails_workspace_subject_search_idx` and `emails_workspace_body_search_idx` on
+`(workspace_id, <vector>)` with `btree_gin`, as D13 option C specifies, and `000001` creates the
+extension. A database where `000001` and `000002` already ran records them as done, so `migrate`
+never re-runs them whatever the index names: it keeps the single-column indexes and lacks
+`btree_gin`. Such a database (the dev and rehearsal databases, not production) needs a fresh
+migrate, or both migration rows deleted and the old indexes dropped first. The search
+leads with one workspace-bounded scan, `subject @@ q or body @@ q or id = any(array(<participant
+ids>))`, which the planner can serve as a bitmap OR and estimate. The gates then test only those
+rows. A union of the three sets was rejected: Postgres guesses 200 rows for its output, drives
+common words from it, and `counts()` took 8.6 s. Under three characters no trigram applies, so the
+search keeps the old shape. It does the same when a probe, run once per viewer and search, finds
+more than 10,000 workspace participants matching (`com`, `gmail`): the id array then costs seconds,
+while nearly every row matches and the view indexes stop early.
+
 ### Task 5: The backfill command, queued from a migration
 
 **Files:** `BackfillEmailSearchVectorsCommand.php`, the service provider, migration `000003`.
 
-- [ ] `email:backfill-search-vectors {--force} {--workspace=} {--max-seconds=240}`.
+- [x] `email:backfill-search-vectors {--force} {--workspace=} {--max-seconds=240}`.
   - Without `--force`: print the count of emails with `body_search is null`, per workspace when
     `--workspace` is absent.
   - With `--force`: walk `DB::table('emails')->whereNull('body_search')->select('id')` with
@@ -573,15 +616,26 @@ columns, triggers and indexes.
   - Stop when `--max-seconds` passes and, if rows remain, queue itself again with the same
     `Artisan::queue(...)->onQueue('imports')->delay(now()->addMinute())`. The `imports` lane
     allows 300 s per try (core.md). Rerunning is safe because the filter is `whereNull`.
-- [ ] Migration `000003`: `Artisan::queue('email:backfill-search-vectors', ['--force' => true])->onQueue('imports')->delay(now()->addMinutes(5))->afterCommit()`.
+- [x] Migration `000003`: `Artisan::queue('email:backfill-search-vectors', ['--force' => true])->onQueue('imports')->delay(now()->addMinutes(5))->afterCommit()`.
   `ConventionsTest` fails if the command name is wrong or the delay is missing.
-- [ ] No test for the command or the migrations (testing.md). The rehearsal proves them.
+- [x] No test for the command or the migrations (testing.md). The rehearsal proves them.
+
+**Done (2026-11-05):** the shape follows `email:backfill-automated-reasons`, not the
+`--max-seconds` budget above: `{--force} {--after=} {--workspace=} {--chunk=20000}`. A run reads at
+most `--chunk` emails in pages of up to 1,000 and queues the rest with `--after` set to the last id
+it read. The write is one `update` per page through the query builder, so `updated_at` stays. It
+fills only null vectors: each column is `coalesce(column, <trigger expression>)` and the `where`
+repeats the null filter, so a vector a trigger wrote since the read is kept. The body comes from a
+correlated subquery on `email_bodies` instead of a self-join. No `--before` cutoff: every row
+stored after `000001` gets its vectors from the triggers. The command is registered outside the
+feature flag, with the other backfills. The rehearsal sets `--chunk` from rows per second, so one
+run stays inside the 300 s `imports` timeout.
 
 ### Task 6: The search service on full text and trigrams
 
 **Files:** `EmailSearchService.php`.
 
-- [ ] Keep `applyToQuery(Builder|Relation $query, User $viewer, string $search)` and its three
+- [x] Keep `applyToQuery(Builder|Relation $query, User $viewer, string $search)` and its three
   branches. Change only the match in each:
   - Participants: keep the BCC role gate (`EmailSearchService.php:30-44`) and the `ilike`
     `%term%` on `name` and `email_address`, now served by the trigram indexes. Escape `%`, `_`
@@ -589,21 +643,42 @@ columns, triggers and indexes.
   - Subject: `whereRaw('emails.subject_search @@ (' . $tsQuery . ')', $bindings)` plus
     `whereViewerCanSeeSubject()`.
   - Body: the same on `body_search` plus `whereViewerCanSeeBody()`. The snippet `ilike` goes.
-- [ ] Private `tsQuery(string $search): array{0: string, 1: list<string>}`: SQL
+- [x] Private `tsQuery(string $search): array{0: string, 1: list<string>}`: SQL
   `websearch_to_tsquery('simple', ?)`, and when the search ends in a bare word of letters and
   digits, `&& to_tsquery('simple', ?)` with that word plus `:*` for a prefix match. The word is
   matched with `/[\p{L}\p{N}]+$/u` before it reaches `to_tsquery`, so no user text is parsed as
   tsquery syntax. A search with no word left skips both full-text branches.
-- [ ] Qualify every column with `emails.` so the service works under `VisibleEmailsQuery`, the
+- [x] Qualify every column with `emails.` so the service works under `VisibleEmailsQuery`, the
   record tab's relation and `ConversationsQuery`'s copies subquery alike.
-- [ ] The Task 2 tests pass. Run `EmailsRelationManagerReadingTest.php`, `EmailToolsTest.php`
+- [x] The Task 2 tests pass. Run `EmailsRelationManagerReadingTest.php`, `EmailToolsTest.php`
   (MCP and chat) and `VisibleEmailScopeTest.php`.
+
+**Done (2026-11-05):** the prefix rule changed. `websearch_to_tsquery(search) && to_tsquery(last:*)`
+still demands the last word whole, so `kumq` never finds "kumquat". The service runs
+`websearch_to_tsquery` over the text before a trailing bare word, and `to_tsquery('simple', word:*)`
+on that word alone. A word counts as bare only at the start or after whitespace, so `pricing -kumq`
+keeps its negation through websearch. The four `todo` markers are gone and the tests pass,
+the trigger one through `body_search`, since search no longer reads `snippet` or `email_bodies`.
+Hot list reads select `Email::listColumns()`, every column but the two vectors:
+`withRecordLinkState()` (`VisibleEmailsQuery`, `ConversationsQuery::messages()`), the newest copies
+in `ConversationsQuery`, the record tab list and its sibling copies in
+`PreferredEmailCopyService::hydrateMailboxAccess()`. An `EmailToolsTest` case fails when a column
+drops out of the list. The access-request list keeps its own `subject` `ilike`
+(`InteractsWithEmailAccessRequests.php:167`), gated by `whereSubjectVisibleTo()`.
+
+**Review fixes (2026-11-05):** the backfill also stops at `--max-seconds=240` (read through `Date`)
+and passes it on when it queues the rest, so a run of large bodies never reaches the 300 s
+timeout. `EmailSearchService::clean()` owns the search limits: it drops null bytes, trims and
+cuts at `MAX_LENGTH` (200), and `VisibleEmailsQuery::filterRules()` reads `MIN_TEXT_LENGTH` (2)
+and `MAX_LENGTH` from it. Below two characters, or with no positive term (only `-word` or
+`-"phrase"`), the subject and body branches are skipped and participants still match. The MCP
+and chat `list-emails` descriptions now say what search matches.
 
 ### Task 7: One filter owner and typed operators
 
 **Files:** `EmailFilter.php`, `ConversationFilters.php`, `ConversationsQuery.php`, lang.
 
-- [ ] `EmailFilter` cases: `Mailbox`, `From`, `To`, `Direction`, `HasAttachment`, `SentAt`,
+- [x] `EmailFilter` cases: `Mailbox`, `From`, `To`, `Direction`, `HasAttachment`, `SentAt`,
   `Record` (company, person or opportunity), `Category`. Each a `match` with no `default`:
   - `field(): string` for the tree (`mailbox`, `from`, `to`, `direction`, `has_attachment`,
     `sent_at`, `record`, `category`).
@@ -613,7 +688,7 @@ columns, triggers and indexes.
   - `typedWords(): list<string>`: `from`, `to`, `has` (only `attachment`), `after` and `before`
     (to `SentAt`), `company`, `person`, `opportunity` (to `Record`).
   - `label(): string` for the chip.
-- [ ] `ConversationFilters` keeps PR 5's fields and adds:
+- [x] `ConversationFilters` keeps PR 5's fields and adds:
   - static `fromTree(array $tree, string $viewerZone): self`. Validates against `EmailFilter`
     only, throws `FilterErrors::at('filter.<field>', ...)` with `validation.filter.*` messages,
     parses operands with `Operand::date()`, `Operand::boolean()` and `Operand::stringList()`,
@@ -624,7 +699,7 @@ columns, triggers and indexes.
     words, and known words with an invalid value such as `after:soon`, stay in `search` as free
     text, per the spec.
   - `toTree(): array` for the URL and the chips.
-- [ ] `ConversationsQuery` compiles each filter inside its copies subquery, after the visibility
+- [x] `ConversationsQuery` compiles each filter inside its copies subquery, after the visibility
   bound, so a filter can only narrow what the viewer may see:
   - `From` and `To`: `whereHas('participants')` with the role (`from`, or `to`/`cc`, plus `bcc`
     only for the viewer's own copies) and the same `ilike` as search. A metadata-tier row shows
@@ -634,7 +709,7 @@ columns, triggers and indexes.
   - `company:Acme` resolves the name to company ids through `Company::query()` bound to the
     viewer's workspace, `ilike` prefix, at most `MAX_LIST_VALUES`.
   - `search`: `EmailSearchService::applyToQuery()`. Never a raw `where` on text (D14 risk).
-- [ ] Tests in `ConversationsPageTest.php`:
+- [x] Tests in `ConversationsPageTest.php`:
   - `it('turns from and has attachment operators into filters and keeps the rest as words')`:
     `from:airbnb.com has:attachment pricing foo:bar` filters to the one matching conversation,
     and `search` holds `pricing foo:bar`.
@@ -644,27 +719,52 @@ columns, triggers and indexes.
   - `it('does not match another member's bcc address through to')`.
   - `it('filters to one company through company:')`.
 
+**Done (2026-11-05):** operators are `$in` for mailbox, direction and category, `$contains` for
+from and to, `$eq` for has_attachment, `$gte` and `$lt` for sent_at (`before:` is exclusive, so
+`$lt`, not `$lte`), and for record `{company|person|opportunity: {$in: [ids]}}` or
+`{...: {$starts_with: name}}`. A typed `company:Acme` keeps the name in the tree and the query
+resolves it to at most `MAX_LIST_VALUES` records of the viewer's workspace, because a data class
+reads no database and the URL keeps what was typed. `withTyped()` takes the viewer's zone, for
+`after:` and `before:`. `ConversationFilters` now holds lists (`mailboxIds`, `recordIds`,
+`categories`) plus `from`, `to` and `recordName`; `forRecord()` moved to `recordIds`, and
+`sentAfter` is inclusive. The participant match is a `#[Scope]` on `EmailParticipant`
+(`matchingSearch()`), shared by search and by `from:`/`to:`, because `ConventionsTest` fails a
+new public method that takes a builder. Tests run through `ConversationsQuery` and
+`ConversationFilters`, because the page has no `filter` or `q` state until Task 8. The test
+"rejects an unknown filter field with a validation message" checks `fromTree()`, and Task 8 adds
+the URL case, which renders the message and lists as if no filter were set.
+
 ### Task 8: The search box and chip bar on the page
 
 **Files:** `EmailInboxPage.php`, `filter-chip-bar.blade.php`, lang.
 
-- [ ] `#[Url(as: 'q')] public string $search` and `#[Url(as: 'filter')] public array $filter`.
+- [x] `#[Url(as: 'q')] public string $search` and `#[Url(as: 'filter')] public array $filter`.
   The search input debounces 300 ms with `wire:model.live.debounce.300ms`. On submit, recognised
   operators leave the box and become chips. An invalid tree from the URL shows the error under
   the bar and lists as if no filter were set.
-- [ ] Chips: Mailbox (the viewer's own mailboxes), Has attachment, Date (after, before, or both,
+- [x] Chips: Mailbox (the viewer's own mailboxes), Has attachment, Date (after, before, or both,
   in the viewer's time zone), Linked to (the existing linked-records picker from
   `resources/js/filament/linked-records-picker.js`), Category. Each active chip shows its value
   and an `x` with an accessible label. "Clear all" appears with two or more chips.
-- [ ] `/` focuses the search box through PR 7's `FocusSearch` handler when PR 7 has merged.
+- [x] `/` focuses the search box through PR 7's `FocusSearch` handler when PR 7 has merged.
   Otherwise the box keeps its own `x-on:keydown.slash.window` guard until PR 7 removes it.
-- [ ] Empty result copy: "No conversations match. Search covers subjects and bodies you can read,
+- [x] Empty result copy: "No conversations match. Search covers subjects and bodies you can read,
   and every name and address."
-- [ ] 390 px: the chip bar scrolls horizontally in one line; the search box takes the full width.
-- [ ] Browser test `ConversationsSearchBrowserTest.php`, light and dark:
+- [x] 390 px: the chip bar scrolls horizontally in one line; the search box takes the full width.
+- [x] Browser test `ConversationsSearchBrowserTest.php`, light and dark:
   `it('turns a typed operator into a chip and back into text when removed')`,
   `it('finds a conversation by a body word')`, `it('keeps search and chips in the url across reload')`.
   Run once with `--browser safari`.
+
+**Done (2026-11-05):** the state, computed filters, chip actions and handlers live in the page
+trait `HasConversationFilters`, so `EmailInboxPage` stays within its size. `$filter` is typed
+`mixed`, because a crafted URL can send a string, and a non-array lists as if no filter were set
+with the error under the bar. Typed chips (from, to, has attachment, after, before, a name-based
+`company:`) go back into the box as text when their label is pressed, so the browser test is
+named "back into text when edited". Picker chips (Mailbox, Date, Linked to, Category) open modal
+actions. Linked to takes one record type per filter, because the tree holds one record key. PR 7
+has not merged, so the `/` guard sits on the search form. Search keeps the 300 ms live debounce.
+Submit moves recognised operators into `filter` and leaves the other words in `q`.
 
 ### Task 9: Rehearsal and verification
 
@@ -918,8 +1018,8 @@ Beyond the plan notes above:
 - **Flag delivery:** a hidden `data-` element from a `BODY_START` hook, re-read on
   `livewire:navigated`. `registerScriptData` runs at boot, before the user is known.
 - **Read granularity:** read marks every reached copy; unread clears the newest reached copy.
-- **Vector content:** snippet plus the first 65,536 characters of `body_text` (spec: 64 KB; D13
-  suggested 20,000). Lower it if the index exceeds the heap.
+- **Vector content:** snippet plus the first 20,000 characters of `body_text`, as D13 says
+  (founder decision, 2026-11-05; the spec's 64 KB is superseded). The subject stays capped at 65,536.
 - **Debounce:** 750 ms trailing on the client, plus 10 s server uniqueness.
 
 ## Risks and unknowns
