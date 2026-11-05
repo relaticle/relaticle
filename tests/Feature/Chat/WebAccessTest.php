@@ -378,7 +378,7 @@ it('never approves web access through approve all or the plan shortcut', functio
     Queue::assertNotPushed(ProcessChatMessage::class);
 })->with(['approve all', 'plan shortcut']);
 
-it('names the search price only where the workspace meters credits', function (bool $metered): void {
+it('never names the search price on the request', function (bool $metered): void {
     if ($metered) {
         withHostedBilling();
     }
@@ -387,11 +387,9 @@ it('names the search price only where the workspace meters credits', function (b
     Queue::fake();
     $request = requestWebAccess($user, (string) str()->ulid());
 
-    $dock = openWebAccessDock($request)->assertSee('Rela wants to search the web for this.');
-
-    $metered
-        ? $dock->assertSee('Each search uses 2 credits.')
-        : $dock->assertDontSee('Each search uses');
+    openWebAccessDock($request)
+        ->assertSee('Rela wants to search the web for this.')
+        ->assertDontSee('credits');
 })->with(['metered' => true, 'unmetered' => false]);
 
 it('ignores the shortcut on a lone web access request', function (): void {

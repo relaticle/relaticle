@@ -64,7 +64,7 @@
             @endif
 
             @if ($isWebAccess)
-                @include('chat::livewire.chat.partials._dock-web-access', ['step' => $steps[0], 'proposal' => $proposal, 'metersCredits' => $metersCredits])
+                @include('chat::livewire.chat.partials._dock-web-access', ['step' => $steps[0], 'proposal' => $proposal])
             @else
             {{-- A plan can be taller than the dock: the steps scroll, so the
                  decision buttons never leave the viewport. --}}

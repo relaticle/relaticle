@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Livewire\Chat;
 
-use App\Contracts\Entitlements;
 use App\Livewire\BaseLivewireComponent;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DateTimePicker;
@@ -1815,7 +1814,6 @@ final class ProposalCard extends BaseLivewireComponent
             'hasOwnApprovalSteps' => $approveAllCount < count($steps),
             'recordCount' => $proposal instanceof PendingAction ? $this->recordCountOf($proposal) : 0,
             'remainingCount' => $proposal instanceof PendingAction ? $this->remainingCountOf($proposal) : 0,
-            'metersCredits' => resolve(Entitlements::class)->metersCredits($this->authUser()->currentWorkspace),
         ]);
     }
 }
