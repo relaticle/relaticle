@@ -13,10 +13,12 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\Attributes\Backoff;
+use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\SerializesModels;
 use Relaticle\Cloud\Billing\Filament\Billing;
 
+#[DeleteWhenMissingModels]
 #[Tries(3)]
 #[Backoff(60, 300)]
 final class InactiveWorkspaceDeletionWarningMail extends Mailable implements ShouldQueue
