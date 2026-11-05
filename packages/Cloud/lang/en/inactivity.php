@@ -3,6 +3,15 @@
 declare(strict_types=1);
 
 return [
+    'notice' => [
+        'subject' => 'We now keep paused workspaces for 60 days',
+        'preheader' => ':workspace is safe until :date. Choose a plan or sign in to keep it longer.',
+        'heading' => 'We now keep paused workspaces for 60 days',
+        'body' => ':workspace has been paused since its trial ended. From today, we delete a paused workspace after 60 days without a sign-in.',
+        'date' => 'Your 60 days start today. If no one signs in and you choose no plan, we will delete :workspace on :date.',
+        'warn' => 'We will email you 14 days and 5 days before that.',
+        'cta' => 'Choose a plan',
+    ],
     'warning' => [
         'subject' => ':workspace will be deleted on :date',
         'preheader' => 'No one has signed in since :since. Choose a plan or sign in to keep it.',

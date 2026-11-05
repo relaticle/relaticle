@@ -20,6 +20,7 @@ use Illuminate\Support\Str;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Cloud\Billing\Actions\CancelInactivityDeletion;
+use Relaticle\Cloud\Billing\Commands\AnnounceInactivityRuleCommand;
 use Relaticle\Cloud\Billing\Commands\ScheduleInactiveTrialDeletionsCommand;
 use Relaticle\Cloud\Billing\Filament\Billing;
 use Relaticle\Cloud\Billing\Listeners\CancelInactivityDeletionOnLogin;
@@ -27,9 +28,12 @@ use Relaticle\Cloud\Billing\Listeners\SendInactiveWorkspaceDeletedMail;
 use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletedMail;
 use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletionReminderMail;
 use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletionWarningMail;
+use Relaticle\Cloud\Billing\Mail\InactivityRuleNoticeMail;
 use Relaticle\Cloud\Billing\Queries\InactiveTrialWorkspacesQuery;
 
 mutates(ScheduleInactiveTrialDeletionsCommand::class);
+mutates(AnnounceInactivityRuleCommand::class);
+mutates(InactivityRuleNoticeMail::class);
 mutates(InactiveTrialWorkspacesQuery::class);
 mutates(InactiveWorkspaceDeletionWarningMail::class);
 mutates(CancelInactivityDeletion::class);
@@ -265,7 +269,7 @@ it('keeps the date and the reason of a deletion the owner requested', function (
 });
 
 it('writes the warning for the owner with dates in their timezone', function (): void {
-    $workspace = inactivePausedWorkspace(timezone: 'Pacific/Auckland');
+    $workspace = inactivePausedWorkspace(timezone: 'Pacific/Kiritimati');
     $deletesAt = CarbonImmutable::parse('2026-12-31 23:00:00');
     $mail = new InactiveWorkspaceDeletionWarningMail($workspace, $deletesAt, CarbonImmutable::parse('2026-11-20 12:00:00'));
 
@@ -394,7 +398,7 @@ it('sends no reminder outside the five-day window or for a deletion the owner re
 });
 
 it('writes the reminder with the deletion date in the owner timezone', function (): void {
-    $workspace = inactivePausedWorkspace(timezone: 'Pacific/Auckland');
+    $workspace = inactivePausedWorkspace(timezone: 'Pacific/Kiritimati');
     $mail = new InactiveWorkspaceDeletionReminderMail($workspace, CarbonImmutable::parse('2026-12-31 23:00:00'));
 
     $mail->assertHasSubject('Acme will be deleted on Jan 1, 2027');
@@ -476,4 +480,69 @@ it('lets the owner of a purged inactive workspace sign in and start a new worksp
         ->and($created->paused_at)->toBeNull()
         ->and($created->scheduled_deletion_at)->toBeNull()
         ->and($created->deletion_reason)->toBeNull();
+});
+
+it('lists who would get the launch notice and writes nothing without force', function (): void {
+    Mail::fake();
+    $workspace = inactivePausedWorkspace();
+
+    $this->travelTo(inactivePausedAt());
+
+    $this->artisan('billing:announce-inactivity-rule')
+        ->expectsOutputToContain('Would notify the owner of Acme.')
+        ->expectsOutputToContain('1 owner(s) would be notified')
+        ->assertSuccessful();
+
+    expect($workspace->refresh()->inactivity_notice_sent_at)->toBeNull();
+    Mail::assertNothingQueued();
+});
+
+it('sends one launch notice per paused owner, dated 60 days from the last activity', function (): void {
+    Mail::fake();
+    $workspace = inactivePausedWorkspace(timezone: 'Pacific/Kiritimati');
+
+    $this->travelTo(inactivePausedAt());
+    $this->artisan('billing:announce-inactivity-rule', ['--force' => true])->assertSuccessful();
+
+    expect($workspace->refresh()->inactivity_notice_sent_at?->toDateTimeString())->toBe(inactivePausedAt()->toDateTimeString());
+
+    Mail::assertQueued(InactivityRuleNoticeMail::class, 1);
+    Mail::assertQueued(InactivityRuleNoticeMail::class, function (InactivityRuleNoticeMail $mail) use ($workspace): bool {
+        $mail->assertHasSubject('We now keep paused workspaces for 60 days');
+        $mail->assertSeeInHtml('Jan 1, 2027');
+
+        return $mail->hasTo($workspace->owner->email) && $mail->workspace->is($workspace);
+    });
+});
+
+it('never sends the launch notice twice', function (): void {
+    Mail::fake();
+    inactivePausedWorkspace();
+
+    $this->travelTo(inactivePausedAt());
+    $this->artisan('billing:announce-inactivity-rule', ['--force' => true])->assertSuccessful();
+    $this->artisan('billing:announce-inactivity-rule', ['--force' => true])->assertSuccessful();
+
+    Mail::assertQueued(InactivityRuleNoticeMail::class, 1);
+});
+
+it('skips a workspace already scheduled for deletion on request when announcing the rule', function (): void {
+    Mail::fake();
+    $workspace = inactivePausedWorkspace([
+        'scheduled_deletion_at' => inactivePausedAt()->addDays(20),
+        'deletion_reason' => DeletionReason::Requested,
+    ]);
+
+    $this->travelTo(inactivePausedAt());
+    $this->artisan('billing:announce-inactivity-rule', ['--force' => true])->assertSuccessful();
+
+    expect($workspace->refresh()->inactivity_notice_sent_at)->toBeNull();
+    Mail::assertNothingQueued();
+});
+
+it('keeps the launch notice command out of the schedule', function (): void {
+    $scheduled = collect(app(Schedule::class)->events())
+        ->contains(fn (Event $event): bool => str_contains((string) $event->command, 'billing:announce-inactivity-rule'));
+
+    expect($scheduled)->toBeFalse();
 });
