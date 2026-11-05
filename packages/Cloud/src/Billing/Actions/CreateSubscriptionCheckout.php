@@ -8,7 +8,9 @@ use App\Contracts\Entitlements;
 use App\Enums\Plan;
 use App\Models\Workspace;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Relaticle\Cloud\Analytics\Models\Acquisition;
 use Relaticle\Cloud\Billing\Filament\Billing;
 
 final readonly class CreateSubscriptionCheckout
@@ -30,10 +32,20 @@ final readonly class CreateSubscriptionCheckout
             ? $builder->trialUntil($trialEndsAt)
             : $builder->skipTrial();
 
-        return (string) $builder
+        $session = $builder
             ->checkout($this->sessionOptions($workspace, ! $this->entitlements->allowsAccess($workspace)))
-            ->asStripeCheckoutSession()
-            ->url;
+            ->asStripeCheckoutSession();
+
+        Acquisition::query()
+            ->where('workspace_id', $workspace->getKey())
+            ->whereNull('first_checkout_at')
+            ->update(['first_checkout_at' => now(), 'first_checkout_session_id' => $session->id]);
+
+        if (request()->hasSession()) {
+            request()->session()->put('fathom.track_checkout_started', (string) Str::uuid());
+        }
+
+        return (string) $session->url;
     }
 
     private function priceId(Plan $plan, string $interval): string

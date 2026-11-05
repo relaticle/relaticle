@@ -105,10 +105,10 @@
             </div>
         @else
             <div class="grid grid-cols-2 gap-3 mobile-nav-enter" style="--stagger: {{ count($mobileNavItems) }}">
-                <x-cloud::marketing.button variant="secondary" href="{{ route('login') }}" class="active:scale-[0.98]">
+                <x-cloud::marketing.button variant="secondary" href="{{ route('login') }}" class="active:scale-[0.98]" data-analytics-intent="login" data-analytics-placement="mobile">
                     Sign In
                 </x-cloud::marketing.button>
-                <x-cloud::marketing.button href="{{ route('login') }}" class="active:scale-[0.98]">
+                <x-cloud::marketing.button href="{{ route('login') }}" class="active:scale-[0.98]" data-analytics-intent="signup" data-analytics-placement="mobile">
                     Start for free
                 </x-cloud::marketing.button>
             </div>

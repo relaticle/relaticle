@@ -199,7 +199,7 @@
                     <p class="{{ $cardDesc }}">Put your companies, deals, and agents in one CRM.</p>
                 </div>
                 <div class="relative mt-5">
-                    <x-cloud::marketing.button size="sm" href="{{ route('login') }}">
+                    <x-cloud::marketing.button size="sm" href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="page">
                         Start for free
                     </x-cloud::marketing.button>
                     <div class="mt-3 flex items-center gap-3 text-[10px] text-gray-500 dark:text-gray-500">

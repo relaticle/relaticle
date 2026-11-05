@@ -302,11 +302,11 @@
                                 {{ __('Open app') }}
                             </x-cloud::marketing.button>
                         @else
-                            <x-cloud::marketing.button variant="secondary" size="sm" href="{{ route('login') }}">
+                            <x-cloud::marketing.button variant="secondary" size="sm" href="{{ route('login') }}" data-analytics-intent="login" data-analytics-placement="header">
                                 Sign In
                             </x-cloud::marketing.button>
 
-                            <x-cloud::marketing.button size="sm" href="{{ route('login') }}">
+                            <x-cloud::marketing.button size="sm" href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="header">
                                 Start for free
                             </x-cloud::marketing.button>
                         @endauth
