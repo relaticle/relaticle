@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Broadcasting\AnonymousEvent;
 use Illuminate\Broadcasting\BroadcastException;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\DB;
 use Laravel\Ai\Responses\Data\ToolCall as DataToolCall;
 use Laravel\Ai\Responses\Data\ToolResult as DataToolResult;
+use Laravel\Ai\Responses\Data\UrlCitation;
+use Laravel\Ai\Streaming\Events\Citation;
+use Laravel\Ai\Streaming\Events\ProviderToolEvent;
 use Laravel\Ai\Streaming\Events\ReasoningDelta;
 use Laravel\Ai\Streaming\Events\StreamStart;
 use Laravel\Ai\Streaming\Events\TextDelta;
@@ -227,4 +231,69 @@ it('carries the proposal expiry to the client without writing it into the stored
     // The value the message persists is replayed to the model on every later turn,
     // so it must stay byte-identical to what the tool returned.
     expect(json_decode($storedResult, true))->not->toHaveKey('expires_at');
+});
+
+it('broadcasts the start and finish of a web search and page read without their results', function (): void {
+    $anthropic = fn (string $status, array $data, string $type = 'server_tool_use'): ?array => StreamEventBroadcaster::payloadFor(
+        new ProviderToolEvent('evt', 'srv-1', $type, $data, $status, time(), 'anthropic'),
+    );
+
+    expect($anthropic('started', ['name' => 'web_search', 'input' => []])['with'])->toMatchArray(['name' => 'web_search', 'status' => 'started', 'query' => null])
+        ->and($anthropic('completed', ['name' => 'web_search', 'input' => ['query' => 'filaforms']])['with'])->toMatchArray(['name' => 'web_search', 'status' => 'completed', 'query' => 'filaforms'])
+        ->and($anthropic('completed', ['name' => 'web_fetch', 'input' => ['url' => 'https://filaforms.app/']])['with'])->toMatchArray(['name' => 'web_fetch', 'url' => 'https://filaforms.app/', 'query' => null])
+        ->and($anthropic('result_received', ['content' => [['url' => 'https://filaforms.app/', 'encrypted_content' => str_repeat('x', 20000)]]], 'web_search_tool_result'))->toBeNull();
+});
+
+it('broadcasts one finish per OpenAI web search, from the event that names its action', function (): void {
+    $openai = fn (string $status, array $data): ?array => StreamEventBroadcaster::payloadFor(
+        new ProviderToolEvent('evt', 'ws_1', 'web_search_call', $data, $status, time(), 'openai'),
+    );
+
+    expect($openai('in_progress', ['item_id' => 'ws_1'])['with'])->toMatchArray(['name' => 'web_search', 'status' => 'started'])
+        ->and($openai('completed', ['item_id' => 'ws_1']))->toBeNull()
+        ->and($openai('completed', ['id' => 'ws_1', 'action' => ['type' => 'open_page', 'url' => 'https://filaforms.app/']])['with'])->toMatchArray(['name' => 'web_fetch', 'status' => 'completed', 'url' => 'https://filaforms.app/']);
+});
+
+it('broadcasts a citation as a source and drops one that is not a web page', function (): void {
+    $citation = fn (string $url, ?string $title): ?array => StreamEventBroadcaster::payloadFor(
+        new Citation('evt', 'msg', new UrlCitation($url, $title), time()),
+    );
+
+    expect($citation('https://www.filaforms.app/pricing?utm_source=openai&plan=pro', 'Pricing')['with'])
+        ->toMatchArray(['url' => 'https://www.filaforms.app/pricing?plan=pro', 'title' => 'Pricing', 'domain' => 'filaforms.app'])
+        ->and($citation('https://ex.com/p?a.b=1&tag=a&tag=b&flag&utm_medium=web#section', null)['with']['url'])->toBe('https://ex.com/p?a.b=1&tag=a&tag=b&flag')
+        ->and($citation('https://ex.com/?q='.str_repeat('x', 2100), 'Long'))->toBeNull()
+        ->and($citation('javascript:alert(1)', 'x'))->toBeNull();
+});
+
+it('broadcasts each cited page once, again only to add its title, and at most ten pages per turn', function (): void {
+    $sent = [];
+    $pending = Mockery::mock(AnonymousEvent::class);
+    $pending->shouldReceive('as')->andReturnSelf();
+    $pending->shouldReceive('with')->andReturnUsing(function (array $with) use (&$sent, $pending): mixed {
+        $sent[] = $with['url'].'|'.($with['title'] ?? '').'|'.$with['invocation_id'];
+
+        return $pending;
+    });
+    $pending->shouldReceive('sendNow');
+    Broadcast::shouldReceive('on')->andReturn($pending);
+
+    $broadcaster = new StreamEventBroadcaster(new PrivateChannel('chat.conversation.test-id'));
+    $cite = fn (string $url, ?string $title, string $invocation = 'turn-1') => $broadcaster->broadcast(
+        (new Citation('evt', 'msg', new UrlCitation($url, $title), time()))->withInvocationId($invocation),
+    );
+
+    $cite('https://filaforms.app/pricing', null);
+    $cite('https://filaforms.app/pricing', null);
+    $cite('https://filaforms.app/pricing', 'Pricing');
+    $cite('https://filaforms.app/pricing', 'Pricing');
+    foreach (range(1, 10) as $site) {
+        $cite("https://site{$site}.com/", null);
+    }
+    $cite('https://filaforms.app/pricing', null, 'turn-2');
+
+    expect($sent)->toHaveCount(12)
+        ->and(array_slice($sent, 0, 2))->toBe(['https://filaforms.app/pricing||turn-1', 'https://filaforms.app/pricing|Pricing|turn-1'])
+        ->and($sent[10])->toBe('https://site9.com/||turn-1')
+        ->and($sent[11])->toBe('https://filaforms.app/pricing||turn-2');
 });

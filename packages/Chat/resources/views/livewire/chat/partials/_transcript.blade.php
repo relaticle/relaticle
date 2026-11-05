@@ -386,6 +386,26 @@
                             </div>
                         </div>
 
+                        <template x-if="(msg.sources || []).length > 0">
+                            <div data-web-sources class="mt-2 flex w-full flex-wrap items-center gap-1.5 px-1" role="group" aria-label="{{ __('Sources') }}">
+                                <span class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ __('Sources') }}</span>
+                                <template x-for="source in msg.sources" :key="source.url">
+                                    <a
+                                        data-web-source
+                                        :href="source.url"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        :title="source.title || source.url"
+                                        :aria-label="sourceLabel(msg.sources, source)"
+                                        class="inline-flex max-w-[14rem] items-center gap-1 rounded-md border border-gray-200 bg-[var(--surface-card-bg)] px-1.5 py-0.5 text-xs text-gray-600 transition hover:border-gray-300 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:border-white/10 dark:text-gray-300 dark:hover:border-white/20 dark:hover:text-white"
+                                    >
+                                        <x-ri-global-line class="h-3 w-3 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                                        <span class="truncate" x-text="sourceLabel(msg.sources, source)"></span>
+                                    </a>
+                                </template>
+                            </div>
+                        </template>
+
                         <template x-if="msg.streamError">
                             <div class="mt-2 flex max-w-[85%] items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 dark:border-amber-700 dark:bg-amber-900/20" role="alert">
                                 <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />

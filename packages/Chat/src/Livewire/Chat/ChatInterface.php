@@ -22,6 +22,7 @@ use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\StoredSteps;
 use Relaticle\Chat\Support\TitleSanitizer;
 use Relaticle\Chat\Support\TurnPresence;
+use Relaticle\Chat\Support\WebSources;
 
 final class ChatInterface extends BaseLivewireComponent
 {
@@ -304,7 +305,7 @@ final class ChatInterface extends BaseLivewireComponent
      * query below is scoped to the authed participant and workspace, so an id from
      * the client cannot reach another user's conversation.
      *
-     * @return array{id: string, content: string, pending_actions: list<array<string, mixed>>, display_blocks: list<array<string, mixed>>}|null
+     * @return array{id: string, content: string, pending_actions: list<array<string, mixed>>, display_blocks: list<array<string, mixed>>, next_steps: list<array{label: string, prompt: string}>, sources: list<array{url: string, title: string|null, domain: string}>}|null
      */
     #[Renderless]
     public function latestAssistantMessage(?string $conversationId = null): ?array
@@ -329,12 +330,16 @@ final class ChatInterface extends BaseLivewireComponent
             return null;
         }
 
+        $meta = $row->meta === null ? null : json_decode((string) $row->meta, true);
+        $meta = is_array($meta) ? $meta : [];
+
         return [
             'id' => (string) $row->id,
             'content' => (string) $row->content,
             'pending_actions' => $this->pendingActionCards($conversationId),
             'display_blocks' => DisplayBlocks::collect(StoredSteps::toolResults($row->steps)),
-            'next_steps' => NextSteps::fromMeta($row->meta === null ? null : (string) $row->meta),
+            'next_steps' => NextSteps::fromMeta($meta),
+            'sources' => WebSources::fromMeta($meta),
         ];
     }
 
