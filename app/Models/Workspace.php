@@ -410,18 +410,18 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
 
     public function onExtendedTrial(): bool
     {
-        return $this->billingStatus() === BillingStatus::Trialing
-            && $this->trial_extended_at !== null
+        return $this->trial_extended_at !== null
             && $this->trial_ends_at !== null
-            && $this->trial_ends_at <= $this->trial_extended_at->addDays(self::TRIAL_EXTENSION_DAYS);
+            && $this->trial_ends_at <= $this->trial_extended_at->addDays(self::TRIAL_EXTENSION_DAYS)
+            && $this->billingStatus() === BillingStatus::Trialing;
     }
 
     public function canExtendTrial(): bool
     {
-        return $this->billingStatus() === BillingStatus::TrialEnded
-            && $this->trial_ends_at === null
+        return $this->trial_ends_at === null
             && $this->trial_extended_at === null
-            && ! $this->isScheduledForDeletion();
+            && ! $this->isScheduledForDeletion()
+            && $this->billingStatus() === BillingStatus::TrialEnded;
     }
 
     /**
