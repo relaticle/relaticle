@@ -24,6 +24,8 @@ final readonly class EmailSearchService
 
     private const int MIN_INDEXED_LENGTH = 3;
 
+    private const int MAX_LEADING_PARTICIPANTS = 10_000;
+
     public static function clean(string $search): string
     {
         $search = trim(str_replace("\0", '', mb_scrub($search, 'UTF-8')));
@@ -50,8 +52,9 @@ final readonly class EmailSearchService
 
         $textQuery = $this->textQuery($search);
 
-        // Under three characters no trigram applies, so no index can lead and every row is tested.
-        if (mb_strlen($search) < self::MIN_INDEXED_LENGTH) {
+        // No trigram applies under three characters, and a common fragment matches most rows:
+        // either way the matches cannot lead, and the view indexes stop early instead.
+        if (mb_strlen($search) < self::MIN_INDEXED_LENGTH || $this->participantsMatchTooMany($viewer, $search)) {
             return $query->where(fn (Builder $outer): Builder => $this->orWhereTextVisible(
                 $outer->whereHas('participants', fn (Builder $participants): Builder => $participants->matchingSearch($viewer, $search)),
                 $viewer,
@@ -127,11 +130,22 @@ final readonly class EmailSearchService
         };
     }
 
+    // Once per viewer and search, because counts() searches each view; either answer gives the same rows.
+    private function participantsMatchTooMany(User $viewer, string $search): bool
+    {
+        return once(fn (): bool => DB::query()
+            ->fromSub($this->participantMatches($viewer, $search)->limit(self::MAX_LEADING_PARTICIPANTS + 1), 'leading_participants')
+            ->count() > self::MAX_LEADING_PARTICIPANTS);
+    }
+
     private function participantMatches(User $viewer, string $search): BaseBuilder
     {
         return EmailParticipant::query()
             ->matchingSearch($viewer, $search)
-            ->whereHas('email', fn (Builder $email): Builder => $email->where('emails.workspace_id', $viewer->current_workspace_id))
+            ->whereExists(fn (BaseBuilder $email): BaseBuilder => $email
+                ->from('emails as participant_emails')
+                ->whereColumn('participant_emails.id', 'email_participants.email_id')
+                ->where('participant_emails.workspace_id', $viewer->current_workspace_id))
             ->select('email_participants.email_id')
             ->toBase();
     }

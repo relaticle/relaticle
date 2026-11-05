@@ -302,11 +302,16 @@ trait HasConversationFilters
             return null;
         }
 
-        $date = ['date' => $instant->setTimezone($this->viewerZone())->translatedFormat('M j, Y')];
+        $local = $instant->setTimezone($this->viewerZone());
 
-        return $bound === 'after'
-            ? __('filament/pages/email-inbox.filters.after', $date)
-            : __('filament/pages/email-inbox.filters.before', $date);
+        if ($bound === 'after') {
+            return __('filament/pages/email-inbox.filters.after', ['date' => $local->translatedFormat('M j, Y')]);
+        }
+
+        // The bound is exclusive, so a local midnight reads as the whole day before it.
+        return $local->eq($local->startOfDay())
+            ? __('filament/pages/email-inbox.filters.on_or_before', ['date' => $local->subDay()->translatedFormat('M j, Y')])
+            : __('filament/pages/email-inbox.filters.before', ['date' => $local->translatedFormat('M j, Y')]);
     }
 
     private function describeRecords(ConversationFilters $filters): string

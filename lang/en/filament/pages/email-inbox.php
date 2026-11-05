@@ -27,6 +27,7 @@ return [
         'no' => 'No',
         'after' => 'after :date',
         'before' => 'before :date',
+        'on_or_before' => 'on or before :date',
         'starts_with' => 'starting with :name',
         'count' => '{1}1 selected|[2,*]:count selected',
         'one_record_type' => 'Pick records of one type: companies, people or opportunities.',

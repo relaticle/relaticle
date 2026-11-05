@@ -588,12 +588,17 @@ and `body_search @@ ...` from the body GIN index.
 access gates drove every plan. The subject and body indexes are now
 `emails_workspace_subject_search_idx` and `emails_workspace_body_search_idx` on
 `(workspace_id, <vector>)` with `btree_gin`, as D13 option C specifies, and `000001` creates the
-extension. New names, so an install that built the old ones gets the composite ones. The search
+extension. A database where `000001` and `000002` already ran records them as done, so `migrate`
+never re-runs them whatever the index names: it keeps the single-column indexes and lacks
+`btree_gin`. Such a database (the dev and rehearsal databases, not production) needs a fresh
+migrate, or both migration rows deleted and the old indexes dropped first. The search
 leads with one workspace-bounded scan, `subject @@ q or body @@ q or id = any(array(<participant
 ids>))`, which the planner can serve as a bitmap OR and estimate. The gates then test only those
 rows. A union of the three sets was rejected: Postgres guesses 200 rows for its output, drives
 common words from it, and `counts()` took 8.6 s. Under three characters no trigram applies, so the
-search keeps the old shape.
+search keeps the old shape. It does the same when a probe, run once per viewer and search, finds
+more than 10,000 workspace participants matching (`com`, `gmail`): the id array then costs seconds,
+while nearly every row matches and the view indexes stop early.
 
 ### Task 5: The backfill command, queued from a migration
 

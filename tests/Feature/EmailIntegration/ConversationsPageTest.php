@@ -1001,6 +1001,29 @@ it('ends a typed before day at midnight in the viewer zone and a picked before d
         ->assertHasNoActionErrors();
 
     expect(conversationsPageKeys($page->html()))->toBe(['conv-early-eighth']);
+    $page->assertSee(__('filament/pages/email-inbox.filters.on_or_before', ['date' => 'Oct 8, 2026']))
+        ->assertDontSee('Oct 9, 2026');
+});
+
+it('labels a before bound that is not a local midnight with the instant it names', function (): void {
+    $this->owner->forceFill(['timezone' => 'America/Los_Angeles'])->save();
+
+    Livewire::withQueryParams(['view' => ConversationView::All->value, 'filter' => ['sent_at' => ['$lt' => '2026-10-08T12:00:00-07:00']]])
+        ->test(EmailInboxPage::class)
+        ->assertSee(__('filament/pages/email-inbox.filters.before', ['date' => 'Oct 8, 2026']))
+        ->assertDontSee(__('filament/pages/email-inbox.filters.on_or_before', ['date' => 'Oct 7, 2026']));
+});
+
+it('finds a teammate conversation through each of subject, body and participant', function (): void {
+    $bySubject = conversationsPageMessage($this->teammateMailbox, 'conv-subject', 'olivia@stripe.test', ['subject' => 'Orchard plan', 'snippet' => 'Hello']);
+    $byBody = conversationsPageMessage($this->teammateMailbox, 'conv-body', 'kai@stripe.test', ['subject' => 'Update', 'snippet' => 'Hello']);
+    EmailBody::create(['email_id' => $byBody->id, 'body_html' => null, 'body_text' => 'The orchard is late']);
+    $byParticipant = conversationsPageMessage($this->teammateMailbox, 'conv-participant', 'orchard@farm.test', ['subject' => 'Update', 'snippet' => 'Hello']);
+    conversationsPageMessage($this->teammateMailbox, 'conv-none', 'lena@stripe.test', ['subject' => 'Update', 'snippet' => 'Hello']);
+    $this->company->emails()->attach([$bySubject->id, $byBody->id, $byParticipant->id]);
+
+    expect(conversationsPageFilteredKeys($this->owner, new ConversationFilters(search: 'orchard')))
+        ->toEqualCanonicalizing(['conv-subject', 'conv-body', 'conv-participant']);
 });
 
 it('resolves a typed company prefix to the first matching names in order', function (): void {

@@ -19,6 +19,9 @@ return [
             'automated' => 'Aucun e-mail automatique.',
         ],
     ],
+    'filters' => [
+        'on_or_before' => 'au plus tard le :date',
+    ],
     'conversation_row' => [
         'me' => 'Moi',
         'unread' => 'Non lu',
