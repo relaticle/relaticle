@@ -8,7 +8,7 @@ use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use App\Livewire\App\Workspaces\DeleteWorkspace;
 use App\Livewire\App\Workspaces\UpdateWorkspaceLogo;
 use App\Livewire\App\Workspaces\UpdateWorkspaceName;
-use App\Livewire\App\Workspaces\WorkspaceWebSearchSettings;
+use App\Livewire\App\Workspaces\WorkspaceAssistantSettings;
 use App\Models\Workspace;
 use Filament\Pages\Tenancy\EditTenantProfile;
 use Filament\Schemas\Components\Livewire;
@@ -34,7 +34,7 @@ final class EditWorkspace extends EditTenantProfile
                 ->data(['workspace' => $tenant]),
             Livewire::make(UpdateWorkspaceLogo::class)
                 ->data(['workspace' => $tenant]),
-            Livewire::make(WorkspaceWebSearchSettings::class)
+            Livewire::make(WorkspaceAssistantSettings::class)
                 ->data(['workspace' => $tenant]),
             Livewire::make(DeleteWorkspace::class)
                 ->visible(fn (): bool => $tenant->isPersonalWorkspace() === false)

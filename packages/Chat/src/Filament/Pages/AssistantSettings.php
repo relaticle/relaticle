@@ -13,24 +13,26 @@ use Filament\Facades\Filament;
 use Filament\Forms\Components\Radio;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Relaticle\Chat\Actions\SetWebSearchPreference;
+use Relaticle\Chat\Enums\WebAccess;
 use Relaticle\Chat\Enums\WebSearchPreference;
 
 /**
  * @property-read Schema $form
  */
-final class WebSearchSettings extends Page
+final class AssistantSettings extends Page
 {
-    protected string $view = 'chat::filament.pages.web-search-settings';
+    protected string $view = 'chat::filament.pages.assistant-settings';
 
     protected static string $layout = 'filament.layouts.settings';
 
-    protected static ?string $slug = 'web-search';
+    protected static ?string $slug = 'assistant';
 
     protected static ?int $navigationSort = 3;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-globe-alt';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-sparkles';
 
     /** @var class-string<Cluster>|null */
     protected static ?string $cluster = Settings::class;
@@ -40,17 +42,17 @@ final class WebSearchSettings extends Page
 
     public static function getNavigationLabel(): string
     {
-        return __('Web search');
+        return (string) config('chat.assistant_name');
     }
 
     public function getHeading(): string
     {
-        return __('Web search');
+        return (string) config('chat.assistant_name');
     }
 
     public static function getLabel(): string
     {
-        return __('Web search');
+        return (string) config('chat.assistant_name');
     }
 
     public function mount(): void
@@ -64,6 +66,7 @@ final class WebSearchSettings extends Page
 
         return $schema
             ->components([
+                Section::make(__('Web search'))->schema([
                 Radio::make('web_search')
                     ->label(__('When :name wants to search the web', ['name' => (string) config('chat.assistant_name')]))
                     ->options(collect(WebSearchPreference::cases())->mapWithKeys(
@@ -76,6 +79,7 @@ final class WebSearchSettings extends Page
                     ->afterStateUpdated(function (): void {
                         $this->save();
                     }),
+                ]),
             ])
             ->statePath('data');
     }
@@ -99,6 +103,7 @@ final class WebSearchSettings extends Page
         $workspace = Filament::getTenant();
 
         return match (true) {
+            ! WebAccess::availableOnThisInstall() => __('No model on this install can search the web.'),
             ! $workspaceAllows => __('Your workspace owner turned web search off.'),
             $workspace instanceof Workspace && resolve(Entitlements::class)->metersCredits($workspace) => __('Search queries go to the AI provider\'s web search. Each search uses :count credits.', ['count' => (int) config('chat.web_search_credit_cost')]),
             default => __('Search queries go to the AI provider\'s web search.'),
@@ -109,7 +114,7 @@ final class WebSearchSettings extends Page
     {
         $workspace = Filament::getTenant();
 
-        return $workspace instanceof Workspace && $workspace->ai_web_search_enabled;
+        return $workspace instanceof Workspace && $workspace->ai_web_search_enabled && WebAccess::availableOnThisInstall();
     }
 
     private function user(): User

@@ -15,8 +15,9 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Locked;
+use Relaticle\Chat\Enums\WebAccess;
 
-final class WorkspaceWebSearchSettings extends BaseLivewireComponent
+final class WorkspaceAssistantSettings extends BaseLivewireComponent
 {
     /** @var array<string, mixed>|null */
     public ?array $data = [];
@@ -35,13 +36,16 @@ final class WorkspaceWebSearchSettings extends BaseLivewireComponent
     {
         return $schema
             ->schema([
-                Section::make(__('workspaces.sections.web_search.title'))
+                Section::make((string) config('chat.assistant_name'))
                     ->aside()
-                    ->description(__('workspaces.sections.web_search.description', ['assistant' => (string) config('chat.assistant_name')]))
+                    ->description(__('workspaces.sections.assistant.description', ['assistant' => (string) config('chat.assistant_name')]))
                     ->schema([
                         Toggle::make('ai_web_search_enabled')
                             ->label(__('workspaces.form.ai_web_search_enabled.label', ['assistant' => (string) config('chat.assistant_name')]))
-                            ->helperText(__('workspaces.form.ai_web_search_enabled.helper_text')),
+                            ->disabled(! WebAccess::availableOnThisInstall())
+                            ->helperText(WebAccess::availableOnThisInstall()
+                                ? __('workspaces.form.ai_web_search_enabled.helper_text')
+                                : __('workspaces.form.ai_web_search_enabled.unavailable')),
                         Actions::make([
                             Action::make('save')
                                 ->label(__('workspaces.actions.save'))
@@ -72,6 +76,6 @@ final class WorkspaceWebSearchSettings extends BaseLivewireComponent
 
     public function render(): View
     {
-        return view('livewire.app.workspaces.workspace-web-search-settings');
+        return view('livewire.app.workspaces.workspace-assistant-settings');
     }
 }

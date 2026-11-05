@@ -28,6 +28,7 @@ return [
         'ai_web_search_enabled' => [
             'label' => 'Let :assistant search the web',
             'helper_text' => 'Search queries go to the AI provider\'s web search.',
+            'unavailable' => 'No model on this install can search the web.',
         ],
     ],
 
@@ -40,9 +41,8 @@ return [
             'title' => 'Workspace Logo',
             'description' => 'Your logo appears in the workspace switcher, on invitations, and on the join page.',
         ],
-        'web_search' => [
-            'title' => 'Web search',
-            'description' => 'Choose whether :assistant may search the web for members of this workspace.',
+        'assistant' => [
+            'description' => 'Choose what :assistant, the built-in AI assistant, may do for members of this workspace.',
         ],
         'invite_people' => [
             'description' => 'Each person gets an email with a link to join :workspace.',

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Laravel\Ai\Enums\Lab;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\Chat\Support\ModelDescriptor;
 
 enum WebAccess
@@ -31,6 +32,14 @@ enum WebAccess
             self::resumesApprovedRequest($user, $workspace, $resumesTurnId) => self::Allowed,
             default => self::Ask,
         };
+    }
+
+    public static function availableOnThisInstall(): bool
+    {
+        return array_any(
+            resolve(ModelRegistry::class)->available(),
+            fn (ModelDescriptor $model): bool => in_array($model->provider, self::WEB_PROVIDERS, true),
+        );
     }
 
     private static function resumesApprovedRequest(User $user, Workspace $workspace, ?string $resumesTurnId): bool

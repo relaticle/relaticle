@@ -32,7 +32,7 @@ same way as any other. See
 
 ## Choose when Rela may search
 
-Open **Settings** from your avatar menu, then **Web search**, and pick one:
+Open **Settings** from your avatar menu, then **Rela**, and under **Web search** pick one:
 
 | Choice | What happens |
 |--------|--------------|
@@ -45,7 +45,7 @@ The choice is yours alone. Teammates pick their own.
 ## Turn web search off for the whole workspace
 
 The workspace owner can turn web search off for every member on **Workspace
-Settings** (click your workspace name in the sidebar), under **Web search**. While it is off, Rela never asks to search,
+Settings** (click your workspace name in the sidebar), in the **Rela** section. While it is off, Rela never asks to search,
 and each member's setting shows that the owner turned it off.
 
 ## What leaves your workspace
