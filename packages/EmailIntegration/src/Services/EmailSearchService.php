@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Services;
 
 use App\Models\User;
+use Illuminate\Contracts\Database\Query\Expression;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Grammar;
 use Illuminate\Database\Query\Builder as BaseBuilder;
+use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 
 final readonly class EmailSearchService
@@ -17,6 +21,8 @@ final readonly class EmailSearchService
     public const int MIN_TEXT_LENGTH = 2;
 
     public const int MAX_LENGTH = 200;
+
+    private const int MIN_INDEXED_LENGTH = 3;
 
     public static function clean(string $search): string
     {
@@ -28,6 +34,8 @@ final readonly class EmailSearchService
     /**
      * Match only fields the viewer is allowed to see. Subject and body stay out of
      * metadata-only rows. Participant search skips other people's BCC rows.
+     *
+     * The ids each index matches lead, so the access gates only test rows that already match.
      *
      * @param  Builder<Email>|Relation<Email, *, *>  $query
      * @return Builder<Email>|Relation<Email, *, *>
@@ -42,23 +50,90 @@ final readonly class EmailSearchService
 
         $textQuery = $this->textQuery($search);
 
-        return $query->where(function (Builder $outer) use ($search, $textQuery, $viewer): void {
-            $outer->whereHas('participants', fn (Builder $participants): Builder => $participants->matchingSearch($viewer, $search));
+        // Under three characters no trigram applies, so no index can lead and every row is tested.
+        if (mb_strlen($search) < self::MIN_INDEXED_LENGTH) {
+            return $query->where(fn (Builder $outer): Builder => $this->orWhereTextVisible(
+                $outer->whereHas('participants', fn (Builder $participants): Builder => $participants->matchingSearch($viewer, $search)),
+                $viewer,
+                $textQuery,
+            ));
+        }
 
-            if ($textQuery === null) {
-                return;
+        if ($textQuery === null) {
+            return $query->whereIn('emails.id', $this->participantMatches($viewer, $search));
+        }
+
+        return $query
+            ->whereIn('emails.id', $this->matchingIds($viewer, $this->participantMatches($viewer, $search), $textQuery))
+            ->where(fn (Builder $outer): Builder => $this->orWhereTextVisible($outer, $viewer, $textQuery)
+                ->orWhereHas('participants', fn (Builder $participants): Builder => $participants->matchingSearch($viewer, $search)));
+    }
+
+    /**
+     * @param  Builder<Email>  $query
+     * @param  array{0: literal-string, 1: list<string>}|null  $textQuery
+     * @return Builder<Email>
+     */
+    private function orWhereTextVisible(Builder $query, User $viewer, ?array $textQuery): Builder
+    {
+        if ($textQuery === null) {
+            return $query;
+        }
+
+        [$sql, $bindings] = $textQuery;
+
+        return $query
+            ->orWhere(fn (Builder $subjectQuery): Builder => $this->whereViewerCanSeeSubject(
+                $subjectQuery->whereRaw("emails.subject_search @@ ({$sql})", $bindings),
+                $viewer,
+            ))
+            ->orWhere(fn (Builder $bodyQuery): Builder => $this->whereViewerCanSeeBody(
+                $bodyQuery->whereRaw("emails.body_search @@ ({$sql})", $bindings),
+                $viewer,
+            ));
+    }
+
+    /**
+     * One scan of the workspace's emails whose arms each have an index, so the planner can
+     * combine them and estimate how many ids match. A union would hide that estimate.
+     *
+     * @param  array{0: literal-string, 1: list<string>}  $textQuery
+     */
+    private function matchingIds(User $viewer, BaseBuilder $participants, array $textQuery): BaseBuilder
+    {
+        [$sql, $bindings] = $textQuery;
+
+        return DB::table('emails as search_matches')
+            ->where('search_matches.workspace_id', $viewer->current_workspace_id)
+            ->where(fn (BaseBuilder $match): BaseBuilder => $match
+                ->whereRaw("search_matches.subject_search @@ ({$sql})", $bindings)
+                ->orWhereRaw("search_matches.body_search @@ ({$sql})", $bindings)
+                ->orWhere('search_matches.id', '=', $this->anyOf($participants))
+                ->addBinding($participants->getBindings(), 'where'))
+            ->select('search_matches.id');
+    }
+
+    // `= any(array(...))` lets the primary key join the bitmap; `in (...)` inside an OR cannot.
+    private function anyOf(BaseBuilder $subquery): Expression
+    {
+        return new readonly class($subquery->toSql()) implements Expression
+        {
+            public function __construct(private string $sql) {}
+
+            public function getValue(Grammar $grammar): string
+            {
+                return "any(array({$this->sql}))";
             }
+        };
+    }
 
-            [$sql, $bindings] = $textQuery;
-
-            $outer->orWhere(fn (Builder $subjectQuery): Builder => $subjectQuery
-                ->whereRaw("emails.subject_search @@ ({$sql})", $bindings)
-                ->where(fn (Builder $access): Builder => $this->whereViewerCanSeeSubject($access, $viewer)));
-
-            $outer->orWhere(fn (Builder $bodyQuery): Builder => $bodyQuery
-                ->whereRaw("emails.body_search @@ ({$sql})", $bindings)
-                ->where(fn (Builder $access): Builder => $this->whereViewerCanSeeBody($access, $viewer)));
-        });
+    private function participantMatches(User $viewer, string $search): BaseBuilder
+    {
+        return EmailParticipant::query()
+            ->matchingSearch($viewer, $search)
+            ->whereHas('email', fn (Builder $email): Builder => $email->where('emails.workspace_id', $viewer->current_workspace_id))
+            ->select('email_participants.email_id')
+            ->toBase();
     }
 
     /**

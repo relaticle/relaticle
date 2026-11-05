@@ -12,6 +12,7 @@ return new class extends Migration
         DB::statement("SET LOCAL lock_timeout = '5s'");
 
         DB::statement('create extension if not exists pg_trgm');
+        DB::statement('create extension if not exists btree_gin');
 
         DB::statement('alter table emails add column if not exists subject_search tsvector, add column if not exists body_search tsvector');
 

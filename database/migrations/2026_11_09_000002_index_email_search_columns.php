@@ -10,8 +10,8 @@ return new class extends Migration
     public $withinTransaction = false;
 
     private const array INDEXES = [
-        'emails_subject_search_idx' => 'emails using gin (subject_search)',
-        'emails_body_search_idx' => 'emails using gin (body_search)',
+        'emails_workspace_subject_search_idx' => 'emails using gin (workspace_id, subject_search)',
+        'emails_workspace_body_search_idx' => 'emails using gin (workspace_id, body_search)',
         'email_participants_email_address_trgm_idx' => 'email_participants using gin (email_address gin_trgm_ops)',
         'email_participants_name_trgm_idx' => 'email_participants using gin (name gin_trgm_ops)',
     ];

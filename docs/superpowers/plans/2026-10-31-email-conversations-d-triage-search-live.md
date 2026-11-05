@@ -584,6 +584,17 @@ its schema-scoped invalid-index cleanup. On the dev database all four indexes ar
 `enable_seqscan = off` the planner serves `email_address ilike '%irbnb%'` from the trigram index
 and `body_search @@ ...` from the body GIN index.
 
+**Changed after the rehearsal (2026-11-05):** no search query used these indexes, because the
+access gates drove every plan. The subject and body indexes are now
+`emails_workspace_subject_search_idx` and `emails_workspace_body_search_idx` on
+`(workspace_id, <vector>)` with `btree_gin`, as D13 option C specifies, and `000001` creates the
+extension. New names, so an install that built the old ones gets the composite ones. The search
+leads with one workspace-bounded scan, `subject @@ q or body @@ q or id = any(array(<participant
+ids>))`, which the planner can serve as a bitmap OR and estimate. The gates then test only those
+rows. A union of the three sets was rejected: Postgres guesses 200 rows for its output, drives
+common words from it, and `counts()` took 8.6 s. Under three characters no trigram applies, so the
+search keeps the old shape.
+
 ### Task 5: The backfill command, queued from a migration
 
 **Files:** `BackfillEmailSearchVectorsCommand.php`, the service provider, migration `000003`.
