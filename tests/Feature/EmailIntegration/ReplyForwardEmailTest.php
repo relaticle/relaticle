@@ -279,6 +279,44 @@ it('inline composer prefills reply-all and forward from their modes', function (
     expect($forward->body->body_html)->toContain('<p>Original body</p>');
 });
 
+it('keeps a prefix the subject already carries instead of adding a second', function (string $mode, string $subject, string $expected): void {
+    $this->inboundEmail->update(['subject' => $subject]);
+
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, $mode)
+        ->assertSet('subject', $expected);
+})->with([
+    'reply to Re' => ['reply', 'Re: Pricing', 'Re: Pricing'],
+    'reply to RE' => ['reply', 'RE: Pricing', 'RE: Pricing'],
+    'reply all to Aw' => ['reply_all', 'Aw: Angebot', 'Aw: Angebot'],
+    'reply to SV' => ['reply', 'SV: Offert', 'SV: Offert'],
+    'reply to a forward' => ['reply', 'Fwd: Pricing', 'Re: Fwd: Pricing'],
+    'forward a Fwd' => ['forward', 'Fwd: Pricing', 'Fwd: Pricing'],
+    'forward a FW' => ['forward', 'FW: Pricing', 'FW: Pricing'],
+    'forward a WG' => ['forward', 'WG: Angebot', 'WG: Angebot'],
+    'forward a reply' => ['forward', 'Re: Pricing', 'Fwd: Re: Pricing'],
+    'a word that starts with re' => ['reply', 'Renewal terms', 'Re: Renewal terms'],
+    'reply to a bracket-counted Re' => ['reply', 'Re[2]: Pricing', 'Re[2]: Pricing'],
+    'reply to a parenthesis-counted RE' => ['reply', 'RE(3): Pricing', 'RE(3): Pricing'],
+    'reply all to a counted Aw' => ['reply_all', 'Aw[2]: Angebot', 'Aw[2]: Angebot'],
+    'forward a bracket-counted Fwd' => ['forward', 'Fwd[2]: Pricing', 'Fwd[2]: Pricing'],
+    'forward a parenthesis-counted FW' => ['forward', 'FW(2): Pricing', 'FW(2): Pricing'],
+    'reply to an unclosed count' => ['reply', 'Re[2 Pricing', 'Re: Re[2 Pricing'],
+]);
+
+it('sends a reply to a Re subject with a single prefix', function (): void {
+    $this->inboundEmail->update(['subject' => 'Re: Pricing for 40 seats']);
+
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'reply')
+        ->set('bodyHtml', '<p>Works for us</p>')
+        ->call('send')
+        ->assertHasNoErrors();
+
+    expect(Email::query()->where('direction', EmailDirection::OUTBOUND)->sole()->subject)
+        ->toBe('Re: Pricing for 40 seats');
+});
+
 it('a reply saved as a draft still threads when it is sent later', function (): void {
     // The draft used to be stored with no link to the message it answered, so
     // reopening it resumed a plain new email and sending it threaded nowhere.

@@ -25,6 +25,7 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
+use Symfony\Component\DomCrawler\Crawler;
 
 use function Pest\Laravel\actingAs;
 
@@ -131,6 +132,39 @@ it('counts drafts, pending outbox mail and available templates for the tab badge
     ]);
 });
 
+it('badges the outbox with what its default segment lists', function (): void {
+    $this->travelTo(now()->startOfSecond());
+
+    foreach ([null, now()->addDay(), now()->addDays(2)] as $scheduledFor) {
+        Email::query()->create([
+            'workspace_id' => $this->workspace->id, 'user_id' => $this->user->id,
+            'connected_account_id' => $this->account->id, 'direction' => EmailDirection::OUTBOUND,
+            'status' => EmailStatus::QUEUED, 'privacy_tier' => EmailPrivacyTier::FULL,
+            'creation_source' => EmailCreationSource::COMPOSE, 'scheduled_for' => $scheduledFor,
+        ]);
+    }
+
+    expect(Livewire::test(EmailInboxPage::class)->instance()->tabCounts()[EmailPageTab::OUTBOX->value])->toBe(1);
+});
+
+it('hides a tab badge when its count is zero', function (): void {
+    makeDraft($this->user, $this->account);
+
+    $html = Livewire::test(EmailInboxPage::class)->html();
+
+    $tabs = (new Crawler($html))
+        ->filter('button')
+        ->reduce(fn (Crawler $button): bool => str_starts_with((string) $button->attr('wire:click'), 'setTab('))
+        ->each(fn (Crawler $button): string => $button->text());
+
+    expect($tabs)->toBe([
+        EmailPageTab::DRAFTS->getLabel().' 1',
+        EmailPageTab::OUTBOX->getLabel(),
+        EmailPageTab::FAILED->getLabel(),
+        EmailPageTab::TEMPLATES->getLabel(),
+    ]);
+});
+
 it('refreshes the tab badges when the composer saves a draft', function (): void {
     $page = Livewire::test(EmailInboxPage::class);
 
@@ -175,22 +209,20 @@ it('refreshes the outbox and failed badges when a failed email is retried', func
         ->toMatchArray(['outbox' => 1, 'failed' => 0]);
 });
 
-it('offers a direct gmail connect on drafts when no mailbox is connected', function (): void {
+it('offers a direct gmail connect on the page when no mailbox is connected', function (): void {
     $this->account->forceDelete();
 
-    Livewire::test(DraftsTable::class)
+    Livewire::test(EmailInboxPage::class)
         ->assertSee(__('filament/pages/email-accounts.not_connected.inbox.heading'))
         ->assertSee(__('filament/pages/email-accounts.actions.connect_gmail'))
-        ->tap(fn ($component) => assertActionHasMailboxOAuthUrl(
-            $component,
-            TestAction::make('connectMailbox')->table(),
-            'gmail',
-            $this->account->workspace,
-        ))
-        ->assertDontSee(__('filament/pages/email-inbox.drafts.empty.heading'))
+        ->tap(fn ($component) => assertActionHasMailboxOAuthUrl($component, 'connectMailbox', 'gmail', $this->account->workspace));
+
+    Livewire::test(DraftsTable::class)
         ->assertDontSee(__('filament/emails/composer.grant_send.description'))
         ->assertDontSee(__('filament/concerns/email-compose.actions.compose.label'))
-        ->assertTableEmptyStateActionsExistInOrder(['composeEmail', 'connectMailbox', 'connectAzure']);
+        ->assertTableEmptyStateActionsExistInOrder(['composeEmail'])
+        ->assertTableActionDoesNotExist('connectMailbox')
+        ->assertTableActionDoesNotExist('connectAzure');
 });
 
 it('opens the composer from the drafts empty state when a mailbox is connected', function (): void {
@@ -198,32 +230,48 @@ it('opens the composer from the drafts empty state when a mailbox is connected',
         ->assertSee(__('filament/pages/email-inbox.drafts.empty.heading'))
         ->assertSee(__('filament/concerns/email-compose.actions.compose.label'))
         ->assertTableHeaderActionsExistInOrder(['composeEmail'])
-        ->assertTableEmptyStateActionsExistInOrder(['composeEmail', 'connectMailbox', 'connectAzure'])
-        ->assertTableActionHidden('connectMailbox')
-        ->assertTableActionHidden('connectAzure');
+        ->assertTableEmptyStateActionsExistInOrder(['composeEmail']);
 });
 
-it('offers a microsoft mailbox on drafts once its client is configured', function (): void {
+it('offers a microsoft mailbox on the page once its client is configured', function (): void {
     config()->set('services.azure.client_id', 'azure-client');
     $this->account->forceDelete();
 
-    Livewire::test(DraftsTable::class)
+    Livewire::test(EmailInboxPage::class)
         ->assertSee(__('filament/pages/email-accounts.actions.connect_azure'))
-        ->tap(fn ($component) => assertActionHasMailboxOAuthUrl(
-            $component,
-            TestAction::make('connectAzure')->table(),
-            'azure',
-            $this->account->workspace,
-        ));
+        ->tap(fn ($component) => assertActionHasMailboxOAuthUrl($component, 'connectAzure', 'azure', $this->account->workspace));
 });
 
-it('hides the microsoft mailbox on drafts without a microsoft client', function (): void {
+it('hides the microsoft mailbox on the page without a microsoft client', function (): void {
     config()->set('services.azure.client_id');
     $this->account->forceDelete();
 
-    Livewire::test(DraftsTable::class)
+    Livewire::test(EmailInboxPage::class)
         ->assertDontSee(__('filament/pages/email-accounts.actions.connect_azure'))
-        ->assertTableActionHidden('connectAzure');
+        ->assertActionHidden('connectAzure');
+});
+
+it('keeps drafts and templates reachable under the connect card when no mailbox is connected', function (): void {
+    $this->account->forceDelete();
+    EmailTemplate::factory()->create(['workspace_id' => $this->workspace->id, 'created_by' => $this->user->id, 'name' => 'Intro call']);
+
+    Livewire::test(EmailInboxPage::class)
+        ->assertSeeHtmlInOrder(['data-connect-card', EmailPageTab::DRAFTS->getLabel()])
+        ->assertSee(__('filament/pages/email-accounts.not_connected.inbox.heading'))
+        ->assertSee(EmailPageTab::DRAFTS->getLabel())
+        ->assertSee(EmailPageTab::TEMPLATES->getLabel())
+        ->call('setTab', EmailPageTab::TEMPLATES->value)
+        ->assertSeeLivewire(TemplatesTable::class);
+
+    Livewire::test(TemplatesTable::class)->assertSee('Intro call');
+
+    Livewire::test(DraftsTable::class)
+        ->assertSee(__('filament/pages/email-inbox.drafts.empty.heading'))
+        ->assertDontSee(__('filament/pages/email-accounts.not_connected.inbox.heading'));
+});
+
+it('shows no connect card once a mailbox is connected', function (): void {
+    Livewire::test(EmailInboxPage::class)->assertDontSeeHtml('data-connect-card');
 });
 
 it('keeps the drafts empty copy when the mailbox cannot send', function (): void {

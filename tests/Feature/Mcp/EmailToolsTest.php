@@ -1184,7 +1184,7 @@ it('shows a held email in the default view of its owner outbox', function (): vo
 
     livewire(OutboxTable::class)
         ->assertCanSeeTableRecords([$held])
-        ->filterTable('status_tab', 'scheduled')
+        ->call('setStatusTab', 'scheduled')
         ->assertCanNotSeeTableRecords([$held]);
 });
 
@@ -1215,7 +1215,7 @@ it('schedules email sent through rela like composer mail in the owner outbox', f
     livewire(OutboxTable::class)
         ->assertCanSeeTableRecords([$inUndoWindow])
         ->assertCanNotSeeTableRecords([$scheduled])
-        ->filterTable('status_tab', 'scheduled')
+        ->call('setStatusTab', 'scheduled')
         ->assertCanSeeTableRecords([$scheduled])
         ->assertCanNotSeeTableRecords([$inUndoWindow]);
 });

@@ -32,12 +32,6 @@ return [
             'bulk_deleted' => '{1}1 draft deleted|[2,*]:count drafts deleted',
         ],
     ],
-    'outbox' => [
-        'empty' => [
-            'heading' => 'No emails in the outbox',
-            'description' => 'Queued and scheduled emails appear here until they send.',
-        ],
-    ],
     'failed' => [
         'empty' => [
             'heading' => 'No failed emails',
@@ -71,6 +65,15 @@ return [
         'request_access' => 'Request access from :name',
         'requested' => 'Requested',
         'opening' => 'Opening…',
+    ],
+    'categories' => [
+        'scheduling' => 'Scheduling',
+        'marketing' => 'Marketing',
+        'invoice' => 'Invoice',
+        'support' => 'Support',
+        'sales' => 'Sales',
+        'personal' => 'Personal',
+        'other' => 'Other',
     ],
     'pending_access' => [
         'heading' => '{1}1 pending access request|[2,*]:count pending access requests',
