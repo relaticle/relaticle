@@ -12,6 +12,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -230,6 +231,24 @@ it('emails the owner when the trial ends within 72 hours', function (): void {
     $this->artisan('billing:process-trials')->assertSuccessful();
 
     Mail::assertQueued(ProTrialEndingSoonMail::class, 1);
+});
+
+it('still pauses expired trials when sending a reminder fails', function (): void {
+    withHostedBilling();
+    Mail::fake();
+
+    [, $endingSoon] = trialOwnerAndWorkspace();
+    $endingSoon->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addHours(71)])->save();
+
+    [, $expired] = trialOwnerAndWorkspace();
+    $expired->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subDay()])->save();
+
+    Workspace::saving(function (Workspace $workspace): void {
+        throw_if($workspace->isDirty('trial_reminded_for'), RuntimeException::class, 'Queue unavailable');
+    });
+
+    expect(fn (): int => Artisan::call('billing:process-trials'))->toThrow(RuntimeException::class, 'Queue unavailable')
+        ->and($expired->refresh()->plan)->toBe(Plan::Free);
 });
 
 it('sends no trial reminder to a workspace scheduled for deletion', function (): void {

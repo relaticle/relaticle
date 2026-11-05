@@ -21,14 +21,14 @@ use Relaticle\Chat\Services\CreditService;
 use Relaticle\Cloud\Billing\Mail\ProEndedMail;
 use Relaticle\Cloud\Billing\Mail\ProTrialEndingSoonMail;
 
-#[Description('Send trial-ending reminders and pause expired Pro trials')]
+#[Description('Pause expired Pro trials and send trial-ending reminders')]
 #[Signature('billing:process-trials')]
 final class ProcessTrialsCommand extends Command
 {
     public function handle(CreditService $credits): int
     {
-        $this->sendEndingSoonReminders();
         $this->pauseExpired($credits);
+        $this->sendEndingSoonReminders();
 
         return self::SUCCESS;
     }
