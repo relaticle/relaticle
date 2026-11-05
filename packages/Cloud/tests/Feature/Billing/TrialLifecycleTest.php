@@ -9,16 +9,20 @@ use App\Models\Workspace;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Mail;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
+use Relaticle\Cloud\Billing\Actions\ExtendEndedTrial;
 use Relaticle\Cloud\Billing\Actions\StartProTrial;
 use Relaticle\Cloud\Billing\Commands\ProcessTrialsCommand;
 use Relaticle\Cloud\Billing\Mail\ProEndedMail;
 use Relaticle\Cloud\Billing\Mail\ProTrialEndingSoonMail;
+use Spatie\Activitylog\Models\Activity;
 
 mutates(StartProTrial::class);
+mutates(ExtendEndedTrial::class);
 mutates(ProcessTrialsCommand::class);
 mutates(CreditService::class);
 
@@ -489,4 +493,141 @@ it('downgrades two or more expired trials in a single chunked run', function ():
         ->and($workspaceB->refresh()->plan)->toBe(Plan::Free)
         ->and($workspaceB->trial_ends_at)->toBeNull()
         ->and($balanceB->credits_remaining)->toBe(Plan::Free->credits());
+});
+
+function pauseTrialOf(Workspace $workspace): void
+{
+    $workspace->forceFill([
+        'plan' => Plan::Free,
+        'trial_ends_at' => null,
+        'pro_trial_used_at' => now()->subDays(20),
+    ])->save();
+}
+
+it('extends an ended trial by seven days once', function (): void {
+    $this->travelTo(now()->startOfSecond());
+    [$owner, $workspace] = trialOwnerAndWorkspace();
+    pauseTrialOf($workspace);
+
+    $first = app(ExtendEndedTrial::class)->execute($owner, $workspace);
+    $endsAt = $workspace->trial_ends_at;
+    $second = app(ExtendEndedTrial::class)->execute($owner, $workspace);
+
+    expect($first)->toBeTrue()
+        ->and($workspace->plan)->toBe(Plan::Pro)
+        ->and($endsAt?->equalTo(now()->addDays(7)))->toBeTrue()
+        ->and($workspace->trial_extended_at)->not->toBeNull()
+        ->and($workspace->billingStatus())->toBe(BillingStatus::Trialing)
+        ->and($second)->toBeFalse()
+        ->and($workspace->refresh()->trial_ends_at?->equalTo($endsAt))->toBeTrue();
+});
+
+it('moves the trial end once when two stale copies of the workspace both extend', function (): void {
+    $this->travelTo(now()->startOfSecond());
+    [$owner, $workspace] = trialOwnerAndWorkspace();
+    pauseTrialOf($workspace);
+    $staleCopy = Workspace::query()->findOrFail($workspace->getKey());
+
+    $results = [
+        app(ExtendEndedTrial::class)->execute($owner, $workspace),
+        app(ExtendEndedTrial::class)->execute($owner, $staleCopy),
+    ];
+
+    expect($results)->toBe([true, false])
+        ->and($workspace->refresh()->trial_ends_at?->equalTo(now()->addDays(7)))->toBeTrue()
+        ->and(Activity::query()->where('event', 'trial_self_extended')->count())->toBe(1);
+});
+
+it('refuses to extend a trial that is not ended', function (callable $arrange): void {
+    [$owner, $workspace] = trialOwnerAndWorkspace();
+    $arrange($workspace);
+    $before = $workspace->refresh()->only(['plan', 'trial_ends_at', 'trial_extended_at']);
+
+    $extended = app(ExtendEndedTrial::class)->execute($owner, $workspace);
+
+    expect($extended)->toBeFalse()
+        ->and($workspace->refresh()->only(['plan', 'trial_ends_at', 'trial_extended_at']))->toEqual($before);
+})->with([
+    'still running' => [fn (Workspace $workspace) => $workspace->forceFill([
+        'plan' => Plan::Pro,
+        'trial_ends_at' => now()->addDays(3),
+        'pro_trial_used_at' => now()->subDays(11),
+    ])->save()],
+    'never trialled' => [fn (Workspace $workspace) => null],
+    'ever had a charged subscription' => [function (Workspace $workspace): void {
+        pauseTrialOf($workspace);
+        $workspace->subscriptions()->create([
+            'type' => 'default',
+            'stripe_id' => 'sub_past',
+            'stripe_status' => 'canceled',
+            'stripe_price' => 'price_pro_monthly_test',
+            'quantity' => 1,
+            'ends_at' => now()->subMonth(),
+        ]);
+    }],
+    'scheduled for deletion' => [function (Workspace $workspace): void {
+        pauseTrialOf($workspace);
+        $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(30)])->save();
+    }],
+]);
+
+it('extends an ended trial whose only subscription never started', function (): void {
+    [$owner, $workspace] = trialOwnerAndWorkspace();
+    pauseTrialOf($workspace);
+    $workspace->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_unstarted',
+        'stripe_status' => 'incomplete_expired',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+    ]);
+
+    expect(app(ExtendEndedTrial::class)->execute($owner, $workspace))->toBeTrue();
+});
+
+it('refuses an extension from a member without billing rights', function (): void {
+    [, $workspace] = trialOwnerAndWorkspace();
+    pauseTrialOf($workspace);
+    $member = User::factory()->create();
+
+    app(ExtendEndedTrial::class)->execute($member, $workspace);
+})->throws(AuthorizationException::class);
+
+it('never raises the credit balance during an extension, even across a month boundary', function (): void {
+    withHostedBilling();
+    $this->travelTo(Date::parse('2026-06-28 09:00:00'));
+    [$owner, $workspace] = trialOwnerAndWorkspace();
+    $workspace->forceFill([
+        'plan' => Plan::Pro,
+        'trial_ends_at' => now()->subHour(),
+        'pro_trial_used_at' => now()->subDays(14),
+    ])->save();
+    $this->artisan('billing:process-trials')->assertSuccessful();
+    $balance = fn (): int => AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole()->credits_remaining;
+    $beforeExtending = $balance();
+
+    app(ExtendEndedTrial::class)->execute($owner, $workspace);
+    $this->travelTo(Date::parse('2026-07-02 09:00:00'));
+    $this->artisan('chat:reset-credits')->assertSuccessful();
+
+    expect($beforeExtending)->toBe(Plan::Free->credits())
+        ->and($balance())->toBe($beforeExtending);
+
+    $this->travelTo(Date::parse('2026-07-06 09:00:00'));
+    $this->artisan('billing:process-trials')->assertSuccessful();
+
+    expect($balance())->toBe(Plan::Free->credits());
+});
+
+it('records who extended the trial', function (): void {
+    [$owner, $workspace] = trialOwnerAndWorkspace();
+    pauseTrialOf($workspace);
+
+    app(ExtendEndedTrial::class)->execute($owner, $workspace);
+
+    $activity = Activity::query()->where('event', 'trial_self_extended')->sole();
+
+    expect($activity->causer?->is($owner))->toBeTrue()
+        ->and($activity->subject?->is($workspace))->toBeTrue()
+        ->and($activity->properties['attributes']['trial_ends_at'])->toBe($workspace->trial_ends_at?->toDateTimeString());
 });

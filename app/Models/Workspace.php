@@ -402,6 +402,24 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
         return BillingStatus::fromWorkspace($this);
     }
 
+    public function hasChargedSubscription(): bool
+    {
+        return $this->subscriptions->contains(
+            fn (Model $subscription): bool => $subscription instanceof Subscription
+                && $subscription->type !== SubscriptionType::ManagedPending->value
+                && ! in_array($subscription->stripe_status, StripeSubscriptionStatus::neverGranted(), true),
+        );
+    }
+
+    public function canExtendTrial(): bool
+    {
+        return $this->billingStatus() === BillingStatus::TrialEnded
+            && $this->pro_trial_used_at !== null
+            && $this->trial_extended_at === null
+            && ! $this->isScheduledForDeletion()
+            && ! $this->hasChargedSubscription();
+    }
+
     /**
      * The single row `Cashier::subscription()` resolves: the newest `default`
      * subscription. It exists so a query can ask what `billingStatus()` asks:

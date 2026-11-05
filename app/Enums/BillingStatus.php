@@ -85,7 +85,7 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
             return self::Grandfathered;
         }
 
-        if ($workspace->plan === Plan::Free && self::hasChargedSubscription($workspace)) {
+        if ($workspace->plan === Plan::Free && $workspace->hasChargedSubscription()) {
             return self::SubscriptionEnded;
         }
 
@@ -238,15 +238,6 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
             self::Granted => $query->whereNot('plan', Plan::Free),
             self::Free => $query->where('plan', Plan::Free),
         };
-    }
-
-    private static function hasChargedSubscription(Workspace $workspace): bool
-    {
-        return $workspace->subscriptions->contains(
-            fn (Model $subscription): bool => $subscription instanceof Subscription
-                && $subscription->type !== SubscriptionType::ManagedPending->value
-                && ! in_array($subscription->stripe_status, StripeSubscriptionStatus::neverGranted(), true),
-        );
     }
 
     /**
