@@ -108,7 +108,7 @@
 
         <x-slot:title>
             {{ __('Your CRM, on your server.') }}
-            <span class="text-gray-500 dark:text-gray-400">{{ __('AGPL-3.0, :name included.', ['name' => $assistantName]) }}</span>
+            <span class="text-gray-500 dark:text-gray-400"><span class="whitespace-nowrap">AGPL-3.0,</span> {{ __(':name included.', ['name' => $assistantName]) }}</span>
         </x-slot:title>
 
         <x-slot:aside>
