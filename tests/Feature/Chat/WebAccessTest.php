@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\Plan;
 use App\Models\Note;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -129,6 +130,24 @@ it('caps web searches and page reads at five per turn', function (): void {
         ->and($webTools[1])->toBeInstanceOf(WebFetch::class)
         ->and($webTools[1]->maxSearches)->toBe(5);
 });
+
+it('allows only the searches the credit balance can pay for', function (int $remaining, array $expectedTools, ?int $expectedSearches, string $expectedLine): void {
+    withHostedBilling();
+    $user = User::factory()->withPersonalWorkspace()->create(['ai_preferences' => ['web_search' => 'allow']]);
+    $user->currentWorkspace->forceFill(['plan' => Plan::Pro])->save();
+    AiCreditBalance::query()->where('workspace_id', $user->currentWorkspace->getKey())->update(['credits_remaining' => $remaining]);
+
+    $agent = agentForWebTurn($user->fresh(), ['provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'id' => 'claude-sonnet-5', 'source' => 'explicit']);
+    $search = collect($agent->tools())->first(fn (Tool|ProviderTool $tool): bool => $tool instanceof WebSearch);
+
+    expect(webToolClasses($agent))->toBe($expectedTools)
+        ->and($search?->maxSearches)->toBe($expectedSearches)
+        ->and($agent->instructions())->toContain($expectedLine);
+})->with([
+    'plenty left' => [50, [WebSearch::class, WebFetch::class], 5, 'up to 5 searches.'],
+    'two searches left' => [5, [WebSearch::class, WebFetch::class], 2, 'up to 2 searches.'],
+    'not one search left' => [1, [], null, 'Web: you cannot open web pages or search the web on this turn.'],
+]);
 
 it('drops web tools when failover lands on a model without web', function (): void {
     config()->set('ai.providers.selfhosted.url', 'http://127.0.0.1:11434/v1');

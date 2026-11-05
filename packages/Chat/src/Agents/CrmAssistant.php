@@ -223,6 +223,8 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
 
     public ?WebAccess $webAccess = null;
 
+    private int $webSearches = WebAccess::MAX_SEARCHES;
+
     public function withModel(?string $label, bool $chosenByAuto): self
     {
         $this->modelLabel = $label;
@@ -238,9 +240,10 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
         return $this;
     }
 
-    public function withWebAccess(?WebAccess $webAccess): self
+    public function withWebAccess(?WebAccess $webAccess, int $searches = WebAccess::MAX_SEARCHES): self
     {
         $this->webAccess = $webAccess;
+        $this->webSearches = $searches;
 
         return $this;
     }
@@ -531,7 +534,7 @@ PROMPT;
             .'"me", "my", "mine" and "I" refer to this user: use this id for "assign to me", "my companies", "owned by me" without asking who they are.'
             .($capabilities === '' ? '' : "\nWhat this role may do: {$capabilities}.")
             .($this->emailReach instanceof EmailReach ? "\n{$this->emailReach->promptLine()}" : '')
-            .($this->webAccess instanceof WebAccess ? "\n{$this->webAccess->promptLine()}" : '');
+            .($this->webAccess instanceof WebAccess ? "\n{$this->webAccess->promptLine($this->webSearches)}" : '');
     }
 
     private function modelBlock(): string
@@ -1034,7 +1037,7 @@ PROMPT;
     private function webTools(): array
     {
         return match ($this->webAccess) {
-            WebAccess::Allowed => [(new WebSearch)->max(WebAccess::MAX_SEARCHES), (new WebFetch)->max(WebAccess::MAX_SEARCHES)],
+            WebAccess::Allowed => [(new WebSearch)->max($this->webSearches), (new WebFetch)->max(WebAccess::MAX_SEARCHES)],
             WebAccess::Ask => [resolve(RequestWebAccessTool::class)],
             WebAccess::Unavailable, null => [],
         };

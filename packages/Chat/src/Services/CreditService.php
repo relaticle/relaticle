@@ -13,6 +13,7 @@ use Illuminate\Support\Str;
 use Laravel\Ai\Ai;
 use Laravel\Ai\Responses\Data\TextUsage;
 use Relaticle\Chat\Enums\AiCreditType;
+use Relaticle\Chat\Enums\WebAccess;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
@@ -114,6 +115,18 @@ final readonly class CreditService
             conversationId: $conversationId,
             metadata: ['reason' => 'reservation_refund'],
         );
+    }
+
+    // The turn's own credit is already reserved, so what remains pays for searches.
+    public function affordableWebSearches(Workspace $workspace): int
+    {
+        if (! $this->entitlements->metersCredits($workspace)) {
+            return WebAccess::MAX_SEARCHES;
+        }
+
+        $cost = (int) config('chat.web_search_credit_cost');
+
+        return min(WebAccess::MAX_SEARCHES, intdiv(max(0, $this->getBalance($workspace)), max(1, $cost)));
     }
 
     public function getBalance(Workspace $workspace): int

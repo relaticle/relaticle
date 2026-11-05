@@ -20,9 +20,10 @@ enum WebAccess
 
     private const array WEB_PROVIDERS = [Lab::Anthropic->value, Lab::OpenAI->value];
 
-    public static function for(User $user, Workspace $workspace, ?ModelDescriptor $model, ?string $resumesTurnId): self
+    public static function for(User $user, Workspace $workspace, ?ModelDescriptor $model, ?string $resumesTurnId, int $affordableSearches): self
     {
         return match (true) {
+            $affordableSearches < 1 => self::Unavailable,
             ! $model instanceof ModelDescriptor, ! in_array($model->provider, self::WEB_PROVIDERS, true) => self::Unavailable,
             ! $workspace->ai_web_search_enabled => self::Unavailable,
             WebSearchPreference::of($user) === WebSearchPreference::Deny => self::Unavailable,
@@ -43,12 +44,12 @@ enum WebAccess
             ->exists();
     }
 
-    public function promptLine(): string
+    public function promptLine(int $searches = self::MAX_SEARCHES): string
     {
         return match ($this) {
             self::Unavailable => 'Web: you cannot open web pages or search the web on this turn. Ask the user to paste the page text or attach it as a .txt file.',
             self::Ask => 'Web: only when answering needs the web (a URL, a website, or something online), call RequestWebAccessTool once with the search you plan, before any web lookup and before any write for that request, then stop. A request the workspace data can answer, and every write that needs nothing from the web, never calls it.',
-            self::Allowed => 'Web: you can search the web and read pages on this turn, up to '.self::MAX_SEARCHES.' searches.',
+            self::Allowed => 'Web: you can search the web and read pages on this turn, up to '.$searches.' searches.',
         };
     }
 }

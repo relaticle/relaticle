@@ -232,7 +232,7 @@ final class ProcessChatMessage implements ShouldQueue
                 'capabilities' => array_column($this->user->workspaceCapabilities($this->workspace->getKey()), 'value'),
             ]);
             $agent->withModel($this->modelLabel(), $this->resolved['source'] === 'auto');
-            $agent->withEmailReach(EmailReach::for($this->user, $this->workspace))->withWebAccess($this->webAccess());
+            $this->grantWebAccess($agent->withEmailReach(EmailReach::for($this->user, $this->workspace)));
             $agent->withMentions($this->mentions);
             $agent->withPageContext($this->pageContext);
             $agent->withContextLedger($this->contextLedger());
@@ -1146,11 +1146,12 @@ final class ProcessChatMessage implements ShouldQueue
         return 'resolve-'.$this->turnId;
     }
 
-    private function webAccess(): WebAccess
+    private function grantWebAccess(CrmAssistant $agent): void
     {
         $model = resolve(ModelRegistry::class)->find((string) ($this->resolved['id'] ?? ''));
+        $searches = resolve(CreditService::class)->affordableWebSearches($this->workspace);
 
-        return WebAccess::for($this->user, $this->workspace, $model, $this->resumesTurnId);
+        $agent->withWebAccess(WebAccess::for($this->user, $this->workspace, $model, $this->resumesTurnId, $searches), $searches);
     }
 
     private function modelLabel(): ?string
