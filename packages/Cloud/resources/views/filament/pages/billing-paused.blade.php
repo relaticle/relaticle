@@ -33,17 +33,16 @@
                     </h1>
 
                     <p class="mt-2 text-[15px] leading-6 text-pretty text-gray-600 dark:text-gray-400">
-                        @php($trialEnded = $billingStatus === \App\Enums\BillingStatus::TrialEnded)
                         @if(! $canManageBilling && $workspace->owner && $lapsedPlan)
                             {{ __('cloud::billing.paused.member_body_managed', ['owner' => $workspace->owner->name, 'workspace' => $workspace->name, 'plan' => $lapsedPlan->marketingLabel()]) }}
                         @elseif(! $canManageBilling)
                             {{ $workspace->owner
-                                ? __($trialEnded ? 'cloud::billing.paused.member_body_trial' : 'cloud::billing.paused.member_body', ['owner' => $workspace->owner->name, 'workspace' => $workspace->name])
+                                ? __($deletesWhenInactive ? 'cloud::billing.paused.member_body_trial' : 'cloud::billing.paused.member_body', ['owner' => $workspace->owner->name, 'workspace' => $workspace->name])
                                 : __('cloud::billing.paused.member_body_ownerless', ['workspace' => $workspace->name]) }}
                         @elseif($lapsedPlan)
                             {{ __('cloud::billing.paused.owner_body_managed', ['plan' => $lapsedPlan->marketingLabel(), 'workspace' => $workspace->name]) }}
                         @else
-                            {{ __($trialEnded ? 'cloud::billing.paused.owner_body_trial' : 'cloud::billing.paused.owner_body', ['workspace' => $workspace->name]) }}
+                            {{ __($deletesWhenInactive ? 'cloud::billing.paused.owner_body_trial' : 'cloud::billing.paused.owner_body', ['workspace' => $workspace->name]) }}
                         @endif
                         @if($mailboxSyncPaused)
                             {{ __('cloud::billing.paused.mailbox_sync') }}

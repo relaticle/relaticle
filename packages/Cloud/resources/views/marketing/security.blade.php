@@ -68,7 +68,7 @@
     $ownership = [
         ['ri-download-2-line', __('Export'), __('Download every record type as CSV or Excel, custom fields included. The REST API reads the same records.')],
         ['ri-delete-bin-line', __('Delete'), __('Ask for deletion at privacy@relaticle.com. An account scheduled for deletion is removed after a 30-day grace period. Records in shared workspaces remain. A paused trial workspace that nobody signs in to for 60 days is deleted with its records, after two emails to the owner.')],
-        ['ri-server-line', __('Leave'), __('Relaticle is open source under AGPL-3.0. Move to your own server whenever you want.')],
+        ['ri-server-line', __('Leave'), __('Relaticle is open source under AGPL-3.0. Move to your own server whenever you want while your workspace is active.')],
     ];
 
     $glance = [

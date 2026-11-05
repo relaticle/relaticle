@@ -48,8 +48,8 @@ a subscription the workspace pauses. If you need more time, the owner can
 extend the trial by 7 days once from the Billing page. AI credits do not
 refill during the extension. Relaticle Cloud has no free plan.
 
-A paused workspace is kept for 60 days. If no one signs in and no plan is
-chosen, it is deleted with its records, after two emails to the owner.
+A paused trial workspace is kept for 60 days. If no one signs in and no plan
+is chosen, it is deleted with its records, after two emails to the owner.
 
 ## Managing the subscription
 

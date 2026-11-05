@@ -7,6 +7,9 @@ use App\Enums\Plan;
 use App\Models\Company;
 use App\Models\User;
 use App\Models\Workspace;
+use Illuminate\Database\Eloquent\Model;
+use Relaticle\Chat\Enums\AiCreditType;
+use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Cloud\Billing\Filament\Billing;
 use Relaticle\Cloud\Billing\Mail\ProEndedMail;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -37,7 +40,7 @@ it('tells the owner the trial ended, the workspace is paused, and how to reopen 
     $mail->assertSeeInHtml('Your Pro trial for Acme has ended');
     $mail->assertSeeInHtml('Your records are safe. Choose a plan, or extend the trial by 7 days.');
     $mail->assertSeeInHtml('Acme is paused. Your records are safe.');
-    $mail->assertSeeInHtml('We keep a paused workspace for 60 days. Choose a plan by Nov 5, 2026 to keep it.');
+    $mail->assertSeeInHtml('We keep a paused trial workspace for 60 days. Choose a plan by Nov 5, 2026 to keep it.');
     $mail->assertSeeInHtml(__('mail.trial_ending.keeps', ['credits' => number_format(Plan::Pro->credits())]));
     $mail->assertSeeInHtml('Choose a plan');
     $mail->assertSeeInHtml('Need more time?');
@@ -59,11 +62,19 @@ it('dates the 60-day line from the pause in the owner timezone', function (): vo
     ProEndedMail::afterTrial($workspace->refresh())->assertSeeInHtml('Choose a plan by Nov 6, 2026 to keep it.');
 });
 
-it('counts 60 days from now when the pause date is missing', function (): void {
-    $this->travelTo('2026-09-06 12:00:00');
-
-    ProEndedMail::afterTrial(proEndedWorkspace())->assertSeeInHtml('Choose a plan by Nov 5, 2026 to keep it.');
+it('states no 60-day rule when the workspace was never paused', function (): void {
+    ProEndedMail::afterTrial(proEndedWorkspace())->assertDontSeeInHtml('60 days');
 });
+
+it('states no 60-day rule to a workspace that bought a credit pack or owes a managed invoice', function (Closure $arrange): void {
+    $workspace = proEndedWorkspace(['paused_at' => now()]);
+    $arrange($workspace);
+
+    ProEndedMail::afterTrial($workspace)->assertDontSeeInHtml('60 days');
+})->with([
+    'credit pack' => fn (Workspace $workspace): Model => AiCreditTransaction::factory()->create(['workspace_id' => $workspace->getKey(), 'type' => AiCreditType::Purchase]),
+    'managed invoice' => fn (Workspace $workspace): Model => $workspace->subscriptions()->create(['type' => 'managed_pending', 'stripe_id' => 'sub_managed', 'stripe_status' => 'incomplete', 'stripe_price' => 'price_pro_monthly_test', 'quantity' => 1]),
+]);
 
 it('keeps the date chosen when the mail was built, even if the pause date moves before it renders', function (): void {
     $workspace = proEndedWorkspace(['paused_at' => '2026-09-06 12:00:00']);
@@ -75,9 +86,9 @@ it('keeps the date chosen when the mail was built, even if the pause date moves 
 });
 
 it('states the 60-day rule on an extended trial that ended', function (): void {
-    $mail = ProEndedMail::afterTrial(proEndedWorkspace(['trial_extended_at' => now()->subWeek()]));
+    $mail = ProEndedMail::afterTrial(proEndedWorkspace(['trial_extended_at' => now()->subWeek(), 'paused_at' => now()]));
 
-    $mail->assertSeeInHtml('We keep a paused workspace for 60 days.');
+    $mail->assertSeeInHtml('We keep a paused trial workspace for 60 days.');
 });
 
 it('states no 60-day rule for a grandfathered workspace, a subscription or a managed plan', function (): void {

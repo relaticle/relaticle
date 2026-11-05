@@ -37,7 +37,13 @@ it('renders an article with its rendered body', function (): void {
 it('tells the reader a paused trial workspace is kept for 60 days', function (): void {
     $this->get('/help/workspace/billing-and-plans')
         ->assertOk()
-        ->assertSeeText('A paused workspace is kept for 60 days. If no one signs in and no plan is chosen, it is deleted with its records, after two emails to the owner.');
+        ->assertSeeText('A paused trial workspace is kept for 60 days. If no one signs in and no plan is chosen, it is deleted with its records, after two emails to the owner.');
+});
+
+it('says the personal workspace cannot be deleted from the delete page only', function (): void {
+    $this->get('/help/workspace/rename-or-delete-your-workspace')
+        ->assertOk()
+        ->assertSeeText("Your original personal workspace can't be deleted from this page");
 });
 
 it('offers a direct contact path from the hub and the article footer', function (): void {

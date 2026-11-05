@@ -18,6 +18,7 @@ use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Str;
 use Relaticle\Cloud\Billing\Filament\Billing;
+use Relaticle\Cloud\Billing\Queries\InactiveTrialWorkspacesQuery;
 use Relaticle\Cloud\Billing\Queries\TrialUsageQuery;
 
 #[Tries(3)]
@@ -48,6 +49,7 @@ final class ProTrialEndingSoonMail extends Mailable implements ShouldQueue
                 'usage' => resolve(TrialUsageQuery::class)->forWorkspace($this->workspace),
                 'billingUrl' => Billing::getUrl(panel: 'app', tenant: $this->workspace),
                 'grandfathered' => $this->workspace->hosted_free_grandfathered_at !== null,
+                'deletesWhenInactive' => ! resolve(InactiveTrialWorkspacesQuery::class)->isExempt($this->workspace),
             ],
         );
     }

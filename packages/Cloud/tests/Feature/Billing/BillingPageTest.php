@@ -16,7 +16,9 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Cashier\Subscription;
 use Laravel\Pennant\Feature;
+use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Cloud\Billing\Actions\ExtendEndedTrial;
 use Relaticle\Cloud\Billing\Actions\StartProTrial;
 use Relaticle\Cloud\Billing\CreditPackCatalog;
@@ -150,7 +152,7 @@ it('replaces the app shell with a standalone paused screen when the trial ends',
         ->assertOk()
         ->assertSee(__('cloud::billing.paused.heading.trial_ended'))
         ->assertDontSee('cloud::billing.paused.heading.', false)
-        ->assertSee(__('cloud::billing.paused.owner_body_trial', ['workspace' => $workspace->name]))
+        ->assertSee(__('cloud::billing.paused.owner_body', ['workspace' => $workspace->name]))
         ->assertSee(__('cloud::billing.paused.continue'))
         ->assertSee('href="https://marketing.test/contact"', false)
         ->assertSee(__('cloud::billing.paused.sign_out'))
@@ -311,7 +313,7 @@ it('tells a member of a paused workspace who can reopen it, without checkout con
     withHostedBilling();
 
     [, $workspace] = billingPageOwner();
-    $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'pro_trial_used_at' => now()->subDays(20)])->save();
+    $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'pro_trial_used_at' => now()->subDays(20), 'paused_at' => now()->subDays(20)])->save();
     $member = User::factory()->create();
     $workspace->users()->attach($member, ['role' => 'member']);
 
@@ -332,6 +334,7 @@ function pausedTrialWorkspace(): array
         'plan' => Plan::Free,
         'trial_ends_at' => null,
         'pro_trial_used_at' => now()->subDays(15),
+        'paused_at' => now()->subDays(15),
     ])->save();
 
     return [$owner, $workspace];
@@ -427,6 +430,33 @@ it('hides the extension once it was used', function (): void {
         ->assertSee(__('cloud::billing.paused.continue'))
         ->assertDontSee(__('cloud::billing.paused.extend', ['days' => Workspace::TRIAL_EXTENSION_DAYS]))
         ->assertDontSee(__('cloud::billing.paused.extend_once'));
+});
+
+it('tells the owner of a paused trial workspace it is kept for 60 days', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = pausedTrialWorkspace();
+
+    livewire(Billing::class)
+        ->assertSee(__('cloud::billing.paused.owner_body_trial', ['workspace' => $workspace->name]))
+        ->assertDontSee(__('cloud::billing.paused.owner_body', ['workspace' => $workspace->name]));
+});
+
+it('promises no 60-day deletion to a paused trial workspace that bought a credit pack', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = pausedTrialWorkspace();
+    AiCreditTransaction::factory()->create(['workspace_id' => $workspace->getKey(), 'type' => AiCreditType::Purchase]);
+
+    livewire(Billing::class)
+        ->assertSee(__('cloud::billing.paused.owner_body', ['workspace' => $workspace->name]))
+        ->assertDontSee(__('cloud::billing.paused.owner_body_trial', ['workspace' => $workspace->name]));
+
+    actingAsMemberOf($workspace);
+
+    livewire(Billing::class)
+        ->assertSee(__('cloud::billing.paused.member_body', ['owner' => $workspace->owner->name, 'workspace' => $workspace->name]))
+        ->assertDontSee(__('cloud::billing.paused.member_body_trial', ['owner' => $workspace->owner->name, 'workspace' => $workspace->name]));
 });
 
 it('hides the extension from a member', function (): void {

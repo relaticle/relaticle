@@ -38,6 +38,13 @@ final readonly class InactiveTrialWorkspacesQuery
         return $eligible instanceof Workspace && ! self::owesManagedInvoice($eligible);
     }
 
+    public function isExempt(Workspace $workspace): bool
+    {
+        return $workspace->hosted_free_grandfathered_at !== null
+            || self::creditPurchases()->where('workspace_id', $workspace->getKey())->exists()
+            || self::owesManagedInvoice($workspace);
+    }
+
     public function stillDue(Workspace $workspace): bool
     {
         $scheduledFor = $workspace->scheduled_deletion_at ?? now();
@@ -54,7 +61,15 @@ final readonly class InactiveTrialWorkspacesQuery
         return BillingStatus::TrialEnded->applyToQuery(Workspace::query())
             ->whereNotNull('paused_at')
             ->whereNull('trial_ends_at')
-            ->whereNotIn('id', AiCreditTransaction::query()->where('type', AiCreditType::Purchase)->select('workspace_id'));
+            ->whereNotIn('id', self::creditPurchases()->select('workspace_id'));
+    }
+
+    /**
+     * @return Builder<AiCreditTransaction>
+     */
+    private static function creditPurchases(): Builder
+    {
+        return AiCreditTransaction::query()->where('type', AiCreditType::Purchase);
     }
 
     private static function owesManagedInvoice(Workspace $workspace): bool

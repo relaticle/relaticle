@@ -19,6 +19,7 @@ use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\SerializesModels;
 use Relaticle\Cloud\Billing\Commands\ScheduleInactiveTrialDeletionsCommand;
 use Relaticle\Cloud\Billing\Filament\Billing;
+use Relaticle\Cloud\Billing\Queries\InactiveTrialWorkspacesQuery;
 use Relaticle\Cloud\Billing\Queries\TrialUsageQuery;
 
 #[Tries(3)]
@@ -41,7 +42,9 @@ final class ProEndedMail extends Mailable implements ShouldQueue
             $workspace,
             BillingStatus::TrialEnded,
             extended: $workspace->trial_extended_at !== null,
-            keptUntil: ($workspace->paused_at ?? now())->addDays(ScheduleInactiveTrialDeletionsCommand::KEEP_DAYS),
+            keptUntil: resolve(InactiveTrialWorkspacesQuery::class)->isEligible($workspace)
+                ? $workspace->paused_at?->addDays(ScheduleInactiveTrialDeletionsCommand::KEEP_DAYS)
+                : null,
         );
     }
 
