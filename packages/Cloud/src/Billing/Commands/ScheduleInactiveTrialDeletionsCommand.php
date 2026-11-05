@@ -31,6 +31,8 @@ final class ScheduleInactiveTrialDeletionsCommand extends Command
 
     public const int WARNING_DAYS = 14;
 
+    public const int REMINDER_DAYS = 5;
+
     public function handle(InactiveTrialWorkspacesQuery $inactive, CancelInactivityDeletion $cancel): int
     {
         if (Feature::inactive(Billing::class)) {
@@ -108,7 +110,7 @@ final class ScheduleInactiveTrialDeletionsCommand extends Command
 
     private function sendReminders(InactiveTrialWorkspacesQuery $inactive, CancelInactivityDeletion $cancel): void
     {
-        $reminderDate = now()->addDays(config('relaticle.deletion.reminder_days_before'));
+        $reminderDate = now()->addDays(self::REMINDER_DAYS);
         $reminded = 0;
 
         Workspace::query()

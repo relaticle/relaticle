@@ -6,7 +6,7 @@
 
 {{ __('cloud::inactivity.notice.date', ['workspace' => $workspace->name, 'date' => $date]) }}
 
-{{ __('cloud::inactivity.notice.warn') }}
+{{ __('cloud::inactivity.notice.warn', ['warning' => \Relaticle\Cloud\Billing\Commands\ScheduleInactiveTrialDeletionsCommand::WARNING_DAYS, 'reminder' => \Relaticle\Cloud\Billing\Commands\ScheduleInactiveTrialDeletionsCommand::REMINDER_DAYS]) }}
 
 <x-mail::button :url="$billingUrl">
 {{ __('cloud::inactivity.notice.cta') }}

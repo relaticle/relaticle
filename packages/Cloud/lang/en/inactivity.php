@@ -9,7 +9,7 @@ return [
         'heading' => 'We now keep paused workspaces for 60 days',
         'body' => ':workspace has been paused since its trial ended. From today, we delete a paused workspace after 60 days without a sign-in.',
         'date' => 'Your 60 days start today. If no one signs in and you choose no plan, we will delete :workspace on :date.',
-        'warn' => 'We will email you 14 days and 5 days before that.',
+        'warn' => 'We will email you :warning days and :reminder days before that.',
         'cta' => 'Choose a plan',
     ],
     'warning' => [
