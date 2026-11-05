@@ -30,14 +30,14 @@ final readonly class TrialUsageQuery
                 ->typed()
                 ->whereNull('superseded_at')
                 ->inWorkspace($id)
-                ->where(self::createdSince($since))
+                ->where($this->createdSince($since))
                 ->count(),
         );
     }
 
     private function records(string $workspaceId, ?CarbonInterface $since): int
     {
-        $since = self::createdSince($since);
+        $since = $this->createdSince($since);
 
         return Company::query()->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $workspaceId)->ownData()->where($since)->count()
             + People::query()->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $workspaceId)->ownData()->where($since)->count()
@@ -46,10 +46,10 @@ final readonly class TrialUsageQuery
             + Note::query()->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $workspaceId)->ownData()->where($since)->count();
     }
 
-    private static function createdSince(?CarbonInterface $since): Closure
+    private function createdSince(?CarbonInterface $since): Closure
     {
         return static function (Builder $query) use ($since): void {
-            if ($since !== null) {
+            if ($since instanceof CarbonInterface) {
                 $query->where('created_at', '>=', $since);
             }
         };
