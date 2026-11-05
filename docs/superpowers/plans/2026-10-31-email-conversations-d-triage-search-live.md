@@ -484,7 +484,7 @@ text above the viewer's tier. Chips and typed operators narrow the list through 
 
 - [ ] Run the spec's one read-only aggregate in production (open question 4):
   `select count(*), avg(octet_length(body_text)), percentile_cont(array[0.5,0.95,0.99]) within group (order by octet_length(body_text)) from email_bodies`.
-  Record the numbers in the PR body. They size the index and decide whether the 64 KB cap
+  Record the numbers in the PR body. They size the index and decide whether the body cap
   matters.
 - [ ] Confirm on production with a read-only query that the migration role may create
   extensions: `select has_database_privilege(current_user, current_database(), 'CREATE')` and
@@ -536,7 +536,7 @@ searched a mid-word fragment of a subject or snippet, so none changed.
   - Function `emails_subject_search_refresh()`, `BEFORE INSERT OR UPDATE OF subject ON emails`:
     `new.subject_search := to_tsvector('simple', coalesce(new.subject, ''))`.
   - Function `emails_body_search_refresh()`, `AFTER INSERT OR UPDATE OF body_text ON email_bodies`:
-    `update emails set body_search = to_tsvector('simple', coalesce(emails.snippet, '') || ' ' || left(coalesce(new.body_text, ''), 65536)) where emails.id = new.email_id`.
+    `update emails set body_search = to_tsvector('simple', coalesce(emails.snippet, '') || ' ' || left(coalesce(new.body_text, ''), 20000)) where emails.id = new.email_id`.
     The snippet joins the body vector because the spec gates snippet and body at FULL together.
   - Function `emails_snippet_search_refresh()`, `BEFORE INSERT OR UPDATE OF snippet ON emails`:
     recompute `new.body_search` from the stored body, so a changed snippet never leaves a stale
@@ -555,7 +555,7 @@ both columns from `toArray()`, because the body vector holds the body's words.
 
 **Review fixes (2026-11-05):** two immutable SQL functions own the vector expressions,
 `email_subject_vector(subject)` and `email_body_vector(snippet, body_text)`, and both triggers and
-the backfill call them. The subject is capped at 65,536 characters like the body. The body trigger
+the backfill call them. The subject is capped at 65,536 characters and the body at 20,000. The body trigger
 also fires on `delete`: it rebuilds `body_search` from the snippet alone, keyed by
 `coalesce(new.email_id, old.email_id)`, so a deleted body's words stop matching. A cascade delete
 from `emails` finds no row to update and raises nothing.
@@ -1018,8 +1018,8 @@ Beyond the plan notes above:
 - **Flag delivery:** a hidden `data-` element from a `BODY_START` hook, re-read on
   `livewire:navigated`. `registerScriptData` runs at boot, before the user is known.
 - **Read granularity:** read marks every reached copy; unread clears the newest reached copy.
-- **Vector content:** snippet plus the first 65,536 characters of `body_text` (spec: 64 KB; D13
-  suggested 20,000). Lower it if the index exceeds the heap.
+- **Vector content:** snippet plus the first 20,000 characters of `body_text`, as D13 says
+  (founder decision, 2026-11-05; the spec's 64 KB is superseded). The subject stays capped at 65,536.
 - **Debounce:** 750 ms trailing on the client, plus 10 s server uniqueness.
 
 ## Risks and unknowns

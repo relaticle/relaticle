@@ -155,7 +155,7 @@ before merge (core.md, Database).
 | `references` | `text`, nullable | Raw `References` header, Message-IDs only, max 50 kept |
 | `automated_reason` | `string(32)`, nullable | `AutomatedReason` enum value |
 | `subject_search` | `tsvector`, nullable | Maintained by trigger, `simple` config |
-| `body_search` | `tsvector`, nullable | Maintained by trigger from `email_bodies.body_text`, `simple` config, first 64 KB |
+| `body_search` | `tsvector`, nullable | Maintained by trigger from `email_bodies.body_text`, `simple` config, snippet plus the first 20,000 characters |
 | `draft_version` | `integer` default 0 | Drafts only. Autosave sends the version it loaded; a mismatch rejects the write (D16) |
 
 Indexes:
@@ -791,7 +791,7 @@ Measured from production aggregates before each phase and 30 days after.
 | A row leaks a hidden subject | Row fields only from visible copies; the summary table holds no text; one test per tier |
 | Merging links unrelated mail | Exact Message-ID inside one workspace only |
 | The backfill is slow on large mailboxes | Chunked, per workspace, on the `imports` lane, rerunnable; the null-key shim keeps the list working meanwhile |
-| Search indexes are large | Measure first; `simple` config; body capped at 64 KB |
+| Search indexes are large | Measure first; `simple` config; body capped at 20,000 characters |
 | Broadcasts leak | Ids only; permitted users only; the client refetches through the query owner |
 | Shortcut collisions with chat | One map, scoped; chat keys need chat focus |
 | The linked-only rule hides useful teammate mail | The owner still sees it; linking from Unlinked or a per-record share widens it deliberately |

@@ -824,6 +824,14 @@ describe('search', function (): void {
             ->assertSee(__('filament/pages/email-inbox.list_empty.no_results', ['search' => 'kumquat']));
     });
 
+    it('matches a body word within the first 20,000 characters and not one past them', function (): void {
+        $filler = str_repeat('a ', 9_995);
+        $email = ($this->linkedEmail)([], $filler.'kumquat '.str_repeat('b ', 10).'quince');
+
+        ($this->searchTab)('kumquat')->assertSeeHtml("email-list-row-{$email->getKey()}");
+        ($this->searchTab)('quince')->assertDontSeeHtml("email-list-row-{$email->getKey()}");
+    });
+
     it('matches a subject word at subject tier but not a body word', function (): void {
         $email = ($this->linkedEmail)(['privacy_tier' => EmailPrivacyTier::SUBJECT, 'subject' => 'Orchard pricing'], 'The kumquat harvest is late this year');
 

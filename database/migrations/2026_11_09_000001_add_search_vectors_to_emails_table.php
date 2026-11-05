@@ -32,7 +32,7 @@ return new class extends Migration
 
             create or replace function email_body_vector(snippet text, body_text text) returns tsvector
             language sql immutable parallel safe as $$
-                select to_tsvector('simple'::regconfig, coalesce(snippet, '') || ' ' || left(coalesce(body_text, ''), 65536))
+                select to_tsvector('simple'::regconfig, coalesce(snippet, '') || ' ' || left(coalesce(body_text, ''), 20000))
             $$;
             SQL);
     }
