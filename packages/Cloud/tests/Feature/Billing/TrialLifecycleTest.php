@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 use App\Enums\BillingStatus;
 use App\Enums\Plan;
+use App\Enums\WorkspaceRole;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
@@ -538,6 +540,45 @@ it('moves the trial end once when two stale copies of the workspace both extend'
         ->and(Activity::query()->where('event', 'trial_self_extended')->count())->toBe(1);
 });
 
+it('re-reads the workspace under a row lock so concurrent extensions serialise', function (): void {
+    [$owner, $workspace] = trialOwnerAndWorkspace();
+    pauseTrialOf($workspace);
+
+    $statements = [];
+    DB::listen(function ($query) use (&$statements): void {
+        $statements[] = $query->sql;
+    });
+
+    app(ExtendEndedTrial::class)->execute($owner, $workspace);
+
+    $locking = array_filter(
+        $statements,
+        fn (string $sql): bool => str_contains($sql, 'workspaces') && str_contains(mb_strtolower($sql), 'for update'),
+    );
+
+    expect($locking)->not->toBeEmpty();
+});
+
+it('refuses to extend until the pause has run, then extends and keeps the Free balance', function (): void {
+    withHostedBilling();
+    [$owner, $workspace] = trialOwnerAndWorkspace();
+    app(StartProTrial::class)->execute($owner, $workspace);
+    $this->travelTo(now()->addDays(14)->addMinute());
+
+    $beforePause = app(ExtendEndedTrial::class)->execute($owner, $workspace->refresh());
+
+    expect($beforePause)->toBeFalse()
+        ->and($workspace->refresh()->trial_extended_at)->toBeNull();
+
+    $this->artisan('billing:process-trials')->assertSuccessful();
+    $afterPause = app(ExtendEndedTrial::class)->execute($owner, $workspace->refresh());
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
+
+    expect($afterPause)->toBeTrue()
+        ->and($workspace->refresh()->trial_extended_at)->not->toBeNull()
+        ->and($balance->credits_remaining)->toBe(Plan::Free->credits());
+});
+
 it('refuses to extend a trial that is not ended', function (callable $arrange): void {
     [$owner, $workspace] = trialOwnerAndWorkspace();
     $arrange($workspace);
@@ -588,9 +629,10 @@ it('extends an ended trial whose only subscription never started', function (): 
 it('refuses an extension from a member without billing rights', function (): void {
     [, $workspace] = trialOwnerAndWorkspace();
     pauseTrialOf($workspace);
-    $member = User::factory()->create();
+    $admin = User::factory()->create();
+    $workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
 
-    app(ExtendEndedTrial::class)->execute($member, $workspace);
+    app(ExtendEndedTrial::class)->execute($admin, $workspace);
 })->throws(AuthorizationException::class);
 
 it('never raises the credit balance during an extension, even across a month boundary', function (): void {

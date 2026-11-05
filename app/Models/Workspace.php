@@ -415,6 +415,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
     {
         return $this->billingStatus() === BillingStatus::TrialEnded
             && $this->pro_trial_used_at !== null
+            && $this->trial_ends_at === null
             && $this->trial_extended_at === null
             && ! $this->isScheduledForDeletion()
             && ! $this->hasChargedSubscription();
