@@ -10,7 +10,8 @@ paths:
 
 The marketing site is a framed grid: one `max-w-6xl` frame with continuous hairline rails, flat
 cells inside it, depth from a surface ladder instead of shadows, and real product UI at 1:1 scale.
-The homepage, `/ai`, `/email-and-calendar`, `/pricing` and `/self-hosted` are built on it. No test reads
+The homepage, `/ai`, `/email-and-calendar`, `/pricing`, `/self-hosted`, `/ai-native-crm` and the two
+`/crm-for-{assistant}` pages are built on it. No test reads
 for these rules, so a reviewer reads for a hand-rolled section, a raw gray pair, or a heading class
 outside the roles.
 
@@ -114,6 +115,16 @@ reach it. Change the header height and the token together. `html` also carries `
   `tests/Browser/Marketing/SelfHostedInstallTest.php` pins the secrets, the address and the clipboard.
   Below it, the six containers come from `compose.yml`, and every number in the page comes from the
   self-hosting guide.
+- The `/ai-native-crm` hero is that page's signature: a self-scoring checklist
+  (`partials/ai-native-checklist.blade.php`). Five checks, a toggle per check for the visitor's own CRM
+  with a live "x of 5" readout, and Relaticle's answer beside each with a link to the page that proves
+  it. `tests/Browser/Marketing/AiNativeChecklistTest.php` pins the score and the toggles.
+- The `/crm-for-{assistant}` hero is an ask gallery (`partials/assistant-playground.blade.php`): four
+  asks as tabs, each showing the assistant's reply with the Relaticle tool it called, and for a write
+  the record it produced with the assistant's actor chip. The client is fixed to the page's assistant,
+  and the ChatGPT page prefixes every ask with `@Relaticle`. It carries no copy button, because the
+  ChatGPT page must render no clipboard call. `tests/Browser/Marketing/AssistantPlaygroundTest.php`
+  pins the tabs and the prefix.
 - The `/ai` hero is that page's signature: a list page with Rela's side panel docked beside it, as the
   app renders it. An approved proposal changes the row in the list, because `ListOpportunities`,
   `ListPeople` and `ManageTasks` re-render on `ai-write-completed`. A record page does not re-render, so
