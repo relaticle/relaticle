@@ -170,8 +170,8 @@
         },
     }"
 >
-    <div class="bg-tint bg-dots flex justify-center px-4 py-8 sm:px-8 md:py-12">
-        <x-cloud::marketing.window class="w-full max-w-5xl">
+    <div class="bg-hero-panel flex justify-center px-4 py-8 sm:px-8 md:py-12">
+        <x-cloud::marketing.mac-window class="w-full max-w-5xl">
             <div class="grid lg:grid-cols-[minmax(0,1fr)_26rem]">
 
                 <div class="grid min-w-0 border-b border-gray-100 lg:border-r lg:border-b-0 dark:border-white/[0.06]" aria-hidden="true">
@@ -488,7 +488,7 @@
                 <span>{{ __('A demo with sample records. Nothing here touches a real workspace.') }}</span>
                 <button type="button" class="shrink-0 cursor-pointer whitespace-nowrap font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white" x-on:click="reset()">{{ __('Start over') }}</button>
             </div>
-        </x-cloud::marketing.window>
+        </x-cloud::marketing.mac-window>
     </div>
 
     <figure class="border-rail flex flex-col gap-4 border-t px-6 py-6 md:flex-row md:items-center md:justify-between md:px-10" data-ai-open-rules>

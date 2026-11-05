@@ -228,22 +228,6 @@ function playBoard() {
     })
 }
 
-function playStory() {
-    const story = document.querySelector("[data-story]")
-
-    if (! story) {
-        return
-    }
-
-    const steps = [...story.querySelectorAll("[data-story-step]")]
-
-    hide(steps)
-
-    once(story.querySelector("ol"), 0.4, () => {
-        animate(steps, rise(10), { duration: BASE, delay: stagger(0.15), ease: EASE }).then(() => settle(steps))
-    })
-}
-
 function playEmail() {
     document.querySelectorAll("[data-mail-demo]").forEach((demo) => {
         const intro = [...demo.querySelectorAll("[data-mail-caption]")]
@@ -310,8 +294,8 @@ function travel(wire) {
     ])
 }
 
-function playStoryVariant(selector, trigger, { connected = false } = {}) {
-    const story = document.querySelector(selector)
+function playStory() {
+    const story = document.querySelector("[data-story]")
 
     if (! story) {
         return
@@ -323,34 +307,15 @@ function playStoryVariant(selector, trigger, { connected = false } = {}) {
     record.start(steps.map((step) => step.dataset.storyActor))
     hide(steps)
 
-    once(trigger(story), 0.35, () => {
+    once(story, 0.35, () => {
         steps.forEach((step, index) => {
             const actor = step.dataset.storyActor
 
             animate(step, rise(10), { duration: BASE, delay: 0.2 + index * 0.9, ease: EASE }).then(() => {
                 settle(step)
-                const wire = connected ? story.querySelector(`[data-story-wire="${actor}"]`) : null
-                travel(wire).then(() => record.write(actor))
+                travel(story.querySelector(`[data-story-wire="${actor}"]`)).then(() => record.write(actor))
             })
         })
-    })
-}
-
-function playStoryCompare() {
-    const story = document.querySelector("[data-story-c]")
-
-    if (! story) {
-        return
-    }
-
-    const pile = [...story.querySelectorAll("[data-story-pile]")]
-    const steps = [...story.querySelectorAll("[data-story-step]")]
-
-    hide([...pile, ...steps])
-
-    once(story, 0.3, () => {
-        animate(pile, { opacity: [0, 1], transform: ["translateY(-16px)", "none"] }, { duration: BASE, delay: stagger(0.12), ease: EASE }).then(() => settle(pile))
-        animate(steps, rise(8), { duration: BASE, delay: stagger(0.15, { startDelay: 0.5 }), ease: EASE }).then(() => settle(steps))
     })
 }
 
@@ -360,8 +325,5 @@ if (! reducedMotion) {
     playApproval()
     playAgent()
     playStory()
-    playStoryVariant("[data-story-a]", (story) => story.querySelector("ol"))
-    playStoryVariant("[data-story-b]", (story) => story, { connected: true })
-    playStoryCompare()
     playEmail()
 }

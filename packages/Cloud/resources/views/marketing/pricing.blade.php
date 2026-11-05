@@ -254,50 +254,34 @@
         </div>
     </x-cloud::marketing.frame>
 
-    <x-cloud::marketing.frame id="pricing-cta">
-        <div class="bg-warm relative overflow-hidden px-6 py-24 text-center md:py-32">
-            <div class="mask-top-corners absolute inset-0 text-gray-400 dark:text-gray-600" aria-hidden="true">
-                <svg class="absolute inset-0 size-full">
-                    <pattern id="pricing-cta-dots" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.2" fill="currentColor"/></pattern>
-                    <rect width="100%" height="100%" fill="url(#pricing-cta-dots)"/>
-                </svg>
-            </div>
+    <x-cloud::marketing.closing-band
+        id="pricing-cta"
+        :title="$billingActive ? __('Start with a 14-day trial') : __('Start for free today')"
+        :lead="$billingActive
+            ? __('No card required. Unlimited users from day one, and the same open-source CRM to self-host whenever you want.')
+            : __('Unlimited users and records. Hosted by us, or on your own server.')"
+    >
+        <x-cloud::marketing.button :href="route('login')" data-analytics-intent="signup" data-analytics-placement="pricing">
+            {{ __('Start for free') }}
+        </x-cloud::marketing.button>
+        @if($billingActive)
+            <x-cloud::marketing.button variant="secondary" :href="route('contact')">
+                {{ __('Talk to us') }}
+            </x-cloud::marketing.button>
+        @else
+            <x-cloud::marketing.button variant="secondary" :href="route('selfHosted')">
+                {{ __('Explore self-hosting') }}
+            </x-cloud::marketing.button>
+        @endif
 
-            <div class="relative mx-auto max-w-2xl">
-                <h2 class="type-title text-gray-950 md:text-5xl dark:text-white">
-                    {{ $billingActive ? __('Start with a 14-day trial') : __('Start for free today') }}
-                </h2>
-                <p class="type-prose mx-auto mt-5 text-gray-500 dark:text-gray-400">
-                    {{ $billingActive
-                        ? __('No card required. Unlimited users from day one, and the same open-source CRM to self-host whenever you want.')
-                        : __('Unlimited users and records. Hosted by us, or on your own server.') }}
-                </p>
-
-                <div class="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                    <x-cloud::marketing.button :href="route('login')" data-analytics-intent="signup" data-analytics-placement="pricing">
-                        {{ __('Start for free') }}
-                    </x-cloud::marketing.button>
-                    @if($billingActive)
-                        <x-cloud::marketing.button variant="secondary" :href="route('contact')">
-                            {{ __('Talk to us') }}
-                        </x-cloud::marketing.button>
-                    @else
-                        <x-cloud::marketing.button variant="secondary" :href="route('selfHosted')">
-                            {{ __('Explore self-hosting') }}
-                        </x-cloud::marketing.button>
-                    @endif
-                </div>
-
-                <p class="mt-6 text-sm text-gray-500 dark:text-gray-400">
-                    <a href="{{ route('ai') }}" class="font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white">{{ __('Explore :name and the MCP server for Claude and ChatGPT', ['name' => config('chat.assistant_name')]) }}</a>
-                    @if(! $billingActive)
-                        <span class="mx-2" aria-hidden="true">·</span>
-                        <a href="{{ route('contact') }}" class="font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white">{{ __('Questions? Talk to us.') }}</a>
-                    @endif
-                </p>
-            </div>
-        </div>
-    </x-cloud::marketing.frame>
+        <x-slot:note>
+            <a href="{{ route('ai') }}" class="font-medium text-white underline decoration-white/30 underline-offset-4 hover:decoration-white">{{ __('Explore :name and the MCP server for Claude and ChatGPT', ['name' => config('chat.assistant_name')]) }}</a>
+            @if(! $billingActive)
+                <span class="mx-2" aria-hidden="true">·</span>
+                <a href="{{ route('contact') }}" class="font-medium text-white underline decoration-white/30 underline-offset-4 hover:decoration-white">{{ __('Questions? Talk to us.') }}</a>
+            @endif
+        </x-slot:note>
+    </x-cloud::marketing.closing-band>
 
     @php
         $schema = (new \Spatie\SchemaOrg\Graph())

@@ -105,7 +105,7 @@
             <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">{{ __('No credit card. Unlimited users. Open source.') }}</p>
         </x-slot:aside>
 
-        <div class="feat-card bg-tint bg-warm border-rail flex justify-center border-t px-4 py-10 sm:px-8 md:py-16">
+        <div class="feat-card bg-hero-panel border-rail flex justify-center border-t px-4 py-10 sm:px-8 md:py-16">
             <x-cloud::marketing.record-emails-mock class="w-full max-w-2xl" data-mail-demo/>
         </div>
     </x-cloud::marketing.hero>
@@ -279,7 +279,7 @@
         </div>
     </x-cloud::marketing.frame>
 
-    @include('cloud::marketing.home.partials.start-building')
+    <x-cloud::marketing.closing-band :title="__('Your CRM, your rules.')" :continuation="__('Start free, self-host whenever you like.')"/>
 
     @php
         $schema = (new \Spatie\SchemaOrg\Graph())

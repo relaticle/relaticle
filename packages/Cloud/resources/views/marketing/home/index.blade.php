@@ -50,12 +50,7 @@
     @include('cloud::marketing.home.partials.hero')
     @include('cloud::marketing.home.partials.works-with')
     @include('cloud::marketing.home.partials.features')
-    @include(match (request()->query('story')) {
-        '0' => 'cloud::marketing.home.partials.story',
-        'a' => 'cloud::marketing.home.partials.story-a',
-        'c' => 'cloud::marketing.home.partials.story-c',
-        default => 'cloud::marketing.home.partials.story-b',
-    })
+    @include('cloud::marketing.home.partials.story')
     @if($emailIntegrationActive)
         @include('cloud::marketing.home.partials.email')
     @endif
@@ -63,7 +58,7 @@
     @include('cloud::marketing.home.partials.community')
     @include('cloud::marketing.home.partials.customer-voices')
     @include('cloud::marketing.home.partials.faq')
-    @include('cloud::marketing.home.partials.start-building')
+    <x-cloud::marketing.closing-band :title="__('Your CRM, your rules.')" :continuation="__('Start free, self-host whenever you like.')"/>
 
     @php
         $schema = (new \Spatie\SchemaOrg\Graph())
