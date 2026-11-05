@@ -1,6 +1,6 @@
-<section {{ $attributes->class('bg-surface border-rail border-b pt-16') }}>
+<section {{ $attributes->class('bg-surface border-rail border-b') }}>
     <div class="border-rail mx-auto max-w-6xl sm:border-x">
-        <div class="grid gap-8 px-6 pb-12 pt-14 md:px-10 md:pb-14 md:pt-20 lg:grid-cols-12 lg:items-end lg:gap-10">
+        <div class="grid gap-8 px-6 pb-12 pt-9 md:px-10 md:pb-14 md:pt-9 lg:grid-cols-12 lg:items-end lg:gap-10">
             <div class="lg:col-span-7">
                 @isset($eyebrow)
                     <div class="mb-6">{{ $eyebrow }}</div>

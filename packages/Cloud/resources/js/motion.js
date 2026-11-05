@@ -266,11 +266,102 @@ function playEmail() {
     })
 }
 
+function storyRecord(story) {
+    const states = [...story.querySelectorAll("[data-story-state]")]
+    const written = (actor) => [...story.querySelectorAll(`[data-story-field="${actor}"]`)]
+    const showStage = (stage) => states.forEach((state) => state.classList.toggle("invisible", state.dataset.storyState !== stage))
+
+    return {
+        start(actors) {
+            showStage("proposal")
+            hide(actors.flatMap(written))
+        },
+        write(actor) {
+            if (actor === "you") {
+                showStage("negotiation")
+            }
+
+            if (actor === "rela") {
+                showStage("won")
+            }
+
+            const fields = written(actor)
+            const flashes = [...story.querySelectorAll(`[data-story-flash="${actor}"]`)]
+
+            animate(fields, { opacity: [0, 1], transform: ["scale(0.96)", "none"] }, { duration: BASE, ease: EASE }).then(() => settle(fields))
+            animate(flashes, { opacity: [0, 1] }, { duration: FAST, ease: EASE })
+                .then(() => animate(flashes, { opacity: [1, 0] }, { duration: SLOW, delay: 0.2, ease: EASE }))
+        },
+    }
+}
+
+function travel(wire) {
+    if (! wire || wire.offsetWidth === 0) {
+        return Promise.resolve()
+    }
+
+    const pulse = wire.querySelector("[data-story-pulse]")
+    const distance = wire.offsetWidth - pulse.offsetWidth
+    const [from, to] = wire.dataset.storyTravel === "right" ? [0, distance] : [distance, 0]
+
+    return Promise.all([
+        animate(pulse, { transform: [`translateX(${from}px)`, `translateX(${to}px)`] }, { duration: SLOW, ease: EASE }),
+        animate(pulse, { opacity: [0, 1, 1, 0] }, { duration: SLOW }),
+    ])
+}
+
+function playStoryVariant(selector, trigger, { connected = false } = {}) {
+    const story = document.querySelector(selector)
+
+    if (! story) {
+        return
+    }
+
+    const steps = [...story.querySelectorAll("[data-story-step]")]
+    const record = storyRecord(story)
+
+    record.start(steps.map((step) => step.dataset.storyActor))
+    hide(steps)
+
+    once(trigger(story), 0.35, () => {
+        steps.forEach((step, index) => {
+            const actor = step.dataset.storyActor
+
+            animate(step, rise(10), { duration: BASE, delay: 0.2 + index * 0.9, ease: EASE }).then(() => {
+                settle(step)
+                const wire = connected ? story.querySelector(`[data-story-wire="${actor}"]`) : null
+                travel(wire).then(() => record.write(actor))
+            })
+        })
+    })
+}
+
+function playStoryCompare() {
+    const story = document.querySelector("[data-story-c]")
+
+    if (! story) {
+        return
+    }
+
+    const pile = [...story.querySelectorAll("[data-story-pile]")]
+    const steps = [...story.querySelectorAll("[data-story-step]")]
+
+    hide([...pile, ...steps])
+
+    once(story, 0.3, () => {
+        animate(pile, { opacity: [0, 1], transform: ["translateY(-16px)", "none"] }, { duration: BASE, delay: stagger(0.12), ease: EASE }).then(() => settle(pile))
+        animate(steps, rise(8), { duration: BASE, delay: stagger(0.15, { startDelay: 0.5 }), ease: EASE }).then(() => settle(steps))
+    })
+}
+
 if (! reducedMotion) {
     revealShowcases()
     playBoard()
     playApproval()
     playAgent()
     playStory()
+    playStoryVariant("[data-story-a]", (story) => story.querySelector("ol"))
+    playStoryVariant("[data-story-b]", (story) => story, { connected: true })
+    playStoryCompare()
     playEmail()
 }
