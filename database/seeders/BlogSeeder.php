@@ -132,7 +132,7 @@ final class BlogSeeder extends Seeder
         $post = Post::withTrashed()->updateOrCreate(['slug' => $row['slug']], [
             'title' => $row['title'],
             'excerpt' => $row['excerpt'],
-            'content' => $this->body($row['excerpt']),
+            'content' => $this->body(),
             'featured_image' => $row['cover'] === null ? null : $covers[$row['cover']],
             'category_id' => $categories[$row['category']],
             'author_id' => $authorId,
@@ -150,10 +150,10 @@ final class BlogSeeder extends Seeder
         ));
     }
 
-    private function body(string $lede): string
+    private function body(): string
     {
-        return <<<MARKDOWN
-            {$lede}
+        return <<<'MARKDOWN'
+            This post walks through one decision in the codebase: what broke, what we tried, and the shape we settled on.
 
             ## The problem we started with
 
@@ -180,11 +180,11 @@ final class BlogSeeder extends Seeder
             ```php
             final readonly class CreateOpportunity
             {
-                public function execute(User \$user, array \$data): Opportunity
+                public function execute(User $user, array $data): Opportunity
                 {
-                    abort_unless(\$user->can('create', Opportunity::class), 403);
+                    abort_unless($user->can('create', Opportunity::class), 403);
 
-                    return Opportunity::query()->create(\$data);
+                    return Opportunity::query()->create($data);
                 }
             }
             ```
