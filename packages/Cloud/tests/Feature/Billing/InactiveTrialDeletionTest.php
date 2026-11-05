@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\DeletionReason;
 use App\Enums\Plan;
 use App\Filament\Pages\CreateWorkspace;
+use App\Jobs\PurgeWorkspace;
 use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
@@ -786,6 +787,26 @@ foreach (deletionsThatNoLongerStand() as $reason => $arrange) {
         Mail::assertNothingQueued();
     });
 }
+
+it('keeps a deletion the owner requested after the purge job read the workspace', function (): void {
+    withHostedBilling();
+    Mail::fake();
+    $workspace = inactivePausedWorkspace();
+    test()->travelTo(inactivePausedAt()->addDays(60)->addMinute());
+    $workspace->forceFill(['scheduled_deletion_at' => now()->subMinute(), 'deletion_reason' => DeletionReason::Inactivity])->save();
+    $job = new PurgeWorkspace($workspace->refresh());
+    $requestedFor = now()->addDays(30)->startOfSecond();
+
+    $workspace->owner->forceFill(['last_login_at' => now()])->save();
+    Workspace::query()->whereKey($workspace->getKey())->update(['scheduled_deletion_at' => $requestedFor, 'deletion_reason' => DeletionReason::Requested->value]);
+
+    app()->call($job->handle(...));
+
+    $workspace->refresh();
+
+    expect($workspace->deletion_reason)->toBe(DeletionReason::Requested)
+        ->and($workspace->scheduled_deletion_at?->equalTo($requestedFor))->toBeTrue();
+});
 
 it('purges a workspace marked for inactivity deletion that is still eligible', function (): void {
     withHostedBilling();
