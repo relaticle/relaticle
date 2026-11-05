@@ -11,51 +11,81 @@ use Illuminate\Database\Query\Builder as BaseBuilder;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 
 final readonly class EmailSearchService
 {
     /**
-     * Match only fields the viewer is allowed to see. Subject and snippet stay
-     * out of metadata-only rows. Participant search skips other people's BCC rows.
+     * Match only fields the viewer is allowed to see. Subject and body stay out of
+     * metadata-only rows. Participant search skips other people's BCC rows.
      *
      * @param  Builder<Email>|Relation<Email, *, *>  $query
      * @return Builder<Email>|Relation<Email, *, *>
      */
     public function applyToQuery(Builder|Relation $query, User $viewer, string $search): Builder|Relation
     {
-        $needle = '%'.$search.'%';
-        $viewerId = $viewer->getKey();
+        $needle = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search).'%';
+        $textQuery = $this->textQuery($search);
 
-        return $query->where(function (Builder $outer) use ($needle, $viewerId, $viewer): void {
-            $outer->whereHas('participants', function (Builder $participantQuery) use ($needle, $viewerId): void {
-                $participantQuery
-                    ->where(function (Builder $roleGate) use ($viewerId): void {
-                        $roleGate
-                            ->where('role', '!=', EmailParticipantRole::BCC)
-                            ->orWhereHas(
-                                'email',
-                                fn (Builder $ownedEmail): Builder => $ownedEmail->where('user_id', $viewerId),
-                            );
-                    })
-                    ->where(function (Builder $match) use ($needle): void {
-                        $match->where('name', 'ilike', $needle)
-                            ->orWhere('email_address', 'ilike', $needle);
-                    });
-            });
+        return $query->where(function (Builder $outer) use ($needle, $textQuery, $viewer): void {
+            $outer->whereHas('participants', fn (Builder $participants): Builder => $this->whereParticipantMatches($participants, $viewer, $needle));
 
-            $outer->orWhere(function (Builder $subjectQuery) use ($needle, $viewer): void {
-                $subjectQuery
-                    ->where('subject', 'ilike', $needle)
-                    ->where(fn (Builder $access): Builder => $this->whereViewerCanSeeSubject($access, $viewer));
-            });
+            if ($textQuery === null) {
+                return;
+            }
 
-            $outer->orWhere(function (Builder $snippetQuery) use ($needle, $viewer): void {
-                $snippetQuery
-                    ->where('snippet', 'ilike', $needle)
-                    ->where(fn (Builder $access): Builder => $this->whereViewerCanSeeBody($access, $viewer));
-            });
+            [$sql, $bindings] = $textQuery;
+
+            $outer->orWhere(fn (Builder $subjectQuery): Builder => $subjectQuery
+                ->whereRaw("emails.subject_search @@ ({$sql})", $bindings)
+                ->where(fn (Builder $access): Builder => $this->whereViewerCanSeeSubject($access, $viewer)));
+
+            $outer->orWhere(fn (Builder $bodyQuery): Builder => $bodyQuery
+                ->whereRaw("emails.body_search @@ ({$sql})", $bindings)
+                ->where(fn (Builder $access): Builder => $this->whereViewerCanSeeBody($access, $viewer)));
         });
+    }
+
+    /**
+     * @param  Builder<EmailParticipant>  $query
+     * @return Builder<EmailParticipant>
+     */
+    private function whereParticipantMatches(Builder $query, User $viewer, string $needle): Builder
+    {
+        return $query
+            ->where(fn (Builder $roleGate): Builder => $roleGate
+                ->where('email_participants.role', '!=', EmailParticipantRole::BCC)
+                ->orWhereHas('email', fn (Builder $ownedEmail): Builder => $ownedEmail->where('emails.user_id', $viewer->getKey())))
+            ->where(fn (Builder $match): Builder => $match
+                ->where('email_participants.name', 'ilike', $needle)
+                ->orWhere('email_participants.email_address', 'ilike', $needle));
+    }
+
+    /**
+     * Whole words through websearch syntax, and a trailing bare word as a prefix. Only letters
+     * and digits reach to_tsquery, so no user text is parsed as tsquery syntax.
+     *
+     * @return array{0: literal-string, 1: list<string>}|null
+     */
+    private function textQuery(string $search): ?array
+    {
+        if (preg_match('/[\p{L}\p{N}]/u', $search) !== 1) {
+            return null;
+        }
+
+        if (preg_match('/(?:^|\s)([\p{L}\p{N}]+)$/u', $search, $match, PREG_OFFSET_CAPTURE) !== 1) {
+            return ["websearch_to_tsquery('simple', ?)", [$search]];
+        }
+
+        $prefix = ["to_tsquery('simple', ?)", [$match[1][0].':*']];
+        $rest = substr($search, 0, $match[1][1]);
+
+        if (preg_match('/[\p{L}\p{N}]/u', $rest) !== 1) {
+            return $prefix;
+        }
+
+        return ["websearch_to_tsquery('simple', ?) && {$prefix[0]}", [$rest, ...$prefix[1]]];
     }
 
     /**
@@ -106,7 +136,7 @@ final readonly class EmailSearchService
             ->where(fn (Builder $unblocked): Builder => VisibleEmailScope::whereNotBlocked($unblocked, $workspaceId))
             ->where(function (Builder $access) use ($viewerId, $workspaceId, $tiers): void {
                 $access
-                    ->where('user_id', $viewerId)
+                    ->where('emails.user_id', $viewerId)
                     ->orWhereExists(fn (BaseBuilder $copyQuery): BaseBuilder => $this->syncedCopyExists($copyQuery, $viewerId))
                     ->orWhereHas('shares', fn (Builder $shareQuery): Builder => $shareQuery
                         ->where('shared_with', $viewerId)
@@ -124,7 +154,7 @@ final readonly class EmailSearchService
                     ->orWhere(function (Builder $byDefault) use ($viewerId, $workspaceId, $tiers): void {
                         $byDefault
                             ->where(fn (Builder $publicGate): Builder => VisibleEmailScope::wherePublicToTeammates($publicGate, $workspaceId))
-                            ->whereIn('privacy_tier', $tiers)
+                            ->whereIn('emails.privacy_tier', $tiers)
                             ->whereExists(fn (BaseBuilder $link): BaseBuilder => $link
                                 ->from('emailables')
                                 ->whereColumn('emailables.email_id', 'emails.id'))

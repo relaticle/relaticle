@@ -29,6 +29,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Illuminate\Testing\TestResponse;
@@ -401,6 +402,16 @@ it('keeps a full page of teammate email under a fixed query budget', function ()
         ->and($queries)->toBeLessThan(76);
 });
 
+it('loads every email column on a listed page except the search vectors', function (): void {
+    ($this->emailFrom)($this->viewer);
+
+    $columns = array_keys(resolve(VisibleEmailsQuery::class)->paginate($this->viewer, [], 10, 1)->first()->getAttributes());
+
+    expect($columns)->toContain(...array_diff(Schema::getColumnListing('emails'), ['subject_search', 'body_search']))
+        ->not->toContain('subject_search')
+        ->not->toContain('body_search');
+});
+
 it('lists the email tool only for a token that holds the grant', function (): void {
     expect(listedToolNames($this->viewer, ['read']))->not->toContain('list-emails-tool')
         ->and(listedToolNames($this->viewer, ['read', 'email:read']))->toContain('list-emails-tool');
@@ -688,7 +699,7 @@ it('matches a body word for the mailbox owner but not for a metadata-tier teamma
 
     expect(array_column(listedEmails($this->coworker, ['search' => 'kumquat']), 'id'))->toBe([$email->id])
         ->and(listedEmails($this->viewer, ['search' => 'kumquat']))->toBe([]);
-})->todo(note: 'Passes once EmailSearchService matches body_search (PR 8 Task 6).');
+});
 
 it('matches a subject word at subject tier but not a body word', function (): void {
     $email = ($this->emailFrom)($this->coworker, ['privacy_tier' => EmailPrivacyTier::SUBJECT, 'subject' => 'Orchard pricing', 'snippet' => 'Notes from the grower']);
@@ -718,7 +729,7 @@ it('matches a body word of a teammate email shared in full', function (): void {
     EmailBody::create(['email_id' => $email->id, 'body_html' => null, 'body_text' => 'The kumquat harvest is late this year']);
 
     expect(array_column(listedEmails($this->viewer, ['search' => 'kumquat']), 'id'))->toBe([$email->id]);
-})->todo(note: 'Passes once EmailSearchService matches body_search (PR 8 Task 6).');
+});
 
 it('filters by thread', function (): void {
     $inThread = ($this->emailFrom)($this->viewer, ['thread_id' => 'thread-one']);

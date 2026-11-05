@@ -208,6 +208,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
         $query = $this->ownerRecordWithEmails()
             ->emails()
+            ->select(Email::listColumns())
             // participants + shares are read per row by the privacy policy; eager-load to avoid N+1.
             ->with(['from', 'labels', 'participants', 'shares', 'user', 'connectedAccount.user'])
             ->withReadStateFor($user->getKey())
@@ -223,7 +224,8 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
         resolve(PreferredEmailCopyService::class)->restrictToVisiblePreferredCopies($query->getQuery(), $user);
 
-        $paginator = $query->latest('sent_at')->paginate(20, pageName: $this->getTablePaginationPageName());
+        // The select above names the email columns, so paginate adds only the pivot's.
+        $paginator = $query->latest('sent_at')->paginate(20, [], $this->getTablePaginationPageName());
 
         resolve(PreferredEmailCopyService::class)->hydrateMailboxAccess($paginator->getCollection(), $user, $this->ownerRecordWithEmails());
 

@@ -206,10 +206,23 @@ final class Email extends Model
     protected function withRecordLinkState(Builder $query): Builder
     {
         if ($query->getQuery()->columns === null) {
-            $query->select($query->qualifyColumn('*'));
+            $query->select(self::listColumns());
         }
 
         return $query->selectRaw('exists (select 1 from emailables where emailables.email_id = emails.id) as is_linked_to_record');
+    }
+
+    /**
+     * Every column but the search vectors, which hold the body's words and up to 64 KB a row.
+     *
+     * @return list<string>
+     */
+    public static function listColumns(): array
+    {
+        $email = new self;
+        $columns = [$email->getKeyName(), ...$email->getFillable(), 'created_at', 'updated_at', 'deleted_at'];
+
+        return array_values(array_map($email->qualifyColumn(...), $columns));
     }
 
     // Relations

@@ -619,7 +619,7 @@ run stays inside the 300 s `imports` timeout.
 
 **Files:** `EmailSearchService.php`.
 
-- [ ] Keep `applyToQuery(Builder|Relation $query, User $viewer, string $search)` and its three
+- [x] Keep `applyToQuery(Builder|Relation $query, User $viewer, string $search)` and its three
   branches. Change only the match in each:
   - Participants: keep the BCC role gate (`EmailSearchService.php:30-44`) and the `ilike`
     `%term%` on `name` and `email_address`, now served by the trigram indexes. Escape `%`, `_`
@@ -627,15 +627,28 @@ run stays inside the 300 s `imports` timeout.
   - Subject: `whereRaw('emails.subject_search @@ (' . $tsQuery . ')', $bindings)` plus
     `whereViewerCanSeeSubject()`.
   - Body: the same on `body_search` plus `whereViewerCanSeeBody()`. The snippet `ilike` goes.
-- [ ] Private `tsQuery(string $search): array{0: string, 1: list<string>}`: SQL
+- [x] Private `tsQuery(string $search): array{0: string, 1: list<string>}`: SQL
   `websearch_to_tsquery('simple', ?)`, and when the search ends in a bare word of letters and
   digits, `&& to_tsquery('simple', ?)` with that word plus `:*` for a prefix match. The word is
   matched with `/[\p{L}\p{N}]+$/u` before it reaches `to_tsquery`, so no user text is parsed as
   tsquery syntax. A search with no word left skips both full-text branches.
-- [ ] Qualify every column with `emails.` so the service works under `VisibleEmailsQuery`, the
+- [x] Qualify every column with `emails.` so the service works under `VisibleEmailsQuery`, the
   record tab's relation and `ConversationsQuery`'s copies subquery alike.
-- [ ] The Task 2 tests pass. Run `EmailsRelationManagerReadingTest.php`, `EmailToolsTest.php`
+- [x] The Task 2 tests pass. Run `EmailsRelationManagerReadingTest.php`, `EmailToolsTest.php`
   (MCP and chat) and `VisibleEmailScopeTest.php`.
+
+**Done (2026-11-05):** the prefix rule changed. `websearch_to_tsquery(search) && to_tsquery(last:*)`
+still demands the last word whole, so `kumq` never finds "kumquat". The service runs
+`websearch_to_tsquery` over the text before a trailing bare word, and `to_tsquery('simple', word:*)`
+on that word alone. A word counts as bare only at the start or after whitespace, so `pricing -kumq`
+keeps its negation through websearch. The four `todo` markers are gone and the tests pass,
+the trigger one through `body_search`, since search no longer reads `snippet` or `email_bodies`.
+Hot list reads select `Email::listColumns()`, every column but the two vectors:
+`withRecordLinkState()` (`VisibleEmailsQuery`, `ConversationsQuery::messages()`), the newest copies
+in `ConversationsQuery`, the record tab list and its sibling copies in
+`PreferredEmailCopyService::hydrateMailboxAccess()`. An `EmailToolsTest` case fails when a column
+drops out of the list. The access-request list keeps its own `subject` `ilike`
+(`InteractsWithEmailAccessRequests.php:167`), gated by `whereSubjectVisibleTo()`.
 
 ### Task 7: One filter owner and typed operators
 

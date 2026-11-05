@@ -822,7 +822,7 @@ describe('search', function (): void {
         ($this->searchTab)('kumquat')
             ->assertDontSeeHtml("email-list-row-{$email->getKey()}")
             ->assertSee(__('filament/pages/email-inbox.list_empty.no_results', ['search' => 'kumquat']));
-    })->todo(note: 'Passes once EmailSearchService matches body_search (PR 8 Task 6).');
+    });
 
     it('matches a subject word at subject tier but not a body word', function (): void {
         $email = ($this->linkedEmail)(['privacy_tier' => EmailPrivacyTier::SUBJECT, 'subject' => 'Orchard pricing'], 'The kumquat harvest is late this year');
@@ -894,7 +894,7 @@ describe('search', function (): void {
         $this->person->emails()->syncWithoutDetaching([$email->getKey()]);
 
         ($this->searchTab)('kumquat')->assertSeeHtml("email-list-row-{$email->getKey()}");
-    })->todo(note: 'Passes once EmailSearchService matches body_search (PR 8 Task 6).');
+    });
 
     it('matches the last word as a prefix', function (): void {
         $email = ($this->linkedEmail)(['privacy_tier' => EmailPrivacyTier::FULL], 'The kumquat harvest is late this year');
@@ -902,5 +902,5 @@ describe('search', function (): void {
         $this->actingAs($this->viewer);
 
         ($this->searchTab)('kumq')->assertSeeHtml("email-list-row-{$email->getKey()}");
-    })->todo(note: 'Passes once EmailSearchService matches body_search (PR 8 Task 6).');
+    });
 });

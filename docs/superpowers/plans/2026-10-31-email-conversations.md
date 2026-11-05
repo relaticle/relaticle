@@ -165,6 +165,7 @@ this table in the same PR.
 | 7 | Actions `MarkConversationsDone`, `ReopenConversations`, `MarkConversationsRead`, `MarkConversationsUnread` | batch input `User $user, array $conversationKeys`, return `TriageOutcome` (done and skipped counts with reasons) |
 | 7 | chat `j`, `k`, `n` | move to a focus scope on the chat list; `single_key_shortcuts` off disables them too |
 | 8 | `Relaticle\EmailIntegration\Enums\EmailFilter` | the one email filter owner (an enum, because `Queries` classes must end in `Query`) |
+| 8 | `Email::listColumns()` | every `emails` column but `subject_search` and `body_search`; list reads select it, so a page never carries the vectors |
 | 8 | search order | recency, not `ts_rank`, so cursor pagination holds; addresses and names match by `ILIKE` on trigram indexes; PR 8 creates `pg_trgm` |
 | 9 | Actions `LinkEmailToRecord`, `UnlinkEmailFromRecord` | `execute(User $user, Email $email, Model $record)` acting on every visible copy in the conversation; bulk Link and the `l` key land here |
 | 9 | `Email::onRecord()` | owns which mail belongs on a record, the opportunity window included |

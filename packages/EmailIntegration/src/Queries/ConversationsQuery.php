@@ -368,7 +368,8 @@ final readonly class ConversationsQuery
     {
         return $this->visibleCopiesOf($viewer, $visible, new ConversationFilters)
             ->whereIn('emails.conversation_key', $keys)
-            ->selectRaw('distinct on (emails.conversation_key) emails.*')
+            ->selectRaw('distinct on (emails.conversation_key) emails.id')
+            ->addSelect(Email::listColumns())
             ->withRecordLinkState()
             ->selectSub($this->viewerSyncedCopy($viewer), 'viewer_has_synced_copy')
             ->selectSub($this->viewerMessageShareTier($viewer), 'viewer_message_share_tier')
