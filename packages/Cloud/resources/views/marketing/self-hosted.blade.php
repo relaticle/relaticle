@@ -18,11 +18,11 @@
         ],
         [
             __('Source you can read and change'),
-            __('Everything a self-hosted install runs, including :name and the MCP server, is on GitHub under AGPL-3.0. Audit it, modify it, and redistribute it under the same licence.', ['name' => $assistantName]),
+            __('Everything a self-hosted install runs, including :name and the MCP server, is on GitHub under AGPL-3.0. Audit it, modify it, and redistribute it under the same license.', ['name' => $assistantName]),
         ],
         [
             __('One flat cost: your server'),
-            __('Unlimited users and unlimited records on every install. No per-seat price, no licence fee, and no user-count paywall to hit.'),
+            __('Unlimited users and unlimited records on every install. No per-seat price, no license fee, and no user-count paywall to hit.'),
         ],
     ];
 
@@ -148,7 +148,7 @@
     @endif
 
     <x-cloud::marketing.frame>
-        <x-cloud::marketing.frame-header :label="__('Open source')" :lead="__('Everything, under one licence.')">
+        <x-cloud::marketing.frame-header :label="__('Open source')" :lead="__('Everything, under one license.')">
             {{ __('Not a community edition.') }}
         </x-cloud::marketing.frame-header>
 
@@ -168,7 +168,7 @@
             {{ __('Each one named in the published compose file.') }}
         </x-cloud::marketing.frame-header>
 
-        <div class="bg-rail grid grid-cols-1 gap-px sm:grid-cols-2 lg:grid-cols-3" data-container-grid>
+        <div class="bg-rail grid grid-cols-1 gap-px sm:grid-cols-2 lg:grid-cols-3">
             @foreach($containers as [$container, $image, $purpose])
                 <div class="bg-surface flex flex-col gap-3 p-6 md:p-8">
                     <div class="flex items-baseline justify-between gap-3">
@@ -182,7 +182,7 @@
 
         <div class="bg-surface border-rail border-t px-6 py-5 md:px-8">
             <p class="type-prose text-gray-700 dark:text-gray-300">
-                {{ __('Minimum 2 GB of RAM, 1 core, and 10 GB of disk, with 4 GB recommended. The guide also covers Dokploy, Coolify, Laravel Cloud, reverse proxies, and a Docker-free manual install.') }}
+                {{ __('The guide also covers Dokploy, Coolify, Laravel Cloud, reverse proxies, backups, and a Docker-free manual install.') }}
                 @if($documentationActive)
                     <a href="{{ route('documentation.show', ['type' => 'self-hosting']) }}" class="{{ $linkClass }}">{{ __('Read the full self-hosting guide') }}</a>
                 @endif

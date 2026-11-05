@@ -71,7 +71,7 @@
 
             <label class="border-rail bg-tint flex items-center gap-2 border-b px-4 py-2.5 font-mono text-[13px]">
                 <span class="text-gray-500 dark:text-gray-400">{{ __('Your address') }}</span>
-                <span class="text-gray-400 dark:text-gray-500" aria-hidden="true">https://</span>
+                <span class="text-gray-500 dark:text-gray-400" aria-hidden="true">https://</span>
                 <input
                     type="text"
                     x-model="host"
