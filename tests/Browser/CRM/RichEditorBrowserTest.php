@@ -163,6 +163,7 @@ it('persists a heading created from selected body text', function (): void {
     $page->assertVisible('[x-ref="floatingToolbar::paragraph"] button[aria-label="Text style"]')
         ->click('[x-ref="floatingToolbar::paragraph"] button[aria-label="Text style"]')
         ->click('[x-ref="floatingToolbar::paragraph"] button[aria-label="Heading 1"]')
+        ->wait(1)
         ->press('Create')
         ->assertSee('Quarterly plan')
         ->assertNoJavaScriptErrors();
