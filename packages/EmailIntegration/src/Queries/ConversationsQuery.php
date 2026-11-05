@@ -107,9 +107,12 @@ final readonly class ConversationsQuery
     private function cappedCount(User $viewer, VisibleEmailScope $visible, ConversationView $view, ConversationFilters $filters): BaseBuilder
     {
         // The view order keeps the planner on the view indexes; unordered, Unlinked hashes every email first.
+        // A listed search drives from its ids instead, and a capped count needs no order.
         $matches = $this->conversations($viewer, $visible, $view, $filters)
-            ->latest('last_message_at')
-            ->orderByDesc('id')
+            ->unless(
+                filled($filters->search) && $this->search->listsMatches($viewer, $filters->search),
+                fn (Builder $ordered): Builder => $ordered->latest('last_message_at')->orderByDesc('id'),
+            )
             ->toBase()
             ->select('email_conversations.id')
             ->limit(ConversationView::COUNT_CAP);

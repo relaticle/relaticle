@@ -5,15 +5,13 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Services;
 
 use App\Models\User;
-use Illuminate\Contracts\Database\Query\Expression;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
-use Illuminate\Database\Grammar;
 use Illuminate\Database\Query\Builder as BaseBuilder;
-use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
+use Relaticle\EmailIntegration\Models\Scopes\ActiveAccountScope;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 
 final readonly class EmailSearchService
@@ -24,7 +22,7 @@ final readonly class EmailSearchService
 
     private const int MIN_INDEXED_LENGTH = 3;
 
-    private const int MAX_LEADING_PARTICIPANTS = 10_000;
+    private const int MAX_LISTED_MATCHES = 10_000;
 
     public static function clean(string $search): string
     {
@@ -37,7 +35,7 @@ final readonly class EmailSearchService
      * Match only fields the viewer is allowed to see. Subject and body stay out of
      * metadata-only rows. Participant search skips other people's BCC rows.
      *
-     * The ids each index matches lead, so the access gates only test rows that already match.
+     * The matches are listed first from the indexes, so the access gates only test rows that match.
      *
      * @param  Builder<Email>|Relation<Email, *, *>  $query
      * @return Builder<Email>|Relation<Email, *, *>
@@ -51,10 +49,10 @@ final readonly class EmailSearchService
         }
 
         $textQuery = $this->textQuery($search);
+        $ids = mb_strlen($search) < self::MIN_INDEXED_LENGTH ? null : $this->matchingIds($viewer, $search, $textQuery);
 
-        // No trigram applies under three characters, and a common fragment matches most rows:
-        // either way the matches cannot lead, and the view indexes stop early instead.
-        if (mb_strlen($search) < self::MIN_INDEXED_LENGTH || $this->participantsMatchTooMany($viewer, $search)) {
+        // Without a short list of matches, no index can lead and the view indexes stop early instead.
+        if ($ids === null) {
             return $query->where(fn (Builder $outer): Builder => $this->orWhereTextVisible(
                 $outer->whereHas('participants', fn (Builder $participants): Builder => $participants->matchingSearch($viewer, $search)),
                 $viewer,
@@ -62,14 +60,69 @@ final readonly class EmailSearchService
             ));
         }
 
-        if ($textQuery === null) {
-            return $query->whereIn('emails.id', $this->participantMatches($viewer, $search));
+        if ($ids === []) {
+            return $query->whereRaw('false');
         }
 
-        return $query
-            ->whereIn('emails.id', $this->matchingIds($viewer, $this->participantMatches($viewer, $search), $textQuery))
-            ->where(fn (Builder $outer): Builder => $this->orWhereTextVisible($outer, $viewer, $textQuery)
-                ->orWhereHas('participants', fn (Builder $participants): Builder => $participants->matchingSearch($viewer, $search)));
+        // A set the planner can hash: `= any(array)` compares every id on each row it filters.
+        return $query->whereRaw('emails.id in (select unnest(?::bpchar[]))', [$this->idArray($ids)]);
+    }
+
+    // True when the matches are a short list of ids, so a caller may read them in any order.
+    public function listsMatches(User $viewer, string $search): bool
+    {
+        $search = self::clean($search);
+
+        return mb_strlen($search) >= self::MIN_INDEXED_LENGTH
+            && $this->matchingIds($viewer, $search, $this->textQuery($search)) !== null;
+    }
+
+    /**
+     * The visible matches as ids, found from the indexes alone, or null when there are too many
+     * to list. Once per viewer and search, because counts() searches each view.
+     *
+     * @param  array{0: literal-string, 1: list<string>}|null  $textQuery
+     * @return list<string>|null
+     */
+    private function matchingIds(User $viewer, string $search, ?array $textQuery): ?array
+    {
+        return once(function () use ($viewer, $search, $textQuery): ?array {
+            $participantIds = $this->firstMatches(EmailParticipant::query()
+                ->join('emails as participant_emails', 'participant_emails.id', '=', 'email_participants.email_id')
+                ->where('participant_emails.workspace_id', $viewer->current_workspace_id)
+                ->matchingSearch($viewer, $search, 'participant_emails.user_id')
+                ->toBase(), 'email_participants.email_id');
+
+            if ($participantIds === null) {
+                return null;
+            }
+
+            return $this->firstMatches(Email::query()
+                ->withoutGlobalScope(ActiveAccountScope::class)
+                ->where('emails.workspace_id', $viewer->current_workspace_id)
+                ->where(fn (Builder $match): Builder => $this->orWhereTextVisible(
+                    $match->whereRaw('emails.id = any(?::bpchar[])', [$this->idArray($participantIds)]),
+                    $viewer,
+                    $textQuery,
+                ))
+                ->toBase(), 'emails.id');
+        });
+    }
+
+    /** @return list<string>|null */
+    private function firstMatches(BaseBuilder $query, string $column): ?array
+    {
+        $matches = array_values($query->limit(self::MAX_LISTED_MATCHES + 1)->pluck($column)
+            ->map(fn (mixed $id): string => (string) $id)
+            ->all());
+
+        return count($matches) > self::MAX_LISTED_MATCHES ? null : $matches;
+    }
+
+    /** @param  list<string>  $ids */
+    private function idArray(array $ids): string
+    {
+        return '{'.implode(',', $ids).'}';
     }
 
     /**
@@ -94,60 +147,6 @@ final readonly class EmailSearchService
                 $bodyQuery->whereRaw("emails.body_search @@ ({$sql})", $bindings),
                 $viewer,
             ));
-    }
-
-    /**
-     * One scan of the workspace's emails whose arms each have an index, so the planner can
-     * combine them and estimate how many ids match. A union would hide that estimate.
-     *
-     * @param  array{0: literal-string, 1: list<string>}  $textQuery
-     */
-    private function matchingIds(User $viewer, BaseBuilder $participants, array $textQuery): BaseBuilder
-    {
-        [$sql, $bindings] = $textQuery;
-
-        return DB::table('emails as search_matches')
-            ->where('search_matches.workspace_id', $viewer->current_workspace_id)
-            ->where(fn (BaseBuilder $match): BaseBuilder => $match
-                ->whereRaw("search_matches.subject_search @@ ({$sql})", $bindings)
-                ->orWhereRaw("search_matches.body_search @@ ({$sql})", $bindings)
-                ->orWhere('search_matches.id', '=', $this->anyOf($participants))
-                ->addBinding($participants->getBindings(), 'where'))
-            ->select('search_matches.id');
-    }
-
-    // `= any(array(...))` lets the primary key join the bitmap; `in (...)` inside an OR cannot.
-    private function anyOf(BaseBuilder $subquery): Expression
-    {
-        return new readonly class($subquery->toSql()) implements Expression
-        {
-            public function __construct(private string $sql) {}
-
-            public function getValue(Grammar $grammar): string
-            {
-                return "any(array({$this->sql}))";
-            }
-        };
-    }
-
-    // Once per viewer and search, because counts() searches each view; either answer gives the same rows.
-    private function participantsMatchTooMany(User $viewer, string $search): bool
-    {
-        return once(fn (): bool => DB::query()
-            ->fromSub($this->participantMatches($viewer, $search)->limit(self::MAX_LEADING_PARTICIPANTS + 1), 'leading_participants')
-            ->count() > self::MAX_LEADING_PARTICIPANTS);
-    }
-
-    private function participantMatches(User $viewer, string $search): BaseBuilder
-    {
-        return EmailParticipant::query()
-            ->matchingSearch($viewer, $search)
-            ->whereExists(fn (BaseBuilder $email): BaseBuilder => $email
-                ->from('emails as participant_emails')
-                ->whereColumn('participant_emails.id', 'email_participants.email_id')
-                ->where('participant_emails.workspace_id', $viewer->current_workspace_id))
-            ->select('email_participants.email_id')
-            ->toBase();
     }
 
     /**
