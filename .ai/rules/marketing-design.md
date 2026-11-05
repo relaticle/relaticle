@@ -76,7 +76,10 @@ reach it. Change the header height and the token together. `html` also carries `
 ## Components (`components/marketing`)
 
 - `hero`: the split hero for inner pages. The `h1` on the left, the subline and CTAs on the right,
-  then the page's visual below on a `bg-hero-panel` cell. `align="center"` stacks the same parts
+  then the page's visual below on a `bg-hero-panel` cell. On a product page that visual cell is the
+  page's signature, and it is interactive when the page's job is: the install configurator on
+  `/self-hosted`, the checklist on `/ai-native-crm`, the ask gallery on `/crm-for-{assistant}`. A static
+  screenshot there is the drift a reviewer reads for. `align="center"` stacks the same parts
   centred, for a page whose visual is a grid rather than one window: `/pricing` uses it with the
   price in the headline and the billing toggle under the line. The homepage hero is centered and built from
   the same parts: the open-source pill, a two-tone `type-display` headline, one subline with Claude
