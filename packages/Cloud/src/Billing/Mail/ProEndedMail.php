@@ -92,9 +92,13 @@ final class ProEndedMail extends Mailable implements ShouldQueue
             return __('mail.pro_ended.preheader_grandfathered');
         }
 
-        return $this->isTrial()
-            ? __("mail.pro_ended.{$this->copyKey()}.preheader", $this->replacements())
-            : __('mail.pro_ended.preheader');
+        if (! $this->isTrial()) {
+            return __('mail.pro_ended.preheader');
+        }
+
+        return $this->offersExtension()
+            ? __('mail.pro_ended.trial_ended.preheader', $this->replacements())
+            : __('mail.pro_ended.extension_ended.preheader');
     }
 
     private function isGrandfathered(): bool

@@ -76,6 +76,7 @@ it('keeps the variant chosen when the mail was built, even if the owner extends 
 
     $mail->assertHasSubject('Your Pro trial for Acme has ended');
     $mail->assertDontSeeInHtml('Extend your trial');
+    $mail->assertDontSeeInHtml('extend the trial');
 });
 
 it('offers no extension the billing page would refuse', function (): void {
@@ -85,6 +86,7 @@ it('offers no extension the billing page would refuse', function (): void {
     $mail->assertSeeInHtml('Choose a plan');
     $mail->assertDontSeeInHtml('Extend your trial');
     $mail->assertDontSeeInHtml('Need more time?');
+    $mail->assertDontSeeInHtml('extend the trial');
 });
 
 it('tells the team what they did during the trial', function (): void {
@@ -145,6 +147,7 @@ it('keeps the pause notice in the managed plan mail', function (): void {
     $mail = ProEndedMail::afterManagedPlan(proEndedWorkspace(), Plan::Enterprise);
 
     $mail->assertSeeInHtml(__('mail.pro_ended.paused', ['workspace' => 'Acme']));
+    $mail->assertSeeInHtml('Your records are safe. Talk to us to restart Enterprise.');
 });
 
 it('tells a grandfathered workspace it is back on Cloud Free, not paused', function (): void {
@@ -154,6 +157,7 @@ it('tells a grandfathered workspace it is back on Cloud Free, not paused', funct
     $mail->assertSeeInHtml(__('mail.pro_ended.cta_grandfathered'));
     $mail->assertDontSeeInHtml(__('mail.pro_ended.paused', ['workspace' => 'Acme']));
     $mail->assertDontSeeInHtml('Extend your trial');
+    $mail->assertSeeInHtml(__('mail.pro_ended.preheader_grandfathered'));
 });
 
 it('says email and calendar sync are paused only when the workspace has a mailbox', function (): void {

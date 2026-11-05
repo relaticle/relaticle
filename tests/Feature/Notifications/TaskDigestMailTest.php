@@ -63,10 +63,10 @@ it('carries rfc 8058 one-click unsubscribe headers pointing at the app host', fu
         ->and($mail->render())->toContain(__('mail.footer.unsubscribe'));
 });
 
-it('leads the subject with the overdue and due-today counts', function (int $overdue, int $due, string $subject): void {
-    $this->travelTo('2026-11-05 09:00:00');
+it('leads the subject with the overdue and due-today counts', function (int $overdue, int $due, string $subject, string $timezone = 'UTC'): void {
+    $this->travelTo('2026-11-05 12:00:00');
 
-    $user = User::factory()->withPersonalWorkspace()->create(['timezone' => 'UTC']);
+    $user = User::factory()->withPersonalWorkspace()->create(['timezone' => $timezone]);
 
     $payload = new DigestPayload([
         new DigestWorkspaceSection(
@@ -83,4 +83,5 @@ it('leads the subject with the overdue and due-today counts', function (int $ove
     'overdue singular' => [1, 0, '1 overdue task, Nov 5'],
     'due singular' => [0, 1, '1 task due today, Nov 5'],
     'due plural' => [0, 3, '3 tasks due today, Nov 5'],
+    'owner timezone date' => [1, 1, '1 overdue, 1 due today, Nov 6', 'Pacific/Auckland'],
 ]);
