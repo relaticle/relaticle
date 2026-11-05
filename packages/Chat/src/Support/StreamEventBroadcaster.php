@@ -7,6 +7,7 @@ namespace Relaticle\Chat\Support;
 use Carbon\CarbonInterface;
 use Illuminate\Broadcasting\BroadcastException;
 use Illuminate\Broadcasting\Channel;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Broadcast;
 use Laravel\Ai\Streaming\Events\Citation;
 use Laravel\Ai\Streaming\Events\ProviderToolEvent;
@@ -24,9 +25,20 @@ final readonly class StreamEventBroadcaster
     // The only stream events chat/stream.js listens for.
     private const array CLIENT_EVENTS = [StreamStart::class, TextDelta::class, ToolCall::class, ToolResult::class, StreamEnd::class, ProviderToolEvent::class, Citation::class];
 
+    /** @var Collection<string, array<string, bool>> invocation id => url => whether it went out with its title */
+    private Collection $sentSources;
+
     public function __construct(
         private Channel $channel,
-    ) {}
+    ) {
+        $this->sentSources = $this->noSourcesSent();
+    }
+
+    /** @return Collection<string, array<string, bool>> */
+    private function noSourcesSent(): Collection
+    {
+        return new Collection;
+    }
 
     /**
      * Broadcast a stream event over the channel, applying payload discipline.
@@ -40,7 +52,7 @@ final readonly class StreamEventBroadcaster
     {
         $payload = self::payloadFor($event);
 
-        if ($payload === null) {
+        if ($payload === null || ($payload['as'] === 'citation' && ! $this->isNewSource($payload['with']))) {
             return;
         }
 
@@ -55,6 +67,28 @@ final readonly class StreamEventBroadcaster
                 'reason' => $e->getMessage(),
             ]);
         }
+    }
+
+    // The client drops repeat and overflow sources anyway; an Anthropic reply cites
+    // per sentence, so this keeps a 30-citation reply to 10 messages.
+    /**
+     * @param  array<string, mixed>  $source
+     */
+    private function isNewSource(array $source): bool
+    {
+        $invocation = (string) $source['invocation_id'];
+        $sent = $this->sentSources->get($invocation, []);
+        $hasTitle = $source['title'] !== null;
+        $known = array_key_exists($source['url'], $sent);
+
+        if (($known && ($sent[$source['url']] || ! $hasTitle)) || (! $known && count($sent) >= WebSources::LIMIT)) {
+            return false;
+        }
+
+        $sent[$source['url']] = $hasTitle;
+        $this->sentSources->put($invocation, $sent);
+
+        return true;
     }
 
     /**

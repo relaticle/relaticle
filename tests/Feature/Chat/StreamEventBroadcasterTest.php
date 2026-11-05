@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Broadcasting\AnonymousEvent;
 use Illuminate\Broadcasting\BroadcastException;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Support\Facades\Broadcast;
@@ -263,4 +264,36 @@ it('broadcasts a citation as a source and drops one that is not a web page', fun
         ->and($citation('https://ex.com/p?a.b=1&tag=a&tag=b&flag&utm_medium=web#section', null)['with']['url'])->toBe('https://ex.com/p?a.b=1&tag=a&tag=b&flag')
         ->and($citation('https://ex.com/?q='.str_repeat('x', 2100), 'Long'))->toBeNull()
         ->and($citation('javascript:alert(1)', 'x'))->toBeNull();
+});
+
+it('broadcasts each cited page once, again only to add its title, and at most ten pages per turn', function (): void {
+    $sent = [];
+    $pending = Mockery::mock(AnonymousEvent::class);
+    $pending->shouldReceive('as')->andReturnSelf();
+    $pending->shouldReceive('with')->andReturnUsing(function (array $with) use (&$sent, $pending): mixed {
+        $sent[] = $with['url'].'|'.($with['title'] ?? '').'|'.$with['invocation_id'];
+
+        return $pending;
+    });
+    $pending->shouldReceive('sendNow');
+    Broadcast::shouldReceive('on')->andReturn($pending);
+
+    $broadcaster = new StreamEventBroadcaster(new PrivateChannel('chat.conversation.test-id'));
+    $cite = fn (string $url, ?string $title, string $invocation = 'turn-1') => $broadcaster->broadcast(
+        (new Citation('evt', 'msg', new UrlCitation($url, $title), time()))->withInvocationId($invocation),
+    );
+
+    $cite('https://filaforms.app/pricing', null);
+    $cite('https://filaforms.app/pricing', null);
+    $cite('https://filaforms.app/pricing', 'Pricing');
+    $cite('https://filaforms.app/pricing', 'Pricing');
+    foreach (range(1, 10) as $site) {
+        $cite("https://site{$site}.com/", null);
+    }
+    $cite('https://filaforms.app/pricing', null, 'turn-2');
+
+    expect($sent)->toHaveCount(12)
+        ->and(array_slice($sent, 0, 2))->toBe(['https://filaforms.app/pricing||turn-1', 'https://filaforms.app/pricing|Pricing|turn-1'])
+        ->and($sent[10])->toBe('https://site9.com/||turn-1')
+        ->and($sent[11])->toBe('https://filaforms.app/pricing||turn-2');
 });
