@@ -581,7 +581,7 @@ and `body_search @@ ...` from the body GIN index.
 
 **Files:** `BackfillEmailSearchVectorsCommand.php`, the service provider, migration `000003`.
 
-- [ ] `email:backfill-search-vectors {--force} {--workspace=} {--max-seconds=240}`.
+- [x] `email:backfill-search-vectors {--force} {--workspace=} {--max-seconds=240}`.
   - Without `--force`: print the count of emails with `body_search is null`, per workspace when
     `--workspace` is absent.
   - With `--force`: walk `DB::table('emails')->whereNull('body_search')->select('id')` with
@@ -593,9 +593,20 @@ and `body_search @@ ...` from the body GIN index.
   - Stop when `--max-seconds` passes and, if rows remain, queue itself again with the same
     `Artisan::queue(...)->onQueue('imports')->delay(now()->addMinute())`. The `imports` lane
     allows 300 s per try (core.md). Rerunning is safe because the filter is `whereNull`.
-- [ ] Migration `000003`: `Artisan::queue('email:backfill-search-vectors', ['--force' => true])->onQueue('imports')->delay(now()->addMinutes(5))->afterCommit()`.
+- [x] Migration `000003`: `Artisan::queue('email:backfill-search-vectors', ['--force' => true])->onQueue('imports')->delay(now()->addMinutes(5))->afterCommit()`.
   `ConventionsTest` fails if the command name is wrong or the delay is missing.
-- [ ] No test for the command or the migrations (testing.md). The rehearsal proves them.
+- [x] No test for the command or the migrations (testing.md). The rehearsal proves them.
+
+**Done (2026-11-05):** the shape follows `email:backfill-automated-reasons`, not the
+`--max-seconds` budget above: `{--force} {--after=} {--workspace=} {--chunk=20000}`. A run reads at
+most `--chunk` emails in pages of up to 1,000 and queues the rest with `--after` set to the last id
+it read. The write is one `update` per page through the query builder, so `updated_at` stays. It
+fills only null vectors: each column is `coalesce(column, <trigger expression>)` and the `where`
+repeats the null filter, so a vector a trigger wrote since the read is kept. The body comes from a
+correlated subquery on `email_bodies` instead of a self-join. No `--before` cutoff: every row
+stored after `000001` gets its vectors from the triggers. The command is registered outside the
+feature flag, with the other backfills. The rehearsal sets `--chunk` from rows per second, so one
+run stays inside the 300 s `imports` timeout.
 
 ### Task 6: The search service on full text and trigrams
 
