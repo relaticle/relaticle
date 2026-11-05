@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Billing\Commands;
 
+use App\Features\Billing;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Console\Attributes\Description;
@@ -11,6 +12,7 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Billing\Mail\InactivityRuleNoticeMail;
 use Relaticle\Cloud\Billing\Queries\InactiveTrialWorkspacesQuery;
 
@@ -20,6 +22,12 @@ final class AnnounceInactivityRuleCommand extends Command
 {
     public function handle(InactiveTrialWorkspacesQuery $inactive): int
     {
+        if (Feature::inactive(Billing::class)) {
+            $this->comment('Hosted billing is off, so there is no inactivity rule to announce.');
+
+            return self::SUCCESS;
+        }
+
         $force = (bool) $this->option('force');
         $count = 0;
 

@@ -618,6 +618,18 @@ it('starts the 60 days on the day the launch notice goes out, not the day of the
         ->and($workspace->refresh()->scheduled_deletion_at?->toDateTimeString())->toBe($promised->toDateTimeString());
 });
 
+it('sends no launch notice while hosted billing is off', function (): void {
+    Feature::define(BillingFeature::class, false);
+    Mail::fake();
+    $workspace = inactivePausedWorkspace();
+
+    $this->travelTo(inactivePausedAt());
+    $this->artisan('billing:announce-inactivity-rule', ['--force' => true])->assertSuccessful();
+
+    expect($workspace->refresh()->inactivity_notice_sent_at)->toBeNull();
+    Mail::assertNothingQueued();
+});
+
 it('never sends the launch notice twice', function (): void {
     Mail::fake();
     inactivePausedWorkspace();
