@@ -339,10 +339,23 @@ it('keeps the checklist out of the note slash menu', function (): void {
     expect(collect($menu['items'])->pluck('id')->all())->not->toContain('taskList');
 });
 
-it('versions the slash menu script by its published file so an edit changes the url', function (): void {
-    $published = filemtime(public_path('js/app/rich-editor-slash-menu.js'));
+it('versions the rich editor scripts by the newest published file so an edit changes the url', function (): void {
+    $slashMenu = public_path('js/app/rich-editor-slash-menu.js');
+    $checklist = public_path('js/app/rich-editor-checklist.js');
+    $original = filemtime($checklist);
+    $newest = max(filemtime($slashMenu), $original);
 
-    expect(FilamentAsset::getScriptSrc('rich-editor-slash-menu'))->toEndWith("?v={$published}");
+    expect(FilamentAsset::getScriptSrc('rich-editor-slash-menu'))->toEndWith("?v={$newest}");
+
+    try {
+        touch($checklist, $newest + 10);
+        $this->refreshApplication();
+
+        expect(FilamentAsset::getScriptSrc('rich-editor-slash-menu'))->toEndWith('?v='.($newest + 10))
+            ->and(FilamentAsset::getScriptSrc('rich-editor-checklist'))->toEndWith('?v='.($newest + 10));
+    } finally {
+        touch($checklist, $original);
+    }
 });
 
 it('keeps file attachments enabled on a toolbarless note body', function (): void {

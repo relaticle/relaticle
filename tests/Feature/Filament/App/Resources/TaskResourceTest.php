@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 use App\Actions\Task\NotifyTaskAssignees;
 use App\Enums\WorkspaceRole;
+use App\Filament\CustomFields\RichEditorFieldType;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
+use App\Filament\RichEditor\ChecklistPlugin;
 use App\Filament\RichEditor\SlashMenuPlugin;
+use App\Filament\RichEditor\TaskItem;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Opportunity;
@@ -32,7 +35,14 @@ use Livewire\Livewire;
 
 use function Filament\Support\generate_icon_html;
 
-mutates(ManageTasks::class, NotifyTaskAssignees::class, TaskResource::class);
+mutates(
+    ManageTasks::class,
+    NotifyTaskAssignees::class,
+    TaskResource::class,
+    ChecklistPlugin::class,
+    TaskItem::class,
+    RichEditorFieldType::class,
+);
 
 beforeEach(function () {
     $this->user = User::factory()->withWorkspace()->create();
@@ -515,7 +525,7 @@ it('gives the task description the borderless document canvas', function (): voi
         ->and($editor->getExtraAttributes()['class'])->toContain('fi-fo-rich-editor-seamless');
 });
 
-function checklistDescription(): string
+function taskResourceChecklistHtml(): string
 {
     return '<ul data-type="taskList">'
         .'<li data-checked="true" data-type="taskItem"><label><input type="checkbox" checked="checked"><span></span></label><div><p>Call Bob</p></div></li>'
@@ -523,20 +533,20 @@ function checklistDescription(): string
         .'</ul><p>Notes</p><table><tbody><tr><td><p>Cell one</p></td><td><p>Cell two</p></td></tr></tbody></table>';
 }
 
-function taskDescriptionField(): CustomField
+function taskResourceDescriptionField(): CustomField
 {
     return CustomField::query()->where('entity_type', 'task')->where('code', 'description')->firstOrFail();
 }
 
 it('keeps a checklist and its ticks when a task is saved from the edit form', function (): void {
     $record = Task::factory()->recycle([$this->user, $this->workspace])->create();
-    $record->saveCustomFieldValue(taskDescriptionField(), checklistDescription());
+    $record->saveCustomFieldValue(taskResourceDescriptionField(), taskResourceChecklistHtml());
 
     livewire(ManageTasks::class)
         ->callAction(TestAction::make('edit')->table($record), data: ['title' => 'Renamed'])
         ->assertHasNoActionErrors();
 
-    $description = $record->fresh('customFieldValues.customField')->getCustomFieldValue(taskDescriptionField());
+    $description = $record->fresh('customFieldValues.customField')->getCustomFieldValue(taskResourceDescriptionField());
 
     expect(substr_count($description, 'data-checked="true"'))->toBe(1)
         ->and(substr_count($description, 'data-checked="false"'))->toBe(1)
@@ -548,7 +558,7 @@ it('shows a viewer the checklist with its ticks', function (): void {
     $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
     $viewer->switchWorkspace($this->workspace);
     $record = Task::factory()->recycle([$this->user, $this->workspace])->create();
-    $record->saveCustomFieldValue(taskDescriptionField(), checklistDescription());
+    $record->saveCustomFieldValue(taskResourceDescriptionField(), taskResourceChecklistHtml());
 
     $this->actingAs($viewer);
 
