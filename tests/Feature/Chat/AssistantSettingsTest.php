@@ -11,6 +11,7 @@ use Relaticle\Chat\Actions\SetWebSearchPreference;
 use Relaticle\Chat\Enums\WebAccess;
 use Relaticle\Chat\Enums\WebSearchPreference;
 use Relaticle\Chat\Filament\Pages\AssistantSettings;
+use Relaticle\Chat\Services\ModelRegistry;
 
 mutates(AssistantSettings::class, WebAccess::class, WebSearchPreference::class, SetWebSearchPreference::class, WorkspaceAssistantSettings::class, SetWorkspaceWebSearch::class);
 
@@ -124,6 +125,10 @@ it('refuses an admin of the workspace', function (): void {
 it('disables both web search controls when no model on the install can search', function (): void {
     config()->set('ai.providers.anthropic.key', '');
     config()->set('ai.providers.openai.key', '');
+    config()->set('chat.self_hosted.url', 'http://127.0.0.1:11434/v1');
+    config()->set('chat.self_hosted.models', 'qwen3:8b');
+    config()->set('ai.providers.selfhosted.url', 'http://127.0.0.1:11434/v1');
+    app()->forgetInstance(ModelRegistry::class);
 
     Livewire::test(AssistantSettings::class)
         ->assertFormFieldDisabled('web_search')
