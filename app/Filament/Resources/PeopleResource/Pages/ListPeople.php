@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\PeopleResource\Pages;
 
+use App\Filament\Actions\ImportExportActionGroup;
 use App\Filament\Concerns\HasCustomFieldColumns;
 use App\Filament\Exports\PeopleExporter;
 use App\Filament\Resources\PeopleResource;
 use App\Models\People;
 use Asmit\ResizedColumn\HasResizableColumn;
 use Filament\Actions\Action;
-use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\ExportAction;
 use Filament\Resources\Pages\ListRecords;
@@ -30,21 +30,14 @@ final class ListPeople extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            ActionGroup::make([
+            ImportExportActionGroup::make([
                 Action::make('import')
                     ->label(__('filament/resources/person.pages.list.actions.import.label'))
                     ->icon('heroicon-o-arrow-up-tray')
                     ->url(ImportPeople::getUrl())
                     ->visible(ImportPeople::canAccess(...)),
                 ExportAction::make()->exporter(PeopleExporter::class)->authorize('exportAny', People::class),
-            ])
-                ->icon('heroicon-o-arrows-up-down')
-                ->color('gray')
-                ->button()
-                ->label(__('filament/resources/person.pages.list.actions.import_export.label'))
-                ->labeledFrom('sm')
-                ->dropdownPlacement('bottom')
-                ->size(Size::Small),
+            ])->label(__('filament/resources/person.pages.list.actions.import_export.label')),
             CreateAction::make()->icon('heroicon-o-plus')->size(Size::Small),
         ];
     }
