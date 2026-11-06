@@ -9,6 +9,7 @@ use App\Enums\CrmEntity;
 use App\Filament\Components\Forms\RecordSelect;
 use App\Filament\Components\Forms\WorkspaceMemberSelect;
 use App\Filament\Components\RecordChip;
+use App\Filament\Components\Tables\EmptyListDescription;
 use App\Filament\Components\Tables\RecordChipColumn;
 use App\Filament\Exports\PeopleExporter;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
@@ -108,7 +109,7 @@ final class PeopleResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->emptyStateDescription(__('filament/resources/person.empty_state.description'))
+            ->emptyStateDescription(EmptyListDescription::unlessFiltered(__('filament/resources/person.empty_state.description')))
             ->columns(self::columns())
             ->defaultSort('created_at', 'desc')
             ->filters([

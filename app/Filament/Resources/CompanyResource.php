@@ -8,6 +8,7 @@ use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
 use App\Filament\Components\Forms\WorkspaceMemberSelect;
 use App\Filament\Components\RecordChip;
+use App\Filament\Components\Tables\EmptyListDescription;
 use App\Filament\Components\Tables\RecordChipColumn;
 use App\Filament\Exports\CompanyExporter;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
@@ -74,7 +75,7 @@ final class CompanyResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->emptyStateDescription(__('filament/resources/company.empty_state.description'))
+            ->emptyStateDescription(EmptyListDescription::unlessFiltered(__('filament/resources/company.empty_state.description')))
             ->columns(self::columns())
             ->defaultSort('created_at', 'desc')
             ->filters([

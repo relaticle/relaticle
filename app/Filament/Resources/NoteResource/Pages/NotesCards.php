@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources\NoteResource\Pages;
 
 use App\Enums\CreatedPeriod;
+use App\Filament\Components\Tables\EmptyListDescription;
 use App\Filament\Components\Tables\NoteCardColumn;
 use App\Filament\Concerns\HasNoteHeaderActions;
 use App\Filament\Concerns\HasViewSwitcher;
@@ -32,7 +33,7 @@ final class NotesCards extends ManageRecords
     {
         return $table
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['opportunities', 'creator']))
-            ->emptyStateDescription(__('filament/resources/note.empty_state.description'))
+            ->emptyStateDescription(EmptyListDescription::unlessFiltered(__('filament/resources/note.empty_state.description')))
             ->columns([
                 Stack::make([
                     NoteCardColumn::make('title')->searchable(),

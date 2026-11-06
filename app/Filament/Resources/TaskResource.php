@@ -9,6 +9,7 @@ use App\Enums\CrmEntity;
 use App\Filament\Actions\CopyToClipboardAction;
 use App\Filament\Actions\EditTaskAction;
 use App\Filament\Components\Forms\WorkspaceMemberSelect;
+use App\Filament\Components\Tables\EmptyListDescription;
 use App\Filament\Components\Tables\Filters\RecordSelectFilter;
 use App\Filament\Components\Tables\LinkedRecordsColumn;
 use App\Filament\Components\Tables\RecordChipColumn;
@@ -92,7 +93,7 @@ final class TaskResource extends Resource
         $valueResolver = resolve(ValueResolvers::class);
 
         return $table
-            ->emptyStateDescription(__('filament/resources/task.empty_state.description'))
+            ->emptyStateDescription(EmptyListDescription::unlessFiltered(__('filament/resources/task.empty_state.description')))
             ->columns(self::columns())
             ->defaultSort('created_at', 'desc')
             ->searchable()
