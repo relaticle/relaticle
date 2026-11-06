@@ -1,8 +1,8 @@
-# Livewire 4 JavaScript integration
+# Livewire 4 JavaScript Integration
 
-## Interceptor system (v4)
+## Interceptor System (v4)
 
-### Intercept messages
+### Intercept Messages
 
 ```js
 Livewire.interceptMessage(({ component, message, onFinish, onSuccess, onError }) => {
@@ -12,7 +12,7 @@ Livewire.interceptMessage(({ component, message, onFinish, onSuccess, onError })
 });
 ```
 
-### Intercept requests
+### Intercept Requests
 
 ```js
 Livewire.interceptRequest(({ request, onResponse, onSuccess, onError, onFailure }) => {
@@ -23,7 +23,7 @@ Livewire.interceptRequest(({ request, onResponse, onSuccess, onError, onFailure 
 });
 ```
 
-### Component-scoped interceptors
+### Component-Scoped Interceptors
 
 ```blade
 <script>
@@ -33,7 +33,7 @@ Livewire.interceptRequest(({ request, onResponse, onSuccess, onError, onFailure 
 </script>
 ```
 
-## Magic properties
+## Magic Properties
 
-- `$errors` gives JavaScript access to validation errors.
-- `$intercept` registers component-scoped interceptors.
+- `$errors` - Access validation errors from JavaScript
+- `$intercept` - Component-scoped interceptors

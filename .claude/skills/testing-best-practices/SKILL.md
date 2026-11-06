@@ -6,12 +6,12 @@ metadata:
   author: laravel
 ---
 
-# Testing best practices
+# Testing Best Practices
 
 This skill provides rules for designing Laravel tests. Each rule file explains what to do and why. Use `search-docs` for Laravel and Pest API syntax.
 This project uses Pest. Follow the corresponding guidance in each rule.
 
-## Consistency first
+## Consistency First
 
 Read nearby tests before you choose syntax and organization.
 
@@ -19,7 +19,7 @@ A pattern repeated throughout the project is a convention, and project conventio
 
 These rules govern the tests you write now. An existing test that follows a project convention is not defective merely because it conflicts with this skill. Do not delete or rewrite it. If the convention has drawbacks, explain them and let the user decide.
 
-## What to test
+## What to Test
 
 Read this section before you write a test.
 
@@ -33,7 +33,7 @@ Read this section before you write a test.
 - Judge an architecture test by the convention it protects, not by the rules above. An `arch()` test declares a rule for an entire directory, such as the parent class of every model, the classes that may use an enum, or the methods every factory declares. It intentionally checks declarations and fails when a new file breaks the convention.
 - Use the test tools that the project installs. Add a new test dependency, plugin, or browser only after the user asks for it.
 
-## How to apply
+## How to Apply
 
 1. Read the code under test. Read the tests in the same directory. Identify every decision in the code.
 2. Select every applicable branch in the rule index. Read every selected rule file.
@@ -41,11 +41,11 @@ Read this section before you write a test.
 4. Write the tests. Run the smallest set of tests that covers the change. The tests must pass.
 5. Check every applicable item in `rules/review.md` and every selected rule file. Resolve every mismatch before completion.
 
-## Rule index
+## Rule Index
 
 Most changes need more than one rule file.
 
-| Subject | Rule file |
+| Subject | Rule File |
 | --- | --- |
 | Test framework features that may already do the work | [`rules/finding-features.md`](rules/finding-features.md) |
 | File layout, test names, and groups | [`rules/naming.md`](rules/naming.md) |

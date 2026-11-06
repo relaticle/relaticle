@@ -1,12 +1,12 @@
 # Assertions
 
-## Arrange, act, assert
+## Arrange, Act, Assert
 
 Write each test in three parts: setup, one action, and assertions. Put one blank line between them so readers can identify each part without comments.
 
 Keep each test self-contained. Do not use values created by another test.
 
-## How to find the correct assertion
+## How to Find the Correct Assertion
 
 First identify the subject of the check, then find an assertion designed for it. A subject-specific assertion identifies the incorrect value when the test fails.
 
@@ -28,13 +28,17 @@ Use a PHPUnit assertion only if no Pest expectation and no Laravel assertion exi
 
 Assert each fact once, but status and content are separate facts. `assertSee` passes on an error page that contains the text, so keep `assertOk()` alongside it when the status is part of the behavior.
 
-## Named response assertions
+## Named Response Assertions
 
 Use a named response assertion, such as `assertNotFound()`, rather than `assertStatus(404)`. A failure then identifies the broken contract. Laravel provides named assertions for commonly tested status codes.
 
 Keep one `expect()` chain on one subject. Start a new chain when the subject changes, or when the chain is difficult to read.
 
-## Assert a known value
+## Format Expectations
+
+Use Pest's format expectations rather than regular expressions because they provide clearer failure messages. Pest covers email addresses, URLs, UUIDs, IP addresses, and other common formats, and each expectation supports `not` for the negative case.
+
+## Assert a Known Value
 
 Write the expected value in the test, or calculate the expected value by a different method. Do not calculate the expected value with the logic of the implementation, because the test then passes when that logic is wrong.
 
@@ -48,7 +52,7 @@ travelTo('2025-01-01 00:00:00');
 expect($from)->toBe('2024-12-31T00:00:00.000000Z');
 ```
 
-## Assert the complete result
+## Assert the Complete Result
 
 A status code is not the complete result of a write operation. Assert each of the following if the operation changes it:
 
