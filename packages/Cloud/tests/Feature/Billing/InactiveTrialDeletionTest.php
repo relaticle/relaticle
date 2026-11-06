@@ -837,6 +837,21 @@ foreach (deletionsThatNoLongerStand() as $reason => $arrange) {
     });
 }
 
+it('keeps a workspace whose countdown was cancelled after the purge job read it', function (): void {
+    Mail::fake();
+    $workspace = inactivePausedWorkspace();
+    test()->travelTo(inactivePausedAt()->addDays(60)->addMinute());
+    $workspace->forceFill(['scheduled_deletion_at' => now()->subMinute(), 'deletion_reason' => DeletionReason::Inactivity])->save();
+    $job = new PurgeWorkspace($workspace->refresh());
+
+    resolve(CancelInactivityDeletion::class)->execute($workspace);
+
+    app()->call($job->handle(...));
+
+    expect(Workspace::query()->whereKey($workspace->getKey())->exists())->toBeTrue();
+    Mail::assertNothingQueued();
+});
+
 it('keeps a deletion the owner requested after the purge job read the workspace', function (): void {
     withHostedBilling();
     Mail::fake();
