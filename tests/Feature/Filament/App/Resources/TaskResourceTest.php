@@ -588,6 +588,31 @@ it('offers the checklist in the task description slash menu', function (): void 
         ->and($item['group'])->toBe('Lists');
 });
 
+it('keeps the checklist out of a custom rich-text field on a task', function (): void {
+    CustomField::factory()->create([
+        'tenant_id' => $this->workspace->getKey(),
+        'entity_type' => 'task',
+        'code' => 'agenda',
+        'name' => 'Agenda',
+        'type' => 'rich-editor',
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+
+    $page = livewire(ManageTasks::class)
+        ->mountAction('create')
+        ->instance();
+
+    $agenda = collect($page->getSchema($page->getMountedActionSchemaName())->getFlatComponents(withHidden: true))
+        ->first(fn (Component $component): bool => $component instanceof RichEditor && str_ends_with($component->getStatePath(), 'agenda'));
+
+    $menu = json_decode(base64_decode(SlashMenuPlugin::attributes($agenda)['data-slash-menu']), associative: true);
+
+    expect(collect($menu['items'])->pluck('id')->all())->not->toContain('taskList')
+        ->and(collect($agenda->getPlugins())->contains(fn (object $plugin): bool => $plugin instanceof ChecklistPlugin))->toBeFalse();
+});
+
 it('groups tasks by a select custom field and titles each group with its option label', function (string $code): void {
     $field = CustomField::query()->where('code', $code)->firstOrFail();
     $option = $field->options()->firstOrFail();
