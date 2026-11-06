@@ -116,6 +116,9 @@
         get keptCount() {
             return this.deals.filter((deal) => ! deal.out).length
         },
+        kept(one, other) {
+            return (this.keptCount === 1 ? one : other).replace(':count', this.keptCount)
+        },
         get batchSummary() {
             return this.batchReplies[this.deals.filter((deal) => deal.decision === 'saved').length]
         },
@@ -319,7 +322,7 @@
                                             <span class="min-w-0 flex-1">
                                                 <span class="block truncate text-sm leading-6">
                                                     <span class="text-gray-500 dark:text-gray-400">{{ __('Move') }}</span>
-                                                    <span class="font-semibold text-gray-900 dark:text-white" x-text="keptCount + ' ' + @js(__('opportunities'))">3 {{ __('opportunities') }}</span>
+                                                    <span class="font-semibold text-gray-900 dark:text-white" x-text="kept(@js(__(':count opportunity')), @js(__(':count opportunities')))">3 {{ __('opportunities') }}</span>
                                                 </span>
                                                 <span class="block text-xs leading-5 text-gray-500 dark:text-gray-400">{{ __('Stage to :value', ['value' => __('Negotiation/Review')]) }}</span>
                                             </span>
@@ -352,7 +355,7 @@
                                                 x-on:click="approveBatch()"
                                                 x-bind:disabled="thinking || ! keptCount"
                                                 data-ai-batch-save
-                                            ><span x-text="@js(__('Approve :count changes')).replace(':count', keptCount)">{{ __('Approve :count changes', ['count' => 3]) }}</span></x-cloud::marketing.rela-approve>
+                                            ><span x-text="kept(@js(__('Approve :count change')), @js(__('Approve :count changes')))">{{ __('Approve :count changes', ['count' => 3]) }}</span></x-cloud::marketing.rela-approve>
                                         </div>
                                     </div>
 
@@ -362,11 +365,11 @@
                                 <div tabindex="-1" x-ref="batchResult" class="col-start-1 row-start-1 self-start invisible opacity-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500" x-bind:class="{ 'invisible opacity-0': undecided.length > 0, '{{ $fade }}': undecided.length === 0 }" data-ai-batch-decided>
                                     <template x-if="deals.some((deal) => deal.decision === 'saved')">
                                         <div>
-                                            <p class="px-2 text-xs text-gray-500 dark:text-gray-400" x-text="@js(__('Applied :count changes · just now')).replace(':count', keptCount)"></p>
+                                            <p class="px-2 text-xs text-gray-500 dark:text-gray-400" x-text="kept(@js(__('Applied :count change · just now')), @js(__('Applied :count changes · just now')))"></p>
                                             <ul class="mt-1">
                                                 <li class="flex min-w-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-gray-700 dark:text-gray-300">
                                                     <x-heroicon-o-check class="size-4 shrink-0 text-gray-500 dark:text-gray-400" aria-hidden="true"/>
-                                                    <span class="min-w-0 truncate" x-text="@js(__('Moved :count opportunities to :stage')).replace(':count', keptCount).replace(':stage', @js(__('Negotiation/Review')))"></span>
+                                                    <span class="min-w-0 truncate" x-text="kept(@js(__('Moved :count opportunity to :stage')), @js(__('Moved :count opportunities to :stage'))).replace(':stage', @js(__('Negotiation/Review')))"></span>
                                                 </li>
                                                 @foreach($deals as $index => $deal)
                                                     <li class="flex min-w-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm" x-show="deals[{{ $index }}].decision === 'skipped'">

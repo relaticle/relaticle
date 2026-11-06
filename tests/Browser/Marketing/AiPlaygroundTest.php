@@ -55,6 +55,25 @@ it('approves a batch with one record left out and reports what it moved', functi
     $page->assertNoJavaScriptErrors();
 });
 
+it('counts a single kept opportunity in the singular', function (): void {
+    $page = $this->visit('/ai');
+    $page->wait(1);
+
+    $page->click('[aria-label="Leave out Kovra add-on seats"]');
+    $page->click('[aria-label="Leave out Kovra platform expansion"]');
+
+    expect(aiPlayground($page, "root.querySelector('[data-ai-batch-save]').innerText.trim()"))->toStartWith('Approve 1 change')
+        ->and(aiPlayground($page, "root.querySelector('[data-ai-batch-save]').innerText.trim()"))->not->toContain('changes');
+
+    $page->click('[data-ai-batch-save]');
+    $page->wait(0.5);
+
+    expect(aiPlayground($page, "root.querySelector('[data-ai-batch-decided] p').innerText.trim()"))->toBe('Applied 1 change · just now')
+        ->and(aiPlayground($page, "root.querySelector('[data-ai-batch-decided] li').innerText.replace(/\\s+/g, ' ').trim()"))->toBe('Moved 1 opportunity to Negotiation/Review');
+
+    $page->assertNoJavaScriptErrors();
+});
+
 it('creates a person with only the fields the visitor keeps', function (): void {
     $page = $this->visit('/ai');
 
