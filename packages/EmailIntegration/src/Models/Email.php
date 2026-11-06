@@ -254,7 +254,7 @@ final class Email extends Model
                                     ->where('emailables.emailable_id', $id));
                             }
                         }))))
-            ->whereNotExists(fn (QueryBuilder $suppression): QueryBuilder => $this->suppressionsOnConversation($suppression, $query)
+            ->whereNotExists($this->suppressionsOnConversation($query)
                 ->where('email_link_suppressions.emailable_type', $record->getMorphClass())
                 ->where('email_link_suppressions.emailable_id', $record->getKey()));
     }
@@ -272,7 +272,7 @@ final class Email extends Model
         return $query->whereExists(fn (QueryBuilder $link): QueryBuilder => $this->linksOf($link, $query)
             ->where('emailables.emailable_type', $morphType)
             ->whereIn('emailables.emailable_id', $recordIds)
-            ->whereNotExists(fn (QueryBuilder $suppression): QueryBuilder => $this->suppressionsOnConversation($suppression, $query)
+            ->whereNotExists($this->suppressionsOnConversation($query)
                 ->whereColumn('email_link_suppressions.emailable_type', 'emailables.emailable_type')
                 ->whereColumn('email_link_suppressions.emailable_id', 'emailables.emailable_id')));
     }
@@ -284,16 +284,17 @@ final class Email extends Model
     }
 
     /** @param  Builder<Email>  $query */
-    private function suppressionsOnConversation(QueryBuilder $suppression, Builder $query): QueryBuilder
+    private function suppressionsOnConversation(Builder $query): QueryBuilder
     {
-        return $suppression
-            ->from('email_link_suppressions')
+        return EmailLinkSuppression::query()
+            ->inForce()
             ->join('emails as suppressed_copies', 'suppressed_copies.id', '=', 'email_link_suppressions.email_id')
             ->whereColumn('email_link_suppressions.workspace_id', $query->qualifyColumn('workspace_id'))
-            ->where(fn (QueryBuilder $same): QueryBuilder => $same
+            ->where(fn (Builder $same): Builder => $same
                 ->whereColumn('suppressed_copies.id', $query->qualifyColumn('id'))
                 ->orWhereColumn('suppressed_copies.conversation_key', $query->qualifyColumn('conversation_key'))
-                ->orWhereColumn('suppressed_copies.rfc_message_id', $query->qualifyColumn('rfc_message_id')));
+                ->orWhereColumn('suppressed_copies.rfc_message_id', $query->qualifyColumn('rfc_message_id')))
+            ->toBase();
     }
 
     // Manual linking and sync linking take this first in their transactions, so neither reads the other's half-written links.

@@ -271,6 +271,7 @@ final readonly class LinkEmailAction
     {
         return array_fill_keys(EmailLinkSuppression::query()
             ->matchingConversationOf($email)
+            ->inForce()
             ->get(['emailable_type', 'emailable_id'])
             ->map(fn (EmailLinkSuppression $suppression): string => "{$suppression->emailable_type}:{$suppression->emailable_id}")
             ->all(), true);

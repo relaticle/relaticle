@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 
 /**
  * @property string $id
@@ -75,5 +76,27 @@ final class EmailLinkSuppression extends Model
         return $query
             ->where($query->qualifyColumn('workspace_id'), $email->workspace_id)
             ->whereIn($query->qualifyColumn('email_id'), $copies);
+    }
+
+    /**
+     * Suppressions no pin overrides: a manual link of the same record on any copy of the suppressed copy's conversation wins.
+     *
+     * @param  Builder<EmailLinkSuppression>  $query
+     * @return Builder<EmailLinkSuppression>
+     */
+    #[Scope]
+    protected function inForce(Builder $query): Builder
+    {
+        return $query->whereNotExists(fn (QueryBuilder $pin): QueryBuilder => $pin
+            ->from('emailables as pins')
+            ->join('emails as pinned_copies', 'pinned_copies.id', '=', 'pins.email_id')
+            ->join('emails as suppressed_on', 'suppressed_on.id', '=', $query->qualifyColumn('email_id'))
+            ->where('pins.link_source', 'manual')
+            ->whereColumn('pins.emailable_type', $query->qualifyColumn('emailable_type'))
+            ->whereColumn('pins.emailable_id', $query->qualifyColumn('emailable_id'))
+            ->whereColumn('pinned_copies.workspace_id', 'suppressed_on.workspace_id')
+            ->where(fn (QueryBuilder $same): QueryBuilder => $same
+                ->whereColumn('pinned_copies.id', 'suppressed_on.id')
+                ->orWhereColumn('pinned_copies.conversation_key', 'suppressed_on.conversation_key')));
     }
 }

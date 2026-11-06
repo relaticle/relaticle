@@ -21,6 +21,7 @@ use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\EmailIntegration\Actions\AutoCreateCompanyAction;
 use Relaticle\EmailIntegration\Actions\AutoCreatePersonAction;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
+use Relaticle\EmailIntegration\Actions\LinkEmailToRecord;
 use Relaticle\EmailIntegration\Actions\UnlinkEmailFromRecord;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -38,6 +39,7 @@ mutates(AutoCreatePersonAction::class);
 mutates(AutoCreateCompanyAction::class);
 mutates(PersonEmailMatcher::class);
 mutates(UnlinkEmailFromRecord::class);
+mutates(EmailLinkSuppression::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -1509,6 +1511,31 @@ it('does not link a later reply in the same conversation to the record a user un
     expect($reply->companies()->whereKey($company->getKey())->exists())->toBeFalse()
         ->and($elsewhere->companies()->whereKey($company->getKey())->exists())->toBeTrue()
         ->and($company->fresh()->email_count)->toBe(1);
+});
+
+it('links a later reply when a teammate unlinked their copy and the user pinned theirs', function (): void {
+    $company = makeAcmeCompanyWithDomain() ?? $this->markTestSkipped('No domains custom field seeded for this workspace.');
+    $bob = User::factory()->create(['current_workspace_id' => $this->workspace->getKey()]);
+    $this->workspace->users()->attach($bob, ['role' => 'member']);
+    $bobsAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create(['workspace_id' => $this->workspace->id, 'user_id' => $bob->id]));
+    $alices = makeLinkEmail(['conversation_key' => 'acme-renewal']);
+    $bobs = makeLinkEmail(['conversation_key' => 'acme-renewal', 'user_id' => $bob->id, 'connected_account_id' => $bobsAccount->getKey()]);
+
+    foreach ([$alices, $bobs] as $copy) {
+        EmailParticipant::factory()->from()->create(['email_id' => $copy->getKey(), 'email_address' => 'ceo@acme.com']);
+        resolve(LinkEmailAction::class)->execute($copy);
+    }
+
+    resolve(UnlinkEmailFromRecord::class)->execute($bob, $bobs, $company);
+    resolve(LinkEmailToRecord::class)->execute($this->user, $alices, $company);
+
+    $reply = makeLinkEmail(['conversation_key' => 'acme-renewal']);
+    EmailParticipant::factory()->from()->create(['email_id' => $reply->getKey(), 'email_address' => 'ceo@acme.com']);
+    resolve(LinkEmailAction::class)->execute($reply);
+
+    expect($reply->companies()->whereKey($company->getKey())->exists())->toBeTrue()
+        ->and($bobs->companies()->whereKey($company->getKey())->exists())->toBeFalse()
+        ->and(Email::query()->onRecord($company)->pluck('id')->all())->toContain($alices->getKey(), $reply->getKey());
 });
 
 function makeAcmeCompanyWithDomain(): ?Company
