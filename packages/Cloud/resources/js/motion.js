@@ -307,7 +307,7 @@ function playStory() {
     record.start(steps.map((step) => step.dataset.storyActor))
     hide(steps)
 
-    once(story, 0.35, () => {
+    once(steps[0], 0.35, () => {
         steps.forEach((step, index) => {
             const actor = step.dataset.storyActor
 

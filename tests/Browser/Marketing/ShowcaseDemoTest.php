@@ -221,3 +221,25 @@ it('switches the record between its emails and its meetings', function (): void 
 
     $page->assertNoJavaScriptErrors();
 });
+
+it('plays the four-hands story on a landscape phone shorter than the stacked story', function (): void {
+    $page = $this->visit('/')->resize(844, 390);
+
+    $page->script(<<<'JS'
+        (async () => {
+            const story = document.querySelector('[data-story]');
+            const top = story.getBoundingClientRect().top + window.scrollY;
+
+            for (let y = top - innerHeight; y < top + story.offsetHeight; y += 120) {
+                window.scrollTo(0, y);
+                await new Promise((resolve) => setTimeout(resolve, 100));
+            }
+        })()
+    JS);
+
+    $revealed = waitForShowcase($page, "[...document.querySelectorAll('[data-story-step]')].every((step) => getComputedStyle(step).opacity === '1')");
+
+    expect($revealed)->toBeTrue();
+
+    $page->assertNoJavaScriptErrors();
+});
