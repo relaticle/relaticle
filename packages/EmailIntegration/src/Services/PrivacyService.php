@@ -6,7 +6,6 @@ namespace Relaticle\EmailIntegration\Services;
 
 use App\Models\User;
 use App\Models\Workspace;
-use Illuminate\Database\Eloquent\Builder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -16,7 +15,6 @@ final readonly class PrivacyService
 {
     public function __construct(
         private EmailVisibilityService $visibility,
-        private PreferredEmailCopyService $preferredCopies,
     ) {}
 
     /**
@@ -35,10 +33,6 @@ final readonly class PrivacyService
 
         if ($this->visibility->isHiddenFromTeammate($email)) {
             return null;
-        }
-
-        if ($this->preferredCopies->viewerHasSyncedCopy($email, $viewer)) {
-            return EmailPrivacyTier::FULL;
         }
 
         // Per-email share overrides the email's own tier (uses the loaded relation when
@@ -78,24 +72,7 @@ final readonly class PrivacyService
     private function shareForViewer(Email $email, User $viewer): ?EmailShare
     {
         $email->loadMissing('shares');
-        $direct = $email->shares->firstWhere('shared_with', $viewer->getKey());
 
-        if ($direct instanceof EmailShare) {
-            return $direct;
-        }
-
-        if (blank($email->rfc_message_id)) {
-            return null;
-        }
-
-        return EmailShare::query()
-            ->where('workspace_id', $email->workspace_id)
-            ->where('shared_with', $viewer->getKey())
-            ->whereHas('email', function (Builder $query) use ($email): void {
-                $query
-                    ->where('workspace_id', $email->workspace_id)
-                    ->where('rfc_message_id', $email->rfc_message_id);
-            })
-            ->first();
+        return $email->shares->firstWhere('shared_with', $viewer->getKey());
     }
 }

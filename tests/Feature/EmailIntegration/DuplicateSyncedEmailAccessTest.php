@@ -12,6 +12,7 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManager;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
@@ -149,6 +150,30 @@ it('still asks a teammate without a mailbox copy to request access once', functi
     ])
         ->assertSee(__('filament/pages/email-inbox.list_row.request_access', ['name' => $this->owner->name]))
         ->assertDontSee(__('filament/pages/email-inbox.list_row.request_access', ['name' => $this->workspacemate->name]));
+});
+
+it('shows a teammate the copy shared with them over a more open copy of the same message', function (): void {
+    $outsider = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+    $this->workspace->users()->attach($outsider, ['role' => 'member']);
+
+    $this->workspacemateCopy->update(['privacy_tier' => EmailPrivacyTier::SUBJECT]);
+
+    EmailShare::factory()->tier(EmailPrivacyTier::FULL)->create([
+        'workspace_id' => $this->workspace->id,
+        'email_id' => $this->ownerCopy->getKey(),
+        'shared_by' => $this->owner->id,
+        'shared_with' => $outsider->id,
+    ]);
+
+    $this->actingAs($outsider);
+    Filament::setTenant($this->workspace);
+
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
+        ->assertSeeHtml("email-list-row-{$this->ownerCopy->getKey()}")
+        ->assertDontSeeHtml("email-list-row-{$this->workspacemateCopy->getKey()}");
 });
 
 it('keeps distinct messages as separate record mailbox rows', function (): void {
