@@ -88,9 +88,7 @@
                         </span>
                     @else
                         <span @class([
-                            'min-w-0 break-words text-sm',
-                            'font-medium text-gray-900 dark:text-white' => array_key_exists('new', $row),
-                            'text-gray-700 dark:text-gray-300' => ! array_key_exists('new', $row),
+                            'min-w-0 break-words text-sm text-gray-900 dark:text-white',
                             'whitespace-pre-wrap' => str_contains($part['text'], "\n"),
                         ])>{{ $part['text'] }}</span>
                     @endif

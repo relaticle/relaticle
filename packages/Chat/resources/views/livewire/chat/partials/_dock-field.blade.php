@@ -16,7 +16,7 @@
 @endphp
 <div class="group/field flex items-start gap-3">
     <span @class([
-        'w-24 shrink-0 truncate text-xs leading-5 text-gray-500 sm:w-28 dark:text-gray-400',
+        'w-24 shrink-0 truncate py-1.5 text-xs leading-5 text-gray-500 sm:w-32 dark:text-gray-400',
         'line-through opacity-60' => $isExcluded,
     ])>{{ $row['label'] ?? '' }}</span>
 
@@ -60,7 +60,7 @@
             'flex min-w-0 flex-1 items-start gap-1.5',
             'line-through opacity-60' => $isExcluded,
         ])>
-            <span class="min-w-0 flex-1 leading-5">
+            <span class="min-w-0 flex-1 py-1.5 leading-5">
                 @include('chat::livewire.chat.partials._dock-value', ['row' => $row, 'stack' => $pairLength > 28, 'clampable' => $clamp, 'refLinks' => $refLinks])
             </span>
 
