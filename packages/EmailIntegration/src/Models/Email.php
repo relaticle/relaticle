@@ -11,6 +11,7 @@ use App\Models\People;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Closure;
 use Database\Factories\EmailFactory;
 use Filament\Support\Facades\FilamentTimezone;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -257,9 +258,9 @@ final class Email extends Model
                                     ->where('emailables.emailable_id', $id));
                             }
                         }))))
-            ->whereNotExists($this->suppressionsOn($query)
+            ->where(fn (Builder $unsuppressed): Builder => $this->withoutSuppressions($unsuppressed, $query, fn (QueryBuilder $suppression): QueryBuilder => $suppression
                 ->where('email_link_suppressions.emailable_type', $record->getMorphClass())
-                ->where('email_link_suppressions.emailable_id', $record->getKey()));
+                ->where('email_link_suppressions.emailable_id', $record->getKey())));
     }
 
     /**
@@ -282,30 +283,41 @@ final class Email extends Model
     {
         return $link->from('emailables')
             ->whereColumn('emailables.email_id', $query->qualifyColumn('id'))
-            ->whereNotExists($this->suppressionsOn($query)
+            ->where(fn (QueryBuilder $unsuppressed): QueryBuilder => $this->withoutSuppressions($unsuppressed, $query, fn (QueryBuilder $suppression): QueryBuilder => $suppression
                 ->whereColumn('email_link_suppressions.emailable_type', 'emailables.emailable_type')
-                ->whereColumn('email_link_suppressions.emailable_id', 'emailables.emailable_id'));
+                ->whereColumn('email_link_suppressions.emailable_id', 'emailables.emailable_id')));
     }
 
     /**
-     * Suppressions that hide a link on this copy: one on the copy itself, or one on another copy of the conversation
-     * the same user holds, unless that user pinned the record on one of their copies. Another member's unlink never hides it.
+     * No suppression hides the record on this copy: none on the copy itself, and none on another copy of the
+     * conversation the same user holds unless that user pinned the record on one of their copies. Another member's
+     * unlink never hides it. Two probes, so each reads the unique key on `email_id` rather than every suppression of the record.
      *
+     * @template TTarget of Builder<Email>|QueryBuilder
+     *
+     * @param  TTarget  $target
      * @param  Builder<Email>  $query
+     * @param  Closure(QueryBuilder): QueryBuilder  $forRecord
+     * @return TTarget
      */
-    private function suppressionsOn(Builder $query): QueryBuilder
+    private function withoutSuppressions(Builder|QueryBuilder $target, Builder $query, Closure $forRecord): Builder|QueryBuilder
     {
-        return EmailLinkSuppression::query()
-            ->join('emails as suppressed_copies', 'suppressed_copies.id', '=', 'email_link_suppressions.email_id')
-            ->whereColumn('email_link_suppressions.workspace_id', $query->qualifyColumn('workspace_id'))
-            ->whereColumn('suppressed_copies.workspace_id', $query->qualifyColumn('workspace_id'))
-            ->where(fn (Builder $copy): Builder => $copy
-                ->whereColumn('suppressed_copies.id', $query->qualifyColumn('id'))
-                ->orWhere(fn (Builder $held): Builder => $held
-                    ->whereColumn('suppressed_copies.conversation_key', $query->qualifyColumn('conversation_key'))
-                    ->whereColumn('suppressed_copies.user_id', $query->qualifyColumn('user_id'))
-                    ->inForce()))
+        $onThisCopy = EmailLinkSuppression::query()
+            ->whereColumn('email_link_suppressions.email_id', $query->qualifyColumn('id'))
             ->toBase();
+        $onHeldCopies = EmailLinkSuppression::query()
+            ->join('emails as held', 'held.id', '=', 'email_link_suppressions.email_id')
+            ->whereColumn('held.workspace_id', $query->qualifyColumn('workspace_id'))
+            ->whereColumn('held.conversation_key', $query->qualifyColumn('conversation_key'))
+            ->whereColumn('held.user_id', $query->qualifyColumn('user_id'))
+            ->whereColumn('held.id', '<>', $query->qualifyColumn('id'))
+            ->whereColumn('email_link_suppressions.workspace_id', $query->qualifyColumn('workspace_id'))
+            ->inForce()
+            ->toBase();
+
+        return $target
+            ->whereNotExists($forRecord($onThisCopy))
+            ->whereNotExists($forRecord($onHeldCopies));
     }
 
     // Manual linking and sync linking take this first in their transactions, so neither reads the other's half-written links.

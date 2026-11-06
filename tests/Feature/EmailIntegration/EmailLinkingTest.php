@@ -501,6 +501,47 @@ it('keeps the user\'s later replies off a record they unlinked when a teammate p
         ->and(Email::query()->onRecord($this->company)->pluck('id')->all())->toBe([$teammates->getKey()]);
 });
 
+it('keeps the record tab right when many members suppressed many copies of its conversations', function (): void {
+    $suppress = fn (Email $email, User $by): EmailLinkSuppression => EmailLinkSuppression::factory()->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'email_id' => $email->getKey(),
+        'emailable_type' => $this->company->getMorphClass(),
+        'emailable_id' => $this->company->getKey(),
+        'user_id' => $by->getKey(),
+    ]);
+    $shown = [];
+
+    foreach (range(0, 39) as $index) {
+        $key = "renewal-{$index}";
+        $owners = linkingEmail($this->owner, ['conversation_key' => $key, 'rfc_message_id' => "<m{$index}@airbnb.test>"]);
+        $owners->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
+
+        if ($index < 30) {
+            $teammates = linkingEmail($this->teammate, ['conversation_key' => $key, 'rfc_message_id' => "<m{$index}@airbnb.test>"]);
+            $teammates->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
+            $shown[] = $teammates->getKey();
+        }
+
+        match (true) {
+            $index < 10, $index >= 30 => $suppress($owners, $this->owner),
+            $index < 20 => $suppress(linkingEmail($this->owner, ['conversation_key' => $key, 'rfc_message_id' => "<m{$index}-reply@airbnb.test>"]), $this->owner),
+            default => $suppress(linkingEmail($this->teammate, ['conversation_key' => $key, 'rfc_message_id' => "<m{$index}-cc@airbnb.test>"]), $this->teammate),
+        };
+
+        if ($index >= 20 && $index < 30) {
+            $shown = [...array_diff($shown, [$teammates->getKey()]), $owners->getKey()];
+        }
+
+        resolve(RefreshConversationSummary::class)->execute($this->workspace->getKey(), $key);
+    }
+
+    expect(EmailLinkSuppression::query()->distinct()->count('user_id'))->toBe(2)
+        ->and(EmailLinkSuppression::query()->count())->toBe(40)
+        ->and(Email::query()->onRecord($this->company)->pluck('id')->all())->toEqualCanonicalizing($shown)
+        ->and(resolve(ConversationsQuery::class)->paginate($this->owner, ConversationView::All, ConversationFilters::forRecord($this->company))->rows)->toHaveCount(30)
+        ->and(resolve(EmailVisibilityService::class)->visibleEmailCountBadge($this->company, $this->owner))->toBe('30');
+});
+
 it('leaves a copy off the opportunity tab once its company link is suppressed on that copy', function (): void {
     $opportunity = Opportunity::factory()->for($this->workspace)->create(['name' => 'Airbnb renewal', 'company_id' => $this->company->getKey()]);
     $email = linkingEmail($this->owner);
