@@ -6,7 +6,7 @@
         ['type' => 'command', 'text' => 'curl -o compose.yml https://raw.githubusercontent.com/relaticle/relaticle/main/compose.yml'],
         ['type' => 'blank'],
         ['type' => 'comment', 'text' => __('Add the two secrets and your address')],
-        ['type' => 'command', 'text' => 'cat > .env << EOF'],
+        ['type' => 'command', 'text' => 'cat > .env << EOF', 'bind' => 'heredocLine'],
         ['type' => 'command', 'text' => 'APP_KEY=base64:$(openssl rand -base64 32)', 'continuation' => true, 'bind' => 'appKeyLine'],
         ['type' => 'command', 'text' => 'DB_PASSWORD=$(openssl rand -hex 24)', 'continuation' => true, 'bind' => 'dbPasswordLine'],
         ['type' => 'command', 'text' => "APP_URL=https://{$defaultHost}", 'continuation' => true, 'bind' => 'appUrlLine'],
@@ -34,9 +34,13 @@
         dbPassword: Array.from(crypto.getRandomValues(new Uint8Array(24)), (byte) => byte.toString(16).padStart(2, '0')).join(''),
         commands: @js($installCommands),
         copied: false,
+        copyFailed: false,
         get cleanHost() {
-            return this.host.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '') || @js($defaultHost);
+            const host = this.host.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+
+            return /^[A-Za-z0-9.-]+(:[0-9]+)?$/.test(host) ? host : @js($defaultHost);
         },
+        get heredocLine() { return 'cat > .env << \'EOF\'' },
         get appKeyLine() { return 'APP_KEY=' + this.appKey },
         get dbPasswordLine() { return 'DB_PASSWORD=' + this.dbPassword },
         get appUrlLine() { return 'APP_URL=https://' + this.cleanHost },
@@ -45,10 +49,25 @@
             return this.commands.map((line) => line.bind ? this[line.bind] : line.text).join('\n');
         },
         copy() {
-            navigator.clipboard.writeText(this.script()).then(() => {
-                this.copied = true;
-                setTimeout(() => this.copied = false, 2000);
-            });
+            Promise.resolve()
+                .then(() => navigator.clipboard.writeText(this.script()))
+                .then(() => {
+                    this.copyFailed = false;
+                    this.copied = true;
+                    setTimeout(() => this.copied = false, 2000);
+                })
+                .catch(() => {
+                    this.selectTerminal();
+                    this.copyFailed = true;
+                    setTimeout(() => this.copyFailed = false, 4000);
+                });
+        },
+        selectTerminal() {
+            const range = document.createRange();
+            range.selectNodeContents(this.$refs.terminal);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
         },
     }"
 >
@@ -65,7 +84,7 @@
                 >
                     <x-ri-file-copy-line x-show="! copied" class="h-3.5 w-3.5" aria-hidden="true"/>
                     <x-ri-check-line x-show="copied" x-cloak class="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden="true"/>
-                    <span aria-live="polite" x-text="copied ? @js(__('Copied')) : @js(__('Copy'))">{{ __('Copy') }}</span>
+                    <span aria-live="polite" x-text="copied ? @js(__('Copied')) : (copyFailed ? @js(__('Press Cmd/Ctrl+C')) : @js(__('Copy')))">{{ __('Copy') }}</span>
                 </button>
             </div>
 
@@ -84,7 +103,7 @@
                 >
             </label>
 
-            <div class="flex-1 overflow-x-auto py-4 pr-10 pl-4 font-mono [mask-image:linear-gradient(to_right,black_calc(100%-2.5rem),transparent)] text-[12px] leading-6 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary sm:text-[13px]" tabindex="0" role="region" aria-label="{{ __('Install commands') }}">
+            <div x-ref="terminal" data-self-hosted-terminal class="flex-1 overflow-x-auto py-4 pr-10 pl-4 font-mono [mask-image:linear-gradient(to_right,black_calc(100%-2.5rem),transparent)] text-[12px] leading-6 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary sm:text-[13px]" tabindex="0" role="region" aria-label="{{ __('Install commands') }}">
                 @foreach($installLines as $line)
                     @if($line['type'] === 'blank')
                         <div class="h-3" aria-hidden="true"></div>
@@ -118,4 +137,13 @@
             />
         </x-cloud::marketing.mac-window>
     </div>
+</div>
+
+<div class="bg-surface border-rail border-t px-6 py-5 md:px-10" data-self-hosted-tls>
+    <p class="type-prose text-gray-700 dark:text-gray-300">
+        {{ __('The stack serves HTTP on port 80. For HTTPS, put a TLS reverse proxy in front.') }}
+        @if($documentationActive)
+            <a href="{{ route('documentation.show', ['type' => 'self-hosting']) }}#reverse-proxy-and-ssl" class="{{ $linkClass }}">{{ __('Reverse proxy guide') }}</a>
+        @endif
+    </p>
 </div>

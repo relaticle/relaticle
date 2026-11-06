@@ -51,8 +51,44 @@ it('copies commands only, with the generated secrets and no prompt glyphs', func
     $appKey = selfHostedInstall($page, 'install.appKey');
 
     expect($script)->toStartWith('curl -o compose.yml')
-        ->and($script)->toContain("cat > .env << EOF\nAPP_KEY={$appKey}\nDB_PASSWORD=")
+        ->and($script)->toContain("cat > .env << 'EOF'\nAPP_KEY={$appKey}\nDB_PASSWORD=")
         ->and($script)->toContain("APP_URL=https://crm.acme.io\nEOF\ndocker compose up -d\ndocker compose exec app php artisan make:filament-user")
         ->and($script)->not->toContain('#')
         ->and($script)->not->toMatch('/^[$>] /m');
+});
+
+it('falls back to the default address when the typed one could run a command', function (string $typed): void {
+    $page = $this->visit('/self-hosted');
+    $page->wait(1);
+
+    $page->fill('[data-self-hosted-host]', $typed);
+    $page->wait(0.3);
+
+    expect(selfHostedInstall($page, "root.querySelector('[x-text=\"appUrlLine\"]').innerText"))->toBe('APP_URL=https://crm.example.com')
+        ->and(selfHostedInstall($page, 'install.script()'))->not->toContain('whoami');
+
+    $page->assertNoJavaScriptErrors();
+})->with([
+    'command substitution' => '$(whoami)',
+    'backticks' => '`whoami`',
+    'a space and a command' => 'crm.acme.io whoami',
+    'a quote' => "crm.acme.io'whoami",
+]);
+
+it('keeps a hostname with a port', function (): void {
+    $page = $this->visit('/self-hosted');
+    $page->wait(1);
+
+    $page->fill('[data-self-hosted-host]', 'crm.acme.io:8080');
+    $page->wait(0.3);
+
+    expect(selfHostedInstall($page, "root.querySelector('[x-text=\"appUrlLine\"]').innerText"))->toBe('APP_URL=https://crm.acme.io:8080');
+});
+
+it('copies a heredoc with a quoted delimiter so the shell expands nothing', function (): void {
+    $page = $this->visit('/self-hosted');
+    $page->wait(1);
+
+    expect(selfHostedInstall($page, 'install.script()'))->toContain("cat > .env << 'EOF'\n")
+        ->and(selfHostedInstall($page, "root.querySelector('[x-text=\"heredocLine\"]').innerText"))->toBe("cat > .env << 'EOF'");
 });

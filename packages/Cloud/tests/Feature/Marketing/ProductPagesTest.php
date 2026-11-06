@@ -198,6 +198,14 @@ it('renders the install with shell-generated secrets before the browser generate
         ->and($html)->toContain('https://crm.example.com/app');
 });
 
+it('tells self-hosters the stack serves plain HTTP and links the reverse proxy guide', function (): void {
+    $html = $this->get('/self-hosted')->assertOk()->getContent();
+
+    expect($html)->toContain('data-self-hosted-tls')
+        ->and($html)->toContain('The stack serves HTTP on port 80. For HTTPS, put a TLS reverse proxy in front.')
+        ->and($html)->toContain('/developers/self-hosting#reverse-proxy-and-ssl');
+});
+
 it('names the six containers the compose file starts', function (): void {
     $html = $this->get('/self-hosted')->assertOk()->getContent();
 
