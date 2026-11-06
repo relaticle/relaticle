@@ -123,7 +123,7 @@ it('shows a plan, a docs answer and an email proposal as product fragments', fun
         ->and($html)->toContain(__('Up to :steps linked steps in one plan', ['steps' => config('chat.max_plan_steps')]))
         ->and($html)->toContain(route('help.show', ['category' => 'ai-assistant', 'slug' => 'connect-claude-or-chatgpt']))
         ->and($html)->toContain(__('Own approval'))
-        ->and($html)->toContain(__('Approve all never sends an email'));
+        ->and($html)->toContain(__('Approving a plan never sends an email'));
 });
 
 it('leaves the email showcase out when email integration is off', function (): void {

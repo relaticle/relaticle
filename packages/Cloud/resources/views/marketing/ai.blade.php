@@ -222,7 +222,7 @@
                     :lead="__('It writes the email.')"
                     :facts="[
                         __('Shows the mailbox, recipients, message and signature'),
-                        __('Approve all never sends an email'),
+                        __('Approving a plan never sends an email'),
                         trans_choice('An Undo button stays up for :count second after Send|An Undo button stays up for :count seconds after Send', $undoSeconds, ['count' => $undoSeconds]),
                     ]"
                     :link-label="__('Use your email with an AI assistant')"
