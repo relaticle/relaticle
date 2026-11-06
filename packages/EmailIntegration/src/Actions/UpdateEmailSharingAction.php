@@ -30,7 +30,7 @@ final readonly class UpdateEmailSharingAction
         // Defense in depth: only the email owner may change its sharing, regardless of caller.
         abort_unless($email->user_id === $sharer->getKey(), 403);
 
-        $previousAudience = filled($email->conversation_key)
+        $previousAudience = filled($email->conversation_key) && ConversationChanged::broadcasts()
             ? $this->conversations->audience($email->workspace_id, $email->conversation_key)
             : [];
 

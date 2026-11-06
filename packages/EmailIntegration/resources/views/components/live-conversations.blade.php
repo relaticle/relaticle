@@ -1,6 +1,6 @@
 @props(['userId', 'workspaceId'])
 
-{{-- One refetch per burst of signals. A hidden tab only collects them, and a tab hidden past a
+{{-- At most one refetch per 750 ms while signals arrive. A hidden tab only collects them, and a tab hidden past a
      minute refetches on return, covering a dropped socket and changes that send no signal. --}}
 <div
     wire:ignore
@@ -8,7 +8,7 @@
     data-live-conversations
     x-data="{
         event: '.email.conversation.changed',
-        debounceMs: 750,
+        throttleMs: 750,
         staleAfterMs: 60000,
         pending: new Set(),
         timer: null,
@@ -48,8 +48,7 @@
             }
         },
         schedule() {
-            clearTimeout(this.timer)
-            this.timer = setTimeout(() => this.flush(), this.debounceMs)
+            this.timer ??= setTimeout(() => this.flush(), this.throttleMs)
         },
         flush() {
             clearTimeout(this.timer)

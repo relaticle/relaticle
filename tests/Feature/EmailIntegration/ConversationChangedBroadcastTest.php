@@ -9,6 +9,7 @@ use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Illuminate\Broadcasting\BroadcastManager;
 use Illuminate\Broadcasting\PrivateChannel;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Relaticle\EmailIntegration\Actions\PurgeStoredMailboxData;
@@ -60,6 +61,7 @@ beforeEach(function (): void {
         ->firstOrFail();
     $company->saveCustomFieldValue($domains, 'https://airbnb.com', $this->workspace);
 
+    config(['broadcasting.default' => 'log']);
     Event::fake([ConversationChanged::class]);
 });
 
@@ -276,8 +278,9 @@ it('signals the audience of a conversation absorbed by a merge', function (): vo
         'status' => EmailStatus::SYNCED,
         'sent_at' => $sentAt,
     ]);
-    $message('conv-parent', '<parent@airbnb.com>', null, now()->subDay());
+    $parent = $message('conv-parent', '<parent@airbnb.com>', null, now()->subDay());
     $reply = $message('conv-reply', '<reply@airbnb.com>', '<parent@airbnb.com>', now());
+    Company::factory()->create(['workspace_id' => $this->workspace->id])->emails()->attach($parent->id);
 
     Event::fake([ConversationChanged::class]);
 
@@ -285,4 +288,25 @@ it('signals the audience of a conversation absorbed by a merge', function (): vo
 
     expect($reply->fresh()->conversation_key)->toBe('conv-parent')
         ->and(conversationChangedAudienceOf('conv-reply'))->toBe(conversationChangedChannels($this->alice));
+});
+
+it('reads no audience before a purge when no broadcaster is configured', function (): void {
+    config(['broadcasting.default' => 'null']);
+    $carolMailbox = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->carol->id,
+        'email_address' => 'carol@acme.test',
+        'status' => 'active',
+    ]));
+    conversationChangedStore($carolMailbox);
+    $audienceReads = 0;
+    DB::listen(function (QueryExecuted $query) use (&$audienceReads): void {
+        if (str_starts_with($query->sql, 'select * from "users"') && str_contains($query->sql, '"current_workspace_id" = ?')) {
+            $audienceReads++;
+        }
+    });
+
+    $this->carol->delete();
+
+    expect($audienceReads)->toBe(0);
 });

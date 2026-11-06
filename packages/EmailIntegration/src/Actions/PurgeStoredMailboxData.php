@@ -9,6 +9,7 @@ use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Relaticle\EmailIntegration\Events\ConversationChanged;
 use Relaticle\EmailIntegration\Jobs\RefreshConversationSummaries;
 use Relaticle\EmailIntegration\Models\AiSummary;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -90,7 +91,7 @@ final readonly class PurgeStoredMailboxData
 
         foreach ($keys as $workspaceId => $workspaceKeys) {
             foreach (array_chunk($workspaceKeys, self::CONVERSATIONS_PER_JOB) as $chunk) {
-                $chunks[$workspaceId][] = [$chunk, $this->conversations->audiences((string) $workspaceId, $chunk)];
+                $chunks[$workspaceId][] = [$chunk, ConversationChanged::broadcasts() ? $this->conversations->audiences((string) $workspaceId, $chunk) : []];
             }
         }
 

@@ -45,7 +45,7 @@ function liveBrowserCountRefreshes(): string
             window.fetch = (...args) => {
                 const body = String(args[1]?.body ?? '')
                 if (body.includes('refreshConversations')) {
-                    window.__refreshCalls.push(body)
+                    window.__refreshCalls.push(performance.now())
                 }
                 return fetch(...args)
             }
@@ -92,6 +92,43 @@ it('refreshes once for a burst of signals', function (string $theme): void {
         ->wait(1.5)
         ->assertScript('window.__refreshCalls.length', 1)
         ->assertNoJavaScriptErrors();
+})->with(['inLightMode', 'inDarkMode']);
+
+it('keeps refreshing at most once per 750 ms while signals keep arriving', function (string $theme): void {
+    liveBrowserBroadcasting();
+
+    $page = loginViaBrowser($this->owner, $theme)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->navigate("/app/{$this->workspace->slug}/email")
+        ->assertPresent('[data-live-conversations]')
+        ->assertScript(liveBrowserCountRefreshes());
+
+    foreach (range(1, 10) as $index) {
+        $page->assertScript(liveBrowserSignal($this->workspace->id, "conv-{$index}"))->wait(0.5);
+    }
+
+    $page->wait(1)
+        ->assertScript('window.__refreshCalls.length >= 5')
+        ->assertScript('window.__refreshCalls.every((at, index, calls) => index === 0 || at - calls[index - 1] >= 700)');
+})->with(['inLightMode', 'inDarkMode']);
+
+it('binds the listener once after navigating away and back', function (string $theme): void {
+    liveBrowserBroadcasting();
+    $bindings = "(() => { const name = Object.keys(window.Echo.connector.channels).find((channel) => channel.startsWith('private-App.Models.User.')); return (window.Echo.connector.channels[name].subscription.callbacks.get('email.conversation.changed') ?? []).length })()";
+
+    loginViaBrowser($this->owner, $theme)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->navigate("/app/{$this->workspace->slug}/email")
+        ->assertPresent('[data-live-conversations]')
+        ->assertScript($bindings, 1)
+        ->assertScript("Livewire.navigate('/app/{$this->workspace->slug}/companies') || true")
+        ->wait(2)
+        ->assertScript('document.querySelector("[data-live-conversations]") === null')
+        ->assertScript($bindings, 0)
+        ->assertScript("Livewire.navigate('/app/{$this->workspace->slug}/email') || true")
+        ->wait(2)
+        ->assertPresent('[data-live-conversations]')
+        ->assertScript($bindings, 1);
 })->with(['inLightMode', 'inDarkMode']);
 
 it('ignores a signal for another workspace', function (string $theme): void {

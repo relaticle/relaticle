@@ -14,9 +14,14 @@ final readonly class ForgetConversationCountsListener
     // Every member active in the workspace, a superset of the audience that skips its visibility queries.
     public function handle(ConversationChanged $event): void
     {
+        $this->forWorkspace($event->workspaceId);
+    }
+
+    public function forWorkspace(string $workspaceId): void
+    {
         $members = User::query()
-            ->inWorkspace($event->workspaceId)
-            ->where('current_workspace_id', $event->workspaceId)
+            ->inWorkspace($workspaceId)
+            ->where('current_workspace_id', $workspaceId)
             ->get(['id', 'current_workspace_id']);
 
         foreach ($members as $member) {

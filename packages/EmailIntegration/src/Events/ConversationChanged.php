@@ -24,9 +24,15 @@ final class ConversationChanged implements ShouldBroadcast, ShouldDispatchAfterC
         public readonly array $alsoNotify = [],
     ) {}
 
-    public function broadcastWhen(): bool
+    // Writers read the audience before a change only when this holds, so a self-hosted install without a broadcaster skips it.
+    public static function broadcasts(): bool
     {
         return config('broadcasting.default') !== 'null' && EmailIntegrationServiceProvider::enabled();
+    }
+
+    public function broadcastWhen(): bool
+    {
+        return self::broadcasts();
     }
 
     public function broadcastAs(): string
