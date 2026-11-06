@@ -30,6 +30,6 @@ final readonly class SaveMailboxSharingTier
         });
 
         // A mailbox-wide change sends no per-conversation signal, so the counts it moves are dropped here.
-        $this->forgetCounts->forWorkspace($mailbox->workspace_id);
+        DB::afterCommit(fn () => $this->forgetCounts->forWorkspace($mailbox->workspace_id));
     }
 }

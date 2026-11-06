@@ -65,6 +65,15 @@ final class MergeConversations implements ShouldBeUniqueUntilProcessing, ShouldQ
         DB::transaction(function () use ($survivor, $absorbed, $refresh): void {
             DB::select('select pg_advisory_xact_lock(hashtext(?))', [$this->workspaceId]);
 
+            $stranded = Email::query()->withoutGlobalScopes()
+                ->where('workspace_id', $this->workspaceId)
+                ->whereIn('conversation_key', $absorbed)
+                ->exists();
+
+            if (! $stranded) {
+                return;
+            }
+
             $audiences = $this->audiences([$survivor, ...$absorbed]);
 
             if ($this->rewrite($absorbed, $survivor) > 0) {
