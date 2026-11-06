@@ -276,7 +276,7 @@ it('warns about an edit made after the proposal and overwrites it only on a clic
     expect($proposal->fresh()->status)->toBe(PendingActionStatus::Pending);
 
     $page->click(LOCK_TEST_DOCK.' button:has-text("Overwrite")')
-        ->wait(1.2)
+        ->waitForText('Applied 1 change')
         ->assertMissing('[data-proposal-overwrite-notice]')
         ->assertNoJavaScriptErrors();
 

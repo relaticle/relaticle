@@ -661,6 +661,34 @@ describe('an edit made after the proposal', function (): void {
             ->assertSeeHtml('data-proposal-shortcut');
     });
 
+    it('warns when a teammate renamed the record the proposal renames', function (): void {
+        $proposal = proposeOpportunityUpdate($this->user, [['id' => $this->opportunity->getKey(), 'name' => 'Figma Enterprise Renewal 2027']]);
+
+        $this->travel(2)->minutes();
+        editAsTeammate($this->teammate, $this->opportunity, ['name' => 'Figma Renewal FY27']);
+
+        Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+            ->dispatch('proposal:set-active', id: $proposal->getKey(), context: 'conversation')
+            ->assertSee('Maya Chen set Name to Figma Renewal FY27 at 14:32, after Rela proposed this.')
+            ->assertSeeHtml('dark:decoration-gray-600">Figma Renewal FY27</span>')
+            ->assertSee('Overwrite');
+    });
+
+    it('warns when a teammate relinked the company the proposal sets', function (): void {
+        $figma = Company::factory()->for($this->workspace)->create(['name' => 'Figma']);
+        $notion = Company::factory()->for($this->workspace)->create(['name' => 'Notion']);
+        $proposal = proposeOpportunityUpdate($this->user, [['id' => $this->opportunity->getKey(), 'company_id' => $figma->getKey()]]);
+
+        $this->travel(2)->minutes();
+        editAsTeammate($this->teammate, $this->opportunity, ['company_id' => $notion->getKey()]);
+
+        Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+            ->dispatch('proposal:set-active', id: $proposal->getKey(), context: 'conversation')
+            ->assertSee('Maya Chen set Company to Notion at 14:32, after Rela proposed this.')
+            ->assertSeeHtml('dark:decoration-gray-600">Notion</span>')
+            ->assertSee('Overwrite');
+    });
+
     it('says you made the change when the viewer edited the record', function (): void {
         $proposal = proposeOpportunityUpdate($this->user, [['id' => $this->opportunity->getKey(), 'custom_fields' => ['amount' => 48000]]]);
 

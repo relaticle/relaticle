@@ -161,21 +161,21 @@
 - [ ] **Step 2: Run** `composer test:arch` and `php artisan test --compact packages/Documentation` (or the docs test path the repo uses). Expected: PASS.
 - [ ] **Step 3: Commit** `docs(chat): describe the redesigned approval dock`
 
-### Task 8: The record changed after the proposal (spec section 7)
-
-**Files:**
-- Create: `packages/Chat/src/Queries/ProposalConflictsQuery.php`, `packages/Chat/src/Data/ProposalConflict.php`, `packages/Chat/src/Support/ProposalConflictNotice.php`, `packages/Chat/resources/views/livewire/chat/partials/_dock-overwrite-notice.blade.php`
-- Modify: `app/Support/ActivityLog/ActivityChangeSummary.php` (rows carry `code`), `packages/Chat/src/Livewire/Chat/ProposalCard.php` (`overwrites()`, `primaryIsRisky()`, `$shownOverwrites`, the guard in `createCurrent`/`approveAll`/`approveStep`), `proposal-card.blade.php` ("Overwrite"), `_dock-step.blade.php` (notices)
-- Test: `tests/Feature/Chat/ProposalCardLifecycleTest.php` ("an edit made after the proposal"), `tests/Browser/Chat/PlanCardTest.php`
-
-- [x] **Step 1: Tests** for: the notice names who, field, value and time, and the button reads Overwrite with no shortcut; an edit to an untouched field changes nothing; an edit after the render is refused once and then shown; the shortcut never overwrites; leaving the field or row out drops the warning; the viewer's own edit reads "You"; a batch warns on the one row.
-- [x] **Step 2: Implement** per the files above.
-- [x] **Step 3: Run** the lifecycle file, `tests/Feature/Chat`, `tests/Feature/ActivityLog`, `WorkspaceActivityLogTest`, `ActivityResourceTest`, Arch; the browser case in Chromium and WebKit.
-- [x] **Step 4: Docs.** Spec decision 10, `.ai/rules/chat.md`, the help article.
-
 ### Task 7: Gates and the end-to-end walk
 
 - [ ] **Step 1:** `vendor/bin/pint --dirty --format agent`, `vendor/bin/rector --dry-run`, `vendor/bin/phpstan analyse`, `composer test:lint`, `composer test:arch`, `composer test:affected`. Expected: all clean.
 - [ ] **Step 2:** Browser tests for every changed surface once in WebKit: `php artisan test --compact tests/Browser/Chat/ProposalDockLockTest.php tests/Browser/Chat/PlanCardTest.php tests/Browser/Chat/ProposalRowDisclosureTest.php --browser safari` and the marketing browser tests the same way.
 - [ ] **Step 3:** The production-shaped chat loop (Horizon, Redis queue, Reverb), real browser: each board scenario through send, stream, dock, leave-out, approve and discard; light, dark, side panel, full page; then WebKit. Screenshots into the PR.
 - [ ] **Step 4:** Push, watch the `Tests` workflow as a background task, update the PR body (what changed, why, behaviour to know, tests, checked, not checked).
+
+### Task 8: The record changed after the proposal (spec section 7)
+
+**Files:**
+- Create: `packages/Chat/src/Queries/ProposalConflictsQuery.php`, `packages/Chat/src/Data/ProposalConflict.php`, `packages/Chat/src/Support/ProposalConflictNotice.php`, `packages/Chat/resources/views/livewire/chat/partials/_dock-overwrite-notice.blade.php`
+- Modify: `app/Support/ActivityLog/ActivityChangeSummary.php` (rows carry `code`), `packages/Chat/src/Livewire/Chat/ProposalCard.php` (`overwrites()`, `primaryIsRisky()`, `$shownOverwrites`, the guard in `createCurrent`/`approveAll`/`approveStep`), `proposal-card.blade.php` ("Overwrite"), `_dock-step.blade.php` (notices)
+- Test: `tests/Feature/Chat/ProposalCardLifecycleTest.php` ("an edit made after the proposal"), `tests/Browser/Chat/ProposalDockLockTest.php`
+
+- [x] **Step 1: Tests** for: the notice names who, field, value and time, and the button reads Overwrite with no shortcut; an edit to an untouched field changes nothing; an edit after the render is refused once and then shown; the shortcut never overwrites; leaving the field or row out drops the warning; the viewer's own edit reads "You"; a rename and a relinked company warn too; a batch warns on the one row.
+- [x] **Step 2: Implement** per the files above.
+- [x] **Step 3: Run** the lifecycle file, `tests/Feature/Chat`, `tests/Feature/ActivityLog`, `WorkspaceActivityLogTest`, `ActivityResourceTest`, Arch; the browser case in Chromium and WebKit.
+- [x] **Step 4: Docs.** Spec decision 10, `.ai/rules/chat.md`, the help article.
