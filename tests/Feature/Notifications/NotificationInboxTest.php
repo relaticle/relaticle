@@ -232,6 +232,57 @@ it('renders a notification stored before this change', function (): void {
         ->assertSee('Open legacy');
 });
 
+it('renders nothing for a notification whose class no longer exists', function (): void {
+    $orphanId = (string) Str::uuid();
+
+    DB::table('notifications')->insert([
+        'id' => $orphanId,
+        'type' => 'App\\Notifications\\RemovedLongAgoNotification',
+        'notifiable_type' => $this->user->getMorphClass(),
+        'notifiable_id' => $this->user->getKey(),
+        'data' => json_encode(['layout_name' => 'Board']),
+        'workspace_id' => $this->workspaceA->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $keptId = insertFilamentNotification($this->user, $this->workspaceA->id, 'Still readable');
+
+    Livewire::actingAs($this->user)->test(AppDatabaseNotifications::class)
+        ->assertSee('Still readable')
+        ->assertSeeHtml("inbox-notification-{$keptId}")
+        ->assertDontSeeHtml("inbox-notification-{$orphanId}");
+});
+
+it('counts and pages past notifications whose class no longer exists', function (): void {
+    foreach (range(1, 51) as $position) {
+        DB::table('notifications')->insert([
+            'id' => (string) Str::uuid(),
+            'type' => 'App\\Notifications\\RemovedLongAgoNotification',
+            'notifiable_type' => $this->user->getMorphClass(),
+            'notifiable_id' => $this->user->getKey(),
+            'data' => json_encode(['layout_name' => 'Board']),
+            'workspace_id' => $this->workspaceA->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    $component = Livewire::actingAs($this->user)->test(AppDatabaseNotifications::class);
+
+    expect($component->instance()->getUnreadNotificationsCount())->toBe(0)
+        ->and($component->instance()->getNotificationsQuery()->count())->toBe(0);
+
+    insertFilamentNotification($this->user, $this->workspaceA->id, 'Still readable');
+
+    $component = Livewire::actingAs($this->user)->test(AppDatabaseNotifications::class);
+
+    $page = $component->instance()->getNotifications();
+
+    expect($component->instance()->getUnreadNotificationsCount())->toBe(1)
+        ->and($page->items())->toHaveCount(1)
+        ->and($page->hasMorePages())->toBeFalse();
+});
+
 it('marks a notification stored before this change as read from its action', function (): void {
     $id = insertFilamentNotification($this->user, $this->workspaceA->id, 'Legacy title', [
         Action::make('open')->label('Open legacy')->url('/legacy')->markAsRead(),

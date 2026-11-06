@@ -40,6 +40,9 @@ final class AppDatabaseNotifications extends DatabaseNotifications
 
     private ?string $announcement = null;
 
+    /** @var list<string>|null */
+    private ?array $removedTypes = null;
+
     public function mount(): void
     {
         $this->announcedThrough = $this->inboxStats()['newest'];
@@ -66,7 +69,22 @@ final class AppDatabaseNotifications extends DatabaseNotifications
     {
         return $this->requireUser()->notifications()
             ->visibleIn(resolve(CurrentWorkspace::class)->get())
+            ->whereNotIn('type', $this->removedNotificationTypes())
             ->orderByDesc('id');
+    }
+
+    /** @return list<string> */
+    private function removedNotificationTypes(): array
+    {
+        return $this->removedTypes ??= array_values($this->requireUser()->notifications()
+            ->visibleIn(resolve(CurrentWorkspace::class)->get())
+            ->reorder()
+            ->toBase()
+            ->distinct()
+            ->pluck('type')
+            ->map(strval(...))
+            ->reject(fn (string $type): bool => class_exists($type))
+            ->all());
     }
 
     public function archiveNotification(string $id): void
