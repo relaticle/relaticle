@@ -8,12 +8,14 @@ use App\Filament\Resources\CompanyResource\RelationManagers\EmailsRelationManage
 use App\Filament\Resources\CompanyResource\RelationManagers\NotesRelationManager;
 use App\Models\Company;
 use App\Models\User;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Events\ConversationChanged;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -31,6 +33,7 @@ beforeEach(function (): void {
     $this->company = Company::factory()->create(['workspace_id' => $this->workspace->id, 'name' => 'Airbnb']);
 
     Feature::for($this->workspace)->activate(EmailConversations::class);
+    Event::fake([ConversationChanged::class]);
 });
 
 function drawerBrowserMailbox(User $user, string $address): ConnectedAccount

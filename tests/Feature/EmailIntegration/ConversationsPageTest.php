@@ -12,6 +12,7 @@ use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Facade;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -29,6 +30,7 @@ use Relaticle\EmailIntegration\Enums\EmailFilter;
 use Relaticle\EmailIntegration\Enums\EmailPageTab;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Events\ConversationChanged;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConversationFilters;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConversationReader;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
@@ -60,6 +62,7 @@ beforeEach(function (): void {
     $this->company = Company::factory()->create(['workspace_id' => $this->workspace->id, 'name' => 'Airbnb']);
 
     Feature::for($this->workspace)->activate(EmailConversations::class);
+    Event::fake([ConversationChanged::class]);
     actingAs($this->owner);
     Filament::setCurrentPanel(Filament::getPanel('app'));
     Filament::setTenant($this->workspace);

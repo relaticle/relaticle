@@ -9,6 +9,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Events\ConversationChanged;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Notifications\EmailSharedNotification;
 use Relaticle\EmailIntegration\Services\EmailSharingService;
@@ -38,6 +39,10 @@ final readonly class UpdateEmailSharingAction
                 ->reject(fn (User $recipient, string $userId): bool => $userId === (string) $sharer->getKey()
                     || in_array($userId, $alreadyHadAccess, true));
         });
+
+        if (filled($email->conversation_key)) {
+            event(new ConversationChanged($email->workspace_id, $email->conversation_key));
+        }
 
         $newlyGranted->each(fn (User $recipient) => $recipient->notify(
             new EmailSharedNotification($email, $sharer, $recipient),

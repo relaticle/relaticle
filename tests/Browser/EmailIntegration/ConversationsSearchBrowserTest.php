@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 use App\Features\EmailConversations;
 use App\Models\User;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Events\ConversationChanged;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConversationFilters;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -31,6 +33,7 @@ beforeEach(function (): void {
     ]));
 
     Feature::for($this->workspace)->activate(EmailConversations::class);
+    Event::fake([ConversationChanged::class]);
 });
 
 function searchBrowserMessage(ConnectedAccount $mailbox, string $key, string $from, string $subject, string $body): Email

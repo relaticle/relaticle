@@ -10,7 +10,6 @@ use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBeUnique;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
-use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\Attributes\Queue;
 use Illuminate\Queue\Attributes\UniqueFor;
 use Illuminate\Support\Facades\Gate;
@@ -23,7 +22,6 @@ use Relaticle\EmailIntegration\Queries\ConversationsQuery;
 #[UniqueFor(10)]
 final class ConversationChanged implements ShouldBeUnique, ShouldBroadcast, ShouldDispatchAfterCommit
 {
-    use Dispatchable;
     use InteractsWithSockets;
 
     public function __construct(

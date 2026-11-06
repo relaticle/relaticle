@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Events\ConversationChanged;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailConversation;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
@@ -24,6 +25,8 @@ final readonly class RefreshConversationSummary
 
             $this->write($workspaceId, $conversationKey);
         });
+
+        event(new ConversationChanged($workspaceId, $conversationKey));
     }
 
     private function write(string $workspaceId, string $conversationKey): void

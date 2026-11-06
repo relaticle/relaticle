@@ -11,6 +11,7 @@ use App\Models\CustomField;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
@@ -20,6 +21,7 @@ use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Enums\MailboxHealth;
+use Relaticle\EmailIntegration\Events\ConversationChanged;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManager;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -44,6 +46,7 @@ beforeEach(function (): void {
     $this->company = Company::factory()->create(['workspace_id' => $this->workspace->id, 'name' => 'Airbnb']);
 
     Feature::for($this->workspace)->activate(EmailConversations::class);
+    Event::fake([ConversationChanged::class]);
     actingAs($this->owner);
     Filament::setCurrentPanel(Filament::getPanel('app'));
     Filament::setTenant($this->workspace);
