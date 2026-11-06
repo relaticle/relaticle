@@ -212,6 +212,26 @@ it('links the open conversation from the drawer picker as a pin', function (): v
     expect(linkSource($email, $this->company))->toBe('manual');
 });
 
+it('shows a chip for every record the open conversation is on, past the three a list row reads', function (): void {
+    $email = linkingEmail($this->owner);
+    $records = [
+        $this->company,
+        Company::factory()->for($this->workspace)->create(['name' => 'Stripe']),
+        Opportunity::factory()->for($this->workspace)->create(['name' => 'Airbnb renewal']),
+        Opportunity::factory()->for($this->workspace)->create(['name' => 'Stripe expansion']),
+    ];
+
+    foreach ($records as $record) {
+        resolve(LinkEmailToRecord::class)->execute($this->owner, $email, $record);
+    }
+
+    $page = linkingPage($email);
+
+    foreach ($records as $record) {
+        $page->assertSeeHtml('data-linked-record="'.$record->getMorphClass().':'.$record->getKey().'"');
+    }
+});
+
 it('searches only the records of the bound workspace and stops at twenty', function (): void {
     $email = linkingEmail($this->owner);
     Company::factory()->count(22)->for($this->workspace)->sequence(fn ($sequence): array => ['name' => 'Airline '.str_pad((string) $sequence->index, 2, '0', STR_PAD_LEFT)])->create();

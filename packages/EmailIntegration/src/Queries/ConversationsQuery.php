@@ -748,11 +748,10 @@ final readonly class ConversationsQuery
 
         $rank = array_flip(array_map(fn (CrmEntity $entity): string => $entity->value, $order));
 
-        return array_map(fn (array $linked): array => array_slice(
-            collect($linked)->sortBy([fn (array $a, array $b): int => $rank[$a['type']] <=> $rank[$b['type']], fn (array $a, array $b): int => strcasecmp($a['name'], $b['name'])])->values()->all(),
-            0,
-            3,
-        ), $records);
+        return array_map(
+            fn (array $linked): array => array_values(collect($linked)->sortBy([fn (array $a, array $b): int => $rank[$a['type']] <=> $rank[$b['type']], fn (array $a, array $b): int => strcasecmp($a['name'], $b['name'])])->all()),
+            $records,
+        );
     }
 
     /**
