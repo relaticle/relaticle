@@ -168,7 +168,7 @@ final class TasksBoard extends BoardResourcePage
     /** @return array{preview: string, progress: ?string} */
     private function summarizeCard(Task $record): array
     {
-        $field = self::descriptionCustomField();
+        $field = $this->descriptionCustomField();
         $description = $field instanceof CustomField ? $record->getCustomFieldValue($field) : null;
         $description = is_string($description) ? $description : '';
         $progress = ChecklistHtml::progress($description);
@@ -373,7 +373,7 @@ final class TasksBoard extends BoardResourcePage
         return $this->statuses()->contains(fn (array $status): bool => (string) $status['id'] === $id);
     }
 
-    private static function descriptionCustomField(): ?CustomField
+    private function descriptionCustomField(): ?CustomField
     {
         return self::cardCustomFields()->get(TaskCustomField::DESCRIPTION->value);
     }
