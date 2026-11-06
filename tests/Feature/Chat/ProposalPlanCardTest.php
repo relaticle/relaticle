@@ -171,6 +171,25 @@ describe('leaving steps and rows out', function (): void {
             ->assertDispatched('proposal:resolved', pendingActionId: (string) $task->getKey(), decision: 'rejected', cancelledBy: (string) $person->getKey());
     });
 
+    it('carries the recomputed outcome of every step in the plan with each announcement', function (): void {
+        [$person, $task, $note] = ($this->chainedPlan)();
+
+        Livewire::test(ProposalCard::class)
+            ->call('setActive', $person->getKey())
+            ->call('toggleLeftOut', (string) $person->getKey())
+            ->call('approveAll')
+            ->assertDispatched('proposal:resolved', function (string $event, array $params) use ($person, $task, $note): bool {
+                $outcomes = array_map(fn (array $receipt): ?string => $receipt['outcome'], $params['receipts'] ?? []);
+
+                return $params['pendingActionId'] === (string) $note->getKey()
+                    && $outcomes === [
+                        (string) $person->getKey() => 'left_out',
+                        (string) $task->getKey() => 'left_out',
+                        (string) $note->getKey() => 'applied',
+                    ];
+            });
+    });
+
     it('writes nothing until approve when a step is left out', function (): void {
         [$person, $task, $note] = ($this->chainedPlan)();
 

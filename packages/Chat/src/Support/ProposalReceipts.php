@@ -1,0 +1,195 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Relaticle\Chat\Support;
+
+use App\Enums\CustomFields\OpportunityField;
+use Relaticle\Chat\Enums\PendingActionOperation;
+use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Enums\ProposalEntity;
+use Relaticle\Chat\Enums\ProposalOutcome;
+use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Queries\OpportunityAmountTotalQuery;
+use Relaticle\Chat\Services\ProposalPlanService;
+
+/**
+ * The facts a transcript receipt needs about one plan, built once for both the
+ * reload path (ConversationMessagesQuery) and the live resolution payloads, so
+ * the browser reads them and derives none of its own.
+ *
+ * @phpstan-type Step array{id: string, status: string, entity_type: ?string, operation: ?string, workspace_id: string, resolved_at: ?string, result_data: ?array<array-key, mixed>, display: ?array<array-key, mixed>}
+ * @phpstan-type Receipt array{outcome: ?string, resolved_at: ?string, excluded: list<string>, moved_to: ?string, moved_total: ?string, itemResults: array<string, array{status: string, outcome: string, excluded: list<string>}>}
+ */
+final readonly class ProposalReceipts
+{
+    public function __construct(
+        private ProposalPlanService $plans,
+        private OpportunityAmountTotalQuery $amounts,
+    ) {}
+
+    /**
+     * @return array<string, Receipt>
+     */
+    public function forPlanOf(PendingAction $step): array
+    {
+        $fresh = PendingAction::query()->whereKey($step->getKey())->first() ?? $step;
+
+        return $this->forGroup(array_map($this->stepFromModel(...), $this->plans->steps($fresh)));
+    }
+
+    /**
+     * @param  list<Step>  $steps
+     * @return array<string, Receipt>
+     */
+    public function forGroup(array $steps): array
+    {
+        $decided = [];
+
+        foreach ($steps as $step) {
+            $decided[$step['id']] = [
+                'status' => PendingActionStatus::tryFrom($step['status']) ?? PendingActionStatus::Pending,
+                'entity' => ProposalEntity::tryFrom((string) $step['entity_type']),
+            ];
+        }
+
+        $outcomes = ProposalOutcome::forGroup($decided);
+
+        $receipts = [];
+
+        foreach ($steps as $step) {
+            $entity = ProposalEntity::tryFrom((string) $step['entity_type']);
+            $resultData = $step['result_data'] ?? [];
+            $items = is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
+            $moved = $this->moved($step, $entity, $items);
+
+            $receipts[$step['id']] = [
+                'outcome' => $outcomes[$step['id']]?->value,
+                'resolved_at' => $step['resolved_at'],
+                'excluded' => $this->codes($resultData['excluded'] ?? null),
+                'moved_to' => $moved['to'] ?? null,
+                'moved_total' => $moved === null ? null : $this->amounts->formatted($step['workspace_id'], $moved['ids']),
+                'itemResults' => $this->itemResults($items, $entity),
+            ];
+        }
+
+        return $receipts;
+    }
+
+    /**
+     * @param  array<array-key, mixed>|null  $resultData
+     * @param  array<array-key, mixed>|null  $display
+     * @return Step
+     */
+    public static function step(string $id, string $status, ?string $entityType, ?string $operation, string $workspaceId, ?string $resolvedAt, ?array $resultData, ?array $display): array
+    {
+        return [
+            'id' => $id,
+            'status' => $status,
+            'entity_type' => $entityType,
+            'operation' => $operation,
+            'workspace_id' => $workspaceId,
+            'resolved_at' => $resolvedAt,
+            'result_data' => $resultData,
+            'display' => $display,
+        ];
+    }
+
+    /**
+     * @return Step
+     */
+    private function stepFromModel(PendingAction $step): array
+    {
+        return self::step(
+            (string) $step->getKey(),
+            $step->status->value,
+            $step->entity_type->value,
+            $step->operation->value,
+            (string) $step->workspace_id,
+            $step->resolved_at?->toIso8601String(),
+            $step->result_data,
+            $step->display_data,
+        );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $items
+     * @return array<string, array{status: string, outcome: string, excluded: list<string>}>
+     */
+    private function itemResults(array $items, ?ProposalEntity $entity): array
+    {
+        $declined = ($entity?->declinedOutcome() ?? ProposalOutcome::LeftOut)->value;
+        $results = [];
+
+        foreach ($items as $index => $item) {
+            $stored = is_array($item) ? ($item['status'] ?? null) : null;
+
+            if ($stored !== 'approved' && $stored !== 'rejected') {
+                continue;
+            }
+
+            $results[(string) $index] = [
+                'status' => $stored === 'approved' ? 'approved' : 'skipped',
+                'outcome' => $stored === 'approved' ? ProposalOutcome::Applied->value : $declined,
+                'excluded' => $this->codes($item['excluded'] ?? null),
+            ];
+        }
+
+        return $results;
+    }
+
+    /**
+     * A batch of opportunity updates is a move when every written row changed
+     * only the stage, to one value, decided on the field code.
+     *
+     * @param  Step  $step
+     * @param  array<array-key, mixed>  $items
+     * @return array{to: string, ids: list<string>}|null
+     */
+    private function moved(array $step, ?ProposalEntity $entity, array $items): ?array
+    {
+        if ($entity !== ProposalEntity::Opportunity || $step['operation'] !== PendingActionOperation::Update->value || $step['status'] !== PendingActionStatus::Approved->value) {
+            return null;
+        }
+
+        $rows = is_array($step['display']['items'] ?? null) ? $step['display']['items'] : [];
+        $targets = [];
+        $ids = [];
+
+        foreach ($rows as $index => $row) {
+            $result = $items[$index] ?? null;
+
+            if ($items !== [] && (! is_array($result) || ($result['status'] ?? null) !== 'approved')) {
+                continue;
+            }
+
+            $excluded = $this->codes(is_array($result) ? ($result['excluded'] ?? null) : null);
+            $fields = array_values(array_filter(
+                is_array($row['fields'] ?? null) ? $row['fields'] : [],
+                fn (mixed $field): bool => is_array($field) && ! in_array($field['code'] ?? null, $excluded, true),
+            ));
+
+            if (count($fields) !== 1 || ($fields[0]['code'] ?? null) !== OpportunityField::STAGE->value || ! is_string($fields[0]['new'] ?? null)) {
+                return null;
+            }
+
+            $targets[] = $fields[0]['new'];
+
+            if (is_array($result) && is_string($result['id'] ?? null)) {
+                $ids[] = $result['id'];
+            }
+        }
+
+        $targets = array_unique($targets);
+
+        return count($targets) === 1 ? ['to' => reset($targets), 'ids' => $ids] : null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function codes(mixed $value): array
+    {
+        return is_array($value) ? array_values(array_filter($value, is_string(...))) : [];
+    }
+}

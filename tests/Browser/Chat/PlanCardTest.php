@@ -253,6 +253,11 @@ function seedReceiptMessages(string $messagesJson): string
                 display: { summary, fields: extra.fields ?? [], items: extra.items },
                 itemResults: extra.itemResults ?? {},
                 record: extra.record ?? null,
+                outcome: extra.outcome ?? null,
+                excluded: extra.excluded ?? [],
+                moved_to: extra.moved_to ?? null,
+                moved_total: extra.moved_total ?? null,
+                resolved_at: extra.resolvedAt ?? null,
             });
 
             const message = (id, actions) => ({ id, role: 'assistant', content: 'Done.', rendered: true, html: '<p>Done.</p>', pending_actions: actions });
@@ -275,21 +280,22 @@ it('receipts an applied plan as check lines under one head, with no status dots'
 
     $page->script(seedReceiptMessages(<<<'JS'
         [message('m1', [
-            step('pa-1', 'approved', 'company', 'create', 'Create company "Acme"', { turn: 't1', record: { id: 'c1', type: 'company', label: 'Acme', url: '/app/x/companies/c1' }, fields: [{ label: 'Name', value: 'Acme' }] }),
-            step('pa-2', 'approved', 'task', 'create', 'Create task "Call Jane"', { turn: 't1', record: { id: 't1', type: 'task', label: 'Call Jane', url: '/app/x/tasks/t1' } }),
-            step('pa-3', 'approved', 'opportunity', 'update', 'Update opportunity "Renewal"', { turn: 't1', record: { id: 'o1', type: 'opportunity', label: 'Renewal', url: '/app/x/opportunities/o1' }, fields: [{ label: 'Stage', old: 'Open', new: 'Won' }, { label: 'Amount', old: '1', new: '2' }] }),
+            step('pa-1', 'approved', 'company', 'create', 'Create company "Acme"', { turn: 't1', outcome: 'applied', record: { id: 'c1', type: 'company', label: 'Acme', url: '/app/x/companies/c1' }, fields: [{ label: 'Name', value: 'Acme' }] }),
+            step('pa-2', 'approved', 'task', 'create', 'Create task "Call Jane"', { turn: 't1', outcome: 'applied', record: { id: 't1', type: 'task', label: 'Call Jane', url: '/app/x/tasks/t1' } }),
+            step('pa-3', 'approved', 'opportunity', 'update', 'Update opportunity "Renewal"', { turn: 't1', outcome: 'applied', excluded: ['amount'], record: { id: 'o1', type: 'opportunity', label: 'Renewal', url: '/app/x/opportunities/o1' }, fields: [{ label: 'Stage', code: 'stage', old: 'Open', new: 'Won' }, { label: 'Amount', code: 'amount', old: '1', new: '2' }] }),
         ])]
     JS));
 
     $page->assertSee('Applied 3 changes · just now')
         ->assertSee('Created task')
         ->assertSee('Call Jane')
-        ->assertSee('Stage, Amount');
+        ->assertSee('Stage (Amount left out)');
 
     $receipt = $page->script(<<<'JS'
         (() => {
             const receipt = document.querySelector('[data-proposal-receipt]');
-            const dots = Array.from(receipt.querySelectorAll('.rounded-full'))
+            const transcript = document.querySelector('[x-ref="messages"]');
+            const dots = Array.from(transcript.querySelectorAll('.rounded-full'))
                 .filter((el) => /\bbg-(green|red)-|\bbg-gray-400\b/.test(el.className));
 
             return {
@@ -316,18 +322,21 @@ it('receipts a mixed outcome: a moved batch with a left-out row and an unsent em
         [message('m1', [
             step('pa-1', 'approved', 'opportunity', 'update', 'Update 6 opportunities', {
                 turn: 't1',
+                outcome: 'applied',
+                moved_to: 'Negotiation',
+                moved_total: '$110,200',
                 items: ['Kovra renewal', 'Kovra add-on seats', 'Kovra platform expansion', 'Kovra pilot', 'Kovra support', 'Kovra training'].map((name) => ({
                     summary: 'Update opportunity "' + name + '"',
                     fields: [{ label: 'Stage', old: 'Open', new: 'Negotiation' }],
                 })),
-                itemResults: { 1: { status: 'skipped', record: null } },
+                itemResults: { 1: { status: 'skipped', outcome: 'left_out', excluded: [], record: null } },
             }),
-            step('pa-2', 'rejected', 'emails', 'create', 'Email: Q4 lanes', { turn: 't1', fields: [{ label: 'To', value: 'Priya Nair' }, { label: 'Subject', value: 'Q4 lanes' }] }),
+            step('pa-2', 'rejected', 'emails', 'create', 'Email: Q4 lanes', { turn: 't1', outcome: 'not_sent', fields: [{ label: 'To', value: 'Priya Nair' }, { label: 'Subject', value: 'Q4 lanes' }] }),
         ])]
     JS));
 
     $page->assertSee('Applied 5 changes · just now')
-        ->assertSee('Moved 5 opportunities to Negotiation')
+        ->assertSee('Moved 5 opportunities to Negotiation · $110,200')
         ->assertSee('Kovra add-on seats · left out')
         ->assertSee('Not sent: Q4 lanes');
 });
@@ -343,11 +352,11 @@ it('settles a discarded, expired and replaced proposal as one grey line', functi
 
     $page->script(seedReceiptMessages(<<<'JS'
         [
-            message('m1', [step('pa-1', 'rejected', 'company', 'create', 'Create company "Acme"')]),
-            message('m2', [step('pa-2', 'superseded', 'task', 'create', 'Create task "Call Jane"')]),
+            message('m1', [step('pa-1', 'rejected', 'company', 'create', 'Create company "Acme"', { outcome: 'discarded' })]),
+            message('m2', [step('pa-2', 'superseded', 'task', 'create', 'Create task "Call Jane"', { outcome: 'replaced' })]),
             message('m3', [
-                step('pa-3', 'expired', 'company', 'create', 'Create company "Globex"', { turn: 't3' }),
-                step('pa-4', 'expired', 'task', 'create', 'Create task "Email Globex"', { turn: 't3' }),
+                step('pa-3', 'expired', 'company', 'create', 'Create company "Globex"', { turn: 't3', outcome: 'expired' }),
+                step('pa-4', 'expired', 'task', 'create', 'Create task "Email Globex"', { turn: 't3', outcome: 'expired' }),
             ]),
         ]
     JS));
@@ -378,8 +387,8 @@ it('offers Propose again on the latest decided proposal only, and never while on
 
     $page->script(seedReceiptMessages(<<<'JS'
         [
-            message('m1', [step('pa-1', 'rejected', 'company', 'create', 'Create company "Acme"')]),
-            message('m2', [step('pa-2', 'rejected', 'task', 'create', 'Create task "Call Jane"')]),
+            message('m1', [step('pa-1', 'rejected', 'company', 'create', 'Create company "Acme"', { outcome: 'discarded' })]),
+            message('m2', [step('pa-2', 'rejected', 'task', 'create', 'Create task "Call Jane"', { outcome: 'discarded' })]),
         ]
     JS));
 
@@ -407,11 +416,62 @@ it('offers Propose again on the latest decided proposal only, and never while on
 
     $page->script(seedReceiptMessages(<<<'JS'
         [
-            message('m1', [step('pa-1', 'rejected', 'company', 'create', 'Create company "Acme"')]),
-            message('m2', [step('pa-2', 'rejected', 'task', 'create', 'Create task "Call Jane"')]),
+            message('m1', [step('pa-1', 'rejected', 'company', 'create', 'Create company "Acme"', { outcome: 'discarded' })]),
+            message('m2', [step('pa-2', 'rejected', 'task', 'create', 'Create task "Call Jane"', { outcome: 'discarded' })]),
             message('m3', [step('pa-3', 'pending', 'people', 'create', 'Create person "Jane"')]),
         ]
     JS));
 
     $page->assertMissing('[data-propose-again]');
+});
+
+it('words the head by when the plan was applied', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'receipt age', $conversationId);
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $page->script(seedReceiptMessages(<<<'JS'
+        [
+            message('m1', [step('pa-1', 'approved', 'company', 'create', 'Create company "Acme"', { outcome: 'applied', resolvedAt: new Date(Date.now() - 5 * 60000).toISOString(), record: { id: 'c1', type: 'company', label: 'Acme', url: '/x' } })]),
+            message('m2', [step('pa-2', 'approved', 'task', 'create', 'Create task "Call Jane"', { outcome: 'applied', resolvedAt: new Date(Date.now() - 20000).toISOString(), record: { id: 't1', type: 'task', label: 'Call Jane', url: '/y' } })]),
+        ]
+    JS));
+
+    $page->assertSee('Applied 1 change · 5 minutes ago')
+        ->assertSee('Applied 1 change · just now');
+});
+
+it('strikes a left-out field in the disclosure of an update', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'left out field', $conversationId);
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $page->script(seedReceiptMessages(<<<'JS'
+        [message('m1', [
+            step('pa-1', 'approved', 'opportunity', 'update', 'Update opportunity "Renewal"', {
+                outcome: 'applied',
+                excluded: ['name'],
+                record: { id: 'o1', type: 'opportunity', label: 'Renewal', url: '/z' },
+                fields: [{ label: 'Name', code: 'name', old: 'Renewal', new: 'Renewal 2027' }, { label: 'Amount', code: 'amount', old: '1', new: '2' }],
+            }),
+        ])]
+    JS));
+
+    $page->assertSee('Amount (Name left out)')
+        ->click('[data-proposal-row]')
+        ->assertVisible('[data-proposal-details]');
+
+    $rows = $page->script(<<<'JS'
+        (() => Array.from(document.querySelectorAll('[data-proposal-field-row]')).map((row) => [row.dataset.leftOut, row.textContent.includes('left out')]))();
+    JS);
+
+    expect($rows)->toBe([['true', true], ['false', false]]);
 });

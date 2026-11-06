@@ -52,6 +52,7 @@ use Relaticle\Chat\Support\ProposalLabel;
 use Relaticle\Chat\Support\ProposalOwnership;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\ProposalProgress;
+use Relaticle\Chat\Support\ProposalReceipts;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
 use Relaticle\EmailIntegration\Actions\CancelAssistantEmail;
@@ -462,6 +463,7 @@ final readonly class PendingActionService
                 status: $status,
                 index: $index,
                 finalized: $finalized,
+                receipts: resolve(ProposalReceipts::class)->forPlanOf($pendingAction),
             ));
         } catch (Throwable $e) {
             report($e);

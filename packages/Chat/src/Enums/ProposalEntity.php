@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Enums;
 
 use App\Enums\CrmEntity;
-use App\Enums\CustomFields\OpportunityField;
 use Illuminate\Support\Str;
 
 enum ProposalEntity: string
@@ -275,14 +274,6 @@ enum ProposalEntity: string
         };
     }
 
-    public function moveField(): ?string
-    {
-        return match ($this) {
-            self::Opportunity => OpportunityField::STAGE->getDisplayName(),
-            self::Company, self::People, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::CustomField, self::SampleData, self::WebAccess => null,
-        };
-    }
-
     public function declinedOutcome(): ProposalOutcome
     {
         return match ($this) {
@@ -318,8 +309,7 @@ enum ProposalEntity: string
      * @return array<string, array{
      *     verbs: array<string, string>,
      *     batch: array<string, array{one: string, other: string}>,
-     *     moved: array{one: string, other: string}|null,
-     *     moveField: ?string,
+     *     moved: array{one: string, other: string},
      *     target: ?string,
      *     title: string,
      *     declined: string
@@ -340,11 +330,10 @@ enum ProposalEntity: string
                         'other' => $entity->receiptBatch($operation, 2),
                     ]])
                     ->all(),
-                'moved' => $entity->moveField() === null ? null : [
+                'moved' => [
                     'one' => $entity->receiptMoved(1),
                     'other' => $entity->receiptMoved(2),
                 ],
-                'moveField' => $entity->moveField(),
                 'target' => $entity->receiptTarget(),
                 'title' => $entity->titleLabel(),
                 'declined' => $entity->declinedOutcome()->value,

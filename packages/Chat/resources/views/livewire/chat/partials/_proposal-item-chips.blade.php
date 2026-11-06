@@ -10,7 +10,7 @@
 </template>
 <template x-if="itemResult(action, itemIdx).status === 'skipped'">
     <span class="inline-flex items-center gap-1.5 font-medium text-gray-500 dark:text-gray-400">
-        <span class="inline-flex shrink-0 [&>svg]:size-3.5" aria-hidden="true" x-html="outcomeIcon(declinedKey(action))"></span>
-        <span x-text="outcomeLabel(declinedKey(action))"></span>
+        <span class="inline-flex shrink-0 [&>svg]:size-3.5" aria-hidden="true" x-html="outcomeIcon(itemResult(action, itemIdx).outcome)"></span>
+        <span x-text="outcomeLabel(itemResult(action, itemIdx).outcome)"></span>
     </span>
 </template>

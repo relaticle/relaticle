@@ -9,6 +9,7 @@
      lines as data, with every word and icon from ProposalOutcome and
      ProposalEntity::receipts(), so this template never branches on an outcome. --}}
 @php
+    $leftOutLabel = \Relaticle\Chat\Enums\ProposalOutcome::LeftOut->label();
     $summaryExpression = "action.display?.summary ?? ((".\Illuminate\Support\Js::from(['create' => __('Create'), 'update' => __('Update'), 'delete' => __('Delete')]).")[action.operation] ?? action.operation)";
 @endphp
 {{-- COMPACT progress view while the batch is still docked. Gated on there being
@@ -67,7 +68,7 @@
     </div>
 </template>
 
-<template x-for="line in receiptLines(action, group)" :key="line.key">
+<template x-for="line in receiptLines(action)" :key="line.key">
     <div x-data="{ open: false }" :data-outcome="line.outcome" data-proposal-line>
         {{-- The whole line is the disclosure when it has values to open,
              because expanding is the safe, reversible read and it deserves the
@@ -146,8 +147,13 @@
                 <template x-if="Array.isArray(action.display?.fields) && action.display.fields.length > 0">
                     <div class="divide-y divide-gray-100 dark:divide-white/5">
                         <template x-for="(field, fieldIdx) in (action.display?.fields || [])" :key="fieldIdx">
-                            <div class="px-4 py-2" data-proposal-field-row>
-                                @include('chat::livewire.chat.partials._proposal-field')
+                            <div class="flex items-start justify-between gap-3 px-4 py-2" data-proposal-field-row :data-left-out="isExcluded(action.excluded, field) ? 'true' : 'false'">
+                                <div class="min-w-0 flex-1" :class="isExcluded(action.excluded, field) ? 'text-gray-400 line-through opacity-60 dark:text-gray-500' : ''">
+                                    @include('chat::livewire.chat.partials._proposal-field')
+                                </div>
+                                <template x-if="isExcluded(action.excluded, field)">
+                                    <span class="shrink-0 text-xs text-gray-500 dark:text-gray-400">{{ $leftOutLabel }}</span>
+                                </template>
                             </div>
                         </template>
                     </div>
@@ -180,8 +186,13 @@
                                 </div>
                                 <div class="mt-2 divide-y divide-gray-100 border-t border-gray-100 dark:divide-white/5 dark:border-white/5">
                                     <template x-for="(field, fieldIdx) in (item.fields || [])" :key="fieldIdx">
-                                        <div class="py-2">
-                                            @include('chat::livewire.chat.partials._proposal-field')
+                                        <div class="flex items-start justify-between gap-3 py-2" data-proposal-field-row :data-left-out="isExcluded(itemResult(action, itemIdx)?.excluded, field) ? 'true' : 'false'">
+                                            <div class="min-w-0 flex-1" :class="isExcluded(itemResult(action, itemIdx)?.excluded, field) ? 'text-gray-400 line-through opacity-60 dark:text-gray-500' : ''">
+                                                @include('chat::livewire.chat.partials._proposal-field')
+                                            </div>
+                                            <template x-if="isExcluded(itemResult(action, itemIdx)?.excluded, field)">
+                                                <span class="shrink-0 text-xs text-gray-500 dark:text-gray-400">{{ $leftOutLabel }}</span>
+                                            </template>
                                         </div>
                                     </template>
                                 </div>

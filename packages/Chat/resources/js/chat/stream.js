@@ -330,6 +330,7 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
             decision: event.status === 'approved' ? 'approved' : 'rejected',
             finalized: !!event.finalized,
             record: null,
+            receipts: event.receipts ?? null,
         });
     },
 

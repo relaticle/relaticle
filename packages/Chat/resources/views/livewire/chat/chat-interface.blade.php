@@ -85,6 +85,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             'receipts' => \Relaticle\Chat\Enums\ProposalEntity::receipts(),
             'proposeAgain' => __('Propose again'),
             'proposeAgainPrompt' => __('Propose again: :summary'),
+            'leftOut' => __('(:fields left out)'),
         ]),
     }),
     ...window.ChatModules.sendModule({

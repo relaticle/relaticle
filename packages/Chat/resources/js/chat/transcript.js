@@ -1065,6 +1065,8 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
             }
         }
 
+        this.applyReceipts(payload.receipts);
+
         if (!isNewResolution) return;
 
         if (payload.decision === 'approved' && window.Livewire?.dispatch) {
@@ -1198,8 +1200,9 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     // ProposalOutcome, the per-entity verbs from ProposalEntity::receipts().
     proposalTexts: {
         outcomes: {},
-        byStatus: {},
         head: { one: ':count change', other: ':count changes' },
+        justNow: 'just now',
+        leftOut: '(:fields left out)',
         changes: { one: ':count change', other: ':count changes' },
         receipts: {},
         proposeAgain: 'Propose again',
@@ -1427,20 +1430,38 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         return items.length === 0 ? 1 : items.filter((_, i) => !this.isSkipped(action, i)).length;
     },
 
-    // What happened to a decided step. A rejected step beside an approved one
-    // was left out of the plan; with nothing approved the whole proposal was
-    // discarded. The words and icons come from ProposalOutcome, never from here.
-    actionOutcome(action, group) {
-        const base = this.proposalTexts.byStatus[action.status] ?? null;
-        if (base !== 'discarded') return base;
-
-        return group.actions.some((a) => a.status === 'approved')
-            ? this.declinedKey(action)
-            : base;
+    isExcluded(excluded, field) {
+        return !!field?.code && Array.isArray(excluded) && excluded.includes(field.code);
     },
 
-    declinedKey(action) {
-        return this.proposalTexts.receipts[action?.entity_type]?.declined ?? 'left_out';
+    // "(Name left out)": the fields the user unchecked, named the way the card
+    // showed them.
+    leftOutNote(excluded, fields) {
+        const labels = (Array.isArray(fields) ? fields : []).filter((f) => this.isExcluded(excluded, f)).map((f) => f.label);
+        if (labels.length === 0) return '';
+
+        const list = new Intl.ListFormat(document.documentElement.lang || undefined, { style: 'long', type: 'conjunction' }).format(labels);
+
+        return this.proposalTexts.leftOut.replace(':fields', () => list);
+    },
+
+    // Folds the server's receipt facts for a plan into the actions on screen,
+    // keeping the record a row already resolved.
+    applyReceipts(receipts) {
+        for (const [id, receipt] of Object.entries(receipts || {})) {
+            const action = this.findPendingAction(id);
+            if (!action) continue;
+
+            const { itemResults, ...facts } = receipt;
+            Object.assign(action, facts);
+
+            if (Object.keys(itemResults || {}).length > 0) {
+                action.itemResults = Object.fromEntries(Object.entries(itemResults).map(([index, result]) => [
+                    index,
+                    { record: null, ...(action.itemResults?.[index] ?? {}), ...result },
+                ]));
+            }
+        }
     },
 
     receiptApplied(group) {
@@ -1452,18 +1473,28 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     },
 
     receiptHead(group) {
-        const written = group.actions
-            .filter((a) => a.status === 'approved')
-            .reduce((sum, a) => sum + this.writtenCount(a), 0);
+        const approved = group.actions.filter((a) => a.status === 'approved');
+        const written = approved.reduce((sum, a) => sum + this.writtenCount(a), 0);
+        const resolvedAt = approved.map((a) => a.resolved_at).filter(Boolean).sort().at(-1);
 
-        return this.plural(this.proposalTexts.head, written);
+        return this.plural(this.proposalTexts.head, written).replace(':when', () => this.relativeWhen(resolvedAt));
     },
 
-    // The one outcome a wholly undone proposal reads as: a discard outranks an
-    // expiry or a replacement when a plan ended with a mix.
+    relativeWhen(iso) {
+        const seconds = iso ? Math.round((Date.parse(iso) - Date.now()) / 1000) : 0;
+        if (!iso || Number.isNaN(seconds) || seconds > -60) return this.proposalTexts.justNow;
+
+        const units = [['day', 86400], ['hour', 3600], ['minute', 60]];
+        const [unit, size] = units.find(([, length]) => -seconds >= length);
+        const locale = document.documentElement.lang || undefined;
+
+        return new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(Math.round(seconds / size), unit);
+    },
+
+    // The outcome of a wholly undone proposal: the server gives every step of
+    // it the same one.
     settledOutcome(group) {
-        const outcomes = group.actions.map((a) => this.proposalTexts.byStatus[a.status]).filter(Boolean);
-        return outcomes.find((o) => o === 'discarded') ?? outcomes[0] ?? 'discarded';
+        return group.actions.map((a) => a.outcome).find(Boolean) ?? null;
     },
 
     settledSummary(group) {
@@ -1500,24 +1531,20 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     // The lines a decided step prints in its receipt. A line is data (outcome
     // key, verb, chip, label, meta) so the template carries no per-outcome
     // branching.
-    receiptLines(action, group) {
+    receiptLines(action) {
         if (action.status === 'pending') return [];
 
-        const outcome = this.actionOutcome(action, group);
-
         if (action.status !== 'approved') {
-            return [this.offLine(`${action.pending_action_id}:step`, outcome, this.proposalRecordLabel(action) || action.display?.summary || '', action)];
+            return [this.offLine(`${action.pending_action_id}:step`, action.outcome, this.proposalRecordLabel(action) || action.display?.summary || '', action)];
         }
 
         const items = this.batchItems(action);
         if (items.length === 0) return [this.appliedLine(action)];
 
-        const declined = this.declinedKey(action);
-
         return [
             this.batchLine(action, items),
             ...items.flatMap((item, index) => this.isSkipped(action, index)
-                ? [this.offLine(`${action.pending_action_id}:${index}`, declined, this.proposalItemLabel(item) || item.summary || '', null)]
+                ? [this.offLine(`${action.pending_action_id}:${index}`, action.itemResults[index].outcome, this.proposalItemLabel(item) || item.summary || '', null)]
                 : []),
         ];
     },
@@ -1546,9 +1573,13 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         const target = receipt.target ? this.fieldValue(fields, receipt.target) : '';
         const label = target || record?.label || this.proposalRecordLabel(action) || this.fieldValue(fields, receipt.title) || action.display?.summary || '';
         const showChip = !!record && !!label && !!window.ChatModules.recordChipIcon(action.entity_type);
-        const meta = receipt.target
-            ? this.fieldValue(fields, receipt.title)
-            : (action.operation === 'update' && Array.isArray(fields) ? fields.map((f) => f.label).join(', ') : '');
+        const kept = (Array.isArray(fields) ? fields : []).filter((f) => !this.isExcluded(action.excluded, f));
+        const meta = [
+            receipt.target
+                ? this.fieldValue(fields, receipt.title)
+                : (action.operation === 'update' ? kept.map((f) => f.label).join(', ') : ''),
+            this.leftOutNote(action.excluded, fields),
+        ].filter(Boolean).join(' ');
 
         return {
             key: `${action.pending_action_id}:step`,
@@ -1568,19 +1599,13 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         const done = items.filter((_, index) => !this.isSkipped(action, index));
         let text = this.plural(receipt.batch?.[operation] ?? { one: ':count', other: ':count' }, done.length);
 
-        if (operation === 'update' && receipt.moved) {
-            const values = done.map((item) => (item.fields ?? []).length === 1 && item.fields[0].label === receipt.moveField
-                ? String(item.fields[0].new ?? item.fields[0].value ?? '')
-                : '');
-
-            if (values.length > 0 && values[0] !== '' && values.every((v) => v === values[0])) {
-                text = this.plural(receipt.moved, done.length).replace(':value', () => values[0]);
-            }
+        if (operation === 'update' && action.moved_to) {
+            text = this.plural(receipt.moved, done.length).replace(':value', () => action.moved_to);
         }
 
         const names = operation === 'delete'
             ? done.map((item) => this.proposalItemLabel(item) || item.summary).filter(Boolean).join(', ')
-            : '';
+            : (action.moved_total ?? '');
 
         return {
             key: `${action.pending_action_id}:step`,
@@ -1659,10 +1684,6 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         }
 
         return groups;
-    },
-
-    isPlanGroup(group) {
-        return !!group && Array.isArray(group.actions) && group.actions.length > 1;
     },
 
     // Follows streaming only while the reader is pinned near the bottom, and never

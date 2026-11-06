@@ -36,6 +36,7 @@ use Relaticle\Chat\Support\ApprovalFailureMessage;
 use Relaticle\Chat\Support\PlanReference;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\ProposalProgress;
+use Relaticle\Chat\Support\ProposalReceipts;
 use Relaticle\Chat\Support\RecordNameResolver;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\WorkspaceMembersContext;
@@ -1244,6 +1245,7 @@ final class ProposalCard extends BaseLivewireComponent
                     decision: 'rejected',
                     finalized: false,
                     record: null,
+                    receipts: $this->receiptsFor($step),
                     context: $this->context,
                 );
             }
@@ -1423,7 +1425,6 @@ final class ProposalCard extends BaseLivewireComponent
 
         try {
             $resolved = $service->approve($pendingAction, $this->authUser(), $this->excludedFields);
-            $record = $this->recordReferenceFor($resolved);
         } catch (QueryException $exception) {
             // Must precede the RuntimeException arm. QueryException extends
             // PDOException extends RuntimeException, so it would otherwise be caught
@@ -1453,15 +1454,7 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         }
 
-        $this->dispatch(
-            'proposal:resolved',
-            pendingActionId: $pendingAction->getKey(),
-            index: null,
-            decision: 'approved',
-            finalized: true,
-            record: $record,
-            context: $this->context,
-        );
+        $this->announceResolution($resolved, 'approved');
 
         $this->settleAfterResolution($pendingAction);
     }
@@ -1536,6 +1529,7 @@ final class ProposalCard extends BaseLivewireComponent
             decision: 'rejected',
             finalized: true,
             record: null,
+            receipts: $this->receiptsFor($pendingAction),
             context: $this->context,
         );
 
@@ -1575,6 +1569,14 @@ final class ProposalCard extends BaseLivewireComponent
         return $cancelled;
     }
 
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    private function receiptsFor(PendingAction $step): array
+    {
+        return resolve(ProposalReceipts::class)->forPlanOf($step);
+    }
+
     private function announceResolution(PendingAction $step, string $decision): void
     {
         $record = null;
@@ -1602,6 +1604,7 @@ final class ProposalCard extends BaseLivewireComponent
             finalized: true,
             record: $record,
             cancelledBy: is_string($cancelledBy) ? $cancelledBy : null,
+            receipts: $this->receiptsFor($step),
             context: $this->context,
         );
     }

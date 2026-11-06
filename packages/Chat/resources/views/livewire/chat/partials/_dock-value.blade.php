@@ -47,13 +47,7 @@
                 @endforeach
             @endif
         @elseif ($type === 'boolean' && $hasNew)
-            <span
-                @class([
-                    'inline-flex items-center rounded-full px-2 py-0.5 text-[length:var(--text-micro)] font-medium',
-                    'bg-green-50 text-green-700 dark:bg-green-400/10 dark:text-green-400' => $newValue === 'Yes',
-                    'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-400' => $newValue !== 'Yes',
-                ])
-            >{{ $newValue }}</span>
+            <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[length:var(--text-micro)] font-medium text-gray-600 dark:bg-white/10 dark:text-gray-400">{{ $newValue }}</span>
         @elseif ($hasNew)
             @if (is_string($row['icon'] ?? null) && $row['icon'] !== '')
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="size-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true">

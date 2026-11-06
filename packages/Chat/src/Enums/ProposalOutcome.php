@@ -71,25 +71,43 @@ enum ProposalOutcome: string
     }
 
     /**
+     * What happened to each step of one plan. A rejected step beside an
+     * approved one was left out of it (or, for a send, not sent). With nothing
+     * approved the plan ended as one outcome, a discard outranking an expiry
+     * or a replacement.
+     *
+     * @param  array<string, array{status: PendingActionStatus, entity: ?ProposalEntity}>  $steps  keyed by step id
+     * @return array<string, ?self>
+     */
+    public static function forGroup(array $steps): array
+    {
+        $applied = array_filter($steps, fn (array $step): bool => $step['status'] === PendingActionStatus::Approved) !== [];
+        $ended = array_values(array_filter(array_map(fn (array $step): ?self => self::forStatus($step['status']), $steps)));
+        $settled = in_array(self::Discarded, $ended, true) ? self::Discarded : ($ended[0] ?? null);
+
+        return array_map(function (array $step) use ($applied, $settled): ?self {
+            $outcome = self::forStatus($step['status']);
+
+            if (! $applied) {
+                return $outcome instanceof ProposalOutcome ? $settled : null;
+            }
+
+            return $outcome === self::Discarded
+                ? ($step['entity']?->declinedOutcome() ?? self::LeftOut)
+                : $outcome;
+        }, $steps);
+    }
+
+    /**
      * @return array{
      *     outcomes: array<string, array{icon: string, label: string, leads: bool, again: bool}>,
-     *     byStatus: array<string, string>,
      *     head: array{one: string, other: string},
-     *     changes: array{one: string, other: string}
+     *     changes: array{one: string, other: string},
+     *     justNow: string
      * }
      */
     public static function forClient(): array
     {
-        $byStatus = [];
-
-        foreach (PendingActionStatus::cases() as $status) {
-            $outcome = self::forStatus($status);
-
-            if ($outcome instanceof self) {
-                $byStatus[$status->value] = $outcome->value;
-            }
-        }
-
         return [
             'outcomes' => collect(self::cases())
                 ->mapWithKeys(fn (self $outcome): array => [$outcome->value => [
@@ -99,15 +117,15 @@ enum ProposalOutcome: string
                     'again' => $outcome->canProposeAgain(),
                 ]])
                 ->all(),
-            'byStatus' => $byStatus,
             'head' => [
-                'one' => __('Applied :count change · just now', ['count' => ':count']),
-                'other' => __('Applied :count changes · just now', ['count' => ':count']),
+                'one' => __('Applied :count change · :when', ['count' => ':count', 'when' => ':when']),
+                'other' => __('Applied :count changes · :when', ['count' => ':count', 'when' => ':when']),
             ],
             'changes' => [
                 'one' => __(':count change', ['count' => ':count']),
                 'other' => __(':count changes', ['count' => ':count']),
             ],
+            'justNow' => __('just now'),
         ];
     }
 }

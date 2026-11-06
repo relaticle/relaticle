@@ -25,12 +25,16 @@ final class PendingActionResolved implements ShouldBroadcastNow
 {
     use InteractsWithSockets;
 
+    /**
+     * @param  array<string, array<string, mixed>>  $receipts  what the transcript shows for every step of the plan
+     */
     public function __construct(
         public readonly string $conversationId,
         public readonly string $pendingActionId,
         public readonly string $status,
         public readonly ?int $index = null,
         public readonly bool $finalized = true,
+        public readonly array $receipts = [],
     ) {}
 
     /**
@@ -58,6 +62,7 @@ final class PendingActionResolved implements ShouldBroadcastNow
             'status' => $this->status,
             'index' => $this->index,
             'finalized' => $this->finalized,
+            'receipts' => $this->receipts,
         ];
     }
 }
