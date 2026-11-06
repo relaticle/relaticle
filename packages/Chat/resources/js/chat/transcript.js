@@ -1194,17 +1194,16 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         { value: 'other', label: 'Other' },
     ],
 
-    // Injected translated copy for the resolved-item chips.
+    // Injected copy for decided proposals: outcome icons and words come from
+    // ProposalOutcome, the per-entity verbs from ProposalEntity::receipts().
     proposalTexts: {
-        createdVerb: 'Created',
-        updatedVerb: 'Updated',
-        deletedVerb: 'Deleted',
-        countCreated: ':count created',
-        countUpdated: ':count updated',
-        countDeleted: ':count deleted',
-        countSkipped: ':count skipped',
-        countKept: ':count kept',
-        entityVerbs: {},
+        outcomes: {},
+        byStatus: {},
+        head: { one: ':count change', other: ':count changes' },
+        changes: { one: ':count change', other: ':count changes' },
+        receipts: {},
+        proposeAgain: 'Propose again',
+        proposeAgainPrompt: 'Propose again: :summary',
         ...proposalTexts,
     },
 
@@ -1396,33 +1395,202 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         return (action.itemResults && action.itemResults[index]) || null;
     },
 
-    // Derived receipt for a finalized batch. The row-level status 'approved'
-    // hides a mixed outcome (approving 2 of 3 records still finalizes the row
-    // as approved), so the header chip is computed from the per-item results
-    // instead of echoing it. Only that status: a batch that wrote nothing
-    // finalizes as 'rejected' and keeps the plain red Rejected chip, which is
-    // both truthful and the stronger signal that nothing happened. Undecided,
-    // expired and superseded cards keep their status chip too.
-    batchOutcome(action) {
-        if (!action || action.status !== 'approved') return null;
+    plural(forms, count) {
+        return (count === 1 ? forms.one : forms.other).replace(':count', () => String(count));
+    },
 
-        const results = Object.values(action.itemResults || {});
-        if (results.length === 0) return null;
+    outcomeIcon(key) {
+        return this.proposalTexts.outcomes[key]?.icon ?? '';
+    },
 
-        const done = results.filter((r) => r?.status === 'approved').length;
-        const skipped = results.length - done;
+    outcomeLabel(key) {
+        return this.proposalTexts.outcomes[key]?.label ?? '';
+    },
 
-        const t = this.proposalTexts;
-        const op = action.operation;
-        const doneTemplate = t.entityVerbs[action.entity_type]?.count
-            ?? (op === 'delete' ? t.countDeleted : (op === 'update' ? t.countUpdated : t.countCreated));
-        const skippedTemplate = op === 'delete' ? t.countKept : t.countSkipped;
+    fieldValue(fields, label) {
+        const field = (Array.isArray(fields) ? fields : []).find((f) => f.label === label);
+        return field ? String(field.new ?? field.value ?? '') : '';
+    },
+
+    batchItems(action) {
+        return Array.isArray(action?.display?.items) ? action.display.items : [];
+    },
+
+    isSkipped(action, index) {
+        return action.itemResults?.[index]?.status === 'skipped';
+    },
+
+    // Records a decided step wrote. A batch approved in one go reports no
+    // per-row results, so only a row reported skipped is subtracted.
+    writtenCount(action) {
+        const items = this.batchItems(action);
+        return items.length === 0 ? 1 : items.filter((_, i) => !this.isSkipped(action, i)).length;
+    },
+
+    // What happened to a decided step. A rejected step beside an approved one
+    // was left out of the plan; with nothing approved the whole proposal was
+    // discarded. The words and icons come from ProposalOutcome, never from here.
+    actionOutcome(action, group) {
+        const base = this.proposalTexts.byStatus[action.status] ?? null;
+        if (base !== 'discarded') return base;
+
+        return group.actions.some((a) => a.status === 'approved')
+            ? this.declinedKey(action)
+            : base;
+    },
+
+    declinedKey(action) {
+        return this.proposalTexts.receipts[action?.entity_type]?.declined ?? 'left_out';
+    },
+
+    receiptApplied(group) {
+        return group.actions.some((a) => a.status === 'approved');
+    },
+
+    receiptSettled(group) {
+        return !this.receiptApplied(group) && group.actions.every((a) => a.status !== 'pending');
+    },
+
+    receiptHead(group) {
+        const written = group.actions
+            .filter((a) => a.status === 'approved')
+            .reduce((sum, a) => sum + this.writtenCount(a), 0);
+
+        return this.plural(this.proposalTexts.head, written);
+    },
+
+    // The one outcome a wholly undone proposal reads as: a discard outranks an
+    // expiry or a replacement when a plan ended with a mix.
+    settledOutcome(group) {
+        const outcomes = group.actions.map((a) => this.proposalTexts.byStatus[a.status]).filter(Boolean);
+        return outcomes.find((o) => o === 'discarded') ?? outcomes[0] ?? 'discarded';
+    },
+
+    settledSummary(group) {
+        if (group.actions.length === 1) return group.actions[0].display?.summary ?? '';
+
+        const records = group.actions.reduce((sum, a) => sum + Math.max(1, this.batchItems(a).length), 0);
+        return this.plural(this.proposalTexts.changes, records);
+    },
+
+    latestDecidedGroupKey() {
+        for (let i = this.messages.length - 1; i >= 0; i--) {
+            const groups = this.proposalGroups(this.messages[i]);
+
+            for (let j = groups.length - 1; j >= 0; j--) {
+                if (groups[j].actions.every((a) => a.status !== 'pending')) return groups[j].key;
+            }
+        }
+
+        return null;
+    },
+
+    canProposeAgain(group) {
+        return !!this.proposalTexts.outcomes[this.settledOutcome(group)]?.again
+            && !this.hasPendingProposal
+            && !this.isStreaming
+            && this.latestDecidedGroupKey() === group.key;
+    },
+
+    proposeAgain(group) {
+        const summary = group.actions.map((a) => a.display?.summary).filter(Boolean).join('; ');
+        this.sendNextStep({ prompt: this.proposalTexts.proposeAgainPrompt.replace(':summary', () => summary) });
+    },
+
+    // The lines a decided step prints in its receipt. A line is data (outcome
+    // key, verb, chip, label, meta) so the template carries no per-outcome
+    // branching.
+    receiptLines(action, group) {
+        if (action.status === 'pending') return [];
+
+        const outcome = this.actionOutcome(action, group);
+
+        if (action.status !== 'approved') {
+            return [this.offLine(`${action.pending_action_id}:step`, outcome, this.proposalRecordLabel(action) || action.display?.summary || '', action)];
+        }
+
+        const items = this.batchItems(action);
+        if (items.length === 0) return [this.appliedLine(action)];
+
+        const declined = this.declinedKey(action);
+
+        return [
+            this.batchLine(action, items),
+            ...items.flatMap((item, index) => this.isSkipped(action, index)
+                ? [this.offLine(`${action.pending_action_id}:${index}`, declined, this.proposalItemLabel(item) || item.summary || '', null)]
+                : []),
+        ];
+    },
+
+    offLine(key, outcome, label, action) {
+        const leads = !!this.proposalTexts.outcomes[outcome]?.leads;
+        const receipt = this.proposalTexts.receipts[action?.entity_type] ?? {};
+        const text = leads && action ? (this.fieldValue(action.display?.fields, receipt.title) || label) : label;
 
         return {
-            done,
-            skipped,
-            doneLabel: doneTemplate.replace(':count', String(done)),
-            skippedLabel: skippedTemplate.replace(':count', String(skipped)),
+            key,
+            outcome,
+            struck: true,
+            expandable: false,
+            verb: leads ? `${this.outcomeLabel(outcome)}:` : '',
+            chip: null,
+            label: text,
+            meta: leads ? '' : `· ${this.outcomeLabel(outcome)}`,
+        };
+    },
+
+    appliedLine(action) {
+        const receipt = this.proposalTexts.receipts[action.entity_type] ?? {};
+        const fields = action.display?.fields;
+        const record = action.record?.url ? action.record : null;
+        const target = receipt.target ? this.fieldValue(fields, receipt.target) : '';
+        const label = target || record?.label || this.proposalRecordLabel(action) || this.fieldValue(fields, receipt.title) || action.display?.summary || '';
+        const showChip = !!record && !!label && !!window.ChatModules.recordChipIcon(action.entity_type);
+        const meta = receipt.target
+            ? this.fieldValue(fields, receipt.title)
+            : (action.operation === 'update' && Array.isArray(fields) ? fields.map((f) => f.label).join(', ') : '');
+
+        return {
+            key: `${action.pending_action_id}:step`,
+            outcome: 'applied',
+            struck: false,
+            expandable: true,
+            verb: receipt.verbs?.[action.operation] ?? '',
+            chip: showChip ? { label, url: record.url, type: action.entity_type } : null,
+            label: showChip ? '' : label,
+            meta: meta ? `· ${meta}` : '',
+        };
+    },
+
+    batchLine(action, items) {
+        const receipt = this.proposalTexts.receipts[action.entity_type] ?? {};
+        const operation = action.operation;
+        const done = items.filter((_, index) => !this.isSkipped(action, index));
+        let text = this.plural(receipt.batch?.[operation] ?? { one: ':count', other: ':count' }, done.length);
+
+        if (operation === 'update' && receipt.moved) {
+            const values = done.map((item) => (item.fields ?? []).length === 1 && item.fields[0].label === receipt.moveField
+                ? String(item.fields[0].new ?? item.fields[0].value ?? '')
+                : '');
+
+            if (values.length > 0 && values[0] !== '' && values.every((v) => v === values[0])) {
+                text = this.plural(receipt.moved, done.length).replace(':value', () => values[0]);
+            }
+        }
+
+        const names = operation === 'delete'
+            ? done.map((item) => this.proposalItemLabel(item) || item.summary).filter(Boolean).join(', ')
+            : '';
+
+        return {
+            key: `${action.pending_action_id}:step`,
+            outcome: 'applied',
+            struck: false,
+            expandable: true,
+            verb: '',
+            chip: null,
+            label: text,
+            meta: names ? `· ${names}` : '',
         };
     },
 
@@ -1435,13 +1603,9 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         return Object.keys(action?.itemResults || {}).length > 0;
     },
 
-    // Past-tense verb for a resolved item's chip, by entity type then operation.
+    // Past-tense verb for a resolved item's outcome, by entity then operation.
     itemVerb(action) {
-        const op = action?.operation;
-        return this.proposalTexts.entityVerbs[action?.entity_type]?.done
-            ?? (op === 'delete'
-                ? this.proposalTexts.deletedVerb
-                : (op === 'update' ? this.proposalTexts.updatedVerb : this.proposalTexts.createdVerb));
+        return this.proposalTexts.receipts[action?.entity_type]?.verbs?.[action?.operation] ?? '';
     },
 
     // Keep resolved proposal identity aligned with the record pills used in

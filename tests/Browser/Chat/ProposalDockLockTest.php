@@ -91,7 +91,8 @@ it('shows the locked line while a proposal waits and removes it after a decision
 
     expect(lockTestVisibility($page))->toBe(['locked' => true, 'editor' => false]);
 
-    $page->click('[wire\:click="createCurrent"]')
+    $page->assertSeeIn('[wire\:click="createCurrent"]', 'Approve')
+        ->click('[wire\:click="createCurrent"]')
         ->assertMissing('[data-proposal-shortcut]');
 
     $page->wait(0.5);
@@ -111,7 +112,8 @@ it('approves a three-step plan with Cmd+Enter', function (): void {
         ->assertSee('Approve 3 changes')
         ->assertVisible('[data-proposal-shortcut]');
 
-    $page->keys(LOCK_TEST_DOCK, 'Control+Enter')
+    $page->assertSeeIn(LOCK_TEST_DOCK, 'Approve 3 changes')
+        ->keys(LOCK_TEST_DOCK, 'Control+Enter')
         ->assertMissing('[data-proposal-shortcut]');
 
     expect(Company::query()->withoutGlobalScopes()->where('workspace_id', $conversation['workspace']->getKey())->count())->toBe(3)
@@ -175,7 +177,14 @@ it('ignores Cmd+Enter on an email, a delete and a plan with a draft in the box',
     }
 
     if ($case !== 'a plan with a draft in the box') {
-        $page->assertMissing('[data-proposal-shortcut]');
+        $label = match ($case) {
+            'an email' => 'Send email',
+            'a delete' => 'Delete 1 task',
+            'a plan with a delete' => 'Approve 3 changes',
+        };
+
+        $page->assertVisible(LOCK_TEST_DOCK." button:has-text(\"{$label}\")")
+            ->assertMissing('[data-proposal-shortcut]');
     }
 
     $page->keys(LOCK_TEST_DOCK, 'Control+Enter')->wait(1.2);
@@ -204,7 +213,8 @@ it('locks the box and approves a plan with Cmd+Enter in the side panel', functio
 
     expect(lockTestVisibility($page, 'side-panel'))->toBe(['locked' => true, 'editor' => false]);
 
-    $page->keys('[data-chat-side-panel] '.LOCK_TEST_DOCK, 'Control+Enter')
+    $page->assertSeeIn('[data-chat-side-panel] '.LOCK_TEST_DOCK, 'Approve 2 changes')
+        ->keys('[data-chat-side-panel] '.LOCK_TEST_DOCK, 'Control+Enter')
         ->assertMissing('[data-proposal-shortcut]');
 
     $page->wait(0.5);

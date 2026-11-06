@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Enums;
 
 use App\Enums\CrmEntity;
+use App\Enums\CustomFields\OpportunityField;
 use Illuminate\Support\Str;
 
 enum ProposalEntity: string
@@ -198,22 +199,6 @@ enum ProposalEntity: string
         };
     }
 
-    public function count(PendingActionOperation $operation): string
-    {
-        return match ($this) {
-            self::Email => __(':count sent'),
-            self::EmailDraft => __(':count saved'),
-            self::EmailDraftSend => __(':count sent'),
-            self::EmailDraftDelete => __(':count deleted'),
-            self::EmailCancel => __(':count cancelled'),
-            self::EmailReschedule => __(':count rescheduled'),
-            self::EmailRetry => __(':count queued again'),
-            self::WorkspaceInvitation => __(':count invited'),
-            self::WebAccess => __(':count web searches allowed'),
-            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::CustomField, self::SampleData => $operation->count(),
-        };
-    }
-
     public function verb(PendingActionOperation $operation): string
     {
         return match ($this) {
@@ -272,27 +257,97 @@ enum ProposalEntity: string
         };
     }
 
-    private function hasOwnReceipt(): bool
+    public function receiptVerb(PendingActionOperation $operation): string
     {
         return match ($this) {
-            self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::WebAccess => true,
-            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::CustomField, self::SampleData => false,
+            self::Task => $operation === PendingActionOperation::Create ? __('Created task') : $operation->done(),
+            self::Note => $operation === PendingActionOperation::Create ? __('Added note') : $operation->done(),
+            self::Email => __('Queued email to'),
+            self::Company, self::People, self::Opportunity, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::CustomField, self::SampleData, self::WebAccess => $this->done($operation),
         };
     }
 
-    /** @return array<string, array{done: string, count: string}> */
+    public function receiptTarget(): ?string
+    {
+        return match ($this) {
+            self::Email => 'To',
+            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::CustomField, self::SampleData, self::WebAccess => null,
+        };
+    }
+
+    public function moveField(): ?string
+    {
+        return match ($this) {
+            self::Opportunity => OpportunityField::STAGE->getDisplayName(),
+            self::Company, self::People, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::CustomField, self::SampleData, self::WebAccess => null,
+        };
+    }
+
+    public function declinedOutcome(): ProposalOutcome
+    {
+        return match ($this) {
+            self::Email, self::EmailDraftSend, self::WorkspaceInvitation => ProposalOutcome::NotSent,
+            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::EmailDraft, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::CustomField, self::SampleData, self::WebAccess => ProposalOutcome::LeftOut,
+        };
+    }
+
+    private function receiptBatch(PendingActionOperation $operation, int $count): string
+    {
+        return match ($this) {
+            self::WorkspaceInvitation => $count === 1
+                ? __('Sent :count invitation', ['count' => ':count'])
+                : __('Sent :count invitations', ['count' => ':count']),
+            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::CustomField, self::SampleData, self::WebAccess => __(':verb :count :entities', [
+                'verb' => $operation->done(),
+                'count' => ':count',
+                'entities' => Str::plural(Str::lower($this->singularName()), $count),
+            ]),
+        };
+    }
+
+    private function receiptMoved(int $count): string
+    {
+        return __('Moved :count :entities to :value', [
+            'count' => ':count',
+            'entities' => Str::plural(Str::lower($this->singularName()), $count),
+            'value' => ':value',
+        ]);
+    }
+
+    /**
+     * @return array<string, array{
+     *     verbs: array<string, string>,
+     *     batch: array<string, array{one: string, other: string}>,
+     *     moved: array{one: string, other: string}|null,
+     *     moveField: ?string,
+     *     target: ?string,
+     *     title: string,
+     *     declined: string
+     * }>
+     */
     public static function receipts(): array
     {
         $receipts = [];
 
         foreach (self::cases() as $entity) {
-            if (! $entity->hasOwnReceipt()) {
-                continue;
-            }
-
             $receipts[$entity->value] = [
-                'done' => $entity->done(PendingActionOperation::Create),
-                'count' => $entity->count(PendingActionOperation::Create),
+                'verbs' => collect(PendingActionOperation::cases())
+                    ->mapWithKeys(fn (PendingActionOperation $operation): array => [$operation->value => $entity->receiptVerb($operation)])
+                    ->all(),
+                'batch' => collect(PendingActionOperation::cases())
+                    ->mapWithKeys(fn (PendingActionOperation $operation): array => [$operation->value => [
+                        'one' => $entity->receiptBatch($operation, 1),
+                        'other' => $entity->receiptBatch($operation, 2),
+                    ]])
+                    ->all(),
+                'moved' => $entity->moveField() === null ? null : [
+                    'one' => $entity->receiptMoved(1),
+                    'other' => $entity->receiptMoved(2),
+                ],
+                'moveField' => $entity->moveField(),
+                'target' => $entity->receiptTarget(),
+                'title' => $entity->titleLabel(),
+                'declined' => $entity->declinedOutcome()->value,
             ];
         }
 
