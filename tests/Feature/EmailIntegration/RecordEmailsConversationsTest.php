@@ -114,6 +114,16 @@ it('lists each conversation linked to the company once', function (): void {
         ->and($html)->toContain('data-message-count="2"');
 });
 
+it('picks up a conversation linked to the company when the tab is refreshed', function (): void {
+    $tab = livewire(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class]);
+
+    $email = conversationsRecordMessage($this->ownerMailbox, 'conv-renewal', 'brian@airbnb.test');
+    $this->company->emails()->attach($email->id);
+    $tab->call('refreshConversations');
+
+    expect(conversationsRecordKeys($tab->html()))->toBe(['conv-renewal']);
+});
+
 it('shows a teammate conversation on the company only while it is linked there', function (): void {
     $linked = conversationsRecordMessage($this->teammateMailbox, 'conv-linked', 'olivia@airbnb.test', [
         'subject' => 'Contract redlines',

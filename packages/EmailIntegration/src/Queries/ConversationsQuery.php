@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Database\Query\Builder as BaseBuilder;
 use Illuminate\Pagination\Cursor;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
@@ -39,6 +40,8 @@ use Relaticle\EmailIntegration\Services\PrivacyService;
 
 final readonly class ConversationsQuery
 {
+    public const int COUNTS_CACHE_SECONDS = 60;
+
     public function __construct(
         private PrivacyService $privacy,
         private PreferredEmailCopyService $preferredCopies,
@@ -63,12 +66,31 @@ final readonly class ConversationsQuery
         );
     }
 
+    public static function countsCacheKey(User $viewer): string
+    {
+        return "email-conversation-counts:{$viewer->current_workspace_id}:{$viewer->getKey()}";
+    }
+
     /** @return array{needs_reply: int, unlinked: int, automated: int} */
     public function counts(User $viewer, ?ConversationFilters $filters = null): array
     {
         Gate::forUser($viewer)->authorize('viewAny', Email::class);
 
         $filters ??= new ConversationFilters;
+
+        // The key holds a generation, so forgetting it drops the counts cached for every filter at once.
+        $generation = Cache::remember(self::countsCacheKey($viewer), self::COUNTS_CACHE_SECONDS, fn (): string => Str::random(16));
+
+        return Cache::remember(
+            self::countsCacheKey($viewer).":{$generation}:".hash('xxh128', serialize($filters)),
+            self::COUNTS_CACHE_SECONDS,
+            fn (): array => $this->uncachedCounts($viewer, $filters),
+        );
+    }
+
+    /** @return array{needs_reply: int, unlinked: int, automated: int} */
+    private function uncachedCounts(User $viewer, ConversationFilters $filters): array
+    {
         $visible = new VisibleEmailScope($viewer);
         $counts = DB::query();
 

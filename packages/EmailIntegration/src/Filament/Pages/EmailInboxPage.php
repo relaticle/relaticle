@@ -11,6 +11,7 @@ use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Collection as SupportCollection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
@@ -162,6 +163,18 @@ final class EmailInboxPage extends Page
         $this->tab = null;
         $this->conversationsCursor = null;
         unset($this->activeView, $this->conversations);
+    }
+
+    // The page re-reads its rows each round trip, so a refetch drops the counts and the cached page.
+    public function refreshConversations(): void
+    {
+        if (! $this->showsConversations()) {
+            return;
+        }
+
+        $this->conversationView ??= $this->activeView;
+        Cache::forget(ConversationsQuery::countsCacheKey($this->authUser()));
+        unset($this->viewCounts, $this->conversations, $this->selectedEmail);
     }
 
     public function nextConversationsPage(): void

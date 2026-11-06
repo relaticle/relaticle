@@ -6,10 +6,12 @@ use App\Features\EmailConversations;
 use App\Models\Company;
 use App\Models\People;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Queries\CustomFieldFilterSchema;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Factories\Sequence;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -21,6 +23,7 @@ use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
+use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
 use Relaticle\EmailIntegration\Data\ConversationFilters;
 use Relaticle\EmailIntegration\Enums\AutomatedReason;
 use Relaticle\EmailIntegration\Enums\ConversationView;
@@ -204,6 +207,7 @@ it('opens on All when nothing needs a reply and on Needs reply once something do
 
     expect(livewire(EmailInboxPage::class)->instance()->activeView)->toBe(ConversationView::All);
 
+    $this->travel(ConversationsQuery::COUNTS_CACHE_SECONDS + 1)->seconds();
     conversationsPageMessage($this->ownerMailbox, 'conv-waiting', 'brian@airbnb.test');
 
     livewire(EmailInboxPage::class)
@@ -427,6 +431,7 @@ it('renders a page of conversations in the same number of queries for 3 or 20 ro
         Feature::for($this->workspace)->activate(EmailConversations::class);
         Filament::setCurrentPanel(Filament::getPanel('app'));
         Filament::setTenant($this->workspace);
+        Cache::forget(ConversationsQuery::countsCacheKey($this->owner));
         $queries = 0;
         DB::listen(function () use (&$queries): void {
             $queries++;
@@ -1065,4 +1070,59 @@ it('drops the opening quote of an unclosed typed value', function (): void {
 
     expect($filters->to)->toBe('Ana')
         ->and($filters->search)->toBe('pricing');
+});
+
+it('adds a new conversation to needs reply when it is refreshed', function (): void {
+    conversationsPageMessage($this->ownerMailbox, 'conv-first', 'kim@notion.test', ['sent_at' => now()->subHour()]);
+    $page = livewire(EmailInboxPage::class);
+
+    conversationsPageMessage($this->ownerMailbox, 'conv-new', 'brian@airbnb.test');
+
+    expect(livewire(EmailInboxPage::class)->instance()->viewCounts['needs_reply'])->toBe(1);
+
+    $page->call('refreshConversations');
+
+    expect(conversationsPageKeys($page->html()))->toBe(['conv-new', 'conv-first'])
+        ->and($page->instance()->viewCounts['needs_reply'])->toBe(2)
+        ->and($page->instance()->activeView)->toBe(ConversationView::NeedsReply);
+});
+
+it('removes a row the viewer may no longer see', function (): void {
+    $email = conversationsPageMessage($this->teammateMailbox, 'conv-shared', 'brian@airbnb.test', ['privacy_tier' => EmailPrivacyTier::METADATA_ONLY]);
+    $this->company->emails()->attach($email->id);
+    $page = livewire(EmailInboxPage::class)->call('setView', ConversationView::All->value);
+
+    expect(conversationsPageKeys($page->html()))->toBe(['conv-shared']);
+
+    resolve(UpdateEmailSharingAction::class)->execute($email->fresh(), $this->teammate, EmailPrivacyTier::PRIVATE, []);
+    $page->call('refreshConversations');
+
+    expect(conversationsPageKeys($page->html()))->toBe([]);
+});
+
+it('ignores a change in another workspace', function (): void {
+    conversationsPageMessage($this->ownerMailbox, 'conv-own', 'kim@notion.test');
+    $page = livewire(EmailInboxPage::class);
+
+    $outsider = User::factory()->withWorkspace()->create();
+    conversationsPageMessage(conversationsPageMailbox($outsider, 'eve@other.test'), 'conv-outside', 'brian@airbnb.test');
+    $page->call('refreshConversations')->assertHasNoErrors();
+
+    expect(conversationsPageKeys($page->html()))->toBe(['conv-own'])
+        ->and($page->instance()->viewCounts['needs_reply'])->toBe(1);
+});
+
+it('keeps cached counts apart for each search and each workspace', function (): void {
+    conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'brian@airbnb.test');
+    conversationsPageMessage($this->ownerMailbox, 'conv-lunch', 'kim@notion.test');
+
+    expect(livewire(EmailInboxPage::class)->instance()->viewCounts['needs_reply'])->toBe(2)
+        ->and(Livewire::withQueryParams(['q' => 'kim@notion.test'])->test(EmailInboxPage::class)->instance()->viewCounts['needs_reply'])->toBe(1);
+
+    $elsewhere = Workspace::factory()->create(['user_id' => $this->owner->id]);
+    Feature::for($elsewhere)->activate(EmailConversations::class);
+    $this->owner->forceFill(['current_workspace_id' => $elsewhere->id])->save();
+    Filament::setTenant($elsewhere);
+
+    expect(livewire(EmailInboxPage::class)->instance()->viewCounts['needs_reply'])->toBe(0);
 });
