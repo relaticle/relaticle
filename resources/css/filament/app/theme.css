@@ -1809,8 +1809,6 @@ html.fi:has(body.fi-onboarding-wizard),
     }
 }
 
-/* The slash menu is appended to <body> to escape the modal's overflow clipping,
-   so z-40 has to clear the modal window at 30. */
 /* Appended to the body, so it must clear the modals email-integration.css lifts to 60
    and 70. It stays under toasts at 80. */
 .fi-slash-menu {
