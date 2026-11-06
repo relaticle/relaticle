@@ -9,13 +9,14 @@ use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
-use Closure;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
+use Relaticle\EmailIntegration\Actions\ApplyEmailLinkChanges;
+use Relaticle\EmailIntegration\Actions\LinkEmailToRecord;
+use Relaticle\EmailIntegration\Actions\UnlinkEmailFromRecord;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Queries\EmailLinkTargetsQuery;
 use Relaticle\EmailIntegration\Queries\VisibleEmailsQuery;
@@ -56,8 +57,7 @@ trait LinksEmailsToRecords
         return true;
     }
 
-    /** @param  Closure(User, Email, Company|People|Opportunity): void  $apply */
-    protected function applyToEveryLink(Request $request, bool $linkedAfter, Closure $apply): Response|ResponseFactory
+    protected function applyToEveryLink(Request $request, bool $linkedAfter, LinkEmailToRecord|UnlinkEmailFromRecord $change): Response|ResponseFactory
     {
         if (($denied = $this->denyIfTokenLacks(EmailGrant::Draft) ?? $this->denyIfTokenCannot('update')) instanceof Response) {
             return $denied;
@@ -83,21 +83,12 @@ trait LinksEmailsToRecords
                 return $pair;
             }
 
-            $pairs[] = [...$pair, 'link' => $link];
+            $pairs[] = $pair;
         }
 
-        $items = DB::transaction(function () use ($pairs, $apply, $user, $linkedAfter): array {
-            $items = [];
+        resolve(ApplyEmailLinkChanges::class)->execute($user, $pairs, $change);
 
-            foreach ($pairs as ['email' => $email, 'record' => $record, 'link' => $link]) {
-                $apply($user, $email, $record);
-                $items[] = [...$link, 'linked' => $linkedAfter];
-            }
-
-            return $items;
-        });
-
-        return Response::structured(['items' => $items]);
+        return Response::structured(['items' => array_map(fn (array $link): array => [...$link, 'linked' => $linkedAfter], $validated['links'])]);
     }
 
     /**
