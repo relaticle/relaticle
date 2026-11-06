@@ -66,7 +66,7 @@ test('web forms link is hidden where hosted billing is off', function (): void {
         ->assertDontSee(__('access-tokens.integrations.forms_link'));
 })->skip(fn (): bool => ! Features::hasApiFeatures(), 'API support is not enabled.');
 
-test('web forms link is hidden where the help centre is off', function (): void {
+test('web forms link is hidden where the help center is off', function (): void {
     withHostedBilling();
     Feature::define(Documentation::class, false);
 

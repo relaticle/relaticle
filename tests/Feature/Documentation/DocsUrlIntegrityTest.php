@@ -26,7 +26,7 @@ it('would regenerate the api reference with the head it serves today', function 
     expect(headOf($regenerated))->toBe(headOf($served));
 });
 
-it('links the docs and help centre from the api reference through the documentation public url', function (): void {
+it('links the docs and help center from the api reference through the documentation public url', function (): void {
     config()->set('documentation.public_url', 'https://docs.example.test');
 
     $html = $this->get('/developers/api')->assertOk()->getContent();

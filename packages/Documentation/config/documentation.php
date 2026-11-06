@@ -21,7 +21,7 @@ return [
     | Public URL
     |--------------------------------------------------------------------------
     |
-    | The site that serves the help centre and the developer guides. DocUrl
+    | The site that serves the help center and the developer guides. DocUrl
     | builds every link to them from it, so an install without the docs
     | website points its assistant and its panel links at relaticle.com.
     |
