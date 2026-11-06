@@ -10,6 +10,159 @@
 @source "../views/overrides";
 @source "../js";
 
+/* Marketing surfaces: hairline rails between flat cells, depth from the surface ladder, not shadows. */
+@theme {
+    --color-rail: var(--color-gray-200);
+    --color-surface: var(--color-white);
+    --color-tint: var(--color-gray-50);
+    --header-height: 4rem;
+}
+
+html {
+    background-color: var(--color-surface);
+    color-scheme: light;
+}
+
+html.dark {
+    color-scheme: dark;
+}
+
+html:has(#main-header) {
+    scroll-padding-top: calc(var(--header-height) + 1.5rem);
+}
+
+/* The framed header floats below the top edge: its card's top gap plus its height. */
+html:has(#main-header[data-framed]) {
+    --header-height: 4.5rem;
+
+    @media (width >= 48rem) {
+        --header-height: 4.75rem;
+    }
+}
+
+.dark {
+    --color-rail: rgb(255 255 255 / 0.1);
+    --color-surface: var(--color-gray-950);
+    --color-tint: var(--color-gray-900);
+}
+
+@utility shadow-navbar {
+    box-shadow:
+        0 0 0 1px var(--color-gray-200),
+        0 8px 24px -12px rgb(0 0 0 / 0.12);
+
+    &:where(.dark, .dark *) {
+        box-shadow:
+            0 0 0 1px rgb(255 255 255 / 0.1),
+            0 8px 24px -12px rgb(0 0 0 / 0.6);
+    }
+}
+
+/* The hero's product panel takes the logo's own colours, #4038CD to #5D54E8. */
+@utility bg-hero-panel {
+    background-color: var(--color-indigo-50);
+    background-image:
+        radial-gradient(55% 90% at 80% 5%, color-mix(in oklab, var(--color-indigo-400) 45%, transparent), transparent 70%),
+        radial-gradient(45% 75% at 10% 0%, color-mix(in oklab, var(--color-primary-200) 85%, transparent), transparent 70%),
+        radial-gradient(60% 70% at 40% 100%, color-mix(in oklab, var(--color-sky-100) 80%, transparent), transparent 70%);
+
+    &:where(.dark, .dark *) {
+        background-color: var(--color-gray-900);
+        background-image:
+            radial-gradient(55% 90% at 80% 5%, color-mix(in oklab, var(--color-indigo-500) 35%, transparent), transparent 70%),
+            radial-gradient(45% 75% at 10% 0%, color-mix(in oklab, var(--color-primary-500) 18%, transparent), transparent 70%);
+    }
+}
+
+/* The closing band: the page's one dark moment, lit with the actor colours. */
+@utility bg-cta-band {
+    background-color: var(--color-gray-950);
+    background-image:
+        radial-gradient(40% 55% at 50% 0%, color-mix(in oklab, var(--color-primary-500) 30%, transparent), transparent 70%),
+        radial-gradient(40% 45% at 12% 70%, color-mix(in oklab, var(--color-emerald-500) 12%, transparent), transparent 70%),
+        radial-gradient(40% 60% at 92% 40%, color-mix(in oklab, var(--color-amber-500) 10%, transparent), transparent 70%);
+
+    &:where(.dark, .dark *) {
+        background-color: var(--color-gray-900);
+    }
+}
+
+@utility bg-warm {
+    background-image:
+        radial-gradient(45% 60% at 15% 10%, var(--color-primary-100), transparent 70%),
+        radial-gradient(40% 55% at 85% 20%, var(--color-amber-50), transparent 70%),
+        radial-gradient(50% 60% at 50% 100%, var(--color-emerald-50), transparent 70%);
+
+    &:where(.dark, .dark *) {
+        background-image:
+            radial-gradient(45% 60% at 15% 10%, rgb(124 58 237 / 0.14), transparent 70%),
+            radial-gradient(40% 55% at 85% 20%, rgb(245 158 11 / 0.07), transparent 70%),
+            radial-gradient(50% 60% at 50% 100%, rgb(16 185 129 / 0.07), transparent 70%);
+    }
+}
+
+@utility bg-dots {
+    background-image: radial-gradient(circle, var(--color-gray-300) 1px, transparent 1.25px);
+    background-size: 20px 20px;
+    background-position: center;
+
+    &:where(.dark, .dark *) {
+        background-image: radial-gradient(circle, rgb(255 255 255 / 0.08) 1px, transparent 1.25px);
+    }
+}
+
+@utility type-display {
+    font-family: var(--font-display);
+    font-size: 2.25rem;
+    font-weight: 600;
+    line-height: 1.08;
+    letter-spacing: -0.03em;
+    text-wrap: balance;
+
+    @media (width >= 48rem) {
+        font-size: 3.75rem;
+    }
+}
+
+@utility type-title {
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+
+    @media (width >= 48rem) {
+        font-size: 2.5rem;
+    }
+}
+
+@utility type-lead {
+    font-size: 1.125rem;
+    font-weight: 500;
+    line-height: 1.4;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+
+    @media (width >= 48rem) {
+        font-size: 1.25rem;
+    }
+}
+
+@utility type-label {
+    font-family: var(--font-mono);
+    font-size: var(--text-micro);
+    line-height: 1.6;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+@utility type-prose {
+    font-size: 1rem;
+    line-height: 1.6;
+    max-width: 66ch;
+}
+
 /* The hero mock mirrors the app panel, whose gray is zinc. This bundle's gray is Tailwind's cool gray. */
 .hero-agent-preview {
     --color-gray-50: var(--color-zinc-50);

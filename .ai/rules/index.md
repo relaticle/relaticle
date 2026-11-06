@@ -14,6 +14,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | packages/EmailIntegration/** | .ai/rules/email-integration.md |
 | app/Jobs/Email/**, app/Support/Email/** | .ai/rules/email.md |
 | app/Filament/**, app/Livewire/**, app/Support/Media/**, app/Actions/Upload/**, app/Mcp/Tools/**, app/Http/Controllers/Media/**, app/Observers/**, app/Jobs/FetchFaviconForCompany.php, app/Services/Favicon/**, app/Console/Commands/**, packages/Chat/src/**, packages/ImportWizard/src/**, packages/EmailIntegration/src/Livewire/**, packages/EmailIntegration/src/Services/EmailTemplateRenderService.php, packages/Cloud/src/**/Filament/**, packages/Cloud/src/**/Livewire/**, packages/Cloud/src/**/Commands/** | .ai/rules/file-uploads.md |
+| packages/Cloud/resources/views/marketing/**, packages/Cloud/resources/views/components/marketing/**, packages/Cloud/resources/css/cloud.css, packages/Cloud/resources/js/motion.js | .ai/rules/marketing-design.md |
 | app/Models/**, app/Casts/** | .ai/rules/models.md |
 | app/Notifications/**, app/Livewire/App/AppDatabaseNotifications.php, app/Contracts/Inbox/**, app/Support/Inbox/**, resources/views/livewire/app/database-notifications.blade.php, resources/views/livewire/app/notifications/**, packages/*/src/Notifications/**, packages/*/src/Inbox/**, packages/Cloud/src/**/Notifications/** | .ai/rules/notifications.md |
 | resources/views/filament/**, app/Filament/**, packages/*/src/Filament/**, packages/*/resources/views/**, packages/Cloud/src/**/Filament/** | .ai/rules/panel-links.md |

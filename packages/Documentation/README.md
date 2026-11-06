@@ -1,6 +1,6 @@
 # Documentation package
 
-The content and the engine behind Relaticle's help centre and developer guides. This package renders no pages. The website that does lives in `packages/Cloud`, which self-hosted builds do not contain.
+The content and the engine behind Relaticle's help center and developer guides. This package renders no pages. The website that does lives in `packages/Cloud`, which self-hosted builds do not contain.
 
 ## What it holds
 

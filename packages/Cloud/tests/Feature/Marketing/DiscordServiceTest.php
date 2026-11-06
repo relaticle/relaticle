@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -73,4 +74,15 @@ it('keeps the last good member count when Discord fails on the next fetch', func
     Cache::forget('discord_members_abc123');
 
     expect($service->getFormattedMemberCount())->toBe('157');
+});
+
+it('gives up on Discord within a few seconds so a cold cache cannot stall the page', function (): void {
+    Http::fake(function (Request $request, array $options): PromiseInterface {
+        expect($options['connect_timeout'])->toBe(2)
+            ->and($options['timeout'])->toBe(3);
+
+        return Http::response(['approximate_member_count' => 157]);
+    });
+
+    expect((new DiscordService)->getFormattedMemberCount())->toBe('157');
 });

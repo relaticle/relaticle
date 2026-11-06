@@ -129,7 +129,7 @@ final readonly class HelpController
         $help = $this->llmsTxtHelpEntries();
 
         if ($help !== []) {
-            array_push($lines, '', '## '.__('Help Centre'), '', ...$help);
+            array_push($lines, '', '## '.__('Help center'), '', ...$help);
         }
 
         $docs = $this->llmsTxtDocsEntries();

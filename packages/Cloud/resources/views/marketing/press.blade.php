@@ -11,6 +11,7 @@
         ['id' => 'companies', 'title' => __('Companies'), 'alt' => __('Relaticle companies list with account owners, ICP status, and website domains')],
         ['id' => 'custom-fields', 'title' => __('Custom fields'), 'alt' => __('Relaticle custom field settings for opportunities')],
     ];
+    $socialClass = 'inline-flex min-h-11 items-center gap-2 rounded-sm text-primary-700 focus-visible:outline-2 focus-visible:outline-primary dark:text-primary-300';
     $downloadClass = 'inline-flex min-h-11 items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 transition hover:border-primary-300 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-primary-400 dark:hover:text-primary-300';
 @endphp
 
@@ -18,38 +19,38 @@
     :title="__('Press kit & brand assets') . ' - Relaticle'"
     :description="__('Download official Relaticle logos, social media avatars, and product screenshots. Find company facts and press contact details.')"
 >
-    <div class="bg-white text-gray-950 dark:bg-gray-950 dark:text-white">
-        <div class="mx-auto max-w-6xl px-6 pb-24 pt-32 sm:pt-40 lg:px-8">
-            <div class="max-w-3xl">
-                <p class="mb-5 text-xs font-semibold uppercase tracking-widest text-primary dark:text-primary-400">{{ __('Press & brand resources') }}</p>
-                <h1 class="font-display text-4xl font-bold leading-tight tracking-tight sm:text-6xl">{{ __('Relaticle, ready to share.') }}</h1>
-                <p class="mt-6 max-w-2xl text-lg leading-relaxed text-gray-600 dark:text-gray-400">
-                    {{ __('Official logos, social avatars, product screenshots, and the facts behind Relaticle. Everything you need to tell the story.') }}
-                </p>
-                <div class="mt-8 flex flex-wrap items-center gap-3">
-                    <a href="{{ asset('brand/kit.zip') }}" download="relaticle-brand-kit.zip" class="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-white transition hover:bg-primary-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary dark:bg-primary-500 dark:hover:bg-primary-600">
-                        <x-ri-download-2-line class="size-4" aria-hidden="true"/>
-                        {{ __('Download brand kit') }}
-                        <span class="font-normal text-white/80">{{ __('ZIP') }}</span>
-                    </a>
-                    <a href="#facts" class="inline-flex min-h-12 items-center gap-2 rounded-xl px-4 text-sm font-medium text-gray-600 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary dark:text-gray-300 dark:hover:text-primary-300">
-                        {{ __('About Relaticle') }}
-                        <x-ri-arrow-down-line class="size-4" aria-hidden="true"/>
-                    </a>
-                </div>
-                <p class="mt-4 text-xs leading-relaxed text-gray-500 dark:text-gray-400">{{ __('Includes SVG logos, transparent PNGs, :count platform presets, and YouTube watermarks.', ['count' => count($brand['platforms'])]) }}</p>
+    <x-cloud::marketing.hero align="start">
+        <x-slot:eyebrow>
+            <x-cloud::marketing.eyebrow>{{ __('Press & brand resources') }}</x-cloud::marketing.eyebrow>
+        </x-slot:eyebrow>
+
+        <x-slot:title>{{ __('Relaticle, ready to share.') }}</x-slot:title>
+
+        <x-slot:aside>
+            <p class="text-base leading-relaxed text-gray-500 md:text-lg dark:text-gray-400">
+                {{ __('Official logos, social avatars, product screenshots, and the facts behind Relaticle. Everything you need to tell the story.') }}
+            </p>
+
+            <div class="mt-7 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
+                <x-cloud::marketing.button href="{{ asset('brand/kit.zip') }}" download="relaticle-brand-kit.zip" icon="ri-download-2-line">
+                    {{ __('Download brand kit') }}
+                </x-cloud::marketing.button>
+                <x-cloud::marketing.button variant="secondary" href="#facts">
+                    {{ __('About Relaticle') }}
+                </x-cloud::marketing.button>
             </div>
 
-            <nav aria-label="{{ __('Press kit sections') }}" class="mt-12 flex flex-wrap gap-x-7 gap-y-3 border-b border-gray-200 pb-5 text-sm font-medium dark:border-gray-800">
-                @foreach (['logos' => __('Logos'), 'social' => __('Social avatars'), 'screenshots' => __('Screenshots'), 'facts' => __('Company facts'), 'contact' => __('Press contact')] as $anchor => $label)
-                    <a href="#{{ $anchor }}" class="rounded-sm py-2 text-gray-600 transition hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary dark:text-gray-400 dark:hover:text-primary-300">{{ $label }}</a>
-                @endforeach
-            </nav>
+            <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">{{ __('Includes SVG logos, transparent PNGs, :count platform presets, and YouTube watermarks.', ['count' => count($brand['platforms'])]) }}</p>
+        </x-slot:aside>
+    </x-cloud::marketing.hero>
 
-            <section id="logos" aria-labelledby="logos-title" class="scroll-mt-24 pt-14 sm:pt-16">
-                <h2 id="logos-title" class="font-display text-2xl font-bold tracking-tight sm:text-3xl">{{ __('The logo') }}</h2>
-                <p class="mt-3 max-w-2xl text-sm leading-relaxed text-gray-600 dark:text-gray-400">{{ __('Use the full logo when space allows. Choose the symbol for compact placements. All files have transparent backgrounds.') }}</p>
-                <div class="mt-7 grid gap-5 sm:grid-cols-2">
+    <x-cloud::marketing.frame id="logos" aria-labelledby="logos-title">
+        <x-cloud::marketing.frame-header :label="__('Logos')" :lead="__('The logo.')">
+            {{ __('Use the full logo when space allows. Choose the symbol for compact placements.') }}
+        </x-cloud::marketing.frame-header>
+        <div class="p-6 md:p-10">
+            <h2 id="logos-title" class="sr-only">{{ __('The logo') }}</h2>
+            <div class="grid gap-5 sm:grid-cols-2">
                     @foreach (['color' => __('For light backgrounds'), 'white' => __('For dark backgrounds')] as $variant => $label)
                         <article class="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800">
                             <div @class(['flex h-52 items-center justify-center px-8 sm:h-60', 'bg-white' => $variant === 'color', 'bg-gray-950' => $variant === 'white'])>
@@ -73,17 +74,21 @@
                         </article>
                     @endforeach
                 </div>
-                <div class="mt-6 grid gap-5 rounded-2xl bg-gray-50 p-6 text-sm dark:bg-gray-900/50 sm:grid-cols-3">
-                    <div><h3 class="font-semibold">{{ __('Give it room') }}</h3><p class="mt-2 leading-relaxed text-gray-600 dark:text-gray-400">{{ __('Keep the supplied padding. Leave space between the logo and surrounding text or graphics.') }}</p></div>
-                    <div><h3 class="font-semibold">{{ __('Keep it recognizable') }}</h3><p class="mt-2 leading-relaxed text-gray-600 dark:text-gray-400">{{ __('Preserve the proportions and colors. Avoid stretching, rotating, or adding effects.') }}</p></div>
-                    <div><h3 class="font-semibold">{{ __('Choose the right format') }}</h3><p class="mt-2 leading-relaxed text-gray-600 dark:text-gray-400">{{ __('Use SVG for layouts that need to scale. Use PNG for uploads, slides, and video overlays.') }}</p></div>
+            <div class="border-rail mt-6 grid gap-5 border-t pt-6 text-sm sm:grid-cols-3">
+<div><h3 class="font-semibold">{{ __('Give it room') }}</h3><p class="type-prose text-gray-700 dark:text-gray-200 mt-2">{{ __('Keep the supplied padding. Leave space between the logo and surrounding text or graphics.') }}</p></div>
+                    <div><h3 class="font-semibold">{{ __('Keep it recognizable') }}</h3><p class="type-prose text-gray-700 dark:text-gray-200 mt-2">{{ __('Preserve the proportions and colors. Avoid stretching, rotating, or adding effects.') }}</p></div>
+                    <div><h3 class="font-semibold">{{ __('Choose the right format') }}</h3><p class="type-prose text-gray-700 dark:text-gray-200 mt-2">{{ __('Use SVG for layouts that need to scale. Use PNG for uploads, slides, and video overlays.') }}</p></div>
                 </div>
-            </section>
+        </div>
+    </x-cloud::marketing.frame>
 
-            <section id="social" aria-labelledby="social-title" class="scroll-mt-24 pt-16 sm:pt-20">
-                <h2 id="social-title" class="font-display text-2xl font-bold tracking-tight sm:text-3xl">{{ __('One identity. Every channel.') }}</h2>
-                <p class="mt-3 max-w-2xl text-sm leading-relaxed text-gray-600 dark:text-gray-400">{{ __('Purple is the primary avatar. Upload the full square image and let the platform apply its crop. Keep one color across accounts.') }}</p>
-                <div class="mt-7 grid gap-5 sm:grid-cols-3">
+    <x-cloud::marketing.frame id="social" aria-labelledby="social-title">
+        <x-cloud::marketing.frame-header :label="__('Social avatars')" :lead="__('One identity. Every channel.')">
+            {{ __('Purple is the primary avatar. Upload the full square image and let the platform apply its crop.') }}
+        </x-cloud::marketing.frame-header>
+        <div class="p-6 md:p-10">
+            <h2 id="social-title" class="sr-only">{{ __('One identity. Every channel.') }}</h2>
+            <div class="grid gap-5 sm:grid-cols-3">
                     @foreach ($brand['avatars'] as $avatar)
                         <article class="rounded-2xl border border-gray-200 p-5 dark:border-gray-800">
                             <div class="flex min-h-7 items-center justify-between gap-2">
@@ -100,7 +105,7 @@
                                 <img src="{{ asset('brand/kit/'.$avatar['svg']) }}" alt="" width="32" height="32" class="size-8 rounded-lg ring-1 ring-gray-200 dark:ring-gray-700" loading="lazy"/>
                                 <span class="text-xs text-gray-500 dark:text-gray-400">{{ __('Square or rounded') }}</span>
                             </div>
-                            <a href="{{ asset('brand/kit/'.$avatar['png']) }}" download class="{{ $downloadClass }} mt-5 w-full justify-center" aria-label="{{ __('Download :color avatar PNG, 1024 pixels', ['color' => $avatarLabels[$avatar['id']]]) }}"><x-ri-download-2-line class="size-4" aria-hidden="true"/>{{ __('PNG · 1024 px') }}</a>
+                            <a href="{{ asset('brand/kit/'.$avatar['png']) }}" download class="{{ $downloadClass }} w-full justify-center" aria-label="{{ __('Download :color avatar PNG, 1024 pixels', ['color' => $avatarLabels[$avatar['id']]]) }}"><x-ri-download-2-line class="size-4" aria-hidden="true"/>{{ __('PNG · 1024 px') }}</a>
                             <div class="mt-2 flex justify-center gap-5 text-xs">
                                 <a href="{{ asset('brand/kit/'.$avatar['largePng']) }}" download class="inline-flex min-h-11 items-center rounded-sm text-gray-600 underline decoration-gray-300 underline-offset-4 hover:text-primary focus-visible:outline-2 focus-visible:outline-primary dark:text-gray-400" aria-label="{{ __('Download :color avatar PNG, 2048 pixels', ['color' => $avatarLabels[$avatar['id']]]) }}">{{ __('PNG · 2048 px') }}</a>
                                 <a href="{{ asset('brand/kit/'.$avatar['svg']) }}" download class="inline-flex min-h-11 items-center rounded-sm text-gray-600 underline decoration-gray-300 underline-offset-4 hover:text-primary focus-visible:outline-2 focus-visible:outline-primary dark:text-gray-400" aria-label="{{ __('Download :color avatar SVG', ['color' => $avatarLabels[$avatar['id']]]) }}">{{ __('SVG') }}</a>
@@ -108,7 +113,7 @@
                         </article>
                     @endforeach
                 </div>
-                <details class="group mt-5 rounded-2xl border border-gray-200 dark:border-gray-800" x-data="{ color: 'purple' }">
+            <details class="group mt-5 rounded-2xl border border-gray-200 dark:border-gray-800" x-data="{ color: 'purple' }">
                     <summary class="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 rounded-2xl px-6 py-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary [&::-webkit-details-marker]:hidden">
                         <span class="text-sm font-semibold">{{ __('Choose a platform') }}<span class="ml-2 font-normal text-gray-500 dark:text-gray-400">{{ __(':count presets', ['count' => count($brand['platforms'])]) }}</span></span>
                         <x-ri-add-line class="size-5 shrink-0 transition group-open:rotate-45" aria-hidden="true"/>
@@ -133,20 +138,24 @@
                         </div>
                     </div>
                 </details>
-                <div class="mt-5 flex flex-wrap items-center justify-between gap-5 rounded-2xl bg-gray-50 p-6 dark:bg-gray-900/50">
-                    <div><h3 class="text-sm font-semibold">{{ __('YouTube video watermark') }}</h3><p class="mt-2 text-sm text-gray-600 dark:text-gray-400">{{ __('Small PNGs for the corner of your videos. Choose white for dark footage or purple for a solid background.') }}</p></div>
+            <div class="border-rail mt-6 flex flex-wrap items-center justify-between gap-5 border-t pt-6">
+<div><h3 class="text-sm font-semibold">{{ __('YouTube video watermark') }}</h3><p class="mt-2 text-sm text-gray-600 dark:text-gray-400">{{ __('Small PNGs for the corner of your videos. Choose white for dark footage or purple for a solid background.') }}</p></div>
                     <div class="flex flex-wrap gap-2">
                         @foreach ($brand['watermarks'] as $watermark)
                             <a href="{{ asset('brand/kit/'.$watermark['png']) }}" download class="{{ $downloadClass }}" aria-label="{{ __('Download :color YouTube watermark PNG', ['color' => $watermark['id'] === 'white' ? __('white') : __('purple')]) }}">{{ $watermark['id'] === 'white' ? __('White PNG') : __('Purple PNG') }}<x-ri-download-2-line class="size-4" aria-hidden="true"/></a>
                         @endforeach
                     </div>
                 </div>
-            </section>
+        </div>
+    </x-cloud::marketing.frame>
 
-            <section id="screenshots" aria-labelledby="screenshots-title" class="scroll-mt-24 pt-16 sm:pt-20">
-                <h2 id="screenshots-title" class="font-display text-2xl font-bold tracking-tight sm:text-3xl">{{ __('Inside Relaticle') }}</h2>
-                <p class="mt-3 text-sm leading-relaxed text-gray-600 dark:text-gray-400">{{ __('Product screenshots in light and dark themes. Download the original PNGs for articles, presentations, and reviews.') }}</p>
-                <div class="mt-7 grid gap-5 sm:grid-cols-3">
+    <x-cloud::marketing.frame id="screenshots" aria-labelledby="screenshots-title">
+        <x-cloud::marketing.frame-header :label="__('Screenshots')" :lead="__('Inside Relaticle.')">
+            {{ __('Product screenshots in light and dark themes, as original PNGs.') }}
+        </x-cloud::marketing.frame-header>
+        <div class="p-6 md:p-10">
+            <h2 id="screenshots-title" class="sr-only">{{ __('Inside Relaticle') }}</h2>
+            <div class="grid gap-5 sm:grid-cols-3">
                     @foreach ($screenshots as $screenshot)
                         <figure class="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800">
                             <img src="{{ Vite::asset('resources/images/app-'.$screenshot['id'].'-preview.png') }}" alt="{{ $screenshot['alt'] }}" width="2880" height="2232" class="block h-auto w-full dark:hidden" loading="lazy"/>
@@ -162,38 +171,48 @@
                         </figure>
                     @endforeach
                 </div>
-            </section>
-
-            <section id="facts" aria-labelledby="facts-title" class="scroll-mt-24 pt-16 sm:pt-20">
-                <div class="grid gap-8 lg:grid-cols-3 lg:gap-12">
-                    <div>
-                        <h2 id="facts-title" class="font-display text-2xl font-bold tracking-tight sm:text-3xl">{{ __('About Relaticle') }}</h2>
-                        <p class="mt-4 text-sm leading-relaxed text-gray-600 dark:text-gray-400">{{ __('Relaticle is an open-source CRM for managing companies, people, opportunities, tasks, and notes. Its built-in AI assistant, :name, proposes changes for you to review and approve.', ['name' => config('chat.assistant_name')]) }}</p>
-                        <p class="mt-3 text-sm leading-relaxed text-gray-600 dark:text-gray-400">{{ __('Choose Relaticle Cloud or run it on your own server.') }}</p>
-                        <div class="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium">
-                            <a href="{{ $facts['source_urls']['repository'] }}" target="_blank" rel="noopener noreferrer" class="inline-flex min-h-11 items-center gap-2 rounded-sm text-primary focus-visible:outline-2 focus-visible:outline-primary dark:text-primary-400"><x-ri-github-fill class="size-4" aria-hidden="true"/>{{ __('GitHub') }}</a>
-                            <a href="{{ route('discord') }}" target="_blank" rel="noopener noreferrer" class="inline-flex min-h-11 items-center gap-2 rounded-sm text-primary focus-visible:outline-2 focus-visible:outline-primary dark:text-primary-400"><x-ri-discord-fill class="size-4" aria-hidden="true"/>{{ __('Discord') }}</a>
-                            <a href="https://x.com/relaticle" target="_blank" rel="noopener noreferrer" class="inline-flex min-h-11 items-center gap-2 rounded-sm text-primary focus-visible:outline-2 focus-visible:outline-primary dark:text-primary-400"><x-ri-twitter-x-fill class="size-4" aria-hidden="true"/>{{ __('X') }}</a>
-                        </div>
-                    </div>
-                    <div class="lg:col-span-2">
-                        <ul class="grid gap-px overflow-hidden rounded-2xl border border-gray-200 bg-gray-200 dark:border-gray-800 dark:bg-gray-800 sm:grid-cols-2">
-                            @foreach ([__('Founded') => '2024', __('License') => $facts['license'], __('Tech stack') => $facts['stack'], __('GitHub stars') => $starsLabel, __('Pricing') => $facts['pricing'], __('AI & MCP') => __(':name, a built-in AI assistant, and an MCP server. Both support self-hosting.', ['name' => config('chat.assistant_name')])] as $label => $value)
-                                <li class="bg-white p-5 dark:bg-gray-950"><p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ $label }}</p><p class="mt-2 text-sm leading-relaxed text-gray-800 dark:text-gray-200">{{ $value }}</p></li>
-                            @endforeach
-                        </ul>
-                        <p class="mt-4 text-xs leading-relaxed text-gray-500 dark:text-gray-400">{{ __('Company facts verified :date.', ['date' => $factsVerifiedAt]) }} <a href="{{ route('pricing') }}" class="underline underline-offset-4">{{ __('See current pricing') }}</a>.</p>
-                    </div>
-                </div>
-            </section>
-
-            <section id="contact" aria-labelledby="contact-title" class="mt-16 scroll-mt-24 rounded-2xl border border-gray-200 bg-gray-50 p-7 dark:border-gray-800 dark:bg-gray-900/50 sm:mt-20 sm:p-10">
-                <div class="flex flex-wrap items-center justify-between gap-6">
-                    <div class="max-w-xl"><h2 id="contact-title" class="font-display text-2xl font-bold tracking-tight">{{ __('Working on a story?') }}</h2><p class="mt-3 text-sm leading-relaxed text-gray-600 dark:text-gray-400">{{ __('Get in touch for interviews, product questions, or help finding the right assets.') }}</p></div>
-                    <a href="{{ route('contact') }}" class="{{ $downloadClass }}">{{ __('Contact the team') }}<x-ri-arrow-right-line class="size-4" aria-hidden="true"/></a>
-                </div>
-                <p class="mt-6 text-xs leading-relaxed text-gray-500 dark:text-gray-400">{{ __('Use these assets to identify or cover Relaticle. Do not imply a partnership or endorsement without our agreement.') }}</p>
-            </section>
         </div>
-    </div>
+    </x-cloud::marketing.frame>
+
+    <x-cloud::marketing.frame id="facts" aria-labelledby="facts-title">
+        <x-cloud::marketing.frame-header :label="__('Company facts')" :lead="__('About Relaticle.')">
+            {{ __('The facts behind the product, verified and dated.') }}
+        </x-cloud::marketing.frame-header>
+        <h2 id="facts-title" class="sr-only">{{ __('About Relaticle') }}</h2>
+        <div class="bg-rail grid grid-cols-1 gap-px lg:grid-cols-12">
+            <div class="bg-surface p-6 md:p-10 lg:col-span-4">
+                <p class="type-prose text-gray-700 dark:text-gray-200">{{ __('Relaticle is an open-source CRM for managing companies, people, opportunities, tasks, and notes. Its built-in AI assistant, :name, proposes changes for you to review and approve.', ['name' => config('chat.assistant_name')]) }}</p>
+                <p class="type-prose text-gray-700 dark:text-gray-200 mt-3">{{ __('Choose Relaticle Cloud or run it on your own server.') }}</p>
+                <div class="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium">
+                    <a href="{{ $facts['source_urls']['repository'] }}" target="_blank" rel="noopener noreferrer" class="{{ $socialClass }}"><x-ri-github-fill class="size-4" aria-hidden="true"/>{{ __('GitHub') }}</a>
+                    <a href="{{ route('discord') }}" target="_blank" rel="noopener noreferrer" class="{{ $socialClass }}"><x-ri-discord-fill class="size-4" aria-hidden="true"/>{{ __('Discord') }}</a>
+                    <a href="https://x.com/relaticle" target="_blank" rel="noopener noreferrer" class="{{ $socialClass }}"><x-ri-twitter-x-fill class="size-4" aria-hidden="true"/>{{ __('X') }}</a>
+                </div>
+            </div>
+            <div class="bg-surface lg:col-span-8">
+                <ul class="bg-rail grid gap-px sm:grid-cols-2">
+                    @foreach ([__('Founded') => '2024', __('License') => $facts['license'], __('Tech stack') => $facts['stack'], __('GitHub stars') => $starsLabel, __('Pricing') => $facts['pricing'], __('AI & MCP') => __(':name, a built-in AI assistant, and an MCP server. Both support self-hosting.', ['name' => config('chat.assistant_name')])] as $label => $value)
+                        <li class="bg-surface p-6 md:p-8">
+                            <x-cloud::marketing.eyebrow>{{ $label }}</x-cloud::marketing.eyebrow>
+                            <p class="mt-2 text-base leading-relaxed text-gray-950 dark:text-white">{{ $value }}</p>
+                        </li>
+                    @endforeach
+                </ul>
+                <p class="border-rail border-t px-6 py-5 text-sm text-gray-500 md:px-8 dark:text-gray-400">{{ __('Company facts verified :date.', ['date' => $factsVerifiedAt]) }} <a href="{{ route('pricing') }}" class="underline underline-offset-4">{{ __('See current pricing') }}</a>.</p>
+            </div>
+        </div>
+    </x-cloud::marketing.frame>
+
+    <x-cloud::marketing.frame id="contact" aria-labelledby="contact-title">
+        <div class="bg-rail grid grid-cols-1 gap-px lg:grid-cols-12">
+            <div class="bg-surface p-6 md:p-10 lg:col-span-8">
+                <h2 id="contact-title" class="type-title text-gray-950 dark:text-white">{{ __('Working on a story?') }}</h2>
+                <p class="type-prose text-gray-700 dark:text-gray-200 mt-3">{{ __('Get in touch for interviews, product questions, or help finding the right assets.') }}</p>
+                <p class="mt-6 text-sm text-gray-500 dark:text-gray-400">{{ __('Use these assets to identify or cover Relaticle. Do not imply a partnership or endorsement without our agreement.') }}</p>
+            </div>
+            <div class="bg-surface flex items-center p-6 md:p-10 lg:col-span-4">
+                <x-cloud::marketing.button variant="secondary" href="{{ route('contact') }}" iconTrailing="ri-arrow-right-line">{{ __('Contact the team') }}</x-cloud::marketing.button>
+            </div>
+        </div>
+    </x-cloud::marketing.frame>
 </x-cloud::guest-layout>

@@ -1,11 +1,4 @@
 @php
-    /**
-     * List layout kept for responsive styling (a real <table> doesn't stack
-     * cleanly on narrow viewports); tables DO convert to markdown since the
-     * TableAwareLeagueDriver landed (see app/Support/Markdown). This is a
-     * presentation choice, not a markdown-conversion workaround. See the
-     * same pattern in press.blade.php.
-     */
     $formatStars = function (array $facts): string {
         if ($facts['stars'] === 0) {
             return __('No public GitHub repository');
@@ -40,18 +33,18 @@
     ];
 @endphp
 
-<ul class="divide-y divide-gray-100 rounded-2xl border border-gray-200/80 bg-white dark:divide-white/[0.04] dark:border-white/[0.06] dark:bg-white/[0.02]">
+<div class="bg-rail grid gap-px">
     @foreach ($rows as [$label, $relaticleValue, $competitorValue])
-        <li class="px-4 py-4 sm:px-6">
-            <p class="text-sm font-semibold text-gray-900 dark:text-white mb-2">{{ $label }}</p>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
-                <p class="text-sm text-gray-600 dark:text-gray-400">
-                    <span class="font-medium text-gray-500 dark:text-gray-500">{{ $relaticle['name'] }}:</span> {{ $relaticleValue }}
-                </p>
-                <p class="text-sm text-gray-600 dark:text-gray-400">
-                    <span class="font-medium text-gray-500 dark:text-gray-500">{{ $competitor['name'] }}:</span> {{ $competitorValue }}
-                </p>
-            </div>
-        </li>
+        <div class="bg-rail grid grid-cols-1 gap-px md:grid-cols-12">
+            <p class="bg-surface px-6 py-5 text-sm font-medium text-gray-950 md:col-span-3 md:px-10 dark:text-white">{{ $label }}</p>
+            <p class="bg-surface px-6 py-5 md:col-span-5 md:px-8">
+                <span class="type-label mb-1 block text-gray-500 dark:text-gray-400">{{ $relaticle['name'] }}:</span>
+                <span class="type-prose text-gray-700 dark:text-gray-300">{{ $relaticleValue }}</span>
+            </p>
+            <p class="bg-surface px-6 py-5 md:col-span-4 md:px-8">
+                <span class="type-label mb-1 block text-gray-500 dark:text-gray-400">{{ $competitor['name'] }}:</span>
+                <span class="type-prose text-gray-700 dark:text-gray-300">{{ $competitorValue }}</span>
+            </p>
+        </div>
     @endforeach
-</ul>
+</div>

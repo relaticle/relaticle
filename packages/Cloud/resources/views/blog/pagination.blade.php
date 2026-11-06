@@ -1,10 +1,10 @@
 @if ($paginator->hasPages())
     @php
-        $baseClasses = 'inline-flex items-center justify-center h-9 min-w-9 px-3 rounded-lg text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-black';
-        $linkClasses = $baseClasses.' text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/[0.06]';
+        $baseClasses = 'inline-flex items-center justify-center h-9 min-w-9 px-3 rounded-lg text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950';
+        $linkClasses = $baseClasses.' text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-tint';
         $currentClasses = $baseClasses.' bg-primary text-white';
         $disabledClasses = $baseClasses.' text-gray-300 dark:text-gray-700 cursor-not-allowed';
-        $separatorClasses = $baseClasses.' text-gray-400 dark:text-gray-600';
+        $separatorClasses = $baseClasses.' text-gray-500 dark:text-gray-400';
     @endphp
 
     <nav role="navigation" aria-label="{{ __('Pagination Navigation') }}"

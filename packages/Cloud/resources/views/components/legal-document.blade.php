@@ -4,29 +4,18 @@
     'content',
 ])
 
-<div class="py-16 md:py-24 bg-white dark:bg-gray-950 relative">
-    <!-- Subtle background elements -->
-    <div class="absolute inset-0 bg-grid-pattern opacity-[0.01] dark:opacity-[0.02]"></div>
-    <div class="absolute top-24 left-24 w-36 h-36 md:w-96 md:h-96 bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl"></div>
-    <div class="absolute -bottom-24 right-24 w-36 h-36 md:w-96 md:h-96 bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl"></div>
+<x-cloud::marketing.hero align="start">
+    <x-slot:title>{{ $title }}</x-slot:title>
 
-    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-        <!-- Header Section -->
-        <div class=" space-y-6 max-w-3xl mb-12">
-            <h1 class="text-4xl sm:text-5xl font-bold text-black dark:text-white leading-[1.1] tracking-tight">
-                <span class="relative inline-block">
-                    <span class="relative z-10">{{ $title }}</span>
-                    <span class="absolute bottom-2 sm:left-0 right-1/4 w-1/2 sm:w-full h-3 bg-primary/10 dark:bg-primary/20 -rotate-1 z-0"></span>
-                </span>
-            </h1>
-            <p class="text-lg text-gray-600 dark:text-gray-300 max-w-2xl leading-relaxed">
-                {{ $subtitle }}
-            </p>
-        </div>
+    <x-slot:aside>
+        <p class="text-base leading-relaxed text-gray-500 md:text-lg dark:text-gray-400">{{ $subtitle }}</p>
+    </x-slot:aside>
+</x-cloud::marketing.hero>
 
-        <!-- Content Section -->
-        <div class="prose dark:prose-invert prose-headings:font-medium prose-headings:text-black dark:prose-headings:text-white prose-a:text-primary dark:prose-a:text-primary-400 prose-img:rounded-xl prose-img:shadow-md max-w-none">
+<x-cloud::marketing.frame>
+    <div class="px-6 py-12 md:px-10 md:py-16">
+        <div class="prose max-w-3xl dark:prose-invert prose-headings:font-medium prose-headings:text-gray-950 dark:prose-headings:text-white prose-a:text-primary dark:prose-a:text-primary-400 prose-img:rounded-xl">
             {!! $content !!}
         </div>
     </div>
-</div>
+</x-cloud::marketing.frame>

@@ -85,7 +85,7 @@ it('stores calendar values longer than 255 characters', function (): void {
     expect($meeting->title)->toBe($long)
         ->and($meeting->location)->toBe($long)
         ->and($meeting->organizer_email)->toBe("{$long}@external.test")
-        ->and($meeting->attendees()->value('name'))->toBe($long)
+        ->and($meeting->attendees()->where('email_address', 'me@example.com')->value('name'))->toBe($long)
         ->and(People::query()->where('workspace_id', $account->workspace_id)->pluck('name')->all())
         ->not->toBeEmpty()
         ->each->toHaveLength(255);

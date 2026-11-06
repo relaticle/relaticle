@@ -42,8 +42,12 @@ shows it, and you can dismiss the chip if you don't want that context.
   from your opportunity data.
 - **Your team**: who's in the workspace, for assigning work.
 
-For anything it can't do in chat, such as importing a file, it links you to
-the right page instead of guessing.
+You can attach a CSV, TXT or MD file of up to 10 MB to a message. Rela
+proposes the records in it, up to 25 at a time. For a bigger CSV of people
+or companies, it links the import wizard with your columns already mapped.
+
+For anything it can't do in chat, such as exporting records to a file, it
+links you to the right page instead of guessing.
 
 ## Manage your conversations
 

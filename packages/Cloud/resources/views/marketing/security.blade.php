@@ -125,8 +125,7 @@
         ],
     ];
 
-    $sectionTitle = 'text-balance font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white';
-    $sectionLead = 'mt-4 text-balance text-base text-gray-500 dark:text-gray-400 leading-relaxed';
+    $linkClass = 'font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white';
 @endphp
 
 <x-cloud::guest-layout
@@ -135,27 +134,21 @@
     :ogTitle="$title"
     :ogDescription="$description"
 >
-    {{-- Hero --}}
-    <section class="relative pt-32 pb-20 md:pt-40 md:pb-24 bg-white dark:bg-gray-950 overflow-hidden">
-        <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]"></div>
+    <x-cloud::marketing.hero align="start">
+        <x-slot:eyebrow>
+            <x-cloud::marketing.eyebrow>{{ __('Security') }}</x-cloud::marketing.eyebrow>
+        </x-slot:eyebrow>
 
-        <div class="relative max-w-3xl mx-auto px-6 lg:px-8 text-center">
-            <div class="flex justify-center mb-6">
-                <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-gray-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-                    <x-ri-shield-check-line class="h-3.5 w-3.5 text-primary dark:text-primary-400"/>
-                    <span class="uppercase tracking-wider text-[10px] font-medium text-gray-500 dark:text-gray-400">{{ __('Security') }}</span>
-                </div>
-            </div>
+        <x-slot:title>
+            {{ __('How Relaticle protects your data.') }}
+        </x-slot:title>
 
-            <h1 class="text-balance font-display text-4xl sm:text-5xl font-bold text-gray-950 dark:text-white tracking-[-0.03em] leading-[1.1]">
-                {{ __('How Relaticle protects your data') }}
-            </h1>
-
-            <p class="mt-5 text-balance text-base md:text-lg text-gray-500 dark:text-gray-400 leading-relaxed max-w-2xl mx-auto">
-                {{ __('Where your records live, who can reach them, and what the AI sees. Relaticle is open source, so most of this page can be checked in the code.') }}
+        <x-slot:aside>
+            <p class="text-base leading-relaxed text-gray-500 md:text-lg dark:text-gray-400">
+                {{ __('Where your records live, who can reach them, and what the AI sees. Relaticle is open source, so these controls can be checked rather than taken on trust.') }}
             </p>
 
-            <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <div class="mt-7 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
                 <x-cloud::marketing.button href="{{ route('policy.show') }}">
                     {{ __('Read the privacy policy') }}
                 </x-cloud::marketing.button>
@@ -163,133 +156,118 @@
                     {{ __('Report a vulnerability') }}
                 </x-cloud::marketing.button>
             </div>
-        </div>
+        </x-slot:aside>
 
-        {{-- At a glance: the four answers a buyer looks for first, each linked to its section --}}
-        <div class="relative mx-auto mt-14 max-w-5xl px-6 lg:px-8">
-            <ul class="grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-gray-200/80 bg-gray-200/80 text-left shadow-[0_1px_2px_rgba(0,0,0,0.03)] sm:grid-cols-2 lg:grid-cols-4 dark:border-white/[0.08] dark:bg-white/[0.08]">
-                @foreach($glance as [$icon, $fact, $detail, $anchor])
-                    <li class="bg-white dark:bg-gray-950">
-                        <a href="{{ $anchor }}" class="group flex h-full flex-col p-5 transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.03]">
-                            <x-dynamic-component :component="$icon" class="h-5 w-5 shrink-0 text-primary dark:text-primary-400"/>
-                            <span class="mt-3 font-display text-sm font-semibold text-gray-900 dark:text-white">{{ $fact }}</span>
-                            <span class="mt-1 text-sm leading-relaxed text-gray-500 dark:text-gray-400">{{ $detail }}</span>
-                        </a>
-                    </li>
-                @endforeach
-            </ul>
-        </div>
-    </section>
-
-    {{-- One row per topic: the heading on the left, the facts on the right --}}
-    <section class="bg-white dark:bg-gray-950 pb-8 md:pb-12">
-        <div class="max-w-5xl mx-auto px-6 lg:px-8">
-            @foreach($sections as [$id, $heading, $lead, $items, $link])
-                <div id="{{ $id }}" class="grid scroll-mt-24 grid-cols-1 gap-x-12 gap-y-8 border-t border-gray-200/80 py-12 md:grid-cols-3 md:py-16 dark:border-white/[0.06]">
-                    <div>
-                        <h2 class="text-balance font-display text-xl sm:text-2xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">{{ $heading }}</h2>
-                        <p class="mt-3 text-sm text-gray-500 dark:text-gray-400 leading-relaxed">{{ $lead }}</p>
-                    </div>
-
-                    <div class="md:col-span-2">
-                        <dl class="space-y-7">
-                            @foreach($items as [$icon, $term, $meaning])
-                                <div class="flex gap-4">
-                                    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/[0.08] dark:bg-primary/[0.15]">
-                                        <x-dynamic-component :component="$icon" class="h-4.5 w-4.5 text-primary dark:text-primary-400"/>
-                                    </div>
-                                    <div>
-                                        <dt class="font-display text-base font-semibold text-gray-900 dark:text-white">{{ $term }}</dt>
-                                        <dd class="mt-1 text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{{ $meaning }}</dd>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </dl>
-
-                        @if($link)
-                            <p class="mt-7 pl-13 text-sm">
-                                <a href="{{ $link[0] }}" class="font-medium text-primary dark:text-primary-400 hover:underline">{{ $link[1] }}</a>
-                            </p>
-                        @endif
-                    </div>
-                </div>
+        <ul class="bg-rail border-rail grid grid-cols-1 gap-px border-t sm:grid-cols-2 lg:grid-cols-4">
+            @foreach($glance as [$icon, $fact, $detail, $anchor])
+                <li class="bg-surface">
+                    <a href="{{ $anchor }}" class="hover:bg-tint flex h-full flex-col p-6 transition-colors md:p-8">
+                        <span class="text-base font-medium text-gray-950 dark:text-white">{{ $fact }}</span>
+                        <span class="mt-2 text-sm leading-relaxed text-gray-500 dark:text-gray-400">{{ $detail }}</span>
+                    </a>
+                </li>
             @endforeach
-        </div>
-    </section>
+        </ul>
+    </x-cloud::marketing.hero>
 
-    {{-- Providers --}}
-    <section id="providers" class="py-20 md:py-28 bg-gray-50 dark:bg-gray-950">
-        <div class="max-w-4xl mx-auto px-6 lg:px-8">
-            <div class="max-w-2xl mx-auto text-center">
-                <h2 class="{{ $sectionTitle }}">{{ __('Service providers') }}</h2>
-                <p class="{{ $sectionLead }}">
-                    {{ $hosted
-                        ? __('The companies that handle data for Relaticle Cloud, and what each one receives.')
-                        : __('This install is run by its own operator. It uses only the company logo lookup, which sends a company domain to Google and DuckDuckGo, unless the operator configures other providers.') }}
-                </p>
+    @foreach($sections as $index => [$id, $heading, $lead, $items, $link])
+        <x-cloud::marketing.frame id="{{ $id }}">
+            <x-cloud::marketing.frame-header :label="sprintf('%02d', $index + 1)" :lead="$heading">
+                {{ $lead }}
+            </x-cloud::marketing.frame-header>
+
+            <div @class(['bg-rail grid grid-cols-1 gap-px', 'md:grid-cols-2' => count($items) === 2, 'md:grid-cols-3' => count($items) === 3, 'sm:grid-cols-2 lg:grid-cols-4' => count($items) === 4])>
+                @foreach($items as [$icon, $term, $meaning])
+                    <div class="bg-surface p-6 md:p-10">
+                        <h3 class="text-lg font-medium text-gray-950 dark:text-white">{{ $term }}</h3>
+                        <p class="type-prose mt-2 text-gray-500 dark:text-gray-400">{{ $meaning }}</p>
+                    </div>
+                @endforeach
             </div>
 
-            @if($hosted)
-            <div class="mt-14 overflow-hidden rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02]">
-                <table class="w-full text-left text-sm">
-                    <caption class="sr-only">{{ __('Service providers for Relaticle Cloud') }}</caption>
-                    <thead class="hidden sm:table-header-group">
-                        <tr class="border-b border-gray-200/80 dark:border-white/[0.06]">
-                            <th scope="col" class="px-5 py-3 font-display font-semibold text-gray-900 dark:text-white">{{ __('Provider') }}</th>
-                            <th scope="col" class="px-5 py-3 font-display font-semibold text-gray-900 dark:text-white">{{ __('What it does') }}</th>
-                            <th scope="col" class="px-5 py-3 font-display font-semibold text-gray-900 dark:text-white">{{ __('What it receives') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200/80 dark:divide-white/[0.06]">
-                        @foreach($providers as [$provider, $purpose, $data])
-                            <tr class="block px-5 py-4 sm:table-row sm:p-0">
-                                <th scope="row" class="block font-medium text-gray-900 dark:text-white sm:table-cell sm:whitespace-nowrap sm:px-5 sm:py-3">{{ $provider }}</th>
-                                <td class="mt-1 block text-gray-600 dark:text-gray-400 sm:mt-0 sm:table-cell sm:px-5 sm:py-3">{{ $purpose }}</td>
-                                <td class="mt-3 block text-gray-600 dark:text-gray-400 sm:mt-0 sm:table-cell sm:px-5 sm:py-3">
-                                    <span class="mb-0.5 block text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 sm:hidden">{{ __('Receives') }}</span>
-                                    {{ $data }}
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-
-            <p class="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                {{ __('A self-hosted install uses only the logo lookup, unless its operator configures the others.') }}
-            </p>
+            @if($link)
+                <div class="bg-surface border-rail border-t px-6 py-5 md:px-8">
+                    <p class="type-prose text-gray-700 dark:text-gray-300">
+                        <a href="{{ $link[0] }}" class="{{ $linkClass }}">{{ $link[1] }}</a>
+                    </p>
+                </div>
             @endif
-        </div>
-    </section>
+        </x-cloud::marketing.frame>
+    @endforeach
 
-    {{-- Report --}}
-    <section id="report" class="py-20 md:py-28 bg-white dark:bg-gray-950">
-        <div class="max-w-3xl mx-auto px-6 lg:px-8 text-center">
-            <h2 class="{{ $sectionTitle }}">{{ __('Report a vulnerability') }}</h2>
-            <p class="{{ $sectionLead }} max-w-xl mx-auto">
-                {{ __('Email what you found and the steps to reproduce it. Please do not open a public issue. We aim to acknowledge reports within 48 hours.') }}
-            </p>
-            <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-                <x-cloud::marketing.button href="mailto:security@relaticle.com">
-                    security@relaticle.com
-                </x-cloud::marketing.button>
-                <x-cloud::marketing.button variant="secondary" href="{{ route('securityTxt') }}">
-                    security.txt
-                </x-cloud::marketing.button>
+    <x-cloud::marketing.frame id="providers">
+        <x-cloud::marketing.frame-header :label="__('Service providers')" :lead="$hosted ? __('Who handles data for Relaticle Cloud.') : __('Run by its own operator.')">
+            {{ $hosted
+                ? __('And what each one receives.')
+                : __('This install is run by its own operator. It uses only the company logo lookup, which sends a company domain to Google and DuckDuckGo, unless the operator configures other providers.') }}
+        </x-cloud::marketing.frame-header>
+
+        @if($hosted)
+            <div class="bg-rail grid gap-px">
+                <div class="bg-rail hidden gap-px md:grid md:grid-cols-12" aria-hidden="true">
+                    <span class="type-label bg-surface px-10 py-3 text-gray-500 dark:text-gray-400 md:col-span-3">{{ __('Provider') }}</span>
+                    <span class="type-label bg-surface px-8 py-3 text-gray-500 dark:text-gray-400 md:col-span-4">{{ __('What it does') }}</span>
+                    <span class="type-label bg-surface px-8 py-3 text-gray-500 dark:text-gray-400 md:col-span-5">{{ __('What it receives') }}</span>
+                </div>
+                @foreach($providers as [$provider, $purpose, $data])
+                    <div class="bg-rail grid grid-cols-1 gap-px md:grid-cols-12">
+                        <p class="bg-surface px-6 py-5 text-sm font-medium text-gray-950 md:col-span-3 md:px-10 dark:text-white">{{ $provider }}</p>
+                        <p class="bg-surface px-6 py-5 text-sm leading-relaxed text-gray-700 md:col-span-4 md:px-8 dark:text-gray-300">{{ $purpose }}</p>
+                        <p class="bg-surface px-6 py-5 md:col-span-5 md:px-8">
+                            <span class="type-label mb-1 block text-gray-500 md:hidden dark:text-gray-400">{{ __('Receives') }}</span>
+                            <span class="text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ $data }}</span>
+                        </p>
+                    </div>
+                @endforeach
+            </div>
+
+            <div class="bg-surface border-rail border-t px-6 py-5 md:px-8">
+                <p class="type-prose text-gray-700 dark:text-gray-300">{{ __('A self-hosted install uses only the logo lookup, unless its operator configures the others.') }}</p>
+            </div>
+        @endif
+    </x-cloud::marketing.frame>
+
+    <x-cloud::marketing.frame id="report">
+        <div class="bg-rail grid grid-cols-1 gap-px lg:grid-cols-12">
+            <div class="bg-surface px-6 py-12 md:px-10 md:py-16 lg:col-span-7">
+                <x-cloud::marketing.eyebrow class="mb-5">{{ __('Responsible disclosure') }}</x-cloud::marketing.eyebrow>
+                <h2 class="type-title text-gray-950 dark:text-white">{{ __('Report a vulnerability') }}</h2>
+                <p class="type-prose mt-4 text-gray-500 dark:text-gray-400">{{ __('Email what you found and the steps to reproduce it. Please do not open a public issue. We aim to acknowledge reports within 48 hours.') }}</p>
+            </div>
+            <div class="bg-surface flex flex-col justify-center gap-3 px-6 py-12 md:px-10 md:py-16 lg:col-span-5">
+                <x-cloud::marketing.button href="mailto:security@relaticle.com" class="w-full sm:w-auto">security@relaticle.com</x-cloud::marketing.button>
+                <x-cloud::marketing.button variant="secondary" href="{{ route('securityTxt') }}" class="w-full sm:w-auto">security.txt</x-cloud::marketing.button>
             </div>
         </div>
-    </section>
+    </x-cloud::marketing.frame>
 
-    {{-- FAQ --}}
-    <section class="py-20 md:py-28 bg-gray-50 dark:bg-gray-950">
-        <div class="max-w-3xl mx-auto px-6 lg:px-8">
-            <div class="text-center mb-10">
-                <h2 class="{{ $sectionTitle }}">{{ __('Security questions, answered') }}</h2>
+    <x-cloud::marketing.frame id="security-faq">
+        <div class="bg-rail grid grid-cols-1 gap-px lg:grid-cols-12">
+            <div class="bg-surface px-6 pb-6 pt-16 md:px-10 md:pt-24 lg:col-span-4">
+                <div class="lg:sticky lg:top-28">
+                    <x-cloud::marketing.eyebrow class="mb-5">{{ __('FAQ') }}</x-cloud::marketing.eyebrow>
+                    <h2 class="type-title text-gray-950 dark:text-white">{{ __('Security questions, answered') }}</h2>
+                    <p class="mt-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+                        {{ __('Something else on your mind?') }}
+                        <a href="{{ route('contact') }}" class="{{ $linkClass }}">{{ __('Get in touch') }}</a>
+                    </p>
+                </div>
             </div>
 
-            <x-cloud::marketing.faq-accordion :faqs="$faqs" id-prefix="security-faq" />
+            <div class="bg-surface px-6 pb-16 md:px-10 lg:col-span-8 lg:pt-20">
+                <x-cloud::marketing.faq-accordion :faqs="$faqs" id-prefix="security-faq" />
+            </div>
         </div>
-    </section>
+    </x-cloud::marketing.frame>
+
+    <x-cloud::marketing.closing-band :title="__('Open source, so you can check.')" :continuation="__('Read the code, or ask us.')" :note="null">
+        <x-cloud::marketing.button href="https://github.com/relaticle/relaticle" icon="ri-github-fill" external>
+            {{ __('View on GitHub') }}
+        </x-cloud::marketing.button>
+        <x-cloud::marketing.button variant="secondary" href="{{ route('contact') }}">
+            {{ __('Get in touch') }}
+        </x-cloud::marketing.button>
+    </x-cloud::marketing.closing-band>
 
     @php
         $schema = (new \Spatie\SchemaOrg\Graph())

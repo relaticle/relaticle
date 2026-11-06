@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Features\EmailIntegration;
 use App\Models\User;
 use App\Support\DetectsPublicMarkdownRequest;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
+use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Marketing\Http\Controllers\HomeController;
 use Relaticle\Cloud\Marketing\Http\Controllers\PrivacyPolicyController;
 use Relaticle\Cloud\Marketing\Http\Controllers\TermsOfServiceController;
@@ -54,6 +57,23 @@ describe('Home page', function () {
         // sidebar the alt text describes is never the part that goes.
         expect(substr_count($html, 'object-cover object-left-top'))->toBe(3)
             ->and($html)->not->toContain('hero-preview-image w-full h-auto');
+    });
+
+    it('names only the providers whose models the assistant offers', function () {
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('runs on the Anthropic or OpenAI model you pick')
+            ->assertDontSee('Anthropic, OpenAI, or Google')
+            ->assertDontSee('stored only in your Relaticle database');
+    });
+
+    it('leaves the mailbox out of the record story when email integration is off', function () {
+        Feature::deactivate(EmailIntegration::class);
+
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('Three hands, one opportunity.')
+            ->assertDontSee('after your first email');
     });
 
     it('uses an existing raster logo in the organization json-ld', function () {
@@ -396,85 +416,15 @@ describe('Response meta', function () {
 });
 
 describe('Hero AI tab: animation timeline', function () {
-    it('hides the data-table outer container at cycle start', function () {
-        $response = $this->get('/');
-        $response->assertSuccessful();
-
-        // The exchange 1 tool-result table container must be opacity-controlled
-        // by the .mcp-el CSS rule. Without this class, the rounded border ghosts
-        // through before any animation runs.
-        $body = $response->getContent();
-        expect($body)->toContain('mcp-el mcp-tasks-table');
-    });
-
-    it('keeps the post-exchange hold window at ~1.5s', function () {
+    it('plays the AI demo once without skip or replay controls', function () {
         $response = $this->get('/');
         $response->assertSuccessful();
         $body = $response->getContent();
 
-        // Hold is the read-time after exchange 3 settles before the loop
-        // restarts from the entry phase. cycleMs no longer exists as a
-        // single magic number. Timing is composed from entryHold +
-        // transition + exchange budgets.
-        expect($body)->toContain('holdMs: 1500');
-    });
-
-    it('does not restart the AI demo on hover or focus changes', function () {
-        $response = $this->get('/');
-        $response->assertSuccessful();
-        $body = $response->getContent();
-
-        // Hovering between the preview and the Ask Rela tab must not
-        // cancel timers and call animateChat(), because that restarts the demo.
         expect($body)
-            ->not->toContain('@mouseenter="pause()"')
-            ->not->toContain('@mouseleave="resume()"')
-            ->not->toContain('@focusin="pause()"')
-            ->not->toContain('@focusout="resume()"')
-            ->not->toContain('pause() {')
-            ->not->toContain('resume() {');
-    });
-
-    it('uses a unified Y-slide for assistant content', function () {
-        $response = $this->get('/');
-        $response->assertSuccessful();
-        $body = $response->getContent();
-
-        // Every assistant child uses translateY for its slide. The legacy
-        // mixed translateX(-6) on tool indicators must stay out.
-        expect($body)->not->toContain("translateX('-6px')");
-        expect($body)->not->toContain('translateX(-6px)');
-    });
-
-    it('reveals new messages at the bottom so earlier ones stay visible', function () {
-        $response = $this->get('/');
-        $response->assertSuccessful();
-        $body = $response->getContent();
-
-        // Real-chat scroll: the view follows each newly revealed message/card
-        // down to the bottom (scrollToShow only scrolls down), so the previous
-        // exchange stays on screen instead of being yanked to the top before
-        // the next message has even appeared.
-        expect($body)
-            ->toContain('scrollToShow')
-            ->toContain("scrollToShow('.mcp-user-2')")
-            ->toContain("scrollToShow('.mcp-user-3')")
-            ->toContain("scrollToShow('.mcp-audit-card')")
-            ->not->toContain('scrollMessageIntoView')
-            ->not->toContain('typeStart2 - 100')
-            ->not->toContain('typeStart3 - 100');
-    });
-
-    it('animates the 3 task rows as a single staggered group with 120ms spacing', function () {
-        $response = $this->get('/');
-        $response->assertSuccessful();
-        $body = $response->getContent();
-
-        // Stagger spacing is 120ms after the table reveal: 1000 / 1120 / 1240
-        // relative to conversationStart.
-        expect($body)->toContain('conversationStart + 1000');
-        expect($body)->toContain('conversationStart + 1120');
-        expect($body)->toContain('conversationStart + 1240');
+            ->not->toContain('Skip to the end of the demo')
+            ->not->toContain('Replay the demo')
+            ->not->toContain('holdMs');
     });
 });
 
@@ -525,18 +475,6 @@ describe('Hero AI tab: entry phase', function () {
         expect($body)->toContain('hero-entry-typed');
         expect($body)->toContain('hero-entry-placeholder');
         expect($body)->toContain('hero-entry-send');
-    });
-
-    it('wires the entry → conversation transition in the heroChat factory', function () {
-        $response = $this->get('/');
-        $response->assertSuccessful();
-        $body = $response->getContent();
-
-        // Phase machine helpers must be in the factory or the loop has no
-        // way to fade the entry overlay out and the conversation pane in.
-        expect($body)->toContain('transitionToConversation');
-        expect($body)->toContain('entryHoldMs');
-        expect($body)->toContain('entryTransitionMs');
     });
 });
 
@@ -616,4 +554,16 @@ describe('Signup attribution', function () {
         expect($links[0])->not->toBeEmpty()
             ->each->toContain('referrerpolicy="no-referrer-when-downgrade"');
     })->with(['/', '/pricing', '/self-hosted', '/developers/mcp', 'a blog post']);
+});
+
+it('renders the hero tabs in their first state before any script runs', function (): void {
+    $html = $this->get('/')->assertOk()->getContent();
+
+    preg_match_all('/<button[^>]*id="tab-([a-z-]+)"[^>]*>/', $html, $tabs, PREG_SET_ORDER);
+
+    $classes = collect($tabs)->mapWithKeys(fn (array $tab): array => [$tab[1] => Str::between($tab[0], ' class="', '"')]);
+
+    expect($classes->keys()->all())->toBe(['ai-agent', 'pipeline', 'companies', 'custom-fields'])
+        ->and($classes['ai-agent'])->toContain('border-gray-200')
+        ->and($classes->except('ai-agent')->all())->each->toContain('border-transparent');
 });

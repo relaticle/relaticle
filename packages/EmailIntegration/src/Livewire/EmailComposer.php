@@ -1106,7 +1106,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      *     avatarUrl: string|null,
      *     iconPath: string|null,
      *     circular: bool,
-     *     avatarColor: string,
      * }>
      */
     #[Computed(persist: true, seconds: 300)]
@@ -1215,7 +1214,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      *     avatarUrl: string|null,
      *     iconPath: string|null,
      *     circular: bool,
-     *     avatarColor: string,
      * }>
      */
     private function companyTeamRecipientOptions(string $workspaceId): array
@@ -1256,7 +1254,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             return [];
         }
 
-        /** @var list<array{type: 'company_team', id: string, label: string, description: string, count: int, countLabel: string, emails: list<string>, avatarUrl: string|null, iconPath: string|null, circular: bool, avatarColor: string}> */
+        /** @var list<array{type: 'company_team', id: string, label: string, description: string, count: int, countLabel: string, emails: list<string>, avatarUrl: string|null, iconPath: string|null, circular: bool}> */
         return Company::query()
             ->where('workspace_id', $workspaceId)
             ->whereKey(array_keys($companyCounts))
@@ -1282,30 +1280,17 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     }
 
     /**
-     * @return array{avatarUrl: string|null, iconPath: string|null, circular: bool, avatarColor: string}
+     * @return array{avatarUrl: string|null, iconPath: string|null, circular: bool}
      */
     private function recipientChipAppearance(Model $record): array
     {
         $chip = RecordChip::forRecord($record);
-        $avatarUrl = $chip->imageUrl;
-
-        if (is_string($avatarUrl) && str_starts_with($avatarUrl, 'data:')) {
-            $avatarUrl = null;
-        }
 
         return [
-            'avatarUrl' => $avatarUrl,
+            'avatarUrl' => $chip->imageUrl,
             'iconPath' => $chip->iconPath,
             'circular' => $chip->circular,
-            'avatarColor' => $this->recipientAvatarColor($chip->name),
         ];
-    }
-
-    private function recipientAvatarColor(string $name): string
-    {
-        $colors = ['primary', 'success', 'warning', 'danger', 'info'];
-
-        return $colors[abs(crc32(mb_strtolower($name))) % count($colors)];
     }
 
     /**

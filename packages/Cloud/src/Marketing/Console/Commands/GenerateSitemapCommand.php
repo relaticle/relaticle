@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Cloud\Marketing\Console\Commands;
 
 use App\Features\Blog;
+use App\Features\EmailIntegration;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -80,6 +81,10 @@ final class GenerateSitemapCommand extends Command
         $this->ensureUrl($sitemap, route('documentation.index'));
         $this->ensureUrl($sitemap, route('aiNativeCrm'));
         $this->ensureUrl($sitemap, route('security'));
+
+        if (Feature::active(EmailIntegration::class)) {
+            $this->ensureUrl($sitemap, route('emailAndCalendar'));
+        }
 
         foreach (ConnectableAssistant::cases() as $assistant) {
             $this->ensureUrl($sitemap, route($assistant->routeName()));

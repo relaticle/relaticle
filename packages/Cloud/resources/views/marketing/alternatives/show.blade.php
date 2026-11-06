@@ -55,6 +55,16 @@
     $metaTitle = $metaTitles[$competitorSlug];
     $description = $descriptions[$competitorSlug];
     $factsVerifiedAt = \Carbon\CarbonImmutable::parse($relaticle['verified'])->format('F j, Y');
+    $assistantName = (string) config('chat.assistant_name');
+    $linkClass = 'font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white';
+
+    $primarySources = collect([$relaticle, $competitor])
+        ->flatMap(fn (array $facts): array => array_filter([
+            ['label' => __(':name pricing', ['name' => $facts['name']]), 'url' => $facts['source_urls']['pricing']],
+            isset($facts['source_urls']['repository'])
+                ? ['label' => __(':name on GitHub', ['name' => $facts['name']]), 'url' => $facts['source_urls']['repository']]
+                : null,
+        ]));
 @endphp
 
 <x-cloud::guest-layout
@@ -62,105 +72,72 @@
     :description="$description"
     :ogTitle="$metaTitle"
 >
-    <section class="relative pt-32 pb-24 md:pt-40 md:pb-32 bg-white dark:bg-gray-950 overflow-hidden">
-        <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]"></div>
+    <x-cloud::marketing.hero align="start">
+        <x-slot:eyebrow>
+            <x-cloud::marketing.eyebrow>{{ $copy['badge'] }}</x-cloud::marketing.eyebrow>
+        </x-slot:eyebrow>
 
-        <div class="relative max-w-3xl mx-auto px-6 lg:px-8">
+        <x-slot:title>{{ $title }}</x-slot:title>
 
-            {{-- Badge --}}
-            <div class="flex justify-center mb-6">
-                <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-gray-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-                    <x-ri-arrow-left-right-line class="h-3.5 w-3.5 text-primary dark:text-primary-400"/>
-                    <span class="uppercase tracking-wider text-[10px] font-medium text-gray-500 dark:text-gray-400">{{ $copy['badge'] }}</span>
-                </div>
-            </div>
-
-            {{-- Header --}}
-            <div class="text-center max-w-2xl mx-auto mb-10">
-                <h1 class="font-display text-4xl sm:text-5xl font-bold text-gray-950 dark:text-white tracking-[-0.03em] leading-[1.1]">
-                    {{ $title }}
-                </h1>
-            </div>
-
-            {{-- Answer-first opening paragraph --}}
-            <p class="text-base md:text-lg text-gray-600 dark:text-gray-400 leading-relaxed mb-12">
+        <x-slot:aside>
+            <p class="text-base leading-relaxed text-gray-500 md:text-lg dark:text-gray-400">
                 {{ $copy['opening'] }}
             </p>
 
-            {{-- Comparison table --}}
-            <div class="mb-16">
-                <h2 class="font-display text-2xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white mb-6">
-                    {{ __('Relaticle vs :name at a glance', ['name' => $competitor['name']]) }}
-                </h2>
-                @include('cloud::marketing.partials.comparison-facts-table')
+            <div class="mt-7 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
+                <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="hero">
+                    {{ __('Start for free') }}
+                </x-cloud::marketing.button>
+                <x-cloud::marketing.button variant="secondary" href="{{ route('selfHosted') }}">
+                    {{ __('Self-host it') }}
+                </x-cloud::marketing.button>
             </div>
+        </x-slot:aside>
+    </x-cloud::marketing.hero>
 
-            {{-- Prose sections per dimension --}}
-            <div class="space-y-10 mb-16">
-                @foreach ($copy['sections'] as $section)
-                    <div>
-                        <h2 class="font-display text-xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white mb-3">
-                            {{ $section['heading'] }}
-                        </h2>
-                        <p class="text-sm md:text-base text-gray-600 dark:text-gray-400 leading-relaxed">
-                            {{ $section['body'] }}
-                        </p>
+    <x-cloud::marketing.frame id="glance">
+        <x-cloud::marketing.frame-header :label="__('At a glance')" :lead="__(':title at a glance', ['title' => $title])">
+            {{ __('Eight facts, each dated in the facts file.') }}
+        </x-cloud::marketing.frame-header>
+
+        @include('cloud::marketing.partials.comparison-facts-table')
+    </x-cloud::marketing.frame>
+
+    <x-cloud::marketing.frame id="details">
+        <div class="bg-rail grid gap-px">
+            @foreach ($copy['sections'] as $section)
+                <div class="bg-rail grid grid-cols-1 gap-px lg:grid-cols-12">
+                    <h2 class="bg-surface px-6 py-8 text-lg font-medium text-gray-950 md:px-10 lg:col-span-4 dark:text-white">{{ $section['heading'] }}</h2>
+                    <div class="bg-surface px-6 py-8 md:px-10 lg:col-span-8">
+                        <p class="type-prose text-gray-700 dark:text-gray-300">{{ $section['body'] }}</p>
                     </div>
-                @endforeach
-            </div>
-
-            {{-- Migration path --}}
-            <div class="rounded-2xl border border-gray-200/80 bg-white dark:border-white/[0.06] dark:bg-white/[0.02] px-6 py-8 mb-16">
-                <h2 class="font-display text-xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white mb-3">
-                    {{ __('Migrating from :name', ['name' => $competitor['name']]) }}
-                </h2>
-                <p class="text-sm md:text-base text-gray-600 dark:text-gray-400 leading-relaxed mb-4">
-                    {{ __('Export your companies, people, and deals from :name as CSV, then bring them into Relaticle with the built-in import wizard. Map columns, preview matched records, and fix errors before anything is created.', ['name' => $competitor['name']]) }}
-                </p>
-                <ul class="space-y-2 text-sm text-gray-600 dark:text-gray-400 list-disc pl-5">
-                    <li>{{ __('Export each record type to CSV from :name.', ['name' => $competitor['name']]) }}</li>
-                    <li>{{ __('Import the CSV with Relaticle\'s import wizard. No third-party migration tool needed.') }}</li>
-                    <li>{{ __('Need programmatic access instead? Relaticle\'s REST API and MCP server can create and update records directly.') }}</li>
-                </ul>
-                <a href="{{ url('/help/import') }}" class="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-primary dark:text-primary-400 hover:underline">
-                    <x-ri-upload-2-line class="h-4 w-4"/>
-                    {{ __('Read the import guide') }}
-                </a>
-            </div>
-
-            <p class="text-xs text-gray-400 dark:text-gray-500 mb-16">
-                {{ __('Facts verified :date. Sources are dated in the underlying facts file. See :repo.', ['date' => $factsVerifiedAt, 'repo' => 'github.com/relaticle/relaticle']) }}
-            </p>
-
-            {{-- CTA --}}
-            <div class="rounded-2xl border border-gray-200/80 bg-white dark:border-white/[0.06] dark:bg-white/[0.02] px-6 py-8 text-center">
-                <h2 class="font-display text-xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white mb-3">
-                    {{ __('Try Relaticle yourself') }}
-                </h2>
-                <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-6 max-w-md mx-auto">
-                    {{ __('Self-host it free under AGPL-3.0, or start on the hosted plan. Both run the same open-source CRM.') }}
-                </p>
-                <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
-                    <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="footer">
-                        {{ __('Start for free') }}
-                    </x-cloud::marketing.button>
-                    <x-cloud::marketing.button variant="secondary" href="{{ route('contact') }}">
-                        {{ __('Get in touch') }}
-                    </x-cloud::marketing.button>
                 </div>
-
-                {{-- The two claims this page leans on hardest, self-hosting and the AI
-                     layer, each have a page of their own. Linked here rather than inside
-                     the copy above, which is all translated strings. --}}
-                <p class="mt-6 text-xs text-gray-500 dark:text-gray-400">
-                    <a href="{{ route('selfHosted') }}" class="underline decoration-gray-300 dark:decoration-gray-600 underline-offset-2 hover:text-primary dark:hover:text-primary-400">{{ __('See self-hosting options') }}</a>
-                    <span class="px-1.5 text-gray-300 dark:text-gray-600" aria-hidden="true">&middot;</span>
-                    <a href="{{ route('ai') }}" class="underline decoration-gray-300 dark:decoration-gray-600 underline-offset-2 hover:text-primary dark:hover:text-primary-400">{{ __('Meet :name, the built-in AI assistant', ['name' => config('chat.assistant_name')]) }}</a>
-                </p>
-            </div>
-
+            @endforeach
         </div>
-    </section>
+
+        <div class="bg-surface border-rail border-t px-6 py-5 text-sm text-gray-500 md:px-8 dark:text-gray-400">
+            <p>{{ __('Facts verified :date. Sources are dated in the underlying facts file. See :repo.', ['date' => $factsVerifiedAt, 'repo' => 'github.com/relaticle/relaticle']) }}</p>
+            <p class="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                <span>{{ __('Primary sources:') }}</span>
+                @foreach ($primarySources as $source)
+                    <a href="{{ $source['url'] }}" rel="nofollow noopener" target="_blank" class="{{ $linkClass }}">{{ $source['label'] }}</a>
+                @endforeach
+            </p>
+            <p class="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                <a href="{{ route('selfHosted') }}" class="{{ $linkClass }}">{{ __('See self-hosting options') }}</a>
+                <a href="{{ route('ai') }}" class="{{ $linkClass }}">{{ __('Meet :name, the built-in AI assistant', ['name' => $assistantName]) }}</a>
+            </p>
+        </div>
+    </x-cloud::marketing.frame>
+
+    <x-cloud::marketing.closing-band :title="__('Try Relaticle yourself.')" :continuation="__('Self-host it free under AGPL-3.0, or start on the hosted plan.')">
+        <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="footer">
+            {{ __('Start for free') }}
+        </x-cloud::marketing.button>
+        <x-cloud::marketing.button variant="secondary" href="{{ route('contact') }}">
+            {{ __('Get in touch') }}
+        </x-cloud::marketing.button>
+    </x-cloud::marketing.closing-band>
 
     @php
         $schema = (new \Spatie\SchemaOrg\Graph())

@@ -1,22 +1,19 @@
-{{-- Hero entry phase, mirroring the real /abcd dashboard: centered greeting,
-     centered composer, recent-chat link, example chips. Lives as an
-     absolutely-positioned overlay above the conversation pane and fades
-     out during the entry → conversation transition.
-     Visibility is driven by .mcp-el rule (opacity: 0 at rest) and the
-     heroChat factory; no x-show so the markup is also visible to the SEO
-     crawler and to no-JS users alongside the conversation. --}}
-<div class="hero-agent-entry mcp-el absolute inset-x-0 bottom-0 top-10 z-20 flex items-start justify-center bg-white dark:bg-zinc-900 px-4 sm:px-6 md:px-8 overflow-hidden">
+{{-- The dashboard the demo starts on, mirroring the real one. It is visible at rest, so the first
+     paint and a no-JS visit show it, and heroChat glides its composer into the conversation's. --}}
+<div class="hero-agent-entry absolute inset-x-0 bottom-0 top-10 z-20 flex items-start justify-center px-4 sm:px-6 md:px-8 overflow-hidden">
+    <div class="hero-entry-bg absolute inset-0 bg-white dark:bg-zinc-900" aria-hidden="true"></div>
+
     {{-- pt-12/pt-20 mirrors the real dashboard's `py-16` while leaving headroom
          on the shorter mobile panel (h-[520px]). max-w-2xl keeps the composer
          readable without dominating the panel. --}}
-    <div class="mx-auto w-full max-w-2xl pt-12 sm:pt-16 md:pt-20">
+    <div class="relative mx-auto w-full max-w-2xl pt-12 sm:pt-16 md:pt-20">
         {{-- Greeting --}}
         <div class="text-center">
-            <h2 class="mcp-el mcp-entry-greeting text-2xl sm:text-3xl font-semibold tracking-tight text-gray-950 dark:text-white">
+            <h2 class="mcp-entry mcp-entry-greeting text-2xl sm:text-3xl font-semibold tracking-tight text-gray-950 dark:text-white">
                 Good morning, Marcus.
             </h2>
 
-            <div class="mcp-el mcp-entry-recent mt-2 inline-flex items-center gap-1.5 text-xs sm:text-sm text-gray-500 dark:text-zinc-400">
+            <div class="mcp-entry mcp-entry-recent mt-2 inline-flex items-center gap-1.5 text-xs sm:text-sm text-gray-500 dark:text-zinc-400">
                 <x-heroicon-o-chat-bubble-left class="h-3.5 w-3.5"/>
                 <span>Recent chat · This week's pipeline review</span>
             </div>
@@ -24,7 +21,7 @@
 
         {{-- Composer twin, identical to hero-agent-composer.blade.php but
              with entry-scoped IDs so the JS factory can target it independently. --}}
-        <div class="mcp-el mcp-entry-composer mt-8 sm:mt-10">
+        <div class="mcp-entry mcp-entry-composer mt-8 sm:mt-10">
             <div class="relative rounded-2xl border border-[var(--surface-input-border)] bg-white transition focus-within:border-primary-400 dark:bg-gray-900 dark:focus-within:border-primary-500/60">
                 <div class="px-4 pt-3.5 pb-1.5 min-h-[60px] text-sm leading-snug">
                     <span id="hero-entry-placeholder" class="hero-composer-placeholder text-gray-400 dark:text-gray-500">Ask anything...</span>
@@ -54,7 +51,7 @@
              marketing frame selling an AI CRM should not depict an empty CRM,
              and the real thing puts overdue dates in red with a header count
              and a create action. Presentational only; the preview is inert. --}}
-        <div class="mcp-el mcp-entry-tasks mt-10 text-start">
+        <div class="mcp-entry mcp-entry-tasks mt-10 text-start">
             <div class="mb-3 flex items-center justify-between">
                 <h3 class="flex items-baseline gap-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     <span>Tasks</span>

@@ -34,7 +34,7 @@
 
         const lifetime = 86400000;
         const conversions = @js($analyticsEventNames);
-        const placements = ['header', 'mobile', 'hero', 'pricing', 'footer', 'docs', 'page'];
+        const placements = ['header', 'mobile', 'hero', 'pricing', 'footer', 'docs', 'capabilities', 'page'];
         const names = new Set([...conversions, ...placements.flatMap(placement => [`signup_cta_${placement}`, `login_cta_${placement}`])]);
         let settings;
         let tracker;

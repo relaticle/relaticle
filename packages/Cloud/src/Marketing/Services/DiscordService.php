@@ -13,6 +13,10 @@ use Illuminate\Support\Str;
 
 final readonly class DiscordService
 {
+    private const int CONNECT_TIMEOUT_SECONDS = 2;
+
+    private const int REQUEST_TIMEOUT_SECONDS = 3;
+
     public function getMemberCount(int $cacheMinutes = 60): int
     {
         $inviteCode = $this->inviteCode();
@@ -26,7 +30,7 @@ final readonly class DiscordService
 
         return (int) Cache::remember($cacheKey, now()->addMinutes($cacheMinutes), function () use ($inviteCode, $lastGoodKey): int {
             try {
-                $response = Http::get("https://discord.com/api/v10/invites/{$inviteCode}", ['with_counts' => 'true']);
+                $response = Http::connectTimeout(self::CONNECT_TIMEOUT_SECONDS)->timeout(self::REQUEST_TIMEOUT_SECONDS)->get("https://discord.com/api/v10/invites/{$inviteCode}", ['with_counts' => 'true']);
 
                 if ($response->successful()) {
                     $members = (int) $response->json('approximate_member_count', 0);

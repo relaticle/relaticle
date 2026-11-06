@@ -178,7 +178,7 @@ it('serves an llms.txt indexing help and docs', function (): void {
 
     expect($body)->toContain('/help/getting-started/create-your-first-company')
         ->and($body)->toContain('/developers/self-hosting')
-        ->and($body)->toContain('Help Centre')
+        ->and($body)->toContain('Help center')
         ->and($body)->toContain('Documentation')
         ->and($body)->toContain('/compare/relaticle-vs-twenty')
         ->and($body)->toContain('/compare/relaticle-vs-espocrm')

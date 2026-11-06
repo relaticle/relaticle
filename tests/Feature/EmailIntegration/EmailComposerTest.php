@@ -1255,9 +1255,9 @@ it('presents composer recipient options as record chips', function (): void {
         'type' => 'person',
         'label' => 'Ada Lovelace',
         'circular' => true,
-        'iconPath' => null,
+        'avatarUrl' => null,
+        'iconPath' => CrmEntity::People->iconPath(),
     ]);
-    expect($personOption['avatarColor'])->toBeIn(['primary', 'success', 'warning', 'danger', 'info']);
     expect($companyOption)->toMatchArray([
         'circular' => false,
         'iconPath' => CrmEntity::Company->iconPath(),
