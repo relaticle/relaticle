@@ -291,7 +291,7 @@ final class Email extends Model
     /**
      * No suppression hides the record on this copy: none on the copy itself, and none on another copy of the
      * conversation the same user holds unless that user pinned the record on one of their copies. Another member's
-     * unlink never hides it. Two probes, so each reads the unique key on `email_id` rather than every suppression of the record.
+     * unlink never hides it. One probe over both cases, each branch reading the unique key on `email_id`.
      *
      * @param  Builder<Email>  $query
      * @param  Closure(QueryBuilder): QueryBuilder  $forRecord
@@ -300,7 +300,8 @@ final class Email extends Model
     {
         $onThisCopy = EmailLinkSuppression::query()
             ->whereColumn('email_link_suppressions.email_id', $query->qualifyColumn('id'))
-            ->toBase();
+            ->toBase()
+            ->selectRaw('1');
         $onHeldCopies = EmailLinkSuppression::query()
             ->join('emails as held', 'held.id', '=', 'email_link_suppressions.email_id')
             ->whereColumn('held.workspace_id', $query->qualifyColumn('workspace_id'))
@@ -309,11 +310,13 @@ final class Email extends Model
             ->whereColumn('held.id', '<>', $query->qualifyColumn('id'))
             ->whereColumn('email_link_suppressions.workspace_id', $query->qualifyColumn('workspace_id'))
             ->inForce()
-            ->toBase();
+            ->toBase()
+            ->selectRaw('1');
 
-        return $target
-            ->whereNotExists($forRecord($onThisCopy))
-            ->whereNotExists($forRecord($onHeldCopies));
+        // One correlated NOT EXISTS keeps the planner's row estimate; two halve it and it stops walking conversations in order.
+        return $target->whereNotExists(fn (QueryBuilder $suppressed): QueryBuilder => $suppressed
+            ->fromSub($forRecord($onThisCopy)->unionAll($forRecord($onHeldCopies)), 'suppressions')
+            ->selectRaw('1'));
     }
 
     // Manual linking and sync linking take this first in their transactions, so neither reads the other's half-written links.

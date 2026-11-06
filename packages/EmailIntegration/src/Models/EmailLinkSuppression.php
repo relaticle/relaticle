@@ -94,7 +94,7 @@ final class EmailLinkSuppression extends Model
             ->from('emailables as pins')
             ->join('emails as pinned_copies', 'pinned_copies.id', '=', 'pins.email_id')
             ->join('emails as suppressed_on', 'suppressed_on.id', '=', $query->qualifyColumn('email_id'))
-            ->where('pins.link_source', 'manual')
+            ->whereRaw("pins.link_source = 'manual'")
             ->whereColumn('pins.emailable_type', $query->qualifyColumn('emailable_type'))
             ->whereColumn('pins.emailable_id', $query->qualifyColumn('emailable_id'))
             ->whereColumn('pinned_copies.workspace_id', 'suppressed_on.workspace_id')
