@@ -1,6 +1,7 @@
 @php
     $icon = static fn (string $type): ?string => \Relaticle\Chat\Support\RecordChipRenderer::iconPath($type);
     $chip = static fn (string $type, string $label): string => '<span class="chat-chip" data-record-type="'.$type.'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="'.$icon($type).'"/></svg><span class="chat-chip-label">'.e($label).'</span></span>';
+    $expiredSummary = __('Update opportunity "Kovra renewal"');
 @endphp
 
 @if($mock === 'approval')
@@ -16,11 +17,7 @@
             <span class="min-w-0 truncate line-through decoration-gray-300 dark:decoration-gray-600">{{ __('Call Sarah Chen') }}</span>
             <span class="shrink-0">&middot; {{ __('left out') }}</span>
         </div>
-        <div class="flex min-w-0 items-center gap-1.5 px-2 py-1.5 text-sm text-gray-500 dark:text-gray-400">
-            <x-heroicon-o-clock class="size-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true"/>
-            <span class="min-w-0 truncate line-through decoration-gray-300 dark:decoration-gray-600">{{ __('Update Kovra renewal') }}</span>
-            <span class="shrink-0">&middot; {{ __('expired') }}</span>
-        </div>
+        <x-cloud::marketing.rela-settled class="mt-4 py-1.5" outcome="expired" :summary="$expiredSummary"/>
     </div>
 @elseif($mock === 'batch')
     <div class="w-full max-w-xs space-y-0.5">

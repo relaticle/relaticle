@@ -8,6 +8,7 @@ use App\Features\EmailIntegration;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Cloud\CloudServiceProvider;
+use Symfony\Component\DomCrawler\Crawler;
 
 mutates(CloudServiceProvider::class);
 
@@ -66,6 +67,20 @@ it('describes batch approval as leaving out records, matching how the service re
     expect($html)->toContain(__('Leave out any record before you approve'))
         ->and($html)->not->toContain('all-or-nothing')
         ->and($html)->not->toContain('no partial approval');
+});
+
+it('shows an expired proposal as its own settled line, never under an applied receipt', function (): void {
+    $page = new Crawler((string) $this->get('/ai')->assertOk()->getContent());
+    $settled = $page->filter('[data-mock-settled]')->reduce(fn (Crawler $line): bool => str_contains($line->text(), 'Kovra renewal'));
+    $appliedRows = $page->filter('p')
+        ->reduce(fn (Crawler $head): bool => trim($head->text()) === __('Applied 1 change · just now'))
+        ->each(fn (Crawler $head): string => implode(' ', $head->nextAll()->reduce(fn (Crawler $row): bool => $row->attr('data-mock-settled') === null)->each(fn (Crawler $row): string => $row->text())));
+
+    expect($settled)->toHaveCount(1)
+        ->and($settled->text())->toContain('Update opportunity "Kovra renewal"')
+        ->and($settled->text())->toContain(__('expired'))
+        ->and($settled->text())->toContain(__('Propose again'))
+        ->and(implode(' ', $appliedRows))->not->toContain(__('expired'));
 });
 
 it('names the assistant from config rather than a hardcoded literal', function (): void {
