@@ -245,7 +245,7 @@ describe('Hero AI tab: conversation', function () {
         // so assert the label, not a "Update task \"...\"" sentence that a
         // restyle of the row legitimately changes.
         $dock = (new Crawler((string) $response->getContent()))->filter('#hero-dock');
-        expect($dock->text())->toContain('Approve or discard the proposal to keep chatting')
+        expect($dock->text())->not->toContain('Approve or discard the proposal to keep chatting')
             ->and($dock->filter('#hero-approve-btn')->text())->toStartWith('Approve');
         $response->assertSee('Add Sarah Chen');
         $response->assertSee('VP of Engineering');
@@ -288,7 +288,7 @@ describe('Hero AI tab: conversation', function () {
         // approval -- still held.
         $dock = (new Crawler($body))->filter('#hero-dock');
 
-        expect($dock->text())->toContain('Approve or discard the proposal to keep chatting')
+        expect($dock->text())->not->toContain('Approve or discard the proposal to keep chatting')
             ->and($dock->filter('button')->first()->text())->toBe('Discard')
             ->and($dock->filter('#hero-approve-btn')->text())->toStartWith('Approve')
             ->and($body)->toContain("I'll mark it done")

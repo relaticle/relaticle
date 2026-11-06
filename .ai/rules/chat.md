@@ -141,9 +141,8 @@ who clicked Discard to dismiss the card rejected a record the card reported as c
   activity ids it rendered in `$shownOverwrites`, and an approval that would overwrite an edit the
   card never showed is refused once, writing nothing, so the next render shows it.
   `tests/Feature/Chat/ProposalCardLifecycleTest.php` ("an edit made after the proposal").
-- While a proposal is pending the message box is locked: the dock sits where the input was, over
-  the line "Approve or discard the proposal to keep chatting" (`_composer.blade.php`,
-  `data-composer-locked`). The user decides before typing again. `tests/Browser/Chat/ProposalDockLockTest.php`.
+- While a proposal is pending the message box is hidden and the dock sits where the input was
+  (`_composer.blade.php`). The user decides before typing again. `tests/Browser/Chat/ProposalDockLockTest.php`.
 
 ## The x leaves a field out at approval time, never from action_data
 Each excludable field row of a single-record card carries a leave-out x

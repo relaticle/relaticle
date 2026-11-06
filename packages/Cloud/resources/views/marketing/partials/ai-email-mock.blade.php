@@ -47,7 +47,6 @@
                     <x-cloud::marketing.rela-approve tabindex="-1" :label="__('Send email')" :shortcut="false"/>
                 </div>
             </div>
-            <x-cloud::marketing.rela-locked/>
         </div>
     </x-cloud::marketing.chat-window>
 </div>

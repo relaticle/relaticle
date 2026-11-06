@@ -4,12 +4,8 @@
         {{-- Docked pending proposal: a nested Livewire component hosts the active proposal so it can
              render real Filament field editors in place (Phase C). Alpine stays the source of truth for
              whether a proposal is pending and pushes the active id to the card via `proposal:set-active`. --}}
-        {{-- The composer below is hidden while a proposal is docked, and its editor
-             holds focus at that moment, so focus would otherwise fall to <body>: a
-             keyboard user lands at the top of the document with no idea a decision is
-             waiting. tabindex plus the focus on show moves them onto the dock, and
-             role=status announces it to a screen reader (the transcript's own log
-             region is a sibling and does not cover this). --}}
+        {{-- The composer hides while a proposal is docked and its editor held focus,
+             so focus moves onto the dock instead of falling to <body>. --}}
         <div
             x-show="hasPendingProposal"
             x-effect="syncActiveProposal()"
@@ -25,9 +21,8 @@
             x-transition:leave-end="motion-safe:translate-y-1 motion-safe:opacity-0"
             class="mb-3 outline-none"
         >
-            {{-- No visible eyebrow above the card (Attio): the halo marks it as
-                 the pending decision, and the wrapper's aria-label plus the locked
-                 line below announce it to screen readers. --}}
+            {{-- The halo marks the pending decision; the wrapper's aria-label
+                 announces it to screen readers. --}}
             {{-- Bounded, but NOT a scroller: the card scrolls its own steps and keeps
                  the decision buttons pinned. Scrolling here instead would push
                  Approve below the fold on any plan taller than the dock. --}}
@@ -38,17 +33,6 @@
                     wire:key="proposal-dock-{{ $context ?? 'conversation' }}"
                 />
             </div>
-        </div>
-
-        <div
-            x-show="hasPendingProposal"
-            x-cloak
-            role="status"
-            data-composer-locked
-            class="mb-2 flex h-10 items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-3 text-xs text-gray-500 dark:border-white/15 dark:bg-white/5 dark:text-gray-400"
-        >
-            <x-heroicon-o-lock-closed class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            <span class="truncate">{{ __('Approve or discard the proposal to keep chatting') }}</span>
         </div>
 
         @include('chat::livewire.chat.partials._banners')

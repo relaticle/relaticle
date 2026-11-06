@@ -70,24 +70,24 @@ function lockTestCompanies(array $conversation, array $names): array
     );
 }
 
-/** @return array{locked: bool, editor: bool} */
+/** @return array{docked: bool, editor: bool} */
 function lockTestVisibility(mixed $page, string $context = 'conversation'): array
 {
+    $dock = LOCK_TEST_DOCK;
+
     return $page->script(<<<JS
         (() => {
             const shown = (el) => el !== null && el.offsetParent !== null;
-            const editor = document.querySelector('[data-chat-context="{$context}"] [contenteditable="true"]');
-            const area = editor.closest('.border-t');
 
             return {
-                locked: shown(area.querySelector('[data-composer-locked]')),
-                editor: shown(editor),
+                docked: shown(document.querySelector('[data-chat-context="{$context}"] {$dock}')),
+                editor: shown(document.querySelector('[data-chat-context="{$context}"] [contenteditable="true"]')),
             };
         })();
     JS);
 }
 
-it('shows the locked line while a proposal waits and removes it after a decision', function (): void {
+it('hides the message box while a proposal waits and brings it back after a decision', function (): void {
     $conversation = lockTestConversation();
     $company = lockTestCompanies($conversation, ['Northwind Traders'])[0];
     $company->update(['turn_id' => null]);
@@ -95,9 +95,9 @@ it('shows the locked line while a proposal waits and removes it after a decision
     $page = ChatBrowser::logIn($conversation['user'], $conversation['workspace']->slug, $conversation['conversationId'])
         ->resize(1440, 900)
         ->assertSee('Northwind Traders')
-        ->assertSee('Approve or discard the proposal to keep chatting');
+        ->assertDontSee('Approve or discard the proposal to keep chatting');
 
-    expect(lockTestVisibility($page))->toBe(['locked' => true, 'editor' => false]);
+    expect(lockTestVisibility($page))->toBe(['docked' => true, 'editor' => false]);
 
     $page->assertSeeIn('[wire\:click="createCurrent"]', 'Approve')
         ->click('[wire\:click="createCurrent"]')
@@ -105,7 +105,7 @@ it('shows the locked line while a proposal waits and removes it after a decision
 
     $page->wait(0.5);
 
-    expect(lockTestVisibility($page))->toBe(['locked' => false, 'editor' => true])
+    expect(lockTestVisibility($page))->toBe(['docked' => false, 'editor' => true])
         ->and($company->fresh()->status)->toBe(PendingActionStatus::Approved);
 
     $page->assertNoJavaScriptErrors();
@@ -184,7 +184,7 @@ it('ignores Cmd+Enter on an email, a delete and a plan with a draft in the box',
 
     $page = ChatBrowser::logIn($conversation['user'], $conversation['workspace']->slug, $conversation['conversationId'])
         ->resize(1440, 900)
-        ->assertSee('Approve or discard the proposal to keep chatting');
+        ->assertVisible(LOCK_TEST_DOCK);
 
     if ($case === 'a plan with a draft in the box') {
         $page->assertVisible('[data-proposal-shortcut]')
@@ -217,7 +217,7 @@ it('ignores Cmd+Enter on an email, a delete and a plan with a draft in the box',
         ->and(Task::query()->withoutGlobalScopes()->whereKey($task->getKey())->exists())->toBeTrue()
         ->and(Company::query()->withoutGlobalScopes()->where('workspace_id', $conversation['workspace']->getKey())->count())->toBe(0);
 
-    expect(lockTestVisibility($page)['locked'])->toBeTrue();
+    expect(lockTestVisibility($page)['docked'])->toBeTrue();
 })->with(['an email', 'a delete', 'a plan with a delete', 'a plan with a draft in the box']);
 
 it('locks the box and approves a plan with Cmd+Enter in the side panel', function (): void {
@@ -234,7 +234,7 @@ it('locks the box and approves a plan with Cmd+Enter in the side panel', functio
         ->click('[data-chat-side-panel] span[title="locked box"]')
         ->assertSee('Approve 2 changes');
 
-    expect(lockTestVisibility($page, 'side-panel'))->toBe(['locked' => true, 'editor' => false]);
+    expect(lockTestVisibility($page, 'side-panel'))->toBe(['docked' => true, 'editor' => false]);
 
     $page->assertSeeIn('[data-chat-side-panel] '.LOCK_TEST_DOCK, 'Approve 2 changes')
         ->keys('[data-chat-side-panel] '.LOCK_TEST_DOCK, 'Control+Enter')
@@ -243,7 +243,7 @@ it('locks the box and approves a plan with Cmd+Enter in the side panel', functio
 
     $page->wait(0.5);
 
-    expect(lockTestVisibility($page, 'side-panel'))->toBe(['locked' => false, 'editor' => true])
+    expect(lockTestVisibility($page, 'side-panel'))->toBe(['docked' => false, 'editor' => true])
         ->and(array_map(fn (PendingAction $step): PendingActionStatus => $step->fresh()->status, $steps))
         ->each->toBe(PendingActionStatus::Approved);
 

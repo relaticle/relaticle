@@ -89,8 +89,6 @@
                     <x-cloud::marketing.rela-approve id="hero-approve-btn" tabindex="-1" label="Approve"/>
                 </div>
             </div>
-
-            <x-cloud::marketing.rela-locked/>
         </div>
 
         <div class="mcp-el mcp-input w-full">

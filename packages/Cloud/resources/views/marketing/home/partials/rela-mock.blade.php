@@ -170,8 +170,6 @@
                     />
                 </div>
             </x-cloud::marketing.window>
-
-            <x-cloud::marketing.rela-locked/>
         </div>
 
         <div class="col-start-1 row-start-1 self-start space-y-3">

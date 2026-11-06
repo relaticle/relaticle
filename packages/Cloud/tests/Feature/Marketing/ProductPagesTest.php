@@ -85,7 +85,7 @@ it('renders the ask playground at the #demo anchor the hero points to', function
     expect($html)->toContain('>'.__('Move').'</span>')
         ->and($html)->toContain(__('Create person'))
         ->and($html)->toContain(__('Approve :count changes', ['count' => 3]))
-        ->and($html)->toContain(__('Approve or discard the proposal to keep chatting'))
+        ->and($html)->not->toContain('Approve or discard the proposal to keep chatting')
         ->and($html)->toContain(__('Discard'))
         ->and($html)->not->toContain('bg-amber-500 text-white');
 });

@@ -61,8 +61,6 @@
                         <x-cloud::marketing.rela-approve tabindex="-1" :label="__('Approve :count changes', ['count' => count($steps)])"/>
                     </div>
                 </div>
-
-                <x-cloud::marketing.rela-locked/>
             </div>
         </div>
     </x-cloud::marketing.chat-window>

@@ -241,7 +241,6 @@
                                     <x-cloud::marketing.rela-approve tabindex="-1" :label="__('Approve')"/>
                                 </div>
                             </div>
-                            <x-cloud::marketing.rela-locked/>
                         </div>
                     </x-cloud::marketing.window>
                 </div>

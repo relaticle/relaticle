@@ -358,8 +358,6 @@
                                             ><span x-text="kept(@js(__('Approve :count change')), @js(__('Approve :count changes')))">{{ __('Approve :count changes', ['count' => 3]) }}</span></x-cloud::marketing.rela-approve>
                                         </div>
                                     </div>
-
-                                    <x-cloud::marketing.rela-locked/>
                                 </div>
 
                                 <div tabindex="-1" x-ref="batchResult" class="col-start-1 row-start-1 self-start invisible opacity-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500" x-bind:class="{ 'invisible opacity-0': undecided.length > 0, '{{ $fade }}': undecided.length === 0 }" data-ai-batch-decided>
@@ -447,8 +445,6 @@
                                             <x-cloud::marketing.rela-approve :label="__('Approve')" x-on:click="decidePerson('created')" x-bind:disabled="thinking" data-ai-create-confirm/>
                                         </div>
                                     </div>
-
-                                    <x-cloud::marketing.rela-locked/>
                                 </div>
 
                                 <div tabindex="-1" x-ref="personcreated" class="invisible col-start-1 row-start-1 self-start focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500" x-bind:class="{ 'invisible': person.decision !== 'created' }" data-ai-create-done>

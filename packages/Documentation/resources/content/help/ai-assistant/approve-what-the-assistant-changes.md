@@ -11,7 +11,7 @@ Acme", "move this deal to Negotiation", "delete these three notes"), it never
 writes to your CRM directly. It drafts the change as a proposal card where
 the message box was, and waits. Approve or discard it to keep chatting.
 
-![A proposal card for "Create task Send updated proposal to Figma", listing its title, linked company and opportunity, status, due date and priority, with Discard and Approve buttons above the line "Approve or discard the proposal to keep chatting"](/help-assets/ai-assistant/approve-what-the-assistant-changes-1.png)
+![A proposal card for "Create task Send updated proposal to Figma", listing its title, linked company and opportunity, status, due date and priority, with Discard and Approve buttons](/help-assets/ai-assistant/approve-what-the-assistant-changes-1.png)
 
 ## The proposal card
 
@@ -79,8 +79,8 @@ button too: **Send invitation**. Approving a plan never sends it.
 
 ## Proposals don't wait forever
 
-- While a proposal waits, the message box is locked. Approve or discard it to
-  keep chatting.
+- While a proposal waits, the card takes the message box's place. Approve or
+  discard it to keep chatting.
 - An untouched proposal expires after 24 hours and its line reads
   **expired**. If it is the most recent, **Propose again** gets a fresh card.
 - You can't regenerate an answer while its proposal is pending. Resolve the
