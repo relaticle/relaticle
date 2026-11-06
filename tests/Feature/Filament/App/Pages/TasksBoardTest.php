@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\CustomFields\TaskField;
+use App\Enums\WorkspaceRole;
 use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Actions\MoveCardAction;
 use App\Filament\Resources\CompanyResource;
@@ -166,6 +167,30 @@ it('moves a card to the status picked from its move to sheet', function (): void
         ->value($this->statusField->getValueColumn());
 
     expect($storedValue)->toBe($inProgress->getKey());
+});
+
+it('keeps move to off a card a viewer cannot change', function (): void {
+    $todo = $this->statusField->options->firstWhere('name', 'To do');
+    $done = $this->statusField->options->firstWhere('name', 'Done');
+
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
+    $task->saveCustomFieldValue($this->statusField, $todo->getKey());
+
+    $viewer = User::factory()->create();
+    $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
+    $viewer->switchWorkspace($this->workspace);
+    $this->actingAs($viewer);
+
+    livewire(TasksBoard::class)
+        ->call('mountAction', 'moveTo', [], ['recordKey' => (string) $task->id])
+        ->assertActionNotMounted()
+        ->call('callMountedAction', ['to' => (string) $done->getKey()]);
+
+    $storedValue = $task->fresh()->customFieldValues()
+        ->where('custom_field_id', $this->statusField->getKey())
+        ->value($this->statusField->getValueColumn());
+
+    expect($storedValue)->toBe($todo->getKey());
 });
 
 it('moves a card between two cards of another column', function (): void {
