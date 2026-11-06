@@ -348,6 +348,100 @@ describe('leaving steps and rows out', function (): void {
     });
 });
 
+describe('the change list', function (): void {
+    beforeEach(function (): void {
+        Bus::fake();
+
+        $this->renderedPlan = function (): array {
+            [$conversationId, $turnId] = ProposalCardFixture::startPlan($this->user);
+
+            $person = ProposalCardFixture::planProposal(CreatePersonTool::class, $conversationId, $turnId, [[
+                'name' => 'Priya Nair',
+                'custom_fields' => ['job_title' => 'VP Engineering', 'emails' => ['priya@northwind.test']],
+            ]]);
+            $task = ProposalCardFixture::planProposal(CreateTaskTool::class, $conversationId, $turnId, [[
+                'title' => 'Call Priya',
+                'assignee_ids' => [(string) $this->user->getKey()],
+                'people_ids' => [PlanReference::to((string) $person->getKey())],
+                'custom_fields' => ['due_date' => '2026-11-20'],
+            ]]);
+            $note = ProposalCardFixture::planProposal(CreateNoteTool::class, $conversationId, $turnId, [[
+                'title' => 'Intro notes',
+                'custom_fields' => ['body' => 'Met at the Northwind offsite and agreed to a follow-up call.'],
+            ]]);
+
+            return [$person, $task, $note];
+        };
+    });
+
+    it('lists every value of every change under one decision', function (): void {
+        [$person] = ($this->renderedPlan)();
+
+        Livewire::test(ProposalCard::class)
+            ->call('setActive', $person->getKey())
+            ->assertSeeText('3 changes')
+            ->assertSeeText('Approve 3 changes')
+            ->assertSeeText('Discard all')
+            ->assertSeeText('Priya Nair')
+            ->assertSeeText('VP Engineering')
+            ->assertSeeText('priya@northwind.test')
+            ->assertSeeText('Call Priya')
+            ->assertSeeText($this->user->name)
+            ->assertSeeText('Nov 20, 2026')
+            ->assertSeeText('Intro notes')
+            ->assertSeeText('Met at the Northwind offsite')
+            ->assertSeeHtml('data-proposal-ref')
+            ->assertSeeText('new')
+            ->assertDontSeeText('Approved together, in order')
+            ->assertDontSeeText('(step 1)')
+            ->assertSeeHtml('data-proposal-shortcut');
+    });
+
+    it('shows what a left-out step takes with it and recounts the primary', function (): void {
+        [$person, $task] = ($this->renderedPlan)();
+
+        Livewire::test(ProposalCard::class)
+            ->call('setActive', $person->getKey())
+            ->call('toggleLeftOut', (string) $person->getKey())
+            ->assertSeeText('1 of 3 changes')
+            ->assertSeeText('Priya Nair is left out, so this task is left out too. It links to Priya Nair.')
+            ->assertSeeText('Keep Priya Nair')
+            ->assertSeeText('Approve 1 change')
+            ->call('toggleLeftOut', (string) $person->getKey())
+            ->assertSeeText('Approve 3 changes')
+            ->assertDontSeeText('is left out, so this task');
+
+        expect($task->refresh()->status)->toBe(PendingActionStatus::Pending);
+    });
+
+    it('hides the primary when every approvable step is left out', function (): void {
+        [$person, $task, $note] = ($this->renderedPlan)();
+
+        Livewire::test(ProposalCard::class)
+            ->call('setActive', $person->getKey())
+            ->call('toggleLeftOut', (string) $person->getKey())
+            ->call('toggleLeftOut', (string) $note->getKey())
+            ->assertSeeText('Discard all')
+            ->assertDontSeeText('Approve 0')
+            ->assertDontSeeHtml('wire:click="approveAll"')
+            ->assertDontSeeHtml('data-proposal-shortcut')
+            ->call('createCurrentFromShortcut');
+
+        expect($person->refresh()->status)->toBe(PendingActionStatus::Pending)
+            ->and($task->refresh()->status)->toBe(PendingActionStatus::Pending)
+            ->and($note->refresh()->status)->toBe(PendingActionStatus::Pending);
+    });
+
+    it('clamps a value longer than 48 characters to two lines with a more control', function (): void {
+        [$person] = ($this->renderedPlan)();
+
+        Livewire::test(ProposalCard::class)
+            ->call('setActive', $person->getKey())
+            ->assertSeeHtml('line-clamp-2')
+            ->assertSeeText('more');
+    });
+});
+
 it('refuses a client-set editing target, so one payload cannot open the same field on every step', function (): void {
     $action = ProposalCardFixture::batchCompany($this->user, ['Alpha', 'Beta']);
 

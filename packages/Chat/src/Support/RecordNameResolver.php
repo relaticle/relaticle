@@ -80,6 +80,39 @@ final readonly class RecordNameResolver
     }
 
     /**
+     * Splits a stored display value into plain text and the records an earlier step
+     * of the turn will create, so a card can draw the latter as a "new" chip.
+     *
+     * @return list<array{text: string, isNew: bool}>
+     */
+    public static function planLabelParts(string $value): array
+    {
+        $template = __(':name (step :step)', ['name' => '@@NAME@@', 'step' => '@@STEP@@']);
+        $pattern = '/^'.str_replace(['@@NAME@@', '@@STEP@@'], ['(.+)', '\d+'], preg_quote($template, '/')).'$/u';
+        $parts = [];
+
+        foreach (explode(', ', $value) as $piece) {
+            if (preg_match($pattern, $piece, $matches) === 1) {
+                $parts[] = ['text' => $matches[1], 'isNew' => true];
+
+                continue;
+            }
+
+            $last = array_key_last($parts);
+
+            if ($last !== null && ! $parts[$last]['isNew']) {
+                $parts[$last]['text'] .= ', '.$piece;
+
+                continue;
+            }
+
+            $parts[] = ['text' => $piece, 'isNew' => false];
+        }
+
+        return $parts;
+    }
+
+    /**
      * The proposed name of a record an earlier step of this turn will create,
      * labelled with that step's position so the card says where it comes from.
      */

@@ -139,6 +139,39 @@ enum ProposalEntity: string
         };
     }
 
+    public function confirmLabel(PendingActionOperation $operation, int $count = 1): string
+    {
+        return match ($this) {
+            self::Email => __('Send email'),
+            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::CustomField, self::SampleData => $operation === PendingActionOperation::Delete
+                ? __('Delete :count :entities', ['count' => $count, 'entities' => Str::plural(Str::lower($this->singularName()), $count)])
+                : __('Approve'),
+            self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::WebAccess => $this->action($operation, $count),
+        };
+    }
+
+    public function declineLabel(): string
+    {
+        return match ($this) {
+            self::Email, self::EmailDraftSend, self::WorkspaceInvitation => __("Don't send"),
+            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::EmailDraft, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::CustomField, self::SampleData, self::WebAccess => __('Discard'),
+        };
+    }
+
+    public function followUpLabel(): string
+    {
+        return match ($this) {
+            self::Email => __('Then email'),
+            self::EmailDraftSend => __('Then send draft'),
+            self::EmailCancel => __('Then cancel email'),
+            self::EmailReschedule => __('Then reschedule email'),
+            self::EmailRetry => __('Then send again'),
+            self::WorkspaceInvitation => __('Then invite'),
+            self::WebAccess => __('Then search the web'),
+            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::EmailDraft, self::EmailDraftDelete, self::CustomField, self::SampleData => __('Then'),
+        };
+    }
+
     public function done(PendingActionOperation $operation): string
     {
         return match ($this) {

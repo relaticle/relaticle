@@ -5,9 +5,11 @@ declare(strict_types=1);
 use App\Actions\CustomFields\CreateCustomField;
 use App\Features\OnboardSeed;
 use App\Models\Company;
+use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Bus;
+use Laravel\Ai\Tools\Request;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Relaticle\Chat\Enums\PendingActionOperation;
@@ -15,6 +17,7 @@ use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\RecordChipRenderer;
+use Relaticle\Chat\Tools\Task\DeleteTaskTool;
 use Tests\Helpers\ProposalCardFixture;
 
 mutates(ProposalCard::class);
@@ -464,5 +467,58 @@ it('renders a single (non-batch) proposal without a stepper', function (): void 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->assertSee('Solo Inc')
-        ->assertSee('Create');
+        ->assertSeeText('Approve')
+        ->assertSeeText('Discard')
+        ->assertSeeHtml('data-proposal-shortcut');
+});
+
+it('lists every record of a standalone batch with its own x and one decision', function (): void {
+    $names = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta'];
+    $action = ProposalCardFixture::batchCompany($this->user, $names);
+
+    $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation');
+
+    foreach ($names as $name) {
+        $component->assertSeeText($name);
+    }
+
+    $component->assertSeeText('Approve 6 changes')
+        ->assertSeeText('Discard all')
+        ->assertSeeHtml('data-proposal-shortcut')
+        ->assertDontSeeHtml('wire:click="nextItem"')
+        ->call('toggleLeftOutRow', (string) $action->getKey(), 4)
+        ->assertSeeText('Approve 5 changes')
+        ->assertSeeHtml('aria-label="Keep Epsilon"');
+
+    expect(substr_count($component->html(), 'data-proposal-batch-row'))->toBe(6);
+});
+
+it('words a delete as the count it deletes and gives it no shortcut', function (): void {
+    $tasks = Task::factory()->count(2)->for($this->workspace)->create();
+    app(DeleteTaskTool::class)->handle(new Request(['ids' => $tasks->pluck('id')->all()]));
+    $action = PendingAction::query()->where('user_id', $this->user->getKey())->firstOrFail();
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->assertSeeText('Delete 2 tasks')
+        ->assertSeeText('Discard')
+        ->assertDontSeeHtml('data-proposal-shortcut')
+        ->assertDontSeeHtml('<kbd');
+});
+
+it('stacks an old and new value that are longer than 28 characters together', function (): void {
+    $action = ProposalCardFixture::proposal($this->user,
+        ['name' => 'Acme Corp'],
+        ['title' => 'Update Company', 'summary' => 'Update company "Acme Corp"', 'fields' => [
+            ['label' => 'Industry', 'old' => 'Enterprise software', 'new' => 'Industrial automation'],
+            ['label' => 'Size', 'old' => '10', 'new' => '50'],
+        ]],
+    );
+    $action->update(['operation' => PendingActionOperation::Update]);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->assertSeeHtml('flex min-w-0 gap-x-1.5 gap-y-0.5 flex-col')
+        ->assertSeeText('Approve');
 });

@@ -1282,7 +1282,7 @@ describe('a send inside a plan', function (): void {
             ->assertSee('Second paragraph of the message.');
     });
 
-    it('has its own Send button while a task step keeps the icon', function (): void {
+    it('lists a send as a follow-up line with no button of its own beside a task', function (): void {
         $task = ($this->planTask)();
         $send = ($this->planSend)();
 
@@ -1291,29 +1291,49 @@ describe('a send inside a plan', function (): void {
 
         expect($views['emails']['needsOwnApproval'])->toBeTrue()
             ->and($views['task']['needsOwnApproval'])->toBeFalse()
-            ->and(substr_count($dock->html(), 'data-proposal-send-step'))->toBe(1);
+            ->and(substr_count($dock->html(), 'data-proposal-send-step'))->toBe(0);
 
-        $dock->assertSeeHtml('data-proposal-send-step="'.$send->getKey().'"');
+        $dock->assertSeeText('Then email')
+            ->assertSeeText('you approve it on its own, next')
+            ->assertDontSeeHtml('data-proposal-send-step="'.$send->getKey().'"');
     });
 
-    it('counts only the steps approve all will approve, and says some steps have their own button', function (): void {
+    it('counts only the records approve will write, and announces the send as a follow-up', function (): void {
         ($this->planTask)('First task');
         ($this->planTask)('Second task');
         $send = ($this->planSend)();
 
         openChatEmailDock($send)
-            ->assertSee('Approve all 2')
-            ->assertSee(__('Some steps have their own button'))
-            ->assertDontSee(__('Approved together, in order'));
+            ->assertSeeText('2 changes')
+            ->assertSeeText('Approve 2 changes')
+            ->assertSeeText('Then email')
+            ->assertDontSeeText('Approved together, in order');
     });
 
-    it('names a single approvable step beside a send without calling it all', function (): void {
+    it('names a single approvable record beside a send by its entity and keeps the shortcut', function (): void {
         $task = ($this->planTask)();
-        ($this->planSend)();
+        ($this->planSend)('Renewal options for Figma');
 
         openChatEmailDock($task)
-            ->assertSee('Approve 1 step')
-            ->assertDontSee('Approve all');
+            ->assertSeeText('Approve task')
+            ->assertSeeTextInOrder(['Then email', 'Renewal options for Figma'])
+            ->assertSeeText('you approve it on its own, next')
+            ->assertSeeHtml('data-proposal-shortcut')
+            ->assertDontSeeText('Approve all');
+    });
+
+    it('shows the email alone with its own decision and no shortcut once the plan is approved', function (): void {
+        $task = ($this->planTask)();
+        ($this->planSend)('Renewal options for Figma');
+
+        openChatEmailDock($task)
+            ->call('approveAll')
+            ->assertSeeText('Renewal options for Figma')
+            ->assertSeeText('Send email')
+            ->assertSeeText("Don't send")
+            ->assertSeeText('Own approval')
+            ->assertDontSeeHtml('data-proposal-shortcut')
+            ->assertDontSeeHtml('<kbd');
     });
 
     it('offers no approve all for a plan made only of sends', function (): void {
@@ -1411,17 +1431,16 @@ describe('a send inside a plan', function (): void {
         openChatEmailDock(($this->planTask)())->assertSeeHtml('<kbd');
     });
 
-    it('disables its Send button while a field of another step is being edited', function (): void {
+    it('blocks the plan primary while a field of a step is being edited', function (): void {
         $task = ($this->planTask)();
-        $send = ($this->planSend)();
+        ($this->planSend)();
 
         $dock = openChatEmailDock($task);
 
-        expect($dock->html())->not->toMatch('/data-proposal-send-step="'.$send->getKey().'"\s+disabled/');
+        $dock->assertDontSeeHtml('Finish editing the field first');
 
-        $dock->call('editField', 'title', (string) $task->getKey());
-
-        expect($dock->html())->toMatch('/data-proposal-send-step="'.$send->getKey().'"\s+disabled/');
+        $dock->call('editField', 'title', (string) $task->getKey())
+            ->assertSeeHtml('Finish editing the field first');
     });
 
     it('names its own step when a draft step fails after an earlier approval', function (): void {
@@ -1617,18 +1636,18 @@ describe('an email card', function (): void {
         $dock->assertSeeHtmlInOrder(['wire:click="createCurrent"', "<span>{$label}</span>"])
             ->assertDontSeeHtml('<span>Create</span>');
     })->with([
-        'a send' => ['sendCard', 'Send'],
+        'a send' => ['sendCard', 'Send email'],
         'a draft' => ['draftCard', 'Save draft'],
     ]);
 
-    it('labels the decision of a draft batch with the draft verb', function (): void {
+    it('counts a draft batch as the changes it will save', function (): void {
         $proposal = proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [
             chatDraftRecord($this->viewerAccount, ['subject' => 'First']),
             chatDraftRecord($this->viewerAccount, ['subject' => 'Second']),
         ]);
 
         openChatEmailDock(pendingChatEmail($proposal))
-            ->assertSeeHtmlInOrder(['wire:click="createCurrent"', '<span>Save draft</span>'])
+            ->assertSeeHtmlInOrder(['wire:click="approveAll"', '<span>Approve 2 changes</span>'])
             ->assertDontSeeHtml('<span>Create</span>');
     });
 

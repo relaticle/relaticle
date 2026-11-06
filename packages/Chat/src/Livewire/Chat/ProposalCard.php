@@ -16,6 +16,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -147,8 +148,12 @@ final class ProposalCard extends BaseLivewireComponent
             ->model($this->modelClass());
     }
 
-    public function editField(string $code, ?string $stepId = null): void
+    public function editField(string $code, ?string $stepId = null, ?int $index = null): void
     {
+        if ($index !== null && $stepId !== null) {
+            $this->focusItem($stepId, $index);
+        }
+
         $pendingAction = $this->loadStep($stepId ?? $this->activeStepId());
 
         if (! $pendingAction instanceof PendingAction || $pendingAction->operation !== PendingActionOperation::Create) {
@@ -358,10 +363,9 @@ final class ProposalCard extends BaseLivewireComponent
     }
 
     /**
-     * Focus one record of a batch step: its row expands to show the editable
-     * fields. Decided items are dropped from the dock queue entirely (Attio
-     * behavior), so a click on a just-resolved row snaps to the first undecided
-     * record instead of re-opening an outcome that lives in the transcript.
+     * Point the editor at one record of a batch step. Decided items are dropped
+     * from the dock queue entirely, so a just-resolved record snaps to the first
+     * undecided one instead of re-opening an outcome that lives in the transcript.
      */
     public function focusItem(string $stepId, int $index): void
     {
@@ -570,9 +574,13 @@ final class ProposalCard extends BaseLivewireComponent
                 'remainingCount' => $this->remainingCountOf($step),
                 'items' => $this->batchItemViews($step),
                 'blockedBy' => $this->sortedPositions($blockedBy),
-                'activeItemLabel' => $this->activeItemLabelOf($step),
-                'activeItemSummary' => $this->activeItemSummaryOf($step),
                 'excludableCodes' => $this->excludableCodesOf($step),
+                'titleKey' => $step->entity_type->titleKey(),
+                'titleLabel' => $step->entity_type->titleLabel(),
+                'entityNoun' => Str::lower($step->entity_type->singularName()),
+                'confirmLabel' => $step->entity_type->confirmLabel($step->operation, $this->remainingCountOf($step)),
+                'declineLabel' => $step->entity_type->declineLabel(),
+                'followUpLabel' => $step->entity_type->followUpLabel(),
             ];
         }
 
@@ -658,10 +666,9 @@ final class ProposalCard extends BaseLivewireComponent
 
     /**
      * One row per still-undecided record of a batch step. Every record is its
-     * own visible row with its own skip control, so nothing can be committed or
-     * skipped without having been on screen.
+     * own visible row, so nothing can be approved or left out unseen.
      *
-     * @return list<array{index: int, summary: string, isActive: bool}>
+     * @return list<array{index: int, summary: string, label: string, isActive: bool, fields: list<array<string, mixed>>}>
      */
     private function batchItemViews(PendingAction $step): array
     {
@@ -673,33 +680,54 @@ final class ProposalCard extends BaseLivewireComponent
 
         $cursor = $this->cursorFor($step);
 
-        return array_map(function (int $index) use ($payload, $cursor): array {
+        return array_map(function (int $index) use ($payload, $cursor, $step): array {
             $display = $payload->displayAt($index);
             $summary = $display['summary'] ?? $display['title'] ?? __('Record :position', ['position' => $index + 1]);
+            $fields = $display['fields'] ?? [];
 
             return [
                 'index' => $index,
                 'summary' => is_string($summary) ? $summary : '',
+                'label' => $this->itemLabel($step->entity_type, $display),
                 'isActive' => $index === $cursor,
+                'fields' => is_array($fields) ? array_values($fields) : [],
             ];
         }, $this->unresolvedIndices($step));
     }
 
     /**
-     * The record name the paginated batch card leads with: the active item's
-     * display title, or the quoted name from its summary. Kept separate from
-     * stepRecordLabel(): a PLAN's batch step header must keep the batch-level
-     * summary, not adopt whichever record the cursor is on.
+     * The identity a batch row leads with: the entity's title value when the row carries one
+     * (an invitation's address), otherwise the name quoted in its summary.
+     *
+     * @param  array<string, mixed>  $display
      */
-    private function activeItemLabelOf(PendingAction $step): string
+    private function itemLabel(ProposalEntity $entity, array $display): string
     {
-        $payload = ProposalPayload::from($step);
+        $fields = is_array($display['fields'] ?? null) ? $display['fields'] : [];
 
-        if (! $payload->isBatch) {
-            return '';
+        foreach ($fields as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $isTitleRow = ($row['code'] ?? null) === null
+                ? ($row['label'] ?? null) === $entity->titleLabel()
+                : $row['code'] === $entity->titleKey();
+            $value = $row['value'] ?? null;
+
+            if ($isTitleRow && is_string($value) && $value !== '') {
+                return $value;
+            }
         }
 
-        $display = $payload->displayAt($this->cursorFor($step));
+        return $this->labelFromDisplay($display);
+    }
+
+    /**
+     * @param  array<string, mixed>  $display
+     */
+    private function labelFromDisplay(array $display): string
+    {
         $summary = $display['summary'] ?? null;
 
         // The quoted record name from the summary ('Create person "Alice"')
@@ -714,19 +742,6 @@ final class ProposalCard extends BaseLivewireComponent
         if (is_string($title) && $title !== '') {
             return $title;
         }
-
-        return is_string($summary) ? $summary : '';
-    }
-
-    private function activeItemSummaryOf(PendingAction $step): string
-    {
-        $payload = ProposalPayload::from($step);
-
-        if (! $payload->isBatch) {
-            return '';
-        }
-
-        $summary = $payload->displayAt($this->cursorFor($step))['summary'] ?? null;
 
         return is_string($summary) ? $summary : '';
     }
@@ -1400,9 +1415,7 @@ final class ProposalCard extends BaseLivewireComponent
     }
 
     /**
-     * Skip one record of a batch step from its row: used by a PLAN's batch step,
-     * whose rows stay listed under the numbered rail. A standalone batch is
-     * paginated instead and its footer Discard rejects the visible record.
+     * Reject one record of a batch step on the spot, without waiting for Approve.
      */
     public function skipItem(string $stepId, int $index, PendingActionService $service): void
     {
@@ -1913,6 +1926,10 @@ final class ProposalCard extends BaseLivewireComponent
             'isPlan' => count($steps) > 1,
             'approvableRecordCount' => $this->approvableRecordCount(),
             'primaryIsRisky' => $this->primaryIsRisky(),
+            'leftOutStepIds' => $this->leftOutStepIds(),
+            'leftOutRowIndexes' => $this->leftOutRowMap(),
+            'takenBy' => $this->leftOutDependents(),
+            'linkedRows' => $this->linkedRowIndexes(),
             'hasOwnApprovalSteps' => in_array(true, array_column($steps, 'needsOwnApproval'), true),
             'recordCount' => $proposal instanceof PendingAction ? $this->recordCountOf($proposal) : 0,
             'remainingCount' => $proposal instanceof PendingAction ? $this->remainingCountOf($proposal) : 0,
