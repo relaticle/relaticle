@@ -2021,6 +2021,7 @@ describe('linking email to records', function (): void {
     it('approves a link step with the rest of its plan', function (): void {
         $this->actingAs($this->viewer);
         Filament::setTenant($this->workspace);
+        Queue::fake();
         $email = ($this->emailFrom)($this->viewer);
         $company = Company::factory()->create(['workspace_id' => $this->workspace->id]);
         $conversationId = chatEmailConversation($this->viewer);
