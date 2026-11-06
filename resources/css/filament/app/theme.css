@@ -1893,7 +1893,10 @@ html.fi:has(body.fi-onboarding-wizard),
         }
 
         &[data-checked='true'] > div {
-            @apply text-gray-500 [--prose-code-color:var(--color-gray-500)] [--prose-link-color:var(--color-gray-500)] [--prose-strong-color:var(--color-gray-500)] dark:text-gray-400 dark:[--prose-code-color:var(--color-gray-400)] dark:[--prose-link-color:var(--color-gray-400)] dark:[--prose-strong-color:var(--color-gray-400)];
+            @apply text-gray-500 dark:text-gray-400;
+            --prose-code-color: currentColor;
+            --prose-link-color: currentColor;
+            --prose-strong-color: currentColor;
         }
     }
 }
