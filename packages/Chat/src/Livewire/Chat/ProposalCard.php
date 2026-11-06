@@ -993,22 +993,27 @@ final class ProposalCard extends BaseLivewireComponent
         }
 
         if ($result['failed'] !== null) {
-            $this->reportResolveFailure($result['failed']['step'], __(':step could not be completed: :message', [
-                'step' => $this->failingRowSummary($result['failed']['step']) ?? $this->stepSummary($result['failed']['step']),
-                'message' => $result['failed']['message'],
-            ]));
-
-            $remaining = $this->loadStep($this->pendingActionId) ?? $this->nextPendingStepOfPlan();
-
-            if ($remaining instanceof PendingAction) {
-                $this->pendingActionId = (string) $remaining->getKey();
-                $this->focusFirstPendingStep($remaining);
-            }
+            $this->reportFailedStep($result['failed']['step'], $result['failed']['message']);
 
             return;
         }
 
         $this->settleAfterResolution($anchor);
+    }
+
+    private function reportFailedStep(PendingAction $failed, string $message): void
+    {
+        $this->reportResolveFailure($failed, __(':step could not be completed: :message', [
+            'step' => $this->failingRowSummary($failed) ?? $this->stepSummary($failed),
+            'message' => $message,
+        ]));
+
+        $remaining = $this->loadStep($this->pendingActionId) ?? $this->nextPendingStepOfPlan();
+
+        if ($remaining instanceof PendingAction) {
+            $this->pendingActionId = (string) $remaining->getKey();
+            $this->focusFirstPendingStep($remaining);
+        }
     }
 
     /**
