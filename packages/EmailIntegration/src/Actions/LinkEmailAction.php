@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Jobs\RecomputeRecordEmailMetricsJob;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailLinkSuppression;
 use Relaticle\EmailIntegration\Models\Scopes\ActiveAccountScope;
@@ -71,6 +72,8 @@ final readonly class LinkEmailAction
     private function claimAndLinkInTransaction(Email $email, bool $reapply): void
     {
         DB::transaction(function () use ($email, $reapply): void {
+            $email->lockConversation();
+
             /** @var Email|null $locked */
             $locked = Email::query()
                 ->withoutGlobalScopes()
@@ -88,7 +91,9 @@ final readonly class LinkEmailAction
 
             $applyMetricsForPrelinkedRecords = $locked->linked_at === null;
 
-            $this->link($email, $applyMetricsForPrelinkedRecords);
+            $suppressed = $this->suppressedPairs($email);
+            $this->detachSuppressed($email, $suppressed);
+            $this->link($email, $applyMetricsForPrelinkedRecords, $suppressed);
 
             if ($locked->linked_at === null) {
                 $locked->updateQuietly(['linked_at' => now()]);
@@ -96,13 +101,13 @@ final readonly class LinkEmailAction
         });
     }
 
-    private function link(Email $email, bool $applyMetricsForPrelinkedRecords): void
+    /** @param  array<string, true>  $suppressed */
+    private function link(Email $email, bool $applyMetricsForPrelinkedRecords, array $suppressed): void
     {
         $participants = $email->participants()->with('contact', 'company')->get();
         $workspaceId = $email->workspace_id;
         $connectedAccount = $email->connectedAccount;
         $skippedDomains = $this->domainMatcher->skippedHosts($workspaceId);
-        $suppressed = $this->suppressedPairs($email);
         $workspace = $email->workspace;
 
         // A single email can resolve to the same company/person/opportunity through
@@ -269,6 +274,23 @@ final readonly class LinkEmailAction
             ->get(['emailable_type', 'emailable_id'])
             ->map(fn (EmailLinkSuppression $suppression): string => "{$suppression->emailable_type}:{$suppression->emailable_id}")
             ->all(), true);
+    }
+
+    /** @param  array<string, true>  $suppressed */
+    private function detachSuppressed(Email $email, array $suppressed): void
+    {
+        if ($suppressed === []) {
+            return;
+        }
+
+        foreach ([$email->companies(), $email->people(), $email->opportunities()] as $relation) {
+            foreach ($relation->get() as $record) {
+                if (isset($suppressed["{$record->getMorphClass()}:{$record->getKey()}"])) {
+                    $relation->detach($record->getKey());
+                    dispatch(new RecomputeRecordEmailMetricsJob($record))->afterCommit();
+                }
+            }
+        }
     }
 
     /**

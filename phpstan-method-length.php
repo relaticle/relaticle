@@ -62,7 +62,7 @@ return [
                 'Relaticle\Chat\Tools\SearchCrmTool::handle' => 64,
                 'Relaticle\EmailIntegration\Actions\CompleteMailboxHistoryImportAction::execute' => 73,
                 'Relaticle\EmailIntegration\Actions\ConnectAccountAction::execute' => 91,
-                'Relaticle\EmailIntegration\Actions\LinkEmailAction::link' => 109,
+                'Relaticle\EmailIntegration\Actions\LinkEmailAction::link' => 108,
                 'Relaticle\EmailIntegration\Actions\LinkMeetingAction::link' => 77,
                 'Relaticle\EmailIntegration\Actions\RetryMailboxHistoryImportFailuresAction::execute' => 78,
                 'Relaticle\EmailIntegration\Actions\SaveEmailDraftAction::execute' => 81,

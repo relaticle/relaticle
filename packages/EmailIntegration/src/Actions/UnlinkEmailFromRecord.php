@@ -24,14 +24,14 @@ final readonly class UnlinkEmailFromRecord
 
     public function execute(User $user, Email $email, Company|People|Opportunity $record): void
     {
-        $copies = $this->prepare->execute($user, $email, $record);
-        $ids = $copies->modelKeys();
         $conversationKey = filled($email->conversation_key) ? (string) $email->conversation_key : null;
-        $previousAudience = $conversationKey !== null && ConversationChanged::broadcasts()
-            ? $this->conversations->audience($email->workspace_id, $conversationKey)
-            : [];
 
-        DB::transaction(function () use ($user, $email, $record, $ids): void {
+        $previousAudience = DB::transaction(function () use ($user, $email, $record, $conversationKey): array {
+            $ids = $this->prepare->execute($user, $email, $record)->modelKeys();
+            $previousAudience = $conversationKey !== null && ConversationChanged::broadcasts()
+                ? $this->conversations->audience($email->workspace_id, $conversationKey)
+                : [];
+
             $record->emails()->detach($ids);
 
             $now = now();
@@ -45,6 +45,8 @@ final readonly class UnlinkEmailFromRecord
                 'user_id' => $user->getKey(),
                 'created_at' => $now,
             ], $ids));
+
+            return $previousAudience;
         });
 
         dispatch(new RecomputeRecordEmailMetricsJob($record))->afterCommit();

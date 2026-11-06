@@ -296,6 +296,16 @@ final class Email extends Model
                 ->orWhereColumn('suppressed_copies.rfc_message_id', $query->qualifyColumn('rfc_message_id')));
     }
 
+    // Manual linking and sync linking take this first in their transactions, so neither reads the other's half-written links.
+    public function lockConversation(): void
+    {
+        if (blank($this->conversation_key)) {
+            return;
+        }
+
+        DB::select('select pg_advisory_xact_lock(hashtext(?))', [$this->workspace_id.':'.$this->conversation_key]);
+    }
+
     /**
      * Every column but the search vectors, which hold the body's words and up to 64 KB a row.
      *

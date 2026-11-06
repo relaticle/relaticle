@@ -17,7 +17,11 @@ final readonly class PrepareEmailRecordLink
 {
     public function __construct(private ConversationsQuery $conversations) {}
 
-    /** @return EloquentCollection<int, Email> */
+    /**
+     * Runs inside the caller's transaction, which then holds the conversation lock.
+     *
+     * @return EloquentCollection<int, Email>
+     */
     public function execute(User $user, Email $email, Company|People|Opportunity $record): EloquentCollection
     {
         abort_unless($user->can('view', $email) && $user->can('update', $record), 403);
@@ -28,6 +32,8 @@ final readonly class PrepareEmailRecordLink
                 && $user->belongsToWorkspaceId($email->workspace_id),
             403,
         );
+
+        $email->lockConversation();
 
         $copies = $this->conversations->copies($user, $email);
 

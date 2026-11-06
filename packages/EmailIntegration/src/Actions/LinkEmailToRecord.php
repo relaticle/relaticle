@@ -23,10 +23,9 @@ final readonly class LinkEmailToRecord
 
     public function execute(User $user, Email $email, Company|People|Opportunity $record): void
     {
-        $copies = $this->prepare->execute($user, $email, $record);
-        $ids = $copies->modelKeys();
-
-        DB::transaction(function () use ($record, $copies, $ids): void {
+        DB::transaction(function () use ($user, $email, $record): void {
+            $copies = $this->prepare->execute($user, $email, $record);
+            $ids = $copies->modelKeys();
             $changes = $record->emails()->syncWithoutDetaching(array_fill_keys($ids, ['link_source' => 'manual']));
 
             EmailLinkSuppression::query()

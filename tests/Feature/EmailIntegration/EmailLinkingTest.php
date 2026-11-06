@@ -7,6 +7,7 @@ use App\Models\Opportunity;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
@@ -32,6 +33,7 @@ use Relaticle\EmailIntegration\Services\RecordCommunicationMetrics;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 mutates(
+    LinkEmailAction::class,
     LinkEmailToRecord::class,
     UnlinkEmailFromRecord::class,
     PrepareEmailRecordLink::class,
@@ -247,6 +249,45 @@ it('leaves undelivered copies of the conversation off the record and out of its 
     expect(linkSource($queued, $this->company))->toBeNull()
         ->and($this->company->fresh()->email_count)->toBe(1);
 });
+
+it('takes a suppressed link off the email when sync linking finds both', function (): void {
+    $email = linkingEmail($this->owner);
+    $email->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
+    $this->company->forceFill(['email_count' => 1, 'inbound_email_count' => 1])->saveQuietly();
+    EmailLinkSuppression::factory()->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'email_id' => $email->getKey(),
+        'emailable_type' => $this->company->getMorphClass(),
+        'emailable_id' => $this->company->getKey(),
+    ]);
+
+    resolve(LinkEmailAction::class)->reapply($email->fresh());
+
+    expect(linkSource($email, $this->company))->toBeNull()
+        ->and($this->company->fresh()->email_count)->toBe(0);
+});
+
+it('waits for the conversation lock before it changes links', function (Closure $change): void {
+    $email = linkingEmail($this->owner);
+    config(['database.connections.conversation_lock' => config('database.connections.'.config('database.default'))]);
+    $holder = DB::connection('conversation_lock');
+    $holder->beginTransaction();
+    $holder->select('select pg_advisory_xact_lock(hashtext(?))', [$this->workspace->getKey().':airbnb-renewal']);
+    DB::statement("set local lock_timeout = '200ms'");
+
+    try {
+        expect(fn (): mixed => $change($this->owner, $email, $this->company))->toThrow(QueryException::class, 'lock timeout');
+    } finally {
+        $holder->rollBack();
+        DB::purge('conversation_lock');
+    }
+
+    expect(linkSource($email, $this->company))->toBeNull();
+})->with([
+    'link' => fn (User $user, Email $email, Company $company): mixed => resolve(LinkEmailToRecord::class)->execute($user, $email, $company),
+    'unlink' => fn (User $user, Email $email, Company $company): mixed => resolve(UnlinkEmailFromRecord::class)->execute($user, $email, $company),
+    'sync linking' => fn (User $user, Email $email): mixed => resolve(LinkEmailAction::class)->reapply($email),
+]);
 
 function linkingPage(Email $email): mixed
 {
