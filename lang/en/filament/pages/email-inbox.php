@@ -345,6 +345,7 @@ return [
             'exists_heading' => ':name already has this address',
             'exists_description' => 'Link the conversations from :address to :name instead of creating a second person.',
             'link_to' => 'Link to :name',
+            'kept_removed' => '{1}One conversation you removed from :name earlier stays removed.|[2,*]:count conversations you removed from :name earlier stay removed.',
         ],
         'link_existing' => [
             'label' => 'Link to existing',

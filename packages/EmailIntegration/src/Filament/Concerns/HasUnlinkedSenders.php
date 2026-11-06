@@ -17,6 +17,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Support\Enums\Width;
 use Illuminate\Contracts\Pagination\CursorPaginator;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Livewire\Attributes\Computed;
 use Relaticle\EmailIntegration\Actions\ApplyEmailLinkChanges;
 use Relaticle\EmailIntegration\Actions\LinkEmailToRecord;
@@ -99,7 +100,7 @@ trait HasUnlinkedSenders
                 ? __('filament/pages/email-inbox.unlinked_senders.create_person.exists_heading', ['name' => $holder->name])
                 : __('filament/pages/email-inbox.unlinked_senders.create_person.heading'))
             ->modalDescription(fn (array $arguments): string => ($holder = $this->senderHolder($arguments)) instanceof People
-                ? __('filament/pages/email-inbox.unlinked_senders.create_person.exists_description', ['name' => $holder->name, 'address' => (string) ($arguments['address'] ?? '')])
+                ? $this->senderHolderDescription((string) ($arguments['address'] ?? ''), $holder)
                 : '')
             ->modalWidth(Width::Medium)
             ->modalSubmitActionLabel(fn (array $arguments): string => ($holder = $this->senderHolder($arguments)) instanceof People
@@ -147,21 +148,53 @@ trait HasUnlinkedSenders
         return once(fn (): ?People => resolve(PersonEmailMatcher::class)->firstMatching($address, $workspaceId));
     }
 
+    private function senderHolderDescription(string $address, People $holder): string
+    {
+        $description = __('filament/pages/email-inbox.unlinked_senders.create_person.exists_description', ['name' => $holder->name, 'address' => $address]);
+        $kept = $this->senderLinkPlan(EmailAddress::canonicalize($address), $holder)['kept_removed'];
+
+        return $kept === 0
+            ? $description
+            : $description.' '.trans_choice('filament/pages/email-inbox.unlinked_senders.create_person.kept_removed', $kept, ['count' => $kept, 'name' => $holder->name]);
+    }
+
     private function linkSenderConversationsTo(string $address, People $person): void
+    {
+        resolve(ApplyEmailLinkChanges::class)->execute($this->authUser(), $this->senderLinkPlan($address, $person)['pairs'], resolve(LinkEmailToRecord::class));
+
+        $this->afterSenderPersonSaved(__('filament/pages/email-inbox.drawer.links.notifications.linked', ['name' => $person->name]));
+    }
+
+    /**
+     * The sender's conversations to link, minus those the user earlier removed from the person: an unlink stays.
+     *
+     * @return array{pairs: list<array{email: Email, record: People}>, kept_removed: int}
+     */
+    private function senderLinkPlan(string $address, People $person): array
     {
         $user = $this->authUser();
         $keys = resolve(UnlinkedSendersQuery::class)->conversationKeys($user, $address, self::SENDER_LINK_LIMIT);
-        $copyIds = resolve(ConversationsQuery::class)->reachedCopies($user, $keys)->unique('conversation_key')->pluck('id')->all();
-        $pairs = Email::query()->whereKey($copyIds)->get()
-            ->map(fn (Email $email): array => ['email' => $email, 'record' => $person])
-            ->values()
+        $removed = Email::query()
+            ->withoutGlobalScopes()
+            ->where('emails.workspace_id', $user->current_workspace_id)
+            ->whereIn('emails.conversation_key', $keys)
+            ->whereExists(fn (QueryBuilder $suppression): QueryBuilder => $suppression
+                ->from('email_link_suppressions')
+                ->whereColumn('email_link_suppressions.email_id', 'emails.id')
+                ->where('email_link_suppressions.emailable_type', $person->getMorphClass())
+                ->where('email_link_suppressions.emailable_id', $person->getKey())
+                ->where('email_link_suppressions.user_id', $user->getKey()))
+            ->distinct()
+            ->pluck('emails.conversation_key')
             ->all();
+        $copyIds = resolve(ConversationsQuery::class)->reachedCopies($user, array_values(array_diff($keys, $removed)))->unique('conversation_key')->pluck('id')->all();
 
-        $pairs = array_values($pairs);
-
-        resolve(ApplyEmailLinkChanges::class)->execute($user, $pairs, resolve(LinkEmailToRecord::class));
-
-        $this->afterSenderPersonSaved(__('filament/pages/email-inbox.drawer.links.notifications.linked', ['name' => $person->name]));
+        return [
+            'pairs' => array_values(Email::query()->whereKey($copyIds)->get()
+                ->map(fn (Email $email): array => ['email' => $email, 'record' => $person])
+                ->all()),
+            'kept_removed' => count($removed),
+        ];
     }
 
     protected function linkSenderToPersonAction(): Action
