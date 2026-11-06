@@ -1411,6 +1411,10 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         }
 
+        if (! $step->needsOwnApproval()) {
+            return;
+        }
+
         if ($plan->unmetDependencies($step, $plan->steps($step)) !== []) {
             $this->reportResolveFailure($step, __('Approve the earlier step this one links to first.'));
 
@@ -1468,6 +1472,10 @@ final class ProposalCard extends BaseLivewireComponent
         if (! $step instanceof PendingAction) {
             $this->reportLapsedStep($stepId);
 
+            return;
+        }
+
+        if (! $step->needsOwnApproval()) {
             return;
         }
 

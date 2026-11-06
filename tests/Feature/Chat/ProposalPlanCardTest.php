@@ -68,46 +68,19 @@ describe('plan card', function (): void {
             ->and(Task::query()->where('title', 'Call Priya')->exists())->toBeTrue();
     });
 
-    it('refuses a step whose dependency is still pending', function (): void {
+    it('refuses to decide one step of a plan on its own', function (string $method): void {
         Bus::fake();
-        [$company, $person] = ProposalCardFixture::planSteps($this->user);
+        [$company, $person, $task] = ProposalCardFixture::planSteps($this->user);
 
         Livewire::test(ProposalCard::class)
             ->call('setActive', $company->getKey())
-            ->call('approveStep', $person->getKey())
-            ->assertHasErrors('resolve');
+            ->call($method, $person->getKey())
+            ->assertHasNoErrors();
 
         expect(People::query()->count())->toBe(0)
-            ->and($person->refresh()->status)->toBe(PendingActionStatus::Pending);
-    });
-
-    it('approves one step and keeps the rest waiting', function (): void {
-        Bus::fake();
-        [$company, $person, $task] = ProposalCardFixture::planSteps($this->user);
-
-        Livewire::test(ProposalCard::class)
-            ->call('setActive', $company->getKey())
-            ->call('approveStep', $company->getKey())
-            ->assertHasNoErrors();
-
-        expect(Company::query()->where('name', 'Northwind Traders')->exists())->toBeTrue()
-            ->and($person->refresh()->status)->toBe(PendingActionStatus::Pending)
-            ->and($task->refresh()->status)->toBe(PendingActionStatus::Pending);
-    });
-
-    it('cancels the dependent steps when one is rejected', function (): void {
-        Bus::fake();
-        [$company, $person, $task] = ProposalCardFixture::planSteps($this->user);
-
-        Livewire::test(ProposalCard::class)
-            ->call('setActive', $company->getKey())
-            ->call('rejectStep', $person->getKey())
-            ->assertHasNoErrors();
-
-        expect($person->refresh()->status)->toBe(PendingActionStatus::Rejected)
-            ->and($task->refresh()->status)->toBe(PendingActionStatus::Rejected)
-            ->and($company->refresh()->status)->toBe(PendingActionStatus::Pending);
-    });
+            ->and([$company->refresh()->status, $person->refresh()->status, $task->refresh()->status])
+            ->each->toBe(PendingActionStatus::Pending);
+    })->with(['approveStep', 'rejectStep']);
 
     it('discards the whole plan without writing anything', function (): void {
         Bus::fake();

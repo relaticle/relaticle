@@ -458,7 +458,7 @@ it('does not open the web for a resume whose only approval was a note', function
     $note->handle(new ToolRequest(['records' => [['title' => 'Filaforms brief']]]));
     $noteStep = PendingAction::query()->where('entity_type', ProposalEntity::Note)->sole();
 
-    openWebAccessDock($noteStep)->call('approveStep', (string) $noteStep->getKey())->assertHasNoErrors();
+    openWebAccessDock($noteStep)->call('createCurrent')->assertHasNoErrors();
 
     expect(webToolClasses(runQueuedResume()))->toBe([RequestWebAccessTool::class]);
 });
@@ -489,7 +489,7 @@ it('does not open the web from another user\'s allowed request on the same turn'
         'expires_at' => now()->addMinutes(15),
     ]);
 
-    openWebAccessDock($noteStep)->call('approveStep', (string) $noteStep->getKey())->assertHasNoErrors();
+    openWebAccessDock($noteStep)->call('createCurrent')->assertHasNoErrors();
 
     expect(webToolClasses(runQueuedResume()))->toBe([RequestWebAccessTool::class]);
 });
@@ -528,7 +528,7 @@ it('grants the web only to the turn whose request was allowed, not a later resum
     $note->handle(new ToolRequest(['records' => [['title' => 'Filaforms brief']]]));
     $noteStep = PendingAction::query()->where('entity_type', ProposalEntity::Note)->sole();
 
-    openWebAccessDock($noteStep)->call('approveStep', (string) $noteStep->getKey())->assertHasNoErrors();
+    openWebAccessDock($noteStep)->call('createCurrent')->assertHasNoErrors();
 
     expect(webToolClasses(runQueuedResume()))->toBe([RequestWebAccessTool::class]);
 });
