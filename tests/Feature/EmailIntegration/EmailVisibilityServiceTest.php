@@ -14,7 +14,9 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailVisibilityEnforcement;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Models\Meeting;
+use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleMeetingScope;
 use Relaticle\EmailIntegration\Models\WorkspaceEmailBlocklist;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
@@ -379,4 +381,38 @@ it('never shows a teammate a private copy while another copy is shared', functio
 
     expect($picked)->toHaveCount(1)
         ->and($picked->first()->getKey())->toBe($subject->getKey());
+});
+
+it('never lists a private teammate copy to a member who holds a copy with the same message id', function (): void {
+    $viewer = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+    $this->workspace->users()->attach($viewer, ['role' => 'member']);
+
+    $private = copyOfMessage($this->user, $this->workspace, EmailPrivacyTier::PRIVATE, now());
+    $held = copyOfMessage($viewer, $this->workspace, EmailPrivacyTier::METADATA_ONLY, now()->subHour());
+
+    $visible = Email::query()->withGlobalScope('visible', new VisibleEmailScope($viewer))->pluck('id');
+
+    expect($visible->all())->toContain($held->getKey())
+        ->not->toContain($private->getKey());
+});
+
+it('never lists a private teammate copy through a share made on another copy', function (): void {
+    $alice = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+    $viewer = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+    $this->workspace->users()->attach([$alice->id => ['role' => 'member'], $viewer->id => ['role' => 'member']]);
+
+    $private = copyOfMessage($this->user, $this->workspace, EmailPrivacyTier::PRIVATE, now());
+    $shared = copyOfMessage($alice, $this->workspace, EmailPrivacyTier::METADATA_ONLY, now()->subHour());
+
+    EmailShare::factory()->tier(EmailPrivacyTier::FULL)->create([
+        'workspace_id' => $this->workspace->id,
+        'email_id' => $shared->getKey(),
+        'shared_by' => $alice->id,
+        'shared_with' => $viewer->id,
+    ]);
+
+    $visible = Email::query()->withGlobalScope('visible', new VisibleEmailScope($viewer))->pluck('id');
+
+    expect($visible->all())->toContain($shared->getKey())
+        ->not->toContain($private->getKey());
 });
