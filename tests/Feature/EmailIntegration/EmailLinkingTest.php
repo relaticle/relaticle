@@ -7,6 +7,7 @@ use App\Models\Opportunity;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -313,6 +314,18 @@ it('changes the counts by only what an unlink took off', function (Closure $reti
     'deleted email' => fn (Email $email): mixed => $email->delete(),
     'disconnected mailbox' => fn (Email $email): mixed => ConnectedAccount::query()->whereKey($email->connected_account_id)->sole()->delete(),
 ]);
+
+it('reads the named record once while it counts every view of the record', function (): void {
+    resolve(LinkEmailToRecord::class)->execute($this->owner, linkingEmail($this->owner), $this->company);
+    $reads = 0;
+    DB::listen(function (QueryExecuted $query) use (&$reads): void {
+        $reads += (int) str_contains($query->sql, 'from "companies"');
+    });
+
+    resolve(ConversationsQuery::class)->counts($this->owner, ConversationFilters::forRecord($this->company));
+
+    expect($reads)->toBe(1);
+});
 
 function linkingPage(Email $email): mixed
 {

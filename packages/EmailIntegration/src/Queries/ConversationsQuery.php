@@ -470,6 +470,17 @@ final readonly class ConversationsQuery
     /** @param  Builder<Email>  $query */
     private function whereLinkedTo(Builder $query, User $viewer, CrmEntity $type, ConversationFilters $filters): void
     {
+        // One named record is its tab's mail, opportunity window included; a set matches stored links that no one removed.
+        if (count($filters->recordIds) === 1) {
+            $record = $this->namedRecord($type, (string) $viewer->current_workspace_id, $filters->recordIds[0]);
+
+            $record instanceof Company || $record instanceof People || $record instanceof Opportunity
+                ? $query->onRecord($record)
+                : $query->whereRaw('false');
+
+            return;
+        }
+
         $model = $type->model();
         $records = $model::query()
             ->withoutGlobalScope(WorkspaceScope::class)
@@ -481,18 +492,17 @@ final readonly class ConversationsQuery
                 ->orderBy((new $model)->getQualifiedKeyName())
                 ->limit(CustomFieldFilterSchema::MAX_LIST_VALUES));
 
-        // One named record is its tab's mail, opportunity window included; a set matches stored links that no one removed.
-        if (count($filters->recordIds) === 1) {
-            $record = $records->first();
-
-            $record instanceof Company || $record instanceof People || $record instanceof Opportunity
-                ? $query->onRecord($record)
-                : $query->whereRaw('false');
-
-            return;
-        }
-
         $query->onRecords($type->value, $records->select((new $model)->getQualifiedKeyName())->toBase());
+    }
+
+    // A page reads its counts and rows through this filter many times, so the record is read once per query instance.
+    private function namedRecord(CrmEntity $type, string $workspaceId, string $recordId): ?Model
+    {
+        return once(fn (): ?Model => $type->model()::query()
+            ->withoutGlobalScopes([WorkspaceScope::class, SoftDeletingScope::class])
+            ->where('workspace_id', $workspaceId)
+            ->whereKey($recordId)
+            ->first());
     }
 
     /**
