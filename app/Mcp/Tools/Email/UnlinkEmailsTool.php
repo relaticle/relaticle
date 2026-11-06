@@ -19,7 +19,7 @@ use Relaticle\EmailIntegration\Actions\UnlinkEmailFromRecord;
 use Relaticle\EmailIntegration\Models\Email;
 
 #[Title('Unlink Emails')]
-#[Description('Take emails off a company, person or opportunity. The unlink covers every copy of the conversation the user can see, and no later sync puts it back on that record. The email itself is never deleted. Every pair is checked before anything is unlinked.')]
+#[Description('Take emails off a company, person or opportunity. The unlink covers the copies of the conversation the user holds or was given in full, and no later sync puts it back on that record. The email itself is never deleted. Every pair is checked before anything is unlinked, and a refused pair unlinks nothing.')]
 final class UnlinkEmailsTool extends Tool
 {
     use LinksEmailsToRecords;

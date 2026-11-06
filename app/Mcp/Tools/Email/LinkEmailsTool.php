@@ -19,7 +19,7 @@ use Relaticle\EmailIntegration\Actions\LinkEmailToRecord;
 use Relaticle\EmailIntegration\Models\Email;
 
 #[Title('Link Emails')]
-#[Description('Put emails on a company, person or opportunity, so each conversation shows on that record. The link covers every copy of the conversation the user can see and stays through every later sync. Every pair is checked before anything is linked.')]
+#[Description('Put emails on a company, person or opportunity, so each conversation shows on that record. The link covers the copies of the conversation the user holds or was given in full, and stays through every later sync. Every pair is checked before anything is linked, and a refused pair links nothing.')]
 final class LinkEmailsTool extends Tool
 {
     use LinksEmailsToRecords;

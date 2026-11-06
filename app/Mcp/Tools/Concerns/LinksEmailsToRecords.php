@@ -11,6 +11,7 @@ use App\Models\People;
 use App\Models\User;
 use Closure;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -85,12 +86,16 @@ trait LinksEmailsToRecords
             $pairs[] = [...$pair, 'link' => $link];
         }
 
-        $items = [];
+        $items = DB::transaction(function () use ($pairs, $apply, $user, $linkedAfter): array {
+            $items = [];
 
-        foreach ($pairs as ['email' => $email, 'record' => $record, 'link' => $link]) {
-            $apply($user, $email, $record);
-            $items[] = [...$link, 'linked' => $linkedAfter];
-        }
+            foreach ($pairs as ['email' => $email, 'record' => $record, 'link' => $link]) {
+                $apply($user, $email, $record);
+                $items[] = [...$link, 'linked' => $linkedAfter];
+            }
+
+            return $items;
+        });
 
         return Response::structured(['items' => $items]);
     }

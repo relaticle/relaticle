@@ -2197,6 +2197,21 @@ it('refuses to link a teammate email the caller sees below full and changes noth
     expect($company->emails()->count())->toBe(0);
 });
 
+it('links nothing when a pair is refused after every pair was checked', function (): void {
+    $own = ($this->emailFrom)($this->viewer);
+    $teammates = ($this->emailFrom)($this->coworker, ['privacy_tier' => EmailPrivacyTier::SUBJECT]);
+    $company = Company::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    RelaticleServer::actingAs($this->viewer)
+        ->tool(LinkEmailsTool::class, ['links' => [
+            ['email_id' => $own->id, 'record_type' => 'company', 'record_id' => $company->id],
+            ['email_id' => $teammates->id, 'record_type' => 'company', 'record_id' => $company->id],
+        ]])
+        ->assertHasErrors(['Only people who hold this conversation, or who were given full access to it, can change its records.']);
+
+    expect($company->emails()->count())->toBe(0);
+});
+
 it('lists the link tools only for a token that holds the draft grant', function (): void {
     expect(listedToolNames($this->viewer, ['read', 'update', 'email:read']))->not->toContain('link-emails-tool', 'unlink-emails-tool')
         ->and(listedToolNames($this->viewer, ['read', 'update', 'email:draft']))->toContain('link-emails-tool', 'unlink-emails-tool');
