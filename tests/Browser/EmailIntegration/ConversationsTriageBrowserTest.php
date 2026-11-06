@@ -303,3 +303,65 @@ it('marks done from the reader a conversation the list does not show', function 
         ->assertPresent('[data-conversation="conv-linked"]')
         ->assertNoJavaScriptErrors();
 })->with(['inLightMode', 'inDarkMode']);
+
+it('keeps the selection bar over the list when the sidebar collapses', function (string $theme): void {
+    triageBrowserInbound($this->mailbox, 'conv-one', now()->subMinutes(10));
+    $edges = '(() => { const wrapper = document.querySelector("[data-triage-bar]").parentElement; const list = document.querySelector("[data-select-page]").closest("[x-data]"); return Math.abs(wrapper.getBoundingClientRect().left - list.getBoundingClientRect().left) < 1 })()';
+
+    loginViaBrowser($this->owner, $theme)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
+        ->click('[data-conversation="conv-one"] [data-select-conversation]')
+        ->assertVisible('[data-triage-bar]')
+        ->assertScript($edges, true)
+        ->assertScript('document.querySelector("[data-select-page]").closest("[x-data]").getBoundingClientRect().left > 100', true)
+        ->assertScript('Alpine.store("sidebar").close() || true')
+        ->wait(1)
+        ->assertScript('document.querySelector("[data-select-page]").closest("[x-data]").getBoundingClientRect().left < 100', true)
+        ->assertScript($edges, true)
+        ->assertNoJavaScriptErrors();
+})->with(['inLightMode', 'inDarkMode']);
+
+it('says the selection is already done when a bulk done changes nothing', function (string $theme): void {
+    triageBrowserInbound($this->mailbox, 'conv-one', now()->subMinutes(10));
+    triageBrowserInbound($this->mailbox, 'conv-two', now()->subMinutes(20));
+    foreach (['conv-one', 'conv-two'] as $key) {
+        EmailConversationState::factory()->create(['workspace_id' => $this->workspace->id, 'user_id' => $this->owner->id, 'conversation_key' => $key]);
+    }
+
+    loginViaBrowser($this->owner, $theme)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->navigate("/app/{$this->workspace->slug}/email?view=all")
+        ->click('[data-conversation="conv-one"] [data-select-conversation]')
+        ->click('[data-conversation="conv-two"] [data-select-conversation]')
+        ->keys('[data-conversation="conv-two"] [data-select-conversation]', 'e')
+        ->assertSee('2 conversations already marked Done.')
+        ->assertMissing('[data-triage-bar]')
+        ->assertMissing('[data-undo-action]')
+        ->assertNoJavaScriptErrors();
+
+    expect(EmailConversationState::query()->count())->toBe(2);
+})->with(['inLightMode', 'inDarkMode']);
+
+it('empties the search box on Escape and keeps the selection', function (string $theme): void {
+    triageBrowserInbound($this->mailbox, 'conv-one', now()->subMinutes(10));
+    $search = '[data-conversation-search] input';
+    $subject = Email::query()->where('conversation_key', 'conv-one')->value('subject');
+
+    loginViaBrowser($this->owner, $theme)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
+        ->click('[data-conversation="conv-one"] [data-select-conversation]')
+        ->assertVisible('[data-triage-bar]')
+        ->type($search, $subject)
+        ->wait(1.5)
+        ->assertPresent('[data-conversation="conv-one"]')
+        ->assertVisible('[data-triage-bar]')
+        ->keys($search, 'Escape')
+        ->wait(1)
+        ->assertValue($search, '')
+        ->assertVisible('[data-triage-bar]')
+        ->assertScript('document.querySelectorAll("[data-selected=true]").length', 1)
+        ->assertNoJavaScriptErrors();
+})->with(['inLightMode', 'inDarkMode']);

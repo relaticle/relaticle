@@ -43,7 +43,7 @@
                         .filter((registration) => registration.scope === group.scope)
                         .flatMap((registration) => registration.entries)
                         .filter((entry, index, entries) => entries.findIndex((other) => other.action === entry.action) === index)
-                        .map((entry) => ({ ...entry, keys: this.$store.shortcuts.liveKeys(entry) }))
+                        .map((entry) => ({ ...entry, label: entry.labels?.[group.scope] ?? entry.label, keys: this.$store.shortcuts.liveKeys(entry) }))
                         .filter((entry) => entry.keys.length > 0),
                 }))
                 .filter((group) => group.rows.length > 0)

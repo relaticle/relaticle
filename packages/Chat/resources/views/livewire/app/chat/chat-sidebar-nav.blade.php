@@ -32,6 +32,10 @@
             const path = target ? new URL(target.href).pathname : null;
             window.chatListKeyNavigation = path;
             document.addEventListener('livewire:navigated', () => {
+                if (location.pathname !== path) {
+                    window.chatListKeyNavigation = null;
+                    return;
+                }
                 let frames = 30;
                 const refocus = () => {
                     const link = Array.from(document.querySelectorAll('.fi-sidebar-chats a[wire\\:navigate]'))

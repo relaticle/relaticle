@@ -3,6 +3,10 @@
         'one' => trans_choice("filament/pages/email-inbox.triage.toast.{$verb}", 1),
         'other' => trans_choice("filament/pages/email-inbox.triage.toast.{$verb}", 2, ['count' => ':count']),
     ]]);
+    $unchanged = collect(['markDone', 'reopen', 'markRead', 'markUnread'])->mapWithKeys(fn (string $verb): array => [$verb => [
+        'one' => trans_choice("filament/pages/email-inbox.triage.toast.unchanged.{$verb}", 1),
+        'other' => trans_choice("filament/pages/email-inbox.triage.toast.unchanged.{$verb}", 2, ['count' => ':count']),
+    ]]);
 @endphp
 
 {{-- The newest action owns the toast, so a second one replaces the first and only its Undo remains. --}}
@@ -11,6 +15,7 @@
     data-undo-toast
     x-data="{
         verbs: @js($verbs),
+        unchanged: @js($unchanged),
         skippedText: @js(__('filament/pages/email-inbox.triage.toast.skipped')),
         undoHint: @js(__('filament/pages/email-inbox.triage.toast.undo_hint')),
         undoKeyHint: @js(__('filament/pages/email-inbox.triage.toast.undo_key_hint')),
@@ -46,10 +51,16 @@
                 return
             }
 
-            this.verb = applied > 0 ? verb : null
-            this.keys = outcome.applied
-            this.seen = seen ?? {}
-            this.text = parts.join(' ')
+            this.present(applied > 0 ? verb : null, outcome.applied, seen ?? {}, parts.join(' '))
+        },
+        showUnchanged({ verb, count }) {
+            this.present(null, [], {}, (count === 1 ? this.unchanged[verb].one : this.unchanged[verb].other).replace(':count', count))
+        },
+        present(verb, keys, seen, text) {
+            this.verb = verb
+            this.keys = keys
+            this.seen = seen
+            this.text = text
             this.announcement = this.verb ? `${this.text} ${this.$store.shortcuts?.keysFor('undo') ? this.undoKeyHint : this.undoHint}` : this.text
             this.visible = true
             clearTimeout(this.timer)
@@ -68,6 +79,7 @@
         },
     }"
     x-on:email-triage-done.window="show($event.detail)"
+    x-on:email-triage-unchanged.window="showUnchanged($event.detail)"
     x-on:email-selection-bar.window="lifted = $event.detail.shown"
 >
     <div aria-live="polite" class="sr-only" x-text="announcement"></div>

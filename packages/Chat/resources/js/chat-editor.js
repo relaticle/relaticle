@@ -125,7 +125,7 @@ export function chatEditor({ placeholder, onSubmit, onChange, onArrowUp, autofoc
             this.text = editor.getText();
 
             // A chat opened with j or k keeps focus on its sidebar link, so the next key moves on.
-            if (autofocus && ! window.chatListKeyNavigation) {
+            if (autofocus && window.chatListKeyNavigation !== location.pathname) {
                 this.$nextTick(() => document.activeElement?.closest('.fi-sidebar-chats') || editorByEl.get(this.editorEl)?.commands.focus('end'));
             }
         },

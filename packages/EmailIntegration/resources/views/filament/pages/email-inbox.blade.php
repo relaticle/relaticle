@@ -100,6 +100,8 @@
                 pending: 0,
                 renders: 0,
                 renderObserver: null,
+                layoutObserver: null,
+                observedDrawer: null,
                 focusedKey: null,
                 hoveredKey: null,
                 selected: [],
@@ -111,9 +113,10 @@
                     {{-- A server render shows the truth, so the optimistic overrides end there unless an action is still in flight. --}}
                     this.renderObserver = new MutationObserver(() => this.serverRendered())
                     this.renderObserver.observe(this.$root, { attributes: true, attributeFilter: ['data-rendered'] })
-                    this.placeBarListener = () => requestAnimationFrame(() => this.placeBar())
-                    window.addEventListener('resize', this.placeBarListener)
-                    window.addEventListener('pointerup', this.placeBarListener)
+                    {{-- The sidebar collapsing and the reader resizing move the list without a window resize. --}}
+                    this.layoutObserver = new ResizeObserver(() => requestAnimationFrame(() => this.placeBar()))
+                    this.layoutObserver.observe(this.$root)
+                    this.carrySelection()
 
                     const entries = this.entries
                     const reader = (action) => () => this.inReader(action)
@@ -153,8 +156,7 @@
                 },
                 destroy() {
                     this.renderObserver?.disconnect()
-                    window.removeEventListener('resize', this.placeBarListener)
-                    window.removeEventListener('pointerup', this.placeBarListener)
+                    this.layoutObserver?.disconnect()
                     this.$store.shortcuts?.unregister('email-list', this.registrations[0])
                     this.$store.shortcuts?.unregister('email-reader', this.registrations[1])
                 },
@@ -264,6 +266,17 @@
                 selectionOwnsKeys() {
                     return this.selected.length > 0 && ! document.activeElement?.closest('[data-email-reader]')
                 },
+                {{-- A search or filter builds a new list in the same view; the selection follows the rows it still shows. --}}
+                carrySelection() {
+                    const host = this.$root.closest('[wire\\:id]')
+                    const carried = host?.emailListSelection
+
+                    if (carried?.view === this.view) {
+                        this.selected = carried.selected.filter((key) => this.row(key))
+                    }
+
+                    this.$watch('selected', (selected) => host && (host.emailListSelection = { view: this.view, selected: [...selected] }))
+                },
                 escapeSelection(event) {
                     if (this.selected.length === 0 || event.target?.matches?.('input:not([type=checkbox]), textarea, [contenteditable=true]')) {
                         return false
@@ -282,9 +295,14 @@
                 },
                 async bulk(verb) {
                     const selection = [...this.selected]
-                    const keys = selection.filter((key) => ! this.isHidden(key) && this.needsChange(key, verb))
+                    const shown = selection.filter((key) => ! this.isHidden(key))
+                    const keys = shown.filter((key) => this.needsChange(key, verb))
 
                     this.clearSelection()
+
+                    if (keys.length === 0) {
+                        return shown.length > 0 && this.$dispatch('email-triage-unchanged', { verb, count: shown.length })
+                    }
 
                     if (! await this.act(verb, keys)) {
                         this.selected = selection.filter((key) => this.row(key))
@@ -293,6 +311,12 @@
                 placeBar() {
                     const drawer = document.querySelector('[data-email-reader]')
                     const list = this.$root.getBoundingClientRect()
+
+                    if (drawer && drawer !== this.observedDrawer) {
+                        this.observedDrawer && this.layoutObserver?.unobserve(this.observedDrawer)
+                        this.layoutObserver?.observe(drawer)
+                        this.observedDrawer = drawer
+                    }
                     const right = drawer?.offsetWidth > 0 ? window.innerWidth - drawer.offsetWidth : window.innerWidth
 
                     this.barFrame = { left: list.left, width: Math.max(0, right - list.left), covered: right - list.left < 320 }

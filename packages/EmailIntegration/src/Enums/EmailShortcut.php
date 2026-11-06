@@ -54,8 +54,12 @@ enum EmailShortcut: string
         };
     }
 
-    public function label(): string
+    public function label(?ShortcutScope $scope = null): string
     {
+        if ($this === self::Close && $scope === ShortcutScope::List) {
+            return __('filament/pages/email-inbox.shortcuts.labels.clear_selection');
+        }
+
         return __("filament/pages/email-inbox.shortcuts.labels.{$this->value}");
     }
 
@@ -98,13 +102,14 @@ enum EmailShortcut: string
         };
     }
 
-    /** @return list<array{keys: list<string>, scopes: list<string>, label: string, action: string, character: bool, editors: bool}> */
+    /** @return list<array{keys: list<string>, scopes: list<string>, label: string, labels: array<string, string>, action: string, character: bool, editors: bool}> */
     public static function forStore(): array
     {
         return array_map(fn (self $shortcut): array => [
             'keys' => $shortcut->keys(),
             'scopes' => array_map(fn (ShortcutScope $scope): string => $scope->value, $shortcut->scopes()),
             'label' => $shortcut->label(),
+            'labels' => array_column(array_map(fn (ShortcutScope $scope): array => [$scope->value, $shortcut->label($scope)], $shortcut->scopes()), 1, 0),
             'action' => $shortcut->action(),
             'character' => $shortcut->isCharacterKey(),
             'editors' => $shortcut->firesInEditors(),
