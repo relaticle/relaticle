@@ -213,6 +213,11 @@ The old full-width header and footer are gone; the `framed` flag went with them 
   `agent-browser set media light reduced-motion`.
 - Never animate an element out of `display: none`. Stack the two states in one grid cell and toggle
   `invisible` (WebKit skips or flashes the first frame otherwise).
+- An element whose classes Alpine sets renders its starting classes from the server, and the binding
+  uses object syntax (`:class="{ '...': on, '...': ! on }"`) so Alpine can also remove them. A
+  string `:class` never removes a server class. A bare `border` paints in `currentColor` until a colour
+  class lands, which is how the homepage tabs flashed dark borders on every load.
+  `PublicPagesTest` "renders the hero tabs in their first state before any script runs" pins them.
 
 ## Copy
 
