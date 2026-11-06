@@ -190,7 +190,7 @@ final class EmailInboxPage extends Page
     #[Renderless]
     public function markDone(array $keys): array
     {
-        return $this->triaged(resolve(MarkConversationsDone::class)->execute($this->authUser(), $keys));
+        return $this->triage(MarkConversationsDone::class, $keys);
     }
 
     /**
@@ -200,7 +200,7 @@ final class EmailInboxPage extends Page
     #[Renderless]
     public function reopen(array $keys): array
     {
-        return $this->triaged(resolve(ReopenConversations::class)->execute($this->authUser(), $keys));
+        return $this->triage(ReopenConversations::class, $keys);
     }
 
     /**
@@ -210,7 +210,7 @@ final class EmailInboxPage extends Page
     #[Renderless]
     public function markRead(array $keys): array
     {
-        return $this->triaged(resolve(MarkConversationsRead::class)->execute($this->authUser(), $keys));
+        return $this->triage(MarkConversationsRead::class, $keys);
     }
 
     /**
@@ -220,12 +220,23 @@ final class EmailInboxPage extends Page
     #[Renderless]
     public function markUnread(array $keys): array
     {
-        return $this->triaged(resolve(MarkConversationsUnread::class)->execute($this->authUser(), $keys));
+        return $this->triage(MarkConversationsUnread::class, $keys);
     }
 
-    /** @return array{applied: list<string>, skipped: list<array{reason: string, label: string, count: int}>} */
-    private function triaged(TriageOutcome $outcome): array
+    /**
+     * @param  class-string<MarkConversationsDone|ReopenConversations|MarkConversationsRead|MarkConversationsUnread>  $action
+     * @param  array<mixed>  $keys
+     * @return array{applied: list<string>, skipped: list<array{reason: string, label: string, count: int}>}
+     */
+    private function triage(string $action, array $keys): array
     {
+        if (! $this->showsConversations()) {
+            return new TriageOutcome([])->toArray();
+        }
+
+        // The default view follows the counts, so emptying Needs reply would otherwise switch the list to All.
+        $this->conversationView ??= $this->activeView;
+        $outcome = resolve($action)->execute($this->authUser(), $keys);
         unset($this->viewCounts, $this->conversations);
 
         return $outcome->toArray();

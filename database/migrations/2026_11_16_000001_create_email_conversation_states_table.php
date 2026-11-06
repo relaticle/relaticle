@@ -17,6 +17,7 @@ return new class extends Migration
             $table->foreignUlid('user_id')->constrained()->cascadeOnDelete();
             $table->string('conversation_key', 64);
             $table->timestamp('done_at');
+            $table->timestamp('done_through')->nullable();
             $table->timestamps();
 
             $table->unique(['workspace_id', 'user_id', 'conversation_key']);

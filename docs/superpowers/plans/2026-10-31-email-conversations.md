@@ -120,7 +120,7 @@ this table in the same PR.
 | 2 | `email_conversations` | `id` ULID, `workspace_id`, `conversation_key` (unique with workspace), `message_count`, `first_message_at`, `last_message_at`, `last_external_inbound_at` nullable, `last_member_outbound_at` nullable, `has_attachments`, `is_automated`, `created_at`, `updated_at` |
 | 4 | `emails.automated_reason` | `string(32)` nullable |
 | 4 | `automated_sender_overrides` | `id`, `workspace_id`, `email_address` (unique with workspace), `user_id`, `created_at` |
-| 7 | `email_conversation_states` | `id`, `workspace_id`, `user_id`, `conversation_key`, `done_at`, timestamps; unique `(workspace_id, user_id, conversation_key)`; model `EmailConversationState`; no job clears a row, a newer external inbound outranks it |
+| 7 | `email_conversation_states` | `id`, `workspace_id`, `user_id`, `conversation_key`, `done_at`, `done_through` (nullable snapshot of `last_external_inbound_at` at the mark), timestamps; unique `(workspace_id, user_id, conversation_key)`; model `EmailConversationState`; no job clears a row, a newer external inbound outranks it |
 | 7 | `users.single_key_shortcuts` | bool default true |
 | 8 | `emails.subject_search`, `emails.body_search` | `tsvector` nullable, GIN, trigger-maintained, `simple` config |
 | 9 | `email_link_suppressions` | `id`, `workspace_id`, `email_id` (cascade), `emailable_type`, `emailable_id`, `user_id`, `created_at`; unique `(email_id, emailable_type, emailable_id)` |
@@ -149,7 +149,7 @@ this table in the same PR.
 | 4 | `Relaticle\EmailIntegration\Enums\AutomatedReason` | cases `List`, `AutoSubmitted`, `Bulk`, `RoleSender`, `ProviderCategory` |
 | 4 | `Relaticle\EmailIntegration\Services\AutomatedMailDetector` | `detect(FetchedEmailData $data, string $workspaceId): ?AutomatedReason` |
 | 4 | `email:backfill-automated-reasons` | command |
-| 5, 7 | `Relaticle\EmailIntegration\Enums\ConversationView` | `NeedsReply`, `AwaitingReply`, `All`, `Unlinked`, `Automated`, `Done` (PR 7: a secondary tab, automated excluded, ordered like every view by `last_message_at desc, id desc` so the cursor holds); Needs reply excludes conversations Done for the viewer, Done while `done_at >= last_external_inbound_at` or no external inbound exists |
+| 5, 7 | `Relaticle\EmailIntegration\Enums\ConversationView` | `NeedsReply`, `AwaitingReply`, `All`, `Unlinked`, `Automated`, `Done` (PR 7: a secondary tab, automated excluded, ordered like every view by `last_message_at desc, id desc` so the cursor holds); Needs reply excludes conversations Done for the viewer, Done while `last_external_inbound_at <= done_through` or no external inbound exists (send times sync late, so the mark's own timestamp is never compared) |
 | 5, 8 | `Relaticle\EmailIntegration\Data\ConversationFilters` | plain `final readonly` data: `mailboxIds`, `direction`, `hasAttachment`, `sentAfter` (inclusive), `sentBefore`, `recordType` with `recordIds` or `recordName`, `categories`, `from`, `to`, `search`; PR 8 adds `fromTree(array, string $viewerZone)`, `withTyped(string, string $viewerZone)`, `toTree()` |
 | 5 | `Relaticle\EmailIntegration\Data\ConversationPage` | plain `final readonly` data: `list<ConversationRow> $rows`, `?string $nextCursor`, `?string $previousCursor` |
 | 5 | `Relaticle\EmailIntegration\Data\ConversationRow` | plain `final readonly` data, fields per spec plus `ownerName`, `senderNames`, `viewerHasPendingRequest`; `access` is an `EmailPrivacyTier`; count and time come from the viewer's visible copies, never the summary row |

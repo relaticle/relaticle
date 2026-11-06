@@ -326,7 +326,7 @@ final readonly class ConversationsQuery
             ->where('emails.user_id', $viewer->getKey());
     }
 
-    // Done holds until an external message newer than the mark arrives, so no job ever clears a state row.
+    // Done holds until the conversation's newest external message is newer than the one the mark saw, so no job clears a row.
     private function doneFor(User $viewer): BaseBuilder
     {
         return DB::table('email_conversation_states')
@@ -335,7 +335,7 @@ final readonly class ConversationsQuery
             ->where('email_conversation_states.user_id', $viewer->getKey())
             ->where(fn (BaseBuilder $current): BaseBuilder => $current
                 ->whereNull('email_conversations.last_external_inbound_at')
-                ->orWhereColumn('email_conversation_states.done_at', '>=', 'email_conversations.last_external_inbound_at'));
+                ->orWhereColumn('email_conversations.last_external_inbound_at', '<=', 'email_conversation_states.done_through'));
     }
 
     /**

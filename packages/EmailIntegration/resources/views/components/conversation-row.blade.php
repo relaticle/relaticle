@@ -31,8 +31,10 @@
     @if ($current) aria-current="true" @endif
     @if ($triage)
         x-bind:hidden="isHidden(@js($row->conversationKey))"
-        x-bind:data-unread="flag(@js($row->conversationKey), 'unread', @js($row->isUnread))"
-        x-bind:data-done="flag(@js($row->conversationKey), 'done', @js($row->isDone))"
+        data-server-unread="{{ $row->isUnread ? 'true' : 'false' }}"
+        data-server-done="{{ $row->isDone ? 'true' : 'false' }}"
+        x-bind:data-unread="flag(@js($row->conversationKey), 'unread')"
+        x-bind:data-done="flag(@js($row->conversationKey), 'done')"
     @endif
     {{ $attributes->class([
         'group/row relative flex w-full items-start gap-2 px-4 py-3 transition-colors sm:px-6',

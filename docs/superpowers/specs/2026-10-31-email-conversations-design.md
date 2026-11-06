@@ -205,9 +205,13 @@ Per-user Done (D10). Read state stays in `email_reads`.
 | `user_id` | ULID FK |
 | `conversation_key` | `string(64)` |
 | `done_at` | timestamp |
+| `done_through` | timestamp, nullable: the conversation's `last_external_inbound_at` when it was marked |
 
-Unique `(workspace_id, user_id, conversation_key)`. A conversation is Done for a user while
-`done_at >= last_external_inbound_at`. A new inbound message brings it back with no job.
+Unique `(workspace_id, user_id, conversation_key)`. A conversation is Done for a user while it
+has no external inbound message or `last_external_inbound_at <= done_through`. The snapshot,
+not `done_at`, is compared, because `last_external_inbound_at` is a send time: a reply sent
+before the mark but synced after it still brings the conversation back. A new inbound message
+brings it back with no job.
 
 ### `email_link_suppressions` (new)
 

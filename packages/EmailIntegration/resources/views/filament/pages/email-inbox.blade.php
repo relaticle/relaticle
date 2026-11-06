@@ -93,15 +93,22 @@
         {{-- Keyed by what the list shows, so a new view, page or filter starts without the previous list's overrides. --}}
         <div
             wire:key="conversation-list-{{ $this->activeView->value }}-{{ $conversationsCursor }}-{{ hash('xxh128', serialize($this->conversationFilters)) }}"
+            data-rendered="{{ hrtime(true) }}"
             x-data="{
                 view: @js($this->activeView->value),
                 overrides: {},
                 pending: 0,
+                renders: 0,
+                renderObserver: null,
                 focusedKey: null,
                 hoveredKey: null,
                 registrations: [],
                 entries: @js(\Relaticle\EmailIntegration\Enums\EmailShortcut::forStore()),
                 init() {
+                    {{-- A server render shows the truth, so the optimistic overrides end there unless an action is still in flight. --}}
+                    this.renderObserver = new MutationObserver(() => this.serverRendered())
+                    this.renderObserver.observe(this.$root, { attributes: true, attributeFilter: ['data-rendered'] })
+
                     const entries = this.entries
                     const reader = (action) => () => this.inReader(action)
 
@@ -137,7 +144,9 @@
                     ]
                 },
                 destroy() {
-                    ['email-list', 'email-reader'].forEach((name, index) => this.$store.shortcuts?.unregister(name, this.registrations[index]))
+                    this.renderObserver?.disconnect()
+                    this.$store.shortcuts?.unregister('email-list', this.registrations[0])
+                    this.$store.shortcuts?.unregister('email-reader', this.registrations[1])
                 },
                 row(key) {
                     return key ? this.$root.querySelector(`[data-conversation='${CSS.escape(key)}']`) : null
@@ -230,11 +239,20 @@
 
                     window.dispatchEvent(new CustomEvent('composer:reply', { detail: { emailId, mode } }))
                 },
-                isHidden(key) {
-                    return this.overrides[key]?.hidden === true
+                serverRendered() {
+                    if (this.pending === 0) {
+                        this.overrides = {}
+                    }
+
+                    this.renders++
                 },
-                flag(key, name, server) {
-                    return String(this.overrides[key]?.[name] ?? server)
+                isHidden(key) {
+                    return this.renders >= 0 && this.overrides[key]?.hidden === true
+                },
+                flag(key, name) {
+                    const server = this.renders >= 0 && this.row(key)?.getAttribute(`data-server-${name}`)
+
+                    return String(this.overrides[key]?.[name] ?? server === 'true')
                 },
                 effect(verb) {
                     return {
@@ -274,26 +292,31 @@
                     keys.forEach((key) => this.overrides[key] = { ...this.overrides[key], ...effect })
                     this.pending++
 
+                    let outcome
+
                     try {
-                        const outcome = await this.$wire.call(verb, keys)
-                        const applied = new Set(outcome.applied)
-
-                        keys.filter((key) => ! applied.has(key)).forEach((key) => this.restore(key, previous[key]))
-
-                        if (options.undoing && keys.some((key) => ! this.row(key))) {
-                            await this.$wire.refreshConversations()
-                        }
-
-                        if (! options.undoing) {
-                            this.$dispatch('email-triage-done', { verb, outcome })
-                        }
-
-                        await options.then?.()
+                        outcome = await this.$wire.call(verb, keys)
                     } catch (error) {
                         keys.forEach((key) => this.restore(key, previous[key]))
+
+                        return
                     } finally {
                         this.pending--
                     }
+
+                    const applied = new Set(outcome.applied)
+                    keys.filter((key) => ! applied.has(key)).forEach((key) => this.restore(key, previous[key]))
+
+                    if (! options.undoing) {
+                        this.$dispatch('email-triage-done', { verb, outcome })
+                    }
+
+                    {{-- The write has landed, so what follows renders from the server and never restores the rows. --}}
+                    if (options.undoing && keys.some((key) => ! this.row(key))) {
+                        await this.$wire.refreshConversations()
+                    }
+
+                    await options.then?.()
                 },
             }"
             x-on:email-triage.window="act($event.detail.verb, $event.detail.keys, $event.detail)"
