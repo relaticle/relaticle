@@ -121,7 +121,7 @@ this table in the same PR.
 | 4 | `emails.automated_reason` | `string(32)` nullable |
 | 4 | `automated_sender_overrides` | `id`, `workspace_id`, `email_address` (unique with workspace), `user_id`, `created_at` |
 | 7 | `email_conversation_states` | `id`, `workspace_id`, `user_id`, `conversation_key`, `done_at`, `done_through` (nullable: the earlier of the `last_external_inbound_at` the viewer's row showed and the summary's value at the mark, null when either is null; the factory sets `now()`), timestamps; unique `(workspace_id, user_id, conversation_key)`; model `EmailConversationState`; no job clears a row, a newer external inbound outranks it |
-| 7 | `users.single_key_shortcuts` | bool default true |
+| 7 | `users.single_key_shortcuts` | bool default true; written only by `App\Actions\User\UpdateKeyboardShortcuts::execute(User $user, bool $enabled): void` from the Profile toggle (`App\Livewire\App\Profile\UpdateKeyboardShortcuts`), which saves on change and updates `[data-single-key-shortcuts]` plus `$store.shortcuts.readPreference()` without a navigation |
 | 8 | `emails.subject_search`, `emails.body_search` | `tsvector` nullable, GIN, trigger-maintained, `simple` config |
 | 9 | `email_link_suppressions` | `id`, `workspace_id`, `email_id` (cascade), `emailable_type`, `emailable_id`, `user_id`, `created_at`; unique `(email_id, emailable_type, emailable_id)` |
 | 10 | `connected_accounts.health`, `health_reason`, `health_changed_at`, `health_notified_at` | `string(24)` default `healthy`, `string(64)` nullable, timestamps nullable |

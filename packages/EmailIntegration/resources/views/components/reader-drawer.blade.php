@@ -188,11 +188,12 @@
                                 color="gray"
                                 icon="ri-inbox-unarchive-line"
                                 data-reader-action="reopen"
+                                aria-label="{{ __('filament/pages/email-inbox.triage.actions.reopen') }}"
                                 x-bind:title="$store.shortcuts?.hint('done', {{ Js::from(__('filament/pages/email-inbox.triage.actions.reopen')) }})"
                                 x-bind:aria-keyshortcuts="$store.shortcuts?.keysFor('done')"
                                 x-on:click="window.dispatchEvent(new CustomEvent('email-triage', { detail: { verb: 'reopen', keys: {{ Js::from($triageKeys) }} } }))"
                             >
-                                {{ __('filament/pages/email-inbox.triage.actions.reopen') }}
+                                <span class="hidden sm:inline">{{ __('filament/pages/email-inbox.triage.actions.reopen') }}</span>
                             </x-filament::button>
                         @else
                             <x-filament::button
@@ -200,6 +201,7 @@
                                 color="gray"
                                 icon="ri-check-line"
                                 data-reader-action="done"
+                                aria-label="{{ __('filament/pages/email-inbox.triage.actions.done') }}"
                                 x-bind:title="$store.shortcuts?.hint('done', {{ Js::from(__('filament/pages/email-inbox.triage.actions.done')) }})"
                                 x-bind:aria-keyshortcuts="$store.shortcuts?.keysFor('done')"
                                 x-on:click="window.dispatchEvent(new CustomEvent('email-triage', { detail: {
@@ -208,7 +210,7 @@
                                     then: () => {{ Js::from($nextEmailId) }} ? leaveReader(() => $wire.selectEmail({{ Js::from($nextEmailId) }})) : closeReader(),
                                 } }))"
                             >
-                                {{ __('filament/pages/email-inbox.triage.actions.done') }}
+                                <span class="hidden sm:inline">{{ __('filament/pages/email-inbox.triage.actions.done') }}</span>
                             </x-filament::button>
                         @endif
 

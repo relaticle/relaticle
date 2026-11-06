@@ -26,6 +26,8 @@
         show() {
             this.returnTo = document.activeElement
             this.open = true
+            {{-- WebKit leaves focus outside when x-trap activates during the show transition. --}}
+            this.$nextTick(() => requestAnimationFrame(() => this.$refs.dialog.contains(document.activeElement) || this.$refs.close.focus()))
         },
         hide() {
             this.open = false
@@ -60,6 +62,7 @@
     >
         <div
             role="dialog"
+            x-ref="dialog"
             aria-modal="true"
             aria-labelledby="shortcut-sheet-heading"
             x-trap.noscroll="open"
@@ -73,6 +76,7 @@
                 </h2>
                 <button
                     type="button"
+                    x-ref="close"
                     x-on:click="hide()"
                     aria-label="{{ __('filament/pages/email-inbox.shortcuts.close') }}"
                     class="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-white/10 dark:hover:text-gray-200"
