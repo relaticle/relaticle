@@ -8,6 +8,11 @@ return [
 
     'limit_reached' => 'This field is full. Delete some content to keep writing.',
 
+    'checklist' => [
+        'item' => 'Checklist item: :item',
+        'empty_item' => 'Empty checklist item',
+    ],
+
     'selection_toolbar' => [
         'text_style' => 'Text style',
     ],
@@ -45,6 +50,10 @@ return [
             'orderedList' => [
                 'label' => 'Numbered list',
                 'description' => 'Create a list with numbering',
+            ],
+            'taskList' => [
+                'label' => 'Checklist',
+                'description' => 'Track steps with checkboxes',
             ],
             'blockquote' => [
                 'label' => 'Quote',

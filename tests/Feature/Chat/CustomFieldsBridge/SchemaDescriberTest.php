@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\CustomFields\CreateCustomField;
 use App\Enums\CrmEntity;
+use App\Enums\CustomFields\TaskField;
 use App\Enums\CustomFieldType;
 use App\Features\OnboardSeed;
 use App\Mcp\Resources\PeopleSchemaResource;
@@ -50,6 +51,19 @@ it('describes the system-seeded task custom fields with type hints', function ()
         ->toContain('"Done"')
         ->toContain('priority')
         ->toContain('description');
+});
+
+it('tells Rela that a task description takes checklist items and a note body does not', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $describer = resolve(CustomFieldsSchemaDescriber::class);
+
+    $descriptionLine = collect(explode("\n", $describer->describe($user->currentWorkspace, 'task')))
+        ->first(fn (string $line): bool => str_starts_with($line, '- description ('));
+    $bodyLine = collect(explode("\n", $describer->describe($user->currentWorkspace, 'note')))
+        ->first(fn (string $line): bool => str_starts_with($line, '- body ('));
+
+    expect($descriptionLine)->toContain(CustomFieldType::RICH_EDITOR->inputFormat().', '.TaskField::CHECKLIST_INPUT_FORMAT)
+        ->and($bodyLine)->not->toContain(TaskField::CHECKLIST_INPUT_FORMAT);
 });
 
 it('returns a stable, sorted listing so the description is cache-friendly', function (): void {

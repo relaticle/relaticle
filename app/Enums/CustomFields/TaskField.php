@@ -11,6 +11,8 @@ enum TaskField: string
 {
     public const string DONE_STATUS = 'Done';
 
+    public const string CHECKLIST_INPUT_FORMAT = 'markdown items "- [ ]" and "- [x]" become a checklist; read back as li[data-type="taskItem"] with data-checked="true" or "false"';
+
     use CustomFieldTrait;
 
     /**

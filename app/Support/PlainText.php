@@ -35,17 +35,14 @@ final readonly class PlainText
 
     public static function fromHtml(string $html): string
     {
-        $text = (string) preg_replace(self::BLOCK_BOUNDARY, ' ', $html);
-        $text = html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5);
-
-        return Str::squish(str_replace("\u{00A0}", ' ', $text));
+        return self::squished(self::markTaskItems($html));
     }
 
     public static function linesFromHtml(string $html): string
     {
-        return collect(preg_split(self::BLOCK_BOUNDARY, $html) ?: [])
+        return collect(preg_split(self::BLOCK_BOUNDARY, self::markTaskItems($html)) ?: [])
             ->flatMap(fn (string $block): array => explode("\n", $block))
-            ->map(self::fromHtml(...))
+            ->map(self::squished(...))
             ->filter(fn (string $line): bool => $line !== '')
             ->implode("\n");
     }
@@ -55,6 +52,34 @@ final readonly class PlainText
         $document = HTMLDocument::createFromString('<body>'.$html, LIBXML_NOERROR, 'UTF-8');
 
         return self::tidy(self::textOf($document->body));
+    }
+
+    private static function squished(string $html): string
+    {
+        $text = (string) preg_replace(self::BLOCK_BOUNDARY, ' ', $html);
+        $text = html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5);
+
+        return Str::squish(str_replace("\u{00A0}", ' ', $text));
+    }
+
+    private static function markTaskItems(string $html): string
+    {
+        if (! str_contains($html, 'taskItem')) {
+            return $html;
+        }
+
+        $document = HTMLDocument::createFromString('<body>'.$html, LIBXML_NOERROR, 'UTF-8');
+
+        foreach ($document->querySelectorAll(ChecklistHtml::ITEM) as $item) {
+            $item->prepend(self::taskMarker($item->matches(ChecklistHtml::CHECKED_ITEM)));
+        }
+
+        return $document->body->innerHTML;
+    }
+
+    private static function taskMarker(bool $checked): string
+    {
+        return $checked ? '[x] ' : '[ ] ';
     }
 
     private static function textOf(Node $parent): string
@@ -120,6 +145,11 @@ final readonly class PlainText
             }
 
             $marker = $list->localName === 'ol' ? (count($items) + 1).'. ' : '- ';
+
+            if ($child->matches(ChecklistHtml::ITEM)) {
+                $marker .= self::taskMarker($child->matches(ChecklistHtml::CHECKED_ITEM));
+            }
+
             $items[] = $marker.self::lines(self::textOf($child));
         }
 

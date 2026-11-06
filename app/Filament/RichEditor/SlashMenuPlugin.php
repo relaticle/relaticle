@@ -20,7 +20,7 @@ use function Filament\Support\generate_icon_html;
 final class SlashMenuPlugin implements RichContentPlugin
 {
     // List only shortcuts verified to fire: there is no code-fence input rule.
-    /** @var array<string, array{group: string, shortcut?: string, icon?: Heroicon}> */
+    /** @var array<string, array{group: string, shortcut?: string, icon?: Heroicon, optional?: bool}> */
     private const array ITEMS = [
         'h1' => ['group' => 'text', 'shortcut' => '#'],
         'h2' => ['group' => 'text', 'shortcut' => '##'],
@@ -29,6 +29,7 @@ final class SlashMenuPlugin implements RichContentPlugin
         'blockquote' => ['group' => 'text', 'shortcut' => '>'],
         'bulletList' => ['group' => 'lists', 'shortcut' => '-'],
         'orderedList' => ['group' => 'lists', 'shortcut' => '1.'],
+        'taskList' => ['group' => 'lists', 'shortcut' => '[ ]', 'optional' => true],
         'codeBlock' => ['group' => 'insert'],
         'table' => ['group' => 'insert'],
         'details' => ['group' => 'insert'],
@@ -50,7 +51,13 @@ final class SlashMenuPlugin implements RichContentPlugin
         $items = [];
 
         foreach (self::ITEMS as $name => $item) {
-            $tool = $tools[$name] ?? throw new LogicException("Slash menu item [{$name}] is not a rich editor tool.");
+            $tool = $tools[$name] ?? null;
+
+            if ($tool === null && ($item['optional'] ?? false)) {
+                continue;
+            }
+
+            throw_if($tool === null, LogicException::class, "Slash menu item [{$name}] is not a rich editor tool.");
 
             $items[] = [
                 'id' => $name,

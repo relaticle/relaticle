@@ -19,10 +19,13 @@ use App\Models\CustomFieldOption;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\ChecklistHtml;
+use App\Support\PlainText;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Infolists\Components\ImageEntry;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Size;
 use Filament\Support\Enums\Width;
@@ -35,6 +38,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\Flowforge\Board;
 use Relaticle\Flowforge\Column;
@@ -43,6 +47,7 @@ use Relaticle\Flowforge\Exceptions\CardMoveRejectedException;
 use Relaticle\Flowforge\Grouping;
 use Relaticle\Flowforge\Lane;
 use Relaticle\Flowforge\Modern\BoardResourcePage;
+use WeakMap;
 
 final class TasksBoard extends BoardResourcePage
 {
@@ -50,6 +55,9 @@ final class TasksBoard extends BoardResourcePage
     use KeepsOpenTaskInUrl;
 
     protected static string $resource = TaskResource::class;
+
+    /** @var WeakMap<Task, array{preview: string, progress: ?string}>|null */
+    private ?WeakMap $cardSummaries = null;
 
     public function getTitle(): string
     {
@@ -89,11 +97,7 @@ final class TasksBoard extends BoardResourcePage
             ->searchable(['title'])
             ->columns($this->getColumns())
             ->cardSchema(function (Schema $schema) use ($customFields): Schema {
-                $descriptionCustomField = $customFields->get('custom_fields.description')
-                    ?->columnSpanFull()
-                    ->visible(fn (?string $state): bool => filled($state))
-                    ->formatStateUsing(fn (string $state): string => str($state)->stripTags()->limit()->toString())
-                    ->extraAttributes(['class' => 'mb-4']);
+                $descriptionCustomField = $this->descriptionPreview($customFields->get('custom_fields.description'));
 
                 $priorityField = $customFields->get('custom_fields.priority')
                     ?->visible(fn (?string $state): bool => filled($state))
@@ -112,20 +116,14 @@ final class TasksBoard extends BoardResourcePage
                     ->formatStateUsing(fn (?string $state): string => $this->formatDueDateBadge($state));
 
                 return $schema
-                    ->inline()
                     ->gap(false)
                     ->components([
                         $descriptionCustomField,
                         CardFlex::make([
+                            $this->checklistProgressEntry(),
                             $priorityField,
                             $dueDateField,
-                            ImageEntry::make('assignees.profile_photo_url')
-                                ->hiddenLabel()
-                                ->alignLeft()
-                                ->imageHeight(20)
-                                ->circular()
-                                ->visible(fn (mixed $state): bool => filled($state))
-                                ->stacked(),
+                            $this->assigneeAvatarsEntry(),
                         ])->align('center'),
                     ]);
             })
@@ -137,6 +135,62 @@ final class TasksBoard extends BoardResourcePage
             ->filtersFormWidth(Width::Medium)
             ->filtersTriggerAction(fn (Action $action): Action => $action->button()->labeledFrom('sm')->size(Size::Small)->label(__('filament/pages/boards.filters_button.label')))
             ->headerToolbar();
+    }
+
+    private function assigneeAvatarsEntry(): ImageEntry
+    {
+        return ImageEntry::make('assignees.profile_photo_url')
+            ->hiddenLabel()
+            ->alignLeft()
+            ->imageHeight(20)
+            ->circular()
+            ->visible(fn (mixed $state): bool => filled($state))
+            ->stacked();
+    }
+
+    private function descriptionPreview(?TextEntry $entry): ?TextEntry
+    {
+        return $entry?->columnSpanFull()
+            ->html(false)
+            ->state(fn (Task $record): string => $this->cardSummary($record)['preview'])
+            ->visible(fn (?string $state): bool => filled($state))
+            ->extraAttributes(['class' => 'mb-4']);
+    }
+
+    /** @return array{preview: string, progress: ?string} */
+    private function cardSummary(Task $record): array
+    {
+        $this->cardSummaries ??= new WeakMap;
+
+        return $this->cardSummaries[$record] ??= $this->summarizeCard($record);
+    }
+
+    /** @return array{preview: string, progress: ?string} */
+    private function summarizeCard(Task $record): array
+    {
+        $field = $this->descriptionCustomField();
+        $description = $field instanceof CustomField ? $record->getCustomFieldValue($field) : null;
+        $description = is_string($description) ? $description : '';
+        $progress = ChecklistHtml::progress($description);
+
+        return [
+            'preview' => Str::limit(PlainText::fromHtml($description)),
+            'progress' => $progress === null ? null : "{$progress['checked']}/{$progress['total']}",
+        ];
+    }
+
+    private function checklistProgressEntry(): TextEntry
+    {
+        return TextEntry::make('checklist_progress')
+            ->label(__('filament/pages/boards.tasks.checklist_progress'))
+            ->hiddenLabel()
+            ->badge()
+            ->color('gray')
+            ->icon('heroicon-o-check-circle')
+            ->grow(false)
+            ->extraAttributes(['data-checklist-progress' => ''])
+            ->state(fn (Task $record): ?string => $this->cardSummary($record)['progress'])
+            ->visible(fn (?string $state): bool => filled($state));
     }
 
     /**
@@ -320,13 +374,26 @@ final class TasksBoard extends BoardResourcePage
         return $this->statuses()->contains(fn (array $status): bool => (string) $status['id'] === $id);
     }
 
+    private function descriptionCustomField(): ?CustomField
+    {
+        return self::cardCustomFields()->get(TaskCustomField::DESCRIPTION->value);
+    }
+
     private static function statusCustomField(): ?CustomField
     {
-        /** @var CustomField|null */
-        return once(fn () => CustomField::query()
+        return self::cardCustomFields()->get(TaskCustomField::STATUS->value);
+    }
+
+    /** @return Collection<string, CustomField> */
+    private static function cardCustomFields(): Collection
+    {
+        /** @var Collection<string, CustomField> */
+        return once(fn (): Collection => CustomField::query()
             ->forEntity(Task::class)
-            ->where('code', TaskCustomField::STATUS)
-            ->first());
+            ->whereIn('code', [TaskCustomField::STATUS, TaskCustomField::DESCRIPTION])
+            ->with('options')
+            ->get()
+            ->keyBy('code'));
     }
 
     /**

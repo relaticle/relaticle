@@ -51,5 +51,6 @@ return [
             'assignee' => 'Assignee',
             'unassigned' => 'Unassigned',
         ],
+        'checklist_progress' => 'Checklist progress',
     ],
 ];

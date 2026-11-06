@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 use App\Actions\Task\NotifyTaskAssignees;
 use App\Enums\WorkspaceRole;
+use App\Filament\CustomFields\RichEditorFieldType;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
+use App\Filament\RichEditor\ChecklistPlugin;
+use App\Filament\RichEditor\SlashMenuPlugin;
+use App\Filament\RichEditor\TaskItem;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Opportunity;
@@ -31,7 +35,14 @@ use Livewire\Livewire;
 
 use function Filament\Support\generate_icon_html;
 
-mutates(ManageTasks::class, NotifyTaskAssignees::class, TaskResource::class);
+mutates(
+    ManageTasks::class,
+    NotifyTaskAssignees::class,
+    TaskResource::class,
+    ChecklistPlugin::class,
+    TaskItem::class,
+    RichEditorFieldType::class,
+);
 
 beforeEach(function () {
     $this->user = User::factory()->withWorkspace()->create();
@@ -512,6 +523,95 @@ it('gives the task description the borderless document canvas', function (): voi
 
     expect($editor->getExtraAttributes())->toHaveKey('data-slash-menu')
         ->and($editor->getExtraAttributes()['class'])->toContain('fi-fo-rich-editor-seamless');
+});
+
+function taskResourceChecklistHtml(): string
+{
+    return '<ul data-type="taskList">'
+        .'<li data-checked="true" data-type="taskItem"><label><input type="checkbox" checked="checked"><span></span></label><div><p>Call Bob</p></div></li>'
+        .'<li data-checked="false" data-type="taskItem"><label><input type="checkbox"><span></span></label><div><p>Send quote</p></div></li>'
+        .'</ul><p>Notes</p><table><tbody><tr><td><p>Cell one</p></td><td><p>Cell two</p></td></tr></tbody></table>';
+}
+
+function taskResourceDescriptionField(): CustomField
+{
+    return CustomField::query()->where('entity_type', 'task')->where('code', 'description')->firstOrFail();
+}
+
+it('keeps a checklist and its ticks when a task is saved from the edit form', function (): void {
+    $record = Task::factory()->recycle([$this->user, $this->workspace])->create();
+    $record->saveCustomFieldValue(taskResourceDescriptionField(), taskResourceChecklistHtml());
+
+    livewire(ManageTasks::class)
+        ->callAction(TestAction::make('edit')->table($record), data: ['title' => 'Renamed'])
+        ->assertHasNoActionErrors();
+
+    $description = $record->fresh('customFieldValues.customField')->getCustomFieldValue(taskResourceDescriptionField());
+
+    expect(substr_count($description, 'data-checked="true"'))->toBe(1)
+        ->and(substr_count($description, 'data-checked="false"'))->toBe(1)
+        ->and($description)->toContain('Call Bob', 'Send quote', '<p>Notes</p>', '<table');
+});
+
+it('shows a viewer the checklist with its ticks', function (): void {
+    $viewer = User::factory()->create();
+    $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
+    $viewer->switchWorkspace($this->workspace);
+    $record = Task::factory()->recycle([$this->user, $this->workspace])->create();
+    $record->saveCustomFieldValue(taskResourceDescriptionField(), taskResourceChecklistHtml());
+
+    $this->actingAs($viewer);
+
+    $page = livewire(ManageTasks::class)
+        ->mountAction(TestAction::make('view')->table($record))
+        ->instance();
+
+    $editor = collect($page->getSchema($page->getMountedActionSchemaName())->getFlatComponents(withHidden: true))
+        ->first(fn (Component $component): bool => $component instanceof RichEditor);
+
+    expect($editor->getState())->toContain('data-checked="true"', 'Send quote');
+});
+
+it('offers the checklist in the task description slash menu', function (): void {
+    $page = livewire(ManageTasks::class)
+        ->mountAction('create')
+        ->instance();
+
+    $editor = collect($page->getSchema($page->getMountedActionSchemaName())->getFlatComponents(withHidden: true))
+        ->first(fn (Component $component): bool => $component instanceof RichEditor);
+
+    $menu = json_decode(base64_decode(SlashMenuPlugin::attributes($editor)['data-slash-menu']), associative: true);
+    $item = collect($menu['items'])->firstWhere('id', 'taskList');
+
+    expect($item)->not->toBeNull()
+        ->and($item['shortcut'])->toBe('[ ]')
+        ->and($item['group'])->toBe('Lists');
+});
+
+it('keeps the checklist and the document canvas out of a custom rich-text field on a task', function (): void {
+    CustomField::factory()->create([
+        'tenant_id' => $this->workspace->getKey(),
+        'entity_type' => 'task',
+        'code' => 'agenda',
+        'name' => 'Agenda',
+        'type' => 'rich-editor',
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+
+    $page = livewire(ManageTasks::class)
+        ->mountAction('create')
+        ->instance();
+
+    $agenda = collect($page->getSchema($page->getMountedActionSchemaName())->getFlatComponents(withHidden: true))
+        ->first(fn (Component $component): bool => $component instanceof RichEditor && str_ends_with($component->getStatePath(), 'agenda'));
+
+    $menu = json_decode(base64_decode(SlashMenuPlugin::attributes($agenda)['data-slash-menu']), associative: true);
+
+    expect(collect($menu['items'])->pluck('id')->all())->not->toContain('taskList')
+        ->and(collect($agenda->getPlugins())->contains(fn (object $plugin): bool => $plugin instanceof ChecklistPlugin))->toBeFalse()
+        ->and($agenda->getExtraAttributes()['class'] ?? '')->not->toContain('fi-fo-rich-editor-seamless');
 });
 
 it('groups tasks by a select custom field and titles each group with its option label', function (string $code): void {
