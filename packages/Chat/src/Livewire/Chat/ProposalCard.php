@@ -1137,6 +1137,7 @@ final class ProposalCard extends BaseLivewireComponent
     public function approvableRecordCount(): int
     {
         $count = 0;
+        $leftOutRows = $this->leftOutRowMap();
 
         foreach ($this->stepsStillIn() as $step) {
             if ($step->needsOwnApproval()) {
@@ -1146,7 +1147,7 @@ final class ProposalCard extends BaseLivewireComponent
             $stepId = (string) $step->getKey();
 
             $count += ProposalPayload::from($step)->isBatch
-                ? count(array_diff($this->unresolvedIndices($step), $this->leftOutRowMap()[$stepId] ?? []))
+                ? count(array_diff($this->unresolvedIndices($step), $leftOutRows[$stepId] ?? []))
                 : 1;
         }
 
@@ -1365,12 +1366,15 @@ final class ProposalCard extends BaseLivewireComponent
     {
         foreach (PendingAction::query()->whereKey($affectedIds)->orderBy('id')->get() as $step) {
             $stepId = (string) $step->getKey();
-            $items = is_array($step->result_data['items'] ?? null) ? $step->result_data['items'] : [];
+            $progress = ProposalProgress::for($step);
+            $receipts = null;
 
             foreach ($leftOutRows[$stepId] ?? [] as $index) {
-                if (($items[$index]['status'] ?? null) !== 'rejected') {
+                if ($progress->statusOf($index, '') !== 'rejected') {
                     continue;
                 }
+
+                $receipts ??= resolve(ProposalReceiptsQuery::class)->forStep($step);
 
                 $this->dispatch(
                     'proposal:resolved',
@@ -1379,7 +1383,7 @@ final class ProposalCard extends BaseLivewireComponent
                     decision: 'rejected',
                     finalized: false,
                     record: null,
-                    receipts: resolve(ProposalReceiptsQuery::class)->forStep($step),
+                    receipts: $receipts,
                     context: $this->context,
                 );
             }
