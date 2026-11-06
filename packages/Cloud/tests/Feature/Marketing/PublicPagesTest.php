@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Support\DetectsPublicMarkdownRequest;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Marketing\Http\Controllers\HomeController;
 use Relaticle\Cloud\Marketing\Http\Controllers\PrivacyPolicyController;
@@ -553,4 +554,16 @@ describe('Signup attribution', function () {
         expect($links[0])->not->toBeEmpty()
             ->each->toContain('referrerpolicy="no-referrer-when-downgrade"');
     })->with(['/', '/pricing', '/self-hosted', '/developers/mcp', 'a blog post']);
+});
+
+it('renders the hero tabs in their first state before any script runs', function (): void {
+    $html = $this->get('/')->assertOk()->getContent();
+
+    preg_match_all('/<button[^>]*id="tab-([a-z-]+)"[^>]*>/', $html, $tabs, PREG_SET_ORDER);
+
+    $classes = collect($tabs)->mapWithKeys(fn (array $tab): array => [$tab[1] => Str::between($tab[0], ' class="', '"')]);
+
+    expect($classes->keys()->all())->toBe(['ai-agent', 'pipeline', 'companies', 'custom-fields'])
+        ->and($classes['ai-agent'])->toContain('border-gray-200')
+        ->and($classes->except('ai-agent')->all())->each->toContain('border-transparent');
 });

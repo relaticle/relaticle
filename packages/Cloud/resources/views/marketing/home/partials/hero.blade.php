@@ -75,6 +75,9 @@
         </div>
 
         @php
+            $activeTabClasses = 'z-10 border-gray-200 bg-gray-100 text-gray-950 dark:border-white/[0.1] dark:bg-gray-900 dark:text-white';
+            $idleTabClasses = 'border-transparent text-gray-600 hover:text-gray-950 dark:text-gray-400 dark:hover:text-white';
+
             $heroTabs = [
                 'ai-agent' => [__('Ask'), __('Ask :name', ['name' => (string) config('chat.assistant_name')])],
                 'pipeline' => [__('Pipeline'), __('Pipeline')],
@@ -94,14 +97,16 @@
                         <button type="button"
                                 id="tab-{{ $id }}"
                                 role="tab"
+                                aria-selected="{{ $loop->first ? 'true' : 'false' }}"
+                                tabindex="{{ $loop->first ? 0 : -1 }}"
                                 :aria-selected="(activeTab === '{{ $id }}').toString()"
                                 :tabindex="activeTab === '{{ $id }}' ? 0 : -1"
                                 aria-controls="panel-{{ $id }}"
                                 x-ref="tab-{{ $id }}"
                                 x-on:click="switchTab('{{ $id }}')"
                                 x-on:keydown="handleTabKeydown($event)"
-                                :class="activeTab === '{{ $id }}' ? 'z-10 border-gray-200 bg-gray-100 text-gray-950 dark:border-white/[0.1] dark:bg-gray-900 dark:text-white' : 'border-transparent text-gray-600 hover:text-gray-950 dark:text-gray-400 dark:hover:text-white'"
-                                class="relative -mb-px cursor-pointer rounded-t-lg border border-b-0 px-3 py-2 text-xs font-medium transition-colors sm:px-5 sm:text-sm md:px-6 md:py-2.5 md:text-base">
+                                :class="{ @js($activeTabClasses): activeTab === '{{ $id }}', @js($idleTabClasses): activeTab !== '{{ $id }}' }"
+                                @class(['relative -mb-px cursor-pointer rounded-t-lg border border-b-0 px-3 py-2 text-xs font-medium transition-colors sm:px-5 sm:text-sm md:px-6 md:py-2.5 md:text-base', $loop->first ? $activeTabClasses : $idleTabClasses])>
                             <span class="sm:hidden">{{ $short }}</span><span class="hidden sm:inline">{{ $long }}</span>
                         </button>
                     @endforeach
