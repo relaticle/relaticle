@@ -960,14 +960,17 @@ final class ProposalCard extends BaseLivewireComponent
         try {
             $result = $plan->approveAll($anchor, $this->authUser(), $this->leftOutSteps, $leftOutRows);
         } catch (QueryException $exception) {
+            $this->announceLeftOut($affectedIds, $leftOutRows);
             $this->reportDatabaseFailure($anchor, $exception);
 
             return;
         } catch (TransportExceptionInterface $exception) {
+            $this->announceLeftOut($affectedIds, $leftOutRows);
             $this->reportDeliveryFailure($anchor, $exception);
 
             return;
         } catch (RuntimeException|ValidationException $exception) {
+            $this->announceLeftOut($affectedIds, $leftOutRows);
             $this->reportResolveFailure($anchor, ApprovalFailureMessage::for($exception));
 
             return;

@@ -556,6 +556,28 @@ describe('the change list', function (): void {
     });
 });
 
+it('still announces a left-out step it rejected when a later rejection fails', function (): void {
+    Bus::fake();
+    [$conversationId, $turnId] = ProposalCardFixture::startPlan($this->user);
+    $kept = ProposalCardFixture::planProposal(CreateCompanyTool::class, $conversationId, $turnId, [['name' => 'Kept Co']]);
+    $leftOut = ProposalCardFixture::planProposal(CreateCompanyTool::class, $conversationId, $turnId, [['name' => 'Left Out Co']]);
+    $lapsing = ProposalCardFixture::planProposal(CreateCompanyTool::class, $conversationId, $turnId, [['name' => 'Lapsing Co']]);
+
+    $card = Livewire::test(ProposalCard::class)
+        ->call('setActive', $kept->getKey())
+        ->call('toggleLeftOut', (string) $leftOut->getKey())
+        ->call('toggleLeftOut', (string) $lapsing->getKey());
+
+    $lapsing->update(['expires_at' => now()->subMinute()]);
+
+    $card->call('approveAll')
+        ->assertHasErrors('resolve')
+        ->assertDispatched('proposal:resolved', fn (string $name, array $params): bool => $params['pendingActionId'] === (string) $leftOut->getKey() && $params['decision'] === 'rejected');
+
+    expect($leftOut->refresh()->status)->toBe(PendingActionStatus::Rejected)
+        ->and(Company::query()->where('name', 'Kept Co')->exists())->toBeFalse();
+});
+
 it('broadcasts a full plan of batches small enough for Reverb, naming only the rows left out', function (): void {
     Bus::fake();
     Event::fake([PendingActionResolved::class]);
