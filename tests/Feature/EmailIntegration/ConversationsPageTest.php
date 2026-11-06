@@ -1271,3 +1271,22 @@ it('reopens a done conversation', function (): void {
     expect(conversationsPageViewKeys(ConversationView::NeedsReply))->toBe(['conv-pricing'])
         ->and(conversationsPageViewKeys(ConversationView::Done))->toBe([]);
 });
+
+it('returns the skipped count to the page', function (): void {
+    conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'brian@airbnb.test');
+    conversationsPageMessage($this->teammateMailbox, 'conv-private', 'olivia@stripe.test', ['privacy_tier' => EmailPrivacyTier::PRIVATE]);
+
+    livewire(EmailInboxPage::class)
+        ->assertSeeHtml('data-triage-action="markDone"')
+        ->call('markDone', ['conv-pricing', 'conv-private', 'conv-pricing'])
+        ->assertReturned([
+            'applied' => ['conv-pricing'],
+            'skipped' => [['reason' => TriageSkipReason::NotAvailable->value, 'label' => TriageSkipReason::NotAvailable->label(), 'count' => 1]],
+        ]);
+
+    expect(conversationsPageViewKeys(ConversationView::Done))->toBe(['conv-pricing']);
+
+    livewire(EmailInboxPage::class)
+        ->call('setView', ConversationView::All->value)
+        ->assertSeeHtml('data-message-count="1" data-done="true"');
+});

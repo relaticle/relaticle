@@ -7,6 +7,7 @@
     'row' => null,
     'adjacent' => null,
     'unavailable' => false,
+    'triage' => false,
 ])
 
 @php
@@ -167,6 +168,50 @@
                                 </button>
                             @endforeach
                         </div>
+                    @endif
+
+                    @if ($triage && filled($email->conversation_key))
+                        @php
+                            $triageKeys = [$email->conversation_key];
+                            $nextEmailId = ($adjacent['next'] ?? null)?->viewerCopyEmailId;
+                        @endphp
+
+                        @if ($row?->isDone)
+                            <x-filament::button
+                                size="sm"
+                                color="gray"
+                                icon="ri-inbox-unarchive-line"
+                                data-reader-action="reopen"
+                                x-on:click="window.dispatchEvent(new CustomEvent('email-triage', { detail: { verb: 'reopen', keys: {{ Js::from($triageKeys) }} } }))"
+                            >
+                                {{ __('filament/pages/email-inbox.triage.actions.reopen') }}
+                            </x-filament::button>
+                        @else
+                            <x-filament::button
+                                size="sm"
+                                color="gray"
+                                icon="ri-check-line"
+                                data-reader-action="done"
+                                x-on:click="window.dispatchEvent(new CustomEvent('email-triage', { detail: {
+                                    verb: 'markDone',
+                                    keys: {{ Js::from($triageKeys) }},
+                                    then: () => {{ Js::from($nextEmailId) }} ? leaveReader(() => $wire.selectEmail({{ Js::from($nextEmailId) }})) : closeReader(),
+                                } }))"
+                            >
+                                {{ __('filament/pages/email-inbox.triage.actions.done') }}
+                            </x-filament::button>
+                        @endif
+
+                        <button
+                            type="button"
+                            data-reader-action="mark-unread"
+                            x-on:click="window.dispatchEvent(new CustomEvent('email-triage', { detail: { verb: 'markUnread', keys: @js($triageKeys), then: () => closeReader() } }))"
+                            title="{{ __('filament/pages/email-inbox.triage.actions.mark_unread') }}"
+                            aria-label="{{ __('filament/pages/email-inbox.triage.actions.mark_unread') }}"
+                            class="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                        >
+                            <x-filament::icon icon="ri-mail-unread-line" class="h-4 w-4" />
+                        </button>
                     @endif
 
                     @if ($replyTarget !== null)

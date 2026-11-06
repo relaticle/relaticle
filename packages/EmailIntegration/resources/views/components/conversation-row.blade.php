@@ -1,4 +1,4 @@
-@props(['row', 'selectable' => false, 'current' => false])
+@props(['row', 'selectable' => false, 'current' => false, 'triage' => false])
 
 @php
     use Filament\Support\Facades\FilamentTimezone;
@@ -27,10 +27,15 @@
 @endphp
 
 <div
-    data-conversation="{{ $row->conversationKey }}" data-unread="{{ $row->isUnread ? 'true' : 'false' }}" data-message-count="{{ $row->messageCount }}"
+    data-conversation="{{ $row->conversationKey }}" data-unread="{{ $row->isUnread ? 'true' : 'false' }}" data-message-count="{{ $row->messageCount }}" data-done="{{ $row->isDone ? 'true' : 'false' }}"
     @if ($current) aria-current="true" @endif
+    @if ($triage)
+        x-bind:hidden="isHidden(@js($row->conversationKey))"
+        x-bind:data-unread="flag(@js($row->conversationKey), 'unread', @js($row->isUnread))"
+        x-bind:data-done="flag(@js($row->conversationKey), 'done', @js($row->isDone))"
+    @endif
     {{ $attributes->class([
-        'relative flex w-full items-start gap-2 px-4 py-3 transition-colors sm:px-6',
+        'group/row relative flex w-full items-start gap-2 px-4 py-3 transition-colors sm:px-6',
         'hover:bg-gray-50 dark:hover:bg-white/5' => $opens,
         'bg-gray-50 before:absolute before:inset-y-0 before:start-0 before:w-0.5 before:bg-primary-500 dark:bg-white/5' => $current,
     ]) }}
@@ -50,9 +55,7 @@
     @endif
 
     <span class="flex h-5 w-2 shrink-0 items-center justify-center">
-        @if ($row->isUnread)
-            <span role="img" aria-label="{{ __('filament/pages/email-inbox.conversation_row.unread') }}" class="size-2 rounded-full bg-primary-500"></span>
-        @endif
+        <span role="img" aria-label="{{ __('filament/pages/email-inbox.conversation_row.unread') }}" class="hidden size-2 rounded-full bg-primary-500 group-data-[unread=true]/row:block"></span>
     </span>
 
     <div class="pointer-events-none relative min-w-0 flex-1">
@@ -86,8 +89,7 @@
             <span class="min-w-0 flex-1 truncate text-sm leading-5">
                 <span @class([
                     'text-gray-400 dark:text-gray-500' => ! $row->access->showsSubject(),
-                    'font-semibold text-gray-900 dark:text-white' => $row->access->showsSubject() && $row->isUnread,
-                    'text-gray-700 dark:text-gray-300' => $row->access->showsSubject() && ! $row->isUnread,
+                    'text-gray-700 group-data-[unread=true]/row:font-semibold group-data-[unread=true]/row:text-gray-900 dark:text-gray-300 dark:group-data-[unread=true]/row:text-white' => $row->access->showsSubject(),
                 ])>{{ $subject }}</span>
                 @if ($snippet !== '')
                     <span class="hidden text-gray-500 sm:inline dark:text-gray-400">{{ $snippet }}</span>
@@ -95,6 +97,11 @@
             </span>
 
             <span class="flex shrink-0 items-center gap-1">
+                <span class="hidden items-center gap-0.5 rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium leading-4 text-gray-600 group-data-[done=true]/row:inline-flex dark:bg-white/10 dark:text-gray-300">
+                    <x-filament::icon icon="ri-check-line" class="size-3" aria-hidden="true" />
+                    {{ __('filament/pages/email-inbox.triage.done_badge') }}
+                </span>
+
                 @forelse ($row->records as $index => $record)
                     @if ($index < 2)
                         <x-email-integration::record-chip
@@ -131,4 +138,33 @@
             </span>
         @endunless
     </div>
+    @if ($triage)
+        @php
+            $buttonClass = 'items-center justify-center rounded-md p-1.5 text-gray-500 transition hover:bg-gray-100 hover:text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-100';
+            $actions = [
+                ['verb' => 'markDone', 'icon' => 'ri-check-line', 'label' => 'done', 'shown' => 'inline-flex group-data-[done=true]/row:hidden', 'advance' => true],
+                ['verb' => 'reopen', 'icon' => 'ri-inbox-unarchive-line', 'label' => 'reopen', 'shown' => 'hidden group-data-[done=true]/row:inline-flex', 'advance' => false],
+                ['verb' => 'markRead', 'icon' => 'ri-mail-open-line', 'label' => 'mark_read', 'shown' => 'hidden group-data-[unread=true]/row:inline-flex', 'advance' => false],
+                ['verb' => 'markUnread', 'icon' => 'ri-mail-unread-line', 'label' => 'mark_unread', 'shown' => 'inline-flex group-data-[unread=true]/row:hidden', 'advance' => false],
+            ];
+        @endphp
+
+        <div
+            data-triage-actions
+            class="absolute end-3 top-1/2 z-10 hidden -translate-y-1/2 items-center gap-0.5 rounded-lg bg-white p-0.5 shadow-sm ring-1 ring-gray-950/5 group-focus-within/row:flex group-hover/row:flex dark:bg-gray-900 dark:ring-white/10"
+        >
+            @foreach ($actions as $action)
+                <button
+                    type="button"
+                    data-triage-action="{{ $action['verb'] }}"
+                    x-on:click.stop="act(@js($action['verb']), [@js($row->conversationKey)], { advance: @js($action['advance']) })"
+                    title="{{ __('filament/pages/email-inbox.triage.actions.'.$action['label']) }}"
+                    aria-label="{{ __('filament/pages/email-inbox.triage.actions.'.$action['label']) }}"
+                    class="{{ $action['shown'] }} {{ $buttonClass }}"
+                >
+                    <x-filament::icon :icon="$action['icon']" class="size-4" />
+                </button>
+            @endforeach
+        </div>
+    @endif
 </div>

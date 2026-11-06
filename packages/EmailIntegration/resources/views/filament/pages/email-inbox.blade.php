@@ -96,9 +96,89 @@
             </p>
         @endif
 
-        <div class="divide-y divide-gray-200/60 dark:divide-white/10">
+        {{-- Keyed by what the list shows, so a new view, page or filter starts without the previous list's overrides. --}}
+        <div
+            wire:key="conversation-list-{{ $this->activeView->value }}-{{ $conversationsCursor }}-{{ hash('xxh128', serialize($this->conversationFilters)) }}"
+            x-data="{
+                view: @js($this->activeView->value),
+                overrides: {},
+                pending: 0,
+                row(key) {
+                    return this.$root.querySelector(`[data-conversation='${CSS.escape(key)}']`)
+                },
+                isHidden(key) {
+                    return this.overrides[key]?.hidden === true
+                },
+                flag(key, name, server) {
+                    return String(this.overrides[key]?.[name] ?? server)
+                },
+                effect(verb) {
+                    return {
+                        markDone: { done: true, hidden: this.view === 'needs_reply' },
+                        reopen: { done: false, hidden: this.view === 'done' },
+                        markRead: { unread: false },
+                        markUnread: { unread: true },
+                    }[verb]
+                },
+                restore(key, previous) {
+                    if (previous === undefined) {
+                        delete this.overrides[key]
+                    } else {
+                        this.overrides[key] = previous
+                    }
+                },
+                advance(key) {
+                    const rows = [...this.$root.querySelectorAll('[data-conversation]')].filter((row) => ! row.hidden)
+                    const index = rows.findIndex((row) => row.dataset.conversation === key)
+                    const target = index === -1 ? null : (rows[index + 1] ?? rows[index - 1])
+
+                    target?.querySelector(':scope > button')?.focus()
+                },
+                async act(verb, keys, options = {}) {
+                    const effect = this.effect(verb)
+                    keys = keys.filter((key) => typeof key === 'string')
+
+                    if (! effect || keys.length === 0) {
+                        return
+                    }
+
+                    const previous = Object.fromEntries(keys.map((key) => [key, this.overrides[key]]))
+
+                    if (options.advance) {
+                        this.advance(keys.at(-1))
+                    }
+
+                    keys.forEach((key) => this.overrides[key] = { ...this.overrides[key], ...effect })
+                    this.pending++
+
+                    try {
+                        const outcome = await this.$wire.call(verb, keys)
+                        const applied = new Set(outcome.applied)
+
+                        keys.filter((key) => ! applied.has(key)).forEach((key) => this.restore(key, previous[key]))
+
+                        if (options.undoing && keys.some((key) => ! this.row(key))) {
+                            await this.$wire.refreshConversations()
+                        }
+
+                        if (! options.undoing) {
+                            this.$dispatch('email-triage-done', { verb, outcome })
+                        }
+
+                        await options.then?.()
+                    } catch (error) {
+                        keys.forEach((key) => this.restore(key, previous[key]))
+                    } finally {
+                        this.pending--
+                    }
+                },
+            }"
+            x-on:email-triage.window="act($event.detail.verb, $event.detail.keys, $event.detail)"
+            x-bind:data-triage-pending="pending > 0 ? 'true' : null"
+            class="divide-y divide-gray-200/60 dark:divide-white/10"
+        >
             @forelse ($this->conversations->rows as $row)
-                <x-email-integration::conversation-row :row="$row" selectable :current="$row->conversationKey === $this->selectedEmail?->conversation_key" wire:key="conversation-{{ $row->conversationKey }}" />
+                <x-email-integration::conversation-row :row="$row" selectable triage :current="$row->conversationKey === $this->selectedEmail?->conversation_key" wire:key="conversation-{{ $row->conversationKey }}" />
             @empty
                 <x-filament::empty-state
                     :heading="$this->isFiltering() ? __('filament/pages/email-inbox.views.no_match') : __('filament/pages/email-inbox.views.empty.'.$this->activeView->value)"
@@ -148,7 +228,10 @@
             :row="$this->selectedConversationRow"
             :adjacent="$this->adjacentConversations"
             :unavailable="$this->selectedEmailUnavailable"
+            triage
         />
+
+        <x-email-integration::undo-toast />
     @endif
 
     <x-filament-actions::modals />

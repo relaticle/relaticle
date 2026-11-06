@@ -36,6 +36,23 @@ return [
             'not_available' => 'non disponible',
             'not_in_your_mailbox' => 'absente de votre boîte mail',
         ],
+        'done_badge' => 'Terminée',
+        'actions' => [
+            'done' => 'Terminer',
+            'reopen' => 'Rouvrir',
+            'mark_read' => 'Marquer comme lue',
+            'mark_unread' => 'Marquer comme non lue',
+        ],
+        'toast' => [
+            'markDone' => 'Conversation terminée dans Relaticle.|:count conversations terminées dans Relaticle.',
+            'reopen' => 'Conversation rouverte.|:count conversations rouvertes.',
+            'markRead' => 'Conversation marquée comme lue.|:count conversations marquées comme lues.',
+            'markUnread' => 'Conversation marquée comme non lue.|:count conversations marquées comme non lues.',
+            'skipped' => ':count ignorée(s) : :reason.',
+            'undo' => 'Annuler',
+            'undo_hint' => 'Annulation possible pendant 5 secondes.',
+            'dismiss' => 'Fermer',
+        ],
     ],
     'drawer' => [
         'reply' => 'Répondre',

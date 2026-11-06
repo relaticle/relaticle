@@ -267,6 +267,23 @@ return [
             'not_available' => 'not available',
             'not_in_your_mailbox' => 'not in your mailbox',
         ],
+        'done_badge' => 'Done',
+        'actions' => [
+            'done' => 'Done',
+            'reopen' => 'Reopen',
+            'mark_read' => 'Mark read',
+            'mark_unread' => 'Mark unread',
+        ],
+        'toast' => [
+            'markDone' => 'Conversation marked Done in Relaticle.|:count conversations marked Done in Relaticle.',
+            'reopen' => 'Conversation reopened.|:count conversations reopened.',
+            'markRead' => 'Conversation marked read.|:count conversations marked read.',
+            'markUnread' => 'Conversation marked unread.|:count conversations marked unread.',
+            'skipped' => ':count skipped: :reason.',
+            'undo' => 'Undo',
+            'undo_hint' => 'Undo is available for 5 seconds.',
+            'dismiss' => 'Dismiss',
+        ],
     ],
     'drawer' => [
         'reply' => 'Reply',
