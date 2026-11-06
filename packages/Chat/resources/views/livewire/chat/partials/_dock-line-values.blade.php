@@ -1,13 +1,14 @@
 {{-- The values of one plan line or batch row, as compact `label value` pairs.
 
      Expects: $fields (display rows), $stepId, $titleKey / $titleLabel (the identity row the line header already shows), $editableCodes,
-     $index (the batch row, or null for a whole step), $skipTitle.
+     $index (the batch row, or null for a whole step), $skipTitle, $refLinks.
 
      Short values flow on one wrapped row. Text over 48 characters gets its own row, clamped to two lines with "more". --}}
 @php
     $index ??= null;
     $skipTitle ??= true;
     $editableCodes ??= [];
+    $refLinks ??= [];
     $pairs = [];
     $longRows = [];
     $editingRows = [];
@@ -21,9 +22,9 @@
 
         $newValue = $row['new'] ?? $row['value'] ?? null;
         $oldValue = $row['old'] ?? null;
-        $values = is_array($row['values'] ?? null) ? $row['values'] : [];
+        $values = array_values(array_filter(is_array($row['values'] ?? null) ? $row['values'] : [], fn (mixed $value): bool => is_scalar($value) && trim((string) $value) !== ''));
 
-        if (in_array($newValue, [null, ''], true) && in_array($oldValue, [null, ''], true) && $values === []) {
+        if (trim((string) (is_scalar($newValue) ? $newValue : '')) === '' && trim((string) (is_scalar($oldValue) ? $oldValue : '')) === '' && $values === []) {
             continue;
         }
 
@@ -60,7 +61,7 @@
 
             <span class="group/pair inline-flex min-w-0 max-w-full items-baseline gap-1.5" data-proposal-field-row>
                 <span class="shrink-0 text-xs text-gray-500 dark:text-gray-400">{{ $row['label'] ?? '' }}</span>
-                @include('chat::livewire.chat.partials._dock-value', ['row' => $row, 'stack' => false, 'clampable' => false])
+                @include('chat::livewire.chat.partials._dock-value', ['row' => $row, 'stack' => mb_strlen((string) ($row['old'] ?? '')) + mb_strlen((string) ($row['new'] ?? $row['value'] ?? '')) > 28, 'clampable' => false, 'refLinks' => $refLinks])
                 @if ($editFor($row))
                     <button
                         type="button"
@@ -80,7 +81,7 @@
     <div class="group/pair mt-1 flex min-w-0 items-start gap-1.5" data-proposal-field-row>
         <div class="min-w-0 flex-1">
             <p class="text-xs text-gray-500 dark:text-gray-400">{{ $row['label'] ?? '' }}</p>
-            @include('chat::livewire.chat.partials._dock-value', ['row' => $row, 'stack' => false, 'clampable' => true])
+            @include('chat::livewire.chat.partials._dock-value', ['row' => $row, 'stack' => false, 'clampable' => true, 'refLinks' => $refLinks])
         </div>
         @if ($editFor($row))
             <button
@@ -104,6 +105,7 @@
             'isEditing' => true,
             'isExcludable' => false,
             'isExcluded' => false,
+            'refLinks' => $refLinks,
         ])
     </div>
 @endforeach

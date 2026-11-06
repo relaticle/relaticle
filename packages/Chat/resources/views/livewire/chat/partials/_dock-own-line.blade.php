@@ -1,12 +1,10 @@
 {{-- A plan step the user approves on its own (an email, an invitation): announced in the list, never counted by the plan's primary.
 
-     Expects: $step, $ownButton (true when the plan holds nothing else to approve, so the line carries its own send button).
-     The line opens to the full message, read-only. --}}
+     Expects: $step. The line opens to the full message, read-only; the step gets its own card once nothing else is left to approve. --}}
 @php
     $entityIcon = \Relaticle\Chat\Support\RecordChipRenderer::iconPath($step['entity_type']);
     $recipient = collect($step['fields'])->firstWhere('label', 'To')['value'] ?? null;
     $lineName = $step['recordLabel'] !== '' ? $step['recordLabel'] : $step['summary'];
-    $blockedBy = $step['blockedBy'] ?? [];
 @endphp
 
 <div class="group/line" wire:key="step-{{ $step['id'] }}" x-data="{ open: false }">
@@ -38,19 +36,6 @@
                 <span>{{ __('you approve it on its own, next') }}</span>
             </span>
         </button>
-
-        @if ($ownButton)
-            <button
-                type="button"
-                wire:click="approveStep(@js($step['id']))"
-                wire:loading.attr="disabled"
-                data-proposal-send-step="{{ $step['id'] }}"
-                @disabled($blockedBy !== [] || $editingFieldCode !== null)
-                class="inline-flex h-7 shrink-0 items-center rounded-md bg-primary-600 px-2.5 text-xs font-medium text-white shadow-sm transition hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-                {{ $step['decisionLabel'] }}
-            </button>
-        @endif
 
         <x-heroicon-o-chevron-down
             class="mt-1.5 h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform dark:text-gray-500"

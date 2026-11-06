@@ -33,8 +33,10 @@ use Relaticle\Chat\Services\Tools\ProposalDisplayBuilder;
 use Relaticle\Chat\Services\Tools\ProposalFieldSchemaDescriber;
 use Relaticle\Chat\Services\TurnContinuationService;
 use Relaticle\Chat\Support\ApprovalFailureMessage;
+use Relaticle\Chat\Support\PlanReference;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\ProposalProgress;
+use Relaticle\Chat\Support\RecordNameResolver;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\WorkspaceMembersContext;
 use Relaticle\CustomFields\Facades\CustomFields;
@@ -455,7 +457,28 @@ final class ProposalCard extends BaseLivewireComponent
 
     private function activeStepId(): ?string
     {
-        return $this->activeStepId ?? $this->pendingActionId;
+        return $this->dockedOwnApprovalStep()?->getKey() ?? $this->activeStepId ?? $this->pendingActionId;
+    }
+
+    /**
+     * When nothing but own-approval steps is left, the dock shows the first one as its
+     * own card and the rest wait their turn.
+     */
+    private function dockedOwnApprovalStep(): ?PendingAction
+    {
+        $steps = $this->planSteps();
+
+        if (count($steps) < 2) {
+            return null;
+        }
+
+        foreach ($steps as $step) {
+            if (! $step->needsOwnApproval()) {
+                return null;
+            }
+        }
+
+        return $steps[0];
     }
 
     private function loadStep(?string $id): ?PendingAction
@@ -548,43 +571,113 @@ final class ProposalCard extends BaseLivewireComponent
      */
     public function stepViews(): array
     {
-        $plan = resolve(ProposalPlanService::class);
-        $activeStepId = $this->activeStepId();
-        $siblings = $this->planAllSteps();
-        $views = [];
+        $docked = $this->dockedOwnApprovalStep();
+        $steps = $docked instanceof PendingAction ? [$docked] : $this->planSteps();
+        $pendingIds = array_map(static fn (PendingAction $pending): string => (string) $pending->getKey(), $this->planSteps());
 
-        foreach ($this->planSteps() as $position => $step) {
-            $blockedBy = $plan->unmetDependencies($step, $siblings);
+        return array_map(
+            fn (PendingAction $step, int $position): array => $this->stepView($step, $position + 1, $pendingIds),
+            $steps,
+            array_keys($steps),
+        );
+    }
 
-            $views[] = [
-                'id' => (string) $step->getKey(),
-                'position' => $position + 1,
-                'operation' => $step->operation->value,
-                'entity_type' => $step->entity_type->value,
-                'summary' => $this->stepSummary($step),
-                'title' => is_string($step->display_data['title'] ?? null) ? $step->display_data['title'] : '',
-                'recordLabel' => $this->stepRecordLabel($step),
-                'fields' => $this->recordFieldsOf($step),
-                'editableCodes' => $this->editableCodesOf($step),
-                'isActive' => (string) $step->getKey() === $activeStepId,
-                'needsOwnApproval' => $step->needsOwnApproval(),
-                'decisionLabel' => $step->entity_type->action($step->operation, $this->remainingCountOf($step)),
-                'isBatch' => ProposalPayload::from($step)->isBatch,
-                'recordCount' => $this->recordCountOf($step),
-                'remainingCount' => $this->remainingCountOf($step),
-                'items' => $this->batchItemViews($step),
-                'blockedBy' => $this->sortedPositions($blockedBy),
-                'excludableCodes' => $this->excludableCodesOf($step),
-                'titleKey' => $step->entity_type->titleKey(),
-                'titleLabel' => $step->entity_type->titleLabel(),
-                'entityNoun' => Str::lower($step->entity_type->singularName()),
-                'confirmLabel' => $step->entity_type->confirmLabel($step->operation, $this->remainingCountOf($step)),
-                'declineLabel' => $step->entity_type->declineLabel(),
-                'followUpLabel' => $step->entity_type->followUpLabel(),
-            ];
+    /**
+     * @param  list<string>  $pendingIds
+     * @return array<string, mixed>
+     */
+    private function stepView(PendingAction $step, int $position, array $pendingIds): array
+    {
+        $entity = $step->entity_type;
+        $blockedBy = resolve(ProposalPlanService::class)->unmetDependencies($step, $this->planAllSteps());
+
+        return [
+            'id' => (string) $step->getKey(),
+            'position' => $position,
+            'operation' => $step->operation->value,
+            'entity_type' => $entity->value,
+            'summary' => $this->stepSummary($step),
+            'title' => is_string($step->display_data['title'] ?? null) ? $step->display_data['title'] : '',
+            'recordLabel' => $this->stepRecordLabel($step),
+            'fields' => $this->visibleRows($step, $this->recordFieldsOf($step)),
+            'editableCodes' => $this->editableCodesOf($step),
+            'isActive' => (string) $step->getKey() === $this->activeStepId(),
+            'needsOwnApproval' => $step->needsOwnApproval(),
+            'isBatch' => ProposalPayload::from($step)->isBatch,
+            'recordCount' => $this->recordCountOf($step),
+            'remainingCount' => $this->remainingCountOf($step),
+            'items' => $this->batchItemViews($step),
+            'blockedBy' => $this->sortedPositions($blockedBy),
+            'excludableCodes' => $this->excludableCodesOf($step),
+            'titleKey' => $entity->titleKey(),
+            'titleLabel' => $entity->titleLabel(),
+            'entityNoun' => Str::lower($entity->singularName()),
+            'deletes' => $entity->deletes($step->operation),
+            'confirmLabel' => $entity->confirmLabel($step->operation, $this->remainingCountOf($step)),
+            'declineLabel' => $entity->declineLabel(),
+            'followUpLabel' => $entity->followUpLabel(),
+            'refLinks' => $this->refLinksOf($step, $pendingIds),
+        ];
+    }
+
+    /**
+     * The earlier steps of the plan this step links to, as the exact text its display rows
+     * carry for them. A link to a step still pending is drawn as a "new" chip.
+     *
+     * @param  list<string>  $pendingIds
+     * @return list<array{display: string, name: string, isNew: bool}>
+     */
+    private function refLinksOf(PendingAction $step, array $pendingIds): array
+    {
+        $plan = $this->planAllSteps();
+        $links = [];
+
+        foreach (PlanReference::targetsIn($step->action_data) as $target) {
+            foreach ($plan as $position => $candidate) {
+                if ((string) $candidate->getKey() !== PlanReference::actionId($target)) {
+                    continue;
+                }
+
+                $record = ProposalPayload::from($candidate)->recordAtOrEmpty(PlanReference::index($target) ?? 0);
+                $name = $record[$candidate->entity_type->titleKey()] ?? null;
+
+                if (is_string($name) && $name !== '') {
+                    $links[] = [
+                        'display' => RecordNameResolver::planLabel($name, $position + 1),
+                        'name' => $name,
+                        'isNew' => in_array((string) $candidate->getKey(), $pendingIds, true),
+                    ];
+                }
+            }
         }
 
-        return $views;
+        return $links;
+    }
+
+    /**
+     * A create lists only what it sets: a value left empty is not a change, so its row stays out.
+     * An update keeps "(none)", because there it means a value is being cleared.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array<string, mixed>>
+     */
+    private function visibleRows(PendingAction $step, array $rows): array
+    {
+        if ($step->operation !== PendingActionOperation::Create) {
+            return $rows;
+        }
+
+        return array_values(array_filter($rows, static function (array $row): bool {
+            $value = $row['new'] ?? $row['value'] ?? null;
+
+            if (is_array($row['values'] ?? null) && $row['values'] !== []) {
+                return true;
+            }
+
+            $text = is_scalar($value) ? trim((string) $value) : '';
+
+            return $text !== '' && $text !== '(none)' && $text !== __('(none)');
+        }));
     }
 
     /**
@@ -690,7 +783,7 @@ final class ProposalCard extends BaseLivewireComponent
                 'summary' => is_string($summary) ? $summary : '',
                 'label' => $this->itemLabel($step->entity_type, $display),
                 'isActive' => $index === $cursor,
-                'fields' => is_array($fields) ? array_values($fields) : [],
+                'fields' => $this->visibleRows($step, is_array($fields) ? array_values($fields) : []),
             ];
         }, $this->unresolvedIndices($step));
     }
@@ -795,23 +888,6 @@ final class ProposalCard extends BaseLivewireComponent
         $this->excludedFields = in_array($code, $this->excludedFields, true)
             ? array_values(array_diff($this->excludedFields, [$code]))
             : [...$this->excludedFields, $code];
-    }
-
-    /**
-     * The header master checkbox: all attributes included → exclude all; any
-     * other state (partial or none) → include all.
-     */
-    public function toggleAllFields(): void
-    {
-        $step = $this->loadStep($this->activeStepId());
-
-        if (! $step instanceof PendingAction) {
-            return;
-        }
-
-        $this->excludedFields = $this->excludedFields === []
-            ? $this->excludableCodesOf($step)
-            : [];
     }
 
     /**
@@ -1020,16 +1096,44 @@ final class ProposalCard extends BaseLivewireComponent
 
     /**
      * Rows that a later step links to, by batch step id and row index, named after the
-     * step that links to them.
+     * step that links to them. A step that is left out no longer holds a row in.
      *
      * @return array<string, array<int, string>>
      */
     public function linkedRowIndexes(): array
     {
+        $leftOut = [...$this->leftOutStepIds(), ...array_keys($this->leftOutDependents())];
+
         return array_map(
             fn (array $rows): array => array_map($this->stepSummary(...), $rows),
-            resolve(ProposalPlanService::class)->linkedRows($this->planAllSteps()),
+            resolve(ProposalPlanService::class)->linkedRows($this->planAllSteps(), $leftOut),
         );
+    }
+
+    /**
+     * Each step a left-out step takes with it, mapped to the step it links to directly, which is
+     * left out itself or taken in turn.
+     *
+     * @return array<string, string>
+     */
+    private function leftOutLinks(): array
+    {
+        $taken = $this->leftOutDependents();
+        $out = [...$this->leftOutStepIds(), ...array_keys($taken)];
+        $links = [];
+
+        foreach ($this->planSteps() as $step) {
+            $stepId = (string) $step->getKey();
+
+            if (! isset($taken[$stepId])) {
+                continue;
+            }
+
+            $direct = array_values(array_intersect(resolve(ProposalPlanService::class)->dependencyIds($step), $out));
+            $links[$stepId] = $direct[0] ?? $taken[$stepId];
+        }
+
+        return $links;
     }
 
     /**
@@ -1061,10 +1165,16 @@ final class ProposalCard extends BaseLivewireComponent
      */
     public function primaryIsRisky(): bool
     {
+        $docked = $this->dockedOwnApprovalStep();
+
+        if ($docked instanceof PendingAction) {
+            return ! $docked->entity_type->approvesFromKeyboard();
+        }
+
         $stillIn = $this->stepsStillIn();
 
         foreach ($stillIn as $step) {
-            if ($step->operation === PendingActionOperation::Delete) {
+            if ($step->entity_type->deletes($step->operation)) {
                 return true;
             }
         }
@@ -1414,64 +1524,6 @@ final class ProposalCard extends BaseLivewireComponent
         $this->settleAfterResolution($batch);
     }
 
-    /**
-     * Reject one record of a batch step on the spot, without waiting for Approve.
-     */
-    public function skipItem(string $stepId, int $index, PendingActionService $service): void
-    {
-        if ($this->editingFieldCode !== null) {
-            return;
-        }
-
-        $pendingAction = $this->loadStep($stepId);
-
-        if (! $pendingAction instanceof PendingAction) {
-            return;
-        }
-
-        if (! ProposalPayload::from($pendingAction)->isBatch) {
-            return;
-        }
-
-        // An already-decided row cannot be re-decided; its outcome lives in the
-        // transcript audit card.
-        if (! in_array($index, $this->unresolvedIndices($pendingAction), true)) {
-            return;
-        }
-
-        try {
-            $result = $service->rejectItem($pendingAction, $this->authUser(), $index);
-        } catch (QueryException $exception) {
-            $this->reportDatabaseFailure($pendingAction, $exception);
-
-            return;
-        } catch (RuntimeException $exception) {
-            $this->reportResolveFailure($pendingAction, $exception->getMessage());
-
-            return;
-        }
-
-        $this->dispatch(
-            'proposal:resolved',
-            pendingActionId: $pendingAction->getKey(),
-            index: $index,
-            decision: 'rejected',
-            finalized: $result['finalized'],
-            record: null,
-            context: $this->context,
-        );
-
-        if (! $result['finalized']) {
-            if ((string) $pendingAction->getKey() === $this->activeStepId()) {
-                $this->cursor = $this->firstUnresolvedIndex($pendingAction->fresh() ?? $pendingAction);
-            }
-
-            return;
-        }
-
-        $this->settleAfterResolution($pendingAction);
-    }
-
     public function discardCurrent(PendingActionService $service): void
     {
         if ($this->editingFieldCode !== null) {
@@ -1482,12 +1534,6 @@ final class ProposalCard extends BaseLivewireComponent
 
         if (! $pendingAction instanceof PendingAction) {
             $this->reportLapsedStep();
-
-            return;
-        }
-
-        if (ProposalPayload::from($pendingAction)->isBatch) {
-            $this->discardAll(resolve(ProposalPlanService::class));
 
             return;
         }
@@ -1929,6 +1975,7 @@ final class ProposalCard extends BaseLivewireComponent
             'leftOutStepIds' => $this->leftOutStepIds(),
             'leftOutRowIndexes' => $this->leftOutRowMap(),
             'takenBy' => $this->leftOutDependents(),
+            'takenVia' => $this->leftOutLinks(),
             'linkedRows' => $this->linkedRowIndexes(),
             'hasOwnApprovalSteps' => in_array(true, array_column($steps, 'needsOwnApproval'), true),
             'recordCount' => $proposal instanceof PendingAction ? $this->recordCountOf($proposal) : 0,

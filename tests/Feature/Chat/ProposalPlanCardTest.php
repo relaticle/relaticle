@@ -440,6 +440,78 @@ describe('the change list', function (): void {
             ->assertSeeHtml('line-clamp-2')
             ->assertSeeText('more');
     });
+
+    it('names the direct link of each taken step, and its plural for a batch', function (): void {
+        [$company, $person, $task] = ProposalCardFixture::planSteps($this->user);
+
+        Livewire::test(ProposalCard::class)
+            ->call('setActive', $company->getKey())
+            ->call('toggleLeftOut', (string) $company->getKey())
+            ->assertSeeText('Northwind Traders is left out, so this person is left out too. It links to Northwind Traders.')
+            ->assertSeeText('Priya Raman is left out, so this task is left out too. It links to Priya Raman.');
+
+        [$conversationId, $turnId] = ProposalCardFixture::startPlan($this->user);
+        $batch = ProposalCardFixture::planProposal(CreatePersonTool::class, $conversationId, $turnId, [['name' => 'Ada'], ['name' => 'Grace'], ['name' => 'Linus']]);
+        ProposalCardFixture::planProposal(CreateTaskTool::class, $conversationId, $turnId, [
+            ['title' => 'Intro calls', 'people_ids' => [PlanReference::to((string) $batch->getKey(), 1)]],
+        ]);
+
+        Livewire::test(ProposalCard::class)
+            ->call('setActive', $batch->getKey())
+            ->call('toggleLeftOut', (string) $batch->getKey())
+            ->assertSeeText('These 3 people are left out, so this task is left out too. It links to them.')
+            ->assertSeeText('Keep these 3 people');
+    });
+
+    it('gives a linked row its x back once the step that links to it is left out', function (): void {
+        [$conversationId, $turnId] = ProposalCardFixture::startPlan($this->user);
+        $batch = ProposalCardFixture::planProposal(CreatePersonTool::class, $conversationId, $turnId, [['name' => 'Ada'], ['name' => 'Grace']]);
+        $task = ProposalCardFixture::planProposal(CreateTaskTool::class, $conversationId, $turnId, [
+            ['title' => 'Call Grace', 'people_ids' => [PlanReference::to((string) $batch->getKey(), 1)]],
+        ]);
+        $stepId = (string) $batch->getKey();
+
+        $component = Livewire::test(ProposalCard::class)
+            ->call('setActive', $batch->getKey())
+            ->assertSeeText('linked from')
+            ->call('toggleLeftOut', (string) $task->getKey())
+            ->assertDontSeeText('linked from')
+            ->call('toggleLeftOutRow', $stepId, 1)
+            ->assertSet('leftOutRows', [$stepId => [1]]);
+
+        expect($component->instance()->linkedRowIndexes())->toBe([]);
+    });
+
+    it('draws a chip only for a record the plan links to, never for free text', function (): void {
+        [$conversationId, $turnId] = ProposalCardFixture::startPlan($this->user);
+        $company = ProposalCardFixture::planProposal(CreateCompanyTool::class, $conversationId, $turnId, [['name' => 'Acme, Inc.']]);
+        ProposalCardFixture::planProposal(CreatePersonTool::class, $conversationId, $turnId, [[
+            'name' => 'Priya Nair',
+            'company_id' => PlanReference::to((string) $company->getKey()),
+            'custom_fields' => ['job_title' => 'Lead (step 2)'],
+        ]]);
+
+        $html = Livewire::test(ProposalCard::class)
+            ->call('setActive', $company->getKey())
+            ->assertSeeText('Lead (step 2)')
+            ->assertSeeText('Acme, Inc.')
+            ->html();
+
+        expect(substr_count($html, 'data-proposal-ref'))->toBe(1);
+    });
+
+    it('writes a create line in sentence case and leaves out what it does not set', function (): void {
+        [$conversationId, $turnId] = ProposalCardFixture::startPlan($this->user);
+        $person = ProposalCardFixture::planProposal(CreatePersonTool::class, $conversationId, $turnId, [['name' => 'Priya Nair']]);
+        ProposalCardFixture::planProposal(CreateTaskTool::class, $conversationId, $turnId, [['title' => 'Call Priya']]);
+
+        Livewire::test(ProposalCard::class)
+            ->call('setActive', $person->getKey())
+            ->assertSeeText('Create person')
+            ->assertSeeText('Create task')
+            ->assertDontSeeText('Create Person')
+            ->assertDontSeeText('(none)');
+    });
 });
 
 it('refuses a client-set editing target, so one payload cannot open the same field on every step', function (): void {
@@ -456,7 +528,7 @@ it('refuses a client-set editing target, so one payload cannot open the same fie
         ->and(fn () => $component->set('editingFieldCode', 'name'))->toThrow(Exception::class);
 });
 
-it('ignores skipItem and focusItem against another tenant\'s proposal', function (): void {
+it('ignores a left-out row and focusItem against another tenant\'s proposal', function (): void {
     Bus::fake();
     $stranger = User::factory()->withPersonalWorkspace()->create();
     $foreignRecords = array_map(static fn (string $n): array => ['name' => $n], ['Contoso A', 'Contoso B']);
@@ -469,7 +541,8 @@ it('ignores skipItem and focusItem against another tenant\'s proposal', function
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $own->getKey(), context: 'conversation')
-        ->call('skipItem', (string) $foreign->getKey(), 0)
+        ->call('toggleLeftOutRow', (string) $foreign->getKey(), 0)
+        ->assertSet('leftOutRows', [])
         ->assertNotDispatched('proposal:resolved')
         ->call('focusItem', (string) $foreign->getKey(), 1)
         ->assertSet('activeStepId', (string) $own->getKey());

@@ -104,14 +104,14 @@ it('resolves a delete batch per item through the component, deleting only approv
 
     $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
-        ->call('skipItem', (string) $action->getKey(), 1); // keep task 1
+        ->call('toggleLeftOutRow', (string) $action->getKey(), 1); // keep task 1
 
-    // The batch is not yet finalized: item 1 is skipped, item 0 still pending.
+    // Leaving a row out decides nothing until Approve.
     expect(Task::query()->whereKey($tasks[1]->getKey())->exists())->toBeTrue()
         ->and(Task::query()->whereKey($tasks[0]->getKey())->exists())->toBeTrue()
         ->and($action->fresh()->status)->toBe(PendingActionStatus::Pending);
 
-    $component->call('createCurrent'); // delete the remaining item 0 -> finalize
+    $component->call('createCurrent'); // delete the rows still in -> finalize
 
     expect($action->fresh()->status)->toBe(PendingActionStatus::Approved)
         ->and(Task::query()->whereKey($tasks[0]->getKey())->exists())->toBeFalse()

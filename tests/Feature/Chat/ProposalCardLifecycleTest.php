@@ -191,13 +191,13 @@ it('discards the whole batch from one footer click', function (): void {
     expect($action->fresh()->status)->toBe(PendingActionStatus::Rejected);
 });
 
-it('finalizes after a skip plus create-all without dispatching a continuation', function (): void {
+it('finalizes after leaving a row out plus approving without dispatching a continuation', function (): void {
     Bus::fake();
     $action = ProposalCardFixture::batchCompany($this->user, ['Alpha', 'Beta']);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
-        ->call('skipItem', (string) $action->getKey(), 1)
+        ->call('toggleLeftOutRow', (string) $action->getKey(), 1)
         ->call('createCurrent')
         ->assertSet('pendingActionId', null);
     expect($action->fresh()->status)->not->toBe(PendingActionStatus::Pending);
@@ -226,21 +226,19 @@ it('emits proposal:resolve-failed and does not advance when the service rejects 
     expect(Company::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0);
 });
 
-it('drops a skipped item from the dock queue and cannot re-decide it', function (): void {
+it('writes nothing for a left-out row and keeps the cursor where it was', function (): void {
     Bus::fake();
     $action = ProposalCardFixture::batchCompany($this->user, ['Alpha', 'Beta', 'Gamma']);
 
     $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
-        ->call('skipItem', (string) $action->getKey(), 0);
+        ->call('toggleLeftOutRow', (string) $action->getKey(), 0);
 
-    // Alpha left the queue: two records remain and the cursor sits on Beta.
-    $component->assertViewHas('remainingCount', 2)
-        ->assertSet('cursor', 1);
+    $component->assertViewHas('remainingCount', 3)
+        ->assertViewHas('approvableRecordCount', 2)
+        ->assertSet('cursor', 0);
 
-    // Skipping the already-decided index again is a no-op, not a re-run.
-    $component->call('skipItem', (string) $action->getKey(), 0)
-        ->assertSet('cursor', 1);
+    expect(Company::query()->count())->toBe(0);
 
     $component->call('createCurrent');
 
@@ -323,8 +321,7 @@ it('leaves a batch row out and keeps it again, never a decided row', function ()
         ->assertViewHas('approvableRecordCount', 1)
         ->call('toggleLeftOutRow', $stepId, 1)
         ->assertSet('leftOutRows', [$stepId => []])
-        ->call('skipItem', $stepId, 0)
-        ->call('toggleLeftOutRow', $stepId, 0)
+        ->call('toggleLeftOutRow', $stepId, 7)
         ->assertSet('leftOutRows', [$stepId => []]);
 });
 
@@ -402,7 +399,7 @@ it('offers no field exclusion on a batch, which leaves out whole rows instead', 
         ->and($owners['Beta'])->not->toBeNull();
 });
 
-it('unchecks and rechecks everything through the master toggle', function (): void {
+it('leaves a field out and keeps it again', function (): void {
     $action = ProposalCardFixture::proposal($this->user,
         ['name' => 'Acme Corp', 'account_owner_id' => $this->user->getKey()],
         ['title' => 'Create Company', 'summary' => 'Create company "Acme Corp"', 'fields' => [
@@ -413,9 +410,9 @@ it('unchecks and rechecks everything through the master toggle', function (): vo
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
-        ->call('toggleAllFields')
+        ->call('toggleField', 'account_owner_id')
         ->assertSet('excludedFields', ['account_owner_id'])
-        ->call('toggleAllFields')
+        ->call('toggleField', 'account_owner_id')
         ->assertSet('excludedFields', []);
 });
 

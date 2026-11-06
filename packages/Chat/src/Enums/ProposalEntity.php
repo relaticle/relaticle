@@ -139,14 +139,24 @@ enum ProposalEntity: string
         };
     }
 
+    public function deletes(PendingActionOperation $operation): bool
+    {
+        return match ($this) {
+            self::EmailDraftDelete => true,
+            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::CustomField, self::SampleData, self::WebAccess => $operation === PendingActionOperation::Delete,
+        };
+    }
+
     public function confirmLabel(PendingActionOperation $operation, int $count = 1): string
     {
         return match ($this) {
             self::Email => __('Send email'),
+            self::EmailDraftDelete => trans_choice('Delete draft|Delete :count drafts', $count, ['count' => $count]),
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::CustomField, self::SampleData => $operation === PendingActionOperation::Delete
                 ? __('Delete :count :entities', ['count' => $count, 'entities' => Str::plural(Str::lower($this->singularName()), $count)])
                 : __('Approve'),
-            self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::WebAccess => $this->action($operation, $count),
+            self::EmailDraft => __('Approve'),
+            self::EmailDraftSend, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::WebAccess => $this->action($operation, $count),
         };
     }
 

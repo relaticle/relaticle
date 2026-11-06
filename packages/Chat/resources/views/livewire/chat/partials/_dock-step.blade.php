@@ -1,6 +1,6 @@
 {{-- One line of the docked change list (or the whole card, when there is one proposal).
 
-     Expects: $step (the view model from ProposalCard::stepViews()), $isPlan, $ownButton.
+     Expects: $step (the view model from ProposalCard::stepViews()), $isPlan.
 
      Every record the footer will approve is on screen with its own x, so Approve
      never writes anything the user was not shown. --}}
@@ -8,10 +8,10 @@
     $stepId = $step['id'];
     $entityIcon = \Relaticle\Chat\Support\RecordChipRenderer::iconPath($step['entity_type']);
     $isDelete = $step['operation'] === 'delete';
-    $verb = ($step['title'] ?? '') !== '' ? $step['title'] : match ($step['operation']) {
+    $verb = match ($step['operation']) {
         'update' => __('Update'),
         'delete' => __('Delete'),
-        default => __('Create'),
+        default => ($step['title'] ?? '') !== '' ? \Illuminate\Support\Str::ucfirst(\Illuminate\Support\Str::lower($step['title'])) : __('Create'),
     };
     $lineName = $step['isBatch'] || $step['recordLabel'] === '' ? $step['summary'] : $step['recordLabel'];
     $showVerb = ! $step['isBatch'] && $step['recordLabel'] !== '';
@@ -19,8 +19,14 @@
     $isLeftOut = in_array($stepId, $leftOutStepIds, true);
     $takenById = $takenBy[$stepId] ?? null;
     $isOut = $isLeftOut || $takenById !== null;
-    $takenByStep = $takenById !== null ? collect($steps)->firstWhere('id', $takenById) : null;
-    $takenByName = $takenByStep !== null ? ($takenByStep['isBatch'] || $takenByStep['recordLabel'] === '' ? $takenByStep['summary'] : $takenByStep['recordLabel']) : '';
+    $linkedStep = $takenById !== null ? collect($steps)->firstWhere('id', $takenVia[$stepId] ?? $takenById) : null;
+    $linkedCount = $linkedStep === null ? 1 : ($linkedStep['isBatch'] ? count($linkedStep['items']) : 1);
+    $linkedName = match (true) {
+        $linkedStep === null => '',
+        $linkedStep['isBatch'] => $linkedCount > 1 ? '' : ($linkedStep['items'][0]['label'] ?? $linkedStep['summary']),
+        default => $linkedStep['recordLabel'] !== '' ? $linkedStep['recordLabel'] : $linkedStep['summary'],
+    };
+    $linkedEntities = $linkedStep === null ? '' : \Illuminate\Support\Str::plural($linkedStep['entityNoun'], $linkedCount);
     $leftOutRowsHere = $leftOutRowIndexes[$stepId] ?? [];
 
     $skipTitle = $step['operation'] !== 'update';
@@ -50,7 +56,7 @@
 @endphp
 
 @if ($isPlan && $holdsOwnApproval)
-    @include('chat::livewire.chat.partials._dock-own-line', ['step' => $step, 'ownButton' => $ownButton])
+    @include('chat::livewire.chat.partials._dock-own-line', ['step' => $step])
 @else
     <div class="group/line" wire:key="step-{{ $stepId }}">
         <div class="flex items-start gap-2.5 px-4 pb-1.5 pt-3">
@@ -62,8 +68,8 @@
                     <span
                         @class([
                             'mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-md',
-                            'bg-red-50 text-red-600 dark:bg-red-400/10 dark:text-red-400' => $isDelete,
-                            'bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400' => ! $isDelete,
+                            'bg-red-50 text-red-600 dark:bg-red-400/10 dark:text-red-400' => $step['deletes'],
+                            'bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400' => ! $step['deletes'],
                         ])
                         aria-hidden="true"
                     >
@@ -83,12 +89,6 @@
                         @endif
                         <span @class(['font-semibold', 'text-gray-900 dark:text-white' => ! $isOut])>{{ $lineName }}</span>
                     </span>
-
-                    @if ($step['blockedBy'] !== [] && ! $isOut)
-                        <span class="block text-[length:var(--text-micro)] text-gray-400 dark:text-gray-500">
-                            {{ trans_choice('Runs after step :steps|Runs after steps :steps', count($step['blockedBy']), ['steps' => implode(', ', $step['blockedBy'])]) }}
-                        </span>
-                    @endif
 
                     @if ($sharedChange !== [] && ! $isOut)
                         <span class="block text-xs leading-5 text-gray-500 dark:text-gray-400">
@@ -114,8 +114,8 @@
                     wire:loading.attr="disabled"
                     @disabled($editingFieldCode !== null)
                     @class([
-                        'inline-flex min-h-8 min-w-8 shrink-0 items-center justify-center rounded-md transition focus-visible:visible focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-60',
-                        'text-gray-400 hover:bg-gray-100 hover:text-gray-700 sm:invisible sm:group-hover/line:visible dark:hover:bg-white/10 dark:hover:text-gray-200' => ! $isLeftOut,
+                        'inline-flex min-h-8 min-w-8 shrink-0 items-center justify-center rounded-md transition focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-60',
+                        'text-gray-400 hover:bg-gray-100 hover:text-gray-700 sm:opacity-0 sm:group-hover/line:opacity-100 dark:hover:bg-white/10 dark:hover:text-gray-200' => ! $isLeftOut,
                         'px-1.5 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400' => $isLeftOut,
                     ])
                     aria-label="{{ $isLeftOut ? __('Keep :name', ['name' => $lineName]) : __('Leave out :name', ['name' => $lineName]) }}"
@@ -130,14 +130,14 @@
         </div>
 
         @if ($takenById !== null)
-            <p class="mx-4 mb-3 ms-[3.125rem] flex flex-wrap items-baseline gap-x-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-inset ring-amber-200 dark:bg-amber-400/10 dark:text-amber-300 dark:ring-amber-400/20" data-proposal-left-out-note>
-                <span>{{ __(':name is left out, so this :entity is left out too. It links to :name.', ['name' => $takenByName, 'entity' => $step['entityNoun']]) }}</span>
+            <p class="mb-3 me-4 ms-[3.125rem] flex flex-wrap items-baseline gap-x-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-inset ring-amber-200 dark:bg-amber-400/10 dark:text-amber-300 dark:ring-amber-400/20" data-proposal-left-out-note>
+                <span>{{ trans_choice(':name is left out, so this :entity is left out too. It links to :name.|These :count :entities are left out, so this :entity is left out too. It links to them.', $linkedCount, ['name' => $linkedName, 'entity' => $step['entityNoun'], 'count' => $linkedCount, 'entities' => $linkedEntities]) }}</span>
                 <button
                     type="button"
                     wire:click="toggleLeftOut(@js($takenById))"
                     wire:loading.attr="disabled"
                     class="font-medium underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600"
-                >{{ __('Keep :name', ['name' => $takenByName]) }}</button>
+                >{{ trans_choice('Keep :name|Keep these :count :entities', $linkedCount, ['name' => $linkedName, 'count' => $linkedCount, 'entities' => $linkedEntities]) }}</button>
             </p>
         @endif
 
@@ -175,8 +175,8 @@
                                         wire:loading.attr="disabled"
                                         @disabled($editingFieldCode !== null)
                                         @class([
-                                            'inline-flex min-h-8 min-w-8 shrink-0 items-center justify-center rounded-md transition focus-visible:visible focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-60',
-                                            'text-gray-400 hover:bg-gray-100 hover:text-gray-700 sm:invisible sm:group-hover/row:visible dark:hover:bg-white/10 dark:hover:text-gray-200' => ! $rowOut,
+                                            'inline-flex min-h-8 min-w-8 shrink-0 items-center justify-center rounded-md transition focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-60',
+                                            'text-gray-400 hover:bg-gray-100 hover:text-gray-700 sm:opacity-0 sm:group-hover/row:opacity-100 dark:hover:bg-white/10 dark:hover:text-gray-200' => ! $rowOut,
                                             'px-1.5 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400' => $rowOut,
                                         ])
                                         aria-label="{{ $rowOut ? __('Keep :name', ['name' => $item['label']]) : __('Leave out :name', ['name' => $item['label']]) }}"
@@ -199,6 +199,7 @@
                                     'editableCodes' => $step['editableCodes'],
                                     'index' => $rowIndex,
                                     'skipTitle' => $skipTitle,
+                                    'refLinks' => $step['refLinks'],
                                 ])
                             @endif
                         </div>
@@ -214,6 +215,7 @@
                         'editableCodes' => $step['editableCodes'],
                         'index' => null,
                         'skipTitle' => $skipTitle,
+                        'refLinks' => $step['refLinks'],
                     ])
                 </div>
             @elseif ($step['fields'] !== [])
@@ -228,6 +230,7 @@
                                 'isExcludable' => ($row['code'] ?? null) !== null && in_array($row['code'], $excludableCodes, true),
                                 'isExcluded' => ($row['code'] ?? null) !== null && in_array($row['code'], $excludedFields, true),
                                 'clamp' => ! $holdsOwnApproval,
+                                'refLinks' => $step['refLinks'],
                             ])
                         </div>
                     @endforeach

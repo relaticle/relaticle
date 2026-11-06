@@ -1,9 +1,11 @@
 {{-- The value half of one display row, shared by the single-record field grid and the plan line pairs.
 
-     Expects: $row, $stack (old above new, for a pair longer than 28 characters), $clampable (long text gets two lines and "more"). --}}
+     Expects: $row, $stack (old above new, for a pair longer than 28 characters), $clampable (long text gets two lines and "more"),
+     $refLinks (the plan steps this value links to, drawn as "new" chips). --}}
 @php
     $stack = $stack ?? false;
     $clampable = $clampable ?? false;
+    $refLinks = $refLinks ?? [];
     $newValue = $row['new'] ?? $row['value'] ?? null;
     $oldValue = $row['old'] ?? null;
     $hasOld = ! in_array($oldValue, [null, ''], true);
@@ -17,7 +19,7 @@
 @if ($hasOld || $hasNew || $values !== [])
     <span @class([
         'flex min-w-0 gap-x-1.5 gap-y-0.5',
-        'flex-col' => $stacked,
+        'flex-col items-start' => $stacked,
         'flex-wrap items-center' => ! $stacked,
     ])>
         @if ($hasOld)
@@ -60,13 +62,20 @@
             @endif
 
             @if ($isLong)
-                <span class="min-w-0" x-data="{ open: false }">
+                <span
+                    class="min-w-0"
+                    x-data="{ open: false, overflows: false }"
+                    x-init="$nextTick(() => overflows = $refs.text.scrollHeight > $refs.text.clientHeight + 1)"
+                >
                     <span
+                        x-ref="text"
                         class="line-clamp-2 whitespace-pre-wrap break-words text-sm text-gray-900 dark:text-white"
                         x-bind:class="open && '!line-clamp-none'"
                     >{{ $newValue }}</span>
                     <button
                         type="button"
+                        x-show="overflows || open"
+                        x-cloak
                         x-on:click="open = ! open"
                         x-bind:aria-expanded="open"
                         class="text-xs font-medium text-primary-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-primary-400"
@@ -76,7 +85,7 @@
                     </button>
                 </span>
             @else
-                @php($parts = \Relaticle\Chat\Support\RecordNameResolver::planLabelParts((string) $newValue))
+                @php($parts = \Relaticle\Chat\Support\RecordNameResolver::chipParts((string) $newValue, $refLinks))
                 @foreach ($parts as $part)
                     @if ($part['isNew'])
                         <span class="inline-flex max-w-full items-center gap-1 rounded-md bg-primary-50 px-1.5 text-xs font-medium leading-5 text-primary-700 dark:bg-primary-400/10 dark:text-primary-300" data-proposal-ref>

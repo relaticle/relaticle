@@ -11,6 +11,7 @@
     $isExcludable = $isExcludable ?? false;
     $isExcluded = $isExcluded ?? false;
     $clamp = $clamp ?? true;
+    $refLinks = $refLinks ?? [];
     $pairLength = mb_strlen((string) ($row['old'] ?? '')) + mb_strlen((string) ($row['new'] ?? $row['value'] ?? ''));
 @endphp
 <div class="group/field flex items-start gap-3">
@@ -60,7 +61,7 @@
             'line-through opacity-60' => $isExcluded,
         ])>
             <span class="min-w-0 flex-1 leading-5">
-                @include('chat::livewire.chat.partials._dock-value', ['row' => $row, 'stack' => $pairLength > 28, 'clampable' => $clamp])
+                @include('chat::livewire.chat.partials._dock-value', ['row' => $row, 'stack' => $pairLength > 28, 'clampable' => $clamp, 'refLinks' => $refLinks])
             </span>
 
             @if ($isEditable)
@@ -80,8 +81,8 @@
                 type="button"
                 wire:click="toggleField(@js($row['code'] ?? ''))"
                 @class([
-                    'inline-flex min-h-8 min-w-8 shrink-0 items-center justify-center rounded-md transition focus-visible:visible focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500',
-                    'text-gray-400 hover:bg-gray-100 hover:text-gray-700 sm:invisible sm:group-hover/field:visible dark:hover:bg-white/10 dark:hover:text-gray-200' => ! $isExcluded,
+                    'inline-flex min-h-8 min-w-8 shrink-0 items-center justify-center rounded-md transition focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500',
+                    'text-gray-400 hover:bg-gray-100 hover:text-gray-700 sm:opacity-0 sm:group-hover/field:opacity-100 dark:hover:bg-white/10 dark:hover:text-gray-200' => ! $isExcluded,
                     'px-1.5 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400' => $isExcluded,
                 ])
                 aria-label="{{ $isExcluded ? __('Keep :field', ['field' => $row['label'] ?? '']) : __('Leave out :field', ['field' => $row['label'] ?? '']) }}"

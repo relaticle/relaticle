@@ -3,8 +3,7 @@
     $approvableSteps = array_filter($steps, fn (array $step): bool => ! $step['needsOwnApproval']);
     $totalRecordCount = array_sum(array_map(fn (array $step): int => $step['isBatch'] ? count($step['items']) : 1, $approvableSteps));
     $countedSteps = array_filter($approvableSteps, fn (array $step): bool => ! in_array($step['id'], $leftOutStepIds, true) && ! isset($takenBy[$step['id']]));
-    $hasDelete = array_filter($countedSteps, fn (array $step): bool => $step['operation'] === 'delete') !== [];
-    $isOnlyOwnApproval = $isPlan && $approvableSteps === [];
+    $hasDelete = array_filter($countedSteps, fn (array $step): bool => $step['deletes']) !== [];
     $isWebAccess = ! $isPlan && ($steps[0]['entity_type'] ?? null) === \Relaticle\Chat\Enums\ProposalEntity::WebAccess->value;
     $holdsOwnApproval = ! $isPlan && ($steps[0]['needsOwnApproval'] ?? false);
     $isStandaloneBatch = ! $isPlan && ($steps[0]['isBatch'] ?? false);
@@ -21,7 +20,7 @@
         $showPrimary = $approvableRecordCount > 0;
         $discardLabel = __('Discard all');
     } else {
-        $isBatchApproval = $isStandaloneBatch && ! $holdsOwnApproval && $operation !== 'delete';
+        $isBatchApproval = $isStandaloneBatch && ! $holdsOwnApproval && ! $steps[0]['deletes'];
         $primaryLabel = $isBatchApproval
             ? trans_choice('Approve :count change|Approve :count changes', $approvableRecordCount, ['count' => $approvableRecordCount])
             : ($proposal?->entity_type->confirmLabel($proposal->operation, max($decisionCount, 1)) ?? __('Approve'));
@@ -31,11 +30,11 @@
 
     $primaryAction = $isPlan || ($isStandaloneBatch && ! $holdsOwnApproval) ? 'approveAll' : 'createCurrent';
     $discardAction = $isPlan ? 'discardAll' : 'discardCurrent';
-    $isDestructive = $isPlan ? $hasDelete : $operation === 'delete';
+    $isDestructive = $isPlan ? $hasDelete : ($steps[0]['deletes'] ?? false);
     $primaryIsSend = $holdsOwnApproval;
     $showsShortcut = ! $primaryIsRisky;
 
-    // Every change of an update unchecked: approving would write nothing, so
+    // Every change of an update left out: approving would write nothing, so
     // the confirm is disabled rather than minting an "Approved" no-op.
     $allChangesExcluded = ! $isPlan
         && $operation === 'update'
@@ -44,7 +43,7 @@
     $primaryBlocked = $editingFieldCode !== null || $allChangesExcluded;
     $primaryBlockedHint = $editingFieldCode !== null
         ? __('Finish editing the field first')
-        : __('Every change is unchecked; there is nothing to save');
+        : __('Every change is left out; there is nothing to approve');
 @endphp
 
 <div class="flex min-h-0 flex-col">
@@ -57,7 +56,7 @@
         {{-- fi-fixed-positioning-context makes a Select open its options with
              position: fixed, so the steps scroller below cannot clip them. --}}
         <div class="fi-fixed-positioning-context flex min-h-0 flex-col overflow-hidden rounded-xl border border-primary-200 bg-[var(--surface-block-bg)] ring-[3px] ring-primary-100 dark:border-primary-400/30 dark:ring-primary-400/10">
-            @if ($isPlan && ! $isOnlyOwnApproval)
+            @if ($isPlan)
                 <div class="flex shrink-0 items-center gap-2.5 border-b border-gray-100 px-4 py-2.5 dark:border-white/5">
                     <p class="min-w-0 flex-1 truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white">
                         {{ $approvableRecordCount === $totalRecordCount
@@ -83,7 +82,7 @@
                 'divide-y divide-gray-100 dark:divide-white/5' => $isPlan,
             ])>
                 @foreach ($steps as $step)
-                    @include('chat::livewire.chat.partials._dock-step', ['step' => $step, 'isPlan' => $isPlan, 'ownButton' => $isOnlyOwnApproval])
+                    @include('chat::livewire.chat.partials._dock-step', ['step' => $step, 'isPlan' => $isPlan])
                 @endforeach
             </div>
 

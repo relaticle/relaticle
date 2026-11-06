@@ -80,33 +80,48 @@ final readonly class RecordNameResolver
     }
 
     /**
-     * Splits a stored display value into plain text and the records an earlier step
-     * of the turn will create, so a card can draw the latter as a "new" chip.
+     * How a display row names a record an earlier step will create.
+     */
+    public static function planLabel(string $name, int $step): string
+    {
+        return __(':name (step :step)', ['name' => $name, 'step' => $step]);
+    }
+
+    /**
+     * Splits a display value into plain text and the linked records among it. Only the exact
+     * text of a link becomes a chip, so free text never does.
      *
+     * @param  list<array{display: string, name: string, isNew: bool}>  $links
      * @return list<array{text: string, isNew: bool}>
      */
-    public static function planLabelParts(string $value): array
+    public static function chipParts(string $value, array $links): array
     {
-        $template = __(':name (step :step)', ['name' => '@@NAME@@', 'step' => '@@STEP@@']);
-        $pattern = '/^'.str_replace(['@@NAME@@', '@@STEP@@'], ['(.+)', '\d+'], preg_quote($template, '/')).'$/u';
-        $parts = [];
+        $parts = [['text' => $value, 'isNew' => false]];
 
-        foreach (explode(', ', $value) as $piece) {
-            if (preg_match($pattern, $piece, $matches) === 1) {
-                $parts[] = ['text' => $matches[1], 'isNew' => true];
+        foreach ($links as $link) {
+            $next = [];
 
-                continue;
+            foreach ($parts as $part) {
+                if ($part['isNew'] || $link['display'] === '' || ! str_contains($part['text'], $link['display'])) {
+                    $next[] = $part;
+
+                    continue;
+                }
+
+                foreach (explode($link['display'], $part['text']) as $position => $piece) {
+                    if ($position > 0) {
+                        $next[] = ['text' => $link['name'], 'isNew' => $link['isNew']];
+                    }
+
+                    $text = trim($piece, ', ');
+
+                    if ($text !== '') {
+                        $next[] = ['text' => $text, 'isNew' => false];
+                    }
+                }
             }
 
-            $last = array_key_last($parts);
-
-            if ($last !== null && ! $parts[$last]['isNew']) {
-                $parts[$last]['text'] .= ', '.$piece;
-
-                continue;
-            }
-
-            $parts[] = ['text' => $piece, 'isNew' => false];
+            $parts = $next;
         }
 
         return $parts;
@@ -153,9 +168,7 @@ final readonly class RecordNameResolver
 
         $step = $this->stepNumber($action);
 
-        return $step === null
-            ? $title
-            : __(':name (step :step)', ['name' => $title, 'step' => $step]);
+        return $step === null ? $title : self::planLabel($title, $step);
     }
 
     /**

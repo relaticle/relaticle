@@ -189,15 +189,20 @@ final readonly class ProposalPlanService
      * row index. Such a row cannot be left out on its own: the link would dangle.
      *
      * @param  list<PendingAction>  $steps
+     * @param  list<string>  $ignoredLinkers  steps that no longer hold a row in, because they are left out
      * @return array<string, array<int, PendingAction>>
      */
-    public function linkedRows(array $steps): array
+    public function linkedRows(array $steps, array $ignoredLinkers = []): array
     {
         $pending = $this->pendingAmong($steps);
         $pendingIds = array_map(static fn (PendingAction $step): string => (string) $step->getKey(), $pending);
         $linked = [];
 
         foreach ($pending as $step) {
+            if (in_array((string) $step->getKey(), $ignoredLinkers, true)) {
+                continue;
+            }
+
             foreach (PlanReference::targetsIn($step->action_data) as $target) {
                 $index = PlanReference::index($target);
                 $targetId = PlanReference::actionId($target);
