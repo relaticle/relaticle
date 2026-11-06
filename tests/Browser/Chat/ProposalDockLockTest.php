@@ -114,6 +114,7 @@ it('approves a three-step plan with Cmd+Enter', function (): void {
 
     $page->assertSeeIn(LOCK_TEST_DOCK, 'Approve 3 changes')
         ->keys(LOCK_TEST_DOCK, 'Control+Enter')
+        ->waitForText('Applied 3 changes')
         ->assertMissing('[data-proposal-shortcut]');
 
     expect(Company::query()->withoutGlobalScopes()->where('workspace_id', $conversation['workspace']->getKey())->count())->toBe(3)
@@ -215,6 +216,7 @@ it('locks the box and approves a plan with Cmd+Enter in the side panel', functio
 
     $page->assertSeeIn('[data-chat-side-panel] '.LOCK_TEST_DOCK, 'Approve 2 changes')
         ->keys('[data-chat-side-panel] '.LOCK_TEST_DOCK, 'Control+Enter')
+        ->waitForText('Applied 2 changes')
         ->assertMissing('[data-proposal-shortcut]');
 
     $page->wait(0.5);
