@@ -38,6 +38,11 @@ final readonly class PlainText
         return self::squished(self::markTaskItems($html));
     }
 
+    public static function fromHtmlWithoutTaskMarkers(string $html): string
+    {
+        return self::squished($html);
+    }
+
     public static function linesFromHtml(string $html): string
     {
         return collect(preg_split(self::BLOCK_BOUNDARY, self::markTaskItems($html)) ?: [])

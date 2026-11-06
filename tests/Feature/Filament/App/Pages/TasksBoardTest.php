@@ -469,11 +469,13 @@ it('shows checklist progress on a task card', function (): void {
         ->assertSee('1/2');
 });
 
-it('reads a card description as separate words and checklist items', function (): void {
+it('reads a card description as separate words and leaves the ticks to the badge', function (): void {
     tasksBoardCardWithDescription($this, '<p>Agenda</p><p>Venue</p>'.tasksBoardChecklistHtml());
 
     livewire(TasksBoard::class)
-        ->assertSee('Agenda Venue [x] Call Bob [ ] Send quote');
+        ->assertSee('Agenda Venue Call Bob Send quote')
+        ->assertDontSee('[x]')
+        ->assertDontSee('[ ]');
 });
 
 it('shows markup typed into a card description as text', function (): void {
@@ -482,6 +484,24 @@ it('shows markup typed into a card description as text', function (): void {
     livewire(TasksBoard::class)
         ->assertSeeHtml('&lt;b&gt;literal&lt;/b&gt;')
         ->assertDontSeeHtml('<b>literal</b>');
+});
+
+it('turns the checklist badge green once every item is ticked', function (): void {
+    tasksBoardCardWithDescription($this, str_replace('data-checked="false"', 'data-checked="true"', tasksBoardChecklistHtml()));
+
+    livewire(TasksBoard::class)
+        ->assertSee('2/2')
+        ->assertSeeHtml('fi-color-success')
+        ->assertSeeHtml('2 of 2 items done');
+});
+
+it('keeps an unfinished checklist badge gray with its count in a tooltip', function (): void {
+    tasksBoardCardWithDescription($this, tasksBoardChecklistHtml());
+
+    livewire(TasksBoard::class)
+        ->assertSee('1/2')
+        ->assertDontSeeHtml('fi-color-success')
+        ->assertSeeHtml('1 of 2 items done');
 });
 
 it('names the checklist badge from the lang file', function (): void {

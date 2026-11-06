@@ -56,7 +56,7 @@ final class TasksBoard extends BoardResourcePage
 
     protected static string $resource = TaskResource::class;
 
-    /** @var WeakMap<Task, array{preview: string, progress: ?string}>|null */
+    /** @var WeakMap<Task, array{preview: string, progress: array{checked: int, total: int}|null}>|null */
     private ?WeakMap $cardSummaries = null;
 
     public function getTitle(): string
@@ -157,7 +157,7 @@ final class TasksBoard extends BoardResourcePage
             ->extraAttributes(['class' => 'mb-4']);
     }
 
-    /** @return array{preview: string, progress: ?string} */
+    /** @return array{preview: string, progress: array{checked: int, total: int}|null} */
     private function cardSummary(Task $record): array
     {
         $this->cardSummaries ??= new WeakMap;
@@ -165,17 +165,16 @@ final class TasksBoard extends BoardResourcePage
         return $this->cardSummaries[$record] ??= $this->summarizeCard($record);
     }
 
-    /** @return array{preview: string, progress: ?string} */
+    /** @return array{preview: string, progress: array{checked: int, total: int}|null} */
     private function summarizeCard(Task $record): array
     {
         $field = $this->descriptionCustomField();
         $description = $field instanceof CustomField ? $record->getCustomFieldValue($field) : null;
         $description = is_string($description) ? $description : '';
-        $progress = ChecklistHtml::progress($description);
 
         return [
-            'preview' => Str::limit(PlainText::fromHtml($description)),
-            'progress' => $progress === null ? null : "{$progress['checked']}/{$progress['total']}",
+            'preview' => Str::limit(PlainText::fromHtmlWithoutTaskMarkers($description)),
+            'progress' => ChecklistHtml::progress($description),
         ];
     }
 
@@ -185,12 +184,28 @@ final class TasksBoard extends BoardResourcePage
             ->label(__('filament/pages/boards.tasks.checklist_progress'))
             ->hiddenLabel()
             ->badge()
-            ->color('gray')
+            ->color(fn (Task $record): string => $this->checklistIsDone($record) ? 'success' : 'gray')
             ->icon('heroicon-o-check-circle')
             ->grow(false)
             ->extraAttributes(['data-checklist-progress' => ''])
-            ->state(fn (Task $record): ?string => $this->cardSummary($record)['progress'])
+            ->state(function (Task $record): ?string {
+                $progress = $this->cardSummary($record)['progress'];
+
+                return $progress === null ? null : "{$progress['checked']}/{$progress['total']}";
+            })
+            ->tooltip(function (Task $record): ?string {
+                $progress = $this->cardSummary($record)['progress'];
+
+                return $progress === null ? null : trans_choice('filament/pages/boards.tasks.checklist_progress_tooltip', $progress['total'], $progress);
+            })
             ->visible(fn (?string $state): bool => filled($state));
+    }
+
+    private function checklistIsDone(Task $record): bool
+    {
+        $progress = $this->cardSummary($record)['progress'];
+
+        return $progress !== null && $progress['checked'] === $progress['total'];
     }
 
     /**

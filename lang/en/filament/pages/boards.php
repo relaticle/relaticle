@@ -52,5 +52,6 @@ return [
             'unassigned' => 'Unassigned',
         ],
         'checklist_progress' => 'Checklist progress',
+        'checklist_progress_tooltip' => '{1} :checked of :total item done|[2,*] :checked of :total items done',
     ],
 ];
