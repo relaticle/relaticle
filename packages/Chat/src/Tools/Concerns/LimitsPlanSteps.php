@@ -25,7 +25,7 @@ trait LimitsPlanSteps
             return null;
         }
 
-        $maxSteps = (int) config('chat.max_plan_steps', 6);
+        $maxSteps = (int) config('chat.max_plan_steps', 5);
 
         $steps = PendingAction::query()
             ->where('conversation_id', $conversationId)

@@ -12,10 +12,12 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Field;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Event;
 use Laravel\Pennant\Feature;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Events\PendingActionResolved;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\PlanReference;
@@ -579,6 +581,33 @@ describe('the change list', function (): void {
             ->assertDontSeeText('Create Person')
             ->assertDontSeeText('(none)');
     });
+});
+
+it('broadcasts a full plan of batches small enough for Reverb, naming only the rows left out', function (): void {
+    Bus::fake();
+    Event::fake([PendingActionResolved::class]);
+    [$conversationId, $turnId] = ProposalCardFixture::startPlan($this->user);
+    $steps = array_map(
+        fn (int $step): PendingAction => ProposalCardFixture::planProposal(CreateTaskTool::class, $conversationId, $turnId, array_map(
+            fn (int $row): array => ['title' => "Step {$step} task {$row}"],
+            range(1, 25),
+        )),
+        range(1, (int) config('chat.max_plan_steps')),
+    );
+
+    Livewire::test(ProposalCard::class)
+        ->call('setActive', $steps[0]->getKey())
+        ->call('toggleLeftOutRow', (string) $steps[0]->getKey(), 3)
+        ->call('approveAll');
+
+    $final = Event::dispatched(PendingActionResolved::class)->map(fn (array $args): PendingActionResolved => $args[0])->last();
+    $receipts = $final->broadcastWith()['receipts'];
+
+    expect(strlen((string) json_encode($final->broadcastWith())))->toBeLessThan(4000)
+        ->and($receipts)->toHaveCount(count($steps))
+        ->and($receipts[(string) $steps[0]->getKey()]['itemResults'])->toBe(['3' => ['status' => 'skipped', 'outcome' => 'left_out', 'excluded' => []]])
+        ->and($receipts[(string) $steps[1]->getKey()]['itemResults'])->toBe([])
+        ->and(Task::query()->where('title', 'like', 'Step %')->count())->toBe(count($steps) * 25 - 1);
 });
 
 it('refuses a client-set editing target, so one payload cannot open the same field on every step', function (): void {

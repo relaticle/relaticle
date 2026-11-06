@@ -40,6 +40,29 @@ final readonly class ProposalReceiptsQuery
     }
 
     /**
+     * @return array<string, Receipt>
+     */
+    public function forPlanBroadcastOf(PendingAction $step): array
+    {
+        // Reverb caps a message at 10 KB, so a decided step drops the rows it applied as
+        // proposed; transcript.js reads a missing row as applied.
+        $receipts = $this->forPlanOf($step);
+
+        foreach ($receipts as $id => $receipt) {
+            if ($receipt['outcome'] === null) {
+                continue;
+            }
+
+            $receipts[$id]['itemResults'] = array_filter(
+                $receipt['itemResults'],
+                fn (array $row): bool => $row['outcome'] !== ProposalOutcome::Applied->value || $row['excluded'] !== [],
+            );
+        }
+
+        return $receipts;
+    }
+
+    /**
      * Only this step's receipt: what a row decision changes. A pending step has
      * no outcome yet, so no sibling can alter it.
      *

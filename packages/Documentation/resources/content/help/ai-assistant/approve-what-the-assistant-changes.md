@@ -52,7 +52,7 @@ meeting notes" arrives as one card that lists all five. Leave out the ones
 you don't want and approve the rest. Deletes work the same way.
 
 A request that needs several linked changes, such as a new company with a
-person and a task attached, arrives as one plan of up to 6 linked steps. A record
+person and a task attached, arrives as one plan of up to 5 linked steps. A record
 the plan creates and another change links to is marked **new**. Leave out
 that record and the changes that link to it go with it; the card tells you
 which, with **Keep** to bring them back. You approve the plan once.

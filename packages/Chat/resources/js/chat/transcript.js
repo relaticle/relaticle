@@ -1479,10 +1479,13 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
             Object.assign(action, facts);
 
             if (Object.keys(itemResults || {}).length > 0) {
-                action.itemResults = Object.fromEntries(Object.entries(itemResults).map(([index, result]) => [
-                    index,
-                    { record: null, ...(action.itemResults?.[index] ?? {}), ...result },
-                ]));
+                action.itemResults = {
+                    ...action.itemResults,
+                    ...Object.fromEntries(Object.entries(itemResults).map(([index, result]) => [
+                        index,
+                        { record: null, ...(action.itemResults?.[index] ?? {}), ...result },
+                    ])),
+                };
             }
         }
     },
