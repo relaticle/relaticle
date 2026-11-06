@@ -279,9 +279,23 @@
                     @endforeach
 
                     @if (count($row->records) > 1)
-                        <span class="text-xs font-medium text-gray-400 sm:hidden dark:text-gray-500">
-                            {{ __('filament/pages/email-inbox.conversation_row.more_records', ['count' => count($row->records) - 1]) }}
-                        </span>
+                        <x-filament::dropdown placement="bottom-start" class="sm:hidden" data-reader-links-overflow>
+                            <x-slot name="trigger">
+                                <button
+                                    type="button"
+                                    aria-label="{{ __('filament/pages/email-inbox.drawer.links.more', ['count' => count($row->records) - 1]) }}"
+                                    class="inline-flex items-center rounded-md px-1.5 py-1 text-xs font-medium leading-4 text-gray-500 ring-1 ring-inset ring-gray-200 outline-none hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-gray-400 dark:ring-white/10 dark:hover:bg-white/5"
+                                >
+                                    {{ __('filament/pages/email-inbox.conversation_row.more_records', ['count' => count($row->records) - 1]) }}
+                                </button>
+                            </x-slot>
+
+                            @foreach (array_slice($row->records, 1) as $record)
+                                <x-filament::dropdown.list wire:key="reader-link-more-{{ $email->getKey() }}-{{ $record['type'] }}-{{ $record['id'] }}">
+                                    <x-email-integration::record-chip :record="$record" :unlink-email-id="$email->getKey()" menu-items />
+                                </x-filament::dropdown.list>
+                            @endforeach
+                        </x-filament::dropdown>
                     @endif
 
                     <button

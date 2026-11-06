@@ -386,6 +386,8 @@ return [
             'menu' => 'Options for :name',
             'open' => 'Open record',
             'unlink' => 'Unlink',
+            'unlink_named' => 'Unlink :name',
+            'more' => 'Show :count more linked records',
             'not_reached' => 'Only people who hold this conversation, or who were given full access to it, can change its records.',
             'this_record' => 'this record',
             'types' => [

@@ -484,6 +484,11 @@ it('shows a chip for every record the open conversation is on, past the three a 
     foreach ($records as $record) {
         $page->assertSeeHtml('data-linked-record="'.$record->getMorphClass().':'.$record->getKey().'"');
     }
+
+    preg_match_all('/data-unlink-record="([a-z]+:[^"]+)"/', $page->html(), $overflow);
+
+    expect($overflow[1])->toHaveCount(3)
+        ->and(array_diff($overflow[1], array_map(fn (Company|Opportunity $record): string => $record->getMorphClass().':'.$record->getKey(), $records)))->toBe([]);
 });
 
 it('searches only the records of the bound workspace and stops at twenty', function (): void {

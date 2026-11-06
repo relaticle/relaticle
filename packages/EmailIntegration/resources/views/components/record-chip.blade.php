@@ -1,4 +1,4 @@
-@props(['record', 'unlinkEmailId' => null])
+@props(['record', 'unlinkEmailId' => null, 'menuItems' => false])
 
 @php
     use App\Filament\Resources\CompanyResource;
@@ -13,7 +13,20 @@
     $chipClasses = 'max-w-[9rem] items-center truncate rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium leading-4 text-gray-600 hover:bg-gray-200 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10';
 @endphp
 
-@if ($unlinkEmailId === null)
+@if ($menuItems)
+    <x-filament::dropdown.list.item tag="a" :href="$url" icon="ri-external-link-line">
+        {{ $record['name'] }}
+    </x-filament::dropdown.list.item>
+
+    <x-filament::dropdown.list.item
+        icon="ri-link-unlink"
+        color="danger"
+        data-unlink-record="{{ $record['type'] }}:{{ $record['id'] }}"
+        wire:click="mountAction('unlinkRecord', {{ Js::from(['emailId' => $unlinkEmailId, 'targetType' => $record['type'], 'targetId' => $record['id']]) }})"
+    >
+        {{ __('filament/pages/email-inbox.drawer.links.unlink_named', ['name' => $record['name']]) }}
+    </x-filament::dropdown.list.item>
+@elseif ($unlinkEmailId === null)
     <a
         href="{{ $url }}"
         {{ $attributes->class([$chipClasses]) }}

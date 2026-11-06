@@ -113,7 +113,34 @@ it('unlinks a chip from its keyboard menu and links it back from Undo', function
         ->assertVisible($chip)
         ->assertNoJavaScriptErrors();
 
-    expect(emailLinkSource($this->email, $this->company))->toBe('manual');
+    expect(emailLinkSource($this->email, $this->company))->toBe('auto');
+})->with(['inLightMode', 'inDarkMode']);
+
+it('unlinks a record from the overflow menu on a phone', function (string $theme): void {
+    $stripe = Company::factory()->create(['workspace_id' => $this->workspace->id, 'name' => 'Stripe']);
+    $this->company->emails()->attach($this->email->id, ['link_source' => 'auto']);
+    $stripe->emails()->attach($this->email->id, ['link_source' => 'auto']);
+    $records = [$this->company, $stripe];
+    usort($records, fn (Company $a, Company $b): int => strcmp($a->name, $b->name));
+    $hidden = '[data-email-reader] [data-reader-links-overflow] [data-unlink-record="company:'.$records[1]->id.'"]';
+
+    $page = loginViaBrowser($this->owner, $theme)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(390, 844)
+        ->navigate("/app/{$this->workspace->slug}/email?view=all")
+        ->click('[data-conversation="conv-airbnb"] > button')
+        ->assertSeeIn('#email-reader-heading', 'Renewal terms')
+        ->click('[data-email-reader] [data-reader-links-overflow] button[aria-haspopup="menu"]')
+        ->assertVisible($hidden)
+        ->click($hidden)
+        ->assertSee('Remove this conversation from '.$records[1]->name.'?')
+        ->click('.fi-modal-window .fi-modal-footer-actions button[type="submit"]')
+        ->assertSee('Removed from '.$records[1]->name)
+        ->assertMissing('[data-email-reader] [data-reader-links-overflow]')
+        ->assertNoJavaScriptErrors();
+
+    expect(emailLinkSource($this->email, $records[1]))->toBeNull()
+        ->and(emailLinkSource($this->email, $records[0]))->toBe('auto');
 })->with(['inLightMode', 'inDarkMode']);
 
 it('groups an unlinked sender and creates a person from the group', function (string $theme): void {
