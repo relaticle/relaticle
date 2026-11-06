@@ -31,11 +31,12 @@ final readonly class UnlinkEmailFromRecord
     {
         $conversationKey = filled($email->conversation_key) ? (string) $email->conversation_key : null;
 
-        [$changed, $previousAudience] = DB::transaction(function () use ($user, $email, $record, $conversationKey): array {
+        $previousAudience = $conversationKey !== null && ConversationChanged::broadcasts()
+            ? $this->conversations->audience($email->workspace_id, $conversationKey)
+            : [];
+
+        $changed = DB::transaction(function () use ($user, $email, $record): array {
             $ids = $this->prepare->execute($user, $email, $record)->modelKeys();
-            $previousAudience = $conversationKey !== null && ConversationChanged::broadcasts()
-                ? $this->conversations->audience($email->workspace_id, $conversationKey)
-                : [];
             $changed = $this->changedCopies($email, $record, array_values(array_map(strval(...), $ids)));
 
             $record->emails()->detach($ids);
@@ -52,7 +53,7 @@ final readonly class UnlinkEmailFromRecord
                 'created_at' => $now,
             ], $ids));
 
-            return [$changed, $previousAudience];
+            return $changed;
         });
 
         dispatch(new RecomputeRecordEmailMetricsJob($record))->afterCommit();
