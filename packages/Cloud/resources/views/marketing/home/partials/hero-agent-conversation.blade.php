@@ -146,17 +146,7 @@
          as _proposal-receipt.blade.php renders it. --}}
     <div class="mcp-el mcp-audit-card my-2 w-full" aria-hidden="true">
         <p class="px-2 text-xs text-gray-500 dark:text-gray-400">Applied 1 change &middot; just now</p>
-        <div class="mt-1 flex min-w-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-gray-700 dark:text-gray-300">
-            <x-heroicon-o-check class="size-4 shrink-0 text-gray-500 dark:text-gray-400"/>
-            <span class="shrink-0 whitespace-nowrap">Updated</span>
-            <span class="chat-chip min-w-0" data-proposal-record-chip data-record-type="task">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3 w-3" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="{{ $heroChipIcons['task'] }}"/>
-                </svg>
-                <span class="chat-chip-label">Schedule demo with Kovra Systems</span>
-            </span>
-            <span class="min-w-0 truncate text-gray-500 dark:text-gray-400">&middot; Status</span>
-        </div>
+        <x-cloud::marketing.rela-receipt-line class="mt-1" verb="Updated" type="task" name="Schedule demo with Kovra Systems" meta="Status"/>
     </div>
 
     {{-- Deciding a proposal resumes the turn (TurnContinuationService), so what
@@ -199,16 +189,7 @@
 
     <div class="mcp-el mcp-create-card my-2 w-full" aria-hidden="true">
         <p class="px-2 text-xs text-gray-500 dark:text-gray-400">Applied 1 change &middot; just now</p>
-        <div class="mt-1 flex min-w-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-gray-700 dark:text-gray-300">
-            <x-heroicon-o-check class="size-4 shrink-0 text-gray-500 dark:text-gray-400"/>
-            <span class="shrink-0 whitespace-nowrap">Created</span>
-            <span class="chat-chip min-w-0" data-proposal-record-chip data-record-type="people">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3 w-3" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="{{ $heroChipIcons['people'] }}"/>
-                </svg>
-                <span class="chat-chip-label">Sarah Chen</span>
-            </span>
-        </div>
+        <x-cloud::marketing.rela-receipt-line class="mt-1" verb="Created" type="people" name="Sarah Chen"/>
     </div>
 
     <div class="mcp-el mcp-create-done w-full min-w-0 px-1 py-1 text-sm leading-relaxed text-gray-900 dark:text-gray-100" aria-hidden="true">
