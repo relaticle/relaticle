@@ -532,6 +532,26 @@ describe('the change list', function (): void {
         expect($component->instance()->linkedRowIndexes())->toBe([]);
     });
 
+    it('writes a linked row again once the step that links to it is kept', function (): void {
+        Bus::fake();
+        [$conversationId, $turnId] = ProposalCardFixture::startPlan($this->user);
+        $batch = ProposalCardFixture::planProposal(CreatePersonTool::class, $conversationId, $turnId, [['name' => 'Ada Fp'], ['name' => 'Grace Fp']]);
+        $task = ProposalCardFixture::planProposal(CreateTaskTool::class, $conversationId, $turnId, [
+            ['title' => 'Call Grace', 'people_ids' => [PlanReference::to((string) $batch->getKey(), 1)]],
+        ]);
+
+        Livewire::test(ProposalCard::class)
+            ->call('setActive', $batch->getKey())
+            ->call('toggleLeftOut', (string) $task->getKey())
+            ->call('toggleLeftOutRow', (string) $batch->getKey(), 1)
+            ->call('toggleLeftOut', (string) $task->getKey())
+            ->assertSeeText('Approve 3 changes')
+            ->call('approveAll');
+
+        expect(People::query()->whereIn('name', ['Ada Fp', 'Grace Fp'])->count())->toBe(2)
+            ->and(Task::query()->where('title', 'Call Grace')->exists())->toBeTrue();
+    });
+
     it('draws a chip only for a record the plan links to, never for free text', function (): void {
         [$conversationId, $turnId] = ProposalCardFixture::startPlan($this->user);
         $company = ProposalCardFixture::planProposal(CreateCompanyTool::class, $conversationId, $turnId, [['name' => 'Acme, Inc.']]);

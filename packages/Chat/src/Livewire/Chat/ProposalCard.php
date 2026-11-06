@@ -1030,6 +1030,7 @@ final class ProposalCard extends BaseLivewireComponent
         $this->leftOutSteps = in_array($stepId, $leftOut, true)
             ? array_values(array_diff($leftOut, [$stepId]))
             : [...$leftOut, $stepId];
+        $this->leftOutRows = $this->leftOutRowMap();
     }
 
     /**
@@ -1040,6 +1041,7 @@ final class ProposalCard extends BaseLivewireComponent
     public function keepLeftOut(array $stepIds): void
     {
         $this->leftOutSteps = array_values(array_diff($this->leftOutSteps, array_filter($stepIds, is_string(...))));
+        $this->leftOutRows = $this->leftOutRowMap();
     }
 
     /**
@@ -1096,11 +1098,9 @@ final class ProposalCard extends BaseLivewireComponent
      */
     public function linkedRowIndexes(): array
     {
-        $leftOut = [...$this->leftOutSteps, ...array_keys($this->leftOutDependents())];
-
         return array_map(
             fn (array $rows): array => array_map($this->stepSummary(...), $rows),
-            resolve(ProposalPlanService::class)->linkedRows($this->planAllSteps(), $leftOut),
+            $this->linkedRows(),
         );
     }
 
@@ -1310,7 +1310,24 @@ final class ProposalCard extends BaseLivewireComponent
      */
     private function leftOutRowMap(): array
     {
-        return $this->leftOutRows;
+        $linked = $this->linkedRows();
+        $map = [];
+
+        foreach ($this->leftOutRows as $stepId => $indexes) {
+            $map[$stepId] = array_values(array_filter($indexes, fn (int $index): bool => ! isset($linked[$stepId][$index])));
+        }
+
+        return $map;
+    }
+
+    /**
+     * @return array<string, array<int, PendingAction>>
+     */
+    private function linkedRows(): array
+    {
+        $leftOut = [...$this->leftOutSteps, ...array_keys($this->leftOutDependents())];
+
+        return resolve(ProposalPlanService::class)->linkedRows($this->planAllSteps(), $leftOut);
     }
 
     private function planStepById(string $stepId): ?PendingAction
