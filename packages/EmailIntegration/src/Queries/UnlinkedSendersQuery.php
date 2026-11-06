@@ -143,8 +143,7 @@ final readonly class UnlinkedSendersQuery
     {
         return $this->unlinked($query)
             ->where('emails.direction', EmailDirection::INBOUND)
-            ->where('emails.is_internal', false)
-            ->whereNull('emails.automated_reason');
+            ->where('emails.is_internal', false);
     }
 
     /**
@@ -155,6 +154,11 @@ final readonly class UnlinkedSendersQuery
     {
         return $query
             ->whereNotNull('emails.conversation_key')
+            ->whereExists(fn (BaseBuilder $conversation): BaseBuilder => $conversation
+                ->from('email_conversations')
+                ->whereColumn('email_conversations.workspace_id', 'emails.workspace_id')
+                ->whereColumn('email_conversations.conversation_key', 'emails.conversation_key')
+                ->whereRaw('not email_conversations.is_automated'))
             ->whereNotExists(fn (BaseBuilder $link): BaseBuilder => $link
                 ->from('emailables')
                 ->join('emails as linked_copies', 'linked_copies.id', '=', 'emailables.email_id')

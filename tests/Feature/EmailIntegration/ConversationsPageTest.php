@@ -1563,6 +1563,17 @@ it('groups a conversation the viewer only wrote in under its first outside recip
         ->and($page->instance()->viewCounts['unlinked'])->toBe(count($rows));
 });
 
+it('groups an automated message in a conversation people answered, as the badge counts it', function (): void {
+    conversationsPageMessage($this->ownerMailbox, 'conv-renewal', 'billing@stripe.test', ['automated_reason' => AutomatedReason::RoleSender]);
+    conversationsPageMessage($this->teammateMailbox, 'conv-renewal', 'olivia@stripe.test');
+    conversationsPageMessage($this->ownerMailbox, 'conv-receipts', 'receipts@stripe.test', ['automated_reason' => AutomatedReason::RoleSender]);
+
+    $page = livewire(EmailInboxPage::class)->call('setView', ConversationView::Unlinked->value);
+
+    expect(unlinkedSenderAddresses($page))->toBe(['billing@stripe.test'])
+        ->and($page->instance()->viewCounts['unlinked'])->toBe(1);
+});
+
 it('leaves a teammate unlinked mail and linked conversations out of the sender groups', function (): void {
     conversationsPageMessage($this->teammateMailbox, 'conv-ben', 'olivia@stripe.test');
     $linked = conversationsPageMessage($this->ownerMailbox, 'conv-linked', 'kim@notion.test');
