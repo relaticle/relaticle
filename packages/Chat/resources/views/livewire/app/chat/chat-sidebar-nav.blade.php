@@ -2,6 +2,7 @@
     x-data="{
         label: 'Chats',
         onKeydown(e) {
+            if (e.defaultPrevented) return;
             const tag = e.target?.tagName;
             if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target?.isContentEditable) return;
             if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;

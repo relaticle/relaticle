@@ -50,6 +50,10 @@
             wire:loading.attr="disabled"
             wire:target="selectEmail('{{ $row->viewerCopyEmailId }}')"
             aria-label="{{ $subject }}"
+            @if ($triage)
+                x-bind:tabindex="tabIndexFor(@js($row->conversationKey))"
+                x-bind:aria-keyshortcuts="$store.shortcuts?.keysFor('open')"
+            @endif
             class="absolute inset-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 data-[loading]:cursor-wait"
         ></button>
     @endif
@@ -142,10 +146,10 @@
         @php
             $buttonClass = 'items-center justify-center rounded-md p-1.5 text-gray-500 transition hover:bg-gray-100 hover:text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-100';
             $actions = [
-                ['verb' => 'markDone', 'icon' => 'ri-check-line', 'label' => 'done', 'shown' => 'inline-flex group-data-[done=true]/row:hidden', 'advance' => true],
-                ['verb' => 'reopen', 'icon' => 'ri-inbox-unarchive-line', 'label' => 'reopen', 'shown' => 'hidden group-data-[done=true]/row:inline-flex', 'advance' => false],
-                ['verb' => 'markRead', 'icon' => 'ri-mail-open-line', 'label' => 'mark_read', 'shown' => 'hidden group-data-[unread=true]/row:inline-flex', 'advance' => false],
-                ['verb' => 'markUnread', 'icon' => 'ri-mail-unread-line', 'label' => 'mark_unread', 'shown' => 'inline-flex group-data-[unread=true]/row:hidden', 'advance' => false],
+                ['verb' => 'markDone', 'icon' => 'ri-check-line', 'label' => 'done', 'shown' => 'inline-flex group-data-[done=true]/row:hidden', 'advance' => true, 'shortcut' => 'done'],
+                ['verb' => 'reopen', 'icon' => 'ri-inbox-unarchive-line', 'label' => 'reopen', 'shown' => 'hidden group-data-[done=true]/row:inline-flex', 'advance' => false, 'shortcut' => 'done'],
+                ['verb' => 'markRead', 'icon' => 'ri-mail-open-line', 'label' => 'mark_read', 'shown' => 'hidden group-data-[unread=true]/row:inline-flex', 'advance' => false, 'shortcut' => null],
+                ['verb' => 'markUnread', 'icon' => 'ri-mail-unread-line', 'label' => 'mark_unread', 'shown' => 'inline-flex group-data-[unread=true]/row:hidden', 'advance' => false, 'shortcut' => 'markUnread'],
             ];
         @endphp
 
@@ -160,6 +164,10 @@
                     x-on:click.stop="act(@js($action['verb']), [@js($row->conversationKey)], { advance: @js($action['advance']) })"
                     title="{{ __('filament/pages/email-inbox.triage.actions.'.$action['label']) }}"
                     aria-label="{{ __('filament/pages/email-inbox.triage.actions.'.$action['label']) }}"
+                    @if ($action['shortcut'] !== null)
+                        x-bind:title="$store.shortcuts?.hint(@js($action['shortcut']), @js(__('filament/pages/email-inbox.triage.actions.'.$action['label'])))"
+                        x-bind:aria-keyshortcuts="$store.shortcuts?.keysFor(@js($action['shortcut']))"
+                    @endif
                     class="{{ $action['shown'] }} {{ $buttonClass }}"
                 >
                     <x-filament::icon :icon="$action['icon']" class="size-4" />

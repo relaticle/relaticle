@@ -51,10 +51,16 @@ return [
             'skipped' => ':count ignorée(s) : :reason.',
             'undo' => 'Annuler',
             'undo_hint' => 'Annulation possible pendant 5 secondes.',
+            'undo_key_hint' => 'Appuyez sur Z pour annuler.',
             'dismiss' => 'Fermer',
         ],
     ],
     'shortcuts' => [
+        'heading' => 'Raccourcis clavier',
+        'close' => 'Fermer',
+        'single_keys_on' => 'Les raccourcis à une touche sont activés.',
+        'single_keys_off' => 'Les raccourcis à une touche sont désactivés.',
+        'profile_link' => 'Modifier dans votre profil',
         'labels' => [
             'next' => 'Conversation suivante',
             'previous' => 'Conversation précédente',

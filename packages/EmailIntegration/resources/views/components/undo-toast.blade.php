@@ -13,6 +13,7 @@
         verbs: @js($verbs),
         skippedText: @js(__('filament/pages/email-inbox.triage.toast.skipped')),
         undoHint: @js(__('filament/pages/email-inbox.triage.toast.undo_hint')),
+        undoKeyHint: @js(__('filament/pages/email-inbox.triage.toast.undo_key_hint')),
         inverse: { markDone: 'reopen', reopen: 'markDone', markRead: 'markUnread', markUnread: 'markRead' },
         verb: null,
         keys: [],
@@ -20,6 +21,19 @@
         announcement: '',
         visible: false,
         timer: null,
+        shortcut: null,
+        init() {
+            this.shortcut = this.$store.shortcuts?.register('email-undo', {
+                scope: 'global',
+                entries: @js(\Relaticle\EmailIntegration\Enums\EmailShortcut::forStore()),
+                handlers: { undo: () => this.undo() },
+                isActive: () => this.visible && this.verb !== null,
+            })
+        },
+        destroy() {
+            clearTimeout(this.timer)
+            this.$store.shortcuts?.unregister('email-undo', this.shortcut)
+        },
         show({ verb, outcome }) {
             const applied = outcome.applied.length
             const parts = applied > 0 ? [(applied === 1 ? this.verbs[verb].one : this.verbs[verb].other).replace(':count', applied)] : []
@@ -33,7 +47,7 @@
             this.verb = applied > 0 ? verb : null
             this.keys = outcome.applied
             this.text = parts.join(' ')
-            this.announcement = this.verb ? `${this.text} ${this.undoHint}` : this.text
+            this.announcement = this.verb ? `${this.text} ${this.$store.shortcuts?.keysFor('undo') ? this.undoKeyHint : this.undoHint}` : this.text
             this.visible = true
             clearTimeout(this.timer)
             this.timer = setTimeout(() => this.dismiss(), 5000)
@@ -67,6 +81,8 @@
             x-show="verb !== null"
             x-on:click="undo()"
             data-undo-action
+            x-bind:title="$store.shortcuts?.hint('undo', @js(__('filament/pages/email-inbox.triage.toast.undo')))"
+            x-bind:aria-keyshortcuts="$store.shortcuts?.keysFor('undo')"
             class="shrink-0 rounded-md px-2 py-1 font-semibold text-primary-300 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
         >
             {{ __('filament/pages/email-inbox.triage.toast.undo') }}

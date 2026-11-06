@@ -64,12 +64,6 @@
         <div class="flex flex-col gap-2 border-b border-gray-200/60 px-4 py-3 sm:flex-row sm:items-center lg:px-6 dark:border-white/10">
             <form
                 wire:submit="submitSearch"
-                x-data
-                x-on:keydown.slash.window="
-                    if ($event.ctrlKey || $event.metaKey || $event.altKey || $event.target.closest('input, textarea, select, [contenteditable], [role=dialog]')) return
-                    $event.preventDefault()
-                    $el.querySelector('input').focus()
-                "
                 class="w-full sm:max-w-sm sm:shrink-0"
                 data-conversation-search
             >
@@ -103,8 +97,138 @@
                 view: @js($this->activeView->value),
                 overrides: {},
                 pending: 0,
+                focusedKey: null,
+                hoveredKey: null,
+                registrations: [],
+                entries: @js(\Relaticle\EmailIntegration\Enums\EmailShortcut::forStore()),
+                init() {
+                    const entries = this.entries
+                    const reader = (action) => () => this.inReader(action)
+
+                    this.registrations = [
+                        this.$store.shortcuts?.register('email-list', {
+                            scope: 'list',
+                            entries,
+                            handlers: {
+                                next: () => this.move(1),
+                                previous: () => this.move(-1),
+                                open: () => this.open(),
+                                done: () => this.toggleDone(),
+                                markUnread: () => this.markUnread(),
+                                focusSearch: () => this.focusSearch(),
+                            },
+                            isActive: () => ! document.activeElement?.closest('[data-email-reader]'),
+                        }),
+                        this.$store.shortcuts?.register('email-reader', {
+                            scope: 'reader',
+                            entries,
+                            handlers: {
+                                next: reader('next'),
+                                previous: reader('previous'),
+                                close: reader('close'),
+                                done: () => this.inReader('done') || this.inReader('reopen'),
+                                markUnread: reader('mark-unread'),
+                                reply: () => this.reply('reply'),
+                                replyAll: () => this.reply('reply_all'),
+                                forward: () => this.reply('forward'),
+                            },
+                            isActive: () => document.querySelector('[data-email-reader]') !== null,
+                        }),
+                    ]
+                },
+                destroy() {
+                    ['email-list', 'email-reader'].forEach((name, index) => this.$store.shortcuts?.unregister(name, this.registrations[index]))
+                },
                 row(key) {
-                    return this.$root.querySelector(`[data-conversation='${CSS.escape(key)}']`)
+                    return key ? this.$root.querySelector(`[data-conversation='${CSS.escape(key)}']`) : null
+                },
+                rows() {
+                    return [...this.$root.querySelectorAll('[data-conversation]')].filter((row) => ! row.hidden)
+                },
+                focusedRow() {
+                    const row = document.activeElement?.closest('[data-conversation]')
+
+                    return row && this.$root.contains(row) ? row : null
+                },
+                targetRow() {
+                    const hovered = this.row(this.hoveredKey)
+
+                    return this.focusedRow() ?? (hovered && ! hovered.hidden ? hovered : null)
+                },
+                tabIndexFor(key) {
+                    const current = this.row(this.focusedKey)
+                    const roving = current && ! current.hidden ? this.focusedKey : this.rows()[0]?.dataset.conversation
+
+                    return roving === key ? 0 : -1
+                },
+                focusRow(row) {
+                    row?.querySelector(':scope > button')?.focus()
+                    row?.scrollIntoView({ block: 'nearest' })
+                },
+                async move(step) {
+                    const rows = this.rows()
+                    const index = rows.indexOf(this.focusedRow())
+                    const page = document.querySelector(`[data-conversations-page='${step > 0 ? 'older' : 'newer'}']:not([disabled])`)
+
+                    if (index === -1 || rows[index + step]) {
+                        this.focusRow(rows[index === -1 ? 0 : index + step])
+
+                        return
+                    }
+
+                    if (page) {
+                        await (step > 0 ? this.$wire.nextConversationsPage() : this.$wire.previousConversationsPage())
+                        const loaded = [...document.querySelectorAll('[data-conversation]')].filter((row) => ! row.hidden)
+                        this.focusRow(step > 0 ? loaded[0] : loaded.at(-1))
+                    }
+                },
+                open() {
+                    const row = this.targetRow()
+                    row?.querySelector(':scope > button')?.click()
+
+                    return row !== null
+                },
+                toggleDone() {
+                    const row = this.targetRow()
+
+                    if (! row) {
+                        return false
+                    }
+
+                    const verb = row.dataset.done === 'true' ? 'reopen' : 'markDone'
+                    this.act(verb, [row.dataset.conversation], { advance: verb === 'markDone' && row === this.focusedRow() })
+                },
+                markUnread() {
+                    const row = this.targetRow()
+
+                    if (! row) {
+                        return false
+                    }
+
+                    this.act('markUnread', [row.dataset.conversation])
+                },
+                focusSearch() {
+                    document.querySelector('[data-conversation-search] input')?.focus()
+                },
+                inReader(action) {
+                    const button = document.querySelector(`[data-email-reader] [data-reader-action='${action}']`)
+
+                    if (! button) {
+                        return false
+                    }
+
+                    button.disabled || button.click()
+
+                    return true
+                },
+                reply(mode) {
+                    const emailId = document.querySelector('[data-email-reader][data-reply-target]')?.dataset.replyTarget
+
+                    if (! emailId) {
+                        return false
+                    }
+
+                    window.dispatchEvent(new CustomEvent('composer:reply', { detail: { emailId, mode } }))
                 },
                 isHidden(key) {
                     return this.overrides[key]?.hidden === true
@@ -128,11 +252,10 @@
                     }
                 },
                 advance(key) {
-                    const rows = [...this.$root.querySelectorAll('[data-conversation]')].filter((row) => ! row.hidden)
+                    const rows = this.rows()
                     const index = rows.findIndex((row) => row.dataset.conversation === key)
-                    const target = index === -1 ? null : (rows[index + 1] ?? rows[index - 1])
 
-                    target?.querySelector(':scope > button')?.focus()
+                    this.focusRow(index === -1 ? null : (rows[index + 1] ?? rows[index - 1]))
                 },
                 async act(verb, keys, options = {}) {
                     const effect = this.effect(verb)
@@ -174,6 +297,9 @@
                 },
             }"
             x-on:email-triage.window="act($event.detail.verb, $event.detail.keys, $event.detail)"
+            x-on:focusin="focusedKey = $event.target.closest('[data-conversation]')?.dataset.conversation ?? focusedKey"
+            x-on:mouseover="hoveredKey = $event.target.closest('[data-conversation]')?.dataset.conversation ?? null"
+            x-on:mouseleave="hoveredKey = null"
             x-bind:data-triage-pending="pending > 0 ? 'true' : null"
             class="divide-y divide-gray-200/60 dark:divide-white/10"
         >
@@ -195,6 +321,7 @@
                 <button
                     type="button"
                     wire:click="previousConversationsPage"
+                    data-conversations-page="newer"
                     wire:loading.attr="disabled"
                     @disabled($this->conversations->previousCursor === null)
                     class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
@@ -205,6 +332,7 @@
                 <button
                     type="button"
                     wire:click="nextConversationsPage"
+                    data-conversations-page="older"
                     wire:loading.attr="disabled"
                     @disabled($this->conversations->nextCursor === null)
                     class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"

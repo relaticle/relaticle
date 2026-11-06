@@ -39,13 +39,20 @@ const createStore = () => ({
         this.singleKeys = flag ? flag.dataset.singleKeyShortcuts !== 'false' : true
     },
 
+    lastId: 0,
+
+    // Returns an id, so a component torn down after its replacement registered cannot remove the new one.
     register(name, { scope, entries, handlers, isActive = () => true }) {
+        const id = ++this.lastId
+
         this.unregister(name)
-        this.registrations.push({ name, scope, entries: entries.filter((entry) => entry.scopes.includes(scope) && handlers[entry.action]), handlers, isActive })
+        this.registrations.push({ id, name, scope, entries: entries.filter((entry) => entry.scopes.includes(scope) && handlers[entry.action]), handlers, isActive })
+
+        return id
     },
 
-    unregister(name) {
-        this.registrations = this.registrations.filter((registration) => registration.name !== name)
+    unregister(name, id = null) {
+        this.registrations = this.registrations.filter((registration) => registration.name !== name || (id !== null && registration.id !== id))
     },
 
     allows(event, { editors = false, character = true } = {}) {

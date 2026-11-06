@@ -282,10 +282,16 @@ return [
             'skipped' => ':count skipped: :reason.',
             'undo' => 'Undo',
             'undo_hint' => 'Undo is available for 5 seconds.',
+            'undo_key_hint' => 'Press Z to undo.',
             'dismiss' => 'Dismiss',
         ],
     ],
     'shortcuts' => [
+        'heading' => 'Keyboard shortcuts',
+        'close' => 'Close',
+        'single_keys_on' => 'Single-key shortcuts are on.',
+        'single_keys_off' => 'Single-key shortcuts are off.',
+        'profile_link' => 'Change in your profile',
         'labels' => [
             'next' => 'Next conversation',
             'previous' => 'Previous conversation',
