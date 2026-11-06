@@ -96,6 +96,7 @@
             data-rendered="{{ hrtime(true) }}"
             x-data="{
                 view: @js($this->activeView->value),
+                cursor: @js($conversationsCursor),
                 overrides: {},
                 pending: 0,
                 renders: 0,
@@ -266,16 +267,18 @@
                 selectionOwnsKeys() {
                     return this.selected.length > 0 && ! document.activeElement?.closest('[data-email-reader]')
                 },
-                {{-- A search or filter builds a new list in the same view; the selection follows the rows it still shows. --}}
+                {{-- A search or filter builds a new list on the same view and page; the selection follows the rows it still shows. Any other list starts empty. --}}
                 carrySelection() {
                     const host = this.$root.closest('[wire\\:id]')
                     const carried = host?.emailListSelection
+                    const remember = () => host && (host.emailListSelection = { view: this.view, cursor: this.cursor, selected: [...this.selected] })
 
-                    if (carried?.view === this.view) {
+                    if (carried?.view === this.view && carried?.cursor === this.cursor) {
                         this.selected = carried.selected.filter((key) => this.row(key))
                     }
 
-                    this.$watch('selected', (selected) => host && (host.emailListSelection = { view: this.view, selected: [...selected] }))
+                    remember()
+                    this.$watch('selected', remember)
                 },
                 escapeSelection(event) {
                     if (this.selected.length === 0 || event.target?.matches?.('input:not([type=checkbox]), textarea, [contenteditable=true]')) {

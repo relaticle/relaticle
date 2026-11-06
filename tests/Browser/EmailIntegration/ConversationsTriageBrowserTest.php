@@ -388,3 +388,88 @@ it('undoes a reopen from the reader of a conversation the list does not show', f
         ->assertPresent('[data-conversation="conv-linked"]')
         ->assertNoJavaScriptErrors();
 })->with(['inLightMode', 'inDarkMode']);
+
+it('drops the selection after leaving the view and coming back', function (string $theme): void {
+    triageBrowserInbound($this->mailbox, 'conv-one', now()->subMinutes(10));
+
+    loginViaBrowser($this->owner, $theme)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
+        ->click('[data-conversation="conv-one"] [data-select-conversation]')
+        ->assertVisible('[data-triage-bar]')
+        ->assertScript("document.querySelector(`[wire\\\\:click=\"setView('all')\"]`).click() || true")
+        ->wait(1.5)
+        ->assertPresent('[data-conversation="conv-one"]')
+        ->assertScript('document.querySelectorAll("[data-selected=true]").length', 0)
+        ->assertScript("document.querySelector(`[wire\\\\:click=\"setView('needs_reply')\"]`).click() || true")
+        ->wait(1.5)
+        ->assertPresent('[data-conversation="conv-one"]')
+        ->assertScript('document.querySelectorAll("[data-selected=true]").length', 0)
+        ->assertMissing('[data-triage-bar]')
+        ->assertNoJavaScriptErrors();
+})->with(['inLightMode', 'inDarkMode']);
+
+it('drops the selection after paging away and back', function (string $theme): void {
+    foreach (range(1, 51) as $index) {
+        triageBrowserInbound($this->mailbox, "conv-{$index}", now()->subMinutes($index));
+    }
+
+    loginViaBrowser($this->owner, $theme)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
+        ->click('[data-conversation="conv-1"] [data-select-conversation]')
+        ->assertVisible('[data-triage-bar]')
+        ->click('[data-conversations-page=older]')
+        ->wait(1.5)
+        ->assertPresent('[data-conversation="conv-51"]')
+        ->click('[data-conversations-page=newer]')
+        ->wait(1.5)
+        ->assertPresent('[data-conversation="conv-1"]')
+        ->assertScript('document.querySelectorAll("[data-selected=true]").length', 0)
+        ->assertMissing('[data-triage-bar]')
+        ->assertNoJavaScriptErrors();
+})->with(['inLightMode', 'inDarkMode']);
+
+it('closes the reader on Escape from an empty search box', function (string $theme): void {
+    triageBrowserInbound($this->mailbox, 'conv-one', now()->subMinutes(10));
+    $search = '[data-conversation-search] input';
+
+    loginViaBrowser($this->owner, $theme)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
+        ->click('[data-conversation="conv-one"] > button')
+        ->assertVisible('[data-email-reader]')
+        ->assertScript("document.querySelector('{$search}').focus() || true")
+        ->keys($search, 'Escape')
+        ->wait(1)
+        ->assertMissing('[data-email-reader]')
+        ->assertNoJavaScriptErrors();
+})->with(['inLightMode', 'inDarkMode']);
+
+it('keeps the selection bar beside the reader while the reader is resized', function (string $theme): void {
+    foreach (['conv-open' => 10, 'conv-one' => 20] as $key => $minutes) {
+        triageBrowserInbound($this->mailbox, $key, now()->subMinutes($minutes));
+    }
+    $meets = '(() => { const bar = document.querySelector("[data-triage-bar]").parentElement.getBoundingClientRect(); const reader = document.querySelector("[data-email-reader]").getBoundingClientRect(); return Math.abs(bar.right - reader.left) < 2 })()';
+    $separator = '[data-email-reader] [role=separator]';
+
+    $page = loginViaBrowser($this->owner, $theme)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
+        ->click('[data-conversation="conv-open"] > button')
+        ->assertVisible('[data-email-reader]')
+        ->click('[data-conversation="conv-one"] [data-select-conversation]')
+        ->assertVisible('[data-triage-bar]')
+        ->assertScript($meets, true);
+
+    $before = $page->script('document.querySelector("[data-email-reader]").getBoundingClientRect().left');
+
+    $page->keys($separator, 'ArrowRight')
+        ->keys($separator, 'ArrowRight')
+        ->wait(1)
+        ->assertScript("document.querySelector('[data-email-reader]').getBoundingClientRect().left > {$before} + 50", true)
+        ->assertScript($meets, true)
+        ->assertNoJavaScriptErrors();
+})->with(['inLightMode', 'inDarkMode']);
