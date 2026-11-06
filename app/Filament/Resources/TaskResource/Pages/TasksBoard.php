@@ -47,6 +47,7 @@ use Relaticle\Flowforge\Exceptions\CardMoveRejectedException;
 use Relaticle\Flowforge\Grouping;
 use Relaticle\Flowforge\Lane;
 use Relaticle\Flowforge\Modern\BoardResourcePage;
+use WeakMap;
 
 final class TasksBoard extends BoardResourcePage
 {
@@ -54,6 +55,9 @@ final class TasksBoard extends BoardResourcePage
     use KeepsOpenTaskInUrl;
 
     protected static string $resource = TaskResource::class;
+
+    /** @var WeakMap<Task, array{preview: string, progress: ?string}>|null */
+    private ?WeakMap $cardSummaries = null;
 
     public function getTitle(): string
     {
@@ -148,17 +152,31 @@ final class TasksBoard extends BoardResourcePage
     {
         return $entry?->columnSpanFull()
             ->html(false)
-            ->state(fn (Task $record): string => Str::limit(PlainText::fromHtml($this->descriptionHtml($record))))
+            ->state(fn (Task $record): string => $this->cardSummary($record)['preview'])
             ->visible(fn (?string $state): bool => filled($state))
             ->extraAttributes(['class' => 'mb-4']);
     }
 
-    private function descriptionHtml(Task $record): string
+    /** @return array{preview: string, progress: ?string} */
+    private function cardSummary(Task $record): array
+    {
+        $this->cardSummaries ??= new WeakMap;
+
+        return $this->cardSummaries[$record] ??= $this->summarizeCard($record);
+    }
+
+    /** @return array{preview: string, progress: ?string} */
+    private function summarizeCard(Task $record): array
     {
         $field = self::descriptionCustomField();
         $description = $field instanceof CustomField ? $record->getCustomFieldValue($field) : null;
+        $description = is_string($description) ? $description : '';
+        $progress = ChecklistHtml::progress($description);
 
-        return is_string($description) ? $description : '';
+        return [
+            'preview' => Str::limit(PlainText::fromHtml($description)),
+            'progress' => $progress === null ? null : "{$progress['checked']}/{$progress['total']}",
+        ];
     }
 
     private function checklistProgressEntry(): TextEntry
@@ -170,11 +188,7 @@ final class TasksBoard extends BoardResourcePage
             ->icon('heroicon-o-check-circle')
             ->grow(false)
             ->extraAttributes(['data-checklist-progress' => ''])
-            ->state(function (Task $record): ?string {
-                $progress = ChecklistHtml::progress($this->descriptionHtml($record));
-
-                return $progress === null ? null : "{$progress['checked']}/{$progress['total']}";
-            })
+            ->state(fn (Task $record): ?string => $this->cardSummary($record)['progress'])
             ->visible(fn (?string $state): bool => filled($state));
     }
 
@@ -361,20 +375,24 @@ final class TasksBoard extends BoardResourcePage
 
     private static function descriptionCustomField(): ?CustomField
     {
-        /** @var CustomField|null */
-        return once(fn () => CustomField::query()
-            ->forEntity(Task::class)
-            ->where('code', TaskCustomField::DESCRIPTION)
-            ->first());
+        return self::cardCustomFields()->get(TaskCustomField::DESCRIPTION->value);
     }
 
     private static function statusCustomField(): ?CustomField
     {
-        /** @var CustomField|null */
-        return once(fn () => CustomField::query()
+        return self::cardCustomFields()->get(TaskCustomField::STATUS->value);
+    }
+
+    /** @return Collection<string, CustomField> */
+    private static function cardCustomFields(): Collection
+    {
+        /** @var Collection<string, CustomField> */
+        return once(fn (): Collection => CustomField::query()
             ->forEntity(Task::class)
-            ->where('code', TaskCustomField::STATUS)
-            ->first());
+            ->whereIn('code', [TaskCustomField::STATUS, TaskCustomField::DESCRIPTION])
+            ->with('options')
+            ->get()
+            ->keyBy('code'));
     }
 
     /**
