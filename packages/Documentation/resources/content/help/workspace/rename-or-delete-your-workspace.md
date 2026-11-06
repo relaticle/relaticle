@@ -38,5 +38,6 @@ shows a **Cancel Deletion** button for the whole grace period. After the 30
 days, the workspace and all its records are permanently removed, so
 [export your data](/help/records/export-your-data) first if you'll want it.
 
-Your original personal workspace can't be deleted from this page, and only the
-workspace owner sees the delete section.
+You can't delete your original personal workspace from this page. It goes when
+you delete your account, or after 60 days as a paused trial with no sign-in.
+Only the workspace owner sees the delete section.

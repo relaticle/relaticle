@@ -432,7 +432,7 @@ it('hides the extension once it was used', function (): void {
         ->assertDontSee(__('cloud::billing.paused.extend_once'));
 });
 
-it('tells the owner of a paused trial workspace it is kept for 60 days', function (): void {
+it('tells the owner of a paused trial workspace it is deleted after 60 days with no sign-in', function (): void {
     withHostedBilling();
 
     [, $workspace] = pausedTrialWorkspace();

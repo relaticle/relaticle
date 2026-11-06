@@ -28,7 +28,7 @@ You own your data. We do not claim any intellectual property rights over the dat
 
 Account deletion uses a 30-day grace period once scheduled. Signing in before the deletion date lets you cancel. Records in shared workspaces remain after your account is removed.
 
-A workspace whose free trial ended without a plan pauses. If no member signs in and no plan is chosen for 60 days, we delete the workspace and its records. We email the owner 14 days and 5 days before. A paused workspace cannot be exported.
+A workspace whose Pro trial ended without a plan pauses. If no one in the workspace signs in and no one chooses a plan for 60 days, we delete the workspace and its records. We email the owner 14 days and 5 days before. A paused workspace cannot be exported.
 
 ## 4. Acceptable Use
 

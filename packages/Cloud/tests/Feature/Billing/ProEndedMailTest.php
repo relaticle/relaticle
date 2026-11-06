@@ -40,7 +40,7 @@ it('tells the owner the trial ended, the workspace is paused, and how to reopen 
     $mail->assertSeeInHtml('Your Pro trial for Acme has ended');
     $mail->assertSeeInHtml('Your records are safe. Choose a plan, or extend the trial by 7 days.');
     $mail->assertSeeInHtml('Acme is paused. Your records are safe.');
-    $mail->assertSeeInHtml('We keep a paused trial workspace for 60 days. Choose a plan by Nov 5, 2026 to keep it.');
+    $mail->assertSeeInHtml('If no one signs in, we delete Acme on Nov 5, 2026. Choose a plan before then to keep it.');
     $mail->assertSeeInHtml(__('mail.trial_ending.keeps', ['credits' => number_format(Plan::Pro->credits())]));
     $mail->assertSeeInHtml('Choose a plan');
     $mail->assertSeeInHtml('Need more time?');
@@ -59,7 +59,7 @@ it('dates the 60-day line from the pause in the owner timezone', function (): vo
     $workspace = proEndedWorkspace(['paused_at' => '2026-09-06 23:30:00']);
     $workspace->owner->forceFill(['timezone' => 'Pacific/Auckland'])->save();
 
-    ProEndedMail::afterTrial($workspace->refresh())->assertSeeInHtml('Choose a plan by Nov 6, 2026 to keep it.');
+    ProEndedMail::afterTrial($workspace->refresh())->assertSeeInHtml('on Nov 6, 2026. Choose a plan before then to keep it.');
 });
 
 it('states no 60-day rule when the workspace was never paused', function (): void {
@@ -82,13 +82,13 @@ it('keeps the date chosen when the mail was built, even if the pause date moves 
 
     $workspace->forceFill(['paused_at' => '2026-09-20 12:00:00'])->save();
 
-    $mail->assertSeeInHtml('Choose a plan by Nov 5, 2026 to keep it.');
+    $mail->assertSeeInHtml('on Nov 5, 2026. Choose a plan before then to keep it.');
 });
 
 it('states the 60-day rule on an extended trial that ended', function (): void {
     $mail = ProEndedMail::afterTrial(proEndedWorkspace(['trial_extended_at' => now()->subWeek(), 'paused_at' => now()]));
 
-    $mail->assertSeeInHtml('We keep a paused trial workspace for 60 days.');
+    $mail->assertSeeInHtml('Choose a plan before then to keep it.');
 });
 
 it('states no 60-day rule for a grandfathered workspace, a subscription or a managed plan', function (): void {

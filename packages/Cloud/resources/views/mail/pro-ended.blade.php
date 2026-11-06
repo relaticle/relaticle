@@ -8,7 +8,7 @@
 {{ __($isTrial ? 'mail.pro_ended.trial_paused' : 'mail.pro_ended.paused', ['workspace' => $workspace->name]) }}
 @if($keptOn)
 
-{{ __('mail.pro_ended.kept', ['date' => $keptOn]) }}
+{{ __('mail.pro_ended.kept', ['workspace' => $workspace->name, 'date' => $keptOn]) }}
 @endif
 @if($mailboxSyncPaused)
 

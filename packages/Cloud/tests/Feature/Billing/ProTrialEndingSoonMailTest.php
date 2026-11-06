@@ -85,7 +85,7 @@ it('renders the trial end time in the owner timezone with the paused-access outc
     $mail->assertSeeInHtml('Pro for Acme ends on Sep 9');
     $mail->assertSeeInHtml('Your Pro trial ends on Sep 9, 2026 at 2:30 PM (Berlin time).');
     $mail->assertSeeInHtml('After that, Acme pauses until you choose a plan.');
-    $mail->assertSeeInHtml('We keep a paused trial workspace for 60 days after that.');
+    $mail->assertSeeInHtml('If no one signs in for 60 days after that, we delete the workspace and its records.');
     $mail->assertSeeInHtml('Questions? Reply to this email.');
     $mail->assertSeeInHtml('Choose a plan');
     $mail->assertSeeInHtml('One flat price covers the whole workspace.');

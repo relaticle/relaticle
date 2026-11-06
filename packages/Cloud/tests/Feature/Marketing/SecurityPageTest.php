@@ -50,8 +50,8 @@ it('gives the provider table the anchor the privacy policy links to', function (
 it('states the 60-day deletion rule beside the deletion on request', function (): void {
     $text = securityPageText($this->get('/security')->assertOk()->getContent());
 
-    expect($text)->toContain('A paused trial workspace that nobody signs in to for 60 days is deleted with its records, after two emails to the owner.')
-        ->and($text)->toContain('Move to your own server whenever you want while your workspace is active.');
+    expect($text)->toContain('We delete a paused trial workspace that no one signs in to for 60 days, after two emails to the owner.')
+        ->and($text)->toContain('Export works while the workspace is active.');
 });
 
 it('names each service provider on a hosted install', function (string $provider): void {

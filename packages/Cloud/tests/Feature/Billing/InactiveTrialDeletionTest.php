@@ -334,7 +334,7 @@ it('writes the warning for the owner with dates in their timezone', function ():
     $mail->assertHasSubject('Acme will be deleted on Jan 1, 2027');
     $mail->assertSeeInHtml('Acme will be deleted on Jan 1, 2027');
     $mail->assertSeeInHtml('Acme is paused, and no one has signed in since Nov 21, 2026.');
-    $mail->assertSeeInHtml('We delete paused workspaces after 60 days. On Jan 1, 2027 we will delete Acme and every record in it. This cannot be undone.');
+    $mail->assertSeeInHtml('We delete a paused trial workspace after 60 days with no sign-in. On Jan 1, 2027 we will delete Acme and every record in it. This cannot be undone.');
     $mail->assertSeeInHtml('To keep the workspace, choose a plan before then.');
     $mail->assertSeeInHtml('Signing in also keeps it for another 60 days.');
     $mail->assertSeeInHtml('Questions? Reply to this email.');
@@ -572,10 +572,10 @@ it('sends one launch notice per paused owner, dated 60 days from the last activi
 
     Mail::assertQueued(InactivityRuleNoticeMail::class, 1);
     Mail::assertQueued(InactivityRuleNoticeMail::class, function (InactivityRuleNoticeMail $mail) use ($workspace): bool {
-        $mail->assertHasSubject('We now keep paused workspaces for 60 days');
-        $mail->assertSeeInText('We now keep paused workspaces for 60 days');
-        $mail->assertSeeInText('Acme has been paused since its trial ended. From today, we delete a paused workspace after 60 days without a sign-in.');
-        $mail->assertSeeInText('Your 60 days start today. If no one signs in and you choose no plan, we will delete Acme on Jan 1, 2027.');
+        $mail->assertHasSubject('We now delete paused trial workspaces after 60 days');
+        $mail->assertSeeInText('We now delete paused trial workspaces after 60 days');
+        $mail->assertSeeInText('Acme has been paused since its trial ended. From today, we delete a paused trial workspace after 60 days with no sign-in.');
+        $mail->assertSeeInText('Your 60 days start today. If no one signs in and no one chooses a plan, we will delete Acme on Jan 1, 2027.');
         $mail->assertSeeInText('We will email you 14 days and 5 days before that.');
         $mail->assertSeeInText('Choose a plan: '.Billing::getUrl(panel: 'app', tenant: $workspace));
 
