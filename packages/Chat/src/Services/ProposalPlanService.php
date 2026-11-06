@@ -142,46 +142,53 @@ final readonly class ProposalPlanService
     }
 
     /**
-     * Pending steps that a left-out step takes with it, each mapped to the left-out
-     * step that takes it: the same transitive walk cancelDependentsOf() performs when
-     * the rejection actually runs.
+     * Pending steps that left-out steps take with them, each mapped to the nearest
+     * left-out steps on its chain of links, in plan order: the same transitive walk
+     * cancelDependentsOf() performs when the rejection actually runs.
      *
      * @param  list<PendingAction>  $steps
      * @param  list<string>  $leftOutIds
-     * @return array<string, string>
+     * @return array<string, list<string>>
      */
     public function dependentsOfLeftOut(array $steps, array $leftOutIds): array
     {
         $pending = $this->pendingAmong($steps);
-        $leftOut = array_values(array_filter(
-            array_map(static fn (PendingAction $step): string => (string) $step->getKey(), $pending),
-            static fn (string $id): bool => in_array($id, $leftOutIds, true),
-        ));
-        $claimed = array_fill_keys($leftOut, true);
-        $dependents = [];
+        $order = array_map(static fn (PendingAction $step): string => (string) $step->getKey(), $pending);
+        $leftOut = array_values(array_intersect($order, $leftOutIds));
+        $links = [];
 
-        foreach ($leftOut as $rootId) {
-            $group = [$rootId];
-
-            do {
-                $grew = false;
-
-                foreach ($pending as $candidate) {
-                    $candidateId = (string) $candidate->getKey();
-
-                    if (isset($claimed[$candidateId]) || array_intersect($this->dependencyIds($candidate), $group) === []) {
-                        continue;
-                    }
-
-                    $claimed[$candidateId] = true;
-                    $dependents[$candidateId] = $rootId;
-                    $group[] = $candidateId;
-                    $grew = true;
-                }
-            } while ($grew);
+        foreach ($pending as $candidate) {
+            $links[(string) $candidate->getKey()] = $this->dependencyIds($candidate);
         }
 
-        return $dependents;
+        $roots = [];
+
+        do {
+            $grew = false;
+
+            foreach ($links as $stepId => $dependencyIds) {
+                if (in_array($stepId, $leftOut, true)) {
+                    continue;
+                }
+
+                $reached = [];
+
+                foreach ($dependencyIds as $dependencyId) {
+                    $reached = in_array($dependencyId, $leftOut, true)
+                        ? [...$reached, $dependencyId]
+                        : [...$reached, ...($roots[$dependencyId] ?? [])];
+                }
+
+                $reached = array_values(array_intersect($order, $reached));
+
+                if ($reached !== [] && $reached !== ($roots[$stepId] ?? [])) {
+                    $roots[$stepId] = $reached;
+                    $grew = true;
+                }
+            }
+        } while ($grew);
+
+        return $roots;
     }
 
     /**

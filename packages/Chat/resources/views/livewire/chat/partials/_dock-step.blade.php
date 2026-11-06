@@ -17,8 +17,9 @@
     $showVerb = ! $step['isBatch'] && $step['recordLabel'] !== '';
 
     $isLeftOut = in_array($stepId, $leftOutStepIds, true);
-    $takenById = $takenBy[$stepId] ?? null;
-    $isOut = $isLeftOut || $takenById !== null;
+    $takenRoots = $takenBy[$stepId] ?? [];
+    $isTaken = $takenRoots !== [];
+    $isOut = $isLeftOut || $isTaken;
     $describeStep = function (?array $other): array {
         $count = $other === null ? 1 : ($other['isBatch'] ? count($other['items']) : 1);
         $name = match (true) {
@@ -29,10 +30,20 @@
 
         return ['name' => $name, 'count' => $count, 'entities' => $other === null ? '' : \Illuminate\Support\Str::plural($other['entityNoun'], $count)];
     };
-    $linkedStep = $takenById !== null ? collect($steps)->firstWhere('id', $takenVia[$stepId] ?? $takenById) : null;
-    $keptStep = $takenById !== null ? collect($steps)->firstWhere('id', $takenById) : null;
-    $linked = $describeStep($linkedStep);
-    $kept = $describeStep($keptStep);
+    $joinNames = fn (array $ids): string => \Illuminate\Support\Arr::join(
+        array_map(function (string $id) use ($steps, $describeStep): string {
+            $described = $describeStep(collect($steps)->firstWhere('id', $id));
+
+            return $described['name'] !== '' ? $described['name'] : "{$described['count']} {$described['entities']}";
+        }, $ids),
+        ', ',
+        ' '.__('and').' ',
+    );
+    $linkedId = $takenVia[$stepId] ?? ($takenRoots[0] ?? null);
+    $linked = $describeStep($linkedId !== null ? collect($steps)->firstWhere('id', $linkedId) : null);
+    $linkedIsLeftOut = in_array($linkedId, $leftOutStepIds, true);
+    $linkedRoots = $linkedIsLeftOut ? [] : ($takenBy[$linkedId] ?? []);
+    $kept = $describeStep(count($takenRoots) === 1 ? collect($steps)->firstWhere('id', $takenRoots[0]) : null);
     $leftOutRowsHere = $leftOutRowIndexes[$stepId] ?? [];
 
     $skipTitle = $step['operation'] !== 'update';
@@ -113,7 +124,7 @@
                 </span>
             @endif
 
-            @if ($isPlan && ! $holdsOwnApproval && $takenById === null)
+            @if ($isPlan && ! $holdsOwnApproval && ! $isTaken)
                 <button
                     type="button"
                     wire:click="toggleLeftOut(@js($stepId))"
@@ -135,15 +146,19 @@
             @endif
         </div>
 
-        @if ($takenById !== null)
+        @if ($isTaken)
             <p class="mb-3 me-4 ms-[3.125rem] flex flex-wrap items-baseline gap-x-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-inset ring-amber-200 dark:bg-amber-400/10 dark:text-amber-300 dark:ring-amber-400/20" data-proposal-left-out-note>
-                <span>{{ trans_choice(':name is left out, so this :entity is left out too. It links to :name.|These :count :entities are left out, so this :entity is left out too. It links to them.', $linked['count'], ['name' => $linked['name'], 'entity' => $step['entityNoun'], 'count' => $linked['count'], 'entities' => $linked['entities']]) }}</span>
+                <span>{{ $linkedIsLeftOut
+                    ? trans_choice(':name is left out, so this :entity is left out too. It links to :name.|These :count :entities are left out, so this :entity is left out too. It links to them.', $linked['count'], ['name' => $linked['name'], 'entity' => $step['entityNoun'], 'count' => $linked['count'], 'entities' => $linked['entities']])
+                    : trans_choice(':name is left out with :roots, so this :entity is left out too. It links to :name.|These :count :entities are left out with :roots, so this :entity is left out too. It links to them.', $linked['count'], ['name' => $linked['name'], 'roots' => $joinNames($linkedRoots), 'entity' => $step['entityNoun'], 'count' => $linked['count'], 'entities' => $linked['entities']]) }}</span>
                 <button
                     type="button"
-                    wire:click="toggleLeftOut(@js($takenById))"
+                    wire:click="keepLeftOut(@js($takenRoots))"
                     wire:loading.attr="disabled"
                     class="font-medium underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600"
-                >{{ trans_choice('Keep :name|Keep these :count :entities', $kept['count'], ['name' => $kept['name'], 'count' => $kept['count'], 'entities' => $kept['entities']]) }}</button>
+                >{{ count($takenRoots) === 1
+                    ? trans_choice('Keep :name|Keep these :count :entities', $kept['count'], ['name' => $kept['name'], 'count' => $kept['count'], 'entities' => $kept['entities']])
+                    : __('Keep :names', ['names' => $joinNames($takenRoots)]) }}</button>
             </p>
         @endif
 

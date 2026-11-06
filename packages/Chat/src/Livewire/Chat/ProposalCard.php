@@ -1017,6 +1017,16 @@ final class ProposalCard extends BaseLivewireComponent
     }
 
     /**
+     * Keep several left-out steps again, as one decision.
+     *
+     * @param  list<string>  $stepIds
+     */
+    public function keepLeftOut(array $stepIds): void
+    {
+        $this->leftOutSteps = array_values(array_diff($this->leftOutStepIds(), ProposalPlanService::cleanLeftOutSteps($stepIds)));
+    }
+
+    /**
      * Leave one row of a batch step out of the approval, or keep it again. A row that a
      * later step links to, and any row of a step with its own button inside a plan,
      * stays in.
@@ -1052,9 +1062,10 @@ final class ProposalCard extends BaseLivewireComponent
     }
 
     /**
-     * Each step that goes down with a left-out step, mapped to the left-out step.
+     * Each step that goes down with a left-out step, mapped to the nearest left-out steps
+     * it links through.
      *
-     * @return array<string, string>
+     * @return array<string, list<string>>
      */
     public function leftOutDependents(): array
     {
@@ -1096,8 +1107,9 @@ final class ProposalCard extends BaseLivewireComponent
                 continue;
             }
 
-            $direct = array_values(array_intersect(resolve(ProposalPlanService::class)->dependencyIds($step), $out));
-            $links[$stepId] = $direct[0] ?? $taken[$stepId];
+            $dependencyIds = resolve(ProposalPlanService::class)->dependencyIds($step);
+            $direct = [...array_intersect($dependencyIds, $this->leftOutStepIds()), ...array_intersect($dependencyIds, $out)];
+            $links[$stepId] = $direct[0] ?? $taken[$stepId][0];
         }
 
         return $links;

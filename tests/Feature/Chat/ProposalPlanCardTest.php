@@ -203,7 +203,7 @@ describe('leaving steps and rows out', function (): void {
             ->instance()
             ->leftOutDependents();
 
-        expect($dependents)->toBe([(string) $task->getKey() => (string) $person->getKey()]);
+        expect($dependents)->toBe([(string) $task->getKey() => [(string) $person->getKey()]]);
     });
 
     it('ignores a step id that is not in the plan', function (): void {
@@ -445,7 +445,7 @@ describe('the change list', function (): void {
             ->call('setActive', $company->getKey())
             ->call('toggleLeftOut', (string) $company->getKey())
             ->assertSeeText('Northwind Traders is left out, so this person is left out too. It links to Northwind Traders.')
-            ->assertSeeText('Priya Raman is left out, so this task is left out too. It links to Priya Raman.');
+            ->assertSeeText('Priya Raman is left out with Northwind Traders, so this task is left out too. It links to Priya Raman.');
 
         [$conversationId, $turnId] = ProposalCardFixture::startPlan($this->user);
         $batch = ProposalCardFixture::planProposal(CreatePersonTool::class, $conversationId, $turnId, [['name' => 'Ada'], ['name' => 'Grace'], ['name' => 'Linus']]);
@@ -473,14 +473,42 @@ describe('the change list', function (): void {
         preg_match_all('/<p[^>]*data-proposal-left-out-note.*?<\/p>/s', $card->html(), $notes);
         $taskNote = last($notes[0]);
 
-        expect($taskNote)->toContain("{$note} is left out, so this task is left out too. It links to {$note}.")
+        expect($taskNote)->toContain("{$note}, so this task is left out too. It links to Priya Raman.")
             ->and(trim(strip_tags(substr($taskNote, (int) strrpos($taskNote, '<button')))))->toBe("Keep {$keep}")
             ->and($taskNote)->toContain($ids[$toggles])
             ->and(array_filter(array_diff_key($ids, [$toggles => true]), static fn (string $id): bool => str_contains($taskNote, $id)))->toBe([]);
     })->with([
-        'only the first step left out' => [[0], 'Priya Raman', 'Northwind Traders', 0],
-        'the first and the middle step left out' => [[0, 1], 'Priya Raman', 'Priya Raman', 1],
+        'only the first step left out' => [[0], 'Priya Raman is left out with Northwind Traders', 'Northwind Traders', 0],
+        'the first and the middle step left out' => [[0, 1], 'Priya Raman is left out', 'Priya Raman', 1],
     ]);
+
+    it('lets one Keep bring back every left-out step a taken step links through', function (): void {
+        [$conversationId, $turnId] = ProposalCardFixture::startPlan($this->user);
+        $company = ProposalCardFixture::planProposal(CreateCompanyTool::class, $conversationId, $turnId, [['name' => 'Northwind Traders']]);
+        $person = ProposalCardFixture::planProposal(CreatePersonTool::class, $conversationId, $turnId, [['name' => 'Priya Raman']]);
+        $task = ProposalCardFixture::planProposal(CreateTaskTool::class, $conversationId, $turnId, [[
+            'title' => 'Call Priya',
+            'company_ids' => [PlanReference::to((string) $company->getKey())],
+            'people_ids' => [PlanReference::to((string) $person->getKey())],
+        ]]);
+
+        $card = Livewire::test(ProposalCard::class)
+            ->call('setActive', $company->getKey())
+            ->call('toggleLeftOut', (string) $company->getKey())
+            ->assertSeeText('Keep Northwind Traders')
+            ->assertDontSeeText('Keep Northwind Traders and Priya Raman')
+            ->call('toggleLeftOut', (string) $person->getKey())
+            ->assertSeeText('Keep Northwind Traders and Priya Raman');
+
+        expect($card->instance()->leftOutDependents())->toBe([(string) $task->getKey() => [(string) $company->getKey(), (string) $person->getKey()]]);
+
+        $card->call('keepLeftOut', [(string) $company->getKey(), (string) $person->getKey()])
+            ->assertSet('leftOutSteps', [])
+            ->assertSeeText('Approve 3 changes')
+            ->assertDontSeeText('is left out');
+
+        expect($task->refresh()->status)->toBe(PendingActionStatus::Pending);
+    });
 
     it('gives a linked row its x back once the step that links to it is left out', function (): void {
         [$conversationId, $turnId] = ProposalCardFixture::startPlan($this->user);

@@ -63,15 +63,17 @@ function lockTestCompanies(array $conversation, array $names): array
 }
 
 /** @return array{locked: bool, editor: bool} */
-function lockTestVisibility(mixed $page): array
+function lockTestVisibility(mixed $page, string $context = 'conversation'): array
 {
-    return $page->script(<<<'JS'
+    return $page->script(<<<JS
         (() => {
             const shown = (el) => el !== null && el.offsetParent !== null;
+            const editor = document.querySelector('[data-chat-context="{$context}"] [contenteditable="true"]');
+            const area = editor.closest('.border-t');
 
             return {
-                locked: shown(document.querySelector('[data-composer-locked]')),
-                editor: shown(document.querySelector('[data-chat-context="conversation"] [contenteditable="true"]')),
+                locked: shown(area.querySelector('[data-composer-locked]')),
+                editor: shown(editor),
             };
         })();
     JS);
@@ -172,6 +174,10 @@ it('ignores Cmd+Enter on an email, a delete and a plan with a draft in the box',
             JS);
     }
 
+    if ($case !== 'a plan with a draft in the box') {
+        $page->assertMissing('[data-proposal-shortcut]');
+    }
+
     $page->keys(LOCK_TEST_DOCK, 'Control+Enter')->wait(1.2);
 
     expect(array_map(fn (PendingAction $step): PendingActionStatus => $step->fresh()->status, $steps))
@@ -181,3 +187,31 @@ it('ignores Cmd+Enter on an email, a delete and a plan with a draft in the box',
 
     expect(lockTestVisibility($page)['locked'])->toBeTrue();
 })->with(['an email', 'a delete', 'a plan with a delete', 'a plan with a draft in the box']);
+
+it('locks the box and approves a plan with Cmd+Enter in the side panel', function (): void {
+    $conversation = lockTestConversation();
+    $steps = lockTestCompanies($conversation, ['Northwind Traders', 'Acme Corp']);
+    $assistantName = config('chat.assistant_name');
+
+    $page = ChatBrowser::logIn($conversation['user'], $conversation['workspace']->slug)
+        ->resize(1440, 900)
+        ->navigate("/app/{$conversation['workspace']->slug}/people")
+        ->click("button[aria-label=\"Ask {$assistantName}\"]")
+        ->assertVisible('[data-chat-side-panel]')
+        ->click('[data-chat-side-panel] button[aria-label="View history"]')
+        ->click('[data-chat-side-panel] span[title="locked box"]')
+        ->assertSee('Approve 2 changes');
+
+    expect(lockTestVisibility($page, 'side-panel'))->toBe(['locked' => true, 'editor' => false]);
+
+    $page->keys('[data-chat-side-panel] '.LOCK_TEST_DOCK, 'Control+Enter')
+        ->assertMissing('[data-proposal-shortcut]');
+
+    $page->wait(0.5);
+
+    expect(lockTestVisibility($page, 'side-panel'))->toBe(['locked' => false, 'editor' => true])
+        ->and(array_map(fn (PendingAction $step): PendingActionStatus => $step->fresh()->status, $steps))
+        ->each->toBe(PendingActionStatus::Approved);
+
+    $page->assertNoJavaScriptErrors();
+});
