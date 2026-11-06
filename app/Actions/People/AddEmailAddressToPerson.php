@@ -7,8 +7,10 @@ namespace App\Actions\People;
 use App\Enums\CustomFields\PeopleField;
 use App\Models\CustomField;
 use App\Models\People;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Support\EmailAddress;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 final readonly class AddEmailAddressToPerson
@@ -22,13 +24,16 @@ final readonly class AddEmailAddressToPerson
         $address = EmailAddress::canonicalize($address);
         Validator::make(['address' => $address], ['address' => ['required', 'email']])->validate();
 
-        $current = $this->addresses($person);
+        return DB::transaction(function () use ($user, $person, $address): People {
+            $locked = People::query()->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $person->workspace_id)->whereKey($person->getKey())->lockForUpdate()->firstOrFail();
+            $current = $this->addresses($locked);
 
-        if (in_array($address, array_map(EmailAddress::canonicalize(...), $current), true)) {
-            return $person;
-        }
+            if (in_array($address, array_map(EmailAddress::canonicalize(...), $current), true)) {
+                return $locked;
+            }
 
-        return $this->updatePeople->execute($user, $person, ['custom_fields' => [PeopleField::EMAILS->value => [...$current, $address]]]);
+            return $this->updatePeople->execute($user, $locked, ['custom_fields' => [PeopleField::EMAILS->value => [...$current, $address]]]);
+        });
     }
 
     /** @return list<string> */

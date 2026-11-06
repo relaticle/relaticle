@@ -18,12 +18,16 @@ use Filament\Notifications\Notification;
 use Filament\Support\Enums\Width;
 use Illuminate\Contracts\Pagination\CursorPaginator;
 use Livewire\Attributes\Computed;
+use Relaticle\EmailIntegration\Actions\ApplyEmailLinkChanges;
+use Relaticle\EmailIntegration\Actions\LinkEmailToRecord;
 use Relaticle\EmailIntegration\Data\ConversationFilters;
 use Relaticle\EmailIntegration\Data\ConversationRow;
 use Relaticle\EmailIntegration\Data\UnlinkedSender;
 use Relaticle\EmailIntegration\Enums\ConversationView;
+use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Queries\ConversationsQuery;
 use Relaticle\EmailIntegration\Queries\UnlinkedSendersQuery;
+use Relaticle\EmailIntegration\Support\PersonEmailMatcher;
 
 /**
  * The Unlinked view grouped by sender, for the Emails page.
@@ -35,6 +39,8 @@ use Relaticle\EmailIntegration\Queries\UnlinkedSendersQuery;
  */
 trait HasUnlinkedSenders
 {
+    private const int SENDER_LINK_LIMIT = 100;
+
     public ?string $sendersCursor = null;
 
     public ?string $expandedSender = null;
@@ -89,14 +95,21 @@ trait HasUnlinkedSenders
         return Action::make('createSenderPerson')
             ->label(__('filament/pages/email-inbox.unlinked_senders.create_person.label'))
             ->icon('ri-user-add-line')
-            ->modalHeading(__('filament/pages/email-inbox.unlinked_senders.create_person.heading'))
+            ->modalHeading(fn (array $arguments): string => ($holder = $this->senderHolder($arguments)) instanceof People
+                ? __('filament/pages/email-inbox.unlinked_senders.create_person.exists_heading', ['name' => $holder->name])
+                : __('filament/pages/email-inbox.unlinked_senders.create_person.heading'))
+            ->modalDescription(fn (array $arguments): string => ($holder = $this->senderHolder($arguments)) instanceof People
+                ? __('filament/pages/email-inbox.unlinked_senders.create_person.exists_description', ['name' => $holder->name, 'address' => (string) ($arguments['address'] ?? '')])
+                : '')
             ->modalWidth(Width::Medium)
-            ->modalSubmitActionLabel(__('filament/pages/email-inbox.unlinked_senders.create_person.submit'))
+            ->modalSubmitActionLabel(fn (array $arguments): string => ($holder = $this->senderHolder($arguments)) instanceof People
+                ? __('filament/pages/email-inbox.unlinked_senders.create_person.link_to', ['name' => $holder->name])
+                : __('filament/pages/email-inbox.unlinked_senders.create_person.submit'))
             ->fillForm(fn (array $arguments): array => [
                 'name' => (string) ($arguments['name'] ?? ''),
                 'email' => (string) ($arguments['address'] ?? ''),
             ])
-            ->schema([
+            ->schema(fn (array $arguments): array => $this->senderHolder($arguments) instanceof People ? [] : [
                 TextInput::make('name')
                     ->label(__('filament/pages/email-inbox.unlinked_senders.fields.name'))
                     ->required()
@@ -107,6 +120,14 @@ trait HasUnlinkedSenders
             ])
             ->action(function (array $data, array $arguments): void {
                 $address = EmailAddress::canonicalize((string) ($arguments['address'] ?? ''));
+                $holder = $this->senderHolder($arguments);
+
+                if ($holder instanceof People) {
+                    $this->linkSenderConversationsTo($address, $holder);
+
+                    return;
+                }
+
                 $person = resolve(CreatePeople::class)->execute($this->authUser(), [
                     'name' => (string) $data['name'],
                     'custom_fields' => [PeopleField::EMAILS->value => [$address]],
@@ -114,6 +135,33 @@ trait HasUnlinkedSenders
 
                 $this->afterSenderPersonSaved(__('filament/pages/email-inbox.unlinked_senders.notifications.created', ['name' => $person->name]));
             });
+    }
+
+    /** @param  array<array-key, mixed>  $arguments */
+    private function senderHolder(array $arguments): ?People
+    {
+        $address = (string) ($arguments['address'] ?? '');
+
+        $workspaceId = (string) $this->authUser()->current_workspace_id;
+
+        return once(fn (): ?People => resolve(PersonEmailMatcher::class)->firstMatching($address, $workspaceId));
+    }
+
+    private function linkSenderConversationsTo(string $address, People $person): void
+    {
+        $user = $this->authUser();
+        $keys = resolve(UnlinkedSendersQuery::class)->conversationKeys($user, $address, self::SENDER_LINK_LIMIT);
+        $copyIds = resolve(ConversationsQuery::class)->reachedCopies($user, $keys)->unique('conversation_key')->pluck('id')->all();
+        $pairs = Email::query()->whereKey($copyIds)->get()
+            ->map(fn (Email $email): array => ['email' => $email, 'record' => $person])
+            ->values()
+            ->all();
+
+        $pairs = array_values($pairs);
+
+        resolve(ApplyEmailLinkChanges::class)->execute($user, $pairs, resolve(LinkEmailToRecord::class));
+
+        $this->afterSenderPersonSaved(__('filament/pages/email-inbox.drawer.links.notifications.linked', ['name' => $person->name]));
     }
 
     protected function linkSenderToPersonAction(): Action

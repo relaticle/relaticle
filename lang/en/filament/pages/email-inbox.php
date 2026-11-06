@@ -342,6 +342,9 @@ return [
             'label' => 'Create person',
             'heading' => 'Create a person for this sender',
             'submit' => 'Create',
+            'exists_heading' => ':name already has this address',
+            'exists_description' => 'Link the conversations from :address to :name instead of creating a second person.',
+            'link_to' => 'Link to :name',
         ],
         'link_existing' => [
             'label' => 'Link to existing',

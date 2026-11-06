@@ -13,6 +13,7 @@ use App\Queries\CustomFieldFilterSchema;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Factories\Sequence;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -55,6 +56,7 @@ use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailConversation;
 use Relaticle\EmailIntegration\Models\EmailConversationState;
 use Relaticle\EmailIntegration\Models\EmailLabel;
+use Relaticle\EmailIntegration\Models\EmailLinkSuppression;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailRead;
 use Relaticle\EmailIntegration\Models\EmailShare;
@@ -1587,6 +1589,42 @@ it('links the sender history to a person created from the group', function (): v
 
     expect($email->people()->whereKey($person->id)->exists())->toBeTrue()
         ->and(unlinkedSenderAddresses($page))->toBe([]);
+});
+
+it('offers to link the sender to the person who already holds the address instead of creating a second one', function (): void {
+    $email = conversationsPageMessage($this->ownerMailbox, 'conv-brian', 'brian@airbnb.test');
+    $person = People::factory()->create(['workspace_id' => $this->workspace->id, 'name' => 'Brian Chesky']);
+    EmailLinkSuppression::factory()->create(['workspace_id' => $this->workspace->id, 'email_id' => $email->id, 'emailable_type' => $person->getMorphClass(), 'emailable_id' => $person->id]);
+    $field = CustomField::query()->withoutGlobalScopes()->where('tenant_id', $this->workspace->id)->where('entity_type', 'people')->where('code', 'emails')->firstOrFail();
+    $person->saveCustomFieldValue($field, ['Brian@Airbnb.test'], $this->workspace);
+
+    livewire(EmailInboxPage::class)
+        ->call('setView', ConversationView::Unlinked->value)
+        ->mountAction('createSenderPerson', arguments: ['address' => 'brian@airbnb.test', 'name' => 'Brian Chesky'])
+        ->assertMountedActionModalSee('Brian Chesky already has this address')
+        ->assertMountedActionModalSee('Link to Brian Chesky')
+        ->callMountedAction()
+        ->assertHasNoActionErrors()
+        ->assertNotified('Linked to Brian Chesky');
+
+    expect(People::query()->where('name', 'Brian Chesky')->count())->toBe(1)
+        ->and($email->people()->wherePivot('link_source', 'manual')->pluck('people.id')->all())->toBe([$person->id]);
+});
+
+it('locks the person row before it reads the addresses it adds to', function (): void {
+    $person = People::factory()->create(['workspace_id' => $this->workspace->id, 'name' => 'Brian Chesky']);
+    $statements = [];
+    DB::listen(function (QueryExecuted $query) use (&$statements): void {
+        $statements[] = $query->sql;
+    });
+
+    resolve(AddEmailAddressToPerson::class)->execute($this->owner, $person, 'brian@airbnb.test');
+
+    $lock = collect($statements)->search(fn (string $sql): bool => str_starts_with($sql, 'select * from "people"') && str_ends_with($sql, 'for update'));
+    $read = collect($statements)->search(fn (string $sql): bool => str_contains($sql, 'from "custom_field_values"'));
+
+    expect($lock)->toBeInt()
+        ->and($lock)->toBeLessThan($read);
 });
 
 it('adds the sender address to an existing person once', function (): void {
