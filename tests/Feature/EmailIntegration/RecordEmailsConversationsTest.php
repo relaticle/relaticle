@@ -460,6 +460,25 @@ it('ends the window 30 days after a past close date', function (): void {
     expect(opportunityTabKeys($opportunity))->toBe(['conv-after', 'conv-before']);
 });
 
+it('reads the close date of an opportunity loaded with its custom field values', function (): void {
+    $this->travelTo(now()->setDate(2026, 6, 1));
+    $opportunity = Opportunity::factory()->for($this->workspace)->create(['company_id' => $this->company->id]);
+    setOpportunityCloseDate($opportunity, now()->addDays(10)->toDateString());
+    $amount = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $opportunity->workspace_id)
+        ->where('entity_type', 'opportunity')
+        ->where('code', 'amount')
+        ->firstOrFail();
+    $opportunity->saveCustomFieldValue($amount, 1200, $opportunity->workspace);
+    $email = conversationsRecordMessage($this->ownerMailbox, 'conv-loaded', 'brian@airbnb.test', ['sent_at' => now()->subDays(3)]);
+    $this->company->emails()->attach($email->id, ['link_source' => 'auto']);
+
+    $loaded = Opportunity::query()->with('customFieldValues')->findOrFail($opportunity->id);
+
+    expect(opportunityTabKeys($loaded))->toBe(['conv-loaded']);
+});
+
 it('drops a derived conversation after a user removes it from the opportunity', function (): void {
     $this->travelTo(now()->setDate(2026, 6, 1));
     $opportunity = Opportunity::factory()->for($this->workspace)->create(['company_id' => $this->company->id]);

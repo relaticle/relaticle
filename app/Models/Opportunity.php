@@ -122,7 +122,7 @@ final class Opportunity extends Model implements HasCustomFields, HasMedia, HasT
             ->where('entity_type', $this->getMorphClass())
             ->where('code', OpportunityField::CLOSE_DATE->value)
             ->first();
-        $value = $field instanceof CustomField ? $this->getCustomFieldValue($field) : null;
+        $value = $field instanceof CustomField ? $this->loadMissing('customFieldValues.customField')->getCustomFieldValue($field) : null;
 
         return match (true) {
             $value instanceof CarbonInterface => $value->toImmutable(),
