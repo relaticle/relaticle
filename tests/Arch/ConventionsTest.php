@@ -1403,3 +1403,28 @@ it('keeps every Tailwind source on disk, and every core one inside the Docker fr
             'The cloud package ships its own stylesheet, which the image never builds, so only core stylesheets must stay inside the frontend stage and none may name the cloud package: '.implode(', ', $problems),
         );
 });
+
+it('builds scripts with Vite, never with a bin script or a committed dist bundle', function (): void {
+    $root = dirname(__DIR__, 2);
+    $problems = [];
+
+    foreach ([$root.'/resources', ...glob($root.'/packages/*/resources', GLOB_ONLYDIR) ?: []] as $directory) {
+        /** @var SplFileInfo $file */
+        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::SELF_FIRST) as $file) {
+            if ($file->isDir() && $file->getFilename() === 'dist') {
+                $problems[] = str_replace($root.'/', '', $file->getPathname()).' holds a built bundle';
+            }
+        }
+    }
+
+    foreach (glob($root.'/bin/*') ?: [] as $script) {
+        if (preg_match('/(?:from\s+|import\s*\(\s*|require\s*\(\s*)([\'"])(?:vite|esbuild|rollup|rolldown|webpack)\1/', (string) file_get_contents($script)) === 1) {
+            $problems[] = str_replace($root.'/', '', $script).' runs a bundler';
+        }
+    }
+
+    expect($problems)->toBe(
+        [],
+        'vite.config.js builds every script that imports a package (.ai/guidelines/relaticle/ui.md): '.implode(', ', $problems),
+    );
+});

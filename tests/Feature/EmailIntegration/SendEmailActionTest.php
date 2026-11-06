@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\People;
 use App\Models\User;
+use App\Support\PlainText;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\UploadedFile;
@@ -29,7 +30,7 @@ use Relaticle\EmailIntegration\Services\ForwardAttachmentCopyService;
 use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(SendEmailAction::class, LinkEmailAction::class, EmailSendingService::class, ConnectedAccount::class, EmailInlineImageEmbedder::class, EmailAttachment::class, ForwardAttachmentCopyService::class);
+mutates(SendEmailAction::class, LinkEmailAction::class, EmailSendingService::class, ConnectedAccount::class, EmailInlineImageEmbedder::class, EmailAttachment::class, ForwardAttachmentCopyService::class, PlainText::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -80,6 +81,18 @@ it('stores a readable text copy and snippet of the queued email', function (): v
 
     expect($email->body->body_text)->toBe("Hi Kai,\n\nI'm Manuk & I build Relaticle.")
         ->and($email->snippet)->toBe("Hi Kai, I'm Manuk & I build Relaticle.");
+});
+
+it('stores the ticks of a checklist in the text copy of the queued email', function (): void {
+    $email = app(SendEmailAction::class)->execute($this->user, [
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Next steps',
+        'body_html' => '<ul data-type="taskList"><li data-checked="true" data-type="taskItem"><label><input type="checkbox" checked="checked"><span></span></label><div><p>Call Bob</p></div></li><li data-checked="false" data-type="taskItem"><label><input type="checkbox"><span></span></label><div><p>Send quote</p></div></li></ul>',
+        'to' => [['email' => 'recipient@example.com', 'name' => 'Recipient']],
+        'creation_source' => EmailCreationSource::COMPOSE,
+    ]);
+
+    expect($email->body->body_text)->toBe("- [x] Call Bob\n- [ ] Send quote");
 });
 
 it('forbids queuing mail when the mailbox cannot send', function (): void {

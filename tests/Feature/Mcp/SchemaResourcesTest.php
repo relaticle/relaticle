@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\CustomFields\TaskField;
 use App\Enums\CustomFieldType;
 use App\Mcp\Resources\CompanySchemaResource;
 use App\Mcp\Resources\NoteSchemaResource;
@@ -73,6 +74,21 @@ it('returns valid task schema with correct fields', function (): void {
         ->assertOk()
         ->assertSee('task')
         ->assertSee('"title"');
+});
+
+it('publishes the checklist hint on the task description and not on the note body', function (): void {
+    $hint = substr(json_encode(TaskField::CHECKLIST_INPUT_FORMAT, JSON_THROW_ON_ERROR), 1, -1);
+    $entry = substr(json_encode(CustomFieldType::RICH_EDITOR->inputFormat().'; '.TaskField::CHECKLIST_INPUT_FORMAT, JSON_THROW_ON_ERROR), 1, -1);
+
+    RelaticleServer::actingAs($this->user)
+        ->resource(TaskSchemaResource::class)
+        ->assertOk()
+        ->assertSee($entry);
+
+    RelaticleServer::actingAs($this->user)
+        ->resource(NoteSchemaResource::class)
+        ->assertOk()
+        ->assertDontSee($hint);
 });
 
 it('returns valid note schema with correct fields', function (): void {

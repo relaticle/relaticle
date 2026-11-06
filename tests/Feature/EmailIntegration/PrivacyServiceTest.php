@@ -340,7 +340,7 @@ it('effectiveTier hides a blocked email from its owner', function (): void {
     expect($tier)->toBeNull();
 });
 
-it('effectiveTier returns FULL for a teammate who already synced the same message', function (): void {
+it('effectiveTier keeps a teammate copy at its own tier when the viewer holds a copy with the same message id', function (): void {
     $viewer = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
     $this->workspace->users()->attach($viewer, ['role' => 'member']);
 
@@ -365,7 +365,7 @@ it('effectiveTier returns FULL for a teammate who already synced the same messag
 
     $tier = $this->service->effectiveTier($email, $viewer);
 
-    expect($tier)->toBe(EmailPrivacyTier::FULL);
+    expect($tier)->toBe(EmailPrivacyTier::METADATA_ONLY);
 });
 
 it('effectiveTier does not treat a different message as a mailbox copy', function (): void {
@@ -396,7 +396,7 @@ it('effectiveTier does not treat a different message as a mailbox copy', functio
     expect($tier)->toBe(EmailPrivacyTier::METADATA_ONLY);
 });
 
-it('effectiveTier uses a share on another copy of the same message', function (): void {
+it('effectiveTier ignores a share made on another copy of the same message', function (): void {
     $viewer = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
     $this->workspace->users()->attach($viewer, ['role' => 'member']);
 
@@ -431,7 +431,7 @@ it('effectiveTier uses a share on another copy of the same message', function ()
 
     $tier = $this->service->effectiveTier($email, $viewer);
 
-    expect($tier)->toBe(EmailPrivacyTier::FULL);
+    expect($tier)->toBe(EmailPrivacyTier::METADATA_ONLY);
 });
 
 it('effectiveTier hides a mailbox-blocklisted email from its owner', function (): void {

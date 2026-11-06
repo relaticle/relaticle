@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Mcp\Schema;
 
 use App\Enums\CrmEntity;
+use App\Enums\CustomFields\TaskField;
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
@@ -59,7 +60,7 @@ final readonly class CustomFieldSchema
                 ->where('tenant_id', $workspaceId)
                 ->where('entity_type', $entity->value)
                 ->active()
-                ->select('id', 'code', 'name', 'type', 'validation_rules')
+                ->select('id', 'entity_type', 'code', 'name', 'type', 'validation_rules')
                 ->with(['options:id,custom_field_id,name'])
                 ->get();
 
@@ -101,7 +102,9 @@ final readonly class CustomFieldSchema
                 'name' => $field->name,
                 'type' => $field->type,
                 'required' => $required,
-                'input_format' => $type->inputFormat(),
+                'input_format' => $field->holdsChecklists()
+                    ? $type->inputFormat().'; '.TaskField::CHECKLIST_INPUT_FORMAT
+                    : $type->inputFormat(),
                 'example' => $type->example(),
             ];
 

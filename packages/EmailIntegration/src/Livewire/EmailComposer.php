@@ -60,6 +60,7 @@ use Relaticle\EmailIntegration\Queries\PersonByEmailQuery;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\ForwardAttachmentCopyService;
 use Relaticle\EmailIntegration\Services\MassSendRecipientResolver;
+use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
 use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
 use Relaticle\EmailIntegration\Support\ComposerInlineImage;
 use Relaticle\EmailIntegration\Support\ComposerPageTo;
@@ -2078,11 +2079,14 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         $user = $this->authUser();
 
-        $original = Email::query()
-            ->with(['body', 'participants', 'from', 'shares'])
-            ->where('workspace_id', $user->current_workspace_id)
-            ->where('rfc_message_id', $draft->in_reply_to)
-            ->withGlobalScope('visible', new VisibleEmailScope($user))
+        $original = resolve(PreferredEmailCopyService::class)
+            ->restrictToVisiblePreferredCopies(
+                Email::query()
+                    ->with(['body', 'participants', 'from', 'shares'])
+                    ->where('workspace_id', $user->current_workspace_id)
+                    ->where('rfc_message_id', $draft->in_reply_to),
+                $user,
+            )
             ->first();
 
         if (! $original instanceof Email || $user->cannot('view', $original)) {

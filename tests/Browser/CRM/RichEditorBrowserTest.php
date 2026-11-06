@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 use App\Filament\CustomFields\RichEditorFieldType;
+use App\Filament\RichEditor\ChecklistPlugin;
 use App\Filament\RichEditor\SlashMenuPlugin;
+use App\Filament\RichEditor\TaskItem;
 use App\Models\CustomField;
 use App\Models\Note;
+use App\Models\Task;
 use App\Models\User;
 
-mutates(RichEditorFieldType::class, SlashMenuPlugin::class);
+mutates(RichEditorFieldType::class, SlashMenuPlugin::class, ChecklistPlugin::class, TaskItem::class);
 
 it('hides the heading toolbar when the caret has no text selection', function (): void {
     $user = User::factory()->withWorkspace()->create();
@@ -292,4 +295,97 @@ it('spaces paragraphs apart in the note editor', function (): void {
     JS);
 
     expect($gap)->toBeGreaterThan(0);
+});
+
+it('opens the slash menu in the top layer, above the task modal', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/tasks")
+        ->press('New task')
+        ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
+        ->click('.fi-fo-rich-editor-seamless .ProseMirror')
+        ->keys('.fi-fo-rich-editor-seamless .ProseMirror', '/')
+        ->assertVisible('.fi-slash-menu');
+
+    $menuOnTop = $page->script(<<<'JS'
+        (() => {
+            const menu = [...document.querySelectorAll('.fi-slash-menu')].find((panel) => panel.getBoundingClientRect().height > 0);
+            const box = menu.getBoundingClientRect();
+
+            return {
+                onTop: menu.contains(document.elementFromPoint(box.left + box.width / 2, box.top + 20)),
+                topLayer: menu.matches(':popover-open'),
+            };
+        })();
+    JS);
+
+    expect($menuOnTop)->toBe(['onTop' => true, 'topLayer' => true]);
+});
+
+it('builds, ticks and saves a checklist in a task description', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $editor = '.fi-fo-rich-editor-seamless .ProseMirror';
+
+    $toggleBold = <<<'JS'
+        (() => {
+            const root = document.querySelector('.fi-fo-rich-editor-seamless [x-data^="richEditorFormComponent"]');
+
+            Alpine.$data(root).getEditor().chain().focus().toggleBold().run();
+        })();
+    JS;
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/tasks")
+        ->press('New task')
+        ->type('[id="mountedActionSchema0.title"]', 'Prepare the offsite')
+        ->assertVisible($editor)
+        ->typeSlowly($editor, '/checklist', 20)
+        ->keys($editor, 'Enter')
+        ->typeSlowly($editor, 'Call ', 20);
+
+    $page->script($toggleBold);
+
+    $page->typeSlowly($editor, 'Bob', 20);
+
+    $page->script($toggleBold);
+
+    $page->keys($editor, 'Enter')
+        ->typeSlowly($editor, 'Send quote', 20)
+        ->keys($editor, ['Enter', 'Enter'])
+        ->typeSlowly($editor, '[ ] Book room', 20)
+        ->assertScript("document.querySelectorAll('{$editor} ul[data-type=\"taskList\"] > li').length === 3")
+        ->assertScript("getComputedStyle(document.querySelector('{$editor} ul[data-type=\"taskList\"]')).listStyleType === 'none'")
+        ->assertScript("getComputedStyle(document.querySelector('{$editor} ul[data-type=\"taskList\"] > li')).display === 'flex'")
+        ->assertScript("(() => { const box = document.querySelector('{$editor} ul[data-type=\"taskList\"] > li > label').getBoundingClientRect(); return box.width >= 24 && box.height >= 24; })()")
+        ->click("{$editor} input[aria-label=\"Checklist item: Call Bob\"]")
+        ->assertScript("document.querySelectorAll('{$editor} li[data-checked=\"true\"]').length === 1")
+        ->assertScript("(() => { const bold = document.querySelector('{$editor} li[data-checked=\"true\"] strong'); return getComputedStyle(bold).color === getComputedStyle(bold.closest('p')).color; })()")
+        ->press('Create')
+        ->assertSee('Prepare the offsite')
+        ->assertNoJavaScriptErrors();
+
+    $task = Task::query()
+        ->where('title', 'Prepare the offsite')
+        ->with('customFieldValues.customField.options')
+        ->firstOrFail();
+    $description = $task->getCustomFieldValue(
+        CustomField::query()
+            ->where('tenant_id', $workspace->getKey())
+            ->where('entity_type', 'task')
+            ->where('code', 'description')
+            ->firstOrFail()
+    );
+
+    expect(substr_count((string) $description, 'data-checked="true"'))->toBe(1)
+        ->and(substr_count((string) $description, 'data-checked="false"'))->toBe(2);
+
+    $page->click('Prepare the offsite')
+        ->assertVisible($editor)
+        ->assertScript("document.querySelector('{$editor} input[aria-label=\"Checklist item: Call Bob\"]')?.checked === true")
+        ->assertNoJavaScriptErrors();
 });
