@@ -64,6 +64,10 @@ final readonly class PlainText
 
     private static function markTaskItems(string $html): string
     {
+        if (! str_contains($html, 'taskItem')) {
+            return $html;
+        }
+
         return preg_replace_callback(
             '/<li\b(?=[^>]*(?<![\w-])data-type\s*=\s*["\']?taskItem(?![\w-]))[^>]*>/i',
             fn (array $tag): string => $tag[0].self::taskMarker(preg_match('/(?<![\w-])data-checked\s*=\s*(["\']?)true\1(?![\w-])/i', $tag[0]) === 1),
