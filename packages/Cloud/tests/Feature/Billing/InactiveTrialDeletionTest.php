@@ -18,6 +18,7 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
@@ -440,13 +441,13 @@ it('reminds the owner of an inactivity deletion five days before it', function (
         && $mail->workspace->is($workspace));
 });
 
-it('sends no reminder outside the five-day window or for a deletion the owner requested', function (): void {
+it('sends no reminder more than five days out, twice, or for a deletion the owner requested', function (): void {
     Mail::fake();
     $this->travelTo(inactivePausedAt()->addDays(50)->setTime(2, 0));
     $sixDays = inactivePausedWorkspace();
     $sixDays->forceFill(['scheduled_deletion_at' => now()->addDays(6), 'deletion_reason' => DeletionReason::Inactivity, 'paused_at' => now()->addDays(6)->subDays(60)])->save();
     $fourDays = inactivePausedWorkspace();
-    $fourDays->forceFill(['scheduled_deletion_at' => now()->addDays(4), 'deletion_reason' => DeletionReason::Inactivity, 'paused_at' => now()->addDays(4)->subDays(60)])->save();
+    $fourDays->forceFill(['scheduled_deletion_at' => now()->addDays(4), 'deletion_reason' => DeletionReason::Inactivity, 'paused_at' => now()->addDays(4)->subDays(60), 'inactivity_reminded_at' => now()->subDay()])->save();
     $requested = inactivePausedWorkspace();
     $requested->forceFill(['scheduled_deletion_at' => now()->addDays(5), 'deletion_reason' => DeletionReason::Requested])->save();
 
@@ -483,7 +484,7 @@ function purgeDueDeletion(Workspace $workspace, DeletionReason $reason): void
 {
     test()->travelTo(inactivePausedAt()->addDays(60)->addMinute());
 
-    $workspace->forceFill(['scheduled_deletion_at' => now()->subMinute(), 'deletion_reason' => $reason])->save();
+    $workspace->forceFill(['scheduled_deletion_at' => now()->subMinute(), 'deletion_reason' => $reason, 'inactivity_reminded_at' => now()->subDays(5)])->save();
 
     test()->artisan('app:purge-scheduled-deletions')->assertSuccessful();
 }
@@ -836,6 +837,94 @@ foreach (deletionsThatNoLongerStand() as $reason => $arrange) {
         Mail::assertNothingQueued();
     });
 }
+
+it('reminds the owner on the next run when the run on the reminder day was missed', function (): void {
+    Mail::fake();
+    inactivePausedWorkspace();
+
+    $this->travelTo(inactivityRunOn(46));
+    runInactivityCommand();
+
+    foreach ([56, 57] as $day) {
+        $this->travelTo(inactivityRunOn($day));
+        runInactivityCommand();
+    }
+
+    Mail::assertQueued(InactiveWorkspaceDeletionReminderMail::class, 1);
+});
+
+it('reminds again for a new countdown after a sign-in ended the first', function (): void {
+    Mail::fake();
+    $workspace = inactivePausedWorkspace();
+
+    foreach ([46, 55] as $day) {
+        $this->travelTo(inactivityRunOn($day));
+        runInactivityCommand();
+    }
+
+    $this->travelTo(inactivityRunOn(56));
+    $workspace->owner->forceFill(['last_login_at' => now()])->save();
+    event(new Login('web', $workspace->owner, false));
+
+    foreach ([102, 111] as $day) {
+        $this->travelTo(inactivityRunOn($day));
+        runInactivityCommand();
+    }
+
+    Mail::assertQueued(InactiveWorkspaceDeletionReminderMail::class, 2);
+});
+
+it('does not remind a workspace another run reminded after it was read', function (): void {
+    Mail::fake();
+    $workspace = inactivePausedWorkspace();
+    $this->travelTo(inactivityRunOn(55));
+    $workspace->forceFill(['scheduled_deletion_at' => inactivePausedAt()->addDays(60), 'deletion_reason' => DeletionReason::Inactivity])->save();
+    $raced = false;
+
+    DB::listen(function (QueryExecuted $query) use (&$raced, $workspace): void {
+        if ($raced || ! str_starts_with($query->sql, 'select * from "users"')) {
+            return;
+        }
+
+        $raced = true;
+        DB::table('workspaces')->where('id', $workspace->getKey())->update(['inactivity_reminded_at' => now()]);
+    });
+
+    runInactivityCommand();
+
+    expect($raced)->toBeTrue();
+    Mail::assertNotQueued(InactiveWorkspaceDeletionReminderMail::class);
+});
+
+it('still sends reminders when scheduling a new countdown fails', function (): void {
+    Mail::fake();
+    $due = inactivePausedWorkspace();
+    $this->travelTo(inactivityRunOn(55));
+    $due->forceFill(['scheduled_deletion_at' => inactivePausedAt()->addDays(60), 'deletion_reason' => DeletionReason::Inactivity])->save();
+    inactivePausedWorkspace(['paused_at' => inactivePausedAt()->subDays(10)]);
+
+    DB::listen(function (QueryExecuted $query): void {
+        throw_if(str_starts_with($query->sql, 'update "workspaces" set "scheduled_deletion_at"'), RuntimeException::class, 'Queue unavailable');
+    });
+
+    expect(fn (): int => Artisan::call('billing:schedule-inactive-deletions'))->toThrow(RuntimeException::class, 'Queue unavailable');
+
+    Mail::assertQueued(InactiveWorkspaceDeletionReminderMail::class, fn (InactiveWorkspaceDeletionReminderMail $mail): bool => $mail->workspace->is($due));
+});
+
+it('keeps a workspace whose reminder never went out and lets the next run warn again', function (): void {
+    Mail::fake();
+    $workspace = inactivePausedWorkspace();
+    test()->travelTo(inactivePausedAt()->addDays(60)->addMinute());
+    $workspace->forceFill(['scheduled_deletion_at' => now()->subMinute(), 'deletion_reason' => DeletionReason::Inactivity])->save();
+
+    test()->artisan('app:purge-scheduled-deletions')->assertSuccessful();
+
+    $workspace->refresh();
+
+    expect(Workspace::query()->whereKey($workspace->getKey())->exists())->toBeTrue()
+        ->and($workspace->scheduled_deletion_at)->toBeNull();
+});
 
 it('keeps a workspace whose countdown was cancelled after the purge job read it', function (): void {
     Mail::fake();

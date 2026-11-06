@@ -35,8 +35,8 @@ final class ScheduleInactiveTrialDeletionsCommand extends Command
             return self::SUCCESS;
         }
 
-        $this->scheduleDeletions($inactive);
         $this->sendReminders($inactive, $cancel);
+        $this->scheduleDeletions($inactive);
 
         return self::SUCCESS;
     }
@@ -74,6 +74,7 @@ final class ScheduleInactiveTrialDeletionsCommand extends Command
                     ->update([
                         'scheduled_deletion_at' => $deletesAt,
                         'deletion_reason' => DeletionReason::Inactivity->value,
+                        'inactivity_reminded_at' => null,
                     ]);
 
                 if ($updated !== 1) {
@@ -106,12 +107,12 @@ final class ScheduleInactiveTrialDeletionsCommand extends Command
 
     private function sendReminders(InactiveTrialWorkspacesQuery $inactive, CancelInactivityDeletion $cancel): void
     {
-        $reminderDate = now()->addDays(InactiveTrialWorkspacesQuery::REMINDER_DAYS);
         $reminded = 0;
 
         Workspace::query()
             ->scheduledForInactivity()
-            ->whereBetween('scheduled_deletion_at', [$reminderDate->startOfDay(), $reminderDate->endOfDay()])
+            ->whereNull('inactivity_reminded_at')
+            ->where('scheduled_deletion_at', '<=', now()->addDays(InactiveTrialWorkspacesQuery::REMINDER_DAYS)->endOfDay())
             ->with('owner')
             ->chunkById(100, function (Collection $workspaces) use ($inactive, $cancel, &$reminded): void {
                 $workspaces->each(function (Workspace $workspace) use ($inactive, $cancel, &$reminded): void {
@@ -128,13 +129,36 @@ final class ScheduleInactiveTrialDeletionsCommand extends Command
                         return;
                     }
 
-                    $this->info("Reminding the owner of {$workspace->name}...");
-
-                    Mail::to($owner->email)->queue(new InactiveWorkspaceDeletionReminderMail($workspace, $workspace->scheduled_deletion_at));
-                    $reminded++;
+                    if ($this->remind($workspace, $owner)) {
+                        $reminded++;
+                    }
                 });
             });
 
         $this->comment("Sent {$reminded} deletion reminder(s).");
+    }
+
+    private function remind(Workspace $workspace, User $owner): bool
+    {
+        /** @var CarbonImmutable $deletesAt */
+        $deletesAt = $workspace->scheduled_deletion_at;
+
+        return DB::transaction(function () use ($workspace, $owner, $deletesAt): bool {
+            $updated = Workspace::query()
+                ->whereKey($workspace->getKey())
+                ->scheduledForInactivity()
+                ->whereNull('inactivity_reminded_at')
+                ->update(['inactivity_reminded_at' => now()]);
+
+            if ($updated !== 1) {
+                return false;
+            }
+
+            $this->info("Reminding the owner of {$workspace->name}...");
+
+            Mail::to($owner->email)->queue(new InactiveWorkspaceDeletionReminderMail($workspace, $deletesAt));
+
+            return true;
+        });
     }
 }

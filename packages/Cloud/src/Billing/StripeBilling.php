@@ -63,6 +63,6 @@ final readonly class StripeBilling implements Billing
 
     public function inactivityDeletionStands(Workspace $workspace): bool
     {
-        return $this->inactive->stillDue($workspace);
+        return $workspace->inactivity_reminded_at !== null && $this->inactive->stillDue($workspace);
     }
 }

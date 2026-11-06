@@ -16,6 +16,7 @@ return new class extends Migration
             $table->timestamp('paused_at')->nullable();
             $table->string('deletion_reason')->nullable();
             $table->timestamp('inactivity_notice_sent_at')->nullable();
+            $table->timestamp('inactivity_reminded_at')->nullable();
         });
 
         DB::table('workspaces')

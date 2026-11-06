@@ -78,6 +78,7 @@ use Spatie\Sluggable\SlugOptions;
  * @property DeletionReason|null $deletion_reason
  * @property CarbonImmutable|null $paused_at
  * @property CarbonImmutable|null $inactivity_notice_sent_at
+ * @property CarbonImmutable|null $inactivity_reminded_at
  * @property ?string $stripe_id
  * @property ?string $pm_type
  * @property ?string $pm_last_four
@@ -253,6 +254,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
             'deletion_reason' => DeletionReason::class,
             'paused_at' => 'datetime',
             'inactivity_notice_sent_at' => 'datetime',
+            'inactivity_reminded_at' => 'datetime',
             'trial_ends_at' => 'datetime',
             'trial_extended_at' => 'datetime',
             'trial_reminded_for' => 'datetime',
