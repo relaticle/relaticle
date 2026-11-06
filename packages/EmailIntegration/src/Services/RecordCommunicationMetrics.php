@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\Meeting;
+use Relaticle\EmailIntegration\Models\Scopes\ActiveAccountScope;
 
 final readonly class RecordCommunicationMetrics
 {
@@ -58,7 +59,16 @@ final readonly class RecordCommunicationMetrics
         $outbound = 0;
         $lastEmailAt = null;
 
-        foreach ($record->emails()->reorder()->with('participants')->lazyById(500, 'emails.id', 'id') as $email) {
+        // The increments counted every linked email whatever later happened to it, so the recount does too.
+        $linked = $record->emails()
+            ->withoutGlobalScope(ActiveAccountScope::class)
+            ->withTrashed()
+            ->whereNotNull('emails.linked_at')
+            ->reorder()
+            ->select(Email::listColumns())
+            ->with('participants:id,email_id,email_address');
+
+        foreach ($linked->lazyById(500, 'emails.id', 'id') as $email) {
             if (! $this->visibility->countsTowardCommunicationIntelligence($email)) {
                 continue;
             }

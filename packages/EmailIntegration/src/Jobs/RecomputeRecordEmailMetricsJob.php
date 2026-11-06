@@ -18,7 +18,7 @@ use Illuminate\Queue\Attributes\UniqueFor;
 use Relaticle\EmailIntegration\Services\RecordCommunicationMetrics;
 
 #[DeleteWhenMissingModels]
-#[Queue('emails-sync')]
+#[Queue('emails-import')]
 #[Timeout(300)]
 #[UniqueFor(600)]
 final class RecomputeRecordEmailMetricsJob implements ShouldBeUniqueUntilProcessing, ShouldQueue

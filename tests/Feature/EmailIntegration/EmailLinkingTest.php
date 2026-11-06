@@ -289,6 +289,31 @@ it('waits for the conversation lock before it changes links', function (Closure 
     'sync linking' => fn (User $user, Email $email): mixed => resolve(LinkEmailAction::class)->reapply($email),
 ]);
 
+it('changes the counts by only what an unlink took off', function (Closure $retire): void {
+    $latest = linkingEmail($this->owner);
+    $secondMailbox = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'user_id' => $this->owner->getKey(),
+        'status' => 'active',
+    ]));
+    $earlier = linkingEmail($this->owner, [
+        'connected_account_id' => $secondMailbox->getKey(),
+        'conversation_key' => 'airbnb-kickoff',
+        'rfc_message_id' => '<kickoff@airbnb.test>',
+    ]);
+    $link = resolve(LinkEmailToRecord::class);
+    $link->execute($this->owner, $earlier, $this->company);
+    $link->execute($this->owner, $latest, $this->company);
+    $retire($earlier);
+
+    resolve(UnlinkEmailFromRecord::class)->execute($this->owner, $latest, $this->company);
+
+    expect($this->company->fresh()->email_count)->toBe(1);
+})->with([
+    'deleted email' => fn (Email $email): mixed => $email->delete(),
+    'disconnected mailbox' => fn (Email $email): mixed => ConnectedAccount::query()->whereKey($email->connected_account_id)->sole()->delete(),
+]);
+
 function linkingPage(Email $email): mixed
 {
     config(['relaticle.features.email_conversations' => [$email->workspace_id]]);
