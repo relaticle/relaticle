@@ -8,6 +8,7 @@ use App\Models\CustomField;
 use App\Models\CustomFieldSection;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\ChecklistHtml;
 use App\Support\PlainText;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
@@ -134,6 +135,20 @@ it('shows a ticked checklist item on the proposal card', function (): void {
         'old' => '[ ] Call Bob',
         'new' => '[x] Call Bob',
     ]);
+});
+
+it('ticks a proposal card item only where the board badge counts it ticked', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $html = '<ul data-type="taskList">'
+        .'<li data-checked="TRUE" data-type="taskItem"><label><input type="checkbox"><span></span></label><div><p>Call Bob</p></div></li>'
+        .'<li data-checked=true data-type=taskItem><label><input type="checkbox"><span></span></label><div><p>Send quote</p></div></li>'
+        .'</ul>';
+
+    $rows = resolve(CustomFieldsDisplayFormatter::class)
+        ->format($user, 'task', cleanFields: ['description' => $html], oldModel: null);
+
+    expect($rows[0]['new'])->toBe('[ ] Call Bob [x] Send quote')
+        ->and(ChecklistHtml::progress($html))->toBe(['checked' => 1, 'total' => 2]);
 });
 
 /**

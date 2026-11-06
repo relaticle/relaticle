@@ -68,11 +68,13 @@ final readonly class PlainText
             return $html;
         }
 
-        return preg_replace_callback(
-            '/<li\b(?=[^>]*(?<![\w-])data-type\s*=\s*["\']?taskItem(?![\w-]))[^>]*>/i',
-            fn (array $tag): string => $tag[0].self::taskMarker(preg_match('/(?<![\w-])data-checked\s*=\s*(["\']?)true\1(?![\w-])/i', $tag[0]) === 1),
-            $html,
-        ) ?? $html;
+        $document = HTMLDocument::createFromString('<body>'.$html, LIBXML_NOERROR, 'UTF-8');
+
+        foreach ($document->querySelectorAll(ChecklistHtml::ITEM) as $item) {
+            $item->prepend(self::taskMarker($item->matches(ChecklistHtml::CHECKED_ITEM)));
+        }
+
+        return $document->body->innerHTML;
     }
 
     private static function taskMarker(bool $checked): string
@@ -144,8 +146,8 @@ final readonly class PlainText
 
             $marker = $list->localName === 'ol' ? (count($items) + 1).'. ' : '- ';
 
-            if ($child->getAttribute('data-type') === 'taskItem') {
-                $marker .= self::taskMarker($child->getAttribute('data-checked') === 'true');
+            if ($child->matches(ChecklistHtml::ITEM)) {
+                $marker .= self::taskMarker($child->matches(ChecklistHtml::CHECKED_ITEM));
             }
 
             $items[] = $marker.self::lines(self::textOf($child));

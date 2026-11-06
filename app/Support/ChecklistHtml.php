@@ -11,6 +11,10 @@ use Dom\Text;
 
 final readonly class ChecklistHtml
 {
+    public const string ITEM = 'li[data-type="taskItem"]';
+
+    public const string CHECKED_ITEM = 'li[data-type="taskItem"][data-checked="true"]';
+
     private const string MARKER = '/^\s*\[([ xX])\] /';
 
     private const string TASK_LIST_ATTRIBUTE = '/data-type\s*=\s*["\']?taskList/';
@@ -66,14 +70,14 @@ final readonly class ChecklistHtml
         }
 
         $document = self::parse($html);
-        $total = $document->querySelectorAll('li[data-type="taskItem"]')->length;
+        $total = $document->querySelectorAll(self::ITEM)->length;
 
         if ($total === 0) {
             return null;
         }
 
         return [
-            'checked' => $document->querySelectorAll('li[data-type="taskItem"][data-checked="true"]')->length,
+            'checked' => $document->querySelectorAll(self::CHECKED_ITEM)->length,
             'total' => $total,
         ];
     }
