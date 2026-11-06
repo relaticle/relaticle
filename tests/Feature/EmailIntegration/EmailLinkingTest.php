@@ -282,6 +282,10 @@ it('takes a suppressed link off the email when sync linking finds both', functio
 });
 
 it('reads the copies it unlinks only after the conversation lock is free', function (): void {
+    if (! function_exists('pg_connect')) {
+        $this->markTestSkipped('Needs ext-pgsql to hold the conversation lock from a second connection.');
+    }
+
     $email = linkingEmail($this->owner);
     $email->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
     $late = Email::factory()->make([
