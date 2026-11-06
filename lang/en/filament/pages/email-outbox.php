@@ -19,6 +19,9 @@ return [
         'completed' => 'Completed',
         'partial_failure' => 'Partial failure',
     ],
+    'filters' => [
+        'status' => 'Status',
+    ],
     'tabs' => [
         'queued' => 'Queued',
         'scheduled' => 'Scheduled',

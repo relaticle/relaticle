@@ -10,6 +10,7 @@ use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Enums\OutboxTab;
 use Relaticle\EmailIntegration\Livewire\OutboxTable;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -293,9 +294,22 @@ it('bulkCancel skips a row that raced to SENDING and still cancels the rest', fu
         ->and($racing->refresh()->status)->toBe(EmailStatus::SENDING);
 });
 
-it('adds no filter indicator for the status the tab already shows', function (): void {
-    $component = livewire(OutboxTable::class)
-        ->assertSet('tableFilters.status_tab.value', 'queued');
+it('names the status it shows and lets only a non-default one be removed', function (string $status, bool $removable): void {
+    $component = livewire(OutboxTable::class)->filterTable('status_tab', $status);
 
-    expect($component->instance()->getTable()->getFilterIndicators())->toBeEmpty();
+    $indicators = $component->instance()->getTable()->getFilterIndicators();
+
+    expect($indicators)->toHaveCount(1)
+        ->and((string) $indicators[0]->getLabel())->toBe(__('filament/pages/email-outbox.filters.status').': '.OutboxTab::from($status)->getLabel())
+        ->and($indicators[0]->isRemovable())->toBe($removable);
+})->with([
+    'queued' => ['queued', false],
+    'scheduled' => ['scheduled', true],
+]);
+
+it('returns to queued when the status filter is removed', function (): void {
+    livewire(OutboxTable::class)
+        ->filterTable('status_tab', 'scheduled')
+        ->removeTableFilter('status_tab')
+        ->assertSet('tableFilters.status_tab.value', 'queued');
 });
