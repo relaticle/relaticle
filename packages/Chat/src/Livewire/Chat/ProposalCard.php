@@ -91,15 +91,13 @@ final class ProposalCard extends BaseLivewireComponent
      */
     public array $excludedFields = [];
 
-    /**
-     * Steps and batch rows the user left out. Nothing is rejected until Approve:
-     * approveAll() hands both lists to the plan service, which rejects them first.
-     *
-     * Typed mixed on purpose: a forged non-array value must reach the sanitizers, not a TypeError.
-     */
-    public mixed $leftOutSteps = [];
+    /** @var list<string> */
+    #[Locked]
+    public array $leftOutSteps = [];
 
-    public mixed $leftOutRows = [];
+    /** @var array<string, list<int>> */
+    #[Locked]
+    public array $leftOutRows = [];
 
     /**
      * Which field is open for inline editing, and on which step. Both are set
@@ -968,7 +966,7 @@ final class ProposalCard extends BaseLivewireComponent
         $affectedIds = $this->leftOutAffectedIds();
 
         try {
-            $result = $plan->approveAll($anchor, $this->authUser(), $this->leftOutStepIds(), $leftOutRows);
+            $result = $plan->approveAll($anchor, $this->authUser(), $this->leftOutSteps, $leftOutRows);
         } catch (QueryException $exception) {
             $this->reportDatabaseFailure($anchor, $exception);
 
@@ -1023,7 +1021,7 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         }
 
-        $leftOut = $this->leftOutStepIds();
+        $leftOut = $this->leftOutSteps;
         $rows = $this->leftOutRowMap();
 
         unset($rows[$stepId]);
@@ -1041,7 +1039,7 @@ final class ProposalCard extends BaseLivewireComponent
      */
     public function keepLeftOut(array $stepIds): void
     {
-        $this->leftOutSteps = array_values(array_diff($this->leftOutStepIds(), ProposalPlanService::cleanLeftOutSteps($stepIds)));
+        $this->leftOutSteps = array_values(array_diff($this->leftOutSteps, array_filter($stepIds, is_string(...))));
     }
 
     /**
@@ -1061,7 +1059,7 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         }
 
-        if (in_array($stepId, $this->leftOutStepIds(), true) || ! in_array($index, $this->unresolvedIndices($step), true)) {
+        if (in_array($stepId, $this->leftOutSteps, true) || ! in_array($index, $this->unresolvedIndices($step), true)) {
             return;
         }
 
@@ -1087,7 +1085,7 @@ final class ProposalCard extends BaseLivewireComponent
      */
     public function leftOutDependents(): array
     {
-        return resolve(ProposalPlanService::class)->dependentsOfLeftOut($this->planAllSteps(), $this->leftOutStepIds());
+        return resolve(ProposalPlanService::class)->dependentsOfLeftOut($this->planAllSteps(), $this->leftOutSteps);
     }
 
     /**
@@ -1098,7 +1096,7 @@ final class ProposalCard extends BaseLivewireComponent
      */
     public function linkedRowIndexes(): array
     {
-        $leftOut = [...$this->leftOutStepIds(), ...array_keys($this->leftOutDependents())];
+        $leftOut = [...$this->leftOutSteps, ...array_keys($this->leftOutDependents())];
 
         return array_map(
             fn (array $rows): array => array_map($this->stepSummary(...), $rows),
@@ -1115,7 +1113,7 @@ final class ProposalCard extends BaseLivewireComponent
     private function leftOutLinks(): array
     {
         $taken = $this->leftOutDependents();
-        $out = [...$this->leftOutStepIds(), ...array_keys($taken)];
+        $out = [...$this->leftOutSteps, ...array_keys($taken)];
         $links = [];
 
         foreach ($this->planSteps() as $step) {
@@ -1126,7 +1124,7 @@ final class ProposalCard extends BaseLivewireComponent
             }
 
             $dependencyIds = resolve(ProposalPlanService::class)->dependencyIds($step);
-            $direct = [...array_intersect($dependencyIds, $this->leftOutStepIds()), ...array_intersect($dependencyIds, $out)];
+            $direct = [...array_intersect($dependencyIds, $this->leftOutSteps), ...array_intersect($dependencyIds, $out)];
             $links[$stepId] = $direct[0] ?? $taken[$stepId][0];
         }
 
@@ -1191,7 +1189,7 @@ final class ProposalCard extends BaseLivewireComponent
     private function stepsStillIn(): array
     {
         $taken = $this->leftOutDependents();
-        $leftOut = $this->leftOutStepIds();
+        $leftOut = $this->leftOutSteps;
 
         return array_values(array_filter(
             $this->planSteps(),
@@ -1308,19 +1306,11 @@ final class ProposalCard extends BaseLivewireComponent
     }
 
     /**
-     * @return list<string>
-     */
-    private function leftOutStepIds(): array
-    {
-        return ProposalPlanService::cleanLeftOutSteps($this->leftOutSteps);
-    }
-
-    /**
      * @return array<string, list<int>>
      */
     private function leftOutRowMap(): array
     {
-        return ProposalPlanService::cleanLeftOutRows($this->leftOutRows);
+        return $this->leftOutRows;
     }
 
     private function planStepById(string $stepId): ?PendingAction
@@ -1342,7 +1332,7 @@ final class ProposalCard extends BaseLivewireComponent
         $planIds = array_map(static fn (PendingAction $step): string => (string) $step->getKey(), $this->planSteps());
 
         return array_values(array_intersect($planIds, [
-            ...$this->leftOutStepIds(),
+            ...$this->leftOutSteps,
             ...array_keys($this->leftOutDependents()),
             ...array_keys($this->leftOutRowMap()),
         ]));
@@ -2084,7 +2074,7 @@ final class ProposalCard extends BaseLivewireComponent
             'approvableRecordCount' => $this->approvableRecordCount(),
             'primaryIsRisky' => $this->primaryIsRisky(),
             'overwrites' => $this->shownOverwrites !== [],
-            'leftOutStepIds' => $this->leftOutStepIds(),
+            'leftOutStepIds' => $this->leftOutSteps,
             'leftOutRowIndexes' => $this->leftOutRowMap(),
             'takenBy' => $this->leftOutDependents(),
             'takenVia' => $this->leftOutLinks(),

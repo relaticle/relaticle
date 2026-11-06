@@ -226,15 +226,14 @@ final readonly class ProposalPlanService
     /**
      * Approve what is left of the plan, in order, after applying what the user left out:
      * left-out steps are rejected (with their dependents), then left-out batch rows.
-     * Both lists name ids the client sent, so they are sanitized and intersected with the plan.
      *
-     * @param  array<array-key, mixed>  $leftOutSteps
-     * @param  array<array-key, mixed>  $leftOutRows
+     * @param  list<string>  $leftOutSteps
+     * @param  array<string, list<int>>  $leftOutRows
      * @return array{approved: list<PendingAction>, failed: array{step: PendingAction, message: string}|null}
      */
     public function approveAll(PendingAction $action, User $user, array $leftOutSteps = [], array $leftOutRows = []): array
     {
-        $this->applyLeftOut($this->steps($action), $user, self::cleanLeftOutSteps($leftOutSteps), self::cleanLeftOutRows($leftOutRows));
+        $this->applyLeftOut($this->steps($action), $user, $leftOutSteps, $leftOutRows);
 
         $approved = [];
 
@@ -263,42 +262,6 @@ final readonly class ProposalPlanService
         }
 
         return ['approved' => $approved, 'failed' => null];
-    }
-
-    /**
-     * Keeps only string step ids: the list is client-writable state.
-     *
-     * @return list<string>
-     */
-    public static function cleanLeftOutSteps(mixed $value): array
-    {
-        if (! is_array($value)) {
-            return [];
-        }
-
-        return array_values(array_unique(array_filter($value, is_string(...))));
-    }
-
-    /**
-     * Keeps only step ids mapped to lists of integer row indexes: the map is client-writable state.
-     *
-     * @return array<string, list<int>>
-     */
-    public static function cleanLeftOutRows(mixed $value): array
-    {
-        if (! is_array($value)) {
-            return [];
-        }
-
-        $clean = [];
-
-        foreach ($value as $stepId => $indexes) {
-            if (is_array($indexes)) {
-                $clean[(string) $stepId] = array_values(array_unique(array_filter($indexes, is_int(...))));
-            }
-        }
-
-        return $clean;
     }
 
     /**

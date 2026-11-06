@@ -13,6 +13,7 @@ use Filament\Facades\Filament;
 use Filament\Forms\Components\Field;
 use Illuminate\Support\Facades\Bus;
 use Laravel\Pennant\Feature;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
@@ -233,7 +234,7 @@ describe('leaving steps and rows out', function (): void {
             ->call('setActive', $person->getKey())
             ->call('toggleLeftOut', (string) $stranger->getKey())
             ->assertSet('leftOutSteps', [])
-            ->set('leftOutSteps', [(string) $stranger->getKey()])
+            ->call('keepLeftOut', [(string) $stranger->getKey(), ['nested']])
             ->call('approveAll');
 
         expect($stranger->refresh()->status)->toBe(PendingActionStatus::Pending);
@@ -321,30 +322,13 @@ describe('leaving steps and rows out', function (): void {
             ->and(Task::query()->where('title', 'Review')->exists())->toBeTrue();
     });
 
-    it('ignores malformed leave-out state sent by the client', function (mixed $malformed): void {
-        [$person, $task, $note] = ($this->chainedPlan)();
+    it('refuses leave-out state written by the client', function (string $property): void {
+        [$person] = ($this->chainedPlan)();
 
-        $component = Livewire::test(ProposalCard::class)
+        Livewire::test(ProposalCard::class)
             ->call('setActive', $person->getKey())
-            ->set('leftOutRows', $malformed)
-            ->set('leftOutSteps', $malformed);
-
-        expect($component->instance()->approvableRecordCount())->toBe(3)
-            ->and($component->instance()->leftOutDependents())->toBe([]);
-
-        $component->call('toggleLeftOutRow', (string) $person->getKey(), 0)
-            ->call('approveAll')
-            ->assertHasNoErrors();
-
-        expect($person->refresh()->status)->toBe(PendingActionStatus::Approved)
-            ->and($task->refresh()->status)->toBe(PendingActionStatus::Approved)
-            ->and($note->refresh()->status)->toBe(PendingActionStatus::Approved);
-    })->with([
-        'a string' => ['x'],
-        'a string value' => [['x' => 'y']],
-        'a string list' => [['x', 'y']],
-        'a nested non-int list' => [['x' => ['a', 1.5, null]]],
-    ]);
+            ->set($property, [(string) $person->getKey()]);
+    })->with(['leftOutSteps', 'leftOutRows'])->throws(CannotUpdateLockedPropertyException::class);
 
     it('rejects the left-out rows of a batch step and approves the others', function (): void {
         [$conversationId, $turnId] = ProposalCardFixture::startPlan($this->user);
