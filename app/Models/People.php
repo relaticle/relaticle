@@ -18,7 +18,6 @@ use App\Observers\PeopleObserver;
 use App\Support\Media\UploadAllowlist;
 use Carbon\CarbonImmutable;
 use Database\Factories\PeopleFactory;
-use Filament\Models\Contracts\HasAvatar;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
@@ -55,7 +54,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
     'name',
     'creation_source',
 ])]
-final class People extends Model implements HasAvatar, HasCustomFields, HasMedia, HasTimeline
+final class People extends Model implements HasCustomFields, HasMedia, HasTimeline
 {
     use BelongsToWorkspaceCreator;
     use HasActivityTimeline;
@@ -88,11 +87,6 @@ final class People extends Model implements HasAvatar, HasCustomFields, HasMedia
             'last_interaction_at' => 'datetime',
             'last_meeting_at' => 'datetime',
         ];
-    }
-
-    public function getFilamentAvatarUrl(): ?string
-    {
-        return null;
     }
 
     /**
