@@ -19,7 +19,6 @@ use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Notifications\DatabaseNotification as FilamentDatabaseNotification;
 use Filament\Notifications\Notification as FilamentNotification;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification as NotificationFacade;
 use Illuminate\Support\Str;
@@ -580,8 +579,8 @@ it('renders the inbox panel as a modal dialog', function (): void {
         ->assertSeeHtml('aria-modal="true"');
 });
 
-it('renders shared email rows without per-row queries beyond the synced copy checks', function (): void {
-    $queriesPerRender = function (): Collection {
+it('renders shared email rows without per-row queries', function (): void {
+    $queriesPerRender = function (): int {
         $component = Livewire::actingAs($this->user)->test(AppDatabaseNotifications::class);
 
         DB::flushQueryLog();
@@ -589,9 +588,8 @@ it('renders shared email rows without per-row queries beyond the synced copy che
 
         $component->call('$refresh');
 
-        return collect(DB::getQueryLog())->pluck('query');
+        return count(DB::getQueryLog());
     };
-    $isSyncedCopyCheck = fn (string $query): bool => str_starts_with($query, 'select exists(select * from "emails"');
 
     sharedEmailNotices($this->user, $this->workspaceA, 5);
     $withFive = $queriesPerRender();
@@ -599,8 +597,7 @@ it('renders shared email rows without per-row queries beyond the synced copy che
     sharedEmailNotices($this->user, $this->workspaceA, 45);
     $withFifty = $queriesPerRender();
 
-    expect($withFifty->reject($isSyncedCopyCheck))->toHaveCount($withFive->reject($isSyncedCopyCheck)->count())
-        ->and($withFifty->filter($isSyncedCopyCheck))->toHaveCount(100);
+    expect($withFifty)->toBe($withFive);
 });
 
 it('renders managed invoice rows without per-row queries', function (): void {
