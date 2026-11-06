@@ -107,3 +107,19 @@ it('hides the Other fallback instead of showing a category tag', function (): vo
         ->assertSee('Catching up next week')
         ->assertDontSee(EmailCategory::Other->value);
 });
+
+it('colours the category tag from the enum, not from a private map', function (EmailCategory $category): void {
+    $email = Email::factory()->inbound()->full()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->getKey(),
+    ]);
+    EmailLabel::factory()->category($category->value)->create(['email_id' => $email->getKey()]);
+    $this->person->emails()->attach($email->getKey());
+
+    $html = livewire(EmailsRelationManager::class, ['ownerRecord' => $this->person, 'pageClass' => ViewPeople::class])
+        ->assertSee($category->getLabel())
+        ->html();
+
+    expect($html)->toMatch('/class="(?=[^"]*\bfi-badge\b)(?=[^"]*\bfi-color-'.$category->getColor().'\b)[^"]*"/');
+})->with([EmailCategory::Invoice, EmailCategory::Support, EmailCategory::Sales]);
