@@ -50,6 +50,8 @@ use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
  * @property string|null $provider_message_id
  * @property string|null $thread_id
  * @property string|null $in_reply_to
+ * @property string|null $references
+ * @property string|null $conversation_key
  * @property string $subject
  * @property string|null $snippet
  * @property CarbonInterface|null $sent_at
@@ -79,6 +81,8 @@ use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
     'provider_message_id',
     'thread_id',
     'in_reply_to',
+    'references',
+    'conversation_key',
     'subject',
     'snippet',
     'sent_at',

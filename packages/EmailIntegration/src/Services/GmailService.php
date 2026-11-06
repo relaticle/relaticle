@@ -23,6 +23,7 @@ use Relaticle\EmailIntegration\Exceptions\MailHistoryExpired;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 use Relaticle\EmailIntegration\Support\EmailAddressHeaderParser;
+use Relaticle\EmailIntegration\Support\MessageIdList;
 use Relaticle\EmailIntegration\Support\PublicSuffixList;
 use Symfony\Component\Mime\Encoder\QpContentEncoder;
 
@@ -148,7 +149,7 @@ final readonly class GmailService implements MailServiceInterface
             providerMessageId: $message->getId(),
             rfcMessageId: $headers->get('message-id')?->getValue(),
             threadId: $message->getThreadId(),
-            inReplyTo: $headers->get('in-reply-to')?->getValue(),
+            inReplyTo: MessageIdList::first($headers->get('in-reply-to')?->getValue()),
             subject: $headers->get('subject')?->getValue(),
             snippet: mb_substr(PlainText::fromHtml((string) $message->getSnippet()), 0, 255),
             sentAt: now()->setTimestamp((int) ($message->getInternalDate() / 1000)),
@@ -162,6 +163,7 @@ final readonly class GmailService implements MailServiceInterface
             attachments: $attachments,
             providerCategory: in_array('CATEGORY_PERSONAL', $labelIds, true) ? EmailCategory::Personal : null,
             isBulkMail: $this->isBulkCategory($labelIds) && ! $this->isRelayedForAnotherSender($participants, $headers),
+            references: MessageIdList::references($headers->get('references')?->getValue()),
         );
     }
 
