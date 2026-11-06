@@ -561,6 +561,30 @@ it('keeps the record tab right when many members suppressed many copies of its c
         ->and(resolve(EmailVisibilityService::class)->visibleEmailCountBadge($this->company, $this->owner))->toBe('30');
 });
 
+it('lets the user\'s own pin lift their held suppression on their other copies, on read and on sync', function (): void {
+    $domains = CustomField::query()->withoutGlobalScopes()->where('tenant_id', $this->workspace->getKey())->where('entity_type', 'company')->where('code', 'domains')->firstOrFail();
+    $this->company->saveCustomFieldValue($domains, 'https://airbnb.test', $this->workspace);
+    $suppressed = linkingEmail($this->owner);
+    $pinned = linkingEmail($this->owner, ['rfc_message_id' => '<renewal-pin@airbnb.test>']);
+    $stored = linkingEmail($this->owner, ['rfc_message_id' => '<renewal-stored@airbnb.test>']);
+    EmailLinkSuppression::factory()->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'email_id' => $suppressed->getKey(),
+        'emailable_type' => $this->company->getMorphClass(),
+        'emailable_id' => $this->company->getKey(),
+        'user_id' => $this->owner->getKey(),
+    ]);
+    $pinned->companies()->attach($this->company->getKey(), ['link_source' => 'manual']);
+    $stored->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
+
+    $synced = linkingEmail($this->owner, ['rfc_message_id' => '<renewal-reply@airbnb.test>', 'linked_at' => null]);
+    EmailParticipant::factory()->from()->create(['email_id' => $synced->getKey(), 'email_address' => 'brian@airbnb.test']);
+    resolve(LinkEmailAction::class)->execute($synced);
+
+    expect(linkSource($synced, $this->company))->toBe('auto')
+        ->and(Email::query()->onRecord($this->company)->pluck('id')->all())->toEqualCanonicalizing([$pinned->getKey(), $stored->getKey(), $synced->getKey()]);
+});
+
 it('leaves a copy off the opportunity tab once its company link is suppressed on that copy', function (): void {
     $opportunity = Opportunity::factory()->for($this->workspace)->create(['name' => 'Airbnb renewal', 'company_id' => $this->company->getKey()]);
     $email = linkingEmail($this->owner);
