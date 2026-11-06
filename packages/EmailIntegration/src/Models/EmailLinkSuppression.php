@@ -69,8 +69,11 @@ final class EmailLinkSuppression extends Model
             ->where('workspace_id', $email->workspace_id)
             ->where(fn (Builder $same): Builder => $same
                 ->whereKey($email->getKey())
-                ->when($email->conversation_key, fn (Builder $keyed, string $key): Builder => $keyed->orWhere('conversation_key', $key))
-                ->when($email->rfc_message_id, fn (Builder $message, string $id): Builder => $message->orWhere('rfc_message_id', $id)))
+                ->when(
+                    $email->conversation_key,
+                    fn (Builder $keyed, string $key): Builder => $keyed->orWhere('conversation_key', $key),
+                    fn (Builder $unkeyed): Builder => $unkeyed->when($email->rfc_message_id, fn (Builder $message, string $id): Builder => $message->orWhere('rfc_message_id', $id)),
+                ))
             ->select('id');
 
         return $query

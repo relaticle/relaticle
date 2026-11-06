@@ -293,7 +293,9 @@ final class Email extends Model
             ->where(fn (Builder $same): Builder => $same
                 ->whereColumn('suppressed_copies.id', $query->qualifyColumn('id'))
                 ->orWhereColumn('suppressed_copies.conversation_key', $query->qualifyColumn('conversation_key'))
-                ->orWhereColumn('suppressed_copies.rfc_message_id', $query->qualifyColumn('rfc_message_id')))
+                ->orWhere(fn (Builder $unkeyed): Builder => $unkeyed
+                    ->whereNull($query->qualifyColumn('conversation_key'))
+                    ->whereColumn('suppressed_copies.rfc_message_id', $query->qualifyColumn('rfc_message_id'))))
             ->toBase();
     }
 

@@ -1538,6 +1538,22 @@ it('links a later reply when a teammate unlinked their copy and the user pinned 
         ->and(Email::query()->onRecord($company)->pluck('id')->all())->toContain($alices->getKey(), $reply->getKey());
 });
 
+it('keeps an unlink to its conversation when another conversation holds the same message id', function (): void {
+    $company = makeAcmeCompanyWithDomain() ?? $this->markTestSkipped('No domains custom field seeded for this workspace.');
+    $unlinked = makeLinkEmail(['conversation_key' => 'acme-renewal', 'rfc_message_id' => '<deal@acme.com>']);
+    $secondMailbox = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create(['workspace_id' => $this->workspace->id, 'user_id' => $this->user->id]));
+    $elsewhere = makeLinkEmail(['conversation_key' => 'acme-forward', 'rfc_message_id' => '<deal@acme.com>', 'connected_account_id' => $secondMailbox->getKey()]);
+    EmailParticipant::factory()->from()->create(['email_id' => $unlinked->getKey(), 'email_address' => 'ceo@acme.com']);
+    EmailParticipant::factory()->from()->create(['email_id' => $elsewhere->getKey(), 'email_address' => 'ceo@acme.com']);
+    resolve(LinkEmailAction::class)->execute($unlinked);
+    resolve(UnlinkEmailFromRecord::class)->execute($this->user, $unlinked, $company);
+
+    resolve(LinkEmailAction::class)->execute($elsewhere);
+
+    expect($elsewhere->companies()->whereKey($company->getKey())->exists())->toBeTrue()
+        ->and(Email::query()->onRecord($company)->pluck('id')->all())->toBe([$elsewhere->getKey()]);
+});
+
 function makeAcmeCompanyWithDomain(): ?Company
 {
     $domainsField = CustomField::query()
