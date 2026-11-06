@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Company;
+use App\Models\People;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -11,11 +12,12 @@ use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
+use Relaticle\EmailIntegration\Filament\Concerns\HasUnlinkedSenders;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 
-mutates(HasEmailReaderActions::class);
+mutates(HasEmailReaderActions::class, HasUnlinkedSenders::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withWorkspace()->create();
@@ -112,4 +114,25 @@ it('unlinks a chip from its keyboard menu and links it back from Undo', function
         ->assertNoJavaScriptErrors();
 
     expect(emailLinkSource($this->email, $this->company))->toBe('manual');
+})->with(['inLightMode', 'inDarkMode']);
+
+it('groups an unlinked sender and creates a person from the group', function (string $theme): void {
+    $page = loginViaBrowser($this->owner, $theme)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->assertScript('document.documentElement.classList.contains("dark")', $theme === 'inDarkMode')
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/email?view=unlinked")
+        ->assertAttribute('[data-unlinked-sender="brian@airbnb.test"] [data-unlinked-sender-toggle]', 'aria-label', 'Show conversations from Brian')
+        ->assertSeeIn('[data-unlinked-sender="brian@airbnb.test"]', '1 conversation')
+        ->click('[data-unlinked-sender="brian@airbnb.test"] [data-unlinked-sender-toggle]')
+        ->assertVisible('[data-unlinked-sender-conversations] [data-conversation="conv-airbnb"]')
+        ->click('[data-unlinked-sender="brian@airbnb.test"] [data-sender-action="create-person"]')
+        ->assertSee('Create a person for this sender')
+        ->assertValue('.fi-modal-window input[disabled]', 'brian@airbnb.test')
+        ->click('.fi-modal-window .fi-modal-footer-actions button[type="submit"]')
+        ->assertSee('Created Brian')
+        ->assertSee('Every conversation is on a record.')
+        ->assertNoJavaScriptErrors();
+
+    expect(People::query()->where('name', 'Brian')->sole()->emails()->whereKey($this->email->id)->exists())->toBeTrue();
 })->with(['inLightMode', 'inDarkMode']);

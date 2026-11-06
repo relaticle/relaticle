@@ -474,59 +474,68 @@
             x-bind:class="selected.length > 0 && 'pb-24'"
             x-effect="renders; selected.length; placeBar()"
         >
-            @if ($this->conversations->rows !== [])
-                <label class="flex items-center gap-2 border-b border-gray-200/60 px-4 py-1.5 text-xs text-gray-500 sm:px-6 dark:border-white/10 dark:text-gray-400">
-                    <input
-                        type="checkbox"
-                        data-select-page
-                        x-bind:checked="pageSelected()"
-                        x-effect="$el.indeterminate = selected.length > 0 && ! pageSelected()"
-                        x-on:change="togglePage()"
-                        class="fi-checkbox-input"
-                    />
-                    {{ __('filament/pages/email-inbox.triage.selection.select_page') }}
-                </label>
-            @endif
+            @if ($this->showsUnlinkedSenders)
+                <x-email-integration::unlinked-senders
+                    :senders="$this->unlinkedSenders"
+                    :expanded="$expandedSender"
+                    :rows="$this->expandedSenderRows"
+                    :current-key="$this->selectedEmail?->conversation_key"
+                />
+            @else
+                @if ($this->conversations->rows !== [])
+                    <label class="flex items-center gap-2 border-b border-gray-200/60 px-4 py-1.5 text-xs text-gray-500 sm:px-6 dark:border-white/10 dark:text-gray-400">
+                        <input
+                            type="checkbox"
+                            data-select-page
+                            x-bind:checked="pageSelected()"
+                            x-effect="$el.indeterminate = selected.length > 0 && ! pageSelected()"
+                            x-on:change="togglePage()"
+                            class="fi-checkbox-input"
+                        />
+                        {{ __('filament/pages/email-inbox.triage.selection.select_page') }}
+                    </label>
+                @endif
 
-            <div class="divide-y divide-gray-200/60 dark:divide-white/10">
-                @forelse ($this->conversations->rows as $row)
-                    <x-email-integration::conversation-row :row="$row" selectable triage :current="$row->conversationKey === $this->selectedEmail?->conversation_key" wire:key="conversation-{{ $row->conversationKey }}" />
-                @empty
-                    <x-filament::empty-state
-                        :heading="$this->isFiltering() ? __('filament/pages/email-inbox.views.no_match') : __('filament/pages/email-inbox.views.empty.'.$this->activeView->value)"
-                        :description="$this->isFiltering() ? __('filament/pages/email-inbox.views.no_match_hint') : null"
-                        :icon="$this->isFiltering() ? 'heroicon-o-magnifying-glass' : 'heroicon-o-envelope'"
-                        icon-color="gray"
-                        :contained="false"
-                    />
-                @endforelse
-            </div>
-
-            @if ($this->conversations->previousCursor !== null || $this->conversations->nextCursor !== null)
-                <div class="flex items-center justify-between border-t border-gray-200/60 px-4 py-3 sm:px-6 dark:border-white/10">
-                    <button
-                        type="button"
-                        wire:click="previousConversationsPage"
-                        data-conversations-page="newer"
-                        wire:loading.attr="disabled"
-                        @disabled($this->conversations->previousCursor === null)
-                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
-                    >
-                        <x-heroicon-o-chevron-left class="h-3.5 w-3.5" />
-                        {{ __('filament/pages/email-inbox.views.newer') }}
-                    </button>
-                    <button
-                        type="button"
-                        wire:click="nextConversationsPage"
-                        data-conversations-page="older"
-                        wire:loading.attr="disabled"
-                        @disabled($this->conversations->nextCursor === null)
-                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
-                    >
-                        {{ __('filament/pages/email-inbox.views.older') }}
-                        <x-heroicon-o-chevron-right class="h-3.5 w-3.5" />
-                    </button>
+                <div class="divide-y divide-gray-200/60 dark:divide-white/10">
+                    @forelse ($this->conversations->rows as $row)
+                        <x-email-integration::conversation-row :row="$row" selectable triage :current="$row->conversationKey === $this->selectedEmail?->conversation_key" wire:key="conversation-{{ $row->conversationKey }}" />
+                    @empty
+                        <x-filament::empty-state
+                            :heading="$this->isFiltering() ? __('filament/pages/email-inbox.views.no_match') : __('filament/pages/email-inbox.views.empty.'.$this->activeView->value)"
+                            :description="$this->isFiltering() ? __('filament/pages/email-inbox.views.no_match_hint') : null"
+                            :icon="$this->isFiltering() ? 'heroicon-o-magnifying-glass' : 'heroicon-o-envelope'"
+                            icon-color="gray"
+                            :contained="false"
+                        />
+                    @endforelse
                 </div>
+
+                @if ($this->conversations->previousCursor !== null || $this->conversations->nextCursor !== null)
+                    <div class="flex items-center justify-between border-t border-gray-200/60 px-4 py-3 sm:px-6 dark:border-white/10">
+                        <button
+                            type="button"
+                            wire:click="previousConversationsPage"
+                            data-conversations-page="newer"
+                            wire:loading.attr="disabled"
+                            @disabled($this->conversations->previousCursor === null)
+                            class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
+                        >
+                            <x-heroicon-o-chevron-left class="h-3.5 w-3.5" />
+                            {{ __('filament/pages/email-inbox.views.newer') }}
+                        </button>
+                        <button
+                            type="button"
+                            wire:click="nextConversationsPage"
+                            data-conversations-page="older"
+                            wire:loading.attr="disabled"
+                            @disabled($this->conversations->nextCursor === null)
+                            class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
+                        >
+                            {{ __('filament/pages/email-inbox.views.older') }}
+                            <x-heroicon-o-chevron-right class="h-3.5 w-3.5" />
+                        </button>
+                    </div>
+                @endif
             @endif
 
             <x-email-integration::triage-bar />

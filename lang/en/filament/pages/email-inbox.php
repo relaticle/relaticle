@@ -250,7 +250,7 @@ return [
             'needs_reply' => 'Nothing is waiting on you.',
             'awaiting_reply' => 'No one owes you a reply.',
             'all' => 'No conversations yet.',
-            'unlinked' => 'Every conversation is linked to a record.',
+            'unlinked' => 'Every conversation is on a record.',
             'automated' => 'No automated mail.',
             'done' => 'Conversations you mark Done appear here. They come back when someone writes again.',
         ],
@@ -329,6 +329,33 @@ return [
             'reader' => 'Reading a conversation',
             'composer' => 'Writing an email',
             'global' => 'Anywhere',
+        ],
+    ],
+    'unlinked_senders' => [
+        'conversations' => '{1} :count conversation|[2,*] :count conversations',
+        'wrote' => '{1} You wrote once|[2,*] You wrote :count times',
+        'expand' => 'Show conversations from :name',
+        'link' => 'Link',
+        'newer' => 'Newer',
+        'older' => 'Older',
+        'create_person' => [
+            'label' => 'Create person',
+            'heading' => 'Create a person for this sender',
+            'submit' => 'Create',
+        ],
+        'link_existing' => [
+            'label' => 'Link to existing',
+            'heading' => 'Add :address to a person',
+            'submit' => 'Add address',
+        ],
+        'fields' => [
+            'name' => 'Name',
+            'email' => 'Email address',
+            'person' => 'Person',
+        ],
+        'notifications' => [
+            'created' => 'Created :name',
+            'added' => 'Added :address to :name',
         ],
     ],
     'drawer' => [

@@ -35,6 +35,7 @@ use Relaticle\EmailIntegration\Filament\Concerns\HasConversationReader;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConversationsFlag;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
+use Relaticle\EmailIntegration\Filament\Concerns\HasUnlinkedSenders;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
@@ -55,6 +56,7 @@ final class EmailInboxPage extends Page
     use HasConversationsFlag;
     use HasEmailFeatureFlag;
     use HasEmailReaderActions;
+    use HasUnlinkedSenders;
 
     protected string $view = 'email-integration::filament.pages.email-inbox';
 
@@ -168,7 +170,9 @@ final class EmailInboxPage extends Page
         $this->conversationView = ConversationView::from($view);
         $this->tab = null;
         $this->conversationsCursor = null;
-        unset($this->activeView, $this->conversations);
+        $this->sendersCursor = null;
+        $this->expandedSender = null;
+        unset($this->activeView, $this->conversations, $this->showsUnlinkedSenders, $this->unlinkedSenders, $this->expandedSenderRows);
     }
 
     // The page re-reads its rows each round trip, so a refetch drops the counts and the cached page.
@@ -180,7 +184,7 @@ final class EmailInboxPage extends Page
 
         $this->conversationView ??= $this->activeView;
         Cache::forget(ConversationsQuery::countsCacheKey($this->authUser()));
-        unset($this->viewCounts, $this->conversations, $this->selectedEmail);
+        unset($this->viewCounts, $this->conversations, $this->selectedEmail, $this->unlinkedSenders, $this->expandedSenderRows);
     }
 
     /**

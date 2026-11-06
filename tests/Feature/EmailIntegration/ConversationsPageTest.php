@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Actions\People\AddEmailAddressToPerson;
 use App\Features\EmailConversations;
 use App\Models\Company;
+use App\Models\CustomField;
 use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
@@ -43,6 +45,7 @@ use Relaticle\EmailIntegration\Enums\TriageSkipReason;
 use Relaticle\EmailIntegration\Events\ConversationChanged;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConversationFilters;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConversationReader;
+use Relaticle\EmailIntegration\Filament\Concerns\HasUnlinkedSenders;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Listeners\ForgetConversationCountsListener;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -56,12 +59,13 @@ use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailRead;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Queries\ConversationsQuery;
+use Relaticle\EmailIntegration\Queries\UnlinkedSendersQuery;
 use Relaticle\EmailIntegration\Services\EmailSearchService;
 use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
 
 use function Pest\Laravel\actingAs;
 
-mutates(ForgetConversationCountsListener::class, EmailInboxPage::class, HasConversationReader::class, ConversationsQuery::class, MarkEmailAsReadAction::class, ConversationView::class, PreferredEmailCopyService::class, ConversationFilters::class, EmailFilter::class, EmailSearchService::class, HasConversationFilters::class, MarkConversationsDone::class, ReopenConversations::class, MarkConversationsRead::class, MarkConversationsUnread::class, PrepareConversationTriage::class, TriageOutcome::class, TriageSkipReason::class);
+mutates(ForgetConversationCountsListener::class, EmailInboxPage::class, HasConversationReader::class, ConversationsQuery::class, MarkEmailAsReadAction::class, ConversationView::class, PreferredEmailCopyService::class, ConversationFilters::class, EmailFilter::class, EmailSearchService::class, HasConversationFilters::class, MarkConversationsDone::class, ReopenConversations::class, MarkConversationsRead::class, MarkConversationsUnread::class, PrepareConversationTriage::class, TriageOutcome::class, TriageSkipReason::class, UnlinkedSendersQuery::class, HasUnlinkedSenders::class, AddEmailAddressToPerson::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withWorkspace()->create();
@@ -303,7 +307,7 @@ it('lists only the viewer own conversations that no record links in Unlinked', f
     $teammateLinked = conversationsPageMessage($this->teammateMailbox, 'conv-ben-linked', 'olivia@stripe.test');
     $this->company->emails()->attach([$ownLinked->id, $teammateLinked->id]);
 
-    $page = livewire(EmailInboxPage::class)->call('setView', ConversationView::Unlinked->value);
+    $page = livewire(EmailInboxPage::class)->call('setView', ConversationView::Unlinked->value)->call('toggleSender', 'brian@airbnb.test');
 
     expect(conversationsPageKeys($page->html()))->toBe(['conv-own-unlinked'])
         ->and($page->instance()->viewCounts['unlinked'])->toBe(1);
@@ -1505,4 +1509,84 @@ it('reads no conversation row from another workspace', function (): void {
     conversationsPageMessage(conversationsPageMailbox($outsider, 'eve@other.test'), 'conv-outside', 'brian@airbnb.test');
 
     expect(resolve(ConversationsQuery::class)->conversationRow($this->owner, 'conv-outside'))->toBeNull();
+});
+
+function unlinkedSenderAddresses(Testable $page): array
+{
+    preg_match_all('/data-unlinked-sender="([^"]+)"/', $page->html(), $matches);
+
+    return $matches[1];
+}
+
+function unlinkedPersonAddresses(People $person): array
+{
+    $field = CustomField::query()->withoutGlobalScopes()
+        ->where('tenant_id', $person->workspace_id)
+        ->where('entity_type', 'people')
+        ->where('code', 'emails')
+        ->firstOrFail();
+
+    return array_values([...$person->fresh()->load('customFieldValues.customField')->getCustomFieldValue($field) ?? []]);
+}
+
+it('groups the unlinked conversations of one sender into one row, the senders you wrote to first', function (): void {
+    conversationsPageMessage($this->ownerMailbox, 'conv-brian-1', 'brian@airbnb.test', ['sent_at' => now()->subDays(2)]);
+    conversationsPageMessage($this->ownerMailbox, 'conv-brian-2', 'Brian@Airbnb.test', ['sent_at' => now()->subDay()]);
+    conversationsPageMessage($this->ownerMailbox, 'conv-kim', 'kim@notion.test', ['sent_at' => now()->subDays(5)]);
+    conversationsPageMessage($this->ownerMailbox, 'conv-kim', 'ana@acme.test', ['sent_at' => now()->subDays(4)]);
+    EmailParticipant::factory()->to()->create(['email_id' => Email::query()->where('conversation_key', 'conv-kim')->where('direction', 'outbound')->value('id'), 'email_address' => 'kim@notion.test']);
+
+    $page = livewire(EmailInboxPage::class)->call('setView', ConversationView::Unlinked->value);
+
+    expect(unlinkedSenderAddresses($page))->toBe(['kim@notion.test', 'brian@airbnb.test'])
+        ->and($page->html())->toContain('2 conversations')
+        ->and($page->html())->toContain('You wrote once');
+
+    expect(conversationsPageKeys($page->call('toggleSender', 'brian@airbnb.test')->html()))->toBe(['conv-brian-2', 'conv-brian-1']);
+});
+
+it('leaves a teammate unlinked mail and linked conversations out of the sender groups', function (): void {
+    conversationsPageMessage($this->teammateMailbox, 'conv-ben', 'olivia@stripe.test');
+    $linked = conversationsPageMessage($this->ownerMailbox, 'conv-linked', 'kim@notion.test');
+    $this->company->emails()->attach($linked->id);
+
+    livewire(EmailInboxPage::class)
+        ->call('setView', ConversationView::Unlinked->value)
+        ->assertDontSeeHtml('data-unlinked-sender=')
+        ->assertSee('Every conversation is on a record.');
+});
+
+it('links the sender history to a person created from the group', function (): void {
+    $email = conversationsPageMessage($this->ownerMailbox, 'conv-brian', 'brian@airbnb.test');
+
+    $page = livewire(EmailInboxPage::class)
+        ->call('setView', ConversationView::Unlinked->value)
+        ->mountAction('createSenderPerson', arguments: ['address' => 'brian@airbnb.test', 'name' => 'Brian Chesky'])
+        ->assertActionDataSet(['name' => 'Brian Chesky', 'email' => 'brian@airbnb.test'])
+        ->callMountedAction()
+        ->assertHasNoActionErrors()
+        ->assertNotified('Created Brian Chesky');
+
+    $person = People::query()->where('name', 'Brian Chesky')->sole();
+
+    expect($email->people()->whereKey($person->id)->exists())->toBeTrue()
+        ->and(unlinkedSenderAddresses($page))->toBe([]);
+});
+
+it('adds the sender address to an existing person once', function (): void {
+    conversationsPageMessage($this->ownerMailbox, 'conv-brian', 'brian@airbnb.test');
+    $person = People::factory()->create(['workspace_id' => $this->workspace->id, 'name' => 'Brian Chesky']);
+    $foreign = People::factory()->create(['name' => 'Brian Elsewhere']);
+    $link = fn (string $personId): Testable => livewire(EmailInboxPage::class)
+        ->call('setView', ConversationView::Unlinked->value)
+        ->mountAction('linkSenderToPerson', arguments: ['address' => 'Brian@Airbnb.test'])
+        ->setActionData(['person_id' => $personId])
+        ->callMountedAction();
+
+    $link($person->id)->assertHasNoActionErrors()->assertNotified('Added Brian@Airbnb.test to Brian Chesky');
+    $link($person->id)->assertHasNoActionErrors();
+    $link($foreign->id)->assertHasActionErrors(['person_id']);
+
+    expect(unlinkedPersonAddresses($person))->toBe(['brian@airbnb.test'])
+        ->and(unlinkedPersonAddresses($foreign))->toBe([]);
 });
