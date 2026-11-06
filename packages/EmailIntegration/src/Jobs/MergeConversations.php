@@ -26,6 +26,7 @@ final class MergeConversations implements ShouldBeUniqueUntilProcessing, ShouldQ
     public function __construct(
         public readonly string $workspaceId,
         public readonly string $emailId,
+        public readonly bool $broadcast = true,
     ) {}
 
     public function uniqueId(): string
@@ -41,7 +42,7 @@ final class MergeConversations implements ShouldBeUniqueUntilProcessing, ShouldQ
                 $keys = $this->mergeLinkedKeys($resolver);
 
                 foreach ($keys as $key) {
-                    $refresh->execute($this->workspaceId, $key);
+                    $refresh->execute($this->workspaceId, $key, $this->broadcast);
                 }
 
                 return $keys;
@@ -71,7 +72,7 @@ final class MergeConversations implements ShouldBeUniqueUntilProcessing, ShouldQ
 
             if ($moved > 0) {
                 foreach ([$survivor, ...$absorbed] as $key) {
-                    $refresh->execute($this->workspaceId, $key);
+                    $refresh->execute($this->workspaceId, $key, $this->broadcast);
                 }
             }
         });

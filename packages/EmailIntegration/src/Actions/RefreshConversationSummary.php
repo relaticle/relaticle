@@ -17,7 +17,7 @@ use Relaticle\EmailIntegration\Models\EmailParticipant;
 
 final readonly class RefreshConversationSummary
 {
-    public function execute(string $workspaceId, string $conversationKey): void
+    public function execute(string $workspaceId, string $conversationKey, bool $broadcast = true): void
     {
         DB::transaction(function () use ($workspaceId, $conversationKey): void {
             // Serialises refreshes of one conversation, so each reads every copy committed before it.
@@ -26,7 +26,9 @@ final readonly class RefreshConversationSummary
             $this->write($workspaceId, $conversationKey);
         });
 
-        event(new ConversationChanged($workspaceId, $conversationKey));
+        if ($broadcast) {
+            event(new ConversationChanged($workspaceId, $conversationKey));
+        }
     }
 
     private function write(string $workspaceId, string $conversationKey): void

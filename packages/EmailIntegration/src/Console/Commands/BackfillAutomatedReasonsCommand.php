@@ -119,7 +119,7 @@ final class BackfillAutomatedReasonsCommand extends Command
         foreach ($touched as $workspaceId => $keys) {
             $currentWorkspace->within($workspaceId, function () use ($workspaceId, $keys, $refresh): void {
                 foreach (array_keys($keys) as $conversationKey) {
-                    $refresh->execute($workspaceId, $conversationKey);
+                    $refresh->execute($workspaceId, $conversationKey, broadcast: false);
                 }
             });
         }

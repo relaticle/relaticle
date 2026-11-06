@@ -106,7 +106,7 @@ final class BackfillConversationsCommand extends Command
                 ->update(['conversation_key' => $email->conversation_key, 'in_reply_to' => $email->in_reply_to]);
 
             if ($written === 1 && $resolver->keysToMerge($email) !== []) {
-                dispatch_sync(new MergeConversations($email->workspace_id, $email->getKey()));
+                dispatch_sync(new MergeConversations($email->workspace_id, $email->getKey(), broadcast: false));
             }
         });
     }
@@ -117,7 +117,7 @@ final class BackfillConversationsCommand extends Command
         $stale->groupBy('workspace_id')->each(function (Collection $conversations, string $workspaceId) use ($refresh, $currentWorkspace): void {
             $currentWorkspace->within($workspaceId, function () use ($conversations, $workspaceId, $refresh): void {
                 foreach ($conversations as $conversation) {
-                    $refresh->execute($workspaceId, $conversation->conversation_key);
+                    $refresh->execute($workspaceId, $conversation->conversation_key, broadcast: false);
                 }
             });
         });
