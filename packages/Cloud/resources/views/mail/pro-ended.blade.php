@@ -1,24 +1,46 @@
 <x-mail::message :reason="__('mail.footer.reason.owner', ['workspace' => $workspace->name])">
-<x-slot:preheader>{{ $managedPlan ? __('mail.pro_ended.managed_ended.preheader', ['plan' => $managedPlan]) : ($grandfathered ? __('mail.pro_ended.preheader_grandfathered') : __('mail.pro_ended.preheader')) }}</x-slot:preheader>
+<x-slot:preheader>{{ $preheader }}</x-slot:preheader>
 # {{ $heading }}
 
 @if($grandfathered)
 {{ $managedPlan ? __('mail.pro_ended.managed_ended.grandfathered', ['workspace' => $workspace->name]) : __('mail.pro_ended.grandfathered', ['workspace' => $workspace->name]) }}
 @else
-{{ __('mail.pro_ended.paused', ['workspace' => $workspace->name]) }}
+{{ __($isTrial ? 'mail.pro_ended.trial_paused' : 'mail.pro_ended.paused', ['workspace' => $workspace->name]) }}
+@if($keptOn)
+
+{{ __('mail.pro_ended.kept', ['workspace' => $workspace->name, 'date' => $keptOn]) }}
+@endif
 @if($mailboxSyncPaused)
 
 {{ $managedPlan ? __('mail.pro_ended.managed_ended.mailbox_sync_paused', ['plan' => $managedPlan]) : __('mail.pro_ended.mailbox_sync_paused') }}
 @endif
+@unless($isTrial)
 
 {{ $managedPlan ? __('mail.pro_ended.managed_ended.restore', ['plan' => $managedPlan]) : __('mail.pro_ended.restore') }}
+@endunless
 @endif
 @if($managedPlan && $grandfathered)
 
 {{ __('mail.pro_ended.managed_ended.restore', ['plan' => $managedPlan]) }}
 @endif
+@if($isTrial)
+@unless($usage->isEmpty())
+
+{{ __('mail.trial_usage.during', ['parts' => $usage->parts()]) }}
+@endunless
+
+{{ __('mail.trial_ending.keeps', ['credits' => $credits]) }}
+@endif
 
 <x-mail::button :url="$ctaUrl">
 {{ $ctaLabel }}
 </x-mail::button>
+@if($offersExtension)
+
+{{ __('mail.pro_ended.extend', ['days' => \App\Models\Workspace::TRIAL_EXTENSION_DAYS, 'url' => $billingUrl]) }}
+@endif
+@if($isTrial)
+
+{{ __('mail.trial_ending.questions') }}
+@endif
 </x-mail::message>

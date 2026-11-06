@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Jetstream\CancelWorkspaceDeletion;
 use App\Actions\Jetstream\DeleteWorkspace;
 use App\Actions\Jetstream\ScheduleWorkspaceDeletion;
+use App\Enums\DeletionReason;
 use App\Enums\WorkspaceRole;
 use App\Filament\Pages\Dashboard;
 use App\Livewire\App\Workspaces\WorkspaceDeletionBanner;
@@ -32,7 +33,8 @@ test('workspace owner can schedule workspace deletion', function () {
     resolve(ScheduleWorkspaceDeletion::class)->schedule($user, $workspace);
 
     expect($workspace->refresh()->scheduled_deletion_at)->not->toBeNull()
-        ->and($workspace->scheduled_deletion_at->isSameDay(now()->addDays(config('relaticle.deletion.grace_period_days'))))->toBeTrue();
+        ->and($workspace->scheduled_deletion_at->isSameDay(now()->addDays(config('relaticle.deletion.grace_period_days'))))->toBeTrue()
+        ->and($workspace->deletion_reason)->toBe(DeletionReason::Requested);
 });
 
 test('workspace owner is notified when workspace is scheduled for deletion', function () {
@@ -89,18 +91,32 @@ test('non-owner cannot schedule workspace deletion', function () {
         ->toThrow(AuthorizationException::class);
 });
 
+test('workspace owner can cancel an inactivity deletion', function () {
+    Notification::fake();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(14), 'deletion_reason' => DeletionReason::Inactivity])->save();
+
+    resolve(CancelWorkspaceDeletion::class)->cancel($user, $workspace);
+
+    expect($workspace->refresh()->scheduled_deletion_at)->toBeNull()
+        ->and($workspace->deletion_reason)->toBeNull();
+});
+
 test('workspace owner can cancel workspace deletion', function () {
     Notification::fake();
 
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->currentWorkspace;
-    $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(30)])->save();
+    $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(30), 'deletion_reason' => DeletionReason::Requested])->save();
     $member = User::factory()->create();
     $workspace->users()->attach($member, ['role' => 'member']);
 
     resolve(CancelWorkspaceDeletion::class)->cancel($user, $workspace);
 
-    expect($workspace->refresh()->scheduled_deletion_at)->toBeNull();
+    expect($workspace->refresh()->scheduled_deletion_at)->toBeNull()
+        ->and($workspace->deletion_reason)->toBeNull();
 
     Notification::assertSentTo($user, WorkspaceDeletionCancelledNotification::class);
     Notification::assertNotSentTo($member, WorkspaceDeletionCancelledNotification::class);

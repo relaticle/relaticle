@@ -158,6 +158,7 @@ services:
                 - Relaticle\Cloud\Marketing\Http
                 - App\Queries
                 - Relaticle\Chat\Queries
+                - Relaticle\Cloud\Billing\Queries
                 - Relaticle\EmailIntegration\Queries
         tags:
             - phpstan.rules.rule

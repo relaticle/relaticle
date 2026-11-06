@@ -21,37 +21,42 @@ use Relaticle\Chat\Services\CreditService;
 use Relaticle\Cloud\Billing\Mail\ProEndedMail;
 use Relaticle\Cloud\Billing\Mail\ProTrialEndingSoonMail;
 
-#[Description('Send trial-ending reminders and pause expired Pro trials')]
+#[Description('Pause expired Pro trials and send trial-ending reminders')]
 #[Signature('billing:process-trials')]
 final class ProcessTrialsCommand extends Command
 {
     public function handle(CreditService $credits): int
     {
-        $this->sendEndingSoonReminders();
         $this->pauseExpired($credits);
+        $this->sendEndingSoonReminders();
 
         return self::SUCCESS;
     }
 
     private function sendEndingSoonReminders(): void
     {
-        $windowStart = now()->addDays(3)->startOfDay();
-        $windowEnd = now()->addDays(3)->endOfDay();
         $count = 0;
 
         Workspace::query()
-            ->whereBetween('trial_ends_at', [$windowStart, $windowEnd])
+            ->whereBetween('trial_ends_at', [now(), now()->addHours(72)])
+            ->where(fn (Builder $query): Builder => $query
+                ->whereNull('trial_reminded_for')
+                ->orWhereColumn('trial_reminded_for', '!=', 'trial_ends_at'))
+            ->notScheduledForDeletion()
             ->whereDoesntHave('subscriptions', $this->live(...))
             ->with('owner')
             ->chunkById(100, function (Collection $workspaces) use (&$count): void {
                 $workspaces->each(function (Workspace $workspace) use (&$count): void {
                     $owner = $workspace->owner;
 
-                    if (! $owner instanceof User) {
+                    $endsAt = $workspace->trial_ends_at;
+
+                    if (! $owner instanceof User || $endsAt === null) {
                         return;
                     }
 
-                    Mail::to($owner->email)->queue(new ProTrialEndingSoonMail($workspace));
+                    Mail::to($owner->email)->queue(new ProTrialEndingSoonMail($workspace, $endsAt));
+                    $workspace->forceFill(['trial_reminded_for' => $endsAt])->save();
                     $count++;
                 });
             });
@@ -76,7 +81,7 @@ final class ProcessTrialsCommand extends Command
                     // Only revert what the trial granted. A converted
                     // subscription, or a plan assigned outside the trial (e.g. a
                     // sysadmin Enterprise grant), outlives the trial window, so
-                    // clear the stale timestamp so it is not reprocessed daily.
+                    // clear the stale timestamp so it is not reprocessed on every run.
                     if ($hasLiveSubscription || $workspace->plan !== Plan::Pro) {
                         $workspace->forceFill(['trial_ends_at' => null])->save();
 
@@ -84,11 +89,11 @@ final class ProcessTrialsCommand extends Command
                     }
 
                     DB::transaction(function () use ($workspace, $credits): void {
-                        $workspace->forceFill(['plan' => Plan::Free, 'trial_ends_at' => null])->save();
+                        $workspace->forceFill(['plan' => Plan::Free, 'trial_ends_at' => null, 'paused_at' => now(), 'inactivity_notice_sent_at' => now()])->save();
                         $credits->resetPeriod($workspace);
                     });
 
-                    if ($workspace->owner instanceof User) {
+                    if ($workspace->owner instanceof User && ! $workspace->isScheduledForDeletion()) {
                         Mail::to($workspace->owner->email)->queue(ProEndedMail::afterTrial($workspace));
                     }
 

@@ -17,9 +17,13 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Mail\Mailables\Headers;
+use Illuminate\Queue\Attributes\Backoff;
+use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\URL;
 
+#[Tries(3)]
+#[Backoff(60, 300)]
 final class TaskDigestMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
@@ -31,9 +35,24 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: __('mail.task_digest.subject', [
-            'date' => now($this->user->effectiveTimezone())->format('M j'),
-        ]));
+        return new Envelope(subject: $this->digestSubject());
+    }
+
+    private function digestSubject(): string
+    {
+        $overdue = $this->payload->overdueCount();
+        $due = $this->payload->upcomingCount();
+        $date = now($this->user->effectiveTimezone())->format('M j');
+
+        if ($overdue > 0 && $due > 0) {
+            return __('mail.task_digest.subject_both', ['overdue' => $overdue, 'due' => $due, 'date' => $date]);
+        }
+
+        if ($overdue > 0) {
+            return trans_choice('mail.task_digest.subject_overdue', $overdue, ['date' => $date]);
+        }
+
+        return trans_choice('mail.task_digest.subject_due', $due, ['date' => $date]);
     }
 
     public function headers(): Headers

@@ -91,6 +91,11 @@ describe('Legal pages', function () {
 
         $response->assertSee('Terms of Service');
         $response->assertSeeText('To request account deletion, email privacy@relaticle.com or contact us.');
+        $response->assertSeeText('You can export it through the application or the REST API while your workspace is active.');
+        $response->assertDontSeeText('You can export your data at any time');
+        $response->assertSeeText('A workspace whose Pro trial ended without a plan pauses.');
+        $response->assertSeeText('If no one in the workspace signs in and no one chooses a plan for 60 days, we delete the workspace and its records.');
+        $response->assertSeeText('We email the owner 14 days and 5 days before. A paused workspace cannot be exported.');
         $response->assertSee('Relaticle');
         $response->assertDontSee('word usage');
         $response->assertDontSee('Basic" plan');
@@ -108,6 +113,8 @@ describe('Legal pages', function () {
         expect($response->headers->get('Content-Type'))->toStartWith($contentType);
 
         $response->assertSee('Privacy Policy');
+        $response->assertSeeTextInOrder(['Data Retention', 'Paused trial workspaces:']);
+        $response->assertSeeText('Deleted with their records after 60 days without a sign-in or a plan. We email the owner 14 days and 5 days before.');
         $response->assertSee('Relaticle');
         $response->assertSee('privacy@relaticle.com');
         $response->assertSee('November 4, 2026');

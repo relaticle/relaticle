@@ -591,6 +591,9 @@ are under about 50. Each rule below names what fails when it is broken.
   property form, and `composer test:refactor` fails until the rewrite is taken. Code that needs
   the number at runtime reads a class constant the attribute also uses, as `SendEmailJob` does
   with `TIMEOUT_SECONDS`. `$this->timeout` no longer exists once the attribute replaces it.
+- A queued Mailable or Notification declares `#[Tries]` and `#[Backoff]`, or inherits them as every
+  `InboxNotification` does. The default queue tries a job once, so one mail provider 502 loses the
+  message. `tests/Arch/ConventionsTest.php` fails a queued mail class without them.
 - An accessor is `Attribute::get()` with a typed closure and a `@return Attribute<TGet, never>`
   docblock. Larastan reads the property type from that docblock, so PHPStan reports the
   attribute as an undefined property without it.

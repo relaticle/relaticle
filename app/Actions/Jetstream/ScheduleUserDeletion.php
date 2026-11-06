@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Jetstream;
 
+use App\Enums\DeletionReason;
 use App\Features\AccountDeletion;
 use App\Models\User;
 use App\Notifications\UserDeletionScheduledNotification;
@@ -25,7 +26,10 @@ final readonly class ScheduleUserDeletion
 
             $user->ownedWorkspaces()
                 ->where('personal_workspace', true)
-                ->update(['scheduled_deletion_at' => $deletionDate]);
+                ->update([
+                    'scheduled_deletion_at' => $deletionDate,
+                    'deletion_reason' => DeletionReason::Requested,
+                ]);
         });
 
         $user->notify(new UserDeletionScheduledNotification($user));

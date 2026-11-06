@@ -29,7 +29,7 @@ final readonly class AcceptWorkspaceInvitation
         $workspace = $invitation->workspace;
 
         abort_if($user->isScheduledForDeletion(), 403, __('workspaces.accept.account_deleting'));
-        abort_if($workspace->isScheduledForDeletion(), 410, __('workspaces.accept.workspace_deleting'));
+        abort_if($workspace->isScheduledOnRequest(), 410, __('workspaces.accept.workspace_deleting'));
 
         $joined = DB::transaction(function () use ($user, $workspace, $invitation): bool {
             $locked = WorkspaceInvitation::query()->lockForUpdate()->find($invitation->id);

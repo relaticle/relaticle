@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Contracts\Entitlements;
 use App\Enums\BillingStatus;
+use App\Enums\DeletionReason;
 use App\Enums\Notifications\NotificationReason;
 use App\Enums\Plan;
 use App\Enums\SubscriptionType;
@@ -31,6 +32,7 @@ use Relaticle\Cloud\Analytics\Listeners\CaptureSubscriptionOutcome;
 use Relaticle\Cloud\Analytics\Models\Acquisition;
 use Relaticle\Cloud\Billing\Actions\ActivateManagedPlan;
 use Relaticle\Cloud\Billing\Actions\CancelWithUnusedTimeRefund;
+use Relaticle\Cloud\Billing\Actions\ExtendEndedTrial;
 use Relaticle\Cloud\Billing\Actions\GrantPurchasedCredits;
 use Relaticle\Cloud\Billing\Actions\NotifyWorkspaceOfPaymentFailure;
 use Relaticle\Cloud\Billing\Actions\StartProTrial;
@@ -226,6 +228,35 @@ it('downgrades the workspace to Free when the subscription is deleted', function
         ->and($balance->credits_remaining)->toBe(Plan::Free->credits());
 });
 
+it('cancels an inactivity countdown when a subscription activates and keeps an owner request', function (DeletionReason $reason, bool $cancelled): void {
+    withHostedBilling();
+    $workspace = stripeBillingWorkspace();
+    $deletesAt = now()->addDays(14)->startOfSecond();
+    $workspace->forceFill(['scheduled_deletion_at' => $deletesAt, 'deletion_reason' => $reason])->save();
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created'))->assertSuccessful();
+
+    $workspace->refresh();
+
+    expect($workspace->plan)->toBe(Plan::Pro)
+        ->and($workspace->scheduled_deletion_at?->equalTo($deletesAt) ?? false)->toBe(! $cancelled)
+        ->and($workspace->deletion_reason)->toBe($cancelled ? null : $reason);
+})->with([
+    'inactivity' => [DeletionReason::Inactivity, true],
+    'requested' => [DeletionReason::Requested, false],
+]);
+
+it('keeps an inactivity countdown when a subscription that never charged is created', function (): void {
+    $workspace = stripeBillingWorkspace();
+    $deletesAt = now()->addDays(14)->startOfSecond();
+    $workspace->forceFill(['scheduled_deletion_at' => $deletesAt, 'deletion_reason' => DeletionReason::Inactivity])->save();
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created', ['status' => 'incomplete']))->assertSuccessful();
+
+    expect($workspace->refresh()->deletion_reason)->toBe(DeletionReason::Inactivity)
+        ->and($workspace->scheduled_deletion_at?->equalTo($deletesAt))->toBeTrue();
+});
+
 it('emails the owner once when the subscription ends', function (): void {
     Mail::fake();
     $workspace = stripeBillingWorkspace();
@@ -244,6 +275,21 @@ it('emails the owner once when the subscription ends', function (): void {
     Mail::assertQueued(ProEndedMail::class, 1);
     Mail::assertQueued(ProEndedMail::class, fn (ProEndedMail $mail): bool => $mail->hasTo($workspace->owner->email)
         && $mail->status === BillingStatus::SubscriptionEnded);
+});
+
+it('sends no ended email when the subscription of a workspace scheduled for deletion ends', function (): void {
+    Mail::fake();
+    $workspace = stripeBillingWorkspace();
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created'))->assertSuccessful();
+    $workspace->refresh()->forceFill(['scheduled_deletion_at' => now()->addDays(30)])->save();
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'deleted', [
+        'status' => 'canceled',
+        'ended_at' => now()->getTimestamp(),
+    ]))->assertSuccessful();
+
+    Mail::assertNotQueued(ProEndedMail::class);
+    expect($workspace->refresh()->plan)->toBe(Plan::Free);
 });
 
 it('sends no ended email when an Enterprise grant outlives the subscription', function (): void {
@@ -441,6 +487,107 @@ it('never double-grants across a mid-trial conversion', function (): void {
     expect($balance->period_starts_at->toDateTimeString())->toBe('2026-07-01 12:00:00')
         ->and($balance->period_ends_at->toDateTimeString())->toBe('2026-08-01 12:00:00')
         ->and($grantsQuery->count())->toBe(2); // trial start + first anniversary cycle, never a third
+});
+
+function extendedTrialWorkspaceWithSpentCredits(): Workspace
+{
+    $workspace = stripeBillingWorkspace();
+    $workspace->forceFill(['plan' => Plan::Free, 'trial_ends_at' => null, 'pro_trial_used_at' => now()->subDays(20)])->save();
+
+    /** @var User $owner */
+    $owner = $workspace->owner;
+    app(ExtendEndedTrial::class)->execute($owner, $workspace);
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->update(['credits_remaining' => 180, 'credits_used' => 120]);
+
+    return $workspace->refresh();
+}
+
+it('keeps the extension balance frozen when the owner subscribes during the extension', function (): void {
+    withHostedBilling();
+    $workspace = extendedTrialWorkspaceWithSpentCredits();
+    $extensionEndsAt = $workspace->trial_ends_at;
+    $this->travel(2)->days();
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created', ['status' => 'trialing', 'trial_end' => $extensionEndsAt->getTimestamp()]))->assertSuccessful();
+
+    $balance = fn (): AiCreditBalance => AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
+
+    expect(resolve(Entitlements::class)->creditAllowance($workspace->refresh()))->toBe(Plan::Free->credits())
+        ->and($balance()->credits_remaining)->toBe(180);
+
+    $this->travelTo($extensionEndsAt->addHour());
+    $this->artisan('chat:reset-credits')->assertSuccessful();
+
+    expect($balance()->credits_remaining)->toBe(Plan::Pro->credits());
+});
+
+it('releases the extension balance at once when a subscription bought during the extension charges immediately', function (): void {
+    withHostedBilling();
+    $workspace = extendedTrialWorkspaceWithSpentCredits();
+    $this->travel(6)->days();
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created'))->assertSuccessful();
+
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
+
+    expect(resolve(Entitlements::class)->creditAllowance($workspace->refresh()))->toBe(Plan::Pro->credits())
+        ->and($balance->credits_remaining)->toBe(Plan::Pro->credits());
+});
+
+it('keeps the extension balance frozen until the first charge when Stripe extends a late trial past the extension', function (): void {
+    withHostedBilling();
+    $workspace = extendedTrialWorkspaceWithSpentCredits();
+    $this->travel(6)->days();
+    $firstChargeAt = now()->addHours(48)->addSeconds(10);
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created', ['status' => 'trialing', 'trial_end' => $firstChargeAt->getTimestamp()]))->assertSuccessful();
+
+    $balance = fn (): AiCreditBalance => AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
+
+    expect(resolve(Entitlements::class)->creditAllowance($workspace->refresh()))->toBe(Plan::Free->credits())
+        ->and($balance()->credits_remaining)->toBe(180);
+
+    $this->travelTo($firstChargeAt->subHour());
+    $this->artisan('chat:reset-credits')->assertSuccessful();
+
+    expect($balance()->credits_remaining)->toBe(180);
+
+    $this->travelTo($firstChargeAt->addHour());
+    $this->artisan('chat:reset-credits')->assertSuccessful();
+
+    expect($balance()->credits_remaining)->toBe(Plan::Pro->credits());
+});
+
+it('grants the plan allowance to a trial subscription bought long after an extension ended', function (): void {
+    withHostedBilling();
+    $workspace = extendedTrialWorkspaceWithSpentCredits();
+    $this->travel(60)->days();
+    $workspace->forceFill(['plan' => Plan::Free, 'trial_ends_at' => null])->save();
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created', ['status' => 'trialing', 'trial_end' => now()->addDays(10)->getTimestamp()]))->assertSuccessful();
+
+    expect(resolve(Entitlements::class)->creditAllowance($workspace->refresh()))->toBe(Plan::Pro->credits());
+});
+
+it('keeps the extension balance frozen when the owner picks Scale during the extension', function (): void {
+    withHostedBilling();
+    config()->set('services.stripe.prices.scale_monthly', 'price_scale_monthly_test');
+    $workspace = extendedTrialWorkspaceWithSpentCredits();
+    $extensionEndsAt = $workspace->trial_ends_at;
+    $this->travel(2)->days();
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created', ['price' => 'price_scale_monthly_test', 'status' => 'trialing', 'trial_end' => $extensionEndsAt->getTimestamp()]))->assertSuccessful();
+
+    $balance = fn (): AiCreditBalance => AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
+
+    expect($workspace->refresh()->plan)->toBe(Plan::Scale)
+        ->and(resolve(Entitlements::class)->creditAllowance($workspace))->toBe(Plan::Free->credits())
+        ->and($balance()->credits_remaining)->toBe(180);
+
+    $this->travelTo($extensionEndsAt->addHour());
+    $this->artisan('chat:reset-credits')->assertSuccessful();
+
+    expect($balance()->credits_remaining)->toBe(Plan::Scale->credits());
 });
 
 /** @return array<string, mixed> */
@@ -919,6 +1066,38 @@ it('switches a managed plan on when its first invoice is paid', function (): voi
     expect(Subscription::query()->where('stripe_id', 'sub_managed_1')->sole()->type)->toBe(SubscriptionType::Managed->value)
         ->and($workspace->refresh()->plan)->toBe(Plan::Enterprise)
         ->and($balance->credits_remaining)->toBe(Plan::Enterprise->credits());
+});
+
+it('cancels an inactivity countdown when a managed plan is switched on', function (): void {
+    withHostedBilling();
+
+    $workspace = stripeBillingWorkspace();
+    $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(14), 'deletion_reason' => DeletionReason::Inactivity])->save();
+    pendingManagedSubscription($workspace);
+    stripeManagedSwitch($workspace);
+
+    sendStripeWebhook(invoicePaidEvent($workspace))->assertOk();
+
+    $workspace->refresh();
+
+    expect($workspace->plan)->toBe(Plan::Enterprise)
+        ->and($workspace->scheduled_deletion_at)->toBeNull()
+        ->and($workspace->deletion_reason)->toBeNull();
+});
+
+it('keeps an owner-requested deletion when a managed plan is switched on', function (): void {
+    withHostedBilling();
+
+    $workspace = stripeBillingWorkspace();
+    $deletesAt = now()->addDays(14)->startOfSecond();
+    $workspace->forceFill(['scheduled_deletion_at' => $deletesAt, 'deletion_reason' => DeletionReason::Requested])->save();
+    pendingManagedSubscription($workspace);
+    stripeManagedSwitch($workspace);
+
+    sendStripeWebhook(invoicePaidEvent($workspace))->assertOk();
+
+    expect($workspace->refresh()->deletion_reason)->toBe(DeletionReason::Requested)
+        ->and($workspace->scheduled_deletion_at?->equalTo($deletesAt))->toBeTrue();
 });
 
 it('marks the Stripe subscription as managed once it is paid', function (): void {

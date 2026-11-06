@@ -146,7 +146,7 @@ it('pauses a workspace whose subscription ended', function (): void {
         ->assertRedirect(route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]));
 });
 
-it('keeps a trial paused after the nightly downgrade', function (): void {
+it('keeps a trial paused after the downgrade', function (): void {
     withHostedBilling();
 
     $this->workspace->forceFill(['plan' => Plan::Free, 'pro_trial_used_at' => now()->subDays(15)])->save();

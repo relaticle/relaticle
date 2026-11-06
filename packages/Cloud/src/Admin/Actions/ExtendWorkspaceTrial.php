@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Admin\Actions;
 
+use App\Actions\Jetstream\CancelInactivityDeletion;
 use App\Enums\BillingStatus;
 use App\Enums\Plan;
 use App\Models\Workspace;
@@ -21,6 +22,7 @@ final readonly class ExtendWorkspaceTrial
     public function __construct(
         private CreditService $credits,
         private RecordTrialChange $recordTrialChange,
+        private CancelInactivityDeletion $cancelInactivityDeletion,
     ) {}
 
     public function execute(SystemAdministrator $admin, Workspace $workspace, CarbonImmutable $endsAt): void
@@ -55,6 +57,7 @@ final readonly class ExtendWorkspaceTrial
             }
 
             $this->recordTrialChange->execute($admin, $locked, $this->event($restarting, $previousEnd, $endsAt), $before);
+            $this->cancelInactivityDeletion->execute($locked);
         });
 
         $workspace->refresh();

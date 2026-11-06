@@ -8,6 +8,7 @@ use App\Models\Workspace;
 use Illuminate\Foundation\Bootstrap\LoadConfiguration;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider;
 use Illuminate\Foundation\Testing\CachedState;
+use Illuminate\Support\Facades\DB;
 use Relaticle\Cloud\Billing\Actions\CreateCreditPackCheckout;
 use Relaticle\Cloud\Billing\Actions\CreateSubscriptionCheckout;
 use Relaticle\Cloud\Billing\Mail\ProTrialEndingSoonMail;
@@ -118,13 +119,6 @@ it('rejects a pack whose price is not configured', function (): void {
         ->toThrow(InvalidArgumentException::class);
 });
 
-/**
- * The domain-mode block below rebuilds the application so the panel registers its
- * routes against a domain. That reboot drops Laravel's parallel-testing database
- * override, pointing the fresh app at the base test database instead of this
- * worker's, so these cases must not touch the database at all. An in-memory Workspace
- * is enough: the URL builders only read the tenant slug.
- */
 function unsavedWorkspace(): Workspace
 {
     return new Workspace(['slug' => 'acme', 'name' => 'Acme']);
@@ -138,12 +132,19 @@ function unsavedWorkspace(): Workspace
  */
 describe('domain-routed app panel', function (): void {
     beforeEach(function (): void {
+        $connection = config('database.default');
+        $database = config("database.connections.{$connection}.database");
+
         putenv('APP_PANEL_DOMAIN=app.example.com');
         CachedState::$cachedRoutes = null;
         CachedState::$cachedConfig = null;
         RouteServiceProvider::loadCachedRoutesUsing(null);
         LoadConfiguration::alwaysUse(null);
         $this->refreshApplication();
+
+        config(["database.connections.{$connection}.database" => $database]);
+        DB::purge($connection);
+        $this->beginDatabaseTransaction();
 
         config()->set('services.stripe.prices.pro_monthly', 'price_pro_monthly_test');
         config()->set('services.stripe.credit_packs.small.price', 'price_credits_1k_test');
@@ -170,7 +171,7 @@ describe('domain-routed app panel', function (): void {
     });
 
     it('links the trial reminder email at the billing route without a panel path prefix', function (): void {
-        expect((string) (new ProTrialEndingSoonMail(unsavedWorkspace()))->render())
+        expect((string) (new ProTrialEndingSoonMail(unsavedWorkspace(), now()->addDays(3)))->render())
             ->toContain('http://app.example.com/acme/billing')
             ->not->toContain('/app/acme/billing');
     });

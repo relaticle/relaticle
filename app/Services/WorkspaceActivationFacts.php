@@ -90,7 +90,7 @@ final class WorkspaceActivationFacts
     {
         return AgentConversationMessage::query()
             ->typed()
-            ->whereRelation('conversation', 'workspace_id', $workspace->getKey())
+            ->inWorkspace((string) $workspace->getKey())
             ->exists();
     }
 
