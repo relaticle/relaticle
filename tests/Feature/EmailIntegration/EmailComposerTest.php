@@ -1793,6 +1793,100 @@ it('sends a reopened forward once an unavailable attachment can be downloaded', 
     expect(Storage::disk(EmailAttachment::DISK)->get($sentPath))->toBe('gmail-contract-bytes');
 });
 
+it('downloads a reopened forward attachment through the sender own copy when a teammate holds a restricted copy', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $this->account->update(['email_address' => 'me@example.com']);
+
+    $inbound = Email::factory()->create([
+        'workspace_id' => $this->user->current_workspace_id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'provider_message_id' => 'provider-msg-1',
+        'rfc_message_id' => '<original@example.com>',
+        'subject' => 'Has a contract',
+    ]);
+
+    EmailParticipant::factory()->create([
+        'email_id' => $inbound->id,
+        'email_address' => 'sender@contact.com',
+        'role' => EmailParticipantRole::FROM,
+    ]);
+
+    EmailAttachment::factory()->create([
+        'email_id' => $inbound->getKey(),
+        'filename' => 'contract.pdf',
+        'storage_path' => null,
+        'provider_attachment_id' => 'provider-att-1',
+        'size' => 18,
+        'is_inline' => false,
+    ]);
+
+    $mail = Mockery::mock(MailServiceInterface::class);
+    $mail->shouldReceive('downloadAttachment')
+        ->twice()
+        ->with('provider-msg-1', 'provider-att-1')
+        ->andReturnUsing(function (): string {
+            static $attempt = 0;
+            $attempt++;
+
+            throw_if($attempt === 1, RuntimeException::class, 'provider unavailable');
+
+            return 'gmail-contract-bytes';
+        });
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->twice()->andReturn($mail);
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    Livewire::test(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', (string) $inbound->getKey(), 'forward')
+        ->set('to', ['forward-to@example.com'])
+        ->set('bodyHtml', '<p>Passing this on</p>')
+        ->call('close');
+
+    $draft = Email::query()->where('status', EmailStatus::DRAFT)->sole();
+
+    $teammate = User::factory()->create(['current_workspace_id' => $this->user->current_workspace_id]);
+    $this->user->currentWorkspace->users()->attach($teammate, ['role' => 'member']);
+
+    $teammateAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'user_id' => $teammate->id,
+        'workspace_id' => $this->user->current_workspace_id,
+    ]));
+
+    Email::factory()->create([
+        'workspace_id' => $this->user->current_workspace_id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateAccount->id,
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        'provider_message_id' => 'teammate-msg-1',
+        'rfc_message_id' => '<original@example.com>',
+        'is_internal' => false,
+    ]);
+
+    $inbound->touch();
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: $draft->id)
+        ->call('send')
+        ->assertHasNoErrors()
+        ->assertSet('isOpen', false);
+
+    $forward = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::FORWARD)
+        ->sole();
+    $sentPath = (string) $forward->attachments->sole()->storage_path;
+
+    expect($forward->attachments->sole()->filename)->toBe('contract.pdf');
+    Storage::disk(EmailAttachment::DISK)->assertExists($sentPath);
+    expect(Storage::disk(EmailAttachment::DISK)->get($sentPath))->toBe('gmail-contract-bytes');
+});
+
 it('deletes a draft\'s attachment files when the draft is deleted', function (): void {
     Storage::fake(EmailAttachment::DISK);
 

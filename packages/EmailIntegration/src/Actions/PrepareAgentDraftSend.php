@@ -16,10 +16,10 @@ use Relaticle\EmailIntegration\Enums\EmailPriority;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
-use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Queries\PersonByEmailQuery;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\ForwardAttachmentCopyService;
+use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
 
 final readonly class PrepareAgentDraftSend
 {
@@ -28,6 +28,7 @@ final readonly class PrepareAgentDraftSend
         private ForwardAttachmentCopyService $attachments,
         private PersonByEmailQuery $people,
         private CheckAgentDraftSend $checkSend,
+        private PreferredEmailCopyService $preferredCopies,
     ) {}
 
     /**
@@ -127,12 +128,15 @@ final readonly class PrepareAgentDraftSend
             return null;
         }
 
-        $original = Email::query()
-            ->with('body')
-            ->where('workspace_id', $user->current_workspace_id)
-            ->where('rfc_message_id', $draft->in_reply_to)
-            ->whereIn('status', [EmailStatus::SYNCED, EmailStatus::SENT])
-            ->withGlobalScope('visible', new VisibleEmailScope($user))
+        $original = $this->preferredCopies
+            ->restrictToVisiblePreferredCopies(
+                Email::query()
+                    ->with('body')
+                    ->where('workspace_id', $user->current_workspace_id)
+                    ->where('rfc_message_id', $draft->in_reply_to)
+                    ->whereIn('status', [EmailStatus::SYNCED, EmailStatus::SENT]),
+                $user,
+            )
             ->first();
 
         return $original instanceof Email && $user->can('view', $original) ? $original : null;

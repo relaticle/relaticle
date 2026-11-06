@@ -1906,6 +1906,20 @@ it('threads a sent reply draft and quotes the original below it', function (): v
         ->toContain('Original question');
 });
 
+it('quotes the caller own copy when a teammate holds a restricted copy of the original', function (): void {
+    $original = ($this->emailFrom)($this->viewer, ['rfc_message_id' => '<quoted@acme.test>']);
+    EmailBody::query()->create(['email_id' => $original->id, 'body_html' => '<p>Original question</p>', 'body_text' => 'Original question']);
+
+    $draftId = emailToolData($this->viewer, CreateEmailDraftTool::class, draftArguments($this->viewerAccount, ['in_reply_to_email_id' => $original->id]))['id'];
+
+    ($this->emailFrom)($this->coworker, ['rfc_message_id' => '<quoted@acme.test>', 'privacy_tier' => EmailPrivacyTier::METADATA_ONLY]);
+    $original->touch();
+
+    $email = Email::query()->with('body')->findOrFail(emailToolData($this->viewer, SendEmailDraftTool::class, ['draft_id' => $draftId])['id']);
+
+    expect($email->body->body_html)->toContain('Original question');
+});
+
 it('sends at the chosen time, never sooner than the hold', function (): void {
     $this->travelTo(now()->startOfSecond());
 
