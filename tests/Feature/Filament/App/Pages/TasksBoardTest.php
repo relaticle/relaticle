@@ -469,11 +469,13 @@ it('shows checklist progress on a task card', function (): void {
         ->assertSee('1/2');
 });
 
-it('reads a card description as separate words and checklist items', function (): void {
+it('reads a card description as separate words and leaves the ticks to the badge', function (): void {
     tasksBoardCardWithDescription($this, '<p>Agenda</p><p>Venue</p>'.tasksBoardChecklistHtml());
 
     livewire(TasksBoard::class)
-        ->assertSee('Agenda Venue [x] Call Bob [ ] Send quote');
+        ->assertSee('Agenda Venue Call Bob Send quote')
+        ->assertDontSee('[x]')
+        ->assertDontSee('[ ]');
 });
 
 it('shows markup typed into a card description as text', function (): void {

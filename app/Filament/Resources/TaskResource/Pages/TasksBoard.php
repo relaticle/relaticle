@@ -174,7 +174,7 @@ final class TasksBoard extends BoardResourcePage
         $progress = ChecklistHtml::progress($description);
 
         return [
-            'preview' => Str::limit(PlainText::fromHtml($description)),
+            'preview' => Str::limit(PlainText::fromHtmlWithoutTaskMarkers($description)),
             'progress' => $progress === null ? null : "{$progress['checked']}/{$progress['total']}",
         ];
     }
