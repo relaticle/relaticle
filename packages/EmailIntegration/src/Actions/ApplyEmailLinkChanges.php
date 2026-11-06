@@ -22,10 +22,15 @@ final readonly class ApplyEmailLinkChanges
     public function execute(User $user, array $pairs, LinkEmailToRecord|UnlinkEmailFromRecord $change): array
     {
         return DB::transaction(function () use ($user, $pairs, $change): array {
-            $byKey = collect($pairs)
-                ->map(fn (array $pair): Email => $pair['email'])
-                ->filter(fn (Email $email): bool => filled($email->conversation_key))
-                ->keyBy(fn (Email $email): string => (string) $email->conversation_key)
+            $emails = collect($pairs)->map(fn (array $pair): Email => $pair['email']);
+            $currentKeys = Email::query()
+                ->withoutGlobalScopes()
+                ->whereKey($emails->map(fn (Email $email): string => $email->getKey())->unique()->values()->all())
+                ->whereNotNull('conversation_key')
+                ->pluck('conversation_key', 'id');
+            $byKey = $emails
+                ->filter(fn (Email $email): bool => $currentKeys->has($email->getKey()))
+                ->keyBy(fn (Email $email): string => (string) $currentKeys->get($email->getKey()))
                 ->sortKeys(SORT_STRING);
 
             foreach ($byKey as $key => $email) {

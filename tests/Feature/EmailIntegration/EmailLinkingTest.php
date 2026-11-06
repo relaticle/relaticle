@@ -357,6 +357,25 @@ it('takes every conversation lock of a batch in key order before it changes a li
     expect(array_slice($locked, 0, 2))->toBe([$this->workspace->getKey().':airbnb-renewal', $this->workspace->getKey().':stripe-renewal']);
 });
 
+it('sorts a batch by the key each email holds now, after a merge moved one', function (): void {
+    $merged = linkingEmail($this->owner, ['conversation_key' => 'zulu-old', 'rfc_message_id' => '<zulu@airbnb.test>']);
+    $other = linkingEmail($this->owner, ['conversation_key' => 'mike-renewal', 'rfc_message_id' => '<mike@airbnb.test>']);
+    Email::query()->withoutGlobalScopes()->whereKey($merged->getKey())->update(['conversation_key' => 'alpha-merged']);
+    $locked = [];
+    DB::listen(function (QueryExecuted $query) use (&$locked): void {
+        if (str_contains($query->sql, 'pg_advisory_xact_lock(?, hashtext(?))')) {
+            $locked[] = $query->bindings[1];
+        }
+    });
+
+    resolve(ApplyEmailLinkChanges::class)->execute($this->owner, [
+        ['email' => $other, 'record' => $this->company],
+        ['email' => $merged, 'record' => $this->company],
+    ], resolve(LinkEmailToRecord::class));
+
+    expect(array_slice($locked, 0, 2))->toBe([$this->workspace->getKey().':alpha-merged', $this->workspace->getKey().':mike-renewal']);
+});
+
 it('links the conversation a merge moved the email into after it was loaded', function (): void {
     $email = linkingEmail($this->owner, ['conversation_key' => 'airbnb-old']);
     $reply = linkingEmail($this->owner, ['rfc_message_id' => '<renewal-reply@airbnb.test>']);
