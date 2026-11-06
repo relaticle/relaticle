@@ -2,8 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Filament\Resources\OpportunityResource\Pages\ViewOpportunity;
+use App\Filament\Resources\OpportunityResource\RelationManagers\EmailsRelationManager as OpportunityEmailsRelationManager;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
+use App\Models\Company;
+use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -739,6 +743,23 @@ it('badges the emails tab with the visible count for the record', function (): v
     $this->person->emails()->attach($visible->modelKeys());
 
     expect(EmailsRelationManager::getBadge($this->person, ViewPeople::class))->toBe('2');
+});
+
+it('badges the opportunity tab with the mail its window shows', function (): void {
+    $this->travelTo(now()->setDate(2026, 6, 1));
+    $company = Company::factory()->create(['workspace_id' => $this->workspace->id]);
+    $opportunity = Opportunity::factory()->create(['workspace_id' => $this->workspace->id, 'company_id' => $company->id]);
+    $mail = fn (int $daysAgo): Email => Email::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->owner->id,
+        'connected_account_id' => $this->account->getKey(),
+        'sent_at' => now()->subDays($daysAgo),
+    ]);
+
+    $company->emails()->attach([$mail(10)->id, $mail(90)->id], ['link_source' => 'auto']);
+    $opportunity->emails()->attach($mail(400)->id, ['link_source' => 'manual']);
+
+    expect(OpportunityEmailsRelationManager::getBadge($opportunity, ViewOpportunity::class))->toBe('2');
 });
 
 it('loads the emails tab badge after the record page renders', function (): void {

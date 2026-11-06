@@ -473,7 +473,7 @@ final readonly class ConversationsQuery
                 ->orderBy((new $model)->getQualifiedKeyName())
                 ->limit(CustomFieldFilterSchema::MAX_LIST_VALUES));
 
-        // One named record is a record's mail, which Email::onRecord() owns; a set of records matches stored links.
+        // One named record is its tab's mail, opportunity window included; a set matches stored links that no one removed.
         if (count($filters->recordIds) === 1) {
             $record = $records->first();
 
@@ -484,11 +484,7 @@ final readonly class ConversationsQuery
             return;
         }
 
-        $query->whereExists(fn (BaseBuilder $link): BaseBuilder => $link
-            ->from('emailables')
-            ->whereColumn('emailables.email_id', 'emails.id')
-            ->where('emailables.emailable_type', $type->value)
-            ->whereIn('emailables.emailable_id', $records->select((new $model)->getQualifiedKeyName())->toBase()));
+        $query->onRecords($type->value, $records->select((new $model)->getQualifiedKeyName())->toBase());
     }
 
     /**

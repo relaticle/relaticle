@@ -2,12 +2,17 @@
 
 declare(strict_types=1);
 
+use App\Enums\CrmEntity;
 use App\Enums\CustomFields\CompanyField;
 use App\Features\EmailConversations;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
 use App\Filament\Resources\CompanyResource\RelationManagers\EmailsRelationManager;
+use App\Filament\Resources\OpportunityResource\Pages\ViewOpportunity;
+use App\Filament\Resources\OpportunityResource\RelationManagers\EmailsRelationManager as OpportunityEmailsRelationManager;
 use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\Opportunity;
+use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
@@ -15,7 +20,11 @@ use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
+use Relaticle\EmailIntegration\Actions\UnlinkEmailFromRecord;
+use Relaticle\EmailIntegration\Data\ConversationFilters;
+use Relaticle\EmailIntegration\Data\ConversationRow;
 use Relaticle\EmailIntegration\Enums\AutomatedReason;
+use Relaticle\EmailIntegration\Enums\ConversationView;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
@@ -31,7 +40,7 @@ use Relaticle\EmailIntegration\Queries\ConversationsQuery;
 
 use function Pest\Laravel\actingAs;
 
-mutates(BaseEmailsRelationManager::class, ConversationsQuery::class);
+mutates(BaseEmailsRelationManager::class, ConversationsQuery::class, Email::class, Opportunity::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withWorkspace()->create();
@@ -372,4 +381,110 @@ it('keeps the conversations, the automated count and the open email of a trashed
         ->assertSee(trans_choice('filament/pages/record-emails.automated_toggle', 1, ['count' => 1]));
 
     expect(conversationsRecordKeys($tab->html()))->toBe(['conv-human']);
+});
+
+function opportunityTabKeys(Opportunity $opportunity): array
+{
+    $keys = conversationsRecordKeys(livewire(OpportunityEmailsRelationManager::class, ['ownerRecord' => $opportunity, 'pageClass' => ViewOpportunity::class])->html());
+    sort($keys);
+
+    return $keys;
+}
+
+function setOpportunityCloseDate(Opportunity $opportunity, string $date): void
+{
+    $field = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $opportunity->workspace_id)
+        ->where('entity_type', 'opportunity')
+        ->where('code', 'close_date')
+        ->firstOrFail();
+
+    $opportunity->saveCustomFieldValue($field, $date, $opportunity->workspace);
+}
+
+it('leaves company mail older than 30 days before an opportunity was created off its tab', function (): void {
+    $this->travelTo(now()->setDate(2026, 6, 1));
+    $old = conversationsRecordMessage($this->ownerMailbox, 'conv-old', 'brian@airbnb.test', ['sent_at' => now()->subDays(45)]);
+    $recent = conversationsRecordMessage($this->ownerMailbox, 'conv-recent', 'brian@airbnb.test', ['sent_at' => now()->subDays(10)]);
+    $this->company->emails()->attach([$old->id, $recent->id], ['link_source' => 'auto']);
+
+    $opportunity = Opportunity::factory()->for($this->workspace)->create(['company_id' => $this->company->id]);
+
+    expect(opportunityTabKeys($opportunity))->toBe(['conv-recent']);
+});
+
+it('shows the point of contact mail inside the window and nothing for an opportunity with neither', function (): void {
+    $this->travelTo(now()->setDate(2026, 6, 1));
+    $person = People::factory()->for($this->workspace)->create();
+    $email = conversationsRecordMessage($this->ownerMailbox, 'conv-contact', 'kim@notion.test', ['sent_at' => now()->subDays(5)]);
+    $person->emails()->attach($email->id, ['link_source' => 'auto']);
+
+    $withContact = Opportunity::factory()->for($this->workspace)->create(['contact_id' => $person->id]);
+    $alone = Opportunity::factory()->for($this->workspace)->create();
+
+    expect(opportunityTabKeys($withContact))->toBe(['conv-contact'])
+        ->and(opportunityTabKeys($alone))->toBe([]);
+});
+
+it('keeps a pinned conversation on the opportunity whatever its date', function (): void {
+    $this->travelTo(now()->setDate(2026, 6, 1));
+    $opportunity = Opportunity::factory()->for($this->workspace)->create(['company_id' => $this->company->id]);
+    $pinned = conversationsRecordMessage($this->ownerMailbox, 'conv-pinned', 'brian@airbnb.test', ['sent_at' => now()->subDays(400)]);
+    $opportunity->emails()->attach($pinned->id, ['link_source' => 'manual']);
+
+    expect(opportunityTabKeys($opportunity))->toBe(['conv-pinned']);
+});
+
+it('ignores an automatic opportunity link outside the window', function (): void {
+    $this->travelTo(now()->setDate(2026, 6, 1));
+    $opportunity = Opportunity::factory()->for($this->workspace)->create();
+    $synced = conversationsRecordMessage($this->ownerMailbox, 'conv-synced', 'brian@airbnb.test', ['sent_at' => now()->subDays(400)]);
+    $opportunity->emails()->attach($synced->id, ['link_source' => 'auto']);
+
+    expect(opportunityTabKeys($opportunity))->toBe([]);
+});
+
+it('ends the window 30 days after a past close date', function (): void {
+    $this->travelTo(now()->setDate(2026, 6, 1));
+    $opportunity = Opportunity::factory()->for($this->workspace)->create(['company_id' => $this->company->id, 'created_at' => now()->subDays(120)]);
+    setOpportunityCloseDate($opportunity, now()->subDays(60)->toDateString());
+    $after = conversationsRecordMessage($this->ownerMailbox, 'conv-after', 'brian@airbnb.test', ['sent_at' => now()->subDays(20)]);
+    $before = conversationsRecordMessage($this->ownerMailbox, 'conv-before', 'brian@airbnb.test', ['sent_at' => now()->subDays(40)]);
+    $this->company->emails()->attach([$after->id, $before->id], ['link_source' => 'auto']);
+
+    expect(opportunityTabKeys($opportunity))->toBe(['conv-before']);
+
+    setOpportunityCloseDate($opportunity, now()->addDays(10)->toDateString());
+
+    expect(opportunityTabKeys($opportunity))->toBe(['conv-after', 'conv-before']);
+});
+
+it('drops a derived conversation after a user removes it from the opportunity', function (): void {
+    $this->travelTo(now()->setDate(2026, 6, 1));
+    $opportunity = Opportunity::factory()->for($this->workspace)->create(['company_id' => $this->company->id]);
+    $first = conversationsRecordMessage($this->ownerMailbox, 'conv-derived', 'brian@airbnb.test', ['sent_at' => now()->subDays(3)]);
+    $this->company->emails()->attach($first->id, ['link_source' => 'auto']);
+
+    resolve(UnlinkEmailFromRecord::class)->execute($this->owner, $first, $opportunity);
+    $reply = conversationsRecordMessage($this->ownerMailbox, 'conv-derived', 'brian@airbnb.test', ['sent_at' => now()->subDay()]);
+    $this->company->emails()->attach($reply->id, ['link_source' => 'auto']);
+
+    expect(opportunityTabKeys($opportunity))->toBe([])
+        ->and($this->company->emails()->whereKey($first->id)->exists())->toBeTrue();
+});
+
+it('matches stored links that no user removed when the filter names several records', function (): void {
+    $other = Company::factory()->create(['workspace_id' => $this->workspace->id, 'name' => 'Airtable']);
+    $kept = conversationsRecordMessage($this->ownerMailbox, 'conv-kept', 'brian@airbnb.test');
+    $removed = conversationsRecordMessage($this->ownerMailbox, 'conv-removed', 'brian@airbnb.test');
+    $this->company->emails()->attach($kept->id);
+    $other->emails()->attach($removed->id);
+    $teammateCopy = conversationsRecordMessage($this->teammateMailbox, 'conv-removed', 'brian@airbnb.test', ['rfc_message_id' => $removed->rfc_message_id]);
+    $other->emails()->attach($teammateCopy->id);
+    resolve(UnlinkEmailFromRecord::class)->execute($this->teammate, $teammateCopy, $other);
+
+    $rows = resolve(ConversationsQuery::class)->paginate($this->owner, ConversationView::All, new ConversationFilters(recordType: CrmEntity::Company, recordName: 'Air'))->rows;
+
+    expect(array_map(fn (ConversationRow $row): string => $row->conversationKey, $rows))->toBe(['conv-kept']);
 });

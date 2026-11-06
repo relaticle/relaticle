@@ -9,6 +9,7 @@ use App\Models\Concerns\HasWorkspace;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Database\Factories\EmailFactory;
 use Filament\Support\Facades\FilamentTimezone;
@@ -113,6 +114,8 @@ final class Email extends Model
      * @use HasFactory<EmailFactory>
      */
     use HasFactory, HasUlids, HasWorkspace, SoftDeletes;
+
+    public const int OPPORTUNITY_WINDOW_DAYS = 30;
 
     protected static function newFactory(): EmailFactory
     {
@@ -220,17 +223,77 @@ final class Email extends Model
     #[Scope]
     protected function onRecord(Builder $query, Company|People|Opportunity $record): Builder
     {
+        if (! $record instanceof Opportunity) {
+            return $query->onRecords($record->getMorphClass(), [(string) $record->getKey()]);
+        }
+
+        // An opportunity also shows its company's and its point of contact's mail inside its window; a pin shows whatever its date.
+        $windowStart = $record->created_at?->subDays(self::OPPORTUNITY_WINDOW_DAYS);
+        $closeDate = $record->closeDate();
+        $windowEnd = $closeDate instanceof CarbonImmutable && $closeDate->isPast() ? $closeDate->addDays(self::OPPORTUNITY_WINDOW_DAYS)->endOfDay() : null;
+        $linked = array_filter([
+            $record->getMorphClass() => $record->getKey(),
+            (new Company)->getMorphClass() => $record->company_id,
+            (new People)->getMorphClass() => $record->contact_id,
+        ]);
+
         return $query
-            ->whereExists(fn (QueryBuilder $link): QueryBuilder => $link
-                ->from('emailables')
-                ->whereColumn('emailables.email_id', $query->qualifyColumn('id'))
-                ->where('emailables.emailable_type', $record->getMorphClass())
-                ->where('emailables.emailable_id', $record->getKey()))
-            ->whereNotExists(fn (QueryBuilder $suppression): QueryBuilder => $suppression
-                ->from('email_link_suppressions')
-                ->whereColumn('email_link_suppressions.email_id', $query->qualifyColumn('id'))
+            ->where(fn (Builder $mail): Builder => $mail
+                ->whereExists(fn (QueryBuilder $pin): QueryBuilder => $this->linksOf($pin, $query)
+                    ->where('emailables.emailable_type', $record->getMorphClass())
+                    ->where('emailables.emailable_id', $record->getKey())
+                    ->where('emailables.link_source', 'manual'))
+                ->orWhere(fn (Builder $windowed): Builder => $windowed
+                    ->when($windowStart, fn (Builder $after, CarbonInterface $start): Builder => $after->where($query->qualifyColumn('sent_at'), '>=', $start))
+                    ->when($windowEnd, fn (Builder $before, CarbonImmutable $end): Builder => $before->where($query->qualifyColumn('sent_at'), '<=', $end))
+                    ->whereExists(fn (QueryBuilder $link): QueryBuilder => $this->linksOf($link, $query)
+                        ->where(function (QueryBuilder $records) use ($linked): void {
+                            foreach ($linked as $type => $id) {
+                                $records->orWhere(fn (QueryBuilder $one): QueryBuilder => $one
+                                    ->where('emailables.emailable_type', $type)
+                                    ->where('emailables.emailable_id', $id));
+                            }
+                        }))))
+            ->whereNotExists(fn (QueryBuilder $suppression): QueryBuilder => $this->suppressionsOnConversation($suppression, $query)
                 ->where('email_link_suppressions.emailable_type', $record->getMorphClass())
                 ->where('email_link_suppressions.emailable_id', $record->getKey()));
+    }
+
+    /**
+     * Stored links to any of the records that no user removed from the email's conversation.
+     *
+     * @param  Builder<Email>  $query
+     * @param  QueryBuilder|list<string>  $recordIds
+     * @return Builder<Email>
+     */
+    #[Scope]
+    protected function onRecords(Builder $query, string $morphType, QueryBuilder|array $recordIds): Builder
+    {
+        return $query->whereExists(fn (QueryBuilder $link): QueryBuilder => $this->linksOf($link, $query)
+            ->where('emailables.emailable_type', $morphType)
+            ->whereIn('emailables.emailable_id', $recordIds)
+            ->whereNotExists(fn (QueryBuilder $suppression): QueryBuilder => $this->suppressionsOnConversation($suppression, $query)
+                ->whereColumn('email_link_suppressions.emailable_type', 'emailables.emailable_type')
+                ->whereColumn('email_link_suppressions.emailable_id', 'emailables.emailable_id')));
+    }
+
+    /** @param  Builder<Email>  $query */
+    private function linksOf(QueryBuilder $link, Builder $query): QueryBuilder
+    {
+        return $link->from('emailables')->whereColumn('emailables.email_id', $query->qualifyColumn('id'));
+    }
+
+    /** @param  Builder<Email>  $query */
+    private function suppressionsOnConversation(QueryBuilder $suppression, Builder $query): QueryBuilder
+    {
+        return $suppression
+            ->from('email_link_suppressions')
+            ->join('emails as suppressed_copies', 'suppressed_copies.id', '=', 'email_link_suppressions.email_id')
+            ->whereColumn('email_link_suppressions.workspace_id', $query->qualifyColumn('workspace_id'))
+            ->where(fn (QueryBuilder $same): QueryBuilder => $same
+                ->whereColumn('suppressed_copies.id', $query->qualifyColumn('id'))
+                ->orWhereColumn('suppressed_copies.conversation_key', $query->qualifyColumn('conversation_key'))
+                ->orWhereColumn('suppressed_copies.rfc_message_id', $query->qualifyColumn('rfc_message_id')));
     }
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\CreationSource;
+use App\Enums\CustomFields\OpportunityField;
 use App\Enums\MediaCollection;
 use App\Models\Concerns\BelongsToWorkspaceCreator;
 use App\Models\Concerns\HasActivityTimeline;
@@ -17,6 +18,7 @@ use App\Models\Scopes\WorkspaceScope;
 use App\Observers\OpportunityObserver;
 use App\Support\Media\UploadAllowlist;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Database\Factories\OpportunityFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
@@ -27,6 +29,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Date;
 use Relaticle\ActivityLog\Contracts\HasTimeline;
 use Relaticle\CustomFields\Models\Concerns\UsesCustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
@@ -109,6 +112,23 @@ final class Opportunity extends Model implements HasCustomFields, HasMedia, HasT
     public function contact(): BelongsTo
     {
         return $this->belongsTo(People::class);
+    }
+
+    public function closeDate(): ?CarbonImmutable
+    {
+        $field = CustomField::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $this->workspace_id)
+            ->where('entity_type', $this->getMorphClass())
+            ->where('code', OpportunityField::CLOSE_DATE->value)
+            ->first();
+        $value = $field instanceof CustomField ? $this->getCustomFieldValue($field) : null;
+
+        return match (true) {
+            $value instanceof CarbonInterface => $value->toImmutable(),
+            is_string($value) && $value !== '' => Date::parse($value)->toImmutable(),
+            default => null,
+        };
     }
 
     /**
