@@ -14,6 +14,7 @@ use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Relaticle\EmailIntegration\Actions\ApplyEmailLinkChanges;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
 use Relaticle\EmailIntegration\Actions\LinkEmailToRecord;
 use Relaticle\EmailIntegration\Actions\PrepareEmailRecordLink;
@@ -41,6 +42,7 @@ use Relaticle\EmailIntegration\Services\RecordCommunicationMetrics;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 mutates(
+    ApplyEmailLinkChanges::class,
     LinkEmailAction::class,
     LinkEmailToRecord::class,
     UnlinkEmailFromRecord::class,
@@ -275,6 +277,24 @@ it('takes a suppressed link off the email when sync linking finds both', functio
 
     expect(linkSource($email, $this->company))->toBeNull()
         ->and($this->company->fresh()->email_count)->toBe(0);
+});
+
+it('takes every conversation lock of a batch in key order before it changes a link', function (): void {
+    $later = linkingEmail($this->owner, ['conversation_key' => 'stripe-renewal', 'rfc_message_id' => '<stripe@stripe.test>']);
+    $earlier = linkingEmail($this->owner);
+    $locked = [];
+    DB::listen(function (QueryExecuted $query) use (&$locked): void {
+        if (str_contains($query->sql, 'pg_advisory_xact_lock(?, hashtext(?))')) {
+            $locked[] = $query->bindings[1];
+        }
+    });
+
+    resolve(ApplyEmailLinkChanges::class)->execute($this->owner, [
+        ['email' => $later, 'record' => $this->company],
+        ['email' => $earlier, 'record' => $this->company],
+    ], resolve(LinkEmailToRecord::class));
+
+    expect(array_slice($locked, 0, 2))->toBe([$this->workspace->getKey().':airbnb-renewal', $this->workspace->getKey().':stripe-renewal']);
 });
 
 it('links the conversation a merge moved the email into after it was loaded', function (): void {

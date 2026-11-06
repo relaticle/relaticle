@@ -21,9 +21,18 @@ final readonly class ApplyEmailLinkChanges
      */
     public function execute(User $user, array $pairs, LinkEmailToRecord|UnlinkEmailFromRecord $change): array
     {
-        return DB::transaction(fn (): array => array_map(
-            fn (array $pair): bool => (bool) $change->execute($user, $pair['email'], $pair['record']),
-            $pairs,
-        ));
+        return DB::transaction(function () use ($user, $pairs, $change): array {
+            $byKey = collect($pairs)
+                ->map(fn (array $pair): Email => $pair['email'])
+                ->filter(fn (Email $email): bool => filled($email->conversation_key))
+                ->keyBy(fn (Email $email): string => (string) $email->conversation_key)
+                ->sortKeys(SORT_STRING);
+
+            foreach ($byKey as $key => $email) {
+                $email->takeConversationLock((string) $key);
+            }
+
+            return array_map(fn (array $pair): bool => (bool) $change->execute($user, $pair['email'], $pair['record']), $pairs);
+        });
     }
 }
