@@ -31,6 +31,7 @@
                         </h2>
                     </div>
 
+                    {{-- max-sm:size-11 is 44px, the smallest target a fingertip hits reliably. The icons stay 16px. --}}
                     <div class="relative flex flex-shrink-0 items-center gap-0.5">
                         <button
                             type="button"
@@ -174,6 +175,8 @@
             init() {
                 const stored = this.read();
 
+                // 40rem is the max-sm: breakpoint. Below it the card sits in the drawer's flow and takes room from
+                // the nav, so a phone starts with it closed.
                 this.open = stored ?? window.matchMedia('(min-width: 40rem)').matches;
             },
 
