@@ -249,6 +249,64 @@ it('keeps mass sending in reach on a phone by leaving the composer full screen',
         ->assertNoJavaScriptErrors();
 });
 
+it('stacks the mass send recipients under the compose column on a phone', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    connectSendingMailbox($user);
+
+    loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(393, 852)
+        ->navigate("/app/{$workspace->slug}/email")
+        ->click(__('filament/concerns/email-compose.actions.compose.label'))
+        ->waitForText(__('filament/emails/composer.title'))
+        ->click('label[for="composer-mass-send-toggle"]')
+        ->waitForText(__('filament/emails/composer.title_mass_send'))
+        ->assertScript("document.querySelector('#email-composer-subject').getBoundingClientRect().width >= 260", true)
+        ->assertScript("document.querySelector('.email-composer-body-ctn').getBoundingClientRect().width >= 300", true)
+        ->assertScript("(() => { const aside = document.querySelector('aside').getBoundingClientRect(); const subject = document.querySelector('#email-composer-subject').getBoundingClientRect(); return aside.width === innerWidth && aside.top > subject.bottom; })()", true)
+        ->assertScript("(() => { const aside = document.querySelector('aside').getBoundingClientRect(); const footer = document.querySelector('#composer-mass-send-toggle').closest('.border-t').getBoundingClientRect(); return Math.abs(footer.top - aside.bottom) <= 2; })()", true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('adds mass send recipients from the search without a script error', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    connectSendingMailbox($user);
+
+    $emailsField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $workspace->id)
+        ->where('entity_type', 'people')
+        ->where('code', PeopleField::EMAILS->value)
+        ->firstOrFail();
+
+    foreach (['Dana Globex' => 'dana@globex.example', 'Dara Initech' => 'dara@initech.example'] as $name => $address) {
+        $person = People::factory()->for($workspace)->create(['name' => $name, 'creator_id' => $user->id]);
+        $person->saveCustomFieldValue($emailsField, [$address], $workspace);
+    }
+
+    loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/email")
+        ->click(__('filament/concerns/email-compose.actions.compose.label'))
+        ->waitForText(__('filament/emails/composer.title'))
+        ->click('label[for="composer-mass-send-toggle"]')
+        ->waitForText(__('filament/emails/composer.title_mass_send'))
+        ->type('aside input[type="text"]', 'dana@globex')
+        ->click('aside ul.absolute > li > button')
+        ->waitForText('dana@globex.example')
+        ->type('aside input[type="text"]', 'dara@initech')
+        ->click('aside ul.absolute > li > button')
+        ->waitForText('dara@initech.example')
+        ->assertSee(__('filament/emails/composer.mass_send.send_button', ['count' => 2]))
+        ->assertNoJavaScriptErrors();
+});
+
 it('fits a shrunk composer onto a phone screen with every field on it', function (): void {
     $this->withVite();
 

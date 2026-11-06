@@ -250,8 +250,8 @@
                         <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
                     @endif
                     @if ($isMassSendLayout)
-                        <div class="flex min-h-0 flex-1 overflow-hidden">
-                            <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                        <div class="flex min-h-0 flex-1 overflow-hidden max-md:flex-col max-md:overflow-y-auto">
+                            <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden max-md:flex-none max-md:overflow-visible">
                     @endif
 
                     {{-- Field rows --}}

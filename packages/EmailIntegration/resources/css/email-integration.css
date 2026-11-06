@@ -271,7 +271,7 @@
     @apply w-full max-w-xs max-sm:max-w-none;
 }
 
-/* Below sm a row is a card, as list tables stack: the heading cell heads it, then one label and value per line. */
+/* Below sm a row is a card, as list tables stack: the heading cell heads it, then one label and value per line, the value under its label on the narrowest phones. */
 .ei-stacked-table {
     @apply max-sm:block;
 
@@ -294,7 +294,7 @@
     }
 
     & > tbody > tr > td[data-label] {
-        @apply max-sm:grid max-sm:grid-cols-[8.5rem_minmax(0,1fr)] max-sm:items-center max-sm:gap-x-3;
+        @apply max-sm:grid max-sm:grid-cols-[8.5rem_minmax(0,1fr)] max-sm:items-center max-sm:gap-x-3 max-[360px]:grid-cols-1! max-[360px]:gap-y-0.5;
 
         &::before {
             @apply max-sm:truncate max-sm:text-gray-500 max-sm:content-[attr(data-label)] dark:max-sm:text-gray-400;

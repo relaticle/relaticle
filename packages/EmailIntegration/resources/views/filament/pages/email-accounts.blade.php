@@ -28,7 +28,7 @@
 
                         <div class="min-w-0">
                             <div class="flex items-center gap-2">
-                                <p class="truncate text-sm font-medium text-gray-950 dark:text-white">{{ $account->email_address }}</p>
+                                <p class="break-all text-sm font-medium text-gray-950 dark:text-white">{{ $account->email_address }}</p>
                                 @if ($account->is_default)
                                     <x-filament::badge color="info" class="shrink-0 max-sm:hidden">
                                         {{ __('filament/pages/email-accounts.default_badge') }}

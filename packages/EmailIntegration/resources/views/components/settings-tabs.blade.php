@@ -8,7 +8,7 @@
     $isPrivacyPage = $this instanceof EmailPrivacySettingsPage;
 @endphp
 
-<x-filament::tabs :label="__('filament/pages/email-privacy-settings.tabs.aria')" class="ei-tabs-segmented">
+<x-filament::tabs :label="__('filament/pages/email-privacy-settings.tabs.aria')" class="ei-tabs-segmented" x-data x-init="$nextTick(() => $el.querySelector('.fi-active')?.scrollIntoView({ inline: 'center', block: 'nearest' }))">
     <x-filament::tabs.item
         :active="$this instanceof EmailAccountsPage"
         tag="a"

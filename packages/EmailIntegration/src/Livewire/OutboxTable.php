@@ -183,6 +183,7 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
             ->options($this->statusFilterOptions())
             ->default(OutboxTab::QUEUED->value)
             ->selectablePlaceholder(false)
+            ->indicateUsing(fn (): array => [])
             ->query(fn (Builder $query, array $data): Builder => $this->applyStatusTab(
                 $query,
                 OutboxTab::tryFrom((string) ($data['value'] ?? '')) ?? OutboxTab::QUEUED,

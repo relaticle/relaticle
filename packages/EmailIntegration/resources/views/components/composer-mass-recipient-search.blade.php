@@ -41,7 +41,6 @@
                 await $wire.addMassRecipient(option.id);
             }
 
-            this.selectedIds = $wire.massRecipients.map((recipient) => recipient.personId);
             this.query = '';
             this.activeIndex = 0;
         },

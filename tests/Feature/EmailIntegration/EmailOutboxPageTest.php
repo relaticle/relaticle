@@ -292,3 +292,10 @@ it('bulkCancel skips a row that raced to SENDING and still cancels the rest', fu
         ->and($queuedB->refresh()->status)->toBe(EmailStatus::CANCELLED)
         ->and($racing->refresh()->status)->toBe(EmailStatus::SENDING);
 });
+
+it('adds no filter indicator for the status the tab already shows', function (): void {
+    $component = livewire(OutboxTable::class)
+        ->assertSet('tableFilters.status_tab.value', 'queued');
+
+    expect($component->instance()->getTable()->getFilterIndicators())->toBeEmpty();
+});

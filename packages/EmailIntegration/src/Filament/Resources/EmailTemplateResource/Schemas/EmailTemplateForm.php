@@ -31,11 +31,10 @@ final class EmailTemplateForm
                     ->label(__('filament/resources/email-template.fields.body_html.label'))
                     ->required()
                     ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
-                    ->activePanel('mergeTags')
                     ->toolbarButtons([
                         'bold', 'italic', 'underline', 'strike',
                         'link', 'bulletList', 'orderedList',
-                        'blockquote', 'h2', 'h3', 'undo', 'redo',
+                        'blockquote', 'h2', 'h3', 'undo', 'redo', 'mergeTags',
                     ])
                     ->columnSpanFull(),
 

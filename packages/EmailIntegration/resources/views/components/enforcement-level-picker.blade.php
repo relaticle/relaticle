@@ -45,7 +45,7 @@
             x-on:click="toggle()"
             x-bind:aria-expanded="open"
             aria-haspopup="listbox"
-            class="ei-enforcement-picker-trigger flex w-full min-w-36 items-center justify-between gap-2 rounded-lg bg-white py-1.5 ps-3 pe-3 text-start text-sm text-gray-950 shadow-sm ring-1 ring-gray-950/10 transition focus:ring-2 focus:ring-primary-600 dark:bg-white/5 dark:text-white dark:ring-white/10 dark:focus:ring-primary-500"
+            class="ei-enforcement-picker-trigger flex w-full min-w-36 max-sm:min-w-0 items-center justify-between gap-2 rounded-lg bg-white py-1.5 ps-3 pe-3 text-start text-sm text-gray-950 shadow-sm ring-1 ring-gray-950/10 transition focus:ring-2 focus:ring-primary-600 dark:bg-white/5 dark:text-white dark:ring-white/10 dark:focus:ring-primary-500"
         >
             <span class="truncate">{{ $current->getLabel() }}</span>
 
