@@ -182,6 +182,7 @@ final class TasksBoard extends BoardResourcePage
     private function checklistProgressEntry(): TextEntry
     {
         return TextEntry::make('checklist_progress')
+            ->label(__('filament/pages/boards.tasks.checklist_progress'))
             ->hiddenLabel()
             ->badge()
             ->color('gray')

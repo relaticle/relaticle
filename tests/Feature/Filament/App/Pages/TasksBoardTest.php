@@ -484,6 +484,14 @@ it('shows markup typed into a card description as text', function (): void {
         ->assertDontSeeHtml('<b>literal</b>');
 });
 
+it('names the checklist badge from the lang file', function (): void {
+    app('translator')->addLines(['filament/pages/boards.tasks.checklist_progress' => 'Steps done'], 'en');
+    tasksBoardCardWithDescription($this, tasksBoardChecklistHtml());
+
+    livewire(TasksBoard::class)
+        ->assertSee('Steps done');
+});
+
 it('shows no checklist badge on a card without a checklist', function (): void {
     tasksBoardCardWithDescription($this, '<p>Plain</p>');
 
