@@ -36,9 +36,11 @@ for review.
 ## When someone changed the record meanwhile
 
 If someone edits a field after the assistant proposed changing it, the card
-says who changed it, to what, and when. The button then reads **Overwrite**
-and takes a click. Leave that field out to keep their value, or discard the
-proposal. An edit to a field the proposal doesn't touch changes nothing.
+says who changed it, to what, and when. Approving then takes a click, never
+the keyboard shortcut. On a single update the button reads **Overwrite**.
+Leave that field out to keep their value (in a batch or plan, leave out that
+record), or discard the proposal. An edit to a field the proposal doesn't
+touch changes nothing.
 
 If the edit lands while the card is open, your first click shows the change
 instead of approving it. Click again once you've read it.
@@ -50,7 +52,7 @@ meeting notes" arrives as one card that lists all five. Leave out the ones
 you don't want and approve the rest. Deletes work the same way.
 
 A request that needs several linked changes, such as a new company with a
-person and a task attached, arrives as one plan of up to 6 changes. A record
+person and a task attached, arrives as one plan of up to 6 linked steps. A record
 the plan creates and another change links to is marked **new**. Leave out
 that record and the changes that link to it go with it; the card tells you
 which, with **Keep** to bring them back. You approve the plan once.
@@ -59,8 +61,8 @@ which, with **Keep** to bring them back. You approve the plan once.
 
 The card leaves and the conversation keeps a receipt: **Applied 3 changes**
 with one line per record, each linking to it. Anything you left out shows
-struck through. A discarded proposal leaves one grey line with
-**Propose again**.
+struck through. A discarded proposal leaves one grey line. The most recent
+one offers **Propose again**.
 
 ## Email
 
@@ -80,7 +82,7 @@ button too: **Send invitation**. Approving a plan never sends it.
 - While a proposal waits, the message box is locked. Approve or discard it to
   keep chatting.
 - An untouched proposal expires after 24 hours and its line reads
-  **expired**, with **Propose again** to get a fresh card.
+  **expired**. If it is the most recent, **Propose again** gets a fresh card.
 - You can't regenerate an answer while its proposal is pending. Resolve the
   card first.
 
