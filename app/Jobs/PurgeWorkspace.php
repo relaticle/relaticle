@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Actions\Jetstream\CancelInactivityDeletion;
 use App\Contracts\Billing;
 use App\Enums\DeletionReason;
 use App\Models\Workspace;
@@ -37,9 +38,9 @@ final class PurgeWorkspace implements ShouldBeUnique, ShouldQueue
         return $this->workspace->getKey();
     }
 
-    public function handle(DeletesTeams $deletesWorkspaces, Billing $billing): void
+    public function handle(DeletesTeams $deletesWorkspaces, Billing $billing, CancelInactivityDeletion $cancelInactivityDeletion): void
     {
-        $purged = DB::transaction(function () use ($deletesWorkspaces, $billing): bool {
+        $purged = DB::transaction(function () use ($deletesWorkspaces, $billing, $cancelInactivityDeletion): bool {
             $workspace = Workspace::query()->whereKey($this->workspace->getKey())->lockForUpdate()->first();
 
             if (! $workspace instanceof Workspace || ! $workspace->isDeletionDue()) {
@@ -47,7 +48,9 @@ final class PurgeWorkspace implements ShouldBeUnique, ShouldQueue
             }
 
             if ($workspace->deletion_reason === DeletionReason::Inactivity && ! $billing->inactivityDeletionStands($workspace)) {
-                $this->cancelInactivityDeletion($workspace);
+                $cancelInactivityDeletion->execute($workspace);
+
+                Log::info('Cancelled an inactivity deletion that no longer stands', ['workspace_id' => $workspace->getKey()]);
 
                 return false;
             }
@@ -60,15 +63,5 @@ final class PurgeWorkspace implements ShouldBeUnique, ShouldQueue
         if ($purged) {
             Log::info('Purged workspace', ['workspace_id' => $this->workspace->getKey(), 'name' => $this->workspace->name]);
         }
-    }
-
-    private function cancelInactivityDeletion(Workspace $workspace): void
-    {
-        Workspace::query()
-            ->whereKey($workspace->getKey())
-            ->scheduledForInactivity()
-            ->update(['scheduled_deletion_at' => null, 'deletion_reason' => null]);
-
-        Log::info('Cancelled an inactivity deletion that no longer stands', ['workspace_id' => $workspace->getKey()]);
     }
 }

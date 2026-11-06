@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Jetstream\CancelInactivityDeletion;
 use App\Enums\DeletionReason;
 use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
@@ -25,7 +26,6 @@ use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditTransaction;
-use Relaticle\Cloud\Billing\Actions\CancelInactivityDeletion;
 use Relaticle\Cloud\Billing\Commands\AnnounceInactivityRuleCommand;
 use Relaticle\Cloud\Billing\Commands\ScheduleInactiveTrialDeletionsCommand;
 use Relaticle\Cloud\Billing\Filament\Billing;

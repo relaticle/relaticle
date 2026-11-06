@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Billing\Commands;
 
+use App\Actions\Jetstream\CancelInactivityDeletion;
 use App\Enums\DeletionReason;
 use App\Features\Billing;
 use App\Models\Membership;
@@ -18,7 +19,6 @@ use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Laravel\Pennant\Feature;
-use Relaticle\Cloud\Billing\Actions\CancelInactivityDeletion;
 use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletionReminderMail;
 use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletionWarningMail;
 use Relaticle\Cloud\Billing\Queries\InactiveTrialWorkspacesQuery;

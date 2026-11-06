@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Billing\Actions;
 
+use App\Actions\Jetstream\CancelInactivityDeletion;
 use App\Enums\Plan;
 use App\Enums\WorkspaceCapability;
 use App\Models\User;

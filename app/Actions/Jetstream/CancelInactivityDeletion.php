@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Relaticle\Cloud\Billing\Actions;
+namespace App\Actions\Jetstream;
 
 use App\Models\Workspace;
 

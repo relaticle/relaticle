@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Billing\Listeners;
 
+use App\Actions\Jetstream\CancelInactivityDeletion;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Database\Eloquent\Builder;
-use Relaticle\Cloud\Billing\Actions\CancelInactivityDeletion;
 
 final readonly class CancelInactivityDeletionOnLogin
 {
