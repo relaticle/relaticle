@@ -22,6 +22,7 @@
     /* Third-party brand marks: kept out of the primary scale since they
        represent an external provider's identity, not our own UI color. */
     --color-anthropic: #D4763C;
+    --color-anthropic-strong: #AE5A27; /* 4.9:1 behind white text, where #D4763C gives 3.25:1 */
 
     /* Off-step typography for compact UI surfaces */
     --text-pico: 0.625rem;     /* 10px */
