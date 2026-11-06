@@ -8,9 +8,7 @@ use App\Enums\CrmEntity;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
-use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
-use App\Support\LikePattern;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
@@ -41,6 +39,7 @@ use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Queries\ConversationsQuery;
+use Relaticle\EmailIntegration\Queries\EmailLinkTargetsQuery;
 use Relaticle\EmailIntegration\Services\EmailThreadSummaryService;
 
 /**
@@ -433,41 +432,15 @@ trait HasEmailReaderActions
             ?? __('filament/pages/email-inbox.drawer.links.this_record');
     }
 
-    // Always bounded by the workspace id, so a forged id from another workspace finds nothing.
     private function findLinkTarget(string $type, string $id): Company|People|Opportunity|null
     {
-        $entity = CrmEntity::tryFrom($type);
-
-        if (! in_array($entity, CrmEntity::linkable(), true) || $id === '') {
-            return null;
-        }
-
-        $record = $entity->model()::query()
-            ->withoutGlobalScope(WorkspaceScope::class)
-            ->where('workspace_id', $this->readerUser()->current_workspace_id)
-            ->find($id);
-
-        return $record instanceof Company || $record instanceof People || $record instanceof Opportunity ? $record : null;
+        return resolve(EmailLinkTargetsQuery::class)->find($this->readerUser(), $type, $id);
     }
 
     /** @return array<string, string> */
     private function linkTargetOptions(string $type, string $search): array
     {
-        $entity = CrmEntity::tryFrom($type);
-
-        if (! in_array($entity, CrmEntity::linkable(), true)) {
-            return [];
-        }
-
-        return $entity->model()::query()
-            ->withoutGlobalScope(WorkspaceScope::class)
-            ->where('workspace_id', $this->readerUser()->current_workspace_id)
-            ->whereLike($entity->titleColumn(), '%'.LikePattern::escape($search).'%')
-            ->orderBy($entity->titleColumn())
-            ->limit(20)
-            ->pluck($entity->titleColumn(), 'id')
-            ->map(fn (mixed $name): string => (string) $name)
-            ->all();
+        return resolve(EmailLinkTargetsQuery::class)->search($this->readerUser(), $type, $search);
     }
 
     private function canOpenRequestAccess(Email $email): bool

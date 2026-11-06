@@ -10,12 +10,14 @@ use App\Mcp\Tools\Email\CancelEmailTool;
 use App\Mcp\Tools\Email\CreateEmailDraftTool;
 use App\Mcp\Tools\Email\DeleteEmailDraftTool;
 use App\Mcp\Tools\Email\GetEmailTool;
+use App\Mcp\Tools\Email\LinkEmailsTool;
 use App\Mcp\Tools\Email\ListEmailAccountsTool;
 use App\Mcp\Tools\Email\ListEmailsTool;
 use App\Mcp\Tools\Email\RescheduleEmailTool;
 use App\Mcp\Tools\Email\RetryEmailTool;
 use App\Mcp\Tools\Email\SendEmailDraftTool;
 use App\Mcp\Tools\Email\SendEmailTool;
+use App\Mcp\Tools\Email\UnlinkEmailsTool;
 use App\Mcp\Tools\Email\UpdateEmailDraftTool;
 use App\Models\Company;
 use App\Models\CustomField;
@@ -37,6 +39,7 @@ use Laravel\Passport\Client;
 use Laravel\Passport\Passport;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Actions\HoldAgentEmail;
+use Relaticle\EmailIntegration\Actions\LinkEmailAction;
 use Relaticle\EmailIntegration\Actions\PickAgentSendTime;
 use Relaticle\EmailIntegration\Actions\PrepareAgentDraftSend;
 use Relaticle\EmailIntegration\Actions\PrepareAgentEmail;
@@ -60,6 +63,7 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailBlocklist;
 use Relaticle\EmailIntegration\Models\EmailBody;
+use Relaticle\EmailIntegration\Models\EmailLinkSuppression;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Models\EmailSignature;
@@ -73,7 +77,7 @@ use Relaticle\EmailIntegration\Support\EmailForAgent;
 use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class, UpdateEmailDraftTool::class, DeleteEmailDraftTool::class, SendEmailTool::class, SendEmailDraftTool::class, CancelEmailTool::class, RescheduleEmailTool::class, RetryEmailTool::class, SendAgentEmailDraft::class, PrepareAgentDraftSend::class, HoldAgentEmail::class, PickAgentSendTime::class, QueueAgentEmailAction::class, PrepareAgentEmail::class, PrepareAgentEmailDraft::class, SaveAgentEmailDraft::class, QueuedSendNotifier::class, EmailSendHeldNotification::class, AgentEmailBody::class, SignatureBlock::class, VisibleEmailsQuery::class, EmailForAgent::class, EmailPolicy::class, EmailSearchService::class);
+mutates(LinkEmailsTool::class, UnlinkEmailsTool::class, ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class, UpdateEmailDraftTool::class, DeleteEmailDraftTool::class, SendEmailTool::class, SendEmailDraftTool::class, CancelEmailTool::class, RescheduleEmailTool::class, RetryEmailTool::class, SendAgentEmailDraft::class, PrepareAgentDraftSend::class, HoldAgentEmail::class, PickAgentSendTime::class, QueueAgentEmailAction::class, PrepareAgentEmail::class, PrepareAgentEmailDraft::class, SaveAgentEmailDraft::class, QueuedSendNotifier::class, EmailSendHeldNotification::class, AgentEmailBody::class, SignatureBlock::class, VisibleEmailsQuery::class, EmailForAgent::class, EmailPolicy::class, EmailSearchService::class);
 
 beforeEach(function (): void {
     $this->viewer = User::factory()->withWorkspace()->create();
@@ -2122,4 +2126,67 @@ it('leaves a teammate email no record links to out of the list and the read', fu
     RelaticleServer::actingAs($this->viewer)
         ->tool(GetEmailTool::class, ['id' => $linked->id])
         ->assertOk();
+});
+
+it('links an email to a record and reports it linked', function (): void {
+    $email = ($this->emailFrom)($this->viewer);
+    $company = Company::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    $items = emailToolData($this->viewer, LinkEmailsTool::class, ['links' => [['email_id' => $email->id, 'record_type' => 'company', 'record_id' => $company->id]]])['items'];
+
+    expect($items)->toBe([['email_id' => $email->id, 'record_type' => 'company', 'record_id' => $company->id, 'linked' => true]])
+        ->and($company->emails()->wherePivot('link_source', 'manual')->pluck('emails.id')->all())->toBe([$email->id]);
+});
+
+it('keeps an unlinked person off the email when its links are applied again', function (): void {
+    $person = People::factory()->recycle([$this->viewer, $this->workspace])->create(['name' => 'Acme Client']);
+    $emailsField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->workspace->id)
+        ->where('entity_type', 'people')
+        ->where('code', PeopleField::EMAILS->value)
+        ->firstOrFail();
+    $person->saveCustomFieldValue($emailsField, ['client@acme.test'], $this->workspace);
+    $email = ($this->emailFrom)($this->viewer);
+    resolve(LinkEmailAction::class)->execute($email);
+
+    expect($person->emails()->pluck('emails.id')->all())->toBe([$email->id]);
+
+    $items = emailToolData($this->viewer, UnlinkEmailsTool::class, ['links' => [['email_id' => $email->id, 'record_type' => 'people', 'record_id' => $person->id]]])['items'];
+    resolve(LinkEmailAction::class)->reapply($email->fresh());
+
+    expect($items[0]['linked'])->toBeFalse()
+        ->and($person->emails()->count())->toBe(0)
+        ->and(EmailLinkSuppression::query()->where('email_id', $email->id)->count())->toBe(1);
+});
+
+it('changes nothing when one pair of a link call names an email the caller may not see', function (): void {
+    $email = ($this->emailFrom)($this->viewer);
+    $private = ($this->emailFrom)($this->coworker, ['privacy_tier' => EmailPrivacyTier::PRIVATE]);
+    $company = Company::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    RelaticleServer::actingAs($this->viewer)
+        ->tool(LinkEmailsTool::class, ['links' => [
+            ['email_id' => $email->id, 'record_type' => 'company', 'record_id' => $company->id],
+            ['email_id' => $private->id, 'record_type' => 'company', 'record_id' => $company->id],
+        ]])
+        ->assertHasErrors(["Email with ID [{$private->id}] not found. Nothing was changed."]);
+
+    expect($company->emails()->count())->toBe(0);
+});
+
+it('refuses to link a record from another workspace', function (): void {
+    $email = ($this->emailFrom)($this->viewer);
+    $foreign = Company::factory()->create(['workspace_id' => Workspace::factory()->create()->id]);
+
+    RelaticleServer::actingAs($this->viewer)
+        ->tool(LinkEmailsTool::class, ['links' => [['email_id' => $email->id, 'record_type' => 'company', 'record_id' => $foreign->id]]])
+        ->assertHasErrors(["No company with ID [{$foreign->id}] in this workspace. Nothing was changed."]);
+
+    expect($foreign->emails()->count())->toBe(0);
+});
+
+it('lists the link tools only for a token that holds the draft grant', function (): void {
+    expect(listedToolNames($this->viewer, ['read', 'update', 'email:read']))->not->toContain('link-emails-tool', 'unlink-emails-tool')
+        ->and(listedToolNames($this->viewer, ['read', 'update', 'email:draft']))->toContain('link-emails-tool', 'unlink-emails-tool');
 });

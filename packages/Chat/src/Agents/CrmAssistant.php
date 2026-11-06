@@ -53,12 +53,14 @@ use Relaticle\Chat\Tools\Email\CancelEmailTool;
 use Relaticle\Chat\Tools\Email\CreateEmailDraftTool;
 use Relaticle\Chat\Tools\Email\DeleteEmailDraftTool;
 use Relaticle\Chat\Tools\Email\GetEmailTool;
+use Relaticle\Chat\Tools\Email\LinkEmailsTool;
 use Relaticle\Chat\Tools\Email\ListEmailAccountsTool;
 use Relaticle\Chat\Tools\Email\ListEmailsTool;
 use Relaticle\Chat\Tools\Email\RescheduleEmailTool;
 use Relaticle\Chat\Tools\Email\RetryEmailTool;
 use Relaticle\Chat\Tools\Email\SendEmailDraftTool;
 use Relaticle\Chat\Tools\Email\SendEmailTool;
+use Relaticle\Chat\Tools\Email\UnlinkEmailsTool;
 use Relaticle\Chat\Tools\Email\UpdateEmailDraftTool;
 use Relaticle\Chat\Tools\GetCreditBalanceTool;
 use Relaticle\Chat\Tools\GetCrmSummaryTool;
@@ -1064,6 +1066,8 @@ PROMPT;
             CancelEmailTool::class,
             RescheduleEmailTool::class,
             RetryEmailTool::class,
+            LinkEmailsTool::class,
+            UnlinkEmailsTool::class,
         ];
     }
 
