@@ -1,4 +1,4 @@
-@props(['record', 'unlinkEmailId' => null, 'menuItems' => false])
+@props(['record', 'unlinkEmailId' => null, 'canUnlink' => false, 'menuItems' => false])
 
 @php
     use App\Filament\Resources\CompanyResource;
@@ -18,14 +18,16 @@
         {{ $record['name'] }}
     </x-filament::dropdown.list.item>
 
-    <x-filament::dropdown.list.item
-        icon="ri-link-unlink"
-        color="danger"
-        data-unlink-record="{{ $record['type'] }}:{{ $record['id'] }}"
-        wire:click="mountAction('unlinkRecord', {{ Js::from(['emailId' => $unlinkEmailId, 'targetType' => $record['type'], 'targetId' => $record['id']]) }})"
-    >
-        {{ __('filament/pages/email-inbox.drawer.links.unlink_named', ['name' => $record['name']]) }}
-    </x-filament::dropdown.list.item>
+    @if ($canUnlink)
+        <x-filament::dropdown.list.item
+            icon="ri-link-unlink"
+            color="danger"
+            data-unlink-record="{{ $record['type'] }}:{{ $record['id'] }}"
+            wire:click="mountAction('unlinkRecord', {{ Js::from(['emailId' => $unlinkEmailId, 'targetType' => $record['type'], 'targetId' => $record['id']]) }})"
+        >
+            {{ __('filament/pages/email-inbox.drawer.links.unlink_named', ['name' => $record['name']]) }}
+        </x-filament::dropdown.list.item>
+    @endif
 @elseif ($unlinkEmailId === null)
     <a
         href="{{ $url }}"
@@ -49,14 +51,16 @@
                 {{ __('filament/pages/email-inbox.drawer.links.open') }}
             </x-filament::dropdown.list.item>
 
-            <x-filament::dropdown.list.item
-                icon="ri-link-unlink"
-                color="danger"
-                data-unlink-record
-                wire:click="mountAction('unlinkRecord', {{ Js::from(['emailId' => $unlinkEmailId, 'targetType' => $record['type'], 'targetId' => $record['id']]) }})"
-            >
-                {{ __('filament/pages/email-inbox.drawer.links.unlink') }}
-            </x-filament::dropdown.list.item>
+            @if ($canUnlink)
+                <x-filament::dropdown.list.item
+                    icon="ri-link-unlink"
+                    color="danger"
+                    data-unlink-record
+                    wire:click="mountAction('unlinkRecord', {{ Js::from(['emailId' => $unlinkEmailId, 'targetType' => $record['type'], 'targetId' => $record['id']]) }})"
+                >
+                    {{ __('filament/pages/email-inbox.drawer.links.unlink') }}
+                </x-filament::dropdown.list.item>
+            @endif
         </x-filament::dropdown.list>
     </x-filament::dropdown>
 @endif

@@ -25,6 +25,7 @@ use Relaticle\EmailIntegration\Enums\ConversationView;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Filament\Concerns\HasConversationReader;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Jobs\RecomputeRecordEmailMetricsJob;
@@ -48,6 +49,7 @@ mutates(
     RecordCommunicationMetrics::class,
     RecomputeRecordEmailMetricsJob::class,
     HasEmailReaderActions::class,
+    HasConversationReader::class,
 );
 
 beforeEach(function (): void {
@@ -537,6 +539,33 @@ it('tells a teammate who reached no copy that the drawer changed nothing', funct
         ->assertNotDispatched('email:links-changed');
 
     expect(linkSource($email, $this->company))->toBe('auto');
+});
+
+it('offers no unlink in the drawer to a teammate who reached no copy', function (): void {
+    $email = linkingEmail($this->owner);
+    $email->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
+    $this->actingAs($this->teammate);
+
+    linkingPage($email)
+        ->assertSeeHtml('data-linked-record="company:'.$this->company->getKey().'"')
+        ->assertDontSeeHtml('data-unlink-record');
+});
+
+it('tells the unlinker when a teammate\'s copy keeps the conversation on the record', function (): void {
+    $owners = linkingEmail($this->owner);
+    $teammates = linkingEmail($this->teammate, ['rfc_message_id' => '<renewal-cc@airbnb.test>']);
+    $owners->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
+    $teammates->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
+    $this->actingAs($this->teammate);
+
+    linkingPage($teammates)
+        ->assertSeeHtml('data-unlink-record')
+        ->mountAction('unlinkRecord', arguments: ['emailId' => $teammates->getKey(), 'targetType' => 'company', 'targetId' => $this->company->getKey()])
+        ->callMountedAction()
+        ->assertNotified('Removed your copies. A teammate\'s copy keeps it on Airbnb.');
+
+    expect(linkSource($teammates, $this->company))->toBeNull()
+        ->and(linkSource($owners, $this->company))->toBe('auto');
 });
 
 it('unlinks a chip from the drawer and its undo puts back exactly what it took off', function (): void {

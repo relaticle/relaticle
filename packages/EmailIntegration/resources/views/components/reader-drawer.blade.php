@@ -5,6 +5,7 @@
     'bodies',
     'expanded' => [],
     'row' => null,
+    'canUnlink' => false,
     'adjacent' => null,
     'unavailable' => false,
     'triage' => false,
@@ -273,6 +274,7 @@
                         <x-email-integration::record-chip
                             :record="$record"
                             :unlink-email-id="$email->getKey()"
+                            :can-unlink="$canUnlink"
                             :class="$index === 0 ? 'inline-flex' : 'hidden sm:inline-flex'"
                             wire:key="reader-link-{{ $email->getKey() }}-{{ $record['type'] }}-{{ $record['id'] }}"
                         />
@@ -292,7 +294,7 @@
 
                             @foreach (array_slice($row->records, 1) as $record)
                                 <x-filament::dropdown.list wire:key="reader-link-more-{{ $email->getKey() }}-{{ $record['type'] }}-{{ $record['id'] }}">
-                                    <x-email-integration::record-chip :record="$record" :unlink-email-id="$email->getKey()" menu-items />
+                                    <x-email-integration::record-chip :record="$record" :unlink-email-id="$email->getKey()" :can-unlink="$canUnlink" menu-items />
                                 </x-filament::dropdown.list>
                             @endforeach
                         </x-filament::dropdown>

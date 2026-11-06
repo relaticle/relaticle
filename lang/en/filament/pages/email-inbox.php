@@ -411,6 +411,7 @@ return [
             'notifications' => [
                 'linked' => 'Linked to :name',
                 'unlinked' => 'Removed from :name',
+                'unlinked_teammate_keeps' => 'Removed your copies. A teammate\'s copy keeps it on :name.',
                 'undo' => 'Undo',
             ],
         ],

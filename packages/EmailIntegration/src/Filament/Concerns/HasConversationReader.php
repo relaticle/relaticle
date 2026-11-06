@@ -18,6 +18,7 @@ use Relaticle\EmailIntegration\Queries\ConversationsQuery;
  * @property-read EloquentCollection<int, Email> $thread
  * @property-read EloquentCollection<string, Email> $expandedBodies
  * @property-read ConversationRow|null $selectedConversationRow
+ * @property-read bool $selectedConversationReached
  * @property-read bool $selectedEmailUnavailable
  * @property-read array{previous: ConversationRow|null, next: ConversationRow|null} $adjacentConversations
  */
@@ -71,6 +72,14 @@ trait HasConversationReader
 
         return collect($this->conversationRows())->first(fn (ConversationRow $row): bool => $row->conversationKey === $key)
             ?? resolve(ConversationsQuery::class)->conversationRow($this->readerUser(), $key);
+    }
+
+    #[Computed]
+    public function selectedConversationReached(): bool
+    {
+        $selected = $this->selectedEmail;
+
+        return $selected instanceof Email && resolve(ConversationsQuery::class)->copies($this->readerUser(), $selected)->isNotEmpty();
     }
 
     /** @return array{previous: ConversationRow|null, next: ConversationRow|null} */

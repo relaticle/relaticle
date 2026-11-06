@@ -35,6 +35,7 @@ use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
 use Relaticle\EmailIntegration\Actions\RestoreEmailRecordLinks;
 use Relaticle\EmailIntegration\Actions\UnlinkEmailFromRecord;
 use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
+use Relaticle\EmailIntegration\Data\ConversationFilters;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
 use Relaticle\EmailIntegration\Models\Email;
@@ -392,7 +393,7 @@ trait HasEmailReaderActions
 
                 Notification::make()
                     ->success()
-                    ->title(__('filament/pages/email-inbox.drawer.links.notifications.unlinked', ['name' => $record->name]))
+                    ->title(__($this->stillOnRecord($email, $record) ? 'filament/pages/email-inbox.drawer.links.notifications.unlinked_teammate_keeps' : 'filament/pages/email-inbox.drawer.links.notifications.unlinked', ['name' => $record->name]))
                     ->actions([
                         Action::make('undo')
                             ->label(__('filament/pages/email-inbox.drawer.links.notifications.undo'))
@@ -405,6 +406,12 @@ trait HasEmailReaderActions
 
                 $this->dispatch('email:links-changed');
             });
+    }
+
+    private function stillOnRecord(Email $email, Company|People|Opportunity $record): bool
+    {
+        return is_string($email->conversation_key)
+            && resolve(ConversationsQuery::class)->contains($this->readerUser(), $email->conversation_key, ConversationFilters::forRecord($record));
     }
 
     /** @param  Closure(): void  $write */

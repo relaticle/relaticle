@@ -553,6 +553,7 @@
             :bodies="$this->expandedBodies"
             :expanded="[...$expandedEmailIds, $selectedEmailId]"
             :row="$this->selectedConversationRow"
+            :can-unlink="$this->selectedConversationReached"
             :adjacent="$this->adjacentConversations"
             :unavailable="$this->selectedEmailUnavailable"
             triage
