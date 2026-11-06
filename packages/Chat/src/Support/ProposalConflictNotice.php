@@ -73,7 +73,7 @@ final readonly class ProposalConflictNotice
         $timezone = $viewer->effectiveTimezone();
         $local = $at->setTimezone($timezone);
 
-        return $local->isSameDay(now($timezone))
+        return $local->isToday()
             ? $local->isoFormat('HH:mm')
             : $local->isoFormat('MMM D, HH:mm');
     }

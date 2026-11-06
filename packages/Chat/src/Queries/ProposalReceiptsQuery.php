@@ -34,9 +34,9 @@ final readonly class ProposalReceiptsQuery
      */
     public function forPlanOf(PendingAction $step): array
     {
-        $fresh = PendingAction::query()->whereKey($step->getKey())->first() ?? $step;
+        $fresh = $step->fresh() ?? $step;
 
-        return $this->forGroup(array_map($this->stepFromModel(...), $this->plans->steps($fresh)));
+        return $this->forGroups([array_map($this->stepFromModel(...), $this->plans->steps($fresh))]);
     }
 
     /**
@@ -47,18 +47,7 @@ final readonly class ProposalReceiptsQuery
      */
     public function forStep(PendingAction $step): array
     {
-        $fresh = PendingAction::query()->whereKey($step->getKey())->first() ?? $step;
-
-        return $this->forGroup([$this->stepFromModel($fresh)]);
-    }
-
-    /**
-     * @param  list<Step>  $steps
-     * @return array<string, Receipt>
-     */
-    public function forGroup(array $steps): array
-    {
-        return $this->forGroups([$steps]);
+        return $this->forGroups([[$this->stepFromModel($step->fresh() ?? $step)]]);
     }
 
     /**
