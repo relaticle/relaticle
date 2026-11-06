@@ -132,7 +132,21 @@ it('tells the page when the proposal lapsed before the approve or discard click'
         ->assertDispatched('proposal:lapsed', pendingActionId: $action->getKey(), context: 'conversation');
 
     expect(Company::query()->where('name', 'Stale')->exists())->toBeFalse();
-})->with(['createCurrent', 'discardCurrent']);
+})->with(['createCurrent', 'discardCurrent', 'approveAll', 'discardAll']);
+
+it('tells the page when a step lapsed before its own approve or reject click', function (string $method): void {
+    $action = ProposalCardFixture::proposal($this->user, ['name' => 'Stale'], ['title' => 't', 'summary' => 's', 'fields' => []]);
+
+    $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation');
+
+    $action->update(['expires_at' => now()->subMinute()]);
+
+    $component->call($method, (string) $action->getKey())
+        ->assertDispatched('proposal:lapsed', pendingActionId: $action->getKey(), context: 'conversation');
+
+    expect(Company::query()->where('name', 'Stale')->exists())->toBeFalse();
+})->with(['approveStep', 'rejectStep']);
 
 it('creates every batch record from one footer click and collapses the dock', function (): void {
     Bus::fake();

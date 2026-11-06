@@ -957,6 +957,8 @@ final class ProposalCard extends BaseLivewireComponent
         $anchor = $this->loadStep($this->pendingActionId);
 
         if (! $anchor instanceof PendingAction) {
+            $this->reportLapsedStep();
+
             return;
         }
 
@@ -1403,6 +1405,8 @@ final class ProposalCard extends BaseLivewireComponent
         $step = $this->loadStep($stepId);
 
         if (! $step instanceof PendingAction) {
+            $this->reportLapsedStep($stepId);
+
             return;
         }
 
@@ -1461,6 +1465,8 @@ final class ProposalCard extends BaseLivewireComponent
         $step = $this->loadStep($stepId);
 
         if (! $step instanceof PendingAction) {
+            $this->reportLapsedStep($stepId);
+
             return;
         }
 
@@ -1497,6 +1503,8 @@ final class ProposalCard extends BaseLivewireComponent
         $steps = $this->planSteps();
 
         if ($steps === []) {
+            $this->reportLapsedStep();
+
             return;
         }
 
@@ -1889,12 +1897,12 @@ final class ProposalCard extends BaseLivewireComponent
     }
 
     // The page expires proposals on its own clock, which can run behind the server's.
-    private function reportLapsedStep(): void
+    private function reportLapsedStep(?string $stepId = null): void
     {
         $user = $this->authUser();
 
         $lapsed = PendingAction::query()
-            ->whereKey($this->activeStepId())
+            ->whereKey($stepId ?? $this->activeStepId())
             ->where('workspace_id', $user->currentWorkspace->getKey())
             ->where('user_id', $user->getKey())
             ->first();
