@@ -9,6 +9,7 @@ return [
         'all' => 'Toutes',
         'unlinked' => 'Non liées',
         'automated' => 'Automatiques',
+        'done' => 'Terminées',
         'newer' => 'Plus récentes',
         'older' => 'Plus anciennes',
         'empty' => [
@@ -17,6 +18,7 @@ return [
             'all' => 'Aucune conversation pour le moment.',
             'unlinked' => 'Chaque conversation est liée à une fiche.',
             'automated' => 'Aucun e-mail automatique.',
+            'done' => 'Les conversations marquées comme terminées apparaissent ici. Elles reviennent quand quelqu\'un écrit à nouveau.',
         ],
     ],
     'filters' => [
@@ -27,6 +29,13 @@ return [
         'unread' => 'Non lu',
         'unlinked' => 'Non liée',
         'more_records' => '+:count',
+    ],
+    'triage' => [
+        'too_many' => 'Sélectionnez au plus :max conversations à la fois.',
+        'skipped' => [
+            'not_available' => 'non disponible',
+            'not_in_your_mailbox' => 'absente de votre boîte mail',
+        ],
     ],
     'drawer' => [
         'reply' => 'Répondre',

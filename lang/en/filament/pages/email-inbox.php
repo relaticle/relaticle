@@ -241,6 +241,7 @@ return [
         'all' => 'All',
         'unlinked' => 'Unlinked',
         'automated' => 'Automated',
+        'done' => 'Done',
         'newer' => 'Newer',
         'older' => 'Older',
         'no_match' => 'No conversations match.',
@@ -251,6 +252,7 @@ return [
             'all' => 'No conversations yet.',
             'unlinked' => 'Every conversation is linked to a record.',
             'automated' => 'No automated mail.',
+            'done' => 'Conversations you mark Done appear here. They come back when someone writes again.',
         ],
     ],
     'conversation_row' => [
@@ -258,6 +260,13 @@ return [
         'unread' => 'Unread',
         'unlinked' => 'Unlinked',
         'more_records' => '+:count',
+    ],
+    'triage' => [
+        'too_many' => 'Select at most :max conversations at a time.',
+        'skipped' => [
+            'not_available' => 'not available',
+            'not_in_your_mailbox' => 'not in your mailbox',
+        ],
     ],
     'drawer' => [
         'reply' => 'Reply',

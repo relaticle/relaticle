@@ -15,9 +15,15 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Renderless;
 use Livewire\Attributes\Url;
+use Relaticle\EmailIntegration\Actions\MarkConversationsDone;
+use Relaticle\EmailIntegration\Actions\MarkConversationsRead;
+use Relaticle\EmailIntegration\Actions\MarkConversationsUnread;
+use Relaticle\EmailIntegration\Actions\ReopenConversations;
 use Relaticle\EmailIntegration\Data\ConversationPage;
 use Relaticle\EmailIntegration\Data\ConversationRow;
+use Relaticle\EmailIntegration\Data\TriageOutcome;
 use Relaticle\EmailIntegration\Enums\ConversationView;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPageTab;
@@ -175,6 +181,54 @@ final class EmailInboxPage extends Page
         $this->conversationView ??= $this->activeView;
         Cache::forget(ConversationsQuery::countsCacheKey($this->authUser()));
         unset($this->viewCounts, $this->conversations, $this->selectedEmail);
+    }
+
+    /**
+     * @param  array<mixed>  $keys
+     * @return array{applied: list<string>, skipped: list<array{reason: string, label: string, count: int}>}
+     */
+    #[Renderless]
+    public function markDone(array $keys): array
+    {
+        return $this->triaged(resolve(MarkConversationsDone::class)->execute($this->authUser(), $keys));
+    }
+
+    /**
+     * @param  array<mixed>  $keys
+     * @return array{applied: list<string>, skipped: list<array{reason: string, label: string, count: int}>}
+     */
+    #[Renderless]
+    public function reopen(array $keys): array
+    {
+        return $this->triaged(resolve(ReopenConversations::class)->execute($this->authUser(), $keys));
+    }
+
+    /**
+     * @param  array<mixed>  $keys
+     * @return array{applied: list<string>, skipped: list<array{reason: string, label: string, count: int}>}
+     */
+    #[Renderless]
+    public function markRead(array $keys): array
+    {
+        return $this->triaged(resolve(MarkConversationsRead::class)->execute($this->authUser(), $keys));
+    }
+
+    /**
+     * @param  array<mixed>  $keys
+     * @return array{applied: list<string>, skipped: list<array{reason: string, label: string, count: int}>}
+     */
+    #[Renderless]
+    public function markUnread(array $keys): array
+    {
+        return $this->triaged(resolve(MarkConversationsUnread::class)->execute($this->authUser(), $keys));
+    }
+
+    /** @return array{applied: list<string>, skipped: list<array{reason: string, label: string, count: int}>} */
+    private function triaged(TriageOutcome $outcome): array
+    {
+        unset($this->viewCounts, $this->conversations);
+
+        return $outcome->toArray();
     }
 
     public function nextConversationsPage(): void
