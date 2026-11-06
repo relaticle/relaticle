@@ -271,6 +271,10 @@ final readonly class ProposalPlanService
      */
     public function rejectRows(PendingAction $step, User $user, array $indexes): void
     {
+        if ($indexes === []) {
+            return;
+        }
+
         $rows = array_intersect($indexes, ProposalProgress::for($step->refresh())->unresolvedIndices());
 
         foreach ($rows as $index) {
@@ -285,10 +289,14 @@ final readonly class ProposalPlanService
      */
     private function applyLeftOut(array $steps, User $user, array $leftOutSteps, array $leftOutRows): void
     {
+        if ($leftOutSteps === [] && array_filter($leftOutRows) === []) {
+            return;
+        }
+
         foreach ($steps as $step) {
             $step->refresh();
 
-            if ($step->status === PendingActionStatus::Pending && in_array((string) $step->getKey(), $leftOutSteps, true)) {
+            if ($step->isPending() && in_array((string) $step->getKey(), $leftOutSteps, true)) {
                 $this->reject($step, $user);
             }
         }
@@ -298,7 +306,7 @@ final readonly class ProposalPlanService
         foreach ($steps as $step) {
             $stepId = (string) $step->getKey();
 
-            if ($step->refresh()->status !== PendingActionStatus::Pending || $step->needsOwnApproval() || ! ProposalPayload::from($step)->isBatch) {
+            if (! $step->refresh()->isPending() || $step->needsOwnApproval() || ! ProposalPayload::from($step)->isBatch) {
                 continue;
             }
 
