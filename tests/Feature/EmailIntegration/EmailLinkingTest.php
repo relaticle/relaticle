@@ -71,6 +71,7 @@ function linkingEmail(User $owner, array $attributes = []): Email
         'privacy_tier' => EmailPrivacyTier::SUBJECT,
         'is_internal' => false,
         'sent_at' => now(),
+        'linked_at' => now(),
         ...$attributes,
     ]);
 }
@@ -186,6 +187,33 @@ it('counts a newly linked email once and recounts the record after an unlink', f
         ->outbound_email_count->toBe(1)
         ->last_email_at->toEqual(now()->subDays(3))
         ->last_interaction_at->toEqual(now()->subDays(3));
+});
+
+it('counts a copy once when the link comes before its own sync linking', function (): void {
+    $pending = linkingEmail($this->owner, ['linked_at' => null]);
+
+    resolve(LinkEmailToRecord::class)->execute($this->owner, $pending, $this->company);
+
+    expect($this->company->fresh()->email_count)->toBe(0);
+
+    resolve(LinkEmailAction::class)->execute($pending->fresh());
+
+    expect($this->company->fresh()->email_count)->toBe(1);
+});
+
+it('leaves undelivered copies of the conversation off the record and out of its counts', function (): void {
+    $sent = linkingEmail($this->owner);
+    $queued = linkingEmail($this->owner, [
+        'rfc_message_id' => '<queued@airbnb.test>',
+        'direction' => EmailDirection::OUTBOUND,
+        'status' => EmailStatus::QUEUED,
+        'sent_at' => null,
+    ]);
+
+    resolve(LinkEmailToRecord::class)->execute($this->owner, $sent, $this->company);
+
+    expect(linkSource($queued, $this->company))->toBeNull()
+        ->and($this->company->fresh()->email_count)->toBe(1);
 });
 
 function linkingPage(Email $email): mixed

@@ -35,7 +35,7 @@ final readonly class LinkEmailToRecord
                 ->where('emailable_id', $record->getKey())
                 ->delete();
 
-            foreach ($copies->only($changes['attached']) as $copy) {
+            foreach ($copies->only($changes['attached'])->whereNotNull('linked_at') as $copy) {
                 $this->metrics->incrementEmailMetrics($record, $copy);
             }
         });

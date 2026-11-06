@@ -295,7 +295,7 @@ final readonly class ConversationsQuery
     {
         Gate::forUser($viewer)->authorize('viewAny', Email::class);
 
-        return Email::query()
+        return $this->delivered(Email::query())
             ->withGlobalScope('visible', new VisibleEmailScope($viewer))
             ->where('emails.workspace_id', $viewer->current_workspace_id)
             ->where('emails.conversation_key', $conversationKey)
