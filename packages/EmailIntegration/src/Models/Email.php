@@ -511,6 +511,14 @@ final class Email extends Model
     }
 
     /**
+     * @return HasMany<EmailLinkSuppression, $this>
+     */
+    public function linkSuppressions(): HasMany
+    {
+        return $this->hasMany(EmailLinkSuppression::class);
+    }
+
+    /**
      * @return HasMany<EmailRead, $this>
      */
     public function reads(): HasMany
