@@ -277,12 +277,23 @@ it('takes a suppressed link off the email when sync linking finds both', functio
         ->and($this->company->fresh()->email_count)->toBe(0);
 });
 
+it('links the conversation a merge moved the email into after it was loaded', function (): void {
+    $email = linkingEmail($this->owner, ['conversation_key' => 'airbnb-old']);
+    $reply = linkingEmail($this->owner, ['rfc_message_id' => '<renewal-reply@airbnb.test>']);
+    Email::query()->withoutGlobalScopes()->whereKey($email->getKey())->update(['conversation_key' => 'airbnb-renewal']);
+
+    resolve(LinkEmailToRecord::class)->execute($this->owner, $email, $this->company);
+
+    expect(linkSource($email, $this->company))->toBe('manual')
+        ->and(linkSource($reply, $this->company))->toBe('manual');
+});
+
 it('waits for the conversation lock before it changes links', function (Closure $change): void {
     $email = linkingEmail($this->owner);
     config(['database.connections.conversation_lock' => config('database.connections.'.config('database.default'))]);
     $holder = DB::connection('conversation_lock');
     $holder->beginTransaction();
-    $holder->select('select pg_advisory_xact_lock(hashtext(?))', [$this->workspace->getKey().':airbnb-renewal']);
+    $holder->select('select pg_advisory_xact_lock(?, hashtext(?))', [Email::CONVERSATION_LOCK_CLASS, $this->workspace->getKey().':airbnb-renewal']);
     DB::statement("set local lock_timeout = '200ms'");
 
     try {

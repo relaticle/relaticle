@@ -117,6 +117,9 @@ final class Email extends Model
 
     public const int OPPORTUNITY_WINDOW_DAYS = 30;
 
+    // The two-key lock form never meets the one-key workspace and thread locks sync and merges take.
+    public const int CONVERSATION_LOCK_CLASS = 7341;
+
     protected static function newFactory(): EmailFactory
     {
         return EmailFactory::new();
@@ -311,7 +314,20 @@ final class Email extends Model
             return;
         }
 
-        DB::select('select pg_advisory_xact_lock(hashtext(?))', [$this->workspace_id.':'.$this->conversation_key]);
+        $this->takeConversationLock((string) $this->conversation_key);
+
+        $current = self::query()->withoutGlobalScopes()->whereKey($this->getKey())->value('conversation_key');
+
+        if (is_string($current) && $current !== $this->conversation_key) {
+            $this->takeConversationLock($current);
+            $this->conversation_key = $current;
+            $this->syncOriginalAttribute('conversation_key');
+        }
+    }
+
+    public function takeConversationLock(string $conversationKey): void
+    {
+        DB::select('select pg_advisory_xact_lock(?, hashtext(?))', [self::CONVERSATION_LOCK_CLASS, $this->workspace_id.':'.$conversationKey]);
     }
 
     /**
