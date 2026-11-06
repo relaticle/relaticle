@@ -535,6 +535,51 @@ it('restores only pairs the user reached and the unlink suppressed', function ()
         ->and(EmailLinkSuppression::query()->count())->toBe(1);
 });
 
+it('restores a reached suppressed pair with its source and leaves a standing auto link auto', function (): void {
+    $email = linkingEmail($this->owner);
+    $standing = linkingEmail($this->owner, ['rfc_message_id' => '<renewal-reply@airbnb.test>']);
+    $email->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
+    $changed = resolve(UnlinkEmailFromRecord::class)->execute($this->owner, $email, $this->company);
+    $standing->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
+
+    $restored = resolve(RestoreEmailRecordLinks::class)->execute($this->owner, $email, $this->company, [...$changed, $standing->getKey() => 'manual']);
+
+    expect($restored)->toBeTrue()
+        ->and(linkSource($email, $this->company))->toBe('auto')
+        ->and(linkSource($standing, $this->company))->toBe('auto')
+        ->and(EmailLinkSuppression::query()->count())->toBe(0);
+});
+
+it('links a reply synced between the unlink and its undo once the undo lifts the unlink', function (): void {
+    $domains = CustomField::query()->withoutGlobalScopes()->where('tenant_id', $this->workspace->getKey())->where('entity_type', 'company')->where('code', 'domains')->firstOrFail();
+    $this->company->saveCustomFieldValue($domains, 'https://airbnb.test', $this->workspace);
+    $email = linkingEmail($this->owner);
+    $email->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
+    $changed = resolve(UnlinkEmailFromRecord::class)->execute($this->owner, $email, $this->company);
+    $reply = linkingEmail($this->owner, ['rfc_message_id' => '<renewal-reply@airbnb.test>', 'linked_at' => null]);
+    EmailParticipant::factory()->from()->create(['email_id' => $reply->getKey(), 'email_address' => 'brian@airbnb.test']);
+    resolve(LinkEmailAction::class)->execute($reply);
+
+    expect(linkSource($reply, $this->company))->toBeNull();
+
+    resolve(RestoreEmailRecordLinks::class)->execute($this->owner, $email, $this->company, $changed);
+
+    expect(linkSource($email, $this->company))->toBe('auto')
+        ->and(linkSource($reply, $this->company))->toBe('auto');
+});
+
+it('says the undo put nothing back when the unlink it names left nothing to restore', function (): void {
+    $email = linkingEmail($this->owner);
+    linkingPage($email);
+    $this->actingAs($this->owner);
+
+    livewire(EmailAccessNotificationHandler::class)
+        ->dispatch('relink-email-record', emailId: $email->getKey(), targetType: 'company', targetId: $this->company->getKey(), links: [$email->getKey() => 'auto'])
+        ->assertNotified('Nothing to put back on Airbnb. It may have changed since.');
+
+    expect(linkSource($email, $this->company))->toBeNull();
+});
+
 it('reads an opportunity\'s close date field once for its tab and once for its badge', function (): void {
     $opportunity = Opportunity::factory()->for($this->workspace)->create(['name' => 'Airbnb renewal', 'company_id' => $this->company->getKey()]);
     linkingEmail($this->owner)->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);

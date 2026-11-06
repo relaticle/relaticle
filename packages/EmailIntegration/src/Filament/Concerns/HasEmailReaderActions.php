@@ -436,9 +436,20 @@ trait HasEmailReaderActions
 
         abort_unless($email instanceof Email && $record !== null, 404);
 
-        if (! $this->wroteLinks(function () use ($email, $record, $links): void {
-            resolve(RestoreEmailRecordLinks::class)->execute($this->readerUser(), $email, $record, $links);
+        $restored = false;
+
+        if (! $this->wroteLinks(function () use ($email, $record, $links, &$restored): void {
+            $restored = resolve(RestoreEmailRecordLinks::class)->execute($this->readerUser(), $email, $record, $links);
         })) {
+            return;
+        }
+
+        if (! $restored) {
+            Notification::make()
+                ->info()
+                ->title(__('filament/pages/email-inbox.drawer.links.notifications.nothing_restored', ['name' => $record->name]))
+                ->send();
+
             return;
         }
 

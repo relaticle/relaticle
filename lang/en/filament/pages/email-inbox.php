@@ -413,6 +413,7 @@ return [
                 'linked' => 'Linked to :name',
                 'unlinked' => 'Removed from :name',
                 'unlinked_teammate_keeps' => 'Removed your copies. A teammate\'s copy keeps it on :name.',
+                'nothing_restored' => 'Nothing to put back on :name. It may have changed since.',
                 'undo' => 'Undo',
             ],
         ],
