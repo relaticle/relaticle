@@ -91,6 +91,17 @@ it('keeps markdown checklist syntax in a fenced code block as code', function ()
         ->and(html_entity_decode(strip_tags($stored)))->toContain('[ ] not a task');
 });
 
+it('keeps numbered markdown items in a task description as a numbered list', function (): void {
+    $stored = $this->postJson('/api/v1/tasks', [
+        'title' => 'Numbered',
+        'custom_fields' => ['description' => "1. [ ] Draft the brief\n2. [x] Book the room"],
+    ])->assertCreated()->json('data.attributes.custom_fields.description');
+
+    expect($stored)->toContain('<ol>')
+        ->toContain('[ ] Draft the brief')
+        ->not->toContain('data-type="taskList"');
+});
+
 it('keeps markdown checklist items in a note as bullets', function (): void {
     $stored = $this->postJson('/api/v1/notes', [
         'title' => 'Bullets',
