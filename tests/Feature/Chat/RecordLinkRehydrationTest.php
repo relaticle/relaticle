@@ -440,6 +440,19 @@ it('reads a rejected step beside an approved one as left out, and an unsent emai
     expect(array_column($actions, 'outcome'))->toBe(['applied', 'left_out', 'not_sent', 'discarded', 'discarded']);
 });
 
+it('reads a plan that applied nothing as one outcome, a discard outranking an expiry', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+    Filament::setTenant($user->currentWorkspace);
+
+    $actions = reloadedProposals($user, [
+        ['entity_type' => 'company', 'turn_id' => 'turn-c', 'status' => PendingActionStatus::Expired],
+        ['entity_type' => 'task', 'turn_id' => 'turn-c', 'status' => PendingActionStatus::Rejected],
+    ]);
+
+    expect(array_column($actions, 'outcome'))->toBe(['discarded', 'discarded']);
+});
+
 it('reads a superseded proposal as replaced, which never offers Propose again', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);

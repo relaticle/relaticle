@@ -607,6 +607,19 @@ describe('an edit made after the proposal', function (): void {
             ->and((float) amountOf($this->opportunity))->toBe(48000.0);
     });
 
+    it('keeps Approve and its shortcut when the edit landed before the proposal', function (): void {
+        editAsTeammate($this->teammate, $this->opportunity, ['custom_fields' => ['amount' => 20000]]);
+        $this->travel(2)->minutes();
+
+        $proposal = proposeOpportunityUpdate($this->user, [['id' => $this->opportunity->getKey(), 'custom_fields' => ['amount' => 48000]]]);
+
+        Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+            ->dispatch('proposal:set-active', id: $proposal->getKey(), context: 'conversation')
+            ->assertDontSeeHtml('data-proposal-overwrite-notice')
+            ->assertDontSee('Overwrite')
+            ->assertSeeHtml('data-proposal-shortcut');
+    });
+
     it('keeps Approve and its shortcut when the edit touched a field the proposal does not write', function (): void {
         $proposal = proposeOpportunityUpdate($this->user, [['id' => $this->opportunity->getKey(), 'custom_fields' => ['amount' => 48000]]]);
 
