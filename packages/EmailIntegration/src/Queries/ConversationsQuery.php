@@ -290,15 +290,23 @@ final readonly class ConversationsQuery
             ->get();
     }
 
-    /** @return EloquentCollection<int, Email> */
-    public function copies(User $viewer, string $conversationKey): EloquentCollection
+    /**
+     * Delivered copies of the email's conversation the viewer reached: their own, or shared to them in full.
+     *
+     * @return EloquentCollection<int, Email>
+     */
+    public function copies(User $viewer, Email $email): EloquentCollection
     {
         Gate::forUser($viewer)->authorize('viewAny', Email::class);
 
-        return $this->delivered(Email::query())
+        return $this->reached($this->delivered(Email::query()), $viewer)
             ->withGlobalScope('visible', new VisibleEmailScope($viewer))
             ->where('emails.workspace_id', $viewer->current_workspace_id)
-            ->where('emails.conversation_key', $conversationKey)
+            ->when(
+                blank($email->conversation_key),
+                fn (Builder $one): Builder => $one->whereKey($email->getKey()),
+                fn (Builder $conversation): Builder => $conversation->where('emails.conversation_key', $email->conversation_key),
+            )
             ->orderBy('emails.id')
             ->get();
     }

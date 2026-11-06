@@ -9,6 +9,7 @@ use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
+use Closure;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
@@ -23,6 +24,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Exceptions\AiException;
 use Livewire\Attributes\On;
 use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
@@ -379,7 +381,9 @@ trait HasEmailReaderActions
 
                 abort_unless($email instanceof Email && $record !== null, 404);
 
-                resolve(UnlinkEmailFromRecord::class)->execute($this->readerUser(), $email, $record);
+                if (! $this->wroteLinks(fn (): mixed => resolve(UnlinkEmailFromRecord::class)->execute($this->readerUser(), $email, $record))) {
+                    return;
+                }
 
                 Notification::make()
                     ->success()
@@ -398,6 +402,20 @@ trait HasEmailReaderActions
             });
     }
 
+    /** @param  Closure(): mixed  $write */
+    private function wroteLinks(Closure $write): bool
+    {
+        try {
+            $write();
+        } catch (ValidationException $refused) {
+            Notification::make()->danger()->title($refused->getMessage())->send();
+
+            return false;
+        }
+
+        return true;
+    }
+
     protected function linkConversationTo(string $emailId, string $targetType, string $targetId): void
     {
         $email = $this->resolveWorkspaceEmail($emailId, 'view');
@@ -405,7 +423,9 @@ trait HasEmailReaderActions
 
         abort_unless($email instanceof Email && $record !== null, 404);
 
-        resolve(LinkEmailToRecord::class)->execute($this->readerUser(), $email, $record);
+        if (! $this->wroteLinks(fn (): mixed => resolve(LinkEmailToRecord::class)->execute($this->readerUser(), $email, $record))) {
+            return;
+        }
 
         Notification::make()
             ->success()

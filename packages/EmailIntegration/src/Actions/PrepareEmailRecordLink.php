@@ -9,6 +9,7 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Validation\ValidationException;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Queries\ConversationsQuery;
 
@@ -28,10 +29,12 @@ final readonly class PrepareEmailRecordLink
             403,
         );
 
-        if (blank($email->conversation_key)) {
-            return new EloquentCollection([$email]);
-        }
+        $copies = $this->conversations->copies($user, $email);
 
-        return $this->conversations->copies($user, (string) $email->conversation_key);
+        throw_if($copies->isEmpty(), ValidationException::withMessages([
+            'email_id' => __('filament/pages/email-inbox.drawer.links.not_reached'),
+        ]));
+
+        return $copies;
     }
 }

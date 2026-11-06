@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
 use Relaticle\EmailIntegration\Actions\LinkEmailToRecord;
 use Relaticle\EmailIntegration\Actions\PrepareEmailRecordLink;
@@ -25,6 +26,7 @@ use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailLinkSuppression;
+use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Queries\ConversationsQuery;
 use Relaticle\EmailIntegration\Services\RecordCommunicationMetrics;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -108,8 +110,10 @@ it('refuses to link an email to a record from another workspace', function (): v
     expect(DB::table('emailables')->where('email_id', $email->getKey())->count())->toBe(0);
 });
 
-it('links every copy of the conversation the user can see and pins it', function (): void {
+it('pins the copies the user reached and leaves the copies they only see as they were', function (): void {
     $own = linkingEmail($this->owner);
+    $sharedCopy = linkingEmail($this->teammate, ['rfc_message_id' => '<renewal-shared@airbnb.test>']);
+    EmailShare::factory()->create(['email_id' => $sharedCopy->getKey(), 'shared_with' => $this->owner->getKey(), 'shared_by' => $this->teammate->getKey()]);
     $teammateCopy = linkingEmail($this->teammate);
     $teammateCopy->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
     $privateCopy = linkingEmail($this->teammate, [
@@ -121,11 +125,40 @@ it('links every copy of the conversation the user can see and pins it', function
     resolve(LinkEmailToRecord::class)->execute($this->owner, $own, $this->company);
 
     expect(linkSource($own, $this->company))->toBe('manual')
-        ->and(linkSource($teammateCopy, $this->company))->toBe('manual')
+        ->and(linkSource($sharedCopy, $this->company))->toBe('manual')
+        ->and(linkSource($teammateCopy, $this->company))->toBe('auto')
         ->and(linkSource($privateCopy, $this->company))->toBeNull();
 });
 
-it('unlinks every visible copy, so the conversation leaves the record for the user', function (): void {
+it('refuses a teammate who reached no copy and leaves the owner\'s copy on the record', function (EmailPrivacyTier $tier): void {
+    $owners = linkingEmail($this->owner, ['privacy_tier' => $tier, 'privacy_tier_customized' => true]);
+    $owners->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
+    $stripe = Company::factory()->for($this->workspace)->create(['name' => 'Stripe']);
+
+    expect(fn (): mixed => resolve(UnlinkEmailFromRecord::class)->execute($this->teammate, $owners, $this->company))
+        ->toThrow(ValidationException::class, 'Only people who hold this conversation')
+        ->and(fn (): mixed => resolve(LinkEmailToRecord::class)->execute($this->teammate, $owners, $stripe))
+        ->toThrow(ValidationException::class, 'Only people who hold this conversation');
+
+    expect(linkSource($owners, $this->company))->toBe('auto')
+        ->and(DB::table('emailables')->where('emailable_id', $stripe->getKey())->exists())->toBeFalse()
+        ->and(EmailLinkSuppression::query()->count())->toBe(0);
+})->with([EmailPrivacyTier::SUBJECT, EmailPrivacyTier::METADATA_ONLY]);
+
+it('unlinks only the teammate\'s own copy when the owner\'s copy is visible to them below full', function (EmailPrivacyTier $tier): void {
+    $owners = linkingEmail($this->owner, ['privacy_tier' => $tier, 'privacy_tier_customized' => true]);
+    $teammates = linkingEmail($this->teammate, ['rfc_message_id' => '<renewal-cc@airbnb.test>']);
+    $owners->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
+    $teammates->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
+
+    resolve(UnlinkEmailFromRecord::class)->execute($this->teammate, $owners, $this->company);
+
+    expect(linkSource($owners, $this->company))->toBe('auto')
+        ->and(linkSource($teammates, $this->company))->toBeNull()
+        ->and(EmailLinkSuppression::query()->pluck('email_id')->all())->toBe([$teammates->getKey()]);
+})->with([EmailPrivacyTier::SUBJECT, EmailPrivacyTier::METADATA_ONLY]);
+
+it('unlinks the copies the user reached, so the conversation leaves the record for the user', function (): void {
     $own = linkingEmail($this->owner);
     $teammateCopy = linkingEmail($this->teammate);
     resolve(LinkEmailToRecord::class)->execute($this->owner, $own, $this->company);
@@ -142,8 +175,7 @@ it('unlinks every visible copy, so the conversation leaves the record for the us
         ->and($conversations->counts($this->owner)['unlinked'])->toBe(1)
         ->and(linkSource($own, $this->company))->toBeNull()
         ->and(linkSource($teammateCopy, $this->company))->toBeNull()
-        ->and(EmailLinkSuppression::query()->where('user_id', $this->owner->getKey())->pluck('email_id')->sort()->values()->all())
-        ->toBe(collect([$own->getKey(), $teammateCopy->getKey()])->sort()->values()->all());
+        ->and(EmailLinkSuppression::query()->where('user_id', $this->owner->getKey())->pluck('email_id')->all())->toBe([$own->getKey()]);
 });
 
 it('links a record again after an unlink and clears the suppression', function (): void {
@@ -291,6 +323,20 @@ it('answers a forged record from another workspace with not found and writes not
         ->assertHasActionErrors(['target_id']);
 
     expect(DB::table('emailables')->where('email_id', $email->getKey())->count())->toBe(0);
+});
+
+it('tells a teammate who reached no copy that the drawer changed nothing', function (): void {
+    $email = linkingEmail($this->owner);
+    $email->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
+    $this->actingAs($this->teammate);
+
+    linkingPage($email)
+        ->mountAction('unlinkRecord', arguments: ['emailId' => $email->getKey(), 'targetType' => 'company', 'targetId' => $this->company->getKey()])
+        ->callMountedAction()
+        ->assertNotified('Only people who hold this conversation, or who were given full access to it, can change its records.')
+        ->assertNotDispatched('email:links-changed');
+
+    expect(linkSource($email, $this->company))->toBe('auto');
 });
 
 it('unlinks a chip from the drawer and links it again from the undo', function (): void {

@@ -2029,6 +2029,17 @@ describe('linking email to records', function (): void {
             ->and($company->emails()->pluck('emails.id')->all())->toBe([$email->id]);
     });
 
+    it('refuses the approval of a link to a teammate email the user sees below full', function (): void {
+        $email = ($this->emailFrom)($this->coworker, ['privacy_tier' => EmailPrivacyTier::SUBJECT]);
+        $company = Company::factory()->create(['workspace_id' => $this->workspace->id]);
+        $proposal = proposeChatEmails($this->viewer, LinkEmailsTool::class, [['email_id' => $email->id, 'record_type' => 'company', 'record_id' => $company->id]]);
+
+        expect(fn (): mixed => resolve(PendingActionService::class)->approve(pendingChatEmail($proposal), $this->viewer))
+            ->toThrow(ValidationException::class, 'Only people who hold this conversation');
+
+        expect($company->emails()->count())->toBe(0);
+    });
+
     it('answers not found for a private teammate email and proposes nothing', function (): void {
         $private = ($this->emailFrom)($this->coworker, ['privacy_tier' => EmailPrivacyTier::PRIVATE]);
 

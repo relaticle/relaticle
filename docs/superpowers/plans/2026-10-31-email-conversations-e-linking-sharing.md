@@ -39,6 +39,7 @@ Each note names the conflict and what this plan does. The spec wins where it spe
 17. **Routing to every holder.** D24 wants it (`d-linking-privacy-reach.md:445-446`). The spec does not include it. Requests still go to the copy's owner (`RequestEmailAccessAction.php:52-63`). Follow-up.
 18. **Public-domain senders.** D22 hides them in Unlinked (`d-linking-privacy-reach.md:196-197`). The spec does not (`design.md:343,601-602`). Kept visible, sorted by mail the viewer sent them.
 19. **Stale citation.** D24 cites `DecideEmailAccessRequest.php:116-127`. The logging is at `:55-66`.
+20. **Link acts on reached copies only (review decision).** Link, unlink, suppress and pin act on the delivered copies the actor reached: their own, plus copies shared to them at Full, the `reached()` rule `MarkConversationsRead` uses. `ConversationsQuery::copies(User, Email)` returns exactly those. Other copies keep their links, so a Subject or Participants-only teammate cannot take the owner's copy off a record or pin it. An actor who reached no copy gets a `ValidationException` on `email_id`: Rela's card and the MCP tool show its message, and the drawer shows it as a notification. A teammate who sees the owner's copy only through the mailbox default tier (no share row) has reached nothing, even at Full.
 
 ## Global constraints (additions to the master list)
 
@@ -657,7 +658,7 @@ Plan notes 1, 5, 6, 11 and 18 are decisions too. The rest:
 
 | Decision | Reason | If overruled |
 |---|---|---|
-| Unlink by a teammate of a visible teammate copy is allowed | Record curation is a workspace act. The owner still sees the mail in Unlinked | Add `$email->user_id === $user->getKey() \|\| <record owner>` to the unlink guard |
+| Unlink by a teammate reaches only their own copies and full shares (overruled in review, note 20) | The owner's copy stays where its owner put it | Widen `copies()` back to every visible copy |
 | Unlink recounts by queued job | D22, no drift | Decrement inline: faster, drifts |
 | Connect step offers Who and when and Subject only | Same as onboarding; Private and Full stay in mailbox settings | Offer all four through `offeredAtConnect()` |
 | Existing mailboxes with a stored tier count as answered | They chose in onboarding or settings | Leave all null and show the card to every mailbox once |

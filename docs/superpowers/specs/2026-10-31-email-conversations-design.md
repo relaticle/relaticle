@@ -600,8 +600,12 @@ were skipped and why.
 
 - The drawer header shows link chips. "+ Link record" opens a record picker (company,
   person, opportunity). A chip's menu has Unlink.
-- New actions: `LinkEmailToRecord` and `UnlinkEmailFromRecord`. Both act on every copy of
-  the conversation the actor may see. Unlink writes `email_link_suppressions`.
+- New actions: `LinkEmailToRecord` and `UnlinkEmailFromRecord`. Both act on the delivered
+  copies of the conversation the actor reached: their own copies and copies shared to them
+  at Full, the rule `MarkConversationsRead` uses. Other copies keep their links. Unlink
+  writes `email_link_suppressions` for the copies it detached, and link pins only reached
+  copies. An actor who reached no copy is refused with a message: a teammate who sees the
+  conversation at Subject or Participants only cannot take it off a record or pin it.
 - The Unlinked view groups the viewer's own conversations by sender, with "Create person"
   (prefilled from the address and name) and "Link to existing".
 - Adding an address to a person still queues `RelinkRecordHistoryJob`, which fills
