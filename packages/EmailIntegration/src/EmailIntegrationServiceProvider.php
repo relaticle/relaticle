@@ -67,6 +67,7 @@ use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 use Relaticle\EmailIntegration\Services\Factories\CalendarServiceFactory;
 use Relaticle\EmailIntegration\Services\Factories\MailServiceFactory;
 use Relaticle\EmailIntegration\Services\MailboxDisplayNameDirectory;
+use Relaticle\EmailIntegration\Services\OpportunityWindows;
 use Relaticle\EmailIntegration\Services\WorkspaceMemberDirectory;
 use Relaticle\EmailIntegration\Support\ComposerPageTo;
 use Relaticle\EmailIntegration\Support\PublicSuffixList;
@@ -90,6 +91,7 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         $this->app->scoped(MailboxDisplayNameDirectory::class);
         $this->app->scoped(EmailVisibilityService::class);
         $this->app->scoped(QueueRecordHistoryRelink::class);
+        $this->app->scoped(OpportunityWindows::class);
         $this->app->tag([EmailAccessRequestSource::class], RequestSource::class);
 
         // Not gated by the feature flag: these are inert while the feature is off, and

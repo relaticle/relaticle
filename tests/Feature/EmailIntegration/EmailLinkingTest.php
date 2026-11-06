@@ -426,6 +426,22 @@ it('restores only pairs the user reached and the unlink suppressed', function ()
         ->and(EmailLinkSuppression::query()->count())->toBe(1);
 });
 
+it('reads an opportunity\'s close date once while it counts every view of its tab', function (): void {
+    $opportunity = Opportunity::factory()->for($this->workspace)->create(['name' => 'Airbnb renewal', 'company_id' => $this->company->getKey()]);
+    linkingEmail($this->owner)->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
+    $reads = 0;
+    DB::listen(function (QueryExecuted $query) use (&$reads): void {
+        $reads += (int) (str_contains($query->sql, 'from "custom_fields"') && in_array('close_date', $query->bindings, true));
+    });
+
+    $conversations = resolve(ConversationsQuery::class);
+    $conversations->counts($this->owner, ConversationFilters::forRecord($opportunity));
+    $conversations->paginate($this->owner, ConversationView::All, ConversationFilters::forRecord($opportunity));
+    resolve(EmailVisibilityService::class)->visibleEmailCountBadge($opportunity, $this->owner);
+
+    expect($reads)->toBe(1);
+});
+
 function linkingPage(Email $email): mixed
 {
     config(['relaticle.features.email_conversations' => [$email->workspace_id]]);

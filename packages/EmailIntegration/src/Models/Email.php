@@ -43,6 +43,7 @@ use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\Scopes\ActiveAccountScope;
 use Relaticle\EmailIntegration\Observers\EmailObserver;
 use Relaticle\EmailIntegration\Policies\EmailPolicy;
+use Relaticle\EmailIntegration\Services\OpportunityWindows;
 use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 
 /**
@@ -228,9 +229,7 @@ final class Email extends Model
         }
 
         // An opportunity also shows its company's and its point of contact's mail inside its window; a pin shows whatever its date.
-        $windowStart = $record->created_at?->subDays(self::OPPORTUNITY_WINDOW_DAYS);
-        $closeDate = $record->closeDate();
-        $windowEnd = $closeDate instanceof CarbonImmutable && $closeDate->isPast() ? $closeDate->addDays(self::OPPORTUNITY_WINDOW_DAYS)->endOfDay() : null;
+        [$windowStart, $windowEnd] = resolve(OpportunityWindows::class)->of($record);
         $linked = array_filter([
             $record->getMorphClass() => $record->getKey(),
             (new Company)->getMorphClass() => $record->company_id,
