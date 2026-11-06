@@ -42,7 +42,7 @@ return [
                 'Relaticle\Chat\Jobs\ProcessChatMessage::process' => 135,
                 'Relaticle\Chat\Jobs\ProcessChatMessage::persistFailedTurn' => 69,
                 'Relaticle\Chat\Jobs\ProcessChatMessage::streamTurn' => 208,
-                'Relaticle\Chat\Livewire\Chat\ProposalCard::createCurrent' => 80,
+                'Relaticle\Chat\Livewire\Chat\ProposalCard::createCurrent' => 77,
                 'Relaticle\Chat\Services\ChatContextService::getContextForUrl' => 64,
                 'Relaticle\Chat\Services\CreditService::deduct' => 63,
                 'Relaticle\Chat\Services\CreditService::recordResolution' => 68,

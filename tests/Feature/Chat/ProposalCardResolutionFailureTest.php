@@ -31,7 +31,7 @@ beforeEach(function (): void {
     Filament::setTenant($this->workspace);
 });
 
-it('keeps a batch open when the active record fails and keeps the earlier commits', function (): void {
+it('keeps a batch open when a record fails and keeps the earlier commits', function (): void {
     Bus::fake();
     $company = Company::factory()->for($this->workspace)->create(['name' => 'Old name']);
 
@@ -64,12 +64,9 @@ it('keeps a batch open when the active record fails and keeps the earlier commit
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->call('createCurrent')
-        ->assertDispatched('proposal:resolved')
-        ->call('createCurrent')
-        ->assertDispatched('proposal:resolve-failed');
+        ->assertDispatched('proposal:resolve-failed')
+        ->assertNotDispatched('proposal:resolved');
 
-    // The first record committed; the vanished one failed its own approval
-    // without undoing it, and the batch stays open on the failing record.
     expect($company->fresh()->name)->toBe('New name')
         ->and($action->fresh()->status)->toBe(PendingActionStatus::Pending)
         ->and($action->fresh()->result_data['items'][0]['status'] ?? null)->toBe('approved');

@@ -241,15 +241,19 @@ describe('an invitation proposal', function (): void {
             ->assertSee('Send 2 invitations');
     });
 
-    it('heads a paginated card with the one invitation its button sends', function (): void {
+    it('sends every address of a standalone card with its footer button', function (): void {
+        Mail::fake();
         $invite = ($this->planInvite)(['alex@example.com', 'jamie@example.com']);
 
         openInvitationDock($invite)
-            ->assertSee('Invite alex@example.com as Member')
-            ->assertDontSee('Invite 2 teammates')
-            ->call('nextItem')
-            ->assertSee('Invite jamie@example.com as Member')
-            ->assertDontSee('Invite alex@example.com as Member');
+            ->assertDontSeeHtml('wire:click="nextItem"')
+            ->call('createCurrent')
+            ->assertHasNoErrors();
+
+        expect(WorkspaceInvitation::query()->orderBy('email')->pluck('email')->all())->toBe(['alex@example.com', 'jamie@example.com'])
+            ->and($invite->fresh()->status)->toBe(PendingActionStatus::Approved);
+
+        Mail::assertQueued(WorkspaceInvitationMail::class, 2);
     });
 
     it('counts only the steps approve all will approve, and says some steps have their own button', function (): void {

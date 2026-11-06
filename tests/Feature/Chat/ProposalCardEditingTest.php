@@ -408,19 +408,20 @@ it('ignores skipItem while a field edit is open', function (): void {
     expect($action->fresh()->result_data)->toBeNull();
 });
 
-it('shrinks the pagination count as records are skipped and hides it for the last one', function (): void {
+it('shrinks the remaining count as records are skipped and shows no paging', function (): void {
     Bus::fake();
     $action = ProposalCardFixture::batchCompany($this->user, ['Alpha', 'Beta', 'Gamma']);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
-        ->assertSee('1/3')
+        ->assertViewHas('remainingCount', 3)
+        ->assertDontSee('1/3')
         ->call('skipItem', (string) $action->getKey(), 2)
-        ->assertSee('1/2')
+        ->assertViewHas('remainingCount', 2)
         ->assertDontSee('Gamma')
         ->call('skipItem', (string) $action->getKey(), 1)
-        ->assertSee('Create')
-        ->assertDontSee('1/1');
+        ->assertViewHas('remainingCount', 1)
+        ->assertSee('Create');
 });
 
 it('opens no edit form on an invitation card', function (): void {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\WorkspaceRole;
 use App\Features\OnboardSeed;
 use App\Models\Company;
+use App\Models\Note;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
@@ -16,6 +17,11 @@ use Livewire\Livewire;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Support\PlanReference;
+use Relaticle\Chat\Tools\Company\CreateCompanyTool;
+use Relaticle\Chat\Tools\Note\CreateNoteTool;
+use Relaticle\Chat\Tools\People\CreatePersonTool;
+use Relaticle\Chat\Tools\Task\CreateTaskTool;
 use Tests\Helpers\ProposalCardFixture;
 
 mutates(ProposalCard::class);
@@ -119,6 +125,198 @@ describe('plan card', function (): void {
             ->and($person->refresh()->status)->toBe(PendingActionStatus::Rejected)
             ->and($task->refresh()->status)->toBe(PendingActionStatus::Rejected)
             ->and(Company::query()->count())->toBe(0);
+    });
+});
+
+describe('leaving steps and rows out', function (): void {
+    beforeEach(function (): void {
+        Bus::fake();
+
+        $this->chainedPlan = function (): array {
+            [$conversationId, $turnId] = ProposalCardFixture::startPlan($this->user);
+
+            $person = ProposalCardFixture::planProposal(CreatePersonTool::class, $conversationId, $turnId, [['name' => 'Priya Raman']]);
+            $task = ProposalCardFixture::planProposal(CreateTaskTool::class, $conversationId, $turnId, [
+                ['title' => 'Call Priya', 'people_ids' => [PlanReference::to((string) $person->getKey())]],
+            ]);
+            $note = ProposalCardFixture::planProposal(CreateNoteTool::class, $conversationId, $turnId, [['title' => 'Intro notes']]);
+
+            return [$person, $task, $note];
+        };
+    });
+
+    it('rejects a left-out step and its dependents and approves the rest', function (): void {
+        [$person, $task, $note] = ($this->chainedPlan)();
+
+        Livewire::test(ProposalCard::class)
+            ->call('setActive', $person->getKey())
+            ->call('toggleLeftOut', (string) $person->getKey())
+            ->call('approveAll')
+            ->assertHasNoErrors();
+
+        expect($person->refresh()->status)->toBe(PendingActionStatus::Rejected)
+            ->and($task->refresh()->status)->toBe(PendingActionStatus::Rejected)
+            ->and($task->result_data['cancelled_by'])->toBe((string) $person->getKey())
+            ->and($note->refresh()->status)->toBe(PendingActionStatus::Approved)
+            ->and(People::query()->count())->toBe(0)
+            ->and(Task::query()->count())->toBe(0)
+            ->and(Note::query()->where('title', 'Intro notes')->count())->toBe(1);
+    });
+
+    it('announces every step the approval rejected', function (): void {
+        [$person, $task] = ($this->chainedPlan)();
+
+        Livewire::test(ProposalCard::class)
+            ->call('setActive', $person->getKey())
+            ->call('toggleLeftOut', (string) $person->getKey())
+            ->call('approveAll')
+            ->assertDispatched('proposal:resolved', pendingActionId: (string) $person->getKey(), decision: 'rejected')
+            ->assertDispatched('proposal:resolved', pendingActionId: (string) $task->getKey(), decision: 'rejected', cancelledBy: (string) $person->getKey());
+    });
+
+    it('writes nothing until approve when a step is left out', function (): void {
+        [$person, $task, $note] = ($this->chainedPlan)();
+
+        $component = Livewire::test(ProposalCard::class)
+            ->call('setActive', $person->getKey())
+            ->call('toggleLeftOut', (string) $person->getKey());
+
+        expect($person->refresh()->status)->toBe(PendingActionStatus::Pending)
+            ->and($task->refresh()->status)->toBe(PendingActionStatus::Pending)
+            ->and($note->refresh()->status)->toBe(PendingActionStatus::Pending);
+
+        $component->call('toggleLeftOut', (string) $person->getKey())
+            ->assertSet('leftOutSteps', [])
+            ->call('approveAll');
+
+        expect($person->refresh()->status)->toBe(PendingActionStatus::Approved)
+            ->and($task->refresh()->status)->toBe(PendingActionStatus::Approved)
+            ->and($note->refresh()->status)->toBe(PendingActionStatus::Approved);
+    });
+
+    it('reports the dependents a left-out step takes', function (): void {
+        [$person, $task] = ($this->chainedPlan)();
+
+        $dependents = Livewire::test(ProposalCard::class)
+            ->call('setActive', $person->getKey())
+            ->call('toggleLeftOut', (string) $person->getKey())
+            ->instance()
+            ->leftOutDependents();
+
+        expect($dependents)->toBe([(string) $task->getKey() => (string) $person->getKey()]);
+    });
+
+    it('ignores a step id that is not in the plan', function (): void {
+        [$person] = ($this->chainedPlan)();
+        $stranger = ProposalCardFixture::proposal($this->user, ['name' => 'Unrelated'], ['title' => 't', 'summary' => 's', 'fields' => []]);
+
+        Livewire::test(ProposalCard::class)
+            ->call('setActive', $person->getKey())
+            ->call('toggleLeftOut', (string) $stranger->getKey())
+            ->assertSet('leftOutSteps', [])
+            ->set('leftOutSteps', [(string) $stranger->getKey()])
+            ->call('approveAll');
+
+        expect($stranger->refresh()->status)->toBe(PendingActionStatus::Pending);
+    });
+
+    it('counts records not steps', function (): void {
+        [$conversationId, $turnId] = ProposalCardFixture::startPlan($this->user);
+
+        $batch = ProposalCardFixture::planProposal(CreateCompanyTool::class, $conversationId, $turnId, array_map(
+            static fn (int $number): array => ['name' => "Company {$number}"],
+            range(1, 6),
+        ));
+        ProposalCardFixture::planProposal(CreateTaskTool::class, $conversationId, $turnId, [['title' => 'Review the list']]);
+
+        $component = Livewire::test(ProposalCard::class)->call('setActive', $batch->getKey());
+
+        expect($component->instance()->approvableRecordCount())->toBe(7);
+
+        $component->call('toggleLeftOutRow', (string) $batch->getKey(), 2);
+
+        expect($component->instance()->approvableRecordCount())->toBe(6);
+    });
+
+    it('never leaves a left-out step pending after a failed approval', function (): void {
+        [$conversationId, $turnId] = ProposalCardFixture::startPlan($this->user);
+
+        $first = ProposalCardFixture::planProposal(CreateCompanyTool::class, $conversationId, $turnId, [['name' => 'Left Out Inc']]);
+        $second = ProposalCardFixture::planProposal(CreateNoteTool::class, $conversationId, $turnId, [['title' => 'Kept note']]);
+        $third = ProposalCardFixture::planProposal(CreateTaskTool::class, $conversationId, $turnId, [['title' => 'Fails']]);
+        $third->update(['action_class' => 'stdClass']);
+
+        $component = Livewire::test(ProposalCard::class)
+            ->call('setActive', $first->getKey())
+            ->call('toggleLeftOut', (string) $first->getKey())
+            ->call('approveAll')
+            ->assertHasErrors('resolve')
+            ->assertSet('leftOutSteps', []);
+
+        expect($first->refresh()->status)->toBe(PendingActionStatus::Rejected)
+            ->and($second->refresh()->status)->toBe(PendingActionStatus::Approved)
+            ->and($third->refresh()->status)->toBe(PendingActionStatus::Pending)
+            ->and($component->instance()->planSteps())->toHaveCount(1)
+            ->and(Company::query()->count())->toBe(0);
+    });
+
+    it('has no leave-out for a row a later step links to', function (): void {
+        [$conversationId, $turnId] = ProposalCardFixture::startPlan($this->user);
+
+        $batch = ProposalCardFixture::planProposal(CreatePersonTool::class, $conversationId, $turnId, [['name' => 'Priya Raman'], ['name' => 'Dev Patel']]);
+        $task = ProposalCardFixture::planProposal(CreateTaskTool::class, $conversationId, $turnId, [
+            ['title' => 'Call Dev', 'people_ids' => [PlanReference::to((string) $batch->getKey(), 1)]],
+        ]);
+
+        $component = Livewire::test(ProposalCard::class)
+            ->call('setActive', $batch->getKey())
+            ->call('toggleLeftOutRow', (string) $batch->getKey(), 1)
+            ->assertSet('leftOutRows', []);
+
+        expect($component->instance()->linkedRowIndexes())->toBe([
+            (string) $batch->getKey() => [1 => 'Create task "Call Dev"'],
+        ]);
+
+        $component->call('toggleLeftOutRow', (string) $batch->getKey(), 0)
+            ->assertSet('leftOutRows', [(string) $batch->getKey() => [0]])
+            ->call('approveAll');
+
+        expect(People::query()->pluck('name')->all())->toBe(['Dev Patel'])
+            ->and($task->refresh()->status)->toBe(PendingActionStatus::Approved);
+    });
+
+    it('approves a batch whose last row is left out', function (): void {
+        [$conversationId, $turnId] = ProposalCardFixture::startPlan($this->user);
+
+        $batch = ProposalCardFixture::planProposal(CreateCompanyTool::class, $conversationId, $turnId, [['name' => 'Alpha'], ['name' => 'Beta'], ['name' => 'Gamma']]);
+        ProposalCardFixture::planProposal(CreateTaskTool::class, $conversationId, $turnId, [['title' => 'Review']]);
+
+        Livewire::test(ProposalCard::class)
+            ->call('setActive', $batch->getKey())
+            ->call('toggleLeftOutRow', (string) $batch->getKey(), 2)
+            ->call('approveAll')
+            ->assertHasNoErrors();
+
+        expect(Company::query()->orderBy('name')->pluck('name')->all())->toBe(['Alpha', 'Beta'])
+            ->and($batch->refresh()->status)->toBe(PendingActionStatus::Approved)
+            ->and(Task::query()->where('title', 'Review')->exists())->toBeTrue();
+    });
+
+    it('rejects the left-out rows of a batch step and approves the others', function (): void {
+        [$conversationId, $turnId] = ProposalCardFixture::startPlan($this->user);
+
+        $batch = ProposalCardFixture::planProposal(CreateCompanyTool::class, $conversationId, $turnId, [['name' => 'Alpha'], ['name' => 'Beta'], ['name' => 'Gamma']]);
+        ProposalCardFixture::planProposal(CreateTaskTool::class, $conversationId, $turnId, [['title' => 'Review']]);
+
+        Livewire::test(ProposalCard::class)
+            ->call('setActive', $batch->getKey())
+            ->call('toggleLeftOutRow', (string) $batch->getKey(), 1)
+            ->call('approveAll')
+            ->assertDispatched('proposal:resolved', pendingActionId: (string) $batch->getKey(), index: 1, decision: 'rejected');
+
+        expect(Company::query()->orderBy('name')->pluck('name')->all())->toBe(['Alpha', 'Gamma'])
+            ->and($batch->refresh()->status)->toBe(PendingActionStatus::Approved)
+            ->and($batch->result_data['items'][1]['status'])->toBe('rejected');
     });
 });
 

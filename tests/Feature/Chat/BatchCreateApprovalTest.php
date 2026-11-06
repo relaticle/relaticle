@@ -13,10 +13,12 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Laravel\Pennant\Feature;
+use Livewire\Livewire;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Events\PendingActionResolved;
+use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\ProposalEditor;
@@ -101,6 +103,38 @@ it('approves one batch item without creating the others and stays pending', func
     expect($fresh->status)->toBe(PendingActionStatus::Pending)
         ->and($fresh->result_data['items']['0']['status'])->toBe('approved')
         ->and($fresh->result_data['ids'])->toHaveCount(1);
+});
+
+it('approves every row of a standalone batch except left-out rows', function (): void {
+    $action = makeBatchProposal($this->convId, $this->user, [
+        ['title' => 'Row A'], ['title' => 'Row B'], ['title' => 'Row C'],
+    ]);
+
+    Livewire::test(ProposalCard::class)
+        ->call('setActive', $action->getKey())
+        ->call('toggleLeftOutRow', (string) $action->getKey(), 1)
+        ->call('createCurrent')
+        ->assertSet('pendingActionId', null);
+
+    $fresh = $action->fresh();
+
+    expect(Task::query()->where('workspace_id', $this->user->currentWorkspace->getKey())->pluck('title')->sort()->values()->all())->toBe(['Row A', 'Row C'])
+        ->and($fresh->status)->toBe(PendingActionStatus::Approved)
+        ->and($fresh->result_data['items']['1']['status'])->toBe('rejected');
+});
+
+it('rejects a standalone batch when every row is left out', function (): void {
+    $action = makeBatchProposal($this->convId, $this->user, [['title' => 'Row A'], ['title' => 'Row B']]);
+
+    Livewire::test(ProposalCard::class)
+        ->call('setActive', $action->getKey())
+        ->call('toggleLeftOutRow', (string) $action->getKey(), 0)
+        ->call('toggleLeftOutRow', (string) $action->getKey(), 1)
+        ->call('createCurrent')
+        ->assertSet('pendingActionId', null);
+
+    expect($action->fresh()->status)->toBe(PendingActionStatus::Rejected)
+        ->and(Task::query()->where('workspace_id', $this->user->currentWorkspace->getKey())->count())->toBe(0);
 });
 
 it('finalizes the batch without dispatching a continuation after the last item resolves', function (): void {

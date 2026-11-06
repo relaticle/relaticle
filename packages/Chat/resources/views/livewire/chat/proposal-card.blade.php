@@ -2,20 +2,16 @@
     $operation = $proposal?->operation->value;
     $stepCount = count($steps);
     // A plan's footer decides every remaining step at once, and says so with a
-    // count. A standalone card (single record, or a paginated batch showing one
-    // record at a time) decides exactly the record on screen, so its labels are
-    // singular: the card can never commit anything that is not rendered.
-    $isBatch = ! $isPlan && ($steps[0]['isBatch'] ?? false);
+    // count of records. A standalone card decides its one proposal.
     $primaryLabel = $isPlan
-        ? trans_choice('Approve :count step|Approve all :count', $approveAllCount, ['count' => $approveAllCount])
+        ? trans_choice('Approve :count step|Approve all :count', $approvableRecordCount, ['count' => $approvableRecordCount])
         : ($proposal?->entity_type->action($proposal->operation) ?? \Relaticle\Chat\Enums\PendingActionOperation::Create->action());
     $primaryAction = $isPlan ? 'approveAll' : 'createCurrent';
-    $showPrimary = ! $isPlan || $approveAllCount > 0;
+    $showPrimary = ! $isPlan || $approvableRecordCount > 0;
     $primaryIsSend = ! $isPlan && ($steps[0]['needsOwnApproval'] ?? false);
     $discardLabel = $isPlan ? __('Discard all') : __('Discard');
     $discardAction = $isPlan ? 'discardAll' : 'discardCurrent';
     $isDestructive = $operation === 'delete' && ! $isPlan;
-    $activePosition = $steps[0]['activeItemPosition'] ?? 1;
     $isWebAccess = ! $isPlan && ($steps[0]['entity_type'] ?? null) === \Relaticle\Chat\Enums\ProposalEntity::WebAccess->value;
 
     // Every change of an update unchecked: approving would write nothing, so
@@ -84,46 +80,9 @@
             @enderror
 
             {{-- Footer: the decision. Separated by a hairline so it reads as one
-                 deliberate step. Styled after the Attio reference (user-directed,
-                 2026-08): pagination on the left for a batch, then a plain-text
-                 discard and a brand-colored confirm, with the genuinely
-                 destructive delete in red. Both buttons decide only the record
-                 on screen. --}}
+                 deliberate step: a plain-text discard and a brand-colored confirm,
+                 with the genuinely destructive delete in red. --}}
             <div class="flex shrink-0 items-center gap-2 border-t border-gray-100 px-4 py-2 dark:border-white/5">
-                @if ($isBatch && $remainingCount > 1)
-                    {{-- Attio-style pagination over the still-undecided records.
-                         Arrows clamp at the ends; deciding a record advances
-                         automatically. aria-live announces the position as it
-                         changes. --}}
-                    <div class="flex items-center gap-1 text-xs font-medium tabular-nums text-gray-500 dark:text-gray-400">
-                        <button
-                            type="button"
-                            wire:click="prevItem"
-                            wire:loading.attr="disabled"
-                            @disabled($activePosition <= 1)
-                            aria-label="{{ __('Previous record') }}"
-                            title="{{ __('Previous record') }}"
-                            class="inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-200 dark:disabled:hover:bg-transparent"
-                        >
-                            <x-heroicon-m-chevron-left class="h-3.5 w-3.5" aria-hidden="true" />
-                        </button>
-
-                        <span aria-live="polite" class="select-none px-0.5">{{ $activePosition }}/{{ $remainingCount }}</span>
-
-                        <button
-                            type="button"
-                            wire:click="nextItem"
-                            wire:loading.attr="disabled"
-                            @disabled($activePosition >= $remainingCount)
-                            aria-label="{{ __('Next record') }}"
-                            title="{{ __('Next record') }}"
-                            class="inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-200 dark:disabled:hover:bg-transparent"
-                        >
-                            <x-heroicon-m-chevron-right class="h-3.5 w-3.5" aria-hidden="true" />
-                        </button>
-                    </div>
-                @endif
-
                 <div class="ms-auto flex items-center gap-2">
                 <button
                     type="button"
