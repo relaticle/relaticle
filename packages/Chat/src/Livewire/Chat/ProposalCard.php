@@ -500,9 +500,8 @@ final class ProposalCard extends BaseLivewireComponent
 
     /**
      * Per-request memo for the plan's steps. stepViews() walks every step and each
-     * walk re-read the whole plan (once for unmetDependencies, once more per
-     * dependency through stepPosition), so a three-step plan issued the plan query
-     * roughly a dozen times per dock render. Livewire builds a fresh component per
+     * walk re-read the whole plan, so a three-step plan issued the plan query
+     * many times per dock render. Livewire builds a fresh component per
      * request, so this never outlives one round trip, but it does have to be
      * dropped after a resolve inside the same request: render() runs after
      * approveAll()/discardAll() and would otherwise paint the pre-decision list.
@@ -520,8 +519,7 @@ final class ProposalCard extends BaseLivewireComponent
 
     /**
      * Every step of the plan, decided or not, in order. Approved steps have to
-     * stay visible here: unmetDependencies() reads this list to tell an approved
-     * dependency from a missing one.
+     * stay visible here: a dependency that is approved is not a missing one.
      *
      * @return list<PendingAction>
      */
@@ -589,7 +587,6 @@ final class ProposalCard extends BaseLivewireComponent
     private function stepView(PendingAction $step, int $position, array $pendingIds): array
     {
         $entity = $step->entity_type;
-        $blockedBy = resolve(ProposalPlanService::class)->unmetDependencies($step, $this->planAllSteps());
 
         return [
             'id' => (string) $step->getKey(),
@@ -607,7 +604,6 @@ final class ProposalCard extends BaseLivewireComponent
             'recordCount' => $this->recordCountOf($step),
             'remainingCount' => $this->remainingCountOf($step),
             'items' => $this->batchItemViews($step),
-            'blockedBy' => $this->sortedPositions($blockedBy),
             'excludableCodes' => $this->excludableCodesOf($step),
             'titleKey' => $entity->titleKey(),
             'titleLabel' => $entity->titleLabel(),
@@ -678,35 +674,6 @@ final class ProposalCard extends BaseLivewireComponent
 
             return $text !== '' && $text !== '(none)' && $text !== __('(none)');
         }));
-    }
-
-    /**
-     * Step positions in plan order, so a hint reads "after steps 1, 2".
-     *
-     * @param  list<PendingAction>  $steps
-     * @return list<int>
-     */
-    private function sortedPositions(array $steps): array
-    {
-        $positions = array_map($this->stepPosition(...), $steps);
-
-        sort($positions);
-
-        return $positions;
-    }
-
-    /**
-     * 1-based position of a step within the plan's undecided steps.
-     */
-    private function stepPosition(PendingAction $step): int
-    {
-        foreach ($this->planSteps() as $index => $candidate) {
-            if ((string) $candidate->getKey() === (string) $step->getKey()) {
-                return $index + 1;
-            }
-        }
-
-        return 1;
     }
 
     private function stepSummary(PendingAction $step): string
@@ -931,14 +898,14 @@ final class ProposalCard extends BaseLivewireComponent
     #[On('proposal:create-current')]
     public function createCurrentFromShortcut(string $context = 'conversation'): void
     {
-        if ($context !== $this->context) {
+        if ($context !== $this->context || $this->primaryIsRisky()) {
             return;
         }
 
         $step = $this->loadStep($this->activeStepId());
 
         if (count($this->planSteps()) > 1 || ($step instanceof PendingAction && ProposalPayload::from($step)->isBatch && ! $step->needsOwnApproval())) {
-            if ($this->approvableRecordCount() > 0 && ! $this->primaryIsRisky()) {
+            if ($this->approvableRecordCount() > 0) {
                 $this->approveAll(resolve(ProposalPlanService::class));
             }
 

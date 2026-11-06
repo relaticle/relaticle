@@ -48,9 +48,6 @@ describe('plan card', function (): void {
             ->and(array_column($steps, 'position'))->toBe([1, 2, 3])
             ->and(array_column($steps, 'entity_type'))->toBe(['company', 'people', 'task'])
             ->and(array_column($steps, 'recordLabel'))->toBe(['Northwind Traders', 'Priya Raman', 'Call Priya'])
-            ->and($steps[0]['blockedBy'])->toBe([])
-            ->and($steps[1]['blockedBy'])->toBe([1])
-            ->and($steps[2]['blockedBy'])->toBe([2])
             ->and($steps[1]['isActive'])->toBeFalse()
             ->and($steps[0]['isActive'])->toBeTrue();
     });
@@ -462,6 +459,28 @@ describe('the change list', function (): void {
             ->assertSeeText('These 3 people are left out, so this task is left out too. It links to them.')
             ->assertSeeText('Keep these 3 people');
     });
+
+    it('names the nearest left-out step on the chain and keeps that step from the note', function (array $leftOut, string $note, string $keep, int $toggles): void {
+        $steps = ProposalCardFixture::planSteps($this->user);
+        $ids = array_map(static fn (PendingAction $step): string => (string) $step->getKey(), $steps);
+
+        $card = Livewire::test(ProposalCard::class)->call('setActive', $steps[0]->getKey());
+
+        foreach ($leftOut as $position) {
+            $card->call('toggleLeftOut', $ids[$position]);
+        }
+
+        preg_match_all('/<p[^>]*data-proposal-left-out-note.*?<\/p>/s', $card->html(), $notes);
+        $taskNote = last($notes[0]);
+
+        expect($taskNote)->toContain("{$note} is left out, so this task is left out too. It links to {$note}.")
+            ->and(trim(strip_tags(substr($taskNote, (int) strrpos($taskNote, '<button')))))->toBe("Keep {$keep}")
+            ->and($taskNote)->toContain($ids[$toggles])
+            ->and(array_filter(array_diff_key($ids, [$toggles => true]), static fn (string $id): bool => str_contains($taskNote, $id)))->toBe([]);
+    })->with([
+        'only the first step left out' => [[0], 'Priya Raman', 'Northwind Traders', 0],
+        'the first and the middle step left out' => [[0, 1], 'Priya Raman', 'Priya Raman', 1],
+    ]);
 
     it('gives a linked row its x back once the step that links to it is left out', function (): void {
         [$conversationId, $turnId] = ProposalCardFixture::startPlan($this->user);

@@ -504,6 +504,19 @@ it('words a delete as the count it deletes and gives it no shortcut', function (
         ->assertDontSeeHtml('<kbd');
 });
 
+it('deletes nothing when the shortcut event reaches a single delete card', function (): void {
+    $task = Task::factory()->for($this->workspace)->create();
+    app(DeleteTaskTool::class)->handle(new Request(['ids' => [$task->getKey()]]));
+    $action = PendingAction::query()->where('user_id', $this->user->getKey())->firstOrFail();
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->dispatch('proposal:create-current', context: 'conversation');
+
+    expect($action->fresh()->status)->toBe(PendingActionStatus::Pending)
+        ->and(Task::query()->whereKey($task->getKey())->exists())->toBeTrue();
+});
+
 it('stacks an old and new value that are longer than 28 characters together', function (): void {
     $action = ProposalCardFixture::proposal($this->user,
         ['name' => 'Acme Corp'],

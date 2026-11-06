@@ -1952,6 +1952,16 @@ describe('a saved draft or a queued email', function (): void {
             ->assertSeeHtml('bg-red-600');
     });
 
+    it('deletes no draft when the shortcut event reaches the delete card', function (): void {
+        $draft = ($this->draftOf)($this->viewer, $this->viewerAccount);
+        $card = pendingChatEmail(proposeChatEmails($this->viewer, DeleteEmailDraftTool::class, [['draft_id' => $draft->getKey()]]));
+
+        openChatEmailDock($card)->dispatch('proposal:create-current', context: 'conversation');
+
+        expect($card->fresh()->status)->toBe(PendingActionStatus::Pending)
+            ->and(Email::query()->whereKey($draft->getKey())->exists())->toBeTrue();
+    });
+
     it('cancels a queued email once the card is approved', function (): void {
         $email = ($this->queued)();
 

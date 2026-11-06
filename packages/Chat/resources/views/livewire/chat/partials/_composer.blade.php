@@ -26,9 +26,8 @@
             class="mb-3"
         >
             {{-- No visible eyebrow above the card (Attio): the halo marks it as
-                 the pending decision, and the wrapper's aria-label plus this
-                 status line announce it to screen readers without taking space. --}}
-            <span class="sr-only" role="status">{{ __('Review before continuing') }}</span>
+                 the pending decision, and the wrapper's aria-label plus the locked
+                 line below announce it to screen readers. --}}
             {{-- Bounded, but NOT a scroller: the card scrolls its own steps and keeps
                  the decision buttons pinned. Scrolling here instead would push
                  Approve below the fold on any plan taller than the dock. --}}
@@ -39,6 +38,17 @@
                     wire:key="proposal-dock-{{ $context ?? 'conversation' }}"
                 />
             </div>
+        </div>
+
+        <div
+            x-show="hasPendingProposal"
+            x-cloak
+            role="status"
+            data-composer-locked
+            class="mb-2 flex h-10 items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-3 text-xs text-gray-500 dark:border-white/15 dark:bg-white/5 dark:text-gray-400"
+        >
+            <x-heroicon-o-lock-closed class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span class="truncate">{{ __('Approve or discard the proposal to keep chatting') }}</span>
         </div>
 
         @include('chat::livewire.chat.partials._banners')

@@ -52,24 +52,38 @@
         : 'editField('.\Illuminate\Support\Js::from($row['code']).', '.\Illuminate\Support\Js::from($stepId).', '.$index.')';
 @endphp
 
-@if ($pairs !== [])
+@php
+    $renderedPairs = [];
+
+    foreach ($pairs as $row) {
+        $valueHtml = view('chat::livewire.chat.partials._dock-value', ['row' => $row, 'stack' => mb_strlen((string) ($row['old'] ?? '')) + mb_strlen((string) ($row['new'] ?? $row['value'] ?? '')) > 28, 'clampable' => false, 'refLinks' => $refLinks])->render();
+
+        if (trim($valueHtml) !== '') {
+            $renderedPairs[] = ['row' => $row, 'valueHtml' => $valueHtml];
+        }
+    }
+@endphp
+
+@if ($renderedPairs !== [])
     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        @foreach ($pairs as $row)
+        @foreach ($renderedPairs as $pair)
+            @php($row = $pair['row'])
+
             @if (! $loop->first)
                 <span class="text-gray-300 dark:text-gray-600" aria-hidden="true">&middot;</span>
             @endif
 
             <span class="group/pair inline-flex min-w-0 max-w-full items-baseline gap-1.5" data-proposal-field-row>
                 <span class="shrink-0 text-xs text-gray-500 dark:text-gray-400">{{ $row['label'] ?? '' }}</span>
-                @include('chat::livewire.chat.partials._dock-value', ['row' => $row, 'stack' => mb_strlen((string) ($row['old'] ?? '')) + mb_strlen((string) ($row['new'] ?? $row['value'] ?? '')) > 28, 'clampable' => false, 'refLinks' => $refLinks])
+                {!! $pair['valueHtml'] !!}
                 @if ($editFor($row))
                     <button
                         type="button"
                         wire:click="{{ $editCall($row) }}"
-                        class="inline-flex h-5 w-5 shrink-0 items-center justify-center self-center rounded text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 sm:opacity-0 sm:group-hover/pair:opacity-100 dark:hover:bg-white/10 dark:hover:text-gray-300"
+                        class="inline-flex h-5 w-5 shrink-0 items-center justify-center self-center rounded text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 sm:-ms-1.5 sm:w-0 sm:overflow-hidden sm:opacity-0 sm:group-hover/pair:ms-0 sm:group-hover/pair:w-5 sm:group-hover/pair:opacity-100 sm:focus-visible:ms-0 sm:focus-visible:w-5 sm:focus-visible:opacity-100 dark:hover:bg-white/10 dark:hover:text-gray-300"
                         aria-label="{{ __('Edit :field', ['field' => $row['label'] ?? '']) }}"
                     >
-                        <x-heroicon-o-pencil-square class="h-3 w-3" aria-hidden="true" />
+                        <x-heroicon-o-pencil-square class="h-3 w-3 shrink-0" aria-hidden="true" />
                     </button>
                 @endif
             </span>

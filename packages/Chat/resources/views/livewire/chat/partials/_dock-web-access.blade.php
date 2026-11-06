@@ -57,6 +57,7 @@
         type="button"
         wire:click="approveStep(@js($step['id']))"
         wire:loading.attr="disabled"
+        data-proposal-shortcut
         class="inline-flex h-7 items-center gap-1.5 rounded-md bg-primary-600 px-2.5 text-xs font-medium text-white shadow-sm transition hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 motion-safe:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
     >
         <x-heroicon-o-arrow-path class="h-3 w-3 motion-safe:animate-spin" wire:loading wire:target="approveStep" aria-hidden="true" />

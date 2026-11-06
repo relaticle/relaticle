@@ -19,14 +19,20 @@
     $isLeftOut = in_array($stepId, $leftOutStepIds, true);
     $takenById = $takenBy[$stepId] ?? null;
     $isOut = $isLeftOut || $takenById !== null;
-    $linkedStep = $takenById !== null ? collect($steps)->firstWhere('id', $takenVia[$stepId] ?? $takenById) : null;
-    $linkedCount = $linkedStep === null ? 1 : ($linkedStep['isBatch'] ? count($linkedStep['items']) : 1);
-    $linkedName = match (true) {
-        $linkedStep === null => '',
-        $linkedStep['isBatch'] => $linkedCount > 1 ? '' : ($linkedStep['items'][0]['label'] ?? $linkedStep['summary']),
-        default => $linkedStep['recordLabel'] !== '' ? $linkedStep['recordLabel'] : $linkedStep['summary'],
+    $describeStep = function (?array $other): array {
+        $count = $other === null ? 1 : ($other['isBatch'] ? count($other['items']) : 1);
+        $name = match (true) {
+            $other === null => '',
+            $other['isBatch'] => $count > 1 ? '' : ($other['items'][0]['label'] ?? $other['summary']),
+            default => $other['recordLabel'] !== '' ? $other['recordLabel'] : $other['summary'],
+        };
+
+        return ['name' => $name, 'count' => $count, 'entities' => $other === null ? '' : \Illuminate\Support\Str::plural($other['entityNoun'], $count)];
     };
-    $linkedEntities = $linkedStep === null ? '' : \Illuminate\Support\Str::plural($linkedStep['entityNoun'], $linkedCount);
+    $linkedStep = $takenById !== null ? collect($steps)->firstWhere('id', $takenVia[$stepId] ?? $takenById) : null;
+    $keptStep = $takenById !== null ? collect($steps)->firstWhere('id', $takenById) : null;
+    $linked = $describeStep($linkedStep);
+    $kept = $describeStep($keptStep);
     $leftOutRowsHere = $leftOutRowIndexes[$stepId] ?? [];
 
     $skipTitle = $step['operation'] !== 'update';
@@ -131,13 +137,13 @@
 
         @if ($takenById !== null)
             <p class="mb-3 me-4 ms-[3.125rem] flex flex-wrap items-baseline gap-x-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-inset ring-amber-200 dark:bg-amber-400/10 dark:text-amber-300 dark:ring-amber-400/20" data-proposal-left-out-note>
-                <span>{{ trans_choice(':name is left out, so this :entity is left out too. It links to :name.|These :count :entities are left out, so this :entity is left out too. It links to them.', $linkedCount, ['name' => $linkedName, 'entity' => $step['entityNoun'], 'count' => $linkedCount, 'entities' => $linkedEntities]) }}</span>
+                <span>{{ trans_choice(':name is left out, so this :entity is left out too. It links to :name.|These :count :entities are left out, so this :entity is left out too. It links to them.', $linked['count'], ['name' => $linked['name'], 'entity' => $step['entityNoun'], 'count' => $linked['count'], 'entities' => $linked['entities']]) }}</span>
                 <button
                     type="button"
                     wire:click="toggleLeftOut(@js($takenById))"
                     wire:loading.attr="disabled"
                     class="font-medium underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600"
-                >{{ trans_choice('Keep :name|Keep these :count :entities', $linkedCount, ['name' => $linkedName, 'count' => $linkedCount, 'entities' => $linkedEntities]) }}</button>
+                >{{ trans_choice('Keep :name|Keep these :count :entities', $kept['count'], ['name' => $kept['name'], 'count' => $kept['count'], 'entities' => $kept['entities']]) }}</button>
             </p>
         @endif
 
