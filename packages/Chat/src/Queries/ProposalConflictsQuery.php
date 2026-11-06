@@ -35,7 +35,11 @@ final readonly class ProposalConflictsQuery
      */
     public function forSteps(User $user, array $steps): array
     {
-        $targets = $this->targets($steps);
+        $targets = $this->targets(array_values(array_filter(
+            $steps,
+            fn (PendingAction $step): bool => (string) $step->user_id === (string) $user->getKey()
+                && (string) $step->workspace_id === (string) $user->current_workspace_id,
+        )));
 
         if ($targets === []) {
             return [];
