@@ -56,12 +56,12 @@
             <div>
                 <h2 class="font-display text-base font-semibold tracking-tight text-gray-950 dark:text-white">{{ __('Using Relaticle, not building on it?') }}</h2>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    {{ __('The help centre covers the day-to-day: records, pipelines, imports, and team access.') }}
+                    {{ __('The help center covers the day-to-day: records, pipelines, imports, and team access.') }}
                 </p>
             </div>
             <div class="mt-4 shrink-0 sm:mt-0">
                 <x-cloud::marketing.button variant="secondary" size="sm" href="{{ route('help.index') }}" icon-trailing="ri-arrow-right-line">
-                    {{ __('Visit the help centre') }}
+                    {{ __('Visit the help center') }}
                 </x-cloud::marketing.button>
             </div>
         </section>
