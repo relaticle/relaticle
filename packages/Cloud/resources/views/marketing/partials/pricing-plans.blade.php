@@ -40,7 +40,7 @@
                     </x-cloud::marketing.button>
                     <p class="mt-3 text-center text-sm text-gray-500 dark:text-gray-400">
                         {{ $isScale
-                            ? __('Starts as a :days-day Cloud Pro trial. Switch plans in Billing.', ['days' => \App\Models\Workspace::PRO_TRIAL_DAYS])
+                            ? __('Starts as a :days-day Cloud Pro trial.', ['days' => \App\Models\Workspace::PRO_TRIAL_DAYS])
                             : __(':days-day trial, no card.', ['days' => \App\Models\Workspace::PRO_TRIAL_DAYS]) }}
                     </p>
                 </div>

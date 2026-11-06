@@ -84,7 +84,7 @@ return [
     'per_month' => '/ month',
     'pro_plan' => [
         'tagline' => 'For teams that put AI to work',
-        'pricing_tagline' => 'For one person selling to a named list',
+        'pricing_tagline' => 'For one seller with a named list',
         'features' => [
             'Unlimited users and records',
             '2,000 AI credits / month',
@@ -96,7 +96,7 @@ return [
     ],
     'scale_plan' => [
         'tagline' => 'For teams that run on Relaticle all day',
-        'pricing_tagline' => 'For a team working one pipeline all day',
+        'pricing_tagline' => 'For a team working one pipeline',
         'badge' => 'Recommended',
         'includes' => 'Everything in Cloud Pro, plus',
         'features' => [
@@ -158,7 +158,7 @@ return [
         'title' => 'Enterprise plan',
         'body' => 'Your plan is managed by Relaticle. Contact us for changes.',
         'tagline' => 'We build it around how you work.',
-        'pricing_tagline' => 'For a rollout with integrations and a timeline',
+        'pricing_tagline' => 'For a rollout with integrations',
         'starting_price' => 'From $:price / year',
         'billing' => 'Billed yearly · never per seat',
         'includes' => 'Everything in Cloud Scale, plus',

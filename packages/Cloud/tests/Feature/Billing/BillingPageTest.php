@@ -953,7 +953,7 @@ it('keeps the buyer-naming pricing taglines out of the plan picker', function ()
 
     livewire(Billing::class)
         ->assertSee(__('cloud::billing.pro_plan.tagline'))
-        ->assertDontSee('For one person selling to a named list');
+        ->assertDontSee('For one seller with a named list');
 });
 
 it('does not offer Enterprise purchases to workspace members', function (): void {

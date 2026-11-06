@@ -36,7 +36,8 @@ it('shows the pro tier when billing is on', function (): void {
         ->assertSee('Prefer to self-host? It’s free.')
         ->assertSee('Start for free')
         ->assertSee('14-day trial, no card.')
-        ->assertSee('Starts as a 14-day Cloud Pro trial. Switch plans in Billing.')
+        ->assertSee('Starts as a 14-day Cloud Pro trial.')
+        ->assertDontSee('Switch plans in Billing.')
         ->assertDontSee('One workspace price as your workspace grows')
         ->assertDontSee('300 AI credits')
         ->assertDontSee('Generous free tier');
@@ -253,9 +254,9 @@ it('names the buyer each plan is for on the pricing page', function (): void {
 
     $this->get('/pricing')
         ->assertOk()
-        ->assertSee('For one person selling to a named list')
-        ->assertSee('For a team working one pipeline all day')
-        ->assertSee('For a rollout with integrations and a timeline');
+        ->assertSee('For one seller with a named list')
+        ->assertSee('For a team working one pipeline')
+        ->assertSee('For a rollout with integrations');
 });
 
 it('emits accurate product json-ld offers when billing is off', function (): void {
