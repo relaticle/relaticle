@@ -16,7 +16,6 @@ use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
-use App\Models\CustomFieldValue;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
@@ -149,18 +148,17 @@ final class TasksBoard extends BoardResourcePage
     {
         return $entry?->columnSpanFull()
             ->html(false)
+            ->state(fn (Task $record): string => Str::limit(PlainText::fromHtml($this->descriptionHtml($record))))
             ->visible(fn (?string $state): bool => filled($state))
-            ->formatStateUsing(fn (Task $record): string => Str::limit(PlainText::fromHtml($this->descriptionHtml($record) ?? '')))
             ->extraAttributes(['class' => 'mb-4']);
     }
 
-    private function descriptionHtml(Task $record): ?string
+    private function descriptionHtml(Task $record): string
     {
-        $description = $record->customFieldValues
-            ->first(fn (CustomFieldValue $value): bool => $value->customField instanceof CustomField && $value->customField->holdsChecklists())
-            ?->getValue();
+        $field = self::descriptionCustomField();
+        $description = $field instanceof CustomField ? $record->getCustomFieldValue($field) : null;
 
-        return is_string($description) ? $description : null;
+        return is_string($description) ? $description : '';
     }
 
     private function checklistProgressEntry(): TextEntry
@@ -173,8 +171,7 @@ final class TasksBoard extends BoardResourcePage
             ->grow(false)
             ->extraAttributes(['data-checklist-progress' => ''])
             ->state(function (Task $record): ?string {
-                $description = $this->descriptionHtml($record);
-                $progress = $description === null ? null : ChecklistHtml::progress($description);
+                $progress = ChecklistHtml::progress($this->descriptionHtml($record));
 
                 return $progress === null ? null : "{$progress['checked']}/{$progress['total']}";
             })
@@ -360,6 +357,15 @@ final class TasksBoard extends BoardResourcePage
     private function ownsColumn(string $id): bool
     {
         return $this->statuses()->contains(fn (array $status): bool => (string) $status['id'] === $id);
+    }
+
+    private static function descriptionCustomField(): ?CustomField
+    {
+        /** @var CustomField|null */
+        return once(fn () => CustomField::query()
+            ->forEntity(Task::class)
+            ->where('code', TaskCustomField::DESCRIPTION)
+            ->first());
     }
 
     private static function statusCustomField(): ?CustomField
