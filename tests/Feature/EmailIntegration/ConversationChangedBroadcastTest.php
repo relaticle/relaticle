@@ -5,11 +5,13 @@ declare(strict_types=1);
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Illuminate\Broadcasting\BroadcastManager;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Relaticle\EmailIntegration\Actions\PurgeStoredMailboxData;
 use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
 use Relaticle\EmailIntegration\Actions\StoreEmailAction;
 use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
@@ -17,15 +19,18 @@ use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Events\ConversationChanged;
+use Relaticle\EmailIntegration\Jobs\MergeConversations;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\WorkspaceEmailBlocklist;
+use Relaticle\EmailIntegration\Queries\ConversationsQuery;
 
 use function Pest\Laravel\actingAs;
 use function Pest\Laravel\postJson;
 
-mutates(ConversationChanged::class, RefreshConversationSummary::class, UpdateEmailSharingAction::class);
+mutates(ConversationChanged::class, RefreshConversationSummary::class, UpdateEmailSharingAction::class, ConversationsQuery::class, PurgeStoredMailboxData::class, MergeConversations::class);
 
 beforeEach(function (): void {
     $this->alice = User::factory()->withWorkspace()->create();
@@ -215,4 +220,69 @@ it('refuses another member the user channel', function (): void {
         'socket_id' => '1234.5678',
         'channel_name' => "private-App.Models.User.{$this->bob->id}",
     ])->assertOk();
+});
+
+/**
+ * @return list<string>
+ */
+function conversationChangedAudienceOf(string $conversationKey): array
+{
+    $event = Event::dispatched(ConversationChanged::class, fn (ConversationChanged $event): bool => $event->conversationKey === $conversationKey)->last()[0];
+
+    return collect($event->broadcastOn())->map(fn (PrivateChannel $channel): string => $channel->name)->sort()->values()->all();
+}
+
+it('signals a teammate whose share is revoked', function (): void {
+    $this->mailbox->update(['sharing_tier' => EmailPrivacyTier::PRIVATE]);
+    $email = conversationChangedStore($this->mailbox);
+    resolve(UpdateEmailSharingAction::class)->execute($email->fresh(), $this->alice, EmailPrivacyTier::PRIVATE, [
+        ['shared_with' => $this->carol->id, 'tier' => EmailPrivacyTier::SUBJECT],
+    ]);
+
+    Event::fake([ConversationChanged::class]);
+
+    resolve(UpdateEmailSharingAction::class)->execute($email->fresh(), $this->alice, EmailPrivacyTier::PRIVATE, []);
+
+    expect(conversationChangedAudience())->toBe(conversationChangedChannels($this->alice, $this->carol));
+});
+
+it('signals the members who saw a conversation whose last copy is purged', function (): void {
+    $carolMailbox = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->carol->id,
+        'email_address' => 'carol@acme.test',
+        'status' => 'active',
+        'sharing_tier' => EmailPrivacyTier::METADATA_ONLY,
+    ]));
+    $email = conversationChangedStore($carolMailbox);
+
+    Event::fake([ConversationChanged::class]);
+
+    $this->carol->delete();
+
+    expect(Email::query()->withoutGlobalScopes()->whereKey($email->id)->exists())->toBeFalse()
+        ->and(conversationChangedAudienceOf((string) $email->conversation_key))->toBe(conversationChangedChannels($this->alice, $this->bob));
+});
+
+it('signals the audience of a conversation absorbed by a merge', function (): void {
+    $message = fn (string $key, string $rfc, ?string $inReplyTo, CarbonImmutable $sentAt): Email => Email::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->alice->id,
+        'connected_account_id' => $this->mailbox->id,
+        'conversation_key' => $key,
+        'rfc_message_id' => $rfc,
+        'in_reply_to' => $inReplyTo,
+        'direction' => EmailDirection::INBOUND,
+        'status' => EmailStatus::SYNCED,
+        'sent_at' => $sentAt,
+    ]);
+    $message('conv-parent', '<parent@airbnb.com>', null, now()->subDay());
+    $reply = $message('conv-reply', '<reply@airbnb.com>', '<parent@airbnb.com>', now());
+
+    Event::fake([ConversationChanged::class]);
+
+    dispatch_sync(new MergeConversations($this->workspace->id, $reply->id));
+
+    expect($reply->fresh()->conversation_key)->toBe('conv-parent')
+        ->and(conversationChangedAudienceOf('conv-reply'))->toBe(conversationChangedChannels($this->alice));
 });

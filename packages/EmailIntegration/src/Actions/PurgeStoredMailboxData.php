@@ -15,9 +15,12 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailThread;
+use Relaticle\EmailIntegration\Queries\ConversationsQuery;
 
 final readonly class PurgeStoredMailboxData
 {
+    public function __construct(private ConversationsQuery $conversations) {}
+
     private const int FILES_PER_DELETE = 500;
 
     private const int CONVERSATIONS_PER_JOB = 200;
@@ -50,9 +53,9 @@ final readonly class PurgeStoredMailboxData
                 $disk->deleteDirectory(EmailAttachment::composeImagesDirectory((string) $owner->getKey()));
             }
 
-            foreach ($conversations as $workspaceId => $keys) {
-                foreach (array_chunk($keys, self::CONVERSATIONS_PER_JOB) as $chunk) {
-                    dispatch(new RefreshConversationSummaries((string) $workspaceId, $chunk));
+            foreach ($conversations as $workspaceId => $chunks) {
+                foreach ($chunks as [$chunk, $audiences]) {
+                    dispatch(new RefreshConversationSummaries((string) $workspaceId, $chunk, $audiences));
                 }
             }
         });
@@ -72,7 +75,8 @@ final readonly class PurgeStoredMailboxData
             ->orWhereIn('connected_account_id', $this->mailboxes($owner)->select('id')));
     }
 
-    /** @return array<string, list<string>> conversation keys by workspace */
+    // Read before the rows go, so the members who lose a conversation still hear that it changed.
+    /** @return array<string, list<array{0: list<string>, 1: array<string, list<string>>}>> key chunks and their audiences by workspace */
     private function conversations(User $user): array
     {
         $keys = [];
@@ -82,7 +86,15 @@ final readonly class PurgeStoredMailboxData
             $keys[$conversation->workspace_id][] = $conversation->conversation_key;
         }
 
-        return $keys;
+        $chunks = [];
+
+        foreach ($keys as $workspaceId => $workspaceKeys) {
+            foreach (array_chunk($workspaceKeys, self::CONVERSATIONS_PER_JOB) as $chunk) {
+                $chunks[$workspaceId][] = [$chunk, $this->conversations->audiences((string) $workspaceId, $chunk)];
+            }
+        }
+
+        return $chunks;
     }
 
     private function deleteThreadSummaries(User $user): void

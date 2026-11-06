@@ -14,6 +14,7 @@ use Illuminate\Queue\Attributes\UniqueFor;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Queries\ConversationsQuery;
 use Relaticle\EmailIntegration\Services\ConversationKeyResolver;
 
 #[Queue('emails-sync')]
@@ -41,9 +42,7 @@ final class MergeConversations implements ShouldBeUniqueUntilProcessing, ShouldQ
             $keys = DB::transaction(function () use ($resolver, $refresh): array {
                 $keys = $this->mergeLinkedKeys($resolver);
 
-                foreach ($keys as $key) {
-                    $refresh->execute($this->workspaceId, $key, $this->broadcast);
-                }
+                $this->refreshMerged($keys, $refresh);
 
                 return $keys;
             });
@@ -71,11 +70,22 @@ final class MergeConversations implements ShouldBeUniqueUntilProcessing, ShouldQ
                 ->update(['conversation_key' => $survivor]);
 
             if ($moved > 0) {
-                foreach ([$survivor, ...$absorbed] as $key) {
-                    $refresh->execute($this->workspaceId, $key, $this->broadcast);
-                }
+                $this->refreshMerged([$survivor, ...$absorbed], $refresh);
             }
         });
+    }
+
+    // An absorbed key's copies now sit under the survivor, so whoever saw them sees the survivor.
+    /** @param  list<string>  $keys  the surviving key first */
+    private function refreshMerged(array $keys, RefreshConversationSummary $refresh): void
+    {
+        $previousAudience = $this->broadcast && count($keys) > 1
+            ? resolve(ConversationsQuery::class)->audience($this->workspaceId, $keys[0])
+            : [];
+
+        foreach ($keys as $index => $key) {
+            $refresh->execute($this->workspaceId, $key, $this->broadcast, $index === 0 ? [] : $previousAudience);
+        }
     }
 
     /** @return list<string> the surviving key first, then the keys it absorbed */

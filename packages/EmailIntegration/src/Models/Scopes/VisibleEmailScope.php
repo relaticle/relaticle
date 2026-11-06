@@ -34,12 +34,18 @@ final readonly class VisibleEmailScope implements Scope
     private bool $appliesWorkspaceBlocklist;
 
     // Builders apply a scope once per compile, so the rule lookups run here, once per query.
-    public function __construct(private User $viewer)
+    public function __construct(private User $viewer, ?bool $appliesMailboxBlocklist = null, ?bool $appliesWorkspaceBlocklist = null)
     {
         $workspaceId = $viewer->current_workspace_id;
 
-        $this->appliesMailboxBlocklist = self::appliesMailboxBlocklist($workspaceId);
-        $this->appliesWorkspaceBlocklist = self::appliesWorkspaceBlocklist($workspaceId);
+        $this->appliesMailboxBlocklist = $appliesMailboxBlocklist ?? self::appliesMailboxBlocklist($workspaceId);
+        $this->appliesWorkspaceBlocklist = $appliesWorkspaceBlocklist ?? self::appliesWorkspaceBlocklist($workspaceId);
+    }
+
+    /** @return self<Model> */
+    public function forTeammate(User $teammate): self
+    {
+        return new self($teammate, $this->appliesMailboxBlocklist, $this->appliesWorkspaceBlocklist);
     }
 
     /**

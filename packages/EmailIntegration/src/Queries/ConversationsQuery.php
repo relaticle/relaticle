@@ -124,6 +124,72 @@ final readonly class ConversationsQuery
     }
 
     /**
+     * Members active in the workspace who may see the conversation, plus those named in $alsoNotify.
+     *
+     * @param  list<string>  $alsoNotify
+     * @return list<string>
+     */
+    public function audience(string $workspaceId, string $conversationKey, array $alsoNotify = []): array
+    {
+        $members = $this->activeMembers($workspaceId);
+        $seeing = $this->seeing($members, [$conversationKey])[$conversationKey] ?? [];
+
+        return array_values($members
+            ->map(fn (User $member): string => (string) $member->getKey())
+            ->filter(fn (string $id): bool => in_array($id, $seeing, true) || in_array($id, $alsoNotify, true))
+            ->all());
+    }
+
+    /**
+     * @param  list<string>  $conversationKeys
+     * @return array<string, list<string>> member ids by conversation key
+     */
+    public function audiences(string $workspaceId, array $conversationKeys): array
+    {
+        return $conversationKeys === [] ? [] : $this->seeing($this->activeMembers($workspaceId), $conversationKeys);
+    }
+
+    /** @return Collection<int, User> */
+    private function activeMembers(string $workspaceId): Collection
+    {
+        // The visibility scope binds the viewer's current workspace, so a member active elsewhere cannot be checked.
+        return User::query()
+            ->inWorkspace($workspaceId)
+            ->where('current_workspace_id', $workspaceId)
+            ->with('currentWorkspace')
+            ->get()
+            ->filter(fn (User $member): bool => Gate::forUser($member)->allows('viewAny', Email::class))
+            ->values()
+            ->toBase();
+    }
+
+    /**
+     * @param  Collection<int, User>  $members
+     * @param  list<string>  $conversationKeys
+     * @return array<string, list<string>>
+     */
+    private function seeing(Collection $members, array $conversationKeys): array
+    {
+        $seeing = [];
+        $visible = null;
+
+        foreach ($members as $member) {
+            $visible = $visible?->forTeammate($member) ?? new VisibleEmailScope($member);
+            $keys = $this->visibleCopiesOf($member, $visible, new ConversationFilters)
+                ->whereIn('emails.conversation_key', $conversationKeys)
+                ->toBase()
+                ->distinct()
+                ->pluck('emails.conversation_key');
+
+            foreach ($keys as $key) {
+                $seeing[(string) $key][] = (string) $member->getKey();
+            }
+        }
+
+        return $seeing;
+    }
+
+    /**
      * @param  VisibleEmailScope<Model>  $visible
      */
     private function cappedCount(User $viewer, VisibleEmailScope $visible, ConversationView $view, ConversationFilters $filters): BaseBuilder

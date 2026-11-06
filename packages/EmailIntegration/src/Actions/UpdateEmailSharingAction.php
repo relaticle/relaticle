@@ -12,11 +12,15 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Events\ConversationChanged;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Notifications\EmailSharedNotification;
+use Relaticle\EmailIntegration\Queries\ConversationsQuery;
 use Relaticle\EmailIntegration\Services\EmailSharingService;
 
 final readonly class UpdateEmailSharingAction
 {
-    public function __construct(private EmailSharingService $sharingService) {}
+    public function __construct(
+        private EmailSharingService $sharingService,
+        private ConversationsQuery $conversations,
+    ) {}
 
     /**
      * @param  array<int, array{shared_with: string|int|array<int, string|int>, tier: string|EmailPrivacyTier}>  $shares
@@ -25,6 +29,10 @@ final readonly class UpdateEmailSharingAction
     {
         // Defense in depth: only the email owner may change its sharing, regardless of caller.
         abort_unless($email->user_id === $sharer->getKey(), 403);
+
+        $previousAudience = filled($email->conversation_key)
+            ? $this->conversations->audience($email->workspace_id, $email->conversation_key)
+            : [];
 
         $newlyGranted = DB::transaction(function () use ($email, $sharer, $tier, $shares): Collection {
             Email::query()->withoutGlobalScopes()->whereKey($email->getKey())->lockForUpdate()->first(['id']);
@@ -41,7 +49,7 @@ final readonly class UpdateEmailSharingAction
         });
 
         if (filled($email->conversation_key)) {
-            event(new ConversationChanged($email->workspace_id, $email->conversation_key));
+            event(new ConversationChanged($email->workspace_id, $email->conversation_key, $previousAudience));
         }
 
         $newlyGranted->each(fn (User $recipient) => $recipient->notify(

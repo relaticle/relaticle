@@ -17,17 +17,21 @@ final class RefreshConversationSummaries implements ShouldQueue
 {
     use Queueable;
 
-    /** @param  list<string>  $conversationKeys */
+    /**
+     * @param  list<string>  $conversationKeys
+     * @param  array<string, list<string>>  $previousAudiences
+     */
     public function __construct(
         public readonly string $workspaceId,
         public readonly array $conversationKeys,
+        public readonly array $previousAudiences = [],
     ) {}
 
     public function handle(CurrentWorkspace $currentWorkspace, RefreshConversationSummary $refresh): void
     {
         $currentWorkspace->within($this->workspaceId, function () use ($refresh): void {
             foreach ($this->conversationKeys as $conversationKey) {
-                $refresh->execute($this->workspaceId, $conversationKey);
+                $refresh->execute($this->workspaceId, $conversationKey, alsoNotify: $this->previousAudiences[$conversationKey] ?? []);
             }
         });
     }

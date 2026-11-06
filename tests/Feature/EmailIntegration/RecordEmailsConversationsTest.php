@@ -11,7 +11,6 @@ use App\Models\CustomField;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
@@ -21,7 +20,6 @@ use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Enums\MailboxHealth;
-use Relaticle\EmailIntegration\Events\ConversationChanged;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManager;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -45,8 +43,7 @@ beforeEach(function (): void {
     $this->teammateMailbox = conversationsRecordMailbox($this->teammate, 'ben@acme.test');
     $this->company = Company::factory()->create(['workspace_id' => $this->workspace->id, 'name' => 'Airbnb']);
 
-    Feature::for($this->workspace)->activate(EmailConversations::class);
-    Event::fake([ConversationChanged::class]);
+    config(['relaticle.features.email_conversations' => [$this->workspace->id]]);
     actingAs($this->owner);
     Filament::setCurrentPanel(Filament::getPanel('app'));
     Filament::setTenant($this->workspace);
@@ -183,7 +180,8 @@ it('opens the reader from the email in the URL only while conversations are on',
         ->assertSet('selectedEmailId', $email->id)
         ->assertSeeHtml('fi-email-reader-drawer');
 
-    Feature::for($this->workspace)->deactivate(EmailConversations::class);
+    config(['relaticle.features.email_conversations' => []]);
+    Feature::purge(EmailConversations::class);
 
     Livewire::withQueryParams(['email' => $email->id])
         ->test(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
@@ -210,7 +208,6 @@ it('lists no conversations on a company whose mailbox is hidden', function (): v
         ->where('code', CompanyField::DOMAINS->value)
         ->firstOrFail();
     $this->company->saveCustomFieldValue($domains, ['https://airbnb.test'], $this->workspace);
-    Feature::for($this->workspace)->activate(EmailConversations::class);
     WorkspaceEmailBlocklist::factory()->protected()->domain('airbnb.test')->create([
         'workspace_id' => $this->workspace->id,
         'created_by' => $this->owner->id,

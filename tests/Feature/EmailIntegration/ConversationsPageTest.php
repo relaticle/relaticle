@@ -37,6 +37,7 @@ use Relaticle\EmailIntegration\Events\ConversationChanged;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConversationFilters;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConversationReader;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
+use Relaticle\EmailIntegration\Listeners\ForgetConversationCountsListener;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBlocklist;
@@ -52,7 +53,7 @@ use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
 
 use function Pest\Laravel\actingAs;
 
-mutates(EmailInboxPage::class, HasConversationReader::class, ConversationsQuery::class, MarkEmailAsReadAction::class, ConversationView::class, PreferredEmailCopyService::class, ConversationFilters::class, EmailFilter::class, EmailSearchService::class, HasConversationFilters::class);
+mutates(ForgetConversationCountsListener::class, EmailInboxPage::class, HasConversationReader::class, ConversationsQuery::class, MarkEmailAsReadAction::class, ConversationView::class, PreferredEmailCopyService::class, ConversationFilters::class, EmailFilter::class, EmailSearchService::class, HasConversationFilters::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withWorkspace()->create();
@@ -64,8 +65,7 @@ beforeEach(function (): void {
     $this->teammateMailbox = conversationsPageMailbox($this->teammate, 'ben@acme.test');
     $this->company = Company::factory()->create(['workspace_id' => $this->workspace->id, 'name' => 'Airbnb']);
 
-    Feature::for($this->workspace)->activate(EmailConversations::class);
-    Event::fake([ConversationChanged::class]);
+    config(['relaticle.features.email_conversations' => [$this->workspace->id]]);
     actingAs($this->owner);
     Filament::setCurrentPanel(Filament::getPanel('app'));
     Filament::setTenant($this->workspace);
@@ -389,7 +389,8 @@ it('lists and counts only the current workspace when another holds the same conv
 
 it('keeps the drafts page when conversations are off, even with a view in the URL', function (): void {
     conversationsPageMessage($this->ownerMailbox, 'conv-waiting', 'brian@airbnb.test');
-    Feature::for($this->workspace)->deactivate(EmailConversations::class);
+    config(['relaticle.features.email_conversations' => []]);
+    Feature::purge(EmailConversations::class);
 
     Livewire::withQueryParams(['view' => 'needs_reply'])
         ->test(EmailInboxPage::class)
@@ -428,7 +429,6 @@ it('renders a page of conversations in the same number of queries for 3 or 20 ro
     $render = function (int $rows): int {
         app()->forgetScopedInstances();
         Facade::clearResolvedInstances();
-        Feature::for($this->workspace)->activate(EmailConversations::class);
         Filament::setCurrentPanel(Filament::getPanel('app'));
         Filament::setTenant($this->workspace);
         Cache::forget(ConversationsQuery::countsCacheKey($this->owner));
@@ -1076,6 +1076,7 @@ it('adds a new conversation to needs reply when it is refreshed', function (): v
     conversationsPageMessage($this->ownerMailbox, 'conv-first', 'kim@notion.test', ['sent_at' => now()->subHour()]);
     $page = livewire(EmailInboxPage::class);
 
+    Event::fake([ConversationChanged::class]);
     conversationsPageMessage($this->ownerMailbox, 'conv-new', 'brian@airbnb.test');
 
     expect(livewire(EmailInboxPage::class)->instance()->viewCounts['needs_reply'])->toBe(1);
@@ -1120,9 +1121,19 @@ it('keeps cached counts apart for each search and each workspace', function (): 
         ->and(Livewire::withQueryParams(['q' => 'kim@notion.test'])->test(EmailInboxPage::class)->instance()->viewCounts['needs_reply'])->toBe(1);
 
     $elsewhere = Workspace::factory()->create(['user_id' => $this->owner->id]);
-    Feature::for($elsewhere)->activate(EmailConversations::class);
+    config(['relaticle.features.email_conversations' => [$this->workspace->id, $elsewhere->id]]);
     $this->owner->forceFill(['current_workspace_id' => $elsewhere->id])->save();
     Filament::setTenant($elsewhere);
 
     expect(livewire(EmailInboxPage::class)->instance()->viewCounts['needs_reply'])->toBe(0);
+});
+
+it('forgets the cached counts of the workspace members when a conversation changes', function (): void {
+    resolve(ConversationsQuery::class)->counts($this->teammate);
+
+    expect(Cache::has(ConversationsQuery::countsCacheKey($this->teammate)))->toBeTrue();
+
+    conversationsPageMessage($this->ownerMailbox, 'conv-new', 'brian@airbnb.test');
+
+    expect(Cache::has(ConversationsQuery::countsCacheKey($this->teammate)))->toBeFalse();
 });

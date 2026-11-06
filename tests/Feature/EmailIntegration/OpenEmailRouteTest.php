@@ -13,7 +13,6 @@ use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
@@ -22,7 +21,6 @@ use Relaticle\EmailIntegration\Controllers\OpenEmailController;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
-use Relaticle\EmailIntegration\Events\ConversationChanged;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -44,8 +42,7 @@ beforeEach(function (): void {
     $this->teammateMailbox = conversationsRouteMailbox($this->teammate, 'ben@acme.test');
     $this->company = Company::factory()->create(['workspace_id' => $this->workspace->id, 'name' => 'Airbnb']);
 
-    Feature::for($this->workspace)->activate(EmailConversations::class);
-    Event::fake([ConversationChanged::class]);
+    config(['relaticle.features.email_conversations' => [$this->workspace->id]]);
     actingAs($this->owner);
 });
 
@@ -134,7 +131,8 @@ it('answers missing, private, unlinked teammate and foreign mail with the same n
 });
 
 it('keeps the old dashboard links while conversations are off, with the reader only for a readable body', function (): void {
-    Feature::for($this->workspace)->deactivate(EmailConversations::class);
+    config(['relaticle.features.email_conversations' => []]);
+    Feature::purge(EmailConversations::class);
     $email = conversationsRouteMessage($this->ownerMailbox, 'conv-route', 'brian@airbnb.test');
     $locked = conversationsRouteMessage($this->teammateMailbox, 'conv-locked', 'olivia@airbnb.test', ['privacy_tier' => EmailPrivacyTier::METADATA_ONLY]);
     $this->company->emails()->attach($locked->id);
@@ -150,7 +148,7 @@ it('opens a link from a workspace the viewer is not switched into without switch
     $other = User::factory()->withWorkspace()->create();
     $otherWorkspace = $other->currentWorkspace;
     $otherWorkspace->users()->attach($this->owner, ['role' => 'member']);
-    Feature::for($otherWorkspace)->activate(EmailConversations::class);
+    config(['relaticle.features.email_conversations' => [$this->workspace->id, $otherWorkspace->id]]);
     $email = conversationsRouteMessage(conversationsRouteMailbox($other, 'kim@beta.test'), 'conv-beta', 'lee@linear.test', ['privacy_tier' => EmailPrivacyTier::FULL]);
     Company::factory()->create(['workspace_id' => $otherWorkspace->id])->emails()->attach($email->id);
 
@@ -175,7 +173,8 @@ it('leaves a resolved link to the record Emails tab instead of the panel reader'
     $relation = (string) array_search(CompanyEmailsRelationManager::class, CompanyResource::getRelations(), true);
 
     if (! $conversations) {
-        Feature::for($this->workspace)->deactivate(EmailConversations::class);
+        config(['relaticle.features.email_conversations' => []]);
+        Feature::purge(EmailConversations::class);
     }
 
     $html = (string) $this->get(CompanyResource::getUrl('view', ['record' => $this->company, 'relation' => $relation, 'email' => $email->id], tenant: $this->workspace))
@@ -204,7 +203,6 @@ it('skips a linked record whose Emails tab hides the mailbox', function (): void
         ->where('code', CompanyField::DOMAINS->value)
         ->firstOrFail();
     $this->company->saveCustomFieldValue($domains, ['https://secret.example'], $this->workspace);
-    Feature::for($this->workspace)->activate(EmailConversations::class);
     WorkspaceEmailBlocklist::factory()->protected()->domain('secret.example')->create([
         'workspace_id' => $this->workspace->id,
         'created_by' => $this->owner->id,
@@ -224,7 +222,8 @@ it('skips a linked record whose Emails tab hides the mailbox', function (): void
 });
 
 it('answers a hidden or trashed email with not found while conversations are off', function (): void {
-    Feature::for($this->workspace)->deactivate(EmailConversations::class);
+    config(['relaticle.features.email_conversations' => []]);
+    Feature::purge(EmailConversations::class);
     $private = conversationsRouteMessage($this->teammateMailbox, 'conv-private', 'olivia@stripe.test', ['privacy_tier' => EmailPrivacyTier::PRIVATE]);
     $this->company->emails()->attach($private->id);
     $trashed = conversationsRouteMessage($this->ownerMailbox, 'conv-trashed', 'brian@airbnb.test');
