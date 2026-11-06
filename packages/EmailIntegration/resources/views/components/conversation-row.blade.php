@@ -33,6 +33,7 @@
         x-bind:hidden="isHidden(@js($row->conversationKey))"
         data-server-unread="{{ $row->isUnread ? 'true' : 'false' }}"
         data-server-done="{{ $row->isDone ? 'true' : 'false' }}"
+        data-last-inbound="{{ $row->lastInboundAt?->utc()->format('Y-m-d\TH:i:s\Z') }}"
         x-bind:data-unread="flag(@js($row->conversationKey), 'unread')"
         x-bind:data-done="flag(@js($row->conversationKey), 'done')"
         x-bind:data-selected="isSelected(@js($row->conversationKey)) ? 'true' : null"

@@ -495,7 +495,7 @@ final readonly class ConversationsQuery
                     return null;
                 }
 
-                return $this->row($viewer, $copy, $access, $copyStats, $senders[$key] ?? [], $records[$key] ?? [], isset($unread[$key]), isset($done[$key]));
+                return $this->row($viewer, $copy, $access, $copyStats, $senders[$key] ?? [], $records[$key] ?? [], isset($unread[$key]), isset($done[$key]), $conversation->last_external_inbound_at);
             })
             ->filter()
             ->values();
@@ -506,7 +506,7 @@ final readonly class ConversationsQuery
      * @param  list<string>  $senderNames
      * @param  list<array{type: string, id: string, name: string}>  $records
      */
-    private function row(User $viewer, Email $copy, EmailPrivacyTier $access, object $stats, array $senderNames, array $records, bool $isUnread, bool $isDone): ConversationRow
+    private function row(User $viewer, Email $copy, EmailPrivacyTier $access, object $stats, array $senderNames, array $records, bool $isUnread, bool $isDone, ?CarbonImmutable $lastInboundAt): ConversationRow
     {
         $isTeammateCopy = $copy->user_id !== $viewer->getKey();
         $roles = $isTeammateCopy
@@ -525,6 +525,7 @@ final readonly class ConversationsQuery
             hasAttachments: (bool) $stats->has_attachments,
             isUnread: $isUnread,
             isDone: $isDone,
+            lastInboundAt: $lastInboundAt,
             ownerUserId: $isTeammateCopy ? $copy->user_id : null,
             ownerName: $isTeammateCopy ? $copy->user?->name : null,
             access: $access,

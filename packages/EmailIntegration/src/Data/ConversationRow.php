@@ -27,6 +27,7 @@ final readonly class ConversationRow
         public bool $hasAttachments,
         public bool $isUnread,
         public bool $isDone,
+        public ?CarbonImmutable $lastInboundAt,
         public ?string $ownerUserId,
         public ?string $ownerName,
         public EmailPrivacyTier $access,

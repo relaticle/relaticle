@@ -356,6 +356,8 @@
                     }
 
                     const previous = Object.fromEntries(keys.map((key) => [key, this.overrides[key]]))
+                    {{-- Done holds back only the inbound this row showed; Undo replays what the original rows showed. --}}
+                    const seen = Object.fromEntries(keys.map((key) => [key, options.seen && Object.hasOwn(options.seen, key) ? options.seen[key] : (this.row(key)?.dataset.lastInbound || null)]))
 
                     if (options.advance) {
                         this.advance(keys.at(-1))
@@ -367,20 +369,24 @@
                     let outcome
 
                     try {
-                        outcome = await this.$wire.call(verb, keys)
+                        outcome = await this.$wire.call(verb, verb === 'markDone' ? seen : keys)
                     } catch (error) {
+                        outcome = null
+                    } finally {
+                        this.pending--
+                    }
+
+                    if (! outcome?.applied) {
                         keys.forEach((key) => this.restore(key, previous[key]))
 
                         return
-                    } finally {
-                        this.pending--
                     }
 
                     const applied = new Set(outcome.applied)
                     keys.filter((key) => ! applied.has(key)).forEach((key) => this.restore(key, previous[key]))
 
                     if (! options.undoing) {
-                        this.$dispatch('email-triage-done', { verb, outcome })
+                        this.$dispatch('email-triage-done', { verb, outcome, seen })
                     }
 
                     {{-- The write has landed, so what follows renders from the server and never restores the rows. --}}

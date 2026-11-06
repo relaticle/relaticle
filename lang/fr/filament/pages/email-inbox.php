@@ -32,6 +32,7 @@ return [
     ],
     'triage' => [
         'too_many' => 'Sélectionnez au plus :max conversations à la fois.',
+        'stale' => 'La liste a changé. Actualisez-la et réessayez.',
         'skipped' => [
             'not_available' => 'non disponible',
             'not_in_your_mailbox' => 'absente de votre boîte mail',

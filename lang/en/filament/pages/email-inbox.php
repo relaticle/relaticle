@@ -263,6 +263,7 @@ return [
     ],
     'triage' => [
         'too_many' => 'Select at most :max conversations at a time.',
+        'stale' => 'The list changed. Refresh it and try again.',
         'skipped' => [
             'not_available' => 'not available',
             'not_in_your_mailbox' => 'not in your mailbox',

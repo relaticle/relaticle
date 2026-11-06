@@ -23,6 +23,7 @@ final class EmailConversationStateFactory extends Factory
             'user_id' => User::factory(),
             'conversation_key' => hash('sha256', fake()->uuid()),
             'done_at' => now(),
+            'done_through' => now(),
         ];
     }
 }

@@ -184,13 +184,13 @@ final class EmailInboxPage extends Page
     }
 
     /**
-     * @param  array<mixed>  $keys
+     * @param  array<mixed>  $seenThrough  conversation key to the last inbound time its row showed, or null
      * @return array{applied: list<string>, skipped: list<array{reason: string, label: string, count: int}>}
      */
     #[Renderless]
-    public function markDone(array $keys): array
+    public function markDone(array $seenThrough): array
     {
-        return $this->triage(MarkConversationsDone::class, $keys);
+        return $this->triage(MarkConversationsDone::class, $seenThrough);
     }
 
     /**

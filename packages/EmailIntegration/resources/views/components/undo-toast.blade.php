@@ -17,6 +17,7 @@
         inverse: { markDone: 'reopen', reopen: 'markDone', markRead: 'markUnread', markUnread: 'markRead' },
         verb: null,
         keys: [],
+        seen: {},
         text: '',
         announcement: '',
         visible: false,
@@ -34,7 +35,7 @@
             clearTimeout(this.timer)
             this.$store.shortcuts?.unregister('email-undo', this.shortcut)
         },
-        show({ verb, outcome }) {
+        show({ verb, outcome, seen }) {
             const applied = outcome.applied.length
             const parts = applied > 0 ? [(applied === 1 ? this.verbs[verb].one : this.verbs[verb].other).replace(':count', applied)] : []
 
@@ -46,6 +47,7 @@
 
             this.verb = applied > 0 ? verb : null
             this.keys = outcome.applied
+            this.seen = seen ?? {}
             this.text = parts.join(' ')
             this.announcement = this.verb ? `${this.text} ${this.$store.shortcuts?.keysFor('undo') ? this.undoKeyHint : this.undoHint}` : this.text
             this.visible = true
@@ -58,7 +60,7 @@
             this.announcement = ''
         },
         undo() {
-            const detail = { verb: this.inverse[this.verb], keys: this.keys, undoing: true }
+            const detail = { verb: this.inverse[this.verb], keys: this.keys, seen: this.seen, undoing: true }
 
             this.dismiss()
             window.dispatchEvent(new CustomEvent('email-triage', { detail }))
