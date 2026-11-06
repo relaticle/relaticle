@@ -215,6 +215,7 @@ final class Login extends \Filament\Auth\Pages\Login
             $data = $this->form->getState();
         } catch (ValidationException $exception) {
             $this->resetTurnstileChallenge();
+            $this->trackRefusedFields($exception);
 
             throw $exception;
         }
@@ -248,6 +249,8 @@ final class Login extends \Filament\Auth\Pages\Login
         try {
             $this->rateLimit(5);
         } catch (TooManyRequestsException $exception) {
+            $this->trackSignupRefusal('throttled');
+
             Notification::make()
                 ->title(__('auth.login.signup_throttled_title'))
                 ->body(__('auth.login.signup_throttled_body', ['seconds' => $exception->secondsUntilAvailable]))
@@ -271,6 +274,7 @@ final class Login extends \Filament\Auth\Pages\Login
         }
 
         $this->forgetDiscovery();
+        $this->trackSignupRefusal('tor');
 
         throw ValidationException::withMessages([
             'data.email' => __('auth.login.signup_over_tor'),
@@ -288,6 +292,7 @@ final class Login extends \Filament\Auth\Pages\Login
 
     private function switchToSignInForExistingAccount(): never
     {
+        $this->trackSignupRefusal('existing_account');
         $this->resetTurnstileChallenge();
         $this->forgetDiscovery();
         $this->discover();
@@ -295,6 +300,24 @@ final class Login extends \Filament\Auth\Pages\Login
         throw ValidationException::withMessages([
             'data.email' => __('auth.login.account_exists'),
         ]);
+    }
+
+    private function trackRefusedFields(ValidationException $exception): void
+    {
+        $reasons = [
+            'data.email' => 'email',
+            'data.password' => 'password',
+            'data.cf_turnstile_response' => 'challenge',
+        ];
+
+        foreach (array_intersect_key($reasons, $exception->errors()) as $reason) {
+            $this->trackSignupRefusal($reason);
+        }
+    }
+
+    private function trackSignupRefusal(string $reason): void
+    {
+        $this->dispatch('analytics-event', name: "signup_refused_{$reason}", id: (string) Str::uuid());
     }
 
     private function forgetDiscovery(): void
