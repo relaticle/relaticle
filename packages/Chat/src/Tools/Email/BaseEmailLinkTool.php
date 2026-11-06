@@ -21,6 +21,8 @@ abstract class BaseEmailLinkTool extends BaseWriteCreateTool
 {
     abstract protected function recordsDescription(): string;
 
+    abstract protected function scopeDescription(): string;
+
     protected function nameAttribute(): string
     {
         return 'email_id';
@@ -88,6 +90,7 @@ abstract class BaseEmailLinkTool extends BaseWriteCreateTool
             'fields' => [
                 ['label' => 'Subject', 'value' => $data['subject']],
                 ['label' => 'Record', 'value' => $recordLabel],
+                ['label' => 'Scope', 'value' => $this->scopeDescription()],
             ],
         ];
     }

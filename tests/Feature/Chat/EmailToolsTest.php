@@ -24,6 +24,7 @@ use Relaticle\Chat\Enums\EmailReach;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\AiCreditBalance;
@@ -2007,6 +2008,10 @@ describe('linking email to records', function (): void {
         $company->emails()->attach($email->id);
 
         $proposal = proposeChatEmails($this->viewer, UnlinkEmailsTool::class, [['email_id' => $email->id, 'record_type' => 'company', 'record_id' => $company->id]]);
+
+        expect(collect($proposal['display']['fields'])->pluck('value', 'label')['Scope'])->toBe('The whole conversation, every copy you hold or were given in full. Later syncs keep it off this record too.')
+            ->and(ProposalEntity::EmailUnlink->needsOwnApproval())->toBeFalse();
+
         resolve(PendingActionService::class)->approve(pendingChatEmail($proposal), $this->viewer);
 
         expect($company->emails()->count())->toBe(0)

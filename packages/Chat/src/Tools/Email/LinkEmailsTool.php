@@ -28,4 +28,9 @@ final class LinkEmailsTool extends BaseEmailLinkTool
     {
         return 'Each item puts one email on one record.';
     }
+
+    protected function scopeDescription(): string
+    {
+        return 'The whole conversation, every copy you hold or were given in full. It stays on the record through later syncs.';
+    }
 }

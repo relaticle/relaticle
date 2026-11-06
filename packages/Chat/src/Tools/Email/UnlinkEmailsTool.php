@@ -28,4 +28,9 @@ final class UnlinkEmailsTool extends BaseEmailLinkTool
     {
         return 'Each item takes one email off one record.';
     }
+
+    protected function scopeDescription(): string
+    {
+        return 'The whole conversation, every copy you hold or were given in full. Later syncs keep it off this record too.';
+    }
 }
