@@ -22,15 +22,21 @@ final readonly class UnlinkEmailFromRecord
         private ConversationsQuery $conversations,
     ) {}
 
-    public function execute(User $user, Email $email, Company|People|Opportunity $record): void
+    /**
+     * The copies this unlink changed: each one's link source before, or null for a copy it only suppressed.
+     *
+     * @return array<string, 'auto'|'manual'|null>
+     */
+    public function execute(User $user, Email $email, Company|People|Opportunity $record): array
     {
         $conversationKey = filled($email->conversation_key) ? (string) $email->conversation_key : null;
 
-        $previousAudience = DB::transaction(function () use ($user, $email, $record, $conversationKey): array {
+        [$changed, $previousAudience] = DB::transaction(function () use ($user, $email, $record, $conversationKey): array {
             $ids = $this->prepare->execute($user, $email, $record)->modelKeys();
             $previousAudience = $conversationKey !== null && ConversationChanged::broadcasts()
                 ? $this->conversations->audience($email->workspace_id, $conversationKey)
                 : [];
+            $changed = $this->changedCopies($email, $record, array_values(array_map(strval(...), $ids)));
 
             $record->emails()->detach($ids);
 
@@ -46,7 +52,7 @@ final readonly class UnlinkEmailFromRecord
                 'created_at' => $now,
             ], $ids));
 
-            return $previousAudience;
+            return [$changed, $previousAudience];
         });
 
         dispatch(new RecomputeRecordEmailMetricsJob($record))->afterCommit();
@@ -54,5 +60,35 @@ final readonly class UnlinkEmailFromRecord
         if ($conversationKey !== null) {
             event(new ConversationChanged($email->workspace_id, $conversationKey, $previousAudience));
         }
+
+        return $changed;
+    }
+
+    /**
+     * @param  list<string>  $ids
+     * @return array<string, 'auto'|'manual'|null>
+     */
+    private function changedCopies(Email $email, Company|People|Opportunity $record, array $ids): array
+    {
+        $linked = DB::table('emailables')
+            ->whereIn('email_id', $ids)
+            ->where('emailable_type', $record->getMorphClass())
+            ->where('emailable_id', $record->getKey())
+            ->pluck('link_source', 'email_id')
+            ->all();
+        $suppressed = EmailLinkSuppression::query()
+            ->where('workspace_id', $email->workspace_id)
+            ->whereIn('email_id', $ids)
+            ->where('emailable_type', $record->getMorphClass())
+            ->where('emailable_id', $record->getKey())
+            ->pluck('email_id')
+            ->all();
+        $changed = array_fill_keys(array_values(array_diff($ids, $suppressed)), null);
+
+        foreach ($linked as $id => $source) {
+            $changed[(string) $id] = $source === 'manual' ? 'manual' : 'auto';
+        }
+
+        return $changed;
     }
 }

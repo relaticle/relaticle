@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CurrentWorkspace;
 use Filament\Facades\Filament;
+use Filament\Notifications\NotificationMailbox;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,7 @@ use Relaticle\EmailIntegration\Actions\LinkEmailAction;
 use Relaticle\EmailIntegration\Actions\LinkEmailToRecord;
 use Relaticle\EmailIntegration\Actions\PrepareEmailRecordLink;
 use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
+use Relaticle\EmailIntegration\Actions\RestoreEmailRecordLinks;
 use Relaticle\EmailIntegration\Actions\UnlinkEmailFromRecord;
 use Relaticle\EmailIntegration\Data\ConversationFilters;
 use Relaticle\EmailIntegration\Enums\ConversationView;
@@ -42,6 +44,7 @@ mutates(
     LinkEmailToRecord::class,
     UnlinkEmailFromRecord::class,
     PrepareEmailRecordLink::class,
+    RestoreEmailRecordLinks::class,
     RecordCommunicationMetrics::class,
     RecomputeRecordEmailMetricsJob::class,
     HasEmailReaderActions::class,
@@ -402,6 +405,27 @@ it('leaves a copy off the opportunity tab once its company link is suppressed on
     expect(Email::query()->onRecord($opportunity)->pluck('id')->all())->toBe([]);
 });
 
+it('restores only pairs the user reached and the unlink suppressed', function (): void {
+    $own = linkingEmail($this->owner);
+    $unsuppressed = linkingEmail($this->owner, ['rfc_message_id' => '<renewal-reply@airbnb.test>']);
+    $teammates = linkingEmail($this->teammate, ['rfc_message_id' => '<renewal-cc@airbnb.test>', 'privacy_tier' => EmailPrivacyTier::FULL, 'privacy_tier_customized' => true]);
+    EmailLinkSuppression::factory()->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'email_id' => $teammates->getKey(),
+        'emailable_type' => $this->company->getMorphClass(),
+        'emailable_id' => $this->company->getKey(),
+    ]);
+
+    resolve(RestoreEmailRecordLinks::class)->execute($this->owner, $own, $this->company, [
+        $unsuppressed->getKey() => 'manual',
+        $teammates->getKey() => 'manual',
+    ]);
+
+    expect(linkSource($unsuppressed, $this->company))->toBeNull()
+        ->and(linkSource($teammates, $this->company))->toBeNull()
+        ->and(EmailLinkSuppression::query()->count())->toBe(1);
+});
+
 function linkingPage(Email $email): mixed
 {
     config(['relaticle.features.email_conversations' => [$email->workspace_id]]);
@@ -493,9 +517,10 @@ it('tells a teammate who reached no copy that the drawer changed nothing', funct
     expect(linkSource($email, $this->company))->toBe('auto');
 });
 
-it('unlinks a chip from the drawer and links it again from the undo', function (): void {
+it('unlinks a chip from the drawer and its undo puts back exactly what it took off', function (): void {
     $email = linkingEmail($this->owner);
-    resolve(LinkEmailToRecord::class)->execute($this->owner, $email, $this->company);
+    $reply = linkingEmail($this->owner, ['rfc_message_id' => '<renewal-reply@airbnb.test>', 'sent_at' => now()->subHour()]);
+    $email->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
     $chip = 'data-linked-record="company:'.$this->company->getKey().'"';
 
     linkingPage($email)
@@ -504,18 +529,24 @@ it('unlinks a chip from the drawer and links it again from the undo', function (
         ->assertActionMounted('unlinkRecord')
         ->assertMountedActionModalSee('Remove this conversation from Airbnb?')
         ->callMountedAction()
-        ->assertNotified('Removed from Airbnb')
         ->assertDispatched('email:links-changed')
         ->call('refreshEmailLinks')
         ->assertDontSeeHtml($chip);
 
+    app(NotificationMailbox::class)->flush();
+    $sent = collect(app(NotificationMailbox::class)->pull())->firstWhere('title', 'Removed from Airbnb');
+    $undo = $sent['actions'][0]['eventData'];
+
     expect(linkSource($email, $this->company))->toBeNull()
-        ->and(EmailLinkSuppression::query()->count())->toBe(1);
+        ->and(EmailLinkSuppression::query()->count())->toBe(2)
+        ->and($undo['links'])->toEqualCanonicalizing([$email->getKey() => 'auto', $reply->getKey() => null]);
 
     livewire(EmailAccessNotificationHandler::class)
-        ->dispatch('relink-email-record', emailId: $email->getKey(), targetType: 'company', targetId: $this->company->getKey())
+        ->dispatch('relink-email-record', ...$undo)
         ->assertNotified('Linked to Airbnb');
 
-    expect(linkSource($email, $this->company))->toBe('manual')
-        ->and(EmailLinkSuppression::query()->count())->toBe(0);
+    expect(linkSource($email, $this->company))->toBe('auto')
+        ->and(linkSource($reply, $this->company))->toBeNull()
+        ->and(EmailLinkSuppression::query()->count())->toBe(0)
+        ->and($this->company->fresh()->email_count)->toBe(1);
 });

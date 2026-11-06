@@ -32,6 +32,7 @@ use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\LinkEmailToRecord;
 use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
+use Relaticle\EmailIntegration\Actions\RestoreEmailRecordLinks;
 use Relaticle\EmailIntegration\Actions\UnlinkEmailFromRecord;
 use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -381,8 +382,10 @@ trait HasEmailReaderActions
 
                 abort_unless($email instanceof Email && $record !== null, 404);
 
-                if (! $this->wroteLinks(function () use ($email, $record): void {
-                    resolve(UnlinkEmailFromRecord::class)->execute($this->readerUser(), $email, $record);
+                $changed = [];
+
+                if (! $this->wroteLinks(function () use ($email, $record, &$changed): void {
+                    $changed = resolve(UnlinkEmailFromRecord::class)->execute($this->readerUser(), $email, $record);
                 })) {
                     return;
                 }
@@ -396,7 +399,7 @@ trait HasEmailReaderActions
                             ->link()
                             ->close()
                             ->dispatchTo(EmailAccessNotificationHandler::LIVEWIRE_ALIAS, 'relink-email-record')
-                            ->eventData(['emailId' => $emailId, 'targetType' => $type, 'targetId' => (string) $record->getKey()]),
+                            ->eventData(['emailId' => $emailId, 'targetType' => $type, 'targetId' => (string) $record->getKey(), 'links' => $changed]),
                     ])
                     ->send();
 
@@ -416,6 +419,28 @@ trait HasEmailReaderActions
         }
 
         return true;
+    }
+
+    /** @param  array<array-key, mixed>  $links */
+    protected function restoreConversationLinks(string $emailId, string $targetType, string $targetId, array $links): void
+    {
+        $email = $this->resolveWorkspaceEmail($emailId, 'view');
+        $record = $this->findLinkTarget($targetType, $targetId);
+
+        abort_unless($email instanceof Email && $record !== null, 404);
+
+        if (! $this->wroteLinks(function () use ($email, $record, $links): void {
+            resolve(RestoreEmailRecordLinks::class)->execute($this->readerUser(), $email, $record, $links);
+        })) {
+            return;
+        }
+
+        Notification::make()
+            ->success()
+            ->title(__('filament/pages/email-inbox.drawer.links.notifications.linked', ['name' => $record->name]))
+            ->send();
+
+        $this->dispatch('email:links-changed');
     }
 
     protected function linkConversationTo(string $emailId, string $targetType, string $targetId): void

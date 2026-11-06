@@ -193,10 +193,11 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
             ->send();
     }
 
+    /** @param  array<array-key, mixed>  $links */
     #[On('relink-email-record')]
-    public function relinkEmailRecord(string $emailId, string $targetType, string $targetId): void
+    public function relinkEmailRecord(string $emailId, string $targetType, string $targetId, array $links = []): void
     {
-        $this->linkConversationTo($emailId, $targetType, $targetId);
+        $this->restoreConversationLinks($emailId, $targetType, $targetId, $links);
     }
 
     public function refreshConversations(): void
