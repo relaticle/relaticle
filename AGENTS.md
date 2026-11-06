@@ -785,6 +785,23 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
   of the core themes. Each imports its core theme and adds Cloud's `@source` directories. A class added to a Cloud billing view
   or sysadmin page reaches CSS only through them, and `packages/Cloud/tests/Feature/AppPanelThemeTest.php` pins the swap.
 
+## Scripts
+
+- `vite.config.js` builds every script that imports a package. Never add a second bundler, a build script in `bin/`, or a
+  committed `dist/` file: a committed bundle drifts from its source, and only an extra CI check catches it.
+  `tests/Arch/ConventionsTest.php` fails a `dist/` directory under `resources/` and a `bin/` script that imports a bundler.
+- A script with no imports that Filament loads through `FilamentAsset` stays unbuilt in `resources/js/filament/`, as
+  `slash-menu.js` and `payload-guard.js` do. `php artisan filament:assets` publishes it to `public/js/app/`.
+- A rich editor plugin that imports TipTap is a Vite input in `resources/js/filament/rich-content-plugins/`, and its
+  `getTipTapJsExtensions()` returns `Vite::asset()` for it. Filament's docs build one with esbuild from `bin/`. Do not
+  follow them here.
+- The `filament-rich-editor-modules` plugin in `vite.config.js` resolves `@tiptap/core` and `@tiptap/pm/{state,model,view}`
+  to `window.FilamentRichEditor.tiptap`, for those plugin files and the packages listed in `richEditorPackages`. The chat
+  composer keeps its own TipTap. A second ProseMirror copy breaks the editor's `instanceof` checks.
+- A TipTap package a plugin imports goes in `richEditorPackages`, which also keeps it out of Vite's dev pre-bundling. The
+  build fails when a plugin imports an unlisted `@tiptap/` package or another ProseMirror module, when code outside the
+  plugins imports a listed package, and when a plugin's chunk loses the default export Filament imports.
+
 ## Icons (Remix Icon)
 
 - **Brand/social icons** (GitHub, Discord, Twitter, LinkedIn) → always `fill` variant
