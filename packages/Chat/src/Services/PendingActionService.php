@@ -48,11 +48,11 @@ use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Events\PendingActionResolved;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Queries\ProposalReceiptsQuery;
 use Relaticle\Chat\Support\ProposalLabel;
 use Relaticle\Chat\Support\ProposalOwnership;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\ProposalProgress;
-use Relaticle\Chat\Support\ProposalReceipts;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
 use Relaticle\EmailIntegration\Actions\CancelAssistantEmail;
@@ -464,8 +464,8 @@ final readonly class PendingActionService
                 index: $index,
                 finalized: $finalized,
                 receipts: $finalized
-                    ? resolve(ProposalReceipts::class)->forPlanOf($pendingAction)
-                    : resolve(ProposalReceipts::class)->forStep($pendingAction),
+                    ? resolve(ProposalReceiptsQuery::class)->forPlanOf($pendingAction)
+                    : resolve(ProposalReceiptsQuery::class)->forStep($pendingAction),
             ));
         } catch (Throwable $e) {
             report($e);

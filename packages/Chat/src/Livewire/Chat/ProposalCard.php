@@ -28,6 +28,7 @@ use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Enums\WebSearchPreference;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Queries\ProposalConflictsQuery;
+use Relaticle\Chat\Queries\ProposalReceiptsQuery;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\ProposalEditor;
 use Relaticle\Chat\Services\ProposalPlanService;
@@ -39,7 +40,6 @@ use Relaticle\Chat\Support\PlanReference;
 use Relaticle\Chat\Support\ProposalConflictNotice;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\ProposalProgress;
-use Relaticle\Chat\Support\ProposalReceipts;
 use Relaticle\Chat\Support\RecordNameResolver;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\WorkspaceMembersContext;
@@ -1382,7 +1382,7 @@ final class ProposalCard extends BaseLivewireComponent
                     decision: 'rejected',
                     finalized: false,
                     record: null,
-                    receipts: resolve(ProposalReceipts::class)->forStep($step),
+                    receipts: resolve(ProposalReceiptsQuery::class)->forStep($step),
                     context: $this->context,
                 );
             }
@@ -1717,7 +1717,7 @@ final class ProposalCard extends BaseLivewireComponent
      */
     private function receiptsFor(PendingAction $step): array
     {
-        return resolve(ProposalReceipts::class)->forPlanOf($step);
+        return resolve(ProposalReceiptsQuery::class)->forPlanOf($step);
     }
 
     private function announceResolution(PendingAction $step, string $decision): void

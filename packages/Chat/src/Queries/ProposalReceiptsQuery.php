@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Relaticle\Chat\Support;
+namespace Relaticle\Chat\Queries;
 
 use App\Enums\CustomFields\OpportunityField;
 use Relaticle\Chat\Enums\PendingActionOperation;
@@ -10,7 +10,6 @@ use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Enums\ProposalOutcome;
 use Relaticle\Chat\Models\PendingAction;
-use Relaticle\Chat\Queries\OpportunityAmountTotalQuery;
 use Relaticle\Chat\Services\ProposalPlanService;
 
 /**
@@ -21,7 +20,7 @@ use Relaticle\Chat\Services\ProposalPlanService;
  * @phpstan-type Step array{id: string, status: string, entity_type: ?string, operation: ?string, workspace_id: string, resolved_at: ?string, result_data: ?array<array-key, mixed>, display: ?array<array-key, mixed>}
  * @phpstan-type Receipt array{outcome: ?string, resolved_at: ?string, excluded: list<string>, moved_to: ?string, moved_total: ?string, itemResults: array<string, array{status: string, outcome: string, excluded: list<string>}>}
  */
-final readonly class ProposalReceipts
+final readonly class ProposalReceiptsQuery
 {
     public function __construct(
         private ProposalPlanService $plans,

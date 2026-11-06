@@ -15,7 +15,7 @@ use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Enums\ProposalOutcome;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Queries\ConversationMessagesQuery;
-use Relaticle\Chat\Support\ProposalReceipts;
+use Relaticle\Chat\Queries\ProposalReceiptsQuery;
 use Tests\Helpers\ChatDocument;
 
 mutates(ConversationMessagesQuery::class);
@@ -538,7 +538,7 @@ it('reads a plan that spans two messages the way the live payload does', functio
         ['entity_type' => 'task', 'turn_id' => 'turn-span', 'message' => 1, 'status' => PendingActionStatus::Rejected],
     ]);
 
-    $live = resolve(ProposalReceipts::class)->forPlanOf(PendingAction::query()->where('turn_id', 'turn-span')->firstOrFail());
+    $live = resolve(ProposalReceiptsQuery::class)->forPlanOf(PendingAction::query()->where('turn_id', 'turn-span')->firstOrFail());
 
     expect(array_column($actions, 'outcome'))->toBe(['applied', 'left_out'])
         ->and(array_map(fn (array $receipt): ?string => $receipt['outcome'], array_values($live)))->toBe(['applied', 'left_out']);

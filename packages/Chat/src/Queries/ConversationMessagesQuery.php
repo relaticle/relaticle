@@ -17,7 +17,6 @@ use Relaticle\Chat\Support\AttachedRows;
 use Relaticle\Chat\Support\DisplayBlocks;
 use Relaticle\Chat\Support\MarkdownRenderer;
 use Relaticle\Chat\Support\NextSteps;
-use Relaticle\Chat\Support\ProposalReceipts;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\StoredSteps;
 use Relaticle\Chat\Support\WebSources;
@@ -30,7 +29,7 @@ final readonly class ConversationMessagesQuery
 {
     public function __construct(
         private RecordReferenceResolver $resolver,
-        private ProposalReceipts $receipts,
+        private ProposalReceiptsQuery $receipts,
         private MarkdownRenderer $markdown = new MarkdownRenderer,
     ) {}
 
@@ -153,7 +152,7 @@ final readonly class ConversationMessagesQuery
         $plans = [];
 
         foreach ($records as $id => $record) {
-            $plans[$record['turn_id'] ?? $id][] = ProposalReceipts::step(
+            $plans[$record['turn_id'] ?? $id][] = ProposalReceiptsQuery::step(
                 (string) $id,
                 $record['status'],
                 $record['entity_type'],
