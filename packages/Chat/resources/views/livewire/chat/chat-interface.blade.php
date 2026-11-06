@@ -388,7 +388,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.approvalKeyHandler = (e) => {
             if (!((e.metaKey || e.ctrlKey) && e.key === 'Enter')) return;
 
-            if (this.isStreaming || !this.hasPendingProposal || !this.$root.querySelector('[data-proposal-shortcut]')) return;
+            if (this.isStreaming || !this.hasPendingProposal || !this.$root.querySelector('[data-proposal-shortcut]:not([disabled])')) return;
             if (this.input.trim().length > 0) return; // composer draft wins
 
             e.preventDefault();
