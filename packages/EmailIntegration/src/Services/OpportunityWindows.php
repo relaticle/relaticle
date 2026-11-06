@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
+use App\Models\CustomFieldValue;
 use App\Models\Opportunity;
 use Carbon\CarbonImmutable;
 use Relaticle\EmailIntegration\Models\Email;
@@ -21,6 +22,14 @@ final class OpportunityWindows
     public function of(Opportunity $opportunity): array
     {
         return $this->windows[$opportunity->getKey().'@'.$opportunity->updated_at?->toIso8601String()] ??= $this->read($opportunity);
+    }
+
+    // The close date is a custom field value, and saving one leaves the opportunity's updated_at alone.
+    public function forget(CustomFieldValue $value): void
+    {
+        if ($value->entity_type === (new Opportunity)->getMorphClass()) {
+            $this->windows = [];
+        }
     }
 
     /** @return array{0: CarbonImmutable|null, 1: CarbonImmutable|null} */

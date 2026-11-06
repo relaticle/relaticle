@@ -117,8 +117,7 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
             return;
         }
 
-        CustomFieldValue::saved(fn (CustomFieldValue $value) => resolve(QueueRecordHistoryRelink::class)->forIdentityValue($value));
-        Event::listen(CustomFieldValuesImported::class, fn (CustomFieldValuesImported $event) => resolve(QueueRecordHistoryRelink::class)->forImportedValues($event));
+        $this->listenForCustomFieldValues();
 
         Event::listen(SocialiteWasCalled::class, [AzureExtendSocialite::class, 'handle']);
 
@@ -232,6 +231,14 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
             IncrementalEmailSyncCommand::class,
             RenewCalendarPushChannelsCommand::class,
         ]);
+    }
+
+    private function listenForCustomFieldValues(): void
+    {
+        CustomFieldValue::saved(fn (CustomFieldValue $value) => resolve(QueueRecordHistoryRelink::class)->forIdentityValue($value));
+        CustomFieldValue::saved(fn (CustomFieldValue $value) => resolve(OpportunityWindows::class)->forget($value));
+        CustomFieldValue::deleted(fn (CustomFieldValue $value) => resolve(OpportunityWindows::class)->forget($value));
+        Event::listen(CustomFieldValuesImported::class, fn (CustomFieldValuesImported $event) => resolve(QueueRecordHistoryRelink::class)->forImportedValues($event));
     }
 
     private function registerCleanupThatIgnoresTheFeatureFlag(): void

@@ -493,7 +493,7 @@ it('drops a derived conversation after a user removes it from the opportunity', 
         ->and($this->company->emails()->whereKey($first->id)->exists())->toBeTrue();
 });
 
-it('matches stored links that no user removed when the filter names several records', function (): void {
+it('matches stored links that no holder of that copy removed when the filter names several records', function (): void {
     $other = Company::factory()->create(['workspace_id' => $this->workspace->id, 'name' => 'Airtable']);
     $kept = conversationsRecordMessage($this->ownerMailbox, 'conv-kept', 'brian@airbnb.test');
     $removed = conversationsRecordMessage($this->ownerMailbox, 'conv-removed', 'brian@airbnb.test');
@@ -503,6 +503,11 @@ it('matches stored links that no user removed when the filter names several reco
     $other->emails()->attach($teammateCopy->id);
     resolve(UnlinkEmailFromRecord::class)->execute($this->teammate, $teammateCopy, $other);
 
+    $rows = resolve(ConversationsQuery::class)->paginate($this->owner, ConversationView::All, new ConversationFilters(recordType: CrmEntity::Company, recordName: 'Air'))->rows;
+
+    expect(array_map(fn (ConversationRow $row): string => $row->conversationKey, $rows))->toEqualCanonicalizing(['conv-kept', 'conv-removed']);
+
+    resolve(UnlinkEmailFromRecord::class)->execute($this->owner, $removed, $other);
     $rows = resolve(ConversationsQuery::class)->paginate($this->owner, ConversationView::All, new ConversationFilters(recordType: CrmEntity::Company, recordName: 'Air'))->rows;
 
     expect(array_map(fn (ConversationRow $row): string => $row->conversationKey, $rows))->toBe(['conv-kept']);

@@ -253,7 +253,7 @@ final class Email extends Model
                                     ->where('emailables.emailable_id', $id));
                             }
                         }))))
-            ->whereNotExists(fn (QueryBuilder $suppression): QueryBuilder => $this->suppressionsOf($suppression, $query->qualifyColumn('id'))
+            ->whereNotExists($this->suppressionsOn($query)
                 ->where('email_link_suppressions.emailable_type', $record->getMorphClass())
                 ->where('email_link_suppressions.emailable_id', $record->getKey()));
     }
@@ -273,23 +273,34 @@ final class Email extends Model
             ->whereIn('emailables.emailable_id', $recordIds));
     }
 
-    /**
-     * A copy's links that no user removed from that copy; another copy's suppression never hides this one.
-     *
-     * @param  Builder<Email>  $query
-     */
+    /** @param  Builder<Email>  $query */
     private function linksOf(QueryBuilder $link, Builder $query): QueryBuilder
     {
         return $link->from('emailables')
             ->whereColumn('emailables.email_id', $query->qualifyColumn('id'))
-            ->whereNotExists(fn (QueryBuilder $suppression): QueryBuilder => $this->suppressionsOf($suppression, 'emailables.email_id')
+            ->whereNotExists($this->suppressionsOn($query)
                 ->whereColumn('email_link_suppressions.emailable_type', 'emailables.emailable_type')
                 ->whereColumn('email_link_suppressions.emailable_id', 'emailables.emailable_id'));
     }
 
-    private function suppressionsOf(QueryBuilder $suppression, string $emailIdColumn): QueryBuilder
+    /**
+     * Suppressions that hide a link on this copy: one on the copy itself, or, until a pin overrides it, one on
+     * another copy of the conversation in the same holder's mail. Another member's unlink never hides this copy.
+     *
+     * @param  Builder<Email>  $query
+     */
+    private function suppressionsOn(Builder $query): QueryBuilder
     {
-        return $suppression->from('email_link_suppressions')->whereColumn('email_link_suppressions.email_id', $emailIdColumn);
+        return EmailLinkSuppression::query()
+            ->join('emails as suppressed_copies', 'suppressed_copies.id', '=', 'email_link_suppressions.email_id')
+            ->whereColumn('suppressed_copies.workspace_id', $query->qualifyColumn('workspace_id'))
+            ->where(fn (Builder $copy): Builder => $copy
+                ->whereColumn('suppressed_copies.id', $query->qualifyColumn('id'))
+                ->orWhere(fn (Builder $held): Builder => $held
+                    ->whereColumn('suppressed_copies.conversation_key', $query->qualifyColumn('conversation_key'))
+                    ->whereColumn('suppressed_copies.user_id', $query->qualifyColumn('user_id'))
+                    ->inForce()))
+            ->toBase();
     }
 
     // Manual linking and sync linking take this first in their transactions, so neither reads the other's half-written links.
