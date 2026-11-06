@@ -40,7 +40,7 @@ trait LinksEmailsToRecords
                     'record_type' => $schema->string()->enum(EmailLinkTargetsQuery::types())->description('The kind of record.')->required(),
                     'record_id' => $schema->string()->description('The record ID.')->required(),
                 ]))
-                ->description('Up to 20 email and record pairs. The whole conversation of each email moves together.')
+                ->description('Up to 20 email and record pairs. Each email moves with the other copies of its conversation the user holds or was given in full.')
                 ->required(),
         ];
     }

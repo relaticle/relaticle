@@ -75,7 +75,7 @@ Each note names the conflict and what this plan does. The spec wins where it spe
 | File | Change | Owns |
 |---|---|---|
 | `database/migrations/2026_11_xx_000000_create_email_link_suppressions_table.php` | create | the table, shape per contract |
-| `packages/EmailIntegration/src/Models/EmailLinkSuppression.php` | create | model, `#[Fillable]`, `#[Scope] matchingConversationOf(Email $email)` |
+| `packages/EmailIntegration/src/Models/EmailLinkSuppression.php` | create | model, `#[Fillable]`, `#[Scope] heldAlongside(Email $email)` (renamed from `matchingConversationOf` in review), `#[Scope] inForce()` |
 | `packages/EmailIntegration/src/Models/Email.php` | modify | `#[Scope] onRecord(Company\|People\|Opportunity $record)`, `linkSuppressions()` relation |
 | `packages/EmailIntegration/src/Actions/LinkEmailToRecord.php` | create | manual link over every visible copy |
 | `packages/EmailIntegration/src/Actions/UnlinkEmailFromRecord.php` | create | unlink plus suppression over every visible copy |

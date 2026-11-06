@@ -257,7 +257,7 @@ The two reading tools need read access. The mailbox tool appears for a connectio
 | `cancel-email-tool` | Cancel a queued email before it leaves. |
 | `reschedule-email-tool` | Change when a queued email leaves. |
 | `retry-email-tool` | Queue a failed email again, held like a new send. |
-| `link-emails-tool` | Put emails on a company, person or opportunity. The whole conversation moves, and the link stays through every sync. |
+| `link-emails-tool` | Put emails on a company, person or opportunity. The user's copies of the conversation move, and the link stays through every sync. |
 | `unlink-emails-tool` | Take emails off a company, person or opportunity. No later sync puts the conversation back on that record. |
 
 ### Files

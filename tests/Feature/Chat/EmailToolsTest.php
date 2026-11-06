@@ -2009,7 +2009,7 @@ describe('linking email to records', function (): void {
 
         $proposal = proposeChatEmails($this->viewer, UnlinkEmailsTool::class, [['email_id' => $email->id, 'record_type' => 'company', 'record_id' => $company->id]]);
 
-        expect(collect($proposal['display']['fields'])->pluck('value', 'label')['Scope'])->toBe('The whole conversation, every copy you hold or were given in full. Later syncs keep it off this record too.')
+        expect(collect($proposal['display']['fields'])->pluck('value', 'label')['Scope'])->toBe('Your copies of this conversation, and copies shared with you in full. Later syncs keep your mail off this record too.')
             ->and(ProposalEntity::EmailUnlink->needsOwnApproval())->toBeFalse();
 
         resolve(PendingActionService::class)->approve(pendingChatEmail($proposal), $this->viewer);

@@ -285,7 +285,7 @@
                             <x-slot name="trigger">
                                 <button
                                     type="button"
-                                    aria-label="{{ __('filament/pages/email-inbox.drawer.links.more', ['count' => count($row->records) - 1]) }}"
+                                    aria-label="{{ trans_choice('filament/pages/email-inbox.drawer.links.more', count($row->records) - 1, ['count' => count($row->records) - 1]) }}"
                                     class="inline-flex items-center rounded-md px-1.5 py-1 text-xs font-medium leading-4 text-gray-500 ring-1 ring-inset ring-gray-200 outline-none hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-gray-400 dark:ring-white/10 dark:hover:bg-white/5"
                                 >
                                     {{ __('filament/pages/email-inbox.conversation_row.more_records', ['count' => count($row->records) - 1]) }}

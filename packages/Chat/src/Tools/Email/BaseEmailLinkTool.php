@@ -39,7 +39,7 @@ abstract class BaseEmailLinkTool extends BaseWriteCreateTool
             'records' => $schema->array()
                 ->items($schema->object($this->entitySchema($schema)))
                 ->required()
-                ->description($this->recordsDescription().' Pass up to '.config('chat.max_batch_size').' items in ONE call (never loop one call per email). The whole conversation of each email moves together.'),
+                ->description($this->recordsDescription().' Pass up to '.config('chat.max_batch_size').' items in ONE call (never loop one call per email). Each email moves with the other copies of its conversation the user holds or was given in full.'),
         ];
     }
 

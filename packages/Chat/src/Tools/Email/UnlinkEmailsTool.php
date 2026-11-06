@@ -31,6 +31,6 @@ final class UnlinkEmailsTool extends BaseEmailLinkTool
 
     protected function scopeDescription(): string
     {
-        return 'The whole conversation, every copy you hold or were given in full. Later syncs keep it off this record too.';
+        return 'Your copies of this conversation, and copies shared with you in full. Later syncs keep your mail off this record too.';
     }
 }

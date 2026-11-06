@@ -14,7 +14,7 @@ use Laravel\Mcp\Server\Tool;
 use Relaticle\EmailIntegration\Actions\UnlinkEmailFromRecord;
 
 #[Title('Unlink Emails')]
-#[Description('Take emails off a company, person or opportunity. The unlink covers the copies of the conversation the user holds or was given in full, and no later sync puts it back on that record. The email itself is never deleted. Every pair is checked before anything is unlinked, and a refused pair unlinks nothing. Each item reports changed: false when the conversation was already off the record.')]
+#[Description('Take emails off a company, person or opportunity. The unlink covers the copies of the conversation the user holds or was given in full, and no later sync puts it back on that record. The email itself is never deleted. Every pair is checked before anything is unlinked, and a refused pair unlinks nothing. Each item reports changed per copy: true when it took at least one of the user\'s copies off the record or kept one off it, false when every copy was already off.')]
 final class UnlinkEmailsTool extends Tool
 {
     use LinksEmailsToRecords;

@@ -634,7 +634,7 @@ it('shows a chip for every record the open conversation is on, past the three a 
         resolve(LinkEmailToRecord::class)->execute($this->owner, $email, $record);
     }
 
-    $page = linkingPage($email);
+    $page = linkingPage($email)->assertSeeHtml('aria-label="+3 more linked records"');
 
     foreach ($records as $record) {
         $page->assertSeeHtml('data-linked-record="'.$record->getMorphClass().':'.$record->getKey().'"');

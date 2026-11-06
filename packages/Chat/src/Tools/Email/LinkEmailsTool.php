@@ -31,6 +31,6 @@ final class LinkEmailsTool extends BaseEmailLinkTool
 
     protected function scopeDescription(): string
     {
-        return 'The whole conversation, every copy you hold or were given in full. It stays on the record through later syncs.';
+        return 'Your copies of this conversation, and copies shared with you in full. They stay on the record through later syncs.';
     }
 }

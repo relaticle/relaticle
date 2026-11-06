@@ -288,8 +288,8 @@ final class Email extends Model
     }
 
     /**
-     * Suppressions that hide a link on this copy: one on the copy itself, or, until a pin overrides it, one on
-     * another copy of the conversation in the same holder's mail. Another member's unlink never hides this copy.
+     * Suppressions that hide a link on this copy: one on the copy itself, or one on another copy of the conversation
+     * the same user holds, unless that user pinned the record on one of their copies. Another member's unlink never hides it.
      *
      * @param  Builder<Email>  $query
      */
