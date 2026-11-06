@@ -86,9 +86,13 @@ trait LinksEmailsToRecords
             $pairs[] = $pair;
         }
 
-        resolve(ApplyEmailLinkChanges::class)->execute($user, $pairs, $change);
+        $changed = resolve(ApplyEmailLinkChanges::class)->execute($user, $pairs, $change);
 
-        return Response::structured(['items' => array_map(fn (array $link): array => [...$link, 'linked' => $linkedAfter], $validated['links'])]);
+        return Response::structured(['items' => array_map(
+            fn (array $link, bool $didChange): array => [...$link, 'linked' => $linkedAfter, 'changed' => $didChange],
+            $validated['links'],
+            $changed,
+        )]);
     }
 
     /**

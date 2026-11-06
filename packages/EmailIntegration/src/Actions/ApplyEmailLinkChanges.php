@@ -13,13 +13,17 @@ use Relaticle\EmailIntegration\Models\Email;
 
 final readonly class ApplyEmailLinkChanges
 {
-    /** @param  list<array{email: Email, record: Company|People|Opportunity}>  $pairs */
-    public function execute(User $user, array $pairs, LinkEmailToRecord|UnlinkEmailFromRecord $change): void
+    /**
+     * Applies every pair or none, and says for each whether it changed anything.
+     *
+     * @param  list<array{email: Email, record: Company|People|Opportunity}>  $pairs
+     * @return list<bool>
+     */
+    public function execute(User $user, array $pairs, LinkEmailToRecord|UnlinkEmailFromRecord $change): array
     {
-        DB::transaction(function () use ($user, $pairs, $change): void {
-            foreach ($pairs as ['email' => $email, 'record' => $record]) {
-                $change->execute($user, $email, $record);
-            }
-        });
+        return DB::transaction(fn (): array => array_map(
+            fn (array $pair): bool => (bool) $change->execute($user, $pair['email'], $pair['record']),
+            $pairs,
+        ));
     }
 }

@@ -2135,7 +2135,7 @@ it('links an email to a record and reports it linked', function (): void {
 
     $items = emailToolData($this->viewer, LinkEmailsTool::class, ['links' => [['email_id' => $email->id, 'record_type' => 'company', 'record_id' => $company->id]]])['items'];
 
-    expect($items)->toBe([['email_id' => $email->id, 'record_type' => 'company', 'record_id' => $company->id, 'linked' => true]])
+    expect($items)->toBe([['email_id' => $email->id, 'record_type' => 'company', 'record_id' => $company->id, 'linked' => true, 'changed' => true]])
         ->and($company->emails()->wherePivot('link_source', 'manual')->pluck('emails.id')->all())->toBe([$email->id]);
 });
 
@@ -2211,6 +2211,19 @@ it('links nothing when a pair is refused after every pair was checked', function
         ->assertHasErrors(['Only people who hold this conversation, or who were given full access to it, can change its records.']);
 
     expect($company->emails()->count())->toBe(0);
+});
+
+it('reports a pair that changed nothing as unchanged', function (): void {
+    $email = ($this->emailFrom)($this->viewer);
+    $company = Company::factory()->create(['workspace_id' => $this->workspace->id]);
+    $pair = ['email_id' => $email->id, 'record_type' => 'company', 'record_id' => $company->id];
+
+    $first = emailToolData($this->viewer, LinkEmailsTool::class, ['links' => [$pair]])['items'];
+    $again = emailToolData($this->viewer, LinkEmailsTool::class, ['links' => [$pair]])['items'];
+    $unlinked = emailToolData($this->viewer, UnlinkEmailsTool::class, ['links' => [$pair]])['items'];
+    $unlinkedAgain = emailToolData($this->viewer, UnlinkEmailsTool::class, ['links' => [$pair]])['items'];
+
+    expect(array_column([...$first, ...$again, ...$unlinked, ...$unlinkedAgain], 'changed'))->toBe([true, false, true, false]);
 });
 
 it('lists the link tools only for a token that holds the draft grant', function (): void {

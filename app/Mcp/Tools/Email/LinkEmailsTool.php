@@ -14,7 +14,7 @@ use Laravel\Mcp\Server\Tool;
 use Relaticle\EmailIntegration\Actions\LinkEmailToRecord;
 
 #[Title('Link Emails')]
-#[Description('Put emails on a company, person or opportunity, so each conversation shows on that record. The link covers the copies of the conversation the user holds or was given in full, and stays through every later sync. Every pair is checked before anything is linked, and a refused pair links nothing.')]
+#[Description('Put emails on a company, person or opportunity, so each conversation shows on that record. The link covers the copies of the conversation the user holds or was given in full, and stays through every later sync. Every pair is checked before anything is linked, and a refused pair links nothing. Each item reports changed: false when the conversation was already pinned to the record.')]
 final class LinkEmailsTool extends Tool
 {
     use LinksEmailsToRecords;

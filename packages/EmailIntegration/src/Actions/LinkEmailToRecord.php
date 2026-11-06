@@ -21,14 +21,21 @@ final readonly class LinkEmailToRecord
         private RecordCommunicationMetrics $metrics,
     ) {}
 
-    public function execute(User $user, Email $email, Company|People|Opportunity $record): void
+    /** True when the link attached, pinned or lifted a suppression on any copy; false when every copy was already pinned. */
+    public function execute(User $user, Email $email, Company|People|Opportunity $record): bool
     {
-        DB::transaction(function () use ($user, $email, $record): void {
+        $changed = DB::transaction(function () use ($user, $email, $record): bool {
             $copies = $this->prepare->execute($user, $email, $record);
             $ids = $copies->modelKeys();
+            $pinned = DB::table('emailables')
+                ->whereIn('email_id', $ids)
+                ->where('emailable_type', $record->getMorphClass())
+                ->where('emailable_id', $record->getKey())
+                ->where('link_source', 'manual')
+                ->count();
             $changes = $record->emails()->syncWithoutDetaching(array_fill_keys($ids, ['link_source' => 'manual']));
 
-            EmailLinkSuppression::query()
+            $lifted = EmailLinkSuppression::query()
                 ->whereIn('email_id', $ids)
                 ->where('emailable_type', $record->getMorphClass())
                 ->where('emailable_id', $record->getKey())
@@ -37,10 +44,14 @@ final readonly class LinkEmailToRecord
             foreach ($copies->only($changes['attached'])->whereNotNull('linked_at') as $copy) {
                 $this->metrics->incrementEmailMetrics($record, $copy);
             }
+
+            return $pinned < count($ids) || $lifted > 0;
         });
 
         if (filled($email->conversation_key)) {
             event(new ConversationChanged($email->workspace_id, (string) $email->conversation_key));
         }
+
+        return $changed;
     }
 }
