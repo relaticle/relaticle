@@ -267,7 +267,7 @@ final readonly class LinkEmailAction
     }
 
     /**
-     * A suppression on this copy always holds; one on another copy of the conversation holds until a pin on the record overrides it.
+     * A suppression on this copy always holds; one on the holder's other copies of the conversation holds until a pin overrides it.
      *
      * @return array<string, true> keyed "type:id"
      */
@@ -278,7 +278,7 @@ final readonly class LinkEmailAction
                 $onThisCopyOnly,
                 fn (EloquentBuilder $own): EloquentBuilder => $own->where('email_id', $email->getKey()),
                 fn (EloquentBuilder $conversation): EloquentBuilder => $conversation
-                    ->matchingConversationOf($email)
+                    ->heldAlongside($email)
                     ->where(fn (EloquentBuilder $holding): EloquentBuilder => $holding->where('email_id', $email->getKey())->orWhere(fn (EloquentBuilder $elsewhere): EloquentBuilder => $elsewhere->inForce())),
             )
             ->get(['emailable_type', 'emailable_id'])

@@ -1554,6 +1554,26 @@ it('keeps an unlink to its conversation when another conversation holds the same
         ->and(Email::query()->onRecord($company)->pluck('id')->all())->toBe([$elsewhere->getKey()]);
 });
 
+it('keeps a teammate\'s unlink to their own mailbox when later replies sync', function (): void {
+    $company = makeAcmeCompanyWithDomain();
+    $bob = User::factory()->create(['current_workspace_id' => $this->workspace->getKey()]);
+    $this->workspace->users()->attach($bob, ['role' => 'member']);
+    $bobsAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create(['workspace_id' => $this->workspace->id, 'user_id' => $bob->id]));
+    $reply = fn (array $attributes = []): Email => tap(makeLinkEmail(['conversation_key' => 'acme-renewal', ...$attributes]), function (Email $email): void {
+        EmailParticipant::factory()->from()->create(['email_id' => $email->getKey(), 'email_address' => 'ceo@acme.com']);
+        resolve(LinkEmailAction::class)->execute($email);
+    });
+    $bobs = $reply(['user_id' => $bob->id, 'connected_account_id' => $bobsAccount->getKey()]);
+
+    resolve(UnlinkEmailFromRecord::class)->execute($bob, $bobs, $company);
+
+    $alicesReply = $reply();
+    $bobsReply = $reply(['user_id' => $bob->id, 'connected_account_id' => $bobsAccount->getKey()]);
+
+    expect($alicesReply->companies()->whereKey($company->getKey())->exists())->toBeTrue()
+        ->and($bobsReply->companies()->whereKey($company->getKey())->exists())->toBeFalse();
+});
+
 function makeAcmeCompanyWithDomain(): Company
 {
     $domainsField = CustomField::query()

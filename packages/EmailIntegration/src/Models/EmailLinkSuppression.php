@@ -58,22 +58,22 @@ final class EmailLinkSuppression extends Model
     }
 
     /**
+     * Suppressions on the email itself or on another copy of its conversation in the same holder's mail.
+     *
      * @param  Builder<EmailLinkSuppression>  $query
      * @return Builder<EmailLinkSuppression>
      */
     #[Scope]
-    protected function matchingConversationOf(Builder $query, Email $email): Builder
+    protected function heldAlongside(Builder $query, Email $email): Builder
     {
         $copies = Email::query()
             ->withoutGlobalScopes()
             ->where('workspace_id', $email->workspace_id)
             ->where(fn (Builder $same): Builder => $same
                 ->whereKey($email->getKey())
-                ->when(
-                    $email->conversation_key,
-                    fn (Builder $keyed, string $key): Builder => $keyed->orWhere('conversation_key', $key),
-                    fn (Builder $unkeyed): Builder => $unkeyed->when($email->rfc_message_id, fn (Builder $message, string $id): Builder => $message->orWhere('rfc_message_id', $id)),
-                ))
+                ->when($email->conversation_key, fn (Builder $keyed, string $key): Builder => $keyed->orWhere(fn (Builder $held): Builder => $held
+                    ->where('conversation_key', $key)
+                    ->where('user_id', $email->user_id))))
             ->select('id');
 
         return $query

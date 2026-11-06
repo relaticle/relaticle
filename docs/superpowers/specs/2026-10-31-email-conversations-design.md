@@ -227,7 +227,7 @@ A manual unlink must survive the next sync and relink (D22).
 | `created_at` | timestamp |
 
 Unique `(email_id, emailable_type, emailable_id)`. `LinkEmailAction` and
-`RelinkRecordHistoryJob` skip suppressed pairs.
+`RelinkRecordHistoryJob` skip pairs suppressed on the same holder's copies (see Linking).
 
 ### `connected_accounts`: new columns
 
@@ -606,6 +606,11 @@ were skipped and why.
   writes `email_link_suppressions` for the copies it detached, and link pins only reached
   copies. An actor who reached no copy is refused with a message: a teammate who sees the
   conversation at Subject or Participants only cannot take it off a record or pin it.
+- An unlink is about the unlinker's own mail. Its suppressions hide and block links only on
+  copies the same member holds: the copy itself and, through sync, that member's later
+  copies of the conversation (the copy alone when it has no conversation key). A pin on
+  any copy overrides them. Another member's unlink never hides, blocks or detaches a link
+  on my copies, at read time or at sync time, so the outcome never depends on when sync runs.
 - The Unlinked view groups the viewer's own conversations by sender, with "Create person"
   (prefilled from the address and name) and "Link to existing".
 - Adding an address to a person still queues `RelinkRecordHistoryJob`, which fills
