@@ -166,7 +166,7 @@ trait HasUnlinkedSenders
     }
 
     /**
-     * The sender's conversations to link, minus those the user earlier removed from the person: an unlink stays.
+     * The sender's conversations to link, minus those removed from the person by the user or on a copy they hold: an unlink stays.
      *
      * @return array{pairs: list<array{email: Email, record: People}>, kept_removed: int}
      */
@@ -183,7 +183,9 @@ trait HasUnlinkedSenders
                 ->whereColumn('email_link_suppressions.email_id', 'emails.id')
                 ->where('email_link_suppressions.emailable_type', $person->getMorphClass())
                 ->where('email_link_suppressions.emailable_id', $person->getKey())
-                ->where('email_link_suppressions.user_id', $user->getKey()))
+                ->where(fn (QueryBuilder $mine): QueryBuilder => $mine
+                    ->where('email_link_suppressions.user_id', $user->getKey())
+                    ->orWhere('emails.user_id', $user->getKey())))
             ->distinct()
             ->pluck('emails.conversation_key')
             ->all();

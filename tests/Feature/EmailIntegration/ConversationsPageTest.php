@@ -1617,13 +1617,33 @@ it('offers to link the sender to the person who already holds the address instea
         ->mountAction('createSenderPerson', arguments: ['address' => 'brian@airbnb.test', 'name' => 'Brian Chesky'])
         ->assertMountedActionModalSee('Brian Chesky already has this address')
         ->assertMountedActionModalSee('Link to Brian Chesky')
-        ->assertMountedActionModalSee('One conversation you removed from Brian Chesky earlier stays removed.')
+        ->assertMountedActionModalSee('One conversation removed from Brian Chesky earlier stays removed.')
         ->callMountedAction()
         ->assertHasNoActionErrors()
         ->assertNotified('Linked to Brian Chesky');
 
     expect(People::query()->where('name', 'Brian Chesky')->count())->toBe(1)
         ->and($email->people()->wherePivot('link_source', 'manual')->pluck('people.id')->all())->toBe([$person->id])
+        ->and($removed->people()->exists())->toBeFalse()
+        ->and(EmailLinkSuppression::query()->where('email_id', $removed->id)->exists())->toBeTrue();
+});
+
+it('keeps a removal a teammate made on the viewer\'s copy when linking the sender to an existing person', function (): void {
+    $person = People::factory()->create(['workspace_id' => $this->workspace->id, 'name' => 'Brian Chesky']);
+    $field = CustomField::query()->withoutGlobalScopes()->where('tenant_id', $this->workspace->id)->where('entity_type', 'people')->where('code', 'emails')->firstOrFail();
+    $person->saveCustomFieldValue($field, ['brian@airbnb.test'], $this->workspace);
+    $email = conversationsPageMessage($this->ownerMailbox, 'conv-brian', 'brian@airbnb.test');
+    $removed = conversationsPageMessage($this->ownerMailbox, 'conv-brian-old', 'brian@airbnb.test', ['sent_at' => now()->subWeek()]);
+    EmailLinkSuppression::factory()->create(['workspace_id' => $this->workspace->id, 'email_id' => $removed->id, 'emailable_type' => $person->getMorphClass(), 'emailable_id' => $person->id, 'user_id' => $this->teammate->id]);
+
+    livewire(EmailInboxPage::class)
+        ->call('setView', ConversationView::Unlinked->value)
+        ->mountAction('createSenderPerson', arguments: ['address' => 'brian@airbnb.test', 'name' => 'Brian Chesky'])
+        ->assertMountedActionModalSee('One conversation removed from Brian Chesky earlier stays removed.')
+        ->callMountedAction()
+        ->assertHasNoActionErrors();
+
+    expect($email->people()->pluck('people.id')->all())->toBe([$person->id])
         ->and($removed->people()->exists())->toBeFalse()
         ->and(EmailLinkSuppression::query()->where('email_id', $removed->id)->exists())->toBeTrue();
 });
