@@ -296,6 +296,31 @@ it('spaces paragraphs apart in the note editor', function (): void {
     expect($gap)->toBeGreaterThan(0);
 });
 
+it('paints the slash menu above the task modal', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/tasks")
+        ->press('New task')
+        ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
+        ->click('.fi-fo-rich-editor-seamless .ProseMirror')
+        ->keys('.fi-fo-rich-editor-seamless .ProseMirror', '/')
+        ->assertVisible('.fi-slash-menu');
+
+    $menuOnTop = $page->script(<<<'JS'
+        (() => {
+            const menu = [...document.querySelectorAll('.fi-slash-menu')].find((panel) => panel.getBoundingClientRect().height > 0);
+            const box = menu.getBoundingClientRect();
+
+            return menu.contains(document.elementFromPoint(box.left + box.width / 2, box.top + 20));
+        })();
+    JS);
+
+    expect($menuOnTop)->toBeTrue();
+});
+
 it('builds, ticks and saves a checklist in a task description', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
