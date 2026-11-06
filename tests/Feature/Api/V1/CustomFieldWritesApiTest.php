@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\MediaCollection;
+use App\Filament\RichEditor\ChecklistPlugin;
 use App\Http\Requests\Api\V1\BaseCrmEntityRequest;
 use App\Models\Company;
 use App\Models\CustomField;
@@ -13,6 +14,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Support\ChecklistHtml;
 use App\Support\Media\MediaLookup;
+use Filament\Forms\Components\RichEditor\RichContentRenderer;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
@@ -168,6 +170,30 @@ it('stores a well-formed checklist sent as html byte for byte', function (): voi
     ])->assertCreated()->json('data.attributes.custom_fields.description');
 
     expect($stored)->toBe($html);
+});
+
+it('stores an agent checklist exactly as the task editor renders it', function (): void {
+    $stored = $this->postJson('/api/v1/tasks', [
+        'title' => 'Same shape',
+        'custom_fields' => ['description' => "- [ ] Call **Bob**\n- [x] Read [the docs](https://relaticle.com/docs)\n  - [ ] nested"],
+    ])->assertCreated()->json('data.attributes.custom_fields.description');
+
+    $panelShape = RichContentRenderer::make($stored)->plugins([ChecklistPlugin::make()])->toUnsafeHtml();
+
+    expect(trim($stored))->toBe($panelShape);
+});
+
+it('drops scripts and event handlers inside a checklist item', function (): void {
+    $stored = $this->postJson('/api/v1/tasks', [
+        'title' => 'Hostile',
+        'custom_fields' => ['description' => '<ul data-type="taskList"><li data-type="taskItem" data-checked="false"><p>Call <img src="x" onerror="alert(1)"> <a href="javascript:alert(1)">Bob</a><script>alert(2)</script></p></li></ul>'],
+    ])->assertCreated()->json('data.attributes.custom_fields.description');
+
+    expect($stored)->not->toContain('onerror')
+        ->not->toContain('<script')
+        ->not->toContain('javascript:')
+        ->toContain('Call')
+        ->toContain('Bob');
 });
 
 it('returns a record field as id and name pairs for an own-workspace company', function (): void {

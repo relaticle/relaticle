@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use App\Filament\RichEditor\ChecklistPlugin;
 use Dom\Element;
 use Dom\HTMLDocument;
 use Dom\Node;
 use Dom\Text;
+use Filament\Forms\Components\RichEditor\RichContentRenderer;
 
 final readonly class ChecklistHtml
 {
@@ -95,9 +97,11 @@ final readonly class ChecklistHtml
             }
 
             $list->replaceChildren(...array_map(
-                fn (Element $item): Element => self::buildItem($document, $item),
+                fn (Element $item): Element => self::bareItem($document, $item),
                 self::collectItems($document, $list),
             ));
+
+            $list->outerHTML = self::rendered($list->outerHTML);
         }
 
         return $document->body->innerHTML;
@@ -211,29 +215,21 @@ final readonly class ChecklistHtml
         return $items;
     }
 
-    private static function buildItem(HTMLDocument $document, Element $source): Element
+    private static function bareItem(HTMLDocument $document, Element $source): Element
     {
-        $checked = $source->getAttribute('data-checked') === 'true';
-
-        $input = $document->createElement('input');
-        $input->setAttribute('type', 'checkbox');
-
-        if ($checked) {
-            $input->setAttribute('checked', 'checked');
-        }
-
-        $label = $document->createElement('label');
-        $label->append($input, $document->createElement('span'));
-
-        $body = $document->createElement('div');
-        $body->append(...self::itemParagraphs($document, self::contentNodes($source)));
-
         $item = $document->createElement('li');
-        $item->setAttribute('data-checked', $checked ? 'true' : 'false');
+        $item->setAttribute('data-checked', $source->getAttribute('data-checked') === 'true' ? 'true' : 'false');
         $item->setAttribute('data-type', 'taskItem');
-        $item->append($label, $body);
+        $item->append(...self::itemParagraphs($document, self::contentNodes($source)));
 
         return $item;
+    }
+
+    private static function rendered(string $taskList): string
+    {
+        return RichContentRenderer::make($taskList)
+            ->plugins([ChecklistPlugin::make()])
+            ->toUnsafeHtml();
     }
 
     /** @return list<Node> */
