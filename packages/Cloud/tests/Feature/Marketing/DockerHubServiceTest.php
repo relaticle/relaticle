@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use GuzzleHttp\Promise\PromiseInterface;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Relaticle\Cloud\Marketing\Services\DockerHubService;
@@ -52,4 +54,15 @@ it('keeps the last good pull count when Docker Hub fails on the next fetch', fun
     Cache::forget('dockerhub_pulls_manukminasyan_relaticle');
 
     expect($service->getFormattedPullCount())->toBe('21,000+');
+});
+
+it('gives up on Docker Hub within a few seconds so a cold cache cannot stall the page', function (): void {
+    Http::fake(function (Request $request, array $options): PromiseInterface {
+        expect($options['connect_timeout'])->toBe(2)
+            ->and($options['timeout'])->toBe(3);
+
+        return Http::response(['pull_count' => 21987]);
+    });
+
+    expect((new DockerHubService)->getFormattedPullCount())->toBe('21,000+');
 });

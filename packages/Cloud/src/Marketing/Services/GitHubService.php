@@ -13,6 +13,10 @@ use Illuminate\Support\Number;
 
 final readonly class GitHubService
 {
+    private const int CONNECT_TIMEOUT_SECONDS = 2;
+
+    private const int REQUEST_TIMEOUT_SECONDS = 3;
+
     /**
      * Get the stargazers to count for a GitHub repository
      *
@@ -28,7 +32,7 @@ final readonly class GitHubService
         return (int) Cache::remember($cacheKey, now()->addMinutes($cacheMinutes), function () use ($owner, $repo, $lastGoodKey): int {
             try {
                 /** @var Response $response */
-                $response = Http::withHeaders([
+                $response = Http::connectTimeout(self::CONNECT_TIMEOUT_SECONDS)->timeout(self::REQUEST_TIMEOUT_SECONDS)->withHeaders([
                     'Accept' => 'application/vnd.github.v3+json',
                 ])->get("https://api.github.com/repos/{$owner}/{$repo}");
 

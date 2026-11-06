@@ -12,6 +12,10 @@ use Illuminate\Support\Number;
 
 final readonly class DockerHubService
 {
+    private const int CONNECT_TIMEOUT_SECONDS = 2;
+
+    private const int REQUEST_TIMEOUT_SECONDS = 3;
+
     public function getPullCount(string $namespace = 'manukminasyan', string $repo = 'relaticle', int $cacheMinutes = 60): int
     {
         $cacheKey = "dockerhub_pulls_{$namespace}_{$repo}";
@@ -19,7 +23,7 @@ final readonly class DockerHubService
 
         return (int) Cache::remember($cacheKey, now()->addMinutes($cacheMinutes), function () use ($namespace, $repo, $lastGoodKey): int {
             try {
-                $response = Http::get("https://hub.docker.com/v2/repositories/{$namespace}/{$repo}/");
+                $response = Http::connectTimeout(self::CONNECT_TIMEOUT_SECONDS)->timeout(self::REQUEST_TIMEOUT_SECONDS)->get("https://hub.docker.com/v2/repositories/{$namespace}/{$repo}/");
 
                 if ($response->successful()) {
                     $pulls = (int) $response->json('pull_count', 0);
