@@ -148,3 +148,56 @@ it('moves the tab stop to a visible row when e marks the hovered tab stop done',
         ->assertScript($tabStops, ['conv-below'])
         ->assertNoJavaScriptErrors();
 })->with(['inLightMode', 'inDarkMode']);
+
+it('selects a range with shift-click and clears it after mark read', function (string $theme): void {
+    foreach (['conv-one' => 10, 'conv-two' => 20, 'conv-three' => 30, 'conv-four' => 40] as $key => $minutes) {
+        triageBrowserInbound($this->mailbox, $key, now()->subMinutes($minutes));
+    }
+    $checkbox = fn (string $key): string => "[data-conversation=\"{$key}\"] [data-select-conversation]";
+
+    $page = loginViaBrowser($this->owner, $theme)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/email?view=all")
+        ->assertPresent($checkbox('conv-four'))
+        ->assertScript('document.querySelectorAll("[data-conversation][data-unread=true]").length', 4)
+        ->click($checkbox('conv-one'));
+
+    $page->page()->locator($checkbox('conv-three'))->click(['modifiers' => ['Shift']]);
+
+    $page->assertVisible('[data-triage-bar]')
+        ->assertSeeIn('[data-triage-selected]', '3 selected')
+        ->assertScript('[...document.querySelectorAll("[data-selected=true]")].map((row) => row.dataset.conversation)', ['conv-one', 'conv-two', 'conv-three']);
+
+    $page->screenshot(filename: "conversation-selection-{$theme}");
+
+    $page->click('[data-triage-bulk="markRead"]')
+        ->wait(1.5)
+        ->assertMissing('[data-triage-bar]')
+        ->assertScript('[...document.querySelectorAll("[data-conversation][data-unread=true]")].map((row) => row.dataset.conversation)', ['conv-four'])
+        ->assertSeeIn('[data-undo-toast]', '3 conversations marked read.')
+        ->assertNoJavaScriptErrors();
+})->with(['inLightMode', 'inDarkMode']);
+
+it('toggles the focused row with x and marks the selection done with e', function (string $theme): void {
+    foreach (['conv-one' => 10, 'conv-two' => 20, 'conv-three' => 30] as $key => $minutes) {
+        triageBrowserInbound($this->mailbox, $key, now()->subMinutes($minutes));
+    }
+
+    loginViaBrowser($this->owner, $theme)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
+        ->assertPresent('[data-conversation="conv-three"]')
+        ->keys('[data-conversation="conv-one"] > button', ['x', 'j'])
+        ->assertScript('document.activeElement.closest("[data-conversation]").dataset.conversation', 'conv-two')
+        ->keys('[data-conversation="conv-two"] > button', 'x')
+        ->assertSeeIn('[data-triage-selected]', '2 selected')
+        ->keys('[data-conversation="conv-two"] > button', 'e')
+        ->wait(1.5)
+        ->assertScript('[...document.querySelectorAll("[data-conversation]")].filter((row) => ! row.hidden).map((row) => row.dataset.conversation)', ['conv-three'])
+        ->assertMissing('[data-triage-bar]')
+        ->assertNoJavaScriptErrors();
+
+    expect(EmailConversationState::query()->where('user_id', $this->owner->id)->pluck('conversation_key')->all())->toEqualCanonicalizing(['conv-one', 'conv-two']);
+})->with(['inLightMode', 'inDarkMode']);

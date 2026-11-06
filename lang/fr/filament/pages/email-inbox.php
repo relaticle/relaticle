@@ -43,6 +43,13 @@ return [
             'mark_read' => 'Marquer comme lue',
             'mark_unread' => 'Marquer comme non lue',
         ],
+        'selection' => [
+            'toolbar' => 'Conversations sélectionnées',
+            'count' => ':count sélectionnée(s)',
+            'select' => 'Sélectionner :subject',
+            'select_page' => 'Tout sélectionner sur cette page',
+            'clear' => 'Effacer la sélection',
+        ],
         'toast' => [
             'markDone' => 'Conversation terminée dans Relaticle.|:count conversations terminées dans Relaticle.',
             'reopen' => 'Conversation rouverte.|:count conversations rouvertes.',
@@ -75,6 +82,7 @@ return [
             'compose' => 'Nouvel e-mail',
             'help' => 'Raccourcis clavier',
             'undo' => 'Annuler',
+            'select' => 'Sélectionner la conversation',
         ],
         'scopes' => [
             'list' => 'Liste des conversations',

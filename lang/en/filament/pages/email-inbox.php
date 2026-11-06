@@ -274,6 +274,13 @@ return [
             'mark_read' => 'Mark read',
             'mark_unread' => 'Mark unread',
         ],
+        'selection' => [
+            'toolbar' => 'Selected conversations',
+            'count' => ':count selected',
+            'select' => 'Select :subject',
+            'select_page' => 'Select all on this page',
+            'clear' => 'Clear selection',
+        ],
         'toast' => [
             'markDone' => 'Conversation marked Done in Relaticle.|:count conversations marked Done in Relaticle.',
             'reopen' => 'Conversation reopened.|:count conversations reopened.',
@@ -306,6 +313,7 @@ return [
             'compose' => 'New email',
             'help' => 'Keyboard shortcuts',
             'undo' => 'Undo',
+            'select' => 'Select conversation',
         ],
         'scopes' => [
             'list' => 'Conversation list',

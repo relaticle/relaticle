@@ -102,6 +102,8 @@
                 renderObserver: null,
                 focusedKey: null,
                 hoveredKey: null,
+                selected: [],
+                anchorKey: null,
                 registrations: [],
                 entries: @js(\Relaticle\EmailIntegration\Enums\EmailShortcut::forStore()),
                 init() {
@@ -122,6 +124,7 @@
                                 open: () => this.open(),
                                 done: () => this.toggleDone(),
                                 markUnread: () => this.markUnread(),
+                                select: () => this.selectTarget(),
                                 focusSearch: () => this.focusSearch(),
                             },
                             isActive: () => ! document.activeElement?.closest('[data-email-reader]'),
@@ -165,8 +168,14 @@
                     return this.focusedRow() ?? (hovered && ! hovered.hidden ? hovered : null)
                 },
                 {{-- Reads the reactive overrides and render count, so the tab stop moves to a neighbour when its row is hidden or refetched away. --}}
+                allKeys() {
+                    return this.renders >= 0 ? [...this.$root.querySelectorAll('[data-conversation]')].map((row) => row.dataset.conversation) : []
+                },
+                visibleKeys() {
+                    return this.allKeys().filter((key) => ! this.isHidden(key))
+                },
                 rovingKey() {
-                    const keys = this.renders >= 0 ? [...this.$root.querySelectorAll('[data-conversation]')].map((row) => row.dataset.conversation) : []
+                    const keys = this.allKeys()
                     const visible = (key) => ! this.isHidden(key)
                     const index = keys.indexOf(this.focusedKey)
 
@@ -206,7 +215,55 @@
 
                     return row !== null
                 },
+                isSelected(key) {
+                    return this.selected.includes(key)
+                },
+                toggleSelect(key, event = null) {
+                    const keys = this.visibleKeys()
+                    const from = keys.indexOf(this.anchorKey)
+                    const to = keys.indexOf(key)
+
+                    if (event?.shiftKey && from !== -1 && to !== -1) {
+                        this.selected = [...new Set([...this.selected, ...keys.slice(Math.min(from, to), Math.max(from, to) + 1)])]
+                    } else {
+                        this.selected = this.isSelected(key) ? this.selected.filter((selected) => selected !== key) : [...this.selected, key]
+                    }
+
+                    this.anchorKey = key
+                },
+                pageSelected() {
+                    const keys = this.visibleKeys()
+
+                    return keys.length > 0 && keys.every((key) => this.isSelected(key))
+                },
+                togglePage() {
+                    this.selected = this.pageSelected() ? [] : this.visibleKeys()
+                    this.anchorKey = null
+                },
+                clearSelection() {
+                    this.selected = []
+                    this.anchorKey = null
+                },
+                selectTarget() {
+                    const row = this.targetRow()
+
+                    if (! row) {
+                        return false
+                    }
+
+                    this.toggleSelect(row.dataset.conversation)
+                },
+                bulk(verb) {
+                    const keys = this.selected.filter((key) => ! this.isHidden(key))
+
+                    this.clearSelection()
+                    this.act(verb, keys)
+                },
                 toggleDone() {
+                    if (this.selected.length > 0) {
+                        return this.bulk(this.view === 'done' ? 'reopen' : 'markDone')
+                    }
+
                     const row = this.targetRow()
 
                     if (! row) {
@@ -217,6 +274,10 @@
                     this.act(verb, [row.dataset.conversation], { advance: verb === 'markDone' && row === this.focusedRow() })
                 },
                 markUnread() {
+                    if (this.selected.length > 0) {
+                        return this.bulk('markUnread')
+                    }
+
                     const row = this.targetRow()
 
                     if (! row) {
@@ -252,6 +313,8 @@
                     if (this.pending === 0) {
                         this.overrides = {}
                     }
+
+                    this.selected = this.selected.filter((key) => this.row(key))
 
                     this.renders++
                 },
@@ -333,19 +396,36 @@
             x-on:mouseover="hoveredKey = $event.target.closest('[data-conversation]')?.dataset.conversation ?? null"
             x-on:mouseleave="hoveredKey = null"
             x-bind:data-triage-pending="pending > 0 ? 'true' : null"
-            class="divide-y divide-gray-200/60 dark:divide-white/10"
         >
-            @forelse ($this->conversations->rows as $row)
-                <x-email-integration::conversation-row :row="$row" selectable triage :current="$row->conversationKey === $this->selectedEmail?->conversation_key" wire:key="conversation-{{ $row->conversationKey }}" />
-            @empty
-                <x-filament::empty-state
-                    :heading="$this->isFiltering() ? __('filament/pages/email-inbox.views.no_match') : __('filament/pages/email-inbox.views.empty.'.$this->activeView->value)"
-                    :description="$this->isFiltering() ? __('filament/pages/email-inbox.views.no_match_hint') : null"
-                    :icon="$this->isFiltering() ? 'heroicon-o-magnifying-glass' : 'heroicon-o-envelope'"
-                    icon-color="gray"
-                    :contained="false"
-                />
-            @endforelse
+            @if ($this->conversations->rows !== [])
+                <label class="flex items-center gap-2 border-b border-gray-200/60 px-4 py-1.5 text-xs text-gray-500 sm:px-6 dark:border-white/10 dark:text-gray-400">
+                    <input
+                        type="checkbox"
+                        data-select-page
+                        x-bind:checked="pageSelected()"
+                        x-effect="$el.indeterminate = selected.length > 0 && ! pageSelected()"
+                        x-on:change="togglePage()"
+                        class="fi-checkbox-input"
+                    />
+                    {{ __('filament/pages/email-inbox.triage.selection.select_page') }}
+                </label>
+            @endif
+
+            <div class="divide-y divide-gray-200/60 dark:divide-white/10">
+                @forelse ($this->conversations->rows as $row)
+                    <x-email-integration::conversation-row :row="$row" selectable triage :current="$row->conversationKey === $this->selectedEmail?->conversation_key" wire:key="conversation-{{ $row->conversationKey }}" />
+                @empty
+                    <x-filament::empty-state
+                        :heading="$this->isFiltering() ? __('filament/pages/email-inbox.views.no_match') : __('filament/pages/email-inbox.views.empty.'.$this->activeView->value)"
+                        :description="$this->isFiltering() ? __('filament/pages/email-inbox.views.no_match_hint') : null"
+                        :icon="$this->isFiltering() ? 'heroicon-o-magnifying-glass' : 'heroicon-o-envelope'"
+                        icon-color="gray"
+                        :contained="false"
+                    />
+                @endforelse
+            </div>
+
+            <x-email-integration::triage-bar />
         </div>
 
         @if ($this->conversations->previousCursor !== null || $this->conversations->nextCursor !== null)

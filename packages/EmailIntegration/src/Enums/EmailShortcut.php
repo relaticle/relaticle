@@ -15,6 +15,7 @@ enum EmailShortcut: string
     case Forward = 'forward';
     case Done = 'done';
     case MarkUnread = 'mark_unread';
+    case Select = 'select';
     case FocusSearch = 'focus_search';
     case Compose = 'compose';
     case Help = 'help';
@@ -33,6 +34,7 @@ enum EmailShortcut: string
             self::Forward => ['f'],
             self::Done => ['e'],
             self::MarkUnread => ['u'],
+            self::Select => ['x'],
             self::FocusSearch => ['/'],
             self::Compose => ['c'],
             self::Help => ['?'],
@@ -45,7 +47,7 @@ enum EmailShortcut: string
     {
         return match ($this) {
             self::Next, self::Previous, self::Done, self::MarkUnread => [ShortcutScope::List, ShortcutScope::Reader],
-            self::Open, self::FocusSearch => [ShortcutScope::List],
+            self::Open, self::Select, self::FocusSearch => [ShortcutScope::List],
             self::Close => [ShortcutScope::Reader, ShortcutScope::Composer],
             self::Reply, self::ReplyAll, self::Forward => [ShortcutScope::Reader],
             self::Compose, self::Help, self::Undo => [ShortcutScope::Global],
@@ -69,6 +71,7 @@ enum EmailShortcut: string
             self::Forward => 'forward',
             self::Done => 'done',
             self::MarkUnread => 'markUnread',
+            self::Select => 'select',
             self::FocusSearch => 'focusSearch',
             self::Compose => 'compose',
             self::Help => 'help',
@@ -82,7 +85,7 @@ enum EmailShortcut: string
         return match ($this) {
             self::Close => false,
             self::Next, self::Previous, self::Open, self::Reply, self::ReplyAll, self::Forward, self::Done,
-            self::MarkUnread, self::FocusSearch, self::Compose, self::Help, self::Undo => true,
+            self::MarkUnread, self::Select, self::FocusSearch, self::Compose, self::Help, self::Undo => true,
         };
     }
 
@@ -91,7 +94,7 @@ enum EmailShortcut: string
         return match ($this) {
             self::Close => true,
             self::Next, self::Previous, self::Open, self::Reply, self::ReplyAll, self::Forward, self::Done,
-            self::MarkUnread, self::FocusSearch, self::Compose, self::Help, self::Undo => false,
+            self::MarkUnread, self::Select, self::FocusSearch, self::Compose, self::Help, self::Undo => false,
         };
     }
 

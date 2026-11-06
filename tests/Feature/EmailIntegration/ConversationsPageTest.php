@@ -1379,3 +1379,23 @@ it('keeps the needs reply view after the last conversation in it is marked done'
     expect($page->instance()->conversationView)->toBe(ConversationView::NeedsReply)
         ->and($page->instance()->activeView)->toBe(ConversationView::NeedsReply);
 });
+
+it('marks every selected conversation done in one call and reports the skipped ones', function (): void {
+    foreach (['conv-pricing', 'conv-security', 'conv-renewal'] as $key) {
+        conversationsPageMessage($this->ownerMailbox, $key, 'brian@airbnb.test');
+    }
+    conversationsPageMessage($this->teammateMailbox, 'conv-private', 'olivia@stripe.test', ['privacy_tier' => EmailPrivacyTier::PRIVATE]);
+
+    livewire(EmailInboxPage::class)
+        ->assertSeeHtml('data-select-page')
+        ->assertSeeHtml('data-select-conversation')
+        ->assertSeeHtml('data-triage-bar')
+        ->call('markDone', ['conv-pricing', 'conv-security', 'conv-renewal', 'conv-private'])
+        ->assertReturned([
+            'applied' => ['conv-pricing', 'conv-security', 'conv-renewal'],
+            'skipped' => [['reason' => TriageSkipReason::NotAvailable->value, 'label' => TriageSkipReason::NotAvailable->label(), 'count' => 1]],
+        ]);
+
+    expect(conversationsPageViewKeys(ConversationView::Done))->toEqualCanonicalizing(['conv-pricing', 'conv-security', 'conv-renewal'])
+        ->and(conversationsPageViewKeys(ConversationView::NeedsReply))->toBe([]);
+});

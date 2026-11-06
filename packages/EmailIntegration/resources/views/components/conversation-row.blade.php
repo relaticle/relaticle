@@ -35,11 +35,13 @@
         data-server-done="{{ $row->isDone ? 'true' : 'false' }}"
         x-bind:data-unread="flag(@js($row->conversationKey), 'unread')"
         x-bind:data-done="flag(@js($row->conversationKey), 'done')"
+        x-bind:data-selected="isSelected(@js($row->conversationKey)) ? 'true' : null"
     @endif
     {{ $attributes->class([
         'group/row relative flex w-full items-start gap-2 px-4 py-3 transition-colors sm:px-6',
         'hover:bg-gray-50 dark:hover:bg-white/5' => $opens,
         'bg-gray-50 before:absolute before:inset-y-0 before:start-0 before:w-0.5 before:bg-primary-500 dark:bg-white/5' => $current,
+        'data-[selected=true]:bg-primary-50 dark:data-[selected=true]:bg-primary-500/10' => $triage,
     ]) }}
 >
     @if ($opens)
@@ -58,6 +60,22 @@
             @endif
             class="absolute inset-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 data-[loading]:cursor-wait"
         ></button>
+    @endif
+
+    @if ($triage)
+        <span class="relative flex h-5 shrink-0 items-center">
+            <input
+                type="checkbox"
+                data-select-conversation
+                aria-label="{{ __('filament/pages/email-inbox.triage.selection.select', ['subject' => $subject]) }}"
+                x-bind:checked="isSelected(@js($row->conversationKey))"
+                x-bind:tabindex="tabIndexFor(@js($row->conversationKey))"
+                x-bind:aria-keyshortcuts="$store.shortcuts?.keysFor('select')"
+                x-bind:class="selected.length > 0 ? '' : 'sm:opacity-0 sm:group-focus-within/row:opacity-100 sm:group-hover/row:opacity-100'"
+                x-on:click.stop="toggleSelect(@js($row->conversationKey), $event)"
+                class="fi-checkbox-input transition-opacity"
+            />
+        </span>
     @endif
 
     <span class="flex h-5 w-2 shrink-0 items-center justify-center">
