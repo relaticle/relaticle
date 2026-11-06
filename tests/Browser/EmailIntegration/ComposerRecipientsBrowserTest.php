@@ -299,11 +299,12 @@ it('adds mass send recipients from the search without a script error', function 
         ->waitForText(__('filament/emails/composer.title_mass_send'))
         ->type('aside input[type="text"]', 'dana@globex')
         ->click('aside ul.absolute > li > button')
-        ->waitForText('dana@globex.example')
+        ->waitForText(__('filament/emails/composer.mass_send.send_button', ['count' => 1]))
         ->type('aside input[type="text"]', 'dara@initech')
         ->click('aside ul.absolute > li > button')
-        ->waitForText('dara@initech.example')
-        ->assertSee(__('filament/emails/composer.mass_send.send_button', ['count' => 2]))
+        ->waitForText(__('filament/emails/composer.mass_send.send_button', ['count' => 2]))
+        ->assertSee('dana@globex.example')
+        ->assertSee('dara@initech.example')
         ->assertNoJavaScriptErrors();
 });
 
