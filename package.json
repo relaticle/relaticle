@@ -10,9 +10,7 @@
         "prebuild": "rm -f public/hot",
         "build": "vite build",
         "brand:build": "node bin/build-brand-assets.mjs",
-        "brand:check": "node bin/build-brand-assets.mjs --check",
-        "rich-editor:build": "node bin/build-rich-editor-plugins.mjs",
-        "rich-editor:check": "node bin/build-rich-editor-plugins.mjs --check"
+        "brand:check": "node bin/build-brand-assets.mjs --check"
     },
     "devDependencies": {
         "@tailwindcss/forms": "^0.5.11",

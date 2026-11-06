@@ -864,8 +864,6 @@ final class AppServiceProvider extends ServiceProvider
         FilamentAsset::register([
             Js::make('rich-editor-slash-menu', resource_path('js/filament/rich-content-plugins/slash-menu.js'))
                 ->loadedOnRequest(),
-            Js::make('rich-editor-checklist', resource_path('js/filament/rich-content-plugins/dist/checklist.js'))
-                ->loadedOnRequest(),
             Js::make('payload-guard', resource_path('js/filament/payload-guard.js')),
             Js::make('linked-records-picker', resource_path('js/filament/linked-records-picker.js')),
         ]);

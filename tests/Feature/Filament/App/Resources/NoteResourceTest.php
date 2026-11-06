@@ -339,14 +339,9 @@ it('keeps the checklist out of the note slash menu', function (): void {
     expect(collect($menu['items'])->pluck('id')->all())->not->toContain('taskList');
 });
 
-it('versions both rich editor scripts by the newest published file', function (): void {
-    $newest = max(
-        filemtime(public_path('js/app/rich-editor-slash-menu.js')),
-        filemtime(public_path('js/app/rich-editor-checklist.js')),
-    );
-
-    expect(FilamentAsset::getScriptSrc('rich-editor-slash-menu'))->toEndWith("?v={$newest}")
-        ->and(FilamentAsset::getScriptSrc('rich-editor-checklist'))->toEndWith("?v={$newest}");
+it('versions the slash menu script by its published file', function (): void {
+    expect(FilamentAsset::getScriptSrc('rich-editor-slash-menu'))
+        ->toEndWith('?v='.filemtime(public_path('js/app/rich-editor-slash-menu.js')));
 });
 
 it('keeps file attachments enabled on a toolbarless note body', function (): void {

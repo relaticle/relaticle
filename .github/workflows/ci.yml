@@ -352,9 +352,6 @@ jobs:
       - name: Install JS dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Check rich editor plugin bundle
-        run: pnpm run rich-editor:check
-
       - name: Build assets
         run: pnpm run build
 

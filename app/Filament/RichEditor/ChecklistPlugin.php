@@ -7,8 +7,8 @@ namespace App\Filament\RichEditor;
 use Filament\Actions\Action;
 use Filament\Forms\Components\RichEditor\Plugins\Contracts\RichContentPlugin;
 use Filament\Forms\Components\RichEditor\RichEditorTool;
-use Filament\Support\Facades\FilamentAsset;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Vite;
 use Tiptap\Core\Extension;
 use Tiptap\Nodes\TaskList;
 
@@ -28,7 +28,7 @@ final class ChecklistPlugin implements RichContentPlugin
     /** @return array<string> */
     public function getTipTapJsExtensions(): array
     {
-        return [FilamentAsset::getScriptSrc('rich-editor-checklist')];
+        return [Vite::asset('resources/js/filament/rich-content-plugins/checklist.js')];
     }
 
     /** @return array<RichEditorTool> */
