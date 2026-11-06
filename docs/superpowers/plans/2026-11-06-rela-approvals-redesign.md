@@ -48,7 +48,8 @@
   - `public function leftOutDependents(): array` (`array<string, string>` dependent step id to the left-out step id that takes it, transitive, computed from `ProposalPlanService::dependencyIds()`)
   - `public function linkedRowIndexes(): array` (`array<string, array<int, string>>` step id to row index to the name of the step that links to that row via `$ref:<id>#n`)
   - `public function approvableRecordCount(): int` (records in pending, approvable, not-left-out steps and rows; replaces `approveAllCount` in the view)
-  - `public function primaryIsRisky(): bool` (true when any counted step is a delete, or the only counted step has `needsOwnApproval()`)
+  - `public function primaryIsRisky(): bool` (true when any counted step is a delete, or the only counted step needs its own approval and is not `approvesFromKeyboard()`; a WebAccess-only card is not risky)
+  - `public mixed $leftOutSteps`, `public mixed $leftOutRows`, read only through `ProposalPlanService::cleanLeftOutSteps()` / `cleanLeftOutRows()`; `ProposalPlanService::rejectRows()` for a standalone own-approval batch (invitations) with rows left out
 - Produces on `ProposalPlanService`:
   - `public function approveAll(PendingAction $action, User $user, array $leftOutSteps = [], array $leftOutRows = []): array` with the same return shape. Order: reject each left-out step via `reject()` (cascade), then `PendingActionService::rejectItem()` for each left-out row, then approve the remaining pending, non-own-approval steps as today.
 - `approveAll` becomes the primary for standalone batches too (a single batch step is a plan of one); `createCurrent` stays the primary for a single record.
@@ -83,7 +84,8 @@
 - [ ] **Step 1: Write failing render tests** (Livewire `assertSeeHtml`/`assertSeeText`):
   - plan of three: sees "3 changes", "Approve 3 changes", "Discard all", every value of every step (job title, email, due date, assignee, note body), the ref chip text "Priya Nair" with "new", and no "Approved together, in order", no "(step 1)".
   - after `toggleLeftOut(person)`: sees "1 of 3 changes", "Priya Nair is left out, so this task is left out too. It links to Priya Nair.", "Keep Priya Nair", and "Approve 1 change" (`trans_choice('Approve :count change|Approve :count changes')`).
-  - standalone batch of 6: sees all six names, "Approve 6 changes", no `prevItem`/`nextItem` controls.
+  - standalone batch of 6: sees all six names (assert each one, the card must render every record the footer approves), "Approve 6 changes", no paging controls.
+  - standalone invitation card of 2: both addresses visible, each with its x; leaving one out changes the button to "Send 1 invitation".
   - delete of 2 tasks: sees "Delete 2 tasks", the primary has no `data-proposal-shortcut`.
   - plan task + email: sees "Approve task", "Then email Renewal options for Figma", "you approve it on its own, next"; primary has `data-proposal-shortcut`.
   - email alone (after `approveAll` on that plan): sees "Send email", "Don't send", no `data-proposal-shortcut`.
