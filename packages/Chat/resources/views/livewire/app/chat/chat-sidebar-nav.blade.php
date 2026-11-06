@@ -26,7 +26,28 @@
                 ? Math.min(list.length - 1, idx + 1)
                 : Math.max(0, idx - 1);
             e.preventDefault();
-            list[next]?.click();
+            {{-- wire:navigate drops focus, so the opened chat's link takes it back once it renders and
+                 j keeps moving. The flag tells the composer not to autofocus over it. --}}
+            const target = list[next];
+            const path = target ? new URL(target.href).pathname : null;
+            window.chatListKeyNavigation = path;
+            document.addEventListener('livewire:navigated', () => {
+                let frames = 30;
+                const refocus = () => {
+                    const link = Array.from(document.querySelectorAll('.fi-sidebar-chats a[wire\\:navigate]'))
+                        .find((candidate) => new URL(candidate.href).pathname === path);
+                    link?.focus();
+                    if (link && document.activeElement === link) {
+                        window.chatListKeyNavigation = null;
+                    } else if (frames-- > 0) {
+                        requestAnimationFrame(refocus);
+                    } else {
+                        window.chatListKeyNavigation = null;
+                    }
+                };
+                refocus();
+            }, { once: true });
+            target?.click();
         },
         allowsWithoutStore(e) {
             const tag = e.target?.tagName;

@@ -21,6 +21,7 @@
         text: '',
         announcement: '',
         visible: false,
+        lifted: false,
         timer: null,
         shortcut: null,
         init() {
@@ -67,6 +68,7 @@
         },
     }"
     x-on:email-triage-done.window="show($event.detail)"
+    x-on:email-selection-bar.window="lifted = $event.detail.shown"
 >
     <div aria-live="polite" class="sr-only" x-text="announcement"></div>
 
@@ -74,7 +76,8 @@
         x-show="visible"
         x-cloak
         x-transition.opacity
-        class="fixed inset-x-4 bottom-4 z-50 mx-auto flex max-w-md items-center gap-3 rounded-xl bg-gray-900 px-4 py-3 text-sm text-white shadow-lg ring-1 ring-gray-950/10 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 dark:bg-gray-800 dark:ring-white/10"
+        x-bind:class="lifted ? 'bottom-20' : 'bottom-4'"
+        class="fixed inset-x-4 z-50 mx-auto flex max-w-md items-center gap-3 rounded-xl bg-gray-900 px-4 py-3 text-sm text-white shadow-lg ring-1 ring-gray-950/10 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 dark:bg-gray-800 dark:ring-white/10"
     >
         <p class="min-w-0 flex-1" x-text="text"></p>
 

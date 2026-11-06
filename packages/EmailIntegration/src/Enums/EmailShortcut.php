@@ -48,7 +48,7 @@ enum EmailShortcut: string
         return match ($this) {
             self::Next, self::Previous, self::Done, self::MarkUnread => [ShortcutScope::List, ShortcutScope::Reader],
             self::Open, self::Select, self::FocusSearch => [ShortcutScope::List],
-            self::Close => [ShortcutScope::Reader, ShortcutScope::Composer],
+            self::Close => [ShortcutScope::List, ShortcutScope::Reader, ShortcutScope::Composer],
             self::Reply, self::ReplyAll, self::Forward => [ShortcutScope::Reader],
             self::Compose, self::Help, self::Undo => [ShortcutScope::Global],
         };

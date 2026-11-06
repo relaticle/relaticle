@@ -104,12 +104,16 @@
                 hoveredKey: null,
                 selected: [],
                 anchorKey: null,
+                barFrame: { left: 0, width: 0, covered: false },
                 registrations: [],
                 entries: @js(\Relaticle\EmailIntegration\Enums\EmailShortcut::forStore()),
                 init() {
                     {{-- A server render shows the truth, so the optimistic overrides end there unless an action is still in flight. --}}
                     this.renderObserver = new MutationObserver(() => this.serverRendered())
                     this.renderObserver.observe(this.$root, { attributes: true, attributeFilter: ['data-rendered'] })
+                    this.placeBarListener = () => requestAnimationFrame(() => this.placeBar())
+                    window.addEventListener('resize', this.placeBarListener)
+                    window.addEventListener('pointerup', this.placeBarListener)
 
                     const entries = this.entries
                     const reader = (action) => () => this.inReader(action)
@@ -125,6 +129,7 @@
                                 done: () => this.toggleDone(),
                                 markUnread: () => this.markUnread(),
                                 select: () => this.selectTarget(),
+                                close: (event) => this.escapeSelection(event),
                                 focusSearch: () => this.focusSearch(),
                             },
                             isActive: () => ! document.activeElement?.closest('[data-email-reader]'),
@@ -136,8 +141,8 @@
                                 next: reader('next'),
                                 previous: reader('previous'),
                                 close: reader('close'),
-                                done: () => this.inReader('done') || this.inReader('reopen'),
-                                markUnread: reader('mark-unread'),
+                                done: () => ! this.selectionOwnsKeys() && (this.inReader('done') || this.inReader('reopen')),
+                                markUnread: () => ! this.selectionOwnsKeys() && this.inReader('mark-unread'),
                                 reply: () => this.reply('reply'),
                                 replyAll: () => this.reply('reply_all'),
                                 forward: () => this.reply('forward'),
@@ -148,6 +153,8 @@
                 },
                 destroy() {
                     this.renderObserver?.disconnect()
+                    window.removeEventListener('resize', this.placeBarListener)
+                    window.removeEventListener('pointerup', this.placeBarListener)
                     this.$store.shortcuts?.unregister('email-list', this.registrations[0])
                     this.$store.shortcuts?.unregister('email-reader', this.registrations[1])
                 },
@@ -253,11 +260,43 @@
 
                     this.toggleSelect(row.dataset.conversation)
                 },
-                bulk(verb) {
-                    const keys = this.selected.filter((key) => ! this.isHidden(key))
+                {{-- With a selection and focus outside the reader, e and u act on the selection, never the open conversation. --}}
+                selectionOwnsKeys() {
+                    return this.selected.length > 0 && ! document.activeElement?.closest('[data-email-reader]')
+                },
+                escapeSelection(event) {
+                    if (this.selected.length === 0 || event.target?.matches?.('input:not([type=checkbox]), textarea, [contenteditable=true]')) {
+                        return false
+                    }
 
                     this.clearSelection()
-                    this.act(verb, keys)
+                },
+                {{-- Only rows not already in the target state are sent, so Undo is the exact inverse. --}}
+                needsChange(key, verb) {
+                    return {
+                        markDone: () => this.flag(key, 'done') !== 'true',
+                        reopen: () => this.flag(key, 'done') === 'true',
+                        markRead: () => this.flag(key, 'unread') === 'true',
+                        markUnread: () => this.flag(key, 'unread') !== 'true',
+                    }[verb]()
+                },
+                async bulk(verb) {
+                    const selection = [...this.selected]
+                    const keys = selection.filter((key) => ! this.isHidden(key) && this.needsChange(key, verb))
+
+                    this.clearSelection()
+
+                    if (! await this.act(verb, keys)) {
+                        this.selected = selection.filter((key) => this.row(key))
+                    }
+                },
+                placeBar() {
+                    const drawer = document.querySelector('[data-email-reader]')
+                    const list = this.$root.getBoundingClientRect()
+                    const right = drawer?.offsetWidth > 0 ? window.innerWidth - drawer.offsetWidth : window.innerWidth
+
+                    this.barFrame = { left: list.left, width: Math.max(0, right - list.left), covered: right - list.left < 320 }
+                    this.$dispatch('email-selection-bar', { shown: this.selected.length > 0 && ! this.barFrame.covered })
                 },
                 toggleDone() {
                     if (this.selected.length > 0) {
@@ -352,7 +391,7 @@
                     keys = keys.filter((key) => typeof key === 'string')
 
                     if (! effect || keys.length === 0) {
-                        return
+                        return keys.length === 0
                     }
 
                     const previous = Object.fromEntries(keys.map((key) => [key, this.overrides[key]]))
@@ -379,7 +418,7 @@
                     if (! outcome?.applied) {
                         keys.forEach((key) => this.restore(key, previous[key]))
 
-                        return
+                        return false
                     }
 
                     const applied = new Set(outcome.applied)
@@ -395,6 +434,8 @@
                     }
 
                     await options.then?.()
+
+                    return true
                 },
             }"
             x-on:email-triage.window="act($event.detail.verb, $event.detail.keys, $event.detail)"
@@ -402,6 +443,8 @@
             x-on:mouseover="hoveredKey = $event.target.closest('[data-conversation]')?.dataset.conversation ?? null"
             x-on:mouseleave="hoveredKey = null"
             x-bind:data-triage-pending="pending > 0 ? 'true' : null"
+            x-bind:class="selected.length > 0 && 'pb-24'"
+            x-effect="renders; selected.length; placeBar()"
         >
             @if ($this->conversations->rows !== [])
                 <label class="flex items-center gap-2 border-b border-gray-200/60 px-4 py-1.5 text-xs text-gray-500 sm:px-6 dark:border-white/10 dark:text-gray-400">
@@ -431,35 +474,36 @@
                 @endforelse
             </div>
 
+            @if ($this->conversations->previousCursor !== null || $this->conversations->nextCursor !== null)
+                <div class="flex items-center justify-between border-t border-gray-200/60 px-4 py-3 sm:px-6 dark:border-white/10">
+                    <button
+                        type="button"
+                        wire:click="previousConversationsPage"
+                        data-conversations-page="newer"
+                        wire:loading.attr="disabled"
+                        @disabled($this->conversations->previousCursor === null)
+                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
+                    >
+                        <x-heroicon-o-chevron-left class="h-3.5 w-3.5" />
+                        {{ __('filament/pages/email-inbox.views.newer') }}
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="nextConversationsPage"
+                        data-conversations-page="older"
+                        wire:loading.attr="disabled"
+                        @disabled($this->conversations->nextCursor === null)
+                        class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
+                    >
+                        {{ __('filament/pages/email-inbox.views.older') }}
+                        <x-heroicon-o-chevron-right class="h-3.5 w-3.5" />
+                    </button>
+                </div>
+            @endif
+
             <x-email-integration::triage-bar />
         </div>
 
-        @if ($this->conversations->previousCursor !== null || $this->conversations->nextCursor !== null)
-            <div class="flex items-center justify-between border-t border-gray-200/60 px-4 py-3 sm:px-6 dark:border-white/10">
-                <button
-                    type="button"
-                    wire:click="previousConversationsPage"
-                    data-conversations-page="newer"
-                    wire:loading.attr="disabled"
-                    @disabled($this->conversations->previousCursor === null)
-                    class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
-                >
-                    <x-heroicon-o-chevron-left class="h-3.5 w-3.5" />
-                    {{ __('filament/pages/email-inbox.views.newer') }}
-                </button>
-                <button
-                    type="button"
-                    wire:click="nextConversationsPage"
-                    data-conversations-page="older"
-                    wire:loading.attr="disabled"
-                    @disabled($this->conversations->nextCursor === null)
-                    class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
-                >
-                    {{ __('filament/pages/email-inbox.views.older') }}
-                    <x-heroicon-o-chevron-right class="h-3.5 w-3.5" />
-                </button>
-            </div>
-        @endif
     @else
         @livewire($pageTabShown->livewireComponent(), $pageTabShown->livewireParameters(), key($pageTabShown->value.'-table'))
     @endif

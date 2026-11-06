@@ -201,3 +201,89 @@ it('toggles the focused row with x and marks the selection done with e', functio
 
     expect(EmailConversationState::query()->where('user_id', $this->owner->id)->pluck('conversation_key')->all())->toEqualCanonicalizing(['conv-one', 'conv-two']);
 })->with(['inLightMode', 'inDarkMode']);
+
+it('marks two checked conversations done with e while a checkbox has focus', function (string $theme): void {
+    foreach (['conv-one' => 10, 'conv-two' => 20, 'conv-three' => 30] as $key => $minutes) {
+        triageBrowserInbound($this->mailbox, $key, now()->subMinutes($minutes));
+    }
+
+    loginViaBrowser($this->owner, $theme)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
+        ->click('[data-conversation="conv-one"] [data-select-conversation]')
+        ->click('[data-conversation="conv-two"] [data-select-conversation]')
+        ->keys('[data-conversation="conv-two"] [data-select-conversation]', 'e')
+        ->wait(1.5)
+        ->assertScript('[...document.querySelectorAll("[data-conversation]")].filter((row) => ! row.hidden).map((row) => row.dataset.conversation)', ['conv-three'])
+        ->assertSeeIn('[data-undo-toast]', '2 conversations marked Done in Relaticle.')
+        ->assertNoJavaScriptErrors();
+
+    expect(EmailConversationState::query()->pluck('conversation_key')->all())->toEqualCanonicalizing(['conv-one', 'conv-two']);
+})->with(['inLightMode', 'inDarkMode']);
+
+it('undoes a mixed bulk done without reopening the row that was already done', function (string $theme): void {
+    triageBrowserInbound($this->mailbox, 'conv-done', now()->subMinutes(10));
+    triageBrowserInbound($this->mailbox, 'conv-open', now()->subMinutes(20));
+    EmailConversationState::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->owner->id,
+        'conversation_key' => 'conv-done',
+        'done_through' => now()->addMinute(),
+    ]);
+
+    loginViaBrowser($this->owner, $theme)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/email?view=all")
+        ->assertScript('document.querySelector(\'[data-conversation="conv-done"]\').dataset.done', 'true')
+        ->click('[data-conversation="conv-done"] [data-select-conversation]')
+        ->click('[data-conversation="conv-open"] [data-select-conversation]')
+        ->keys('[data-conversation="conv-open"] [data-select-conversation]', 'e')
+        ->wait(1.5)
+        ->assertSeeIn('[data-undo-toast]', 'Conversation marked Done in Relaticle.')
+        ->click('[data-undo-action]')
+        ->wait(1.5)
+        ->assertScript('document.querySelector(\'[data-conversation="conv-done"]\').dataset.done', 'true')
+        ->assertScript('document.querySelector(\'[data-conversation="conv-open"]\').dataset.done', 'false')
+        ->assertNoJavaScriptErrors();
+
+    expect(EmailConversationState::query()->pluck('conversation_key')->all())->toBe(['conv-done']);
+})->with(['inLightMode', 'inDarkMode']);
+
+it('marks the selection done with e while the reader shows another conversation', function (string $theme): void {
+    foreach (['conv-open' => 10, 'conv-one' => 20, 'conv-two' => 30] as $key => $minutes) {
+        triageBrowserInbound($this->mailbox, $key, now()->subMinutes($minutes));
+    }
+
+    loginViaBrowser($this->owner, $theme)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
+        ->click('[data-conversation="conv-open"] > button')
+        ->assertVisible('.fi-email-reader-drawer')
+        ->click('[data-conversation="conv-one"] [data-select-conversation]')
+        ->click('[data-conversation="conv-two"] [data-select-conversation]')
+        ->assertVisible('[data-triage-bar]')
+        ->assertScript('document.querySelector("[data-triage-bar]").getBoundingClientRect().right <= document.querySelector(".fi-email-reader-drawer").getBoundingClientRect().left', true)
+        ->keys('[data-conversation="conv-two"] [data-select-conversation]', 'e')
+        ->wait(1.5)
+        ->assertVisible('.fi-email-reader-drawer')
+        ->assertNoJavaScriptErrors();
+
+    expect(EmailConversationState::query()->pluck('conversation_key')->all())->toEqualCanonicalizing(['conv-one', 'conv-two']);
+})->with(['inLightMode', 'inDarkMode']);
+
+it('clears the selection with Escape', function (string $theme): void {
+    triageBrowserInbound($this->mailbox, 'conv-one', now()->subMinutes(10));
+
+    loginViaBrowser($this->owner, $theme)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
+        ->click('[data-conversation="conv-one"] [data-select-conversation]')
+        ->assertVisible('[data-triage-bar]')
+        ->keys('[data-conversation="conv-one"] [data-select-conversation]', 'Escape')
+        ->assertMissing('[data-triage-bar]')
+        ->assertScript('document.querySelectorAll("[data-selected=true]").length', 0)
+        ->assertNoJavaScriptErrors();
+})->with(['inLightMode', 'inDarkMode']);

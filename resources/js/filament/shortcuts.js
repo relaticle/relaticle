@@ -6,8 +6,12 @@ const blockers = '[role=dialog][aria-modal=true], [role=menu], [role=listbox], .
 
 const hasOpenDropdown = () => document.querySelector(".fi-dropdown-panel[style*='display: block']") !== null
 
+const nonTextInputs = ['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'color', 'file', 'image']
+
 const isEditable = (target) =>
-    ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName) || target?.isContentEditable === true
+    (target?.tagName === 'INPUT' && ! nonTextInputs.includes(target.type))
+    || ['TEXTAREA', 'SELECT'].includes(target?.tagName)
+    || target?.isContentEditable === true
 
 const keyOf = (event) => {
     if (/^[a-z]$/i.test(event.key)) {
