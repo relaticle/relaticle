@@ -859,6 +859,7 @@ final class AppServiceProvider extends ServiceProvider
                 ->loadedOnRequest(),
             Js::make('payload-guard', resource_path('js/filament/payload-guard.js')),
             Js::make('linked-records-picker', resource_path('js/filament/linked-records-picker.js')),
+            Js::make('shortcuts', resource_path('js/filament/shortcuts.js')),
         ]);
 
         FilamentAsset::registerScriptData(['payloadTooLarge' => __('filament/panel.payload_too_large')]);

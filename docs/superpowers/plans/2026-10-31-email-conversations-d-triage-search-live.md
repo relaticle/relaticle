@@ -428,6 +428,10 @@ in `ConversationsPageTest.php`.
   - `it('undoes done with z while the toast is visible')`.
   - `it('selects a range with shift-click and clears it after mark read')`.
   - `it('lists the shortcuts in the help sheet')`: `?` opens it, Esc closes it, focus returns.
+- [ ] When the Profile toggle saves without a navigation, refresh the store: call
+  `$store.shortcuts.readPreference()` after updating the `[data-single-key-shortcuts]` flag, or set
+  `$store.shortcuts.singleKeys` directly. The `?` sheet footer links to Profile and says the
+  switch lives there, so that copy must be true once this task lands (review of Tasks 3-4).
 - [ ] Run each changed browser file once in WebKit: `php artisan test --compact <file> --browser safari`.
 - [ ] UI verification (see "Verification per PR").
 - [ ] Commit `test(email): cover triage keys and the off switch in the browser`.

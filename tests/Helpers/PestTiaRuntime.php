@@ -28,6 +28,8 @@ final class PestTiaRuntime
         'resources/data/disposable-email-domains.json' => 'tests/Feature/Auth/RegistrationTest.php',
         'phpstan*.neon' => 'tests/Arch',
         'phpunit*.xml' => 'tests/Arch',
+        'public/js/app/*.js' => 'tests/Arch',
+        'resources/js/filament/*.js' => 'tests/Arch',
     ];
 
     /** @var list<string> */

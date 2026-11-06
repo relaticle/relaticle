@@ -190,7 +190,7 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         ]).Blade::render('@livewire(\''.EmailAccessNotificationHandler::LIVEWIRE_ALIAS.'\', [\'hostsReader\' => $hostsReader, \'readerOnRecordPage\' => $readerOnRecordPage])', [
             'hostsReader' => $this->conversationsOn() && (in_array(EmailInboxPage::class, $scopes, true) || $this->isRecordPage($scopes)),
             'readerOnRecordPage' => $this->conversationsOn() && $this->isRecordPage($scopes),
-        ]);
+        ]).view('email-integration::components.shortcut-sheet')->render();
     }
 
     private function conversationsOn(): bool

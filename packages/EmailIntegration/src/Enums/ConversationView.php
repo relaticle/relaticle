@@ -17,6 +17,7 @@ enum ConversationView: string implements HasLabel
     case All = 'all';
     case Unlinked = 'unlinked';
     case Automated = 'automated';
+    case Done = 'done';
 
     public function getLabel(): string
     {
@@ -26,6 +27,7 @@ enum ConversationView: string implements HasLabel
             self::All => __('filament/pages/email-inbox.views.all'),
             self::Unlinked => __('filament/pages/email-inbox.views.unlinked'),
             self::Automated => __('filament/pages/email-inbox.views.automated'),
+            self::Done => __('filament/pages/email-inbox.views.done'),
         };
     }
 
@@ -38,7 +40,7 @@ enum ConversationView: string implements HasLabel
     {
         return match ($this) {
             self::NeedsReply, self::AwaitingReply, self::All, self::Unlinked => true,
-            self::Automated => false,
+            self::Automated, self::Done => false,
         };
     }
 
@@ -46,7 +48,7 @@ enum ConversationView: string implements HasLabel
     {
         return match ($this) {
             self::NeedsReply, self::AwaitingReply, self::Unlinked => true,
-            self::All, self::Automated => false,
+            self::All, self::Automated, self::Done => false,
         };
     }
 
@@ -54,7 +56,7 @@ enum ConversationView: string implements HasLabel
     {
         return match ($this) {
             self::Automated => true,
-            self::NeedsReply, self::AwaitingReply, self::All, self::Unlinked => false,
+            self::NeedsReply, self::AwaitingReply, self::All, self::Unlinked, self::Done => false,
         };
     }
 }

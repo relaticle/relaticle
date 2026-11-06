@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 return [
     'form' => [
+        'single_key_shortcuts' => [
+            'label' => 'Single-key shortcuts',
+            'helper_text' => 'Single-character keys such as J, K, E, / and ? act on the page. Turn off if you use speech input.',
+        ],
         'name' => [
             'label' => 'Name',
         ],
@@ -55,6 +59,10 @@ return [
                 'last_active' => 'Last active',
                 'unknown_device' => 'Unknown',
             ],
+        ],
+        'keyboard_shortcuts' => [
+            'title' => 'Keyboard shortcuts',
+            'description' => 'Choose whether single-character keys act on the page. Enter, Escape and keys with Ctrl or Cmd always work.',
         ],
         'delete_account' => [
             'title' => 'Delete Account',
@@ -138,6 +146,7 @@ return [
             'success' => 'Saved.',
         ],
         'photo_removed' => 'Profile photo removed.',
+        'keyboard_shortcuts_saved' => 'Keyboard shortcuts saved.',
         'photo_remove_failed' => 'Could not remove your profile photo. Please try again.',
         'logged_out_other_sessions' => [
             'success' => 'All other browser sessions have been logged out successfully.',

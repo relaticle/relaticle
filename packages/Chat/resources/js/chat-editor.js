@@ -124,8 +124,9 @@ export function chatEditor({ placeholder, onSubmit, onChange, onArrowUp, autofoc
             editorByEl.set(this.editorEl, editor);
             this.text = editor.getText();
 
-            if (autofocus) {
-                this.$nextTick(() => editorByEl.get(this.editorEl)?.commands.focus('end'));
+            // A chat opened with j or k keeps focus on its sidebar link, so the next key moves on.
+            if (autofocus && window.chatListKeyNavigation !== location.pathname) {
+                this.$nextTick(() => document.activeElement?.closest('.fi-sidebar-chats') || editorByEl.get(this.editorEl)?.commands.focus('end'));
             }
         },
 

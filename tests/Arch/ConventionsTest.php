@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Relaticle\EmailIntegration\Enums\EmailShortcut;
+use Relaticle\EmailIntegration\Enums\ShortcutScope;
 
 /**
  * Guards documented conventions that pest-arch and PHPStan cannot express.
@@ -1341,4 +1343,44 @@ it('keeps every Tailwind source on disk, and every core one inside the Docker fr
             'Self-hosted images would ship CSS that differs from production (.ai/guidelines/relaticle/ui.md). '.
             'The cloud package ships its own stylesheet, which the image never builds, so only core stylesheets must stay inside the frontend stage and none may name the cloud package: '.implode(', ', $problems),
         );
+});
+
+it('gives every email shortcut key one meaning per scope', function (): void {
+    $scopes = static fn (EmailShortcut $shortcut): array => array_map(fn (ShortcutScope $scope): string => $scope->value, $shortcut->scopes());
+    $clashes = [];
+
+    foreach (EmailShortcut::cases() as $index => $first) {
+        foreach (array_slice(EmailShortcut::cases(), $index + 1) as $second) {
+            $sharedKeys = array_intersect($first->keys(), $second->keys());
+            $overlap = in_array(ShortcutScope::Global->value, [...$scopes($first), ...$scopes($second)], true)
+                || array_intersect($scopes($first), $scopes($second)) !== [];
+
+            if ($sharedKeys !== [] && $overlap) {
+                $clashes[] = "{$first->name} and {$second->name} on ".implode(', ', $sharedKeys);
+            }
+        }
+    }
+
+    expect($clashes)->toBeEmpty('A key means one thing wherever its scopes meet: '.implode('; ', $clashes));
+
+    foreach (EmailShortcut::cases() as $shortcut) {
+        $singleCharacters = array_filter($shortcut->keys(), fn (string $key): bool => mb_strlen($key) === 1);
+
+        expect($shortcut->isCharacterKey())->toBe(count($singleCharacters) === count($shortcut->keys()), "{$shortcut->name} marks its keys as character keys only when every key is one character")
+            ->and($shortcut->keys())->each->toMatch('/^(?:[a-z\/?]|[A-Z][a-zA-Z]+)$/');
+    }
+});
+
+it('commits a published copy of every panel script that matches its source', function (): void {
+    $root = dirname(__DIR__, 2);
+    preg_match_all("/Js::make\('([\w-]+)', resource_path\('([^']+)'\)\)/", (string) file_get_contents($root.'/app/Providers/AppServiceProvider.php'), $registered, PREG_SET_ORDER);
+    $sources = array_column($registered, 2, 1);
+    $published = array_map(fn (string $path): string => basename($path, '.js'), glob($root.'/public/js/app/*.js') ?: []);
+
+    expect($sources)->not->toBeEmpty()
+        ->and($published)->toEqualCanonicalizing(array_keys($sources));
+
+    foreach ($sources as $id => $source) {
+        expect(file_get_contents("{$root}/public/js/app/{$id}.js"))->toBe(file_get_contents("{$root}/resources/{$source}"), "Run `php artisan filament:assets` and commit public/js/app/{$id}.js");
+    }
 });

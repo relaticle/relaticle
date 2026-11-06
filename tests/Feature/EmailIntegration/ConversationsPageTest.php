@@ -21,10 +21,16 @@ use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
+use Relaticle\EmailIntegration\Actions\MarkConversationsDone;
+use Relaticle\EmailIntegration\Actions\MarkConversationsRead;
+use Relaticle\EmailIntegration\Actions\MarkConversationsUnread;
 use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
+use Relaticle\EmailIntegration\Actions\PrepareConversationTriage;
 use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
+use Relaticle\EmailIntegration\Actions\ReopenConversations;
 use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
 use Relaticle\EmailIntegration\Data\ConversationFilters;
+use Relaticle\EmailIntegration\Data\TriageOutcome;
 use Relaticle\EmailIntegration\Enums\AutomatedReason;
 use Relaticle\EmailIntegration\Enums\ConversationView;
 use Relaticle\EmailIntegration\Enums\EmailCategory;
@@ -33,6 +39,7 @@ use Relaticle\EmailIntegration\Enums\EmailFilter;
 use Relaticle\EmailIntegration\Enums\EmailPageTab;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Enums\TriageSkipReason;
 use Relaticle\EmailIntegration\Events\ConversationChanged;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConversationFilters;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConversationReader;
@@ -43,6 +50,7 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBlocklist;
 use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailConversation;
+use Relaticle\EmailIntegration\Models\EmailConversationState;
 use Relaticle\EmailIntegration\Models\EmailLabel;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailRead;
@@ -53,7 +61,7 @@ use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
 
 use function Pest\Laravel\actingAs;
 
-mutates(ForgetConversationCountsListener::class, EmailInboxPage::class, HasConversationReader::class, ConversationsQuery::class, MarkEmailAsReadAction::class, ConversationView::class, PreferredEmailCopyService::class, ConversationFilters::class, EmailFilter::class, EmailSearchService::class, HasConversationFilters::class);
+mutates(ForgetConversationCountsListener::class, EmailInboxPage::class, HasConversationReader::class, ConversationsQuery::class, MarkEmailAsReadAction::class, ConversationView::class, PreferredEmailCopyService::class, ConversationFilters::class, EmailFilter::class, EmailSearchService::class, HasConversationFilters::class, MarkConversationsDone::class, ReopenConversations::class, MarkConversationsRead::class, MarkConversationsUnread::class, PrepareConversationTriage::class, TriageOutcome::class, TriageSkipReason::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withWorkspace()->create();
@@ -109,6 +117,21 @@ function conversationsPageMessage(ConnectedAccount $mailbox, string $key, string
     resolve(RefreshConversationSummary::class)->execute($mailbox->workspace_id, $key);
 
     return $email;
+}
+
+/**
+ * @param  list<string>  $keys
+ * @return array<string, string|null>
+ */
+function conversationsPageSeen(array $keys): array
+{
+    $html = livewire(EmailInboxPage::class)->call('setView', ConversationView::All->value)->html();
+
+    return collect($keys)->mapWithKeys(function (string $key) use ($html): array {
+        preg_match('/data-conversation="'.preg_quote($key, '/').'"[^>]*?data-last-inbound="([^"]*)"/', $html, $rendered);
+
+        return [$key => ($rendered[1] ?? '') === '' ? null : $rendered[1]];
+    })->all();
 }
 
 /**
@@ -1136,4 +1159,350 @@ it('forgets the cached counts of the workspace members when a conversation chang
     conversationsPageMessage($this->ownerMailbox, 'conv-new', 'brian@airbnb.test');
 
     expect(Cache::has(ConversationsQuery::countsCacheKey($this->teammate)))->toBeFalse();
+});
+
+/**
+ * @return list<string>
+ */
+function conversationsPageViewKeys(ConversationView $view): array
+{
+    return conversationsPageKeys(livewire(EmailInboxPage::class)->call('setView', $view->value)->html());
+}
+
+it('brings a done conversation back to needs reply when the customer writes again', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-11-02 09:00'));
+    conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'brian@airbnb.test', ['sent_at' => now()->subHour()]);
+
+    livewire(EmailInboxPage::class)->call('markDone', conversationsPageSeen(['conv-pricing']));
+
+    expect(conversationsPageViewKeys(ConversationView::NeedsReply))->toBe([])
+        ->and(conversationsPageViewKeys(ConversationView::Done))->toBe(['conv-pricing'])
+        ->and(livewire(EmailInboxPage::class)->instance()->viewCounts['needs_reply'])->toBe(0);
+
+    $this->travel(1)->hour();
+    conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'brian@airbnb.test', ['in_reply_to' => '<pricing-1@airbnb.test>']);
+
+    expect(conversationsPageViewKeys(ConversationView::NeedsReply))->toBe(['conv-pricing'])
+        ->and(conversationsPageViewKeys(ConversationView::Done))->toBe([]);
+});
+
+it('keeps a conversation done when a member replies', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-11-02 09:00'));
+    conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'brian@airbnb.test', ['sent_at' => now()->subHour()]);
+
+    livewire(EmailInboxPage::class)->call('markDone', conversationsPageSeen(['conv-pricing']));
+
+    $this->travel(1)->hour();
+    conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'ana@acme.test');
+    $this->travel(1)->hour();
+    conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'ben@acme.test');
+
+    expect(conversationsPageViewKeys(ConversationView::NeedsReply))->toBe([])
+        ->and(conversationsPageViewKeys(ConversationView::Done))->toBe(['conv-pricing']);
+});
+
+it('keeps a conversation done when an automated message arrives', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-11-02 09:00'));
+    conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'brian@airbnb.test', ['sent_at' => now()->subHour()]);
+
+    livewire(EmailInboxPage::class)->call('markDone', conversationsPageSeen(['conv-pricing']));
+
+    $this->travel(1)->hour();
+    conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'updates@airbnb.test', ['automated_reason' => AutomatedReason::List]);
+
+    expect(conversationsPageViewKeys(ConversationView::NeedsReply))->toBe([])
+        ->and(conversationsPageViewKeys(ConversationView::Done))->toBe(['conv-pricing']);
+});
+
+it('does not share done between two members holding the same conversation', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-11-02 09:00'));
+    conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'brian@airbnb.test', ['rfc_message_id' => '<pricing-1@airbnb.test>', 'sent_at' => now()->subHour()]);
+    conversationsPageMessage($this->teammateMailbox, 'conv-pricing', 'brian@airbnb.test', ['rfc_message_id' => '<pricing-1@airbnb.test>', 'sent_at' => now()->subHour()]);
+
+    livewire(EmailInboxPage::class)->call('markDone', conversationsPageSeen(['conv-pricing']));
+
+    expect(conversationsPageViewKeys(ConversationView::Done))->toBe(['conv-pricing']);
+
+    actingAs($this->teammate);
+
+    expect(conversationsPageViewKeys(ConversationView::NeedsReply))->toBe(['conv-pricing'])
+        ->and(conversationsPageViewKeys(ConversationView::Done))->toBe([]);
+});
+
+it('refuses to mark a conversation done that the viewer cannot see', function (): void {
+    conversationsPageMessage($this->teammateMailbox, 'conv-private', 'brian@airbnb.test', ['privacy_tier' => EmailPrivacyTier::PRIVATE]);
+
+    livewire(EmailInboxPage::class)
+        ->call('markDone', conversationsPageSeen(['conv-private']))
+        ->assertReturned([
+            'applied' => [],
+            'skipped' => [['reason' => TriageSkipReason::NotAvailable->value, 'label' => TriageSkipReason::NotAvailable->label(), 'count' => 1]],
+        ]);
+
+    expect(EmailConversationState::query()->count())->toBe(0);
+});
+
+it('marks unread only the viewer\'s own read state', function (): void {
+    $ownerCopy = conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'brian@airbnb.test', ['rfc_message_id' => '<pricing-1@airbnb.test>']);
+    $teammateCopy = conversationsPageMessage($this->teammateMailbox, 'conv-pricing', 'brian@airbnb.test', ['rfc_message_id' => '<pricing-1@airbnb.test>']);
+    EmailRead::factory()->create(['email_id' => $ownerCopy->id, 'user_id' => $this->owner->id, 'read_at' => now()]);
+    EmailRead::factory()->create(['email_id' => $teammateCopy->id, 'user_id' => $this->teammate->id, 'read_at' => now()]);
+    EmailRead::factory()->create(['email_id' => $ownerCopy->id, 'user_id' => $this->teammate->id, 'read_at' => now()]);
+
+    livewire(EmailInboxPage::class)->call('markUnread', ['conv-pricing']);
+
+    expect(EmailRead::query()->where('email_id', $ownerCopy->id)->where('user_id', $this->teammate->id)->exists())->toBeTrue()
+        ->and(EmailRead::query()->where('email_id', $ownerCopy->id)->where('user_id', $this->owner->id)->exists())->toBeFalse();
+
+    livewire(EmailInboxPage::class)
+        ->call('setView', ConversationView::All->value)
+        ->assertSeeHtml('data-conversation="conv-pricing" data-unread="true"');
+
+    actingAs($this->teammate);
+
+    livewire(EmailInboxPage::class)
+        ->call('setView', ConversationView::All->value)
+        ->assertSeeHtml('data-conversation="conv-pricing" data-unread="false"');
+});
+
+it('skips teammate copies that never reached the viewer when marking read', function (): void {
+    $email = conversationsPageMessage($this->teammateMailbox, 'conv-ben-lead', 'olivia@stripe.test');
+    $this->company->emails()->attach($email->id);
+
+    livewire(EmailInboxPage::class)
+        ->call('markRead', ['conv-ben-lead'])
+        ->assertReturned([
+            'applied' => [],
+            'skipped' => [['reason' => TriageSkipReason::NotInYourMailbox->value, 'label' => TriageSkipReason::NotInYourMailbox->label(), 'count' => 1]],
+        ]);
+
+    expect(EmailRead::query()->count())->toBe(0);
+});
+
+it('reopens a done conversation', function (): void {
+    conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'brian@airbnb.test');
+
+    livewire(EmailInboxPage::class)
+        ->call('markDone', conversationsPageSeen(['conv-pricing']))
+        ->call('reopen', ['conv-pricing'])
+        ->assertReturned(['applied' => ['conv-pricing'], 'skipped' => []]);
+
+    expect(conversationsPageViewKeys(ConversationView::NeedsReply))->toBe(['conv-pricing'])
+        ->and(conversationsPageViewKeys(ConversationView::Done))->toBe([]);
+});
+
+it('returns the skipped count to the page', function (): void {
+    conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'brian@airbnb.test');
+    conversationsPageMessage($this->teammateMailbox, 'conv-private', 'olivia@stripe.test', ['privacy_tier' => EmailPrivacyTier::PRIVATE]);
+
+    livewire(EmailInboxPage::class)
+        ->assertSeeHtml('data-triage-action="markDone"')
+        ->call('markDone', conversationsPageSeen(['conv-pricing', 'conv-private', 'conv-pricing']))
+        ->assertReturned([
+            'applied' => ['conv-pricing'],
+            'skipped' => [['reason' => TriageSkipReason::NotAvailable->value, 'label' => TriageSkipReason::NotAvailable->label(), 'count' => 1]],
+        ]);
+
+    expect(conversationsPageViewKeys(ConversationView::Done))->toBe(['conv-pricing']);
+
+    livewire(EmailInboxPage::class)
+        ->call('setView', ConversationView::All->value)
+        ->assertSeeHtml('data-message-count="1" data-done="true"');
+});
+
+it('brings a done conversation back when a reply sent before the mark syncs after it', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-11-02 10:00'));
+    conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'brian@airbnb.test');
+
+    $this->travelTo(CarbonImmutable::parse('2026-11-02 10:02'));
+    livewire(EmailInboxPage::class)->call('markDone', conversationsPageSeen(['conv-pricing']));
+
+    $this->travelTo(CarbonImmutable::parse('2026-11-02 10:05'));
+    conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'brian@airbnb.test', ['sent_at' => CarbonImmutable::parse('2026-11-02 10:01')]);
+
+    expect(conversationsPageViewKeys(ConversationView::NeedsReply))->toBe(['conv-pricing'])
+        ->and(conversationsPageViewKeys(ConversationView::Done))->toBe([]);
+});
+
+it('reopens only the viewer\'s own done state', function (): void {
+    conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'brian@airbnb.test', ['rfc_message_id' => '<pricing-1@airbnb.test>']);
+    conversationsPageMessage($this->teammateMailbox, 'conv-pricing', 'brian@airbnb.test', ['rfc_message_id' => '<pricing-1@airbnb.test>']);
+    EmailConversationState::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->teammate->id,
+        'conversation_key' => 'conv-pricing',
+    ]);
+
+    livewire(EmailInboxPage::class)
+        ->call('markDone', conversationsPageSeen(['conv-pricing']))
+        ->call('reopen', ['conv-pricing']);
+
+    expect(EmailConversationState::query()->where('user_id', $this->owner->id)->exists())->toBeFalse()
+        ->and(EmailConversationState::query()->where('user_id', $this->teammate->id)->where('conversation_key', 'conv-pricing')->exists())->toBeTrue();
+});
+
+it('writes no read row for a teammate copy shared below full', function (EmailPrivacyTier $tier): void {
+    $email = conversationsPageMessage($this->teammateMailbox, 'conv-shared', 'olivia@stripe.test', ['privacy_tier' => EmailPrivacyTier::PRIVATE]);
+    EmailShare::factory()->create([
+        'email_id' => $email->id,
+        'shared_by' => $this->teammate->id,
+        'shared_with' => $this->owner->id,
+        'tier' => $tier->value,
+    ]);
+
+    livewire(EmailInboxPage::class)
+        ->call('markRead', ['conv-shared'])
+        ->assertReturned([
+            'applied' => [],
+            'skipped' => [['reason' => TriageSkipReason::NotInYourMailbox->value, 'label' => TriageSkipReason::NotInYourMailbox->label(), 'count' => 1]],
+        ]);
+
+    expect(EmailRead::query()->count())->toBe(0);
+})->with([EmailPrivacyTier::SUBJECT, EmailPrivacyTier::METADATA_ONLY]);
+
+it('refuses more than one hundred conversations in one action', function (): void {
+    conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'brian@airbnb.test');
+    $keys = ['conv-pricing', ...array_map(fn (int $index): string => "conv-{$index}", range(1, 100))];
+
+    livewire(EmailInboxPage::class)
+        ->call('markDone', conversationsPageSeen($keys))
+        ->assertHasErrors(['keys']);
+
+    expect(EmailConversationState::query()->count())->toBe(0);
+});
+
+it('marks done in the current workspace when another holds the same key', function (): void {
+    conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'brian@airbnb.test');
+    $elsewhere = Workspace::factory()->create(['user_id' => $this->owner->id]);
+    config(['relaticle.features.email_conversations' => [$this->workspace->id, $elsewhere->id]]);
+    $this->owner->forceFill(['current_workspace_id' => $elsewhere->id])->save();
+    Filament::setTenant($elsewhere);
+    conversationsPageMessage(conversationsPageMailbox($this->owner, 'ana@elsewhere.test'), 'conv-pricing', 'brian@airbnb.test');
+
+    livewire(EmailInboxPage::class)
+        ->call('markDone', conversationsPageSeen(['conv-pricing']))
+        ->assertReturned(['applied' => ['conv-pricing'], 'skipped' => []]);
+
+    expect(EmailConversationState::query()->pluck('workspace_id')->all())->toBe([$elsewhere->id]);
+});
+
+it('keeps the needs reply view after the last conversation in it is marked done', function (): void {
+    conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'brian@airbnb.test');
+
+    $page = livewire(EmailInboxPage::class)->call('markDone', conversationsPageSeen(['conv-pricing']));
+
+    expect($page->instance()->conversationView)->toBe(ConversationView::NeedsReply)
+        ->and($page->instance()->activeView)->toBe(ConversationView::NeedsReply);
+});
+
+it('marks every selected conversation done in one call and reports the skipped ones', function (): void {
+    foreach (['conv-pricing', 'conv-security', 'conv-renewal'] as $key) {
+        conversationsPageMessage($this->ownerMailbox, $key, 'brian@airbnb.test');
+    }
+    conversationsPageMessage($this->teammateMailbox, 'conv-private', 'olivia@stripe.test', ['privacy_tier' => EmailPrivacyTier::PRIVATE]);
+
+    livewire(EmailInboxPage::class)
+        ->assertSeeHtml('data-select-page')
+        ->assertSeeHtml('data-select-conversation')
+        ->assertSeeHtml('data-triage-bar')
+        ->call('markDone', conversationsPageSeen(['conv-pricing', 'conv-security', 'conv-renewal', 'conv-private']))
+        ->assertReturned([
+            'applied' => ['conv-pricing', 'conv-security', 'conv-renewal'],
+            'skipped' => [['reason' => TriageSkipReason::NotAvailable->value, 'label' => TriageSkipReason::NotAvailable->label(), 'count' => 1]],
+        ]);
+
+    expect(conversationsPageViewKeys(ConversationView::Done))->toEqualCanonicalizing(['conv-pricing', 'conv-security', 'conv-renewal'])
+        ->and(conversationsPageViewKeys(ConversationView::NeedsReply))->toBe([]);
+});
+
+it('brings a done conversation back when the summary gained a reply the row had not shown yet', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-11-02 10:00'));
+    conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'brian@airbnb.test');
+    $seen = conversationsPageSeen(['conv-pricing']);
+
+    $this->travelTo(CarbonImmutable::parse('2026-11-02 10:01'));
+    conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'brian@airbnb.test');
+
+    livewire(EmailInboxPage::class)
+        ->call('markDone', $seen)
+        ->assertReturned(['applied' => ['conv-pricing'], 'skipped' => []]);
+
+    expect($seen)->toBe(['conv-pricing' => '2026-11-02T10:00:00Z'])
+        ->and(conversationsPageViewKeys(ConversationView::NeedsReply))->toBe(['conv-pricing'])
+        ->and(conversationsPageViewKeys(ConversationView::Done))->toBe([]);
+});
+
+it('never stores a seen time past the summary', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-11-02 10:00'));
+    conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'brian@airbnb.test');
+
+    livewire(EmailInboxPage::class)->call('markDone', ['conv-pricing' => '2027-01-01T00:00:00Z']);
+
+    expect(EmailConversationState::query()->sole()->done_through?->toIso8601String())->toBe('2026-11-02T10:00:00+00:00');
+});
+
+it('refuses a seen time that is not a date', function (mixed $seen): void {
+    conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'brian@airbnb.test');
+
+    livewire(EmailInboxPage::class)
+        ->call('markDone', ['conv-pricing' => $seen])
+        ->assertHasErrors(['keys']);
+
+    expect(EmailConversationState::query()->count())->toBe(0);
+})->with(['not a date' => 'soon-ish', 'empty' => '', 'a list' => [['2026-11-02']]]);
+
+it('keeps a conversation with no inbound in done until external mail arrives', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-11-02 10:00'));
+    conversationsPageMessage($this->ownerMailbox, 'conv-intro', 'ana@acme.test');
+
+    livewire(EmailInboxPage::class)->call('markDone', conversationsPageSeen(['conv-intro']));
+
+    expect(EmailConversationState::query()->sole()->done_through)->toBeNull()
+        ->and(conversationsPageViewKeys(ConversationView::Done))->toBe(['conv-intro']);
+
+    $this->travelTo(CarbonImmutable::parse('2026-11-02 11:00'));
+    conversationsPageMessage($this->ownerMailbox, 'conv-intro', 'brian@airbnb.test');
+
+    expect(conversationsPageViewKeys(ConversationView::NeedsReply))->toBe(['conv-intro'])
+        ->and(conversationsPageViewKeys(ConversationView::Done))->toBe([]);
+});
+
+it('marks done from the reader a conversation the list does not show', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-11-02 10:00'));
+    $email = conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'brian@airbnb.test');
+
+    $page = livewire(EmailInboxPage::class)
+        ->call('setView', ConversationView::AwaitingReply->value)
+        ->call('openRequestedEmail', $email->id);
+    preg_match('/data-conversation-key="conv-pricing"\s+data-last-inbound="([^"]*)"/', $page->html(), $rendered);
+
+    expect(conversationsPageKeys($page->html()))->toBe([])
+        ->and($rendered[1] ?? null)->toBe('2026-11-02T10:00:00Z');
+
+    $page->call('markDone', ['conv-pricing' => $rendered[1]])
+        ->assertReturned(['applied' => ['conv-pricing'], 'skipped' => []]);
+
+    expect(conversationsPageViewKeys(ConversationView::Done))->toBe(['conv-pricing'])
+        ->and(conversationsPageViewKeys(ConversationView::NeedsReply))->toBe([]);
+});
+
+it('reads one conversation row as the list shows it to a teammate below full', function (EmailPrivacyTier $tier): void {
+    $email = conversationsPageMessage($this->teammateMailbox, 'conv-shared', 'olivia@stripe.test', ['subject' => 'Security review findings', 'privacy_tier' => $tier]);
+    $this->company->emails()->attach($email->id);
+    $query = resolve(ConversationsQuery::class);
+
+    $listed = $query->paginate($this->owner, ConversationView::All, new ConversationFilters)->rows[0];
+    $row = $query->conversationRow($this->owner, 'conv-shared');
+
+    expect($row?->subject)->toBe($listed->subject)
+        ->and($row?->subject)->toBe($tier === EmailPrivacyTier::SUBJECT ? 'Security review findings' : null)
+        ->and($row?->access)->toBe($listed->access)
+        ->and($row?->viewerCopyEmailId)->toBe($listed->viewerCopyEmailId);
+})->with([EmailPrivacyTier::METADATA_ONLY, EmailPrivacyTier::SUBJECT]);
+
+it('reads no conversation row from another workspace', function (): void {
+    $outsider = User::factory()->withWorkspace()->create();
+    conversationsPageMessage(conversationsPageMailbox($outsider, 'eve@other.test'), 'conv-outside', 'brian@airbnb.test');
+
+    expect(resolve(ConversationsQuery::class)->conversationRow($this->owner, 'conv-outside'))->toBeNull();
 });

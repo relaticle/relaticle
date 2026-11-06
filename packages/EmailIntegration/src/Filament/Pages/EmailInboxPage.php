@@ -15,9 +15,15 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Renderless;
 use Livewire\Attributes\Url;
+use Relaticle\EmailIntegration\Actions\MarkConversationsDone;
+use Relaticle\EmailIntegration\Actions\MarkConversationsRead;
+use Relaticle\EmailIntegration\Actions\MarkConversationsUnread;
+use Relaticle\EmailIntegration\Actions\ReopenConversations;
 use Relaticle\EmailIntegration\Data\ConversationPage;
 use Relaticle\EmailIntegration\Data\ConversationRow;
+use Relaticle\EmailIntegration\Data\TriageOutcome;
 use Relaticle\EmailIntegration\Enums\ConversationView;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPageTab;
@@ -175,6 +181,65 @@ final class EmailInboxPage extends Page
         $this->conversationView ??= $this->activeView;
         Cache::forget(ConversationsQuery::countsCacheKey($this->authUser()));
         unset($this->viewCounts, $this->conversations, $this->selectedEmail);
+    }
+
+    /**
+     * @param  array<mixed>  $seenThrough  conversation key to the last inbound time its row showed, or null
+     * @return array{applied: list<string>, skipped: list<array{reason: string, label: string, count: int}>}
+     */
+    #[Renderless]
+    public function markDone(array $seenThrough): array
+    {
+        return $this->triage(MarkConversationsDone::class, $seenThrough);
+    }
+
+    /**
+     * @param  array<mixed>  $keys
+     * @return array{applied: list<string>, skipped: list<array{reason: string, label: string, count: int}>}
+     */
+    #[Renderless]
+    public function reopen(array $keys): array
+    {
+        return $this->triage(ReopenConversations::class, $keys);
+    }
+
+    /**
+     * @param  array<mixed>  $keys
+     * @return array{applied: list<string>, skipped: list<array{reason: string, label: string, count: int}>}
+     */
+    #[Renderless]
+    public function markRead(array $keys): array
+    {
+        return $this->triage(MarkConversationsRead::class, $keys);
+    }
+
+    /**
+     * @param  array<mixed>  $keys
+     * @return array{applied: list<string>, skipped: list<array{reason: string, label: string, count: int}>}
+     */
+    #[Renderless]
+    public function markUnread(array $keys): array
+    {
+        return $this->triage(MarkConversationsUnread::class, $keys);
+    }
+
+    /**
+     * @param  class-string<MarkConversationsDone|ReopenConversations|MarkConversationsRead|MarkConversationsUnread>  $action
+     * @param  array<mixed>  $keys
+     * @return array{applied: list<string>, skipped: list<array{reason: string, label: string, count: int}>}
+     */
+    private function triage(string $action, array $keys): array
+    {
+        if (! $this->showsConversations()) {
+            return new TriageOutcome([])->toArray();
+        }
+
+        // The default view follows the counts, so emptying Needs reply would otherwise switch the list to All.
+        $this->conversationView ??= $this->activeView;
+        $outcome = resolve($action)->execute($this->authUser(), $keys);
+        unset($this->viewCounts, $this->conversations);
+
+        return $outcome->toArray();
     }
 
     public function nextConversationsPage(): void

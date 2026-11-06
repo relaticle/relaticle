@@ -9,7 +9,7 @@
     @foreach ($thread as $message)
         @if ($bodies->has($message->getKey()))
             <div wire:key="thread-message-{{ $message->getKey() }}" data-thread-message="{{ $message->getKey() }}">
-                <x-email-integration::email-view :record="$bodies->get($message->getKey())" threaded />
+                <x-email-integration::email-view :record="$bodies->get($message->getKey())" threaded :shortcuts="$replyTarget?->is($message) ?? false" />
             </div>
         @elseif (in_array($message->getKey(), $expanded, true))
             <div wire:key="thread-message-{{ $message->getKey() }}" data-thread-message="{{ $message->getKey() }}">

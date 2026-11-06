@@ -330,6 +330,11 @@ final class AppPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::BODY_START,
                 $this->workspaceDeletionBanner(...),
+            )
+            // Read by the shortcut dispatcher on every navigation; script data is fixed at boot, before the user is known.
+            ->renderHook(
+                PanelsRenderHook::BODY_START,
+                fn (): View|Factory => view('filament.app.shortcut-preferences', ['enabled' => $this->signedInUser()->single_key_shortcuts ?? true]),
             );
     }
 

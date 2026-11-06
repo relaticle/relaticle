@@ -1,4 +1,4 @@
-@props(['record', 'threaded' => false])
+@props(['record', 'threaded' => false, 'shortcuts' => false])
 
 @php
     use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -282,7 +282,12 @@
                             "
                             type="button"
                             aria-label="{{ $label }}"
-                            x-tooltip="{ content: @js($label), theme: $store.theme }"
+                            @if ($shortcuts)
+                                x-tooltip="{ content: $store.shortcuts?.hint(@js(\Illuminate\Support\Str::camel($replyMode)), @js($label)) ?? @js($label), theme: $store.theme }"
+                                x-bind:aria-keyshortcuts="$store.shortcuts?.keysFor(@js(\Illuminate\Support\Str::camel($replyMode)))"
+                            @else
+                                x-tooltip="{ content: @js($label), theme: $store.theme }"
+                            @endif
                             class="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
                         >
                             <x-filament::icon :icon="$icon" class="h-4 w-4" />

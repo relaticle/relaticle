@@ -53,6 +53,14 @@
         flush() {
             clearTimeout(this.timer)
             this.timer = null
+
+            {{-- A refetch while a triage action is in flight would render the row it is changing. --}}
+            if (document.querySelector('[data-triage-pending]')) {
+                this.schedule()
+
+                return
+            }
+
             this.pending.clear()
             $wire.refreshConversations()
         },
