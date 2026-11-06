@@ -67,11 +67,11 @@ trait HasRecordPageLayout
                     ->chipSize('lg')
                     ->size(TextSize::Large)
                     ->weight(FontWeight::SemiBold)
-                    ->extraAttributes(['class' => 'fi-record-title max-sm:[&_.truncate]:break-words max-sm:[&_.truncate]:whitespace-normal']),
+                    ->extraAttributes(['class' => 'fi-record-title']),
                 $this->recordActions()->grow(false),
             ])
                 ->verticallyAlignCenter()
-                ->extraAttributes(['class' => 'max-sm:flex-wrap max-sm:gap-y-2 max-sm:[&>.fi-growable]:basis-full']),
+                ->extraAttributes(['class' => 'fi-record-header']),
             $this->quickActions(),
             $this->detailsSection($schema),
             CommunicationIntelligenceInfolist::section()

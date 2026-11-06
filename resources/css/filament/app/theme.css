@@ -1211,6 +1211,18 @@ html.fi-record-stacked .fi-record-layout {
     }
 }
 
+.fi-record-header {
+    @apply max-sm:flex-wrap max-sm:gap-y-2;
+
+    & > .fi-growable {
+        @apply max-sm:basis-full;
+    }
+}
+
+.fi-record-title .truncate {
+    @apply max-sm:break-words max-sm:whitespace-normal;
+}
+
 .fi-record-details-toggle {
     @apply justify-self-start text-sm font-medium text-gray-500 hover:text-gray-950 dark:text-gray-400 dark:hover:text-white;
 }
