@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Admin\Actions;
 
+use App\Actions\Jetstream\CancelInactivityDeletion;
 use App\Enums\BillingStatus;
 use App\Enums\Plan;
 use App\Models\Workspace;
@@ -16,12 +17,22 @@ use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 final readonly class ExtendWorkspaceTrial
 {
-    public function __construct(private CreditService $credits) {}
+    public const int MAX_DAYS_AHEAD = 60;
+
+    public function __construct(
+        private CreditService $credits,
+        private RecordTrialChange $recordTrialChange,
+        private CancelInactivityDeletion $cancelInactivityDeletion,
+    ) {}
 
     public function execute(SystemAdministrator $admin, Workspace $workspace, CarbonImmutable $endsAt): void
     {
         if (! $endsAt->isFuture()) {
-            throw ValidationException::withMessages(['trial_ends_at' => 'The trial must end in the future.']);
+            throw ValidationException::withMessages(['trial_ends_at' => __('cloud::admin.trials.must_end_in_future')]);
+        }
+
+        if ($endsAt->isAfter(now()->addDays(self::MAX_DAYS_AHEAD))) {
+            throw ValidationException::withMessages(['trial_ends_at' => __('cloud::admin.trials.latest_end', ['days' => self::MAX_DAYS_AHEAD])]);
         }
 
         DB::transaction(function () use ($admin, $workspace, $endsAt): void {
@@ -31,6 +42,8 @@ final readonly class ExtendWorkspaceTrial
             abort_unless(Gate::forUser($admin)->allows('extendTrial', $locked), 403);
 
             $restarting = $locked->billingStatus() === BillingStatus::TrialEnded;
+            $before = $locked->only(['plan', 'trial_ends_at']);
+            $previousEnd = $locked->trial_ends_at;
 
             $locked->forceFill([
                 'plan' => Plan::Pro,
@@ -42,8 +55,20 @@ final readonly class ExtendWorkspaceTrial
             if ($restarting) {
                 $this->credits->resetPeriod($locked, (string) $admin->getKey());
             }
+
+            $this->recordTrialChange->execute($admin, $locked, $this->event($restarting, $previousEnd, $endsAt), $before);
+            $this->cancelInactivityDeletion->execute($locked);
         });
 
         $workspace->refresh();
+    }
+
+    private function event(bool $restarting, ?CarbonImmutable $previousEnd, CarbonImmutable $endsAt): string
+    {
+        return match (true) {
+            $restarting => 'trial_restarted',
+            $previousEnd?->isAfter($endsAt) === true => 'trial_shortened',
+            default => 'trial_extended',
+        };
     }
 }

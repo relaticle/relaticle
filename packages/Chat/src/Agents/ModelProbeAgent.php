@@ -13,6 +13,7 @@ use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Enums\Lab;
 use Laravel\Ai\Gateway\TextGenerationOptions;
 use Laravel\Ai\Promptable;
+use Laravel\Ai\Providers\Tools\ProviderTool;
 use Laravel\Ai\ToolChoice;
 
 /**
@@ -47,7 +48,7 @@ final class ModelProbeAgent implements Agent, HasProviderOptions, HasTools
     }
 
     /**
-     * @return list<Tool>
+     * @return list<Tool|ProviderTool>
      */
     public function tools(): array
     {

@@ -272,7 +272,7 @@ final class SubscriptionResource extends Resource
             ->where('user_id', $source->user_id)
             ->whereKeyNot($source->getKey())
             ->whereNull('stripe_id')
-            ->whereNull('scheduled_deletion_at')
+            ->whereNot(static fn (Builder $query): Builder => $query->scheduledOnRequest())
             ->orderBy('name')
             ->pluck('name', 'id')
             ->all();

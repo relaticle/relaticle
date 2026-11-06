@@ -359,8 +359,8 @@ it('shows the current user attendee row when is_self is true', function (): void
         ->assertMountedActionModalSee('Oliver Workspace')
         ->assertMountedActionModalSee('oliver@relaticle.test')
         ->assertMountedActionModalDontSee('Calendar Oliver')
-        ->assertMountedActionModalSee('attendee-avatar-initials', escape: false)
-        ->assertMountedActionModalDontSee('attendee-avatar-guest', escape: false)
+        ->assertMountedActionModalSee('member-avatar', escape: false)
+        ->assertMountedActionModalDontSee('person-silhouette', escape: false)
         ->assertMountedActionModalSee(AttendeeResponseStatus::ACCEPTED->getLabel());
 });
 
@@ -446,8 +446,8 @@ it('shows the linked person name above the attendee email', function (): void {
         ->mountAction(TestAction::make('view')->table($meeting))
         ->assertMountedActionModalSee('Maya Chen')
         ->assertMountedActionModalSee('maya@example.test')
-        ->assertMountedActionModalSee('attendee-avatar-initials', escape: false)
-        ->assertMountedActionModalDontSee('attendee-avatar-guest', escape: false);
+        ->assertMountedActionModalSee('person-silhouette', escape: false)
+        ->assertMountedActionModalDontSee('member-avatar', escape: false);
 });
 
 it('shows the address itself rather than inventing a name from the email', function (): void {
@@ -468,8 +468,8 @@ it('shows the address itself rather than inventing a name from the email', funct
         ->mountAction(TestAction::make('view')->table($meeting))
         ->assertMountedActionModalSee('only@example.test')
         ->assertMountedActionModalDontSee(__('filament/resources/meeting.attendees.guest'))
-        ->assertMountedActionModalSee('attendee-avatar-guest', escape: false)
-        ->assertMountedActionModalDontSee('attendee-avatar-initials', escape: false);
+        ->assertMountedActionModalSee('person-silhouette', escape: false)
+        ->assertMountedActionModalDontSee('member-avatar', escape: false);
 });
 
 it('names a guest from mailbox history without a person record', function (): void {
@@ -500,8 +500,8 @@ it('names a guest from mailbox history without a person record', function (): vo
         ->mountAction(TestAction::make('view')->table($meeting))
         ->assertMountedActionModalSee('Asmit Nepali')
         ->assertMountedActionModalSee('mail2asmitnepali@gmail.com')
-        ->assertMountedActionModalSee('attendee-avatar-initials', escape: false)
-        ->assertMountedActionModalDontSee('attendee-avatar-guest', escape: false);
+        ->assertMountedActionModalSee('person-silhouette', escape: false)
+        ->assertMountedActionModalDontSee('member-avatar', escape: false);
 });
 
 it('ignores a linked person whose name is the email and uses the mailbox name', function (): void {
@@ -536,8 +536,8 @@ it('ignores a linked person whose name is the email and uses the mailbox name', 
         ->mountAction(TestAction::make('view')->table($meeting))
         ->assertMountedActionModalSee('Asmit Nepali')
         ->assertMountedActionModalSee('mail2asmitnepali@gmail.com')
-        ->assertMountedActionModalSee('attendee-avatar-initials', escape: false)
-        ->assertMountedActionModalDontSee('attendee-avatar-guest', escape: false);
+        ->assertMountedActionModalSee('person-silhouette', escape: false)
+        ->assertMountedActionModalDontSee('member-avatar', escape: false);
 });
 
 it('does not use another team mailbox name for a guest', function (): void {

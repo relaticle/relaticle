@@ -12,9 +12,13 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Queue\Attributes\Backoff;
+use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Number;
 
+#[Tries(3)]
+#[Backoff(60, 300)]
 final class ManagedPlanInvoiceMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;

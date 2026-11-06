@@ -87,6 +87,6 @@ it('builds the markdown 404 index links from the documentation public url', func
     $this->get('/no-such-page', ['Accept' => 'text/markdown'])
         ->assertNotFound()
         ->assertSee('- Site index: https://docs.example.test/llms.txt', false)
-        ->assertSee('- Help centre: https://docs.example.test/help', false)
+        ->assertSee('- Help center: https://docs.example.test/help', false)
         ->assertSee('- Developer docs: https://docs.example.test/developers', false);
 });

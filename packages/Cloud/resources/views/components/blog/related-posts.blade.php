@@ -1,12 +1,13 @@
 @props(['posts'])
 
 @if($posts->isNotEmpty())
-    <section class="mt-10 pt-10 border-t border-gray-200/60 dark:border-white/[0.04]">
-        <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Related posts</h2>
-        <div class="divide-y divide-gray-200/60 dark:divide-white/[0.04]">
+    <x-cloud::marketing.frame>
+        <x-cloud::marketing.frame-header :label="__('Keep reading')" :lead="__('Related posts.')" />
+
+        <ul class="bg-rail grid gap-px">
             @foreach($posts as $relatedPost)
-                <x-cloud::blog.post-card :post="$relatedPost" />
+                <x-cloud::blog.post-card :post="$relatedPost" heading="h3" />
             @endforeach
-        </div>
-    </section>
+        </ul>
+    </x-cloud::marketing.frame>
 @endif

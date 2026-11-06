@@ -179,6 +179,7 @@ it('turning off the email channel leaves the in-app row', function (): void {
 });
 
 it('sends a Participants-only share without the subject in the bell or the mail', function (): void {
+    $this->owner->update(['name' => 'Dana Whitfield']);
     saveSharing([$this->alice], EmailPrivacyTier::METADATA_ONLY);
 
     $row = $this->alice->notifications()->where('type', EmailSharedNotification::class)->sole();
@@ -188,7 +189,7 @@ it('sends a Participants-only share without the subject in the bell or the mail'
     $presented = EmailSharedNotification::present($row);
 
     expect($row->data['email_subject'])->toBeNull()
-        ->and($presented->getTitle())->toBe($this->owner->name.' shared an email with you')
+        ->and($presented->getTitle())->toBe('Dana Whitfield shared an email with you')
         ->and($presented->getBody())->toBeEmpty()
         ->and($presented->getActions())->toBeEmpty()
         ->and((string) $mail->render())->not->toContain('Renewal terms')

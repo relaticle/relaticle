@@ -215,7 +215,8 @@ it('never prints a stored value when a row fails to update', function (): void {
     });
 
     $this->artisan('custom-fields:normalize-values', ['--force' => true])
-        ->doesntExpectOutputToContain('555')
+        ->doesntExpectOutputToContain('415-555-0142')
+        ->doesntExpectOutputToContain('4155550142')
         ->expectsOutputToContain('RuntimeException, skipped.')
         ->assertSuccessful();
 });

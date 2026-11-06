@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\DeletionReason;
 use App\Enums\Plan;
 use App\Models\User;
 use App\Models\Workspace;
@@ -482,4 +483,19 @@ it('hides the transfer action when the owner has no workspace the billing can mo
 
     expect($source->refresh()->stripe_id)->toBe('cus_transfer_source')
         ->and($subscription->refresh()->workspace_id)->toBe($source->getKey());
+});
+
+it('transfers onto a workspace on an inactivity countdown and stops the countdown', function (): void {
+    [$source, $target, $subscription] = transferPair();
+    $target->forceFill(['scheduled_deletion_at' => now()->addDays(7), 'deletion_reason' => DeletionReason::Inactivity])->save();
+
+    expect(array_keys(SubscriptionResource::transferTargets($subscription)))->toContain($target->getKey());
+
+    app(TransferWorkspaceBilling::class)->execute($source, $target, (string) $this->admin->getKey());
+
+    $target->refresh();
+
+    expect($subscription->refresh()->workspace_id)->toBe($target->getKey())
+        ->and($target->scheduled_deletion_at)->toBeNull()
+        ->and($target->deletion_reason)->toBeNull();
 });

@@ -53,8 +53,9 @@ anatomy mirrors a Laravel app: `src/`, `config/`, `routes/`, `resources/`,
 business half of the sysadmin panel (Overview, revenue, subscriptions, AI credits, trial and
 managed-plan actions), the marketing site, the docs and help website, and the blog: its pages,
 its authoring in the sysadmin panel and its `/mcp/blog` endpoint. Its own `LICENSE` allows
-development and testing use, and production use only under an agreement. The root `LICENSE` opens
-by naming that split, the shape GitLab, PostHog and Metabase use. The self-hosted build is this
+development and testing use, and production use only under an agreement. The root `LICENSE` stays
+the verbatim AGPL text, so GitHub still detects the repository as AGPL-3.0, and the README names the
+split. Plausible keeps its proprietary directory the same way. The self-hosted build is this
 repository without it.
 
 - Core never references it. `tests/Arch/ArchTest.php` fails a core layer that uses
@@ -180,6 +181,20 @@ final readonly class CreateOpportunity
   (`Relaticle\ImportWizard\Data\ColumnData`). Use a plain `final readonly` class when code
   builds the object with `new` (`App\Data\ListQuery`). No test tells the two apart, so a
   reviewer reads for a data object that only ever meets `new`
+- Settings that a feature will keep adding to share one nullable `jsonb` column on their
+  owner, named for the feature: `workspaces.ai_settings` holds every workspace-level setting
+  for the assistant. A new setting is a new property, not a migration. Use a boolean or enum
+  column only for a standalone setting that SQL filters or reports on
+- A laravel-data class types that column: `App\Data\AiSettings` is the worked example. The
+  model casts it with `AiSettings::class.':default'`, so a `null` column reads as the
+  defaults. Each property carries its default in the constructor, and
+  `#[MapName(SnakeCaseMapper::class)]` keeps the stored keys snake case. Readers use the typed
+  property (`$workspace->ai_settings->webSearch`) and never index the raw array. The action
+  that writes one setting rebuilds the object from the current values:
+  `AiSettings::from([...$workspace->ai_settings->toArray(), 'web_search' => $enabled])`.
+  `tests/Feature/Chat/AssistantSettingsTest.php` fails when the stored key or a default
+  changes. `users.ai_preferences` and `users.notification_preferences` predate this rule and
+  still use the `array` cast
 - Name domain concepts plainly (`Plan`, not `AiPlan`). Context comes from the
   namespace
 - `Support` holds code with no business rule in it: code that could ship as a standalone
@@ -576,6 +591,9 @@ are under about 50. Each rule below names what fails when it is broken.
   property form, and `composer test:refactor` fails until the rewrite is taken. Code that needs
   the number at runtime reads a class constant the attribute also uses, as `SendEmailJob` does
   with `TIMEOUT_SECONDS`. `$this->timeout` no longer exists once the attribute replaces it.
+- A queued Mailable or Notification declares `#[Tries]` and `#[Backoff]`, or inherits them as every
+  `InboxNotification` does. The default queue tries a job once, so one mail provider 502 loses the
+  message. `tests/Arch/ConventionsTest.php` fails a queued mail class without them.
 - An accessor is `Attribute::get()` with a typed closure and a `@return Attribute<TGet, never>`
   docblock. Larastan reads the property type from that docblock, so PHPStan reports the
   attribute as an undefined property without it.
@@ -770,6 +788,23 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
   of the core themes. Each imports its core theme and adds Cloud's `@source` directories. A class added to a Cloud billing view
   or sysadmin page reaches CSS only through them, and `packages/Cloud/tests/Feature/AppPanelThemeTest.php` pins the swap.
 
+## Scripts
+
+- `vite.config.js` builds every script that imports a package. Never add a second bundler, a build script in `bin/`, or a
+  committed `dist/` file: a committed bundle drifts from its source, and only an extra CI check catches it.
+  `tests/Arch/ConventionsTest.php` fails a `dist/` directory under `resources/` and a `bin/` script that imports a bundler.
+- A script with no imports that Filament loads through `FilamentAsset` stays unbuilt in `resources/js/filament/`, as
+  `slash-menu.js` and `payload-guard.js` do. `php artisan filament:assets` publishes it to `public/js/app/`.
+- A rich editor plugin that imports TipTap is a Vite input in `resources/js/filament/rich-content-plugins/`, and its
+  `getTipTapJsExtensions()` returns `Vite::asset()` for it. Filament's docs build one with esbuild from `bin/`. Do not
+  follow them here.
+- The `filament-rich-editor-modules` plugin in `vite.config.js` resolves `@tiptap/core` and `@tiptap/pm/{state,model,view}`
+  to `window.FilamentRichEditor.tiptap`, for those plugin files and the packages listed in `richEditorPackages`. The chat
+  composer keeps its own TipTap. A second ProseMirror copy breaks the editor's `instanceof` checks.
+- A TipTap package a plugin imports goes in `richEditorPackages`, which also keeps it out of Vite's dev pre-bundling. The
+  build fails when a plugin imports an unlisted `@tiptap/` package or another ProseMirror module, when code outside the
+  plugins imports a listed package, and when a plugin's chunk loses the default export Filament imports.
+
 ## Icons (Remix Icon)
 
 - **Brand/social icons** (GitHub, Discord, Twitter, LinkedIn) → always `fill` variant
@@ -803,6 +838,10 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
 ## Releases
 
 - Merge to main and tag only on explicit instruction, never on your own.
+- Composer security fixes are the one exception, and a bot runs it. `security-patch.yml` opens
+  and auto-merges the `security/composer-advisories` pull request.
+  `security-release.yml` tags the next patch release when that merge is the only commit since
+  the last tag. Otherwise it comments on the pull request, and a person releases.
 - Procedure: merge → `git checkout main && git pull` → confirm local and remote
   parity (`git log origin/main..main` and the reverse are both empty) → tag
   `vX.Y.Z` (minor for features, patch for fixes) → `git push origin <tag>`.

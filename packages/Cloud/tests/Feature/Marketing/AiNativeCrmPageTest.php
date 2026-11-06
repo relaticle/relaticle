@@ -19,8 +19,11 @@ function aiNativeCrmPageText(string $html): string
 it('renders the AI-native CRM page with its structured data', function (): void {
     $html = $this->get('/ai-native-crm')->assertOk()->getContent();
 
-    expect($html)->toContain(__('The AI-native CRM you can run on your own server'))
-        ->and($html)->toContain(__('Five checks before you call a CRM AI-native'))
+    expect($html)->toContain(__('What makes a CRM'))
+        ->and($html)->toContain(__('AI-native?'))
+        ->and($html)->toContain(__('Five checks.'))
+        ->and($html)->toContain(__('AI-native checklist'))
+        ->and($html)->toContain('data-ai-native-toggle')
         ->and($html)->toContain('"FAQPage"')
         ->and($html)->toContain('"BreadcrumbList"')
         ->and($html)->toContain(route('aiNativeCrm'));
@@ -79,4 +82,13 @@ it('has no copy holes from empty interpolations', function (): void {
         ->not->toMatch('/\s-credit/')
         ->not->toContain(':name')
         ->not->toContain(':count');
+});
+
+it('links every check to the page that proves it', function (): void {
+    $html = $this->get('/ai-native-crm')->assertOk()->getContent();
+
+    expect(substr_count($html, 'data-ai-native-check>'))->toBe(5)
+        ->and($html)->toContain(route('documentation.show', ['type' => 'mcp']).'#schema-resources')
+        ->and($html)->toContain(route('help.show', ['category' => 'ai-assistant', 'slug' => 'approve-what-the-assistant-changes']))
+        ->and($html)->toContain('Run the five checks on Relaticle yourself.');
 });

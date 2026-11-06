@@ -13,6 +13,7 @@ return [
             'owner' => 'You received this because you own the :workspace workspace.',
             'member' => 'You received this because you are a member of :workspace.',
             'former_member' => 'You received this because you were a member of :workspace.',
+            'former_owner' => 'You received this because you owned the :workspace workspace.',
             'digest' => 'You received this because you enabled the daily digest.',
             'assignee' => 'You received this because a task in :workspace was assigned to you.',
             'invitee' => 'You received this because :email was invited to :workspace.',
@@ -34,21 +35,37 @@ return [
     ],
 
     'trial_ending' => [
-        'subject' => 'Your Pro trial ends in 3 days',
-        'preheader' => 'Keep every AI model and :credits credits for one flat price',
-        'heading' => '3 days left on Pro for :workspace',
-        'ends_on' => 'Your 14-day Pro trial ends on :date.',
-        'keeps' => 'Pro keeps every AI model, :credits monthly credits, and higher rate limits.',
-        'flat_price' => 'There is no per-seat pricing. One flat price covers the whole workspace.',
+        'subject' => 'Your Pro trial ends on :date',
+        'preheader' => ':workspace pauses then unless you choose a plan. Your records stay safe.',
+        'preheader_grandfathered' => ':workspace returns to its Cloud Free plan then. Your records stay safe.',
+        'heading' => 'Pro for :workspace ends on :date',
+        'ends_at' => 'Your Pro trial ends on :datetime (:zone time).',
+        'pauses' => 'After that, :workspace pauses until you choose a plan.',
+        'kept' => 'If no one signs in for 60 days after that, we delete the workspace and its records.',
+        'keeps' => 'Pro keeps every AI model, :credits monthly credits and higher rate limits. One flat price covers the whole workspace.',
         'grandfathered' => 'If you do nothing, :workspace returns to its grandfathered Cloud Free plan. Your data is untouched.',
-        'paused' => 'If you do nothing, Cloud access pauses when the trial ends. Your data stays stored, and you can subscribe at any time to pick up where you left off.',
-        'cta' => 'Keep Pro',
+        'cta' => 'Choose a plan',
+        'questions' => 'Questions? Reply to this email.',
+    ],
+
+    'trial_usage' => [
+        'so_far' => 'So far your team has :parts.',
+        'during' => 'During the trial your team :parts.',
+        'records' => 'added :count record|added :count records',
+        'questions' => 'asked Rela :count question|asked Rela :count questions',
+        'both' => ':records and :questions',
     ],
 
     'pro_ended' => [
         'trial_ended' => [
-            'subject' => 'Your Pro trial has ended',
+            'subject' => 'Your Pro trial for :workspace has ended',
             'heading' => 'Your Pro trial for :workspace has ended',
+            'preheader' => 'Your records are safe. Choose a plan, or extend the trial by :days days.',
+        ],
+        'extension_ended' => [
+            'subject' => 'Your extended trial for :workspace has ended',
+            'heading' => 'Your extended trial for :workspace has ended',
+            'preheader' => 'Your records are safe. Choose a plan to pick up where you left off.',
         ],
         'subscription_ended' => [
             'subject' => 'Your Cloud subscription has ended',
@@ -63,6 +80,9 @@ return [
             'cta' => 'Talk to us',
             'mailbox_sync_paused' => 'Email and calendar sync are paused too, and resume when :plan restarts.',
         ],
+        'trial_paused' => ':workspace is paused. Your records are safe.',
+        'kept' => 'If no one signs in, we delete :workspace on :date. Choose a plan before then to keep it.',
+        'extend' => 'Need more time? [Extend your trial by :days days](:url) from the billing page. You can do this once.',
         'preheader' => 'Your records are safe. Subscribe to reopen the workspace.',
         'preheader_grandfathered' => 'Your workspace is back on its Cloud Free plan.',
         'paused' => 'Cloud access to :workspace is now paused. Your records are safe, and nothing has been deleted.',
@@ -100,7 +120,9 @@ return [
     ],
 
     'task_digest' => [
-        'subject' => 'Your tasks for :date',
+        'subject_both' => ':overdue overdue, :due due today, :date',
+        'subject_overdue' => ':count overdue task, :date|:count overdue tasks, :date',
+        'subject_due' => ':count task due today, :date|:count tasks due today, :date',
         'preheader' => ':overdue overdue, :due due today',
         'heading' => "Today's tasks, :name",
         'overdue' => 'Overdue',

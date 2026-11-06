@@ -232,7 +232,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
             $indexes = array_filter([
                 __('Site index') => DocUrl::root().'/llms.txt',
-                __('Help centre') => DocUrl::area(DocUrl::HELP),
+                __('Help center') => DocUrl::area(DocUrl::HELP),
                 __('Developer docs') => DocUrl::area(DocUrl::DOCS),
                 __('REST API spec') => Route::has('openapi.json') ? route('openapi.json') : null,
             ]);

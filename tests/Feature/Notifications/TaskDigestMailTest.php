@@ -23,7 +23,7 @@ it('renders the digest with subject, preheader, workspace sections, footer, and 
 
     $mail = new TaskDigestMail($user, $payload);
 
-    $mail->assertHasSubject(__('mail.task_digest.subject', ['date' => now('UTC')->format('M j')]));
+    $mail->assertHasSubject('1 overdue, 1 due today, '.now('UTC')->format('M j'));
     $mail->assertSeeInHtml(__('mail.task_digest.preheader', ['overdue' => 1, 'due' => 1]));
     $mail->assertSeeInHtml(__('mail.task_digest.heading', ['name' => 'Ada']), escape: false);
     $mail->assertSeeInHtml('Acme');
@@ -62,3 +62,26 @@ it('carries rfc 8058 one-click unsubscribe headers pointing at the app host', fu
         ->and($mail->render())->toContain(trim($headers['List-Unsubscribe'], '<>'))
         ->and($mail->render())->toContain(__('mail.footer.unsubscribe'));
 });
+
+it('leads the subject with the overdue and due-today counts', function (int $overdue, int $due, string $subject, string $timezone = 'UTC'): void {
+    $this->travelTo('2026-11-05 12:00:00');
+
+    $user = User::factory()->withPersonalWorkspace()->create(['timezone' => $timezone]);
+
+    $payload = new DigestPayload([
+        new DigestWorkspaceSection(
+            workspaceName: 'Acme',
+            overdue: array_fill(0, $overdue, new DigestTaskItem('Late', now()->subDay(), 'https://app.test/tasks?a')),
+            upcoming: array_fill(0, $due, new DigestTaskItem('Due', now(), 'https://app.test/tasks?b')),
+        ),
+    ]);
+
+    (new TaskDigestMail($user, $payload))->assertHasSubject($subject);
+})->with([
+    'both' => [2, 1, '2 overdue, 1 due today, Nov 5'],
+    'overdue plural' => [2, 0, '2 overdue tasks, Nov 5'],
+    'overdue singular' => [1, 0, '1 overdue task, Nov 5'],
+    'due singular' => [0, 1, '1 task due today, Nov 5'],
+    'due plural' => [0, 3, '3 tasks due today, Nov 5'],
+    'owner timezone date' => [1, 1, '1 overdue, 1 due today, Nov 6', 'Pacific/Auckland'],
+]);

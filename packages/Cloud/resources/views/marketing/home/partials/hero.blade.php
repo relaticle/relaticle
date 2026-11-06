@@ -1,206 +1,163 @@
-<section x-data="heroTabs()" x-init="init()" @resize.window="positionIndicator()" class="relative pt-32 pb-16 md:pt-40 md:pb-20 bg-white dark:bg-gray-950 overflow-hidden">
+<section x-data="heroTabs()" x-init="init()" class="bg-surface relative overflow-hidden">
+    <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]" aria-hidden="true"></div>
 
-    {{-- Background system: layered depth --}}
-    <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]"></div>
-
-    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-        <div class="flex flex-col items-center gap-8 md:gap-10">
-
-            {{-- ── Badge (GitHub) ── --}}
-            <div class="flex justify-center">
-                <a href="https://github.com/relaticle/relaticle" target="_blank" rel="noopener"
-                   aria-label="{{ __('Open Source, :count+ GitHub stars', ['count' => $formattedGithubStars]) }}"
-                   class="group inline-flex items-center gap-2 rounded-full border border-gray-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200 hover:border-gray-300 dark:hover:border-white/[0.15]">
-                    <x-ri-github-fill class="h-3.5 w-3.5"/>
-                    <span>Open Source</span>
-                    <span class="w-px h-3 bg-gray-200 dark:bg-white/10"></span>
-                    <span class="inline-flex items-center whitespace-nowrap text-gray-900 dark:text-white font-semibold leading-none">
-                        <span x-ref="githubStars" class="relative inline-grid tabular-nums" aria-hidden="true">
-                            <span class="invisible col-start-1 row-start-1">{{ $formattedGithubStars }}</span>
-                            <span class="col-start-1 row-start-1 inline-flex justify-self-end">
-                                @foreach(str_split($formattedGithubStars) as $character)
-                                    @if(ctype_digit($character))
-                                        <span class="inline-block h-[1em] w-[1ch] overflow-hidden">
-                                            <span data-github-star-digit="{{ $character }}" class="flex flex-col text-center leading-none" style="transform: translateY(-{{ (int) $character }}em)">
-                                                @for($digit = 0; $digit <= (int) $character; $digit++)
-                                                    <span class="block h-[1em] leading-none">{{ $digit }}</span>
-                                                @endfor
-                                            </span>
+    <div class="border-rail relative mx-auto max-w-6xl sm:border-x">
+        <div class="flex flex-col items-center px-6 pb-12 pt-10 text-center md:px-10 md:pb-12 md:pt-10">
+            <a href="https://github.com/relaticle/relaticle" target="_blank" rel="noopener"
+               aria-label="{{ __('Open Source, :count+ GitHub stars', ['count' => $formattedGithubStars]) }}"
+               class="group inline-flex items-center gap-2 rounded-full border border-gray-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200 hover:border-gray-300 dark:hover:border-white/[0.15]">
+                <x-ri-github-fill class="h-3.5 w-3.5"/>
+                <span>{{ __('Open Source') }}</span>
+                <span class="w-px h-3 bg-gray-200 dark:bg-white/10"></span>
+                <span class="inline-flex items-center whitespace-nowrap text-gray-900 dark:text-white font-semibold leading-none">
+                    <span x-ref="githubStars" class="relative inline-grid tabular-nums" aria-hidden="true">
+                        <span class="invisible col-start-1 row-start-1">{{ $formattedGithubStars }}</span>
+                        <span class="col-start-1 row-start-1 inline-flex justify-self-end">
+                            @foreach(str_split($formattedGithubStars) as $character)
+                                @if(ctype_digit($character))
+                                    <span class="inline-block h-[1em] w-[1ch] overflow-hidden">
+                                        <span data-github-star-digit="{{ $character }}" class="flex flex-col text-center leading-none" style="transform: translateY(-{{ (int) $character }}em)">
+                                            @for($digit = 0; $digit <= (int) $character; $digit++)
+                                                <span class="block h-[1em] leading-none">{{ $digit }}</span>
+                                            @endfor
                                         </span>
-                                    @else
-                                        <span>{{ $character }}</span>
-                                    @endif
-                                @endforeach
-                            </span>
-                        </span>+ stars
-                    </span>
-                    <x-ri-arrow-right-up-line class="h-3 w-3 text-gray-400 dark:text-gray-500"/>
-                </a>
-            </div>
+                                    </span>
+                                @else
+                                    <span>{{ $character }}</span>
+                                @endif
+                            @endforeach
+                        </span>
+                    </span>+ stars
+                </span>
+                <x-ri-arrow-right-up-line class="h-3 w-3 text-gray-400 dark:text-gray-500"/>
+            </a>
 
-            {{-- ── Heading ── --}}
-            <div class="text-center max-w-3xl">
-                <h1 class="font-display leading-[1.08] tracking-[-0.035em] text-balance">
-                    <span class="block text-2xl sm:text-[2.5rem] md:text-[3rem] lg:text-[3.25rem] font-normal text-gray-500 dark:text-gray-400">The AI CRM for selling</span>
-                    <span class="block text-[2.25rem] sm:text-5xl md:text-[3.5rem] lg:text-[3.75rem] font-extrabold text-gray-950 dark:text-white mt-1.5 sm:mt-2">without a sales team</span>
-                </h1>
+            <h1 class="type-display mt-7 max-w-3xl md:mt-8">
+                <span class="block font-normal text-gray-500">{{ __('The AI CRM for selling') }}</span>
+                <span class="mt-[0.1em] block font-bold tracking-tight text-gray-950 dark:text-white">{{ __('without a sales team') }}</span>
+            </h1>
 
-                <p class="mt-6 sm:mt-7 text-[15px] sm:text-lg text-gray-500 dark:text-gray-400 max-w-xl mx-auto leading-relaxed tracking-[-0.01em]">
-                    For people who sell to a named list of companies.<br class="hidden sm:block"/>
-                    Work from Claude or ChatGPT, or ask {{ config('chat.assistant_name') }}, the built-in AI assistant.
-                </p>
-            </div>
+            <p class="mt-5 max-w-3xl text-base leading-relaxed text-gray-500 sm:text-lg dark:text-gray-400">
+                {{ __('For people who sell to a named list of companies.') }}<br class="hidden sm:block"/>
+                {{ __('Work from') }} <span class="font-medium text-gray-950 dark:text-white">Claude</span> {{ __('or') }} <span class="font-medium text-gray-950 dark:text-white">ChatGPT</span>,
+                {{ __('or ask') }}
+                <span class="inline-flex items-baseline"><x-cloud::marketing.actor as="rela" size="lg"/>,</span>
+                {{ __('the built-in AI assistant.') }}
+            </p>
 
-            {{-- ── CTA Buttons ── --}}
-            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto max-w-sm sm:max-w-none mx-auto -mt-2 px-2 sm:px-0">
-                <x-cloud::marketing.button href="{{ route('login') }}" class="group">
-                    Start for free
+            <div class="mt-7 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
+                <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="hero">
+                    {{ __('Start for free') }}
                 </x-cloud::marketing.button>
 
                 <x-cloud::marketing.button variant="secondary" href="{{ route('contact') }}">
-                    Get in touch
+                    {{ __('Get in touch') }}
                 </x-cloud::marketing.button>
             </div>
 
-            {{-- Watch demo CTA (only renders when video asset exists) --}}
+            <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">{{ __(':days-day trial, no card, unlimited users.', ['days' => \App\Models\Workspace::PRO_TRIAL_DAYS]) }}</p>
+
             @if(file_exists(public_path('videos/hero-demo.mp4')))
                 <button
                     type="button"
                     x-data
                     @click="$dispatch('open-hero-demo')"
-                    class="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors -mt-1"
+                    class="mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 transition-colors hover:text-gray-950 dark:text-gray-400 dark:hover:text-white"
                 >
-                    <x-ri-play-circle-line class="w-4 h-4"/>
-                    Watch 30s demo
-                    <x-ri-arrow-right-up-line class="w-3 h-3"/>
+                    <x-ri-play-circle-line class="h-4 w-4"/>
+                    {{ __('Watch 30s demo') }}
+                    <x-ri-arrow-right-up-line class="h-3 w-3"/>
                 </button>
 
                 @include('cloud::marketing.home.partials.hero-demo-modal')
             @endif
 
-            {{-- ── App Preview with tabs ── --}}
-            <div class="relative w-full max-w-5xl mt-8 md:mt-12">
+        </div>
 
-                {{-- Multi-color glow behind mockup --}}
-                <div class="absolute -inset-6 md:-inset-12 -z-10 pointer-events-none" aria-hidden="true">
-                    <div class="absolute top-[0%] left-[15%] w-[70%] h-[60%] rounded-full bg-primary/[0.04] dark:bg-primary/[0.08] blur-[120px]"></div>
+        @php
+            $activeTabClasses = 'z-10 border-gray-200 bg-gray-100 text-gray-950 dark:border-white/[0.1] dark:bg-gray-900 dark:text-white';
+            $idleTabClasses = 'border-transparent text-gray-600 hover:text-gray-950 dark:text-gray-400 dark:hover:text-white';
+
+            $heroTabs = [
+                'ai-agent' => [__('Ask'), __('Ask :name', ['name' => (string) config('chat.assistant_name')])],
+                'pipeline' => [__('Pipeline'), __('Pipeline')],
+                'companies' => [__('Companies'), __('Companies')],
+                'custom-fields' => [__('Fields'), __('Custom fields')],
+            ];
+
+        @endphp
+
+    </div>
+
+    <div class="relative px-2 pb-2 sm:px-3 sm:pb-3 md:px-6 md:pb-6">
+        <div class="bg-hero-panel rounded-2xl px-3 pb-4 pt-8 sm:px-6 sm:pb-8 sm:pt-11 md:rounded-3xl md:px-10 md:pb-12 md:pt-12">
+            <div class="mx-auto max-w-6xl">
+                <div id="hero-tabs" role="tablist" class="mx-auto flex w-fit rounded-t-xl bg-white/50 px-1 pt-1 backdrop-blur-sm dark:bg-white/[0.05]">
+                    @foreach($heroTabs as $id => [$short, $long])
+                        <button type="button"
+                                id="tab-{{ $id }}"
+                                role="tab"
+                                aria-selected="{{ $loop->first ? 'true' : 'false' }}"
+                                tabindex="{{ $loop->first ? 0 : -1 }}"
+                                :aria-selected="(activeTab === '{{ $id }}').toString()"
+                                :tabindex="activeTab === '{{ $id }}' ? 0 : -1"
+                                aria-controls="panel-{{ $id }}"
+                                x-ref="tab-{{ $id }}"
+                                x-on:click="switchTab('{{ $id }}')"
+                                x-on:keydown="handleTabKeydown($event)"
+                                :class="{ @js($activeTabClasses): activeTab === '{{ $id }}', @js($idleTabClasses): activeTab !== '{{ $id }}' }"
+                                @class(['relative -mb-px cursor-pointer rounded-t-lg border border-b-0 px-3 py-2 text-xs font-medium transition-colors sm:px-5 sm:text-sm md:px-6 md:py-2.5 md:text-base', $loop->first ? $activeTabClasses : $idleTabClasses])>
+                            <span class="sm:hidden">{{ $short }}</span><span class="hidden sm:inline">{{ $long }}</span>
+                        </button>
+                    @endforeach
                 </div>
 
-                {{-- ── Decorative framing lines ── --}}
-                <div class="hidden md:block absolute left-1/2 -translate-x-1/2 -top-10 w-px h-10 bg-gradient-to-b from-transparent via-gray-200/60 to-gray-200 dark:via-white/[0.04] dark:to-white/[0.08] pointer-events-none" aria-hidden="true"></div>
-                <div class="hidden md:block absolute top-0 left-1/2 -translate-x-1/2 w-[100vw] h-px bg-gray-200 dark:bg-white/[0.08] pointer-events-none" aria-hidden="true"></div>
-                <div class="hidden md:block absolute top-0 -left-12 w-px bg-gradient-to-b from-gray-200 via-gray-200/60 to-transparent dark:from-white/[0.08] dark:via-white/[0.05] dark:to-transparent pointer-events-none" style="height:70%" aria-hidden="true"></div>
-                <div class="hidden md:block absolute top-0 -right-12 w-px bg-gradient-to-b from-gray-200 via-gray-200/60 to-transparent dark:from-white/[0.08] dark:via-white/[0.05] dark:to-transparent pointer-events-none" style="height:70%" aria-hidden="true"></div>
-
-                {{-- Feature Tabs --}}
-                <div id="hero-tabs" role="tablist" class="relative z-10 flex items-stretch">
-                    <div class="absolute bottom-0 left-0 right-0 h-px bg-gray-200 dark:bg-white/[0.08] pointer-events-none" aria-hidden="true"></div>
-                    <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-[100vw] h-px pointer-events-none bg-[repeating-linear-gradient(to_right,theme(colors.gray.200)_0,theme(colors.gray.200)_10px,transparent_10px,transparent_18px)] dark:bg-[repeating-linear-gradient(to_right,rgba(255,255,255,0.08)_0,rgba(255,255,255,0.08)_10px,transparent_10px,transparent_18px)]" aria-hidden="true"></div>
-                    <div x-ref="indicator" class="absolute bottom-0 h-px bg-primary/80 rounded-full pointer-events-none transition-[left,width] duration-200" aria-hidden="true"></div>
-                    <button type="button" id="tab-ai-agent" role="tab" :aria-selected="(activeTab === 'ai-agent').toString()" :tabindex="activeTab === 'ai-agent' ? 0 : -1" aria-controls="panel-ai-agent" x-ref="tab-ai-agent" x-on:click="switchTab('ai-agent')" x-on:keydown="handleTabKeydown($event)" :class="tabClasses('ai-agent')" class="relative flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors duration-200 cursor-pointer">
-                        <span class="sm:hidden">{{ __('Ask') }}</span><span class="hidden sm:inline">{{ __('Ask :name', ['name' => (string) config('chat.assistant_name')]) }}</span>
-                    </button>
-                    <div class="w-px self-stretch my-0 bg-gray-200 dark:bg-white/[0.08]" aria-hidden="true"></div>
-                    <button type="button" id="tab-pipeline" role="tab" :aria-selected="(activeTab === 'pipeline').toString()" :tabindex="activeTab === 'pipeline' ? 0 : -1" aria-controls="panel-pipeline" x-ref="tab-pipeline" x-on:click="switchTab('pipeline')" x-on:keydown="handleTabKeydown($event)" :class="tabClasses('pipeline')" class="relative flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors duration-200 cursor-pointer">
-                        Pipeline
-                    </button>
-                    <div class="w-px self-stretch my-0 bg-gray-200 dark:bg-white/[0.08]" aria-hidden="true"></div>
-                    <button type="button" id="tab-companies" role="tab" :aria-selected="(activeTab === 'companies').toString()" :tabindex="activeTab === 'companies' ? 0 : -1" aria-controls="panel-companies" x-ref="tab-companies" x-on:click="switchTab('companies')" x-on:keydown="handleTabKeydown($event)" :class="tabClasses('companies')" class="relative flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors duration-200 cursor-pointer">
-                        Companies
-                    </button>
-                    <div class="w-px self-stretch my-0 bg-gray-200 dark:bg-white/[0.08]" aria-hidden="true"></div>
-                    <button type="button" id="tab-custom-fields" role="tab" :aria-selected="(activeTab === 'custom-fields').toString()" :tabindex="activeTab === 'custom-fields' ? 0 : -1" aria-controls="panel-custom-fields" x-ref="tab-custom-fields" x-on:click="switchTab('custom-fields')" x-on:keydown="handleTabKeydown($event)" :class="tabClasses('custom-fields')" class="relative flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors duration-200 cursor-pointer">
-                        <span class="sm:hidden">Fields</span><span class="hidden sm:inline">Custom Fields</span>
-                    </button>
-                </div>
-
-                {{-- Mockup with layered glow border --}}
-                <div class="relative z-10 mt-5 [perspective:2000px]">
-                    <div class="hidden md:block absolute -top-[110px] left-0 w-px h-[120px] bg-gradient-to-b from-transparent via-gray-200/60 to-gray-200 dark:via-white/[0.04] dark:to-white/[0.08] pointer-events-none" aria-hidden="true"></div>
-                    <div class="hidden md:block absolute -top-[110px] right-0 w-px h-[120px] bg-gradient-to-b from-transparent via-gray-200/60 to-gray-200 dark:via-white/[0.04] dark:to-white/[0.08] pointer-events-none" aria-hidden="true"></div>
-                    <div class="absolute -inset-3 rounded-3xl bg-gradient-to-b from-black/[0.03] via-black/[0.015] to-transparent dark:from-white/[0.04] dark:via-white/[0.02] dark:to-transparent blur-xl pointer-events-none" aria-hidden="true"></div>
-                    <div class="absolute -inset-[3px] rounded-[18px] bg-gradient-to-b from-gray-300/40 via-gray-200/20 to-gray-100/5 dark:from-white/[0.07] dark:via-white/[0.03] dark:to-transparent blur-[3px] pointer-events-none" aria-hidden="true"></div>
-                    <div class="absolute -inset-0.5 rounded-[18px] bg-gradient-to-b from-gray-300/50 via-gray-200/30 to-gray-200/10 dark:from-white/[0.12] dark:via-white/[0.06] dark:to-white/[0.02] pointer-events-none" aria-hidden="true"></div>
-
-                    <div class="relative rounded-2xl overflow-hidden border-[3px] border-gray-300/70 bg-white dark:border-white/[0.12] dark:bg-neutral-950 transform-gpu hover:[transform:rotateX(1deg)] transition-transform duration-700 ease-out">
-
-                        {{-- Browser chrome --}}
-                        <div class="bg-gray-50 dark:bg-neutral-900 border-b border-gray-200/60 dark:border-white/[0.06] px-4 py-2.5 flex items-center justify-between">
-                            <div class="flex gap-1.5">
-                                <div class="w-2.5 h-2.5 rounded-full bg-gray-300/80 dark:bg-white/[0.08]"></div>
-                                <div class="w-2.5 h-2.5 rounded-full bg-gray-300/80 dark:bg-white/[0.08]"></div>
-                                <div class="w-2.5 h-2.5 rounded-full bg-gray-300/80 dark:bg-white/[0.08]"></div>
-                            </div>
-                            <div class="bg-white/60 dark:bg-white/[0.04] rounded-md px-3 py-1 text-[11px] text-gray-500 dark:text-gray-500">
-                                app.relaticle.com
-                            </div>
+                <x-cloud::marketing.mac-window>
+                    {{-- The frame keeps the chat panel's height on every tab, so the screenshots cover it from
+                         their top-left corner and crop the rest instead of resizing the frame. --}}
+                    <div class="relative h-[520px] sm:h-[580px] md:h-[640px]">
+                        <div id="panel-ai-agent" role="tabpanel" aria-labelledby="tab-ai-agent" x-ref="panel-ai-agent" class="absolute inset-0">
+                            @include('cloud::marketing.home.partials.hero-agent-preview')
                         </div>
 
-                        {{-- Tab panels use grid stacking for a Safari-smooth crossfade.
-                             min-height matches the live chat panel so switching to an
-                             image tab can't collapse the mockup frame.
+                        @php
+                            $heroScreenshots = [
+                                'pipeline' => ['widths' => [380, 640, 832, 1652], 'alt' => __('Relaticle opportunities board grouped into pipeline stages, showing amount and close date')],
+                                'companies' => ['widths' => [1652], 'alt' => __('Relaticle companies list showing account owner, ICP status, and website domain for each company')],
+                                'custom-fields' => ['widths' => [1652], 'alt' => __('Relaticle custom fields settings showing field name, type, constraints, and properties for Opportunities')],
+                            ];
 
-                             The image tabs FILL that frame (object-cover) rather than
-                             sitting in it at their own aspect: the frame is a constant
-                             826x640 from `lg` up, so the screenshots are captured at
-                             that ratio and land pixel-exact there. Below `lg` the frame
-                             narrows and finally turns portrait, and cover crops the
-                             right edge instead of leaving the dead band under the
-                             image that a plain `h-auto` used to (measured: 124px at
-                             desktop, over half the frame on a phone). object-left-top
-                             keeps the crop predictable -- you always see the app from
-                             its top-left corner, which is what the alt text
-                             describes. --}}
-                        <div class="relative grid overflow-hidden min-h-[520px] sm:min-h-[580px] md:min-h-[640px]">
-                            {{-- AI Agent tab (default, featured) --}}
-                            {{-- min-w-0: a grid item defaults to min-width:auto, so the
-                                 chat panel's own table would size the column to its
-                                 intrinsic width and push the transcript past the frame. --}}
-                            <div id="panel-ai-agent" role="tabpanel" aria-labelledby="tab-ai-agent" x-ref="panel-ai-agent" class="col-start-1 row-start-1 min-w-0">
-                                @include('cloud::marketing.home.partials.hero-agent-preview')
+                            // 1652w fills the 1056px desktop frame at 1x; a 2x display takes the 2880w original.
+                            $heroSrcset = static fn (string $id, string $theme, array $widths): string => collect($widths)
+                                ->map(fn (int $width): string => Vite::asset("resources/images/app-{$id}-preview{$theme}-{$width}w.webp")." {$width}w")
+                                ->push(Vite::asset("resources/images/app-{$id}-preview{$theme}.webp").' 2880w')
+                                ->implode(', ');
+                        @endphp
+
+                        @foreach($heroScreenshots as $id => $screenshot)
+                            <div id="panel-{{ $id }}" role="tabpanel" aria-labelledby="tab-{{ $id }}" x-ref="panel-{{ $id }}" class="invisible absolute inset-0">
+                                <picture class="block h-full w-full">
+                                    <source data-light-srcset="{{ $heroSrcset($id, '', $screenshot['widths']) }}"
+                                            data-dark-srcset="{{ $heroSrcset($id, '-dark', $screenshot['widths']) }}"
+                                            srcset="{{ $heroSrcset($id, '', $screenshot['widths']) }}"
+                                            sizes="(max-width: 640px) 750px, (max-width: 1151px) calc(100vw - 96px), 1056px"
+                                            type="image/webp">
+                                    <img data-light-src="{{ Vite::asset("resources/images/app-{$id}-preview.png") }}"
+                                         data-dark-src="{{ Vite::asset("resources/images/app-{$id}-preview-dark.png") }}"
+                                         src="{{ Vite::asset("resources/images/app-{$id}-preview.png") }}"
+                                         alt="{{ $screenshot['alt'] }}"
+                                         class="hero-preview-image h-full w-full object-cover object-left-top"
+                                         width="1440"
+                                         height="1116"
+                                         loading="lazy">
+                                </picture>
                             </div>
-
-                            @php
-                                $heroScreenshots = [
-                                    'pipeline' => ['widths' => [380, 640, 832, 1652], 'alt' => __('Relaticle opportunities board grouped into pipeline stages, showing amount and close date')],
-                                    'companies' => ['widths' => [1652], 'alt' => __('Relaticle companies list showing account owner, ICP status, and website domain for each company')],
-                                    'custom-fields' => ['widths' => [1652], 'alt' => __('Relaticle custom fields settings showing field name, type, constraints, and properties for Opportunities')],
-                                ];
-
-                                // 1652w is rendered at the frame's own pixel size on a 2x display, so the browser draws it without resampling.
-                                $heroSrcset = static fn (string $id, string $theme, array $widths): string => collect($widths)
-                                    ->map(fn (int $width): string => Vite::asset("resources/images/app-{$id}-preview{$theme}-{$width}w.webp")." {$width}w")
-                                    ->push(Vite::asset("resources/images/app-{$id}-preview{$theme}.webp").' 2880w')
-                                    ->implode(', ');
-                            @endphp
-
-                            @foreach($heroScreenshots as $id => $screenshot)
-                                <div id="panel-{{ $id }}" role="tabpanel" aria-labelledby="tab-{{ $id }}" x-ref="panel-{{ $id }}" class="col-start-1 row-start-1 invisible absolute inset-0 w-full">
-                                    <picture class="block h-full w-full">
-                                        <source data-light-srcset="{{ $heroSrcset($id, '', $screenshot['widths']) }}"
-                                                data-dark-srcset="{{ $heroSrcset($id, '-dark', $screenshot['widths']) }}"
-                                                srcset="{{ $heroSrcset($id, '', $screenshot['widths']) }}"
-                                                sizes="(max-width: 640px) 750px, (max-width: 1023px) 842px, 826px"
-                                                type="image/webp">
-                                        <img data-light-src="{{ Vite::asset("resources/images/app-{$id}-preview.png") }}"
-                                             data-dark-src="{{ Vite::asset("resources/images/app-{$id}-preview-dark.png") }}"
-                                             src="{{ Vite::asset("resources/images/app-{$id}-preview.png") }}"
-                                             alt="{{ $screenshot['alt'] }}"
-                                             class="hero-preview-image h-full w-full object-cover object-left-top"
-                                             width="1440"
-                                             height="1116"
-                                             loading="lazy">
-                                    </picture>
-                                </div>
-                            @endforeach
-                            {{-- Bottom fade overlay --}}
-                            <div class="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white/60 via-white/20 to-transparent dark:from-gray-950/60 dark:via-gray-950/20 dark:to-transparent pointer-events-none"></div>
-                        </div>
+                        @endforeach
+                        {{-- Bottom fade overlay --}}
+                        <div class="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white/60 via-white/20 to-transparent dark:from-gray-950/60 dark:via-gray-950/20 dark:to-transparent pointer-events-none"></div>
                     </div>
-                </div>
+                </x-cloud::marketing.mac-window>
             </div>
-
-
         </div>
     </div>
 </section>
@@ -218,7 +175,6 @@
             githubStarsAnimationRequestedAt: null,
 
             init() {
-                this.positionIndicator();
                 this.updateImages();
                 this.observeDarkMode();
                 this.animateGithubStars();
@@ -278,23 +234,13 @@
                 });
             },
 
-            positionIndicator() {
-                var tab = this.$refs['tab-' + this.activeTab];
-                var indicator = this.$refs.indicator;
-                if (!tab || !indicator) return;
-                indicator.style.left = tab.offsetLeft + 'px';
-                indicator.style.width = tab.offsetWidth + 'px';
-            },
-
             showPanel(panel) {
-                panel.classList.remove('invisible', 'absolute', 'inset-0');
-                panel.style.position = 'relative';
+                panel.classList.remove('invisible');
                 panel.style.zIndex = '1';
             },
 
             hidePanel(panel) {
-                panel.classList.add('invisible', 'absolute', 'inset-0');
-                panel.style.position = '';
+                panel.classList.add('invisible');
                 panel.style.opacity = '';
                 panel.style.transform = '';
                 panel.style.willChange = '';
@@ -324,7 +270,10 @@
                 var self = this;
 
                 this.activeTab = target;
-                this.positionIndicator();
+
+                if (previousTab === 'ai-agent') {
+                    this.$dispatch('hero-chat-stop');
+                }
 
                 if (target === 'ai-agent') {
                     this.$dispatch('hero-chat-reset');
@@ -398,12 +347,6 @@
                     this.switchTab(this.tabOrder[next]);
                     this.$refs['tab-' + this.tabOrder[next]].focus();
                 }
-            },
-
-            tabClasses(tab) {
-                return this.activeTab === tab
-                    ? 'text-gray-800 dark:text-white'
-                    : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300';
             },
 
             updateImages() {

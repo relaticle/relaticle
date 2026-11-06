@@ -60,6 +60,7 @@ use Relaticle\EmailIntegration\Queries\PersonByEmailQuery;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\ForwardAttachmentCopyService;
 use Relaticle\EmailIntegration\Services\MassSendRecipientResolver;
+use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
 use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
 use Relaticle\EmailIntegration\Support\ComposerInlineImage;
 use Relaticle\EmailIntegration\Support\ComposerPageTo;
@@ -1105,7 +1106,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      *     avatarUrl: string|null,
      *     iconPath: string|null,
      *     circular: bool,
-     *     avatarColor: string,
      * }>
      */
     #[Computed(persist: true, seconds: 300)]
@@ -1214,7 +1214,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      *     avatarUrl: string|null,
      *     iconPath: string|null,
      *     circular: bool,
-     *     avatarColor: string,
      * }>
      */
     private function companyTeamRecipientOptions(string $workspaceId): array
@@ -1255,7 +1254,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             return [];
         }
 
-        /** @var list<array{type: 'company_team', id: string, label: string, description: string, count: int, countLabel: string, emails: list<string>, avatarUrl: string|null, iconPath: string|null, circular: bool, avatarColor: string}> */
+        /** @var list<array{type: 'company_team', id: string, label: string, description: string, count: int, countLabel: string, emails: list<string>, avatarUrl: string|null, iconPath: string|null, circular: bool}> */
         return Company::query()
             ->where('workspace_id', $workspaceId)
             ->whereKey(array_keys($companyCounts))
@@ -1281,30 +1280,17 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     }
 
     /**
-     * @return array{avatarUrl: string|null, iconPath: string|null, circular: bool, avatarColor: string}
+     * @return array{avatarUrl: string|null, iconPath: string|null, circular: bool}
      */
     private function recipientChipAppearance(Model $record): array
     {
         $chip = RecordChip::forRecord($record);
-        $avatarUrl = $chip->imageUrl;
-
-        if (is_string($avatarUrl) && str_starts_with($avatarUrl, 'data:')) {
-            $avatarUrl = null;
-        }
 
         return [
-            'avatarUrl' => $avatarUrl,
+            'avatarUrl' => $chip->imageUrl,
             'iconPath' => $chip->iconPath,
             'circular' => $chip->circular,
-            'avatarColor' => $this->recipientAvatarColor($chip->name),
         ];
-    }
-
-    private function recipientAvatarColor(string $name): string
-    {
-        $colors = ['primary', 'success', 'warning', 'danger', 'info'];
-
-        return $colors[abs(crc32(mb_strtolower($name))) % count($colors)];
     }
 
     /**
@@ -2093,11 +2079,14 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         $user = $this->authUser();
 
-        $original = Email::query()
-            ->with(['body', 'participants', 'from', 'shares'])
-            ->where('workspace_id', $user->current_workspace_id)
-            ->where('rfc_message_id', $draft->in_reply_to)
-            ->withGlobalScope('visible', new VisibleEmailScope($user))
+        $original = resolve(PreferredEmailCopyService::class)
+            ->restrictToVisiblePreferredCopies(
+                Email::query()
+                    ->with(['body', 'participants', 'from', 'shares'])
+                    ->where('workspace_id', $user->current_workspace_id)
+                    ->where('rfc_message_id', $draft->in_reply_to),
+                $user,
+            )
             ->first();
 
         if (! $original instanceof Email || $user->cannot('view', $original)) {

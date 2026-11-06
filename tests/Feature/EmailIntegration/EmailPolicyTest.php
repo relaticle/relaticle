@@ -76,7 +76,7 @@ it('still allows a teammate to view a shared-tier email in the same workspace', 
         ->and($teammate->can('share', $this->email))->toBeFalse();
 });
 
-it('gives a teammate full access when they already synced the same message', function (): void {
+it('keeps a teammate copy restricted when the viewer holds a copy with the same message id', function (): void {
     $this->email->update(['privacy_tier' => EmailPrivacyTier::METADATA_ONLY]);
 
     $teammate = User::factory()->create();
@@ -97,7 +97,7 @@ it('gives a teammate full access when they already synced the same message', fun
         'is_internal' => false,
     ]);
 
-    expect($teammate->can('viewBody', $this->email))->toBeTrue()
-        ->and($teammate->can('requestAccess', $this->email))->toBeFalse()
+    expect($teammate->can('viewBody', $this->email))->toBeFalse()
+        ->and($teammate->can('requestAccess', $this->email))->toBeTrue()
         ->and($teammate->can('share', $this->email))->toBeFalse();
 });

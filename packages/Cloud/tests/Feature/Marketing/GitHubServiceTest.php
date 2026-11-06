@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -139,4 +140,15 @@ it('keeps the last good stars count when GitHub rate-limits the next fetch', fun
     Cache::forget('github_stars_Relaticle_relaticle');
 
     expect($this->service->getStarsCount())->toBe(1522);
+});
+
+it('gives up on GitHub within a few seconds so a cold cache cannot stall the page', function (): void {
+    Http::fake(function (Request $request, array $options): PromiseInterface {
+        expect($options['connect_timeout'])->toBe(2)
+            ->and($options['timeout'])->toBe(3);
+
+        return Http::response(['stargazers_count' => 1800]);
+    });
+
+    expect($this->service->getStarsCount())->toBe(1800);
 });

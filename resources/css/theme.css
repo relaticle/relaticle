@@ -1,8 +1,8 @@
 /* Theme Configuration */
 @theme {
     /* Font Family */
-    --font-default: "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-    --font-display: "Satoshi", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    --font-default: "Inter", "Inter Fallback", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    --font-display: "Satoshi", "Satoshi Fallback", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
     --font-sans: var(--font-default);
 
     /* Primary Color Scale */
@@ -22,6 +22,7 @@
     /* Third-party brand marks: kept out of the primary scale since they
        represent an external provider's identity, not our own UI color. */
     --color-anthropic: #D4763C;
+    --color-anthropic-strong: #AE5A27; /* 4.9:1 behind white text, where #D4763C gives 3.25:1 */
 
     /* Off-step typography for compact UI surfaces */
     --text-pico: 0.625rem;     /* 10px */

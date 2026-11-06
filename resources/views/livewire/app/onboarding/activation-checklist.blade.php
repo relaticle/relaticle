@@ -22,18 +22,13 @@
                 x-transition:enter-start="opacity-0 translate-y-1"
                 x-transition:enter-end="opacity-100 translate-y-0"
                 x-on:keydown.escape.window="close()"
-                class="absolute bottom-full left-2 z-20 mb-2 w-[min(20rem,calc(100vw-1rem))] rounded-xl border border-gray-200 bg-white p-3 shadow-xl dark:border-white/10 dark:bg-gray-900"
+                class="absolute inset-x-2 bottom-full z-20 mx-auto mb-2 max-w-80 rounded-xl border border-gray-200 bg-white p-3 shadow-xl dark:border-white/10 dark:bg-gray-900"
             >
                 <div class="flex items-start justify-between gap-2">
-                    <div class="min-w-0">
+                    <div class="min-w-0 self-center">
                         <h2 class="text-sm font-semibold text-gray-950 dark:text-white">
                             {{ __('filament/pages/dashboard.activation.heading') }}
                         </h2>
-                        <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                            <span>{{ __('filament/pages/dashboard.activation.progress', ['completed' => $completed, 'total' => $total]) }}</span>
-                            <span class="px-1 text-gray-300 dark:text-gray-600">|</span>
-                            <span>{{ __('filament/pages/dashboard.activation.encouragement') }}</span>
-                        </p>
                     </div>
 
                     <div class="relative flex flex-shrink-0 items-center gap-0.5">
@@ -86,6 +81,12 @@
                         </div>
                     </div>
                 </div>
+
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                    <span>{{ __('filament/pages/dashboard.activation.progress', ['completed' => $completed, 'total' => $total]) }}</span>
+                    <span class="px-1 text-gray-300 dark:text-gray-600">|</span>
+                    <span>{{ __('filament/pages/dashboard.activation.encouragement') }}</span>
+                </p>
 
                 {{-- One segment per step: the progress reads at a glance without
                      the user parsing "1 of 4". --}}

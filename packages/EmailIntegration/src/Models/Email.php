@@ -39,6 +39,7 @@ use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\Scopes\ActiveAccountScope;
 use Relaticle\EmailIntegration\Observers\EmailObserver;
 use Relaticle\EmailIntegration\Policies\EmailPolicy;
+use Relaticle\EmailIntegration\Services\WorkspaceMemberDirectory;
 use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 
 /**
@@ -295,6 +296,21 @@ final class Email extends Model
         }
 
         return $this->user?->name;
+    }
+
+    public function senderMemberAvatarUrl(): ?string
+    {
+        if ($this->direction === EmailDirection::OUTBOUND) {
+            return $this->user?->profile_photo_url;
+        }
+
+        $address = $this->fromParticipant()?->email_address;
+
+        if (blank($address)) {
+            return null;
+        }
+
+        return resolve(WorkspaceMemberDirectory::class)->find((string) $this->workspace_id, $address)['avatar'] ?? null;
     }
 
     /**

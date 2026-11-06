@@ -14,6 +14,10 @@ parameters:
     # PHPStan otherwise caches to the system temp dir, which GitHub Actions discards.
     tmpDir: .cache/phpstan
 
+    databaseMigrationsPath:
+        - database/migrations
+        - packages/Cloud/database/migrations
+
     ignoreErrors:
         # Custom field model type covariance - App\Models\CustomField* extends Relaticle\CustomFields\Models\CustomField*
         # Runtime model swapping is configured in AppServiceProvider but PHPStan doesn't know about it
@@ -155,6 +159,7 @@ services:
                 - Relaticle\Cloud\Marketing\Http
                 - App\Queries
                 - Relaticle\Chat\Queries
+                - Relaticle\Cloud\Billing\Queries
                 - Relaticle\EmailIntegration\Queries
         tags:
             - phpstan.rules.rule

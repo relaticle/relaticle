@@ -73,6 +73,13 @@ final class AgentConversationMessage extends Model
 
     /** @param Builder<self> $query */
     #[Scope]
+    protected function inWorkspace(Builder $query, string $workspaceId): void
+    {
+        $query->whereRelation('conversation', 'workspace_id', $workspaceId);
+    }
+
+    /** @param Builder<self> $query */
+    #[Scope]
     protected function withoutSynthetic(Builder $query): void
     {
         $query->where(function (Builder $visible): void {

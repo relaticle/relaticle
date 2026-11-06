@@ -10,15 +10,20 @@ use App\Mail\SetupNudgeMail;
 use App\Mail\TaskAssignedMail;
 use App\Mail\TaskDigestMail;
 use App\Mail\WorkspaceInvitationMail;
+use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
+use App\Notifications\TaskAssignedNotification;
 use App\Support\Mail\ParksInactiveRecipientsTransport;
 use Illuminate\Contracts\Mail\Mailable;
 use Illuminate\Mail\Message;
+use Illuminate\Mail\SendQueuedMailable;
+use Illuminate\Notifications\SendQueuedNotifications;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Queue;
 use Relaticle\Cloud\Billing\Mail\ProEndedMail;
 use Relaticle\Cloud\Billing\Mail\ProTrialEndingSoonMail;
 use Spatie\MailcoachMailer\Exceptions\InvalidMailerConfig;
@@ -79,7 +84,7 @@ it('parks the owner when the trial notice bounces', function (): void {
     $workspace = Workspace::factory()->create(['user_id' => $owner->id, 'trial_ends_at' => now()->addDays(3)]);
     useMailcoachAnswering(new MockHttpClient(new MockResponse('', ['http_code' => 406])));
 
-    Mail::mailer('array')->to($owner)->queue(new ProTrialEndingSoonMail($workspace));
+    Mail::mailer('array')->to($owner)->queue(new ProTrialEndingSoonMail($workspace, now()->addDays(3)));
 
     expect($owner->fresh()->email_bounced_at)->not->toBeNull();
 });
@@ -248,4 +253,26 @@ it('names the missing mailcoach setting when the mailer is not configured', func
     Mail::purge('mailcoach');
 
     expect(fn () => Mail::mailer('mailcoach'))->toThrow(InvalidMailerConfig::class);
+});
+
+it('queues mail with retries so a provider outage does not lose it', function (): void {
+    Queue::fake();
+    $user = User::factory()->withPersonalWorkspace()->create();
+
+    Mail::to($user)->queue(new TaskDigestMail($user, new DigestPayload([])));
+
+    Queue::assertPushed(SendQueuedMailable::class, fn (SendQueuedMailable $job): bool => $job->tries === 3
+        && $job->backoff() === [60, 300]);
+});
+
+it('queues an inbox notification mail with the retries its base declares', function (): void {
+    Queue::fake();
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $task = Task::factory()->for($user->currentWorkspace, 'workspace')->create();
+
+    $user->notify(new TaskAssignedNotification($task, null));
+
+    Queue::assertPushed(SendQueuedNotifications::class, fn (SendQueuedNotifications $job): bool => $job->channels === ['mail']
+        && $job->tries === 3
+        && $job->backoff() === [60, 300]);
 });

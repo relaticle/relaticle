@@ -6,6 +6,10 @@ namespace Relaticle\Cloud;
 
 use App\Contracts\Billing as BillingContract;
 use App\Contracts\Entitlements;
+use App\Enums\Plan;
+use App\Events\WorkspaceCreated;
+use App\Events\WorkspaceDeleted;
+use App\Events\WorkspaceSetupCompleted;
 use App\Features\Billing;
 use App\Features\Documentation;
 use App\Models\User;
@@ -14,28 +18,48 @@ use App\Providers\Filament\AppPanelProvider;
 use App\Services\NoBilling;
 use App\Services\SelfHostedEntitlements;
 use App\Support\Mail\MailPreview;
+use Carbon\CarbonImmutable;
+use Filament\Auth\Events\Registered;
 use Filament\Panel;
 use Filament\View\PanelsRenderHook;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\View\View as ViewContract;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 use Laravel\Cashier\Events\WebhookHandled;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Relaticle\Cloud\Admin\CloudAdminPlugin;
 use Relaticle\Cloud\Admin\Mail\ManagedPlanInvoiceMail;
+use Relaticle\Cloud\Analytics\Actions\AssociateAcquisitionWorkspace;
+use Relaticle\Cloud\Analytics\Actions\CompleteAcquisitionSetup;
+use Relaticle\Cloud\Analytics\Actions\RecordAcquisition;
+use Relaticle\Cloud\Analytics\Attribution;
+use Relaticle\Cloud\Analytics\Http\Middleware\CaptureAcquisition;
+use Relaticle\Cloud\Analytics\Listeners\CaptureSubscriptionOutcome;
+use Relaticle\Cloud\Billing\Commands\AnnounceInactivityRuleCommand;
 use Relaticle\Cloud\Billing\Commands\ProcessTrialsCommand;
+use Relaticle\Cloud\Billing\Commands\ScheduleInactiveTrialDeletionsCommand;
 use Relaticle\Cloud\Billing\Filament\Billing as BillingPage;
 use Relaticle\Cloud\Billing\Filament\BillingPanelHooks;
 use Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal;
+use Relaticle\Cloud\Billing\Listeners\CancelInactivityDeletionOnLogin;
+use Relaticle\Cloud\Billing\Listeners\SendInactiveWorkspaceDeletedMail;
 use Relaticle\Cloud\Billing\Listeners\SyncPlanOnStripeSubscriptionChange;
 use Relaticle\Cloud\Billing\Livewire\UpgradeModal;
+use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletedMail;
+use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletionReminderMail;
+use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletionWarningMail;
+use Relaticle\Cloud\Billing\Mail\InactivityRuleNoticeMail;
 use Relaticle\Cloud\Billing\Mail\ProEndedMail;
 use Relaticle\Cloud\Billing\Mail\ProTrialEndingSoonMail;
 use Relaticle\Cloud\Billing\Notifications\ManagedInvoiceOverdueNotification;
@@ -65,6 +89,8 @@ final class CloudServiceProvider extends ServiceProvider
             : $app->make(NoBilling::class));
 
         $this->mergeConfigFrom(__DIR__.'/../config/comparisons.php', 'comparisons');
+        $this->mergeConfigFrom(__DIR__.'/../config/analytics.php', 'analytics');
+        $this->mergeConfigFrom(__DIR__.'/../config/marketing.php', 'marketing');
 
         $this->configureBlog();
 
@@ -80,6 +106,8 @@ final class CloudServiceProvider extends ServiceProvider
     {
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'cloud');
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'cloud');
+        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+        $this->configureAnalytics();
         $this->loadRoutesFrom(__DIR__.'/../routes/webhooks.php');
         $this->registerMarketingRoutes();
         $this->registerDocsRoutes();
@@ -90,17 +118,53 @@ final class CloudServiceProvider extends ServiceProvider
         Livewire::component('App\\Filament\\Pages\\Billing', BillingPage::class);
 
         Event::listen(WebhookHandled::class, [SyncPlanOnStripeSubscriptionChange::class, 'handle']);
+        Event::listen(WebhookHandled::class, [CaptureSubscriptionOutcome::class, 'handle']);
+        Event::listen(Login::class, [CancelInactivityDeletionOnLogin::class, 'handle']);
+        Event::listen(WorkspaceDeleted::class, [SendInactiveWorkspaceDeletedMail::class, 'handle']);
 
-        $this->commands([ProcessTrialsCommand::class, GenerateSitemapCommand::class, ReportStaleCompetitorFactsCommand::class]);
+        $this->commands([ProcessTrialsCommand::class, ScheduleInactiveTrialDeletionsCommand::class, AnnounceInactivityRuleCommand::class, GenerateSitemapCommand::class, ReportStaleCompetitorFactsCommand::class]);
 
         $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {
-            $schedule->command('billing:process-trials')->dailyAt('00:15')->withoutOverlapping()->onOneServer();
+            $schedule->command('billing:process-trials')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
+            $schedule->command('billing:schedule-inactive-deletions')->dailyAt('02:00')->withoutOverlapping()->onOneServer();
             $schedule->command('app:generate-sitemap')->daily()->onOneServer();
         });
 
         $this->linkWebsiteFromCore();
         $this->registerMailPreviews();
         $this->registerCommunityCounts();
+    }
+
+    private function configureAnalytics(): void
+    {
+        Route::pushMiddlewareToGroup('web', CaptureAcquisition::class);
+
+        Event::listen(Registered::class, static function (Registered $event): void {
+            $user = $event->getUser();
+
+            if ($user instanceof User && request()->hasSession() && ! Attribution::optedOut(request())) {
+                resolve(RecordAcquisition::class)->execute($user, session('analytics.acquisition'));
+                DB::afterCommit(static fn () => session()->forget('analytics.acquisition'));
+            }
+        });
+
+        Event::listen(Verified::class, static function (Verified $event): void {
+            if ($event->user instanceof User && request()->hasSession()) {
+                DB::afterCommit(static fn () => session()->put('fathom.track_email_verified', (string) Str::uuid()));
+            }
+        });
+
+        Event::listen(WorkspaceCreated::class, static function (WorkspaceCreated $event): void {
+            resolve(AssociateAcquisitionWorkspace::class)->execute($event->workspace);
+        });
+
+        Event::listen(WorkspaceSetupCompleted::class, static function (WorkspaceSetupCompleted $event): void {
+            resolve(CompleteAcquisitionSetup::class)->execute($event->workspace);
+
+            if (request()->hasSession()) {
+                session()->put('fathom.track_setup_completed', (string) Str::uuid());
+            }
+        });
     }
 
     private function configureBlog(): void
@@ -202,12 +266,34 @@ final class CloudServiceProvider extends ServiceProvider
         MailPreview::register('trial-ending', static function (User $owner, Workspace $workspace): Mailable {
             $workspace->setRelation('owner', $owner);
 
-            return new ProTrialEndingSoonMail($workspace);
+            return new ProTrialEndingSoonMail($workspace, $workspace->trial_ends_at ?? now()->addDays(3));
         });
 
-        MailPreview::register('trial-ended', static fn (User $owner, Workspace $workspace): Mailable => ProEndedMail::afterTrial($workspace));
+        MailPreview::register('trial-ended', static fn (User $owner, Workspace $workspace): Mailable => ProEndedMail::afterTrial(self::pausedTrial($workspace)));
+
+        MailPreview::register('extension-ended', static fn (User $owner, Workspace $workspace): Mailable => ProEndedMail::afterTrial(self::pausedTrial($workspace, now()->subWeek())));
 
         MailPreview::register('subscription-ended', static fn (User $owner, Workspace $workspace): Mailable => ProEndedMail::afterSubscription($workspace));
+
+        MailPreview::register('inactive-deletion-warning', static function (User $owner, Workspace $workspace): Mailable {
+            $workspace->setRelation('owner', $owner);
+
+            return new InactiveWorkspaceDeletionWarningMail($workspace, now()->addDays(14), now()->subDays(46));
+        });
+
+        MailPreview::register('inactive-deletion-reminder', static function (User $owner, Workspace $workspace): Mailable {
+            $workspace->setRelation('owner', $owner);
+
+            return new InactiveWorkspaceDeletionReminderMail($workspace, now()->addDays(5));
+        });
+
+        MailPreview::register('inactivity-rule-notice', static function (User $owner, Workspace $workspace): Mailable {
+            $workspace->setRelation('owner', $owner);
+
+            return new InactivityRuleNoticeMail($workspace, now()->addDays(60));
+        });
+
+        MailPreview::register('inactive-deleted', static fn (User $owner, Workspace $workspace): Mailable => new InactiveWorkspaceDeletedMail($workspace->name));
 
         MailPreview::register('contact-submission', static fn (): Mailable => new NewContactSubmissionMail([
             'name' => 'Ana Reyes',
@@ -217,9 +303,20 @@ final class CloudServiceProvider extends ServiceProvider
         ]));
     }
 
+    private static function pausedTrial(Workspace $workspace, ?CarbonImmutable $extendedAt = null): Workspace
+    {
+        return $workspace->forceFill([
+            'plan' => Plan::Free,
+            'trial_ends_at' => null,
+            'pro_trial_used_at' => now()->subDay(),
+            'trial_extended_at' => $extendedAt,
+            'scheduled_deletion_at' => null,
+        ]);
+    }
+
     private function registerCommunityCounts(): void
     {
-        View::composer(['cloud::components.layout.community-links', 'cloud::marketing.home.partials.hero', 'cloud::marketing.press'], static function (ViewContract $view): void {
+        View::composer(['cloud::components.layout.community-links', 'cloud::marketing.home.partials.hero', 'cloud::marketing.home.partials.community', 'cloud::marketing.press', 'cloud::marketing.self-hosted'], static function (ViewContract $view): void {
             $gitHubService = resolve(GitHubService::class);
 
             $view->with([
@@ -228,11 +325,11 @@ final class CloudServiceProvider extends ServiceProvider
             ]);
         });
 
-        View::composer('cloud::components.layout.community-links', static function (ViewContract $view): void {
+        View::composer(['cloud::components.layout.community-links', 'cloud::marketing.home.partials.community', 'cloud::marketing.self-hosted'], static function (ViewContract $view): void {
             $view->with('formattedDiscordMembers', resolve(DiscordService::class)->getFormattedMemberCount());
         });
 
-        View::composer('cloud::marketing.home.partials.works-with', static function (ViewContract $view): void {
+        View::composer(['cloud::marketing.home.partials.community', 'cloud::marketing.self-hosted'], static function (ViewContract $view): void {
             $view->with('formattedDockerPulls', resolve(DockerHubService::class)->getFormattedPullCount());
         });
     }

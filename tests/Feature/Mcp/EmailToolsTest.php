@@ -612,11 +612,53 @@ it('lists a private teammate email the viewer was shared in full', function (): 
         ->and($items[0]['access'])->toBe('full');
 });
 
-it('reads a teammate copy in full when the caller holds a synced copy of the message', function (): void {
+it('reads a teammate copy at its own tier when the caller holds a copy with the same message id', function (): void {
     ($this->emailFrom)($this->viewer, ['rfc_message_id' => '<held@acme.test>']);
     $teammateCopy = ($this->emailFrom)($this->coworker, ['rfc_message_id' => '<held@acme.test>', 'privacy_tier' => EmailPrivacyTier::METADATA_ONLY]);
 
-    expect(fetchedEmail($this->viewer, $teammateCopy->id)['access'])->toBe('full');
+    expect(fetchedEmail($this->viewer, $teammateCopy->id)['access'])->toBe('metadata_only');
+});
+
+it('keeps a private teammate email hidden when the caller holds a copy with the same message id', function (): void {
+    ($this->emailFrom)($this->viewer, ['rfc_message_id' => '<private@acme.test>']);
+    $privateCopy = ($this->emailFrom)($this->coworker, ['rfc_message_id' => '<private@acme.test>', 'privacy_tier' => EmailPrivacyTier::PRIVATE]);
+
+    expect(array_column(listedEmails($this->viewer), 'id'))->not->toContain($privateCopy->id);
+
+    RelaticleServer::actingAs($this->viewer)
+        ->tool(GetEmailTool::class, ['id' => $privateCopy->id])
+        ->assertHasErrors(["Email with ID [{$privateCopy->id}] not found."]);
+});
+
+it('does not open a teammate copy through a share made on another copy of the same message', function (): void {
+    $sharer = User::factory()->create();
+    $sharer->workspaces()->attach($this->workspace);
+    $sharer->forceFill(['current_workspace_id' => $this->workspace->id])->save();
+
+    $sharerAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $sharer->id,
+    ]));
+
+    $sharerCopy = Email::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $sharer->id,
+        'connected_account_id' => $sharerAccount->getKey(),
+        'rfc_message_id' => '<forwarded@acme.test>',
+        'is_internal' => false,
+    ]);
+
+    EmailShare::factory()->tier(EmailPrivacyTier::FULL)->create([
+        'workspace_id' => $this->workspace->id,
+        'email_id' => $sharerCopy->id,
+        'shared_with' => $this->viewer->id,
+        'shared_by' => $sharer->id,
+    ]);
+
+    $coworkerCopy = ($this->emailFrom)($this->coworker, ['rfc_message_id' => '<forwarded@acme.test>', 'privacy_tier' => EmailPrivacyTier::METADATA_ONLY]);
+
+    expect(fetchedEmail($this->viewer, $coworkerCopy->id)['access'])->toBe('metadata_only')
+        ->and(fetchedEmail($this->viewer, $sharerCopy->id)['access'])->toBe('full');
 });
 
 it('hides mail from a blocked address, even from the mailbox owner', function (): void {
@@ -758,6 +800,17 @@ it('saves a private draft and sends nothing', function (): void {
         ->and($draft->body->body_html)->toContain('<strong>plan</strong>')
         ->and($draft->participants->pluck('email_address', 'role.value')->sortKeys()->all())->toBe(['cc' => 'boss@acme.test', 'to' => 'client@acme.test'])
         ->and(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(0);
+});
+
+it('stores a readable text copy and snippet of a draft', function (): void {
+    $data = emailToolData($this->viewer, CreateEmailDraftTool::class, draftArguments($this->viewerAccount, [
+        'body' => "Hi Dana,\n\nI'm sending the plan & the timeline.",
+    ]));
+
+    $draft = Email::query()->with('body')->findOrFail($data['id']);
+
+    expect($draft->body->body_text)->toBe("Hi Dana,\n\nI'm sending the plan & the timeline.")
+        ->and($draft->snippet)->toBe("Hi Dana, I'm sending the plan & the timeline.");
 });
 
 it('escapes raw html in a draft body', function (): void {
@@ -1851,6 +1904,20 @@ it('threads a sent reply draft and quotes the original below it', function (): v
     expect($email->in_reply_to)->toBe($original->rfc_message_id)
         ->and($email->body->body_html)->toContain('<blockquote')
         ->toContain('Original question');
+});
+
+it('quotes the caller own copy when a teammate holds a restricted copy of the original', function (): void {
+    $original = ($this->emailFrom)($this->viewer, ['rfc_message_id' => '<quoted@acme.test>']);
+    EmailBody::query()->create(['email_id' => $original->id, 'body_html' => '<p>Original question</p>', 'body_text' => 'Original question']);
+
+    $draftId = emailToolData($this->viewer, CreateEmailDraftTool::class, draftArguments($this->viewerAccount, ['in_reply_to_email_id' => $original->id]))['id'];
+
+    ($this->emailFrom)($this->coworker, ['rfc_message_id' => '<quoted@acme.test>', 'privacy_tier' => EmailPrivacyTier::METADATA_ONLY]);
+    $original->touch();
+
+    $email = Email::query()->with('body')->findOrFail(emailToolData($this->viewer, SendEmailDraftTool::class, ['draft_id' => $draftId])['id']);
+
+    expect($email->body->body_html)->toContain('Original question');
 });
 
 it('sends at the chosen time, never sooner than the hold', function (): void {

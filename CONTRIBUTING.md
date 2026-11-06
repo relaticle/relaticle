@@ -69,4 +69,4 @@ This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md). Participati
 
 ## License
 
-Contributions are licensed under the [AGPL-3.0](LICENSE), the same license as Relaticle.
+Relaticle ships under the [AGPL-3.0](LICENSE), except `packages/Cloud`, which has [its own license](packages/Cloud/LICENSE). Before we merge your first pull request, you accept our [Contributor License Agreement](.github/CLA.md) by posting the sentence the CLA bot asks for. You keep ownership of your work and give Relaticle, Inc. a license to it, including the right to relicense it.

@@ -25,3 +25,34 @@
     font-weight: 300 900;
     font-display: swap;
 }
+
+/* Metrics from `npx fontpie <file> --name <family>` against the woff2 files in resources/fonts. */
+@font-face {
+    font-family: "Inter Fallback";
+    src: local("Arial"), local("Liberation Sans");
+    font-style: normal;
+    size-adjust: 107.89%;
+    ascent-override: 89.79%;
+    descent-override: 22.36%;
+    line-gap-override: 0%;
+}
+
+@font-face {
+    font-family: "Satoshi Fallback";
+    src: local("Arial"), local("Liberation Sans");
+    font-style: normal;
+    size-adjust: 109.35%;
+    ascent-override: 92.36%;
+    descent-override: 21.95%;
+    line-gap-override: 9.14%;
+}
+
+@font-face {
+    font-family: "Satoshi Fallback";
+    src: local("Arial Italic"), local("Liberation Sans Italic");
+    font-style: italic;
+    size-adjust: 107.02%;
+    ascent-override: 94.38%;
+    descent-override: 22.43%;
+    line-gap-override: 9.34%;
+}

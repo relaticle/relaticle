@@ -305,6 +305,47 @@ it('a reply saved as a draft still threads when it is sent later', function (): 
         ->and($reply->thread_id)->toBe($this->inboundEmail->thread_id);
 });
 
+it('resumes a reply draft on the sender own copy when a teammate holds a restricted copy of the message', function (): void {
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'reply')
+        ->set('bodyHtml', '<p>Started, not finished</p>')
+        ->call('close');
+
+    $draftId = Email::query()->where('status', EmailStatus::DRAFT)->sole()->getKey();
+
+    $teammate = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+    $this->workspace->users()->attach($teammate, ['role' => 'member']);
+
+    $teammateAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $teammate->id,
+    ]));
+
+    Email::factory()->inbound()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateAccount->id,
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        'rfc_message_id' => $this->inboundEmail->rfc_message_id,
+        'is_internal' => false,
+    ]);
+
+    $this->inboundEmail->touch();
+
+    livewire(EmailComposer::class)
+        ->call('open', [], $draftId)
+        ->assertSet('inReplyToEmailId', $this->inboundEmail->id)
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $reply = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::REPLY)
+        ->sole();
+
+    expect($reply->body->body_html)->toContain('Original body');
+});
+
 it('includes the original plain-text body when quoting a reply or forward', function (string $mode, string $marker): void {
     $this->inboundEmail->body->update([
         'body_html' => null,

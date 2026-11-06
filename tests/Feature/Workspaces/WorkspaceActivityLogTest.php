@@ -14,6 +14,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Support\ActivityLog\RequestActivityBatch;
 use App\Support\CurrentSource;
+use App\Support\PlainText;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Support\Facades\FilamentColor;
@@ -27,7 +28,7 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 
-mutates(ActivityLog::class, Activity::class);
+mutates(ActivityLog::class, Activity::class, PlainText::class);
 
 function slideOverChanges(Testable $component): string
 {
@@ -498,6 +499,33 @@ test('rich editor markup is read as its text, never as tags', function (): void 
         ->assertOk()
         ->assertSee('Description: — → Renewal due Friday', escape: false)
         ->assertDontSee('<strong>', escape: false);
+});
+
+test('a ticked checklist item shows in the activity log', function (): void {
+    $task = Task::factory()->for($this->workspace)->create(['title' => 'Prepare the quote']);
+    $item = fn (string $checked): string => '<ul data-type="taskList"><li data-checked="'.$checked.'" data-type="taskItem"><label><input type="checkbox"><span></span></label><div><p>Call Bob</p></div></li></ul>';
+
+    Activity::withoutGlobalScopes()->create([
+        'log_name' => 'crm',
+        'description' => 'custom_field_changes',
+        'event' => 'custom_field_changes',
+        'subject_type' => $task->getMorphClass(),
+        'subject_id' => $task->getKey(),
+        'causer_type' => 'user',
+        'causer_id' => $this->owner->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
+        'properties' => ['custom_field_changes' => [[
+            'code' => 'description',
+            'label' => 'Description',
+            'type' => 'rich-editor',
+            'old' => ['value' => $item('false'), 'label' => $item('false')],
+            'new' => ['value' => $item('true'), 'label' => $item('true')],
+        ]]],
+    ]);
+
+    livewire(ActivityLog::class)
+        ->assertOk()
+        ->assertSee('Description: [ ] Call Bob → [x] Call Bob', escape: false);
 });
 
 test('a row whose only change fits inline offers no slide-over', function (): void {

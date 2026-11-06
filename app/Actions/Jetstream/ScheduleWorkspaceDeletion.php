@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Jetstream;
 
 use App\Contracts\Billing;
+use App\Enums\DeletionReason;
 use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use App\Models\Workspace;
@@ -34,7 +35,10 @@ final readonly class ScheduleWorkspaceDeletion
         }
 
         DB::transaction(function () use ($workspace): void {
-            $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(config('relaticle.deletion.grace_period_days'))])->save();
+            $workspace->forceFill([
+                'scheduled_deletion_at' => now()->addDays(config('relaticle.deletion.grace_period_days')),
+                'deletion_reason' => DeletionReason::Requested,
+            ])->save();
 
             $workspace->workspaceInvitations()->delete();
         });

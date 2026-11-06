@@ -1,4 +1,6 @@
-{{-- Full-screen mobile menu --}}
+<div x-show="mobileMenu" x-transition.opacity.duration.150ms @click="mobileMenu = false" class="fixed inset-0 z-[59] md:hidden" x-cloak aria-hidden="true"></div>
+
+{{-- A card under the floating header --}}
 <nav x-show="mobileMenu"
      x-ref="overlay"
      x-transition.opacity.duration.150ms
@@ -8,12 +10,12 @@
           sees Shift+Tab and focus escapes backwards out of the overlay. --}}
      @keydown.tab="trapTab($event)"
      @keydown.shift.tab="trapTab($event)"
-     class="md:hidden fixed inset-0 z-[60] bg-white dark:bg-gray-950 flex flex-col"
+     class="md:hidden fixed z-[60] bg-white dark:bg-gray-950 flex flex-col inset-x-2 top-2 max-h-[calc(100dvh-1rem)] overflow-hidden rounded-2xl shadow-navbar"
      x-cloak
      aria-label="{{ __('Mobile menu') }}">
 
     {{-- Header --}}
-    <div class="flex items-center justify-between h-16 px-4 shrink-0">
+    <div class="flex items-center justify-between h-16 shrink-0 px-2">
         <a href="{{ url('/') }}" aria-label="Relaticle Home">
             <x-brand.logo-lockup size="md" class="text-black dark:text-white"/>
         </a>
@@ -42,30 +44,28 @@
          re-centers on every frame of an accordion's height animation, so a
          collapse + expand makes the whole menu wobble. Anchored to the top,
          height changes only push content downward. --}}
-    <div class="flex-1 flex flex-col px-8 overflow-y-auto pt-8 pb-6">
-        <div class="space-y-1">
+    <div class="flex-1 flex flex-col overflow-y-auto">
+        <div>
             @foreach($mobileNavItems as $item)
                 @if($item->url === null && count($item->children) > 0)
                     @php($slug = \Illuminate\Support\Str::slug($item->label))
-                    <div class="py-2 mobile-nav-enter" style="--stagger: {{ $loop->index }}">
+                    <div class="mobile-nav-enter border-t border-gray-100 dark:border-white/[0.06]" style="--stagger: {{ $loop->index }}">
                         <button type="button" @click="mobileExpanded = mobileExpanded === '{{ $slug }}' ? null : '{{ $slug }}'"
                                 :aria-expanded="(mobileExpanded === '{{ $slug }}').toString()"
                                 aria-controls="mobile-menu-{{ $slug }}"
-                                class="w-full flex items-center justify-between text-[2rem] leading-tight font-semibold text-gray-950 dark:text-white hover:text-primary dark:hover:text-primary-400 active:opacity-60 transition-[color,opacity] duration-200 cursor-pointer">
+                                class="w-full flex items-center justify-between active:opacity-60 transition-[color,opacity] duration-200 cursor-pointer px-4 py-3.5 text-lg font-medium text-gray-600 hover:text-gray-950 dark:text-gray-300 dark:hover:text-white">
                             <span>{{ $item->label }}</span>
-                            <x-ri-arrow-down-s-line class="w-7 h-7 shrink-0 text-gray-400 dark:text-gray-500 transition-transform duration-200"
+                            <x-ri-arrow-down-s-line class="h-5 w-5 shrink-0 text-gray-400 dark:text-gray-500 transition-transform duration-200"
                                                      ::class="mobileExpanded === '{{ $slug }}' && 'rotate-180'"/>
                         </button>
                         <div id="mobile-menu-{{ $slug }}" x-show="mobileExpanded === '{{ $slug }}'" x-collapse x-cloak>
                             {{-- Padding lives on this inner wrapper, not the collapsing element:
                                  border-box height cannot animate below its own padding, so a
                                  padded collapse stalls at the padding height and then pops. --}}
-                            <div class="pl-4 pt-1 pb-3 space-y-0.5">
+                            <div class="pb-3 space-y-0.5 px-4">
                             @foreach($item->children as $child)
                                 @if($child->url === null && count($child->children) > 0)
-                                    <p class="pt-4 pb-1.5 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                                        {{ $child->label }}
-                                    </p>
+                                    <x-cloud::marketing.eyebrow class="pt-4 pb-1.5">{{ $child->label }}</x-cloud::marketing.eyebrow>
                                     @foreach($child->children as $grandchild)
                                         <x-cloud::layout.mobile-menu-link :item="$grandchild"/>
                                     @endforeach
@@ -80,7 +80,7 @@
                     <a href="{{ $item->url }}" @click="mobileMenu = false"
                        @if($item->external) target="_blank" rel="noopener noreferrer" @endif
                        @if(url()->current() === $item->url) aria-current="page" @endif
-                       class="mobile-nav-enter text-[2rem] leading-tight font-semibold text-gray-950 dark:text-white hover:text-primary dark:hover:text-primary-400 active:opacity-60 transition-[color,opacity] duration-200 py-2 block"
+                       class="mobile-nav-enter block active:opacity-60 transition-[color,opacity] duration-200 border-t border-gray-100 px-4 py-3.5 text-lg font-medium text-gray-600 hover:text-gray-950 dark:border-white/[0.06] dark:text-gray-300 dark:hover:text-white"
                        style="--stagger: {{ $loop->index }}">
                         {{ $item->label }}
                     </a>
@@ -92,23 +92,21 @@
     {{-- Bottom CTA. With both accordions open the list scrolls under this block,
          so it carries a fade: without one the last link stops dead against the
          buttons and reads as clipped rather than scrollable. --}}
-    <div class="relative px-8 pb-[max(2.5rem,env(safe-area-inset-bottom))] shrink-0">
-        <div class="pointer-events-none absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-white dark:from-gray-950"
-             aria-hidden="true"></div>
+    <div class="relative shrink-0 border-t border-gray-100 p-4 dark:border-white/[0.06]">
         <x-cloud::layout.community-links class="mobile-nav-enter mb-4 flex w-fit" style="--stagger: {{ count($mobileNavItems) }}"/>
 
         @auth('web')
             <div class="grid mobile-nav-enter" style="--stagger: {{ count($mobileNavItems) }}">
-                <x-cloud::marketing.button icon-trailing="ri-arrow-right-line" :href="app(\App\Support\Auth\LoginDestination::class)->resolve(auth('web')->user(), null)" class="active:scale-[0.98]">
+                <x-cloud::marketing.button :href="app(\App\Support\Auth\LoginDestination::class)->resolve(auth('web')->user(), null)" class="active:scale-[0.98]">
                     {{ __('Open app') }}
                 </x-cloud::marketing.button>
             </div>
         @else
             <div class="grid grid-cols-2 gap-3 mobile-nav-enter" style="--stagger: {{ count($mobileNavItems) }}">
-                <x-cloud::marketing.button variant="secondary" href="{{ route('login') }}" class="active:scale-[0.98]">
+                <x-cloud::marketing.button variant="secondary" href="{{ route('login') }}" class="active:scale-[0.98]" data-analytics-intent="login" data-analytics-placement="mobile">
                     Sign In
                 </x-cloud::marketing.button>
-                <x-cloud::marketing.button href="{{ route('login') }}" class="active:scale-[0.98]">
+                <x-cloud::marketing.button href="{{ route('login') }}" class="active:scale-[0.98]" data-analytics-intent="signup" data-analytics-placement="mobile">
                     Start for free
                 </x-cloud::marketing.button>
             </div>

@@ -1,20 +1,20 @@
-<section id="faq" class="py-24 md:py-32 bg-gray-50 dark:bg-gray-950 relative overflow-hidden">
-    <div class="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,rgb(0_0_0/0.04)_1px,transparent_0)] dark:bg-[radial-gradient(circle_at_1px_1px,rgb(255_255_255/0.035)_1px,transparent_0)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,black_25%,transparent_100%)]"></div>
-
-    <!-- Bottom gradient fade into next section -->
-    <div class="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-b from-transparent to-white dark:to-gray-950 pointer-events-none"></div>
-
-    <div class="relative max-w-3xl mx-auto px-6 lg:px-8">
-        <div class="max-w-2xl mx-auto text-center mb-16">
-            <h2 class="font-display text-3xl sm:text-4xl md:text-[2.75rem] font-bold text-gray-950 dark:text-white tracking-[-0.02em] leading-[1.15]">
-                Frequently Asked Questions
-            </h2>
-            <p class="mt-5 text-base md:text-lg text-gray-500 dark:text-gray-400 max-w-lg mx-auto leading-relaxed">
-                Everything you need to know about Relaticle, from getting started to working with AI.
-            </p>
+<x-cloud::marketing.frame id="faq">
+    <div class="bg-rail grid grid-cols-1 gap-px lg:grid-cols-12">
+        <div class="bg-surface px-6 pb-6 pt-20 md:px-10 md:pt-28 lg:col-span-4">
+            <div class="lg:sticky lg:top-28">
+                <x-cloud::marketing.eyebrow class="mb-5">{{ __('FAQ') }}</x-cloud::marketing.eyebrow>
+                <h2 class="type-title text-gray-950 dark:text-white">
+                    {{ __('Frequently asked questions') }}
+                </h2>
+                <p class="mt-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+                    {{ __('Something else on your mind?') }}
+                    <a href="{{ route('contact') }}" class="font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white">{{ __('Get in touch') }}</a>
+                </p>
+            </div>
         </div>
 
-        <x-cloud::marketing.faq-accordion :faqs="$faqs" />
+        <div class="bg-surface px-6 pb-16 md:px-10 lg:col-span-8 lg:pt-24">
+            <x-cloud::marketing.faq-accordion :faqs="$faqs" />
+        </div>
     </div>
-
-</section>
+</x-cloud::marketing.frame>

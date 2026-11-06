@@ -260,6 +260,9 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
             if (!Array.isArray(m.next_steps)) {
                 m.next_steps = [];
             }
+            if (!Array.isArray(m.sources)) {
+                m.sources = [];
+            }
             m.feedback = m.feedback ?? null;
             m.feedbackPanelOpen = false;
             m.feedbackCategory = m.feedback?.category ?? null;
@@ -268,6 +271,24 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         if (m.role === 'user') {
             m.editing = false;
             m.editText = '';
+        }
+    },
+
+    sourceLabel(sources, source) {
+        if (sources.filter((s) => s.domain === source.domain).length < 2) {
+            return source.domain;
+        }
+
+        if (source.title) {
+            return source.title;
+        }
+
+        try {
+            const path = new URL(source.url).pathname;
+
+            return path === '/' ? source.domain : source.domain + path;
+        } catch {
+            return source.domain;
         }
     },
 

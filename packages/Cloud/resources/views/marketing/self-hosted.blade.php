@@ -1,35 +1,65 @@
 @php
     $assistantName = (string) config('chat.assistant_name');
+    $documentationActive = \Laravel\Pennant\Feature::active(\App\Features\Documentation::class);
 
     $title = __('Self-hosted CRM: Run it on your server').' - Relaticle';
     $description = __('Deploy Relaticle, the open-source AGPL-3.0 CRM, on your own server with two Docker commands. Unlimited users, no per-seat pricing, and your data stays yours.');
 
-    $quickStartLines = [
-        ['type' => 'comment', 'text' => __('Download the compose file')],
-        ['type' => 'command', 'text' => 'curl -o compose.yml https://raw.githubusercontent.com/relaticle/relaticle/main/compose.yml'],
-        ['type' => 'blank'],
-        ['type' => 'comment', 'text' => __('Add the two secrets and your public URL')],
-        ['type' => 'command', 'text' => 'cat > .env << EOF'],
-        ['type' => 'command', 'text' => 'APP_KEY=base64:$(openssl rand -base64 32)', 'continuation' => true],
-        ['type' => 'command', 'text' => 'DB_PASSWORD=$(openssl rand -hex 24)', 'continuation' => true],
-        ['type' => 'command', 'text' => 'APP_URL=https://crm.example.com', 'continuation' => true],
-        ['type' => 'command', 'text' => 'EOF', 'continuation' => true],
-        ['type' => 'blank'],
-        ['type' => 'comment', 'text' => __('Start Relaticle')],
-        ['type' => 'command', 'text' => 'docker compose up -d'],
+    $stats = array_values(array_filter([
+        $githubStars > 0 ? [__(':count+', ['count' => $formattedGithubStars]), __('GitHub stars'), 'https://github.com/relaticle/relaticle'] : null,
+        $formattedDockerPulls !== null ? [$formattedDockerPulls, __('Docker pulls'), 'https://hub.docker.com/r/manukminasyan/relaticle'] : null,
+        $formattedDiscordMembers !== null ? [$formattedDiscordMembers, __('Discord members'), route('discord')] : null,
+    ]));
+
+    $reasons = [
+        [
+            __('Your data stays on your server'),
+            __('Every company, person, opportunity, task, and uploaded file lives on the PostgreSQL, Redis, and storage volumes compose.yml defines. Nothing is sent to Relaticle.'),
+        ],
+        [
+            __('Source you can read and change'),
+            __('Everything a self-hosted install runs, including :name and the MCP server, is on GitHub under AGPL-3.0. Audit it, modify it, and redistribute it under the same license.', ['name' => $assistantName]),
+        ],
+        [
+            __('One flat cost: your server'),
+            __('Unlimited users and unlimited records on every install. No per-seat price, no license fee, and no user-count paywall to hit.'),
+        ],
     ];
 
-    // What the copy button puts on the clipboard: commands only, no prompt glyphs
-    // and no comment lines, so a paste into a real shell runs as-is.
-    $quickStartClipboard = collect($quickStartLines)
-        ->filter(fn (array $line): bool => ($line['type'] ?? null) === 'command')
-        ->pluck('text')
-        ->implode("\n");
+    $containers = [
+        ['app', 'ghcr.io/relaticle/relaticle', __('Serves the app, the API and the MCP server, and runs migrations on startup.')],
+        ['horizon', 'ghcr.io/relaticle/relaticle', __('The queue worker: imports, exports, email, and :name\'s replies.', ['name' => $assistantName])],
+        ['scheduler', 'ghcr.io/relaticle/relaticle', __('Runs the recurring jobs: cleanup and notifications.')],
+        ['reverb', 'ghcr.io/relaticle/relaticle', __('The websocket server that streams :name\'s replies to the browser.', ['name' => $assistantName])],
+        ['postgres', 'postgres:17-alpine', __('PostgreSQL 17, on a volume you back up.')],
+        ['redis', 'redis:7-alpine', __('Cache, sessions, and the queue, with append-only persistence.')],
+    ];
+
+    $providerLines = [
+        ['comment', __('Cloud models, billed to your own account')],
+        ['env', 'ANTHROPIC_API_KEY', 'sk-ant-…'],
+        ['env', 'OPENAI_API_KEY', 'sk-…'],
+        ['blank'],
+        ['comment', __('A local model through Ollama')],
+        ['env', 'OLLAMA_BASE_URL', 'http://host.docker.internal:11434'],
+        ['env', 'OLLAMA_MODEL', 'qwen3:14b'],
+        ['blank'],
+        ['comment', __('Or any OpenAI-compatible endpoint, such as vLLM')],
+        ['env', 'SELF_HOSTED_AI_URL', 'http://host.docker.internal:8000/v1'],
+        ['env', 'SELF_HOSTED_AI_MODELS', 'qwen3:14b,llama3.1:70b'],
+    ];
+
+    $comparison = [
+        [__('Infrastructure'), __('Your own server, under your own operational control.'), __('Relaticle-managed infrastructure.')],
+        [__('Updates and backups'), __('You pull new images and back up PostgreSQL yourself. The guide has the pg_dump commands.'), __('Handled by Relaticle, with no maintenance window to schedule.')],
+        [__('AI models'), __('Bring your own provider key, or run a local model with Ollama.'), __('Cloud-hosted models ready immediately, with no provider key required.')],
+        [__('Getting help'), __('Community support on Discord and GitHub issues.'), __('Email support.')],
+    ];
 
     $faqs = [
         [
             __('What license is Relaticle released under?'),
-            __('AGPL-3.0. Everything a self-hosted install runs, including :name, the built-in AI assistant, and the MCP server, is on GitHub under that license. Read it, audit it, modify it, and redeploy your own fork.', ['name' => config('chat.assistant_name')]),
+            __('AGPL-3.0. Everything a self-hosted install runs, including :name, the built-in AI assistant, and the MCP server, is on GitHub under that license. Read it, audit it, modify it, and redistribute it under the same terms.', ['name' => $assistantName]),
         ],
         [
             __('How do I update a self-hosted install?'),
@@ -39,12 +69,12 @@
             ]),
         ],
         [
-            __('What does :name need to work on a self-hosted install?', ['name' => config('chat.assistant_name')]),
+            __('What does :name need to work on a self-hosted install?', ['name' => $assistantName]),
             __('A provider it can call. Set an API key for Claude or GPT, or point it at Ollama or any OpenAI-compatible endpoint. With neither configured, the assistant has no model to answer with.'),
         ],
         [
             __('Where does my data live?'),
-            __('On the PostgreSQL, Redis, and storage volumes defined in compose.yml, all running on your own server. Nothing is sent to Relaticle-operated infrastructure unless you choose the hosted Cloud plan instead.'),
+            __('On the PostgreSQL, Redis, and storage volumes defined in compose.yml, all running on your own server. Nothing is sent to Relaticle-operated infrastructure unless you choose the hosted Cloud instead.'),
         ],
         [
             __('What server do I need?'),
@@ -59,6 +89,8 @@
             __('Yes. Both run the same CRM against the same schema, and every record type has a built-in CSV export, so moving between them is an export and re-import, not a proprietary migration.'),
         ],
     ];
+
+    $linkClass = 'font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white';
 @endphp
 
 <x-cloud::guest-layout
@@ -68,337 +100,193 @@
     :ogDescription="$description"
     :ogImage="url('/images/open-graph-self-hosted.jpg').'?v=1'"
 >
-    {{-- Hero --}}
-    <section class="relative pt-32 pb-20 md:pt-40 md:pb-24 bg-white dark:bg-gray-950 overflow-hidden">
-        <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]"></div>
+    <x-cloud::marketing.hero>
+        <x-slot:eyebrow>
+            <x-cloud::marketing.eyebrow>{{ __('Self-hosted') }}</x-cloud::marketing.eyebrow>
+        </x-slot:eyebrow>
 
-        <div class="relative max-w-3xl mx-auto px-6 lg:px-8 text-center">
+        <x-slot:title>
+            {{ __('Your CRM, on your server.') }}
+            <span class="text-gray-500 dark:text-gray-400"><span class="whitespace-nowrap">AGPL-3.0,</span> {{ __(':name included.', ['name' => $assistantName]) }}</span>
+        </x-slot:title>
 
-            {{-- Badge --}}
-            <div class="flex justify-center mb-6">
-                <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-gray-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-                    <x-ri-server-line class="h-3.5 w-3.5 text-primary dark:text-primary-400"/>
-                    <span class="uppercase tracking-wider text-[10px] font-medium text-gray-500 dark:text-gray-400">{{ __('Self-hosted') }}</span>
-                </div>
-            </div>
-
-            <h1 class="font-display text-4xl sm:text-5xl font-bold text-gray-950 dark:text-white tracking-[-0.03em] leading-[1.1]">
-                {{ __('Your CRM. Your server. Your data.') }}
-            </h1>
-
-            <p class="mt-5 text-base md:text-lg text-gray-500 dark:text-gray-400 leading-relaxed max-w-2xl mx-auto">
-                {{ __('Relaticle is open source under the AGPL-3.0 license. Run it on your own hardware with unlimited users and no per-seat cost, forever.') }}
+        <x-slot:aside>
+            <p class="text-base leading-relaxed text-gray-500 md:text-lg dark:text-gray-400">
+                {{ __('Download the compose file, add two secrets, start it. Unlimited users, no per-seat cost, and an install below that is ready to paste.') }}
             </p>
-        </div>
 
-        {{-- Terminal: a purpose-built command block, not the homepage hero mockup. The two
-             lines the tests and the founder's brief require are kept verbatim from
-             packages/Documentation/resources/content/docs/guides/self-hosting.md:19,39. The
-             APP_KEY/DB_PASSWORD lines in between are added because compose.yml hard-requires
-             both (${APP_KEY:?...}, ${DB_PASSWORD:?...}), so the two headline commands alone
-             would fail if someone actually ran them. --}}
-        <div class="relative mt-12 max-w-2xl mx-auto px-6 lg:px-8">
-            <div class="rounded-2xl border border-black/[0.06] dark:border-white/[0.08] bg-gray-950 shadow-xl shadow-gray-950/10 overflow-hidden text-left">
-                <div class="flex items-center gap-1.5 border-b border-white/[0.06] px-4 py-3">
-                    <span class="h-2.5 w-2.5 rounded-full bg-red-500/70"></span>
-                    <span class="h-2.5 w-2.5 rounded-full bg-yellow-500/70"></span>
-                    <span class="h-2.5 w-2.5 rounded-full bg-green-500/70"></span>
-                    <span class="ml-3 font-mono text-xs text-gray-500">{{ __('Terminal') }}</span>
-
-                    <button
-                        type="button"
-                        x-data="{ copied: false }"
-                        @click="navigator.clipboard.writeText(@js($quickStartClipboard)).then(() => { copied = true; setTimeout(() => copied = false, 2000) })"
-                        class="ml-auto inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-gray-400 hover:text-gray-100 transition-colors cursor-pointer"
-                    >
-                        <template x-if="! copied">
-                            <span class="inline-flex items-center gap-1.5">
-                                <x-ri-file-copy-line class="h-3.5 w-3.5"/>
-                                {{ __('Copy') }}
-                            </span>
-                        </template>
-                        <template x-if="copied">
-                            <span class="inline-flex items-center gap-1.5 text-emerald-400">
-                                <x-ri-check-line class="h-3.5 w-3.5"/>
-                                {{ __('Copied') }}
-                            </span>
-                        </template>
-                    </button>
-                </div>
-                <div class="px-5 py-5 font-mono text-[12px] sm:text-[13px] leading-relaxed">
-                    @foreach($quickStartLines as $line)
-                        @if(($line['type'] ?? null) === 'blank')
-                            <div class="h-3" aria-hidden="true"></div>
-                        @elseif(($line['type'] ?? null) === 'comment')
-                            {{-- The `#` stays selectable, unlike the `$`/`>` prompts below: it is
-                                 what keeps the line a shell comment once it is copied. --}}
-                            <p class="text-gray-500">
-                                <span>#</span> {{ $line['text'] }}
-                            </p>
-                        @else
-                            {{-- Prompt glyphs carry `select-none` so a select-and-copy of the
-                                 block yields runnable shell input, not stray `$`/`>` lines. --}}
-                            <p class="flex gap-2 whitespace-pre-wrap break-all text-gray-100">
-                                <span class="shrink-0 select-none {{ ($line['continuation'] ?? false) ? 'text-gray-600' : 'text-emerald-400' }}" aria-hidden="true">{{ ($line['continuation'] ?? false) ? '>' : '$' }}</span>
-                                <span>{{ $line['text'] }}</span>
-                            </p>
-                        @endif
-                    @endforeach
-                </div>
-            </div>
-            <p class="mt-4 text-center text-xs text-gray-400 dark:text-gray-500">
-                {{ __('Requires Docker 20.10+ and Docker Compose v2. Environment variables, reverse proxy configs, and a manual (non-Docker) install are covered in the guide below.') }}
-            </p>
-        </div>
-    </section>
-
-    {{-- Why self-host --}}
-    <section class="py-20 md:py-28 bg-gray-50 dark:bg-gray-950">
-        <div class="max-w-5xl mx-auto px-6 lg:px-8">
-            <div class="max-w-2xl mx-auto text-center mb-14">
-                <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">
-                    {{ __('Why run it yourself') }}
-                </h2>
-                <p class="mt-4 text-base text-gray-500 dark:text-gray-400 leading-relaxed">
-                    {{ __('The same reasons people self-host any serious open-source tool.') }}
-                </p>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                @foreach([
-                    ['ri-database-2-line', __('Your data stays yours'), __('Every company, person, opportunity, task, and uploaded file lives on infrastructure you control. Nothing is sent to Relaticle. Looking up a company logo sends that company\'s domain to Google and DuckDuckGo.')],
-                    ['ri-scales-line', __('Source you can read and change'), __('Relaticle is licensed AGPL-3.0. Everything a self-hosted install runs is on GitHub, not a stripped-down edition. Audit it, modify it, and redeploy your fork.')],
-                    ['ri-hard-drive-line', __('One flat cost: your server'), __('Unlimited users and unlimited records on every self-hosted install. There is no per-seat pricing and no user-count paywall to hit.')],
-                ] as [$icon, $cardTitle, $cardDesc])
-                    <div class="rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-6">
-                        <div class="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/[0.08] dark:bg-primary/[0.15] mb-4">
-                            <x-dynamic-component :component="$icon" class="w-4.5 h-4.5 text-primary dark:text-primary-400"/>
-                        </div>
-                        <h3 class="font-display text-base font-semibold text-gray-900 dark:text-white mb-1.5">
-                            {{ $cardTitle }}
-                        </h3>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                            {{ $cardDesc }}
-                        </p>
-                    </div>
-                @endforeach
-            </div>
-        </div>
-    </section>
-
-    {{-- Quick start --}}
-    <section class="py-20 md:py-28 bg-white dark:bg-gray-950">
-        <div class="max-w-3xl mx-auto px-6 lg:px-8">
-            <div class="max-w-2xl mx-auto text-center mb-14">
-                <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">
-                    {{ __('Three steps to a running CRM') }}
-                </h2>
-                <p class="mt-4 text-base text-gray-500 dark:text-gray-400 leading-relaxed">
-                    {{ __('Distilled from the full guide, which also covers Dokploy, Coolify, Laravel Cloud, Traefik, and a Docker-free manual install.') }}
-                </p>
-            </div>
-
-            <ol class="space-y-4">
-                @foreach([
-                    [__('Get the compose file'), __('Download the published compose.yml, set the two secrets it requires (:appKey and :dbPassword), and point :appUrl at the address you will serve from. Invitation and password-reset links are signed against that host, so they break if it is wrong.', ['appKey' => 'APP_KEY', 'dbPassword' => 'DB_PASSWORD', 'appUrl' => 'APP_URL'])],
-                    [__('Start the stack'), __('Run :command and Docker pulls six containers: the app, a queue worker, a scheduler, a websocket server, PostgreSQL, and Redis. Database migrations run automatically on startup.', ['command' => 'docker compose up -d'])],
-                    [__('Create your admin account'), __('Run :command, choose the app panel, and sign in with the account you just created.', ['command' => 'docker compose exec app php artisan make:filament-user'])],
-                ] as $index => [$stepTitle, $stepDesc])
-                    <li class="flex gap-4 rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-6">
-                        <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/[0.08] dark:bg-primary/[0.15] font-display text-sm font-semibold text-primary dark:text-primary-400">
-                            {{ $index + 1 }}
-                        </div>
-                        <div>
-                            <h3 class="font-display text-base font-semibold text-gray-900 dark:text-white mb-1.5">
-                                {{ $stepTitle }}
-                            </h3>
-                            <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                                {{ $stepDesc }}
-                            </p>
-                        </div>
-                    </li>
-                @endforeach
-            </ol>
-
-            @feature(App\Features\Documentation::class)
-                <div class="mt-8 text-center">
-                    <x-cloud::marketing.button variant="secondary" href="{{ route('documentation.show', ['type' => 'self-hosting']) }}">
-                        {{ __('Read the full self-hosting guide') }}
+            <div class="mt-7 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
+                @if($documentationActive)
+                    <x-cloud::marketing.button href="{{ route('documentation.show', ['type' => 'self-hosting']) }}">
+                        {{ __('Read the guide') }}
                     </x-cloud::marketing.button>
-                </div>
-            @endfeature
-        </div>
-    </section>
-
-    {{-- AI on your server --}}
-    <section class="py-20 md:py-28 bg-gray-50 dark:bg-gray-950">
-        <div class="max-w-3xl mx-auto px-6 lg:px-8">
-            <div class="max-w-2xl mx-auto text-center mb-12">
-                <div class="flex justify-center mb-6">
-                    <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-gray-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-                        <x-ri-key-2-line class="h-3.5 w-3.5 text-primary dark:text-primary-400"/>
-                        <span class="uppercase tracking-wider text-[10px] font-medium text-gray-500 dark:text-gray-400">{{ __('AI, self-hosted') }}</span>
-                    </div>
-                </div>
-
-                <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">
-                    {{ __('Your keys, your models') }}
-                </h2>
-                <p class="mt-4 text-base text-gray-500 dark:text-gray-400 leading-relaxed">
-                    {{ __(':name is part of the self-hosted image, but it ships with no provider configured. You decide what it calls, if anything.', ['name' => $assistantName]) }}
-                </p>
+                    <x-cloud::marketing.button variant="secondary" href="https://github.com/relaticle/relaticle" icon="ri-github-fill" external>
+                        {{ __('View on GitHub') }}
+                    </x-cloud::marketing.button>
+                @else
+                    <x-cloud::marketing.button href="https://github.com/relaticle/relaticle" icon="ri-github-fill" external>
+                        {{ __('View on GitHub') }}
+                    </x-cloud::marketing.button>
+                @endif
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div class="rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-6">
-                    <div class="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/[0.08] dark:bg-primary/[0.15] mb-4">
-                        <x-ri-key-2-line class="w-4.5 h-4.5 text-primary dark:text-primary-400"/>
-                    </div>
-                    <h3 class="font-display text-base font-semibold text-gray-900 dark:text-white mb-1.5">
-                        {{ __('Bring your own provider key') }}
-                    </h3>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                        {{ __('Set :anthropicKey or :openaiKey and the assistant calls Claude or GPT with your own account, at your own usage rates. Relaticle does not meter AI credits on a self-hosted install.', ['anthropicKey' => 'ANTHROPIC_API_KEY', 'openaiKey' => 'OPENAI_API_KEY']) }}
-                    </p>
-                </div>
+            <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">{{ __('2 GB of RAM to start. Docker 20.10+ with Compose v2.') }}</p>
+        </x-slot:aside>
 
-                <div class="rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-6">
-                    <div class="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/[0.08] dark:bg-primary/[0.15] mb-4">
-                        <x-ri-cpu-line class="w-4.5 h-4.5 text-primary dark:text-primary-400"/>
-                    </div>
-                    <h3 class="font-display text-base font-semibold text-gray-900 dark:text-white mb-1.5">
-                        {{ __('Run it locally with Ollama') }}
-                    </h3>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                        {{ __('Point :ollamaUrl at your Ollama server and set :ollamaModel to the tag you want in the picker. From inside the containers, that usually means :dockerHost, not localhost.', ['ollamaUrl' => 'OLLAMA_BASE_URL', 'ollamaModel' => 'OLLAMA_MODEL', 'dockerHost' => 'http://host.docker.internal:11434']) }}
-                    </p>
-                </div>
-            </div>
+        @include('cloud::marketing.partials.self-hosted-install')
+    </x-cloud::marketing.hero>
 
-            <p class="mt-8 text-sm text-gray-500 dark:text-gray-400 leading-relaxed text-center max-w-xl mx-auto">
-                {{ __('Either way, the model catalog in a hosted Relaticle Cloud workspace is provisioned by Relaticle. A self-hosted install starts with none of that: nothing answers until you configure a provider yourself.') }}
-            </p>
-        </div>
-    </section>
-
-    {{-- Cloud vs self-hosted --}}
-    <section class="py-20 md:py-28 bg-white dark:bg-gray-950">
-        <div class="max-w-3xl mx-auto px-6 lg:px-8">
-            <div class="max-w-2xl mx-auto text-center mb-12">
-                <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">
-                    {{ __('Self-hosted or Cloud: how to choose') }}
-                </h2>
-                <p class="mt-4 text-base text-gray-500 dark:text-gray-400 leading-relaxed">
-                    {{ __('Both run the same open-source CRM. The real differences are who operates the server and who provisions the AI models.') }}
-                </p>
-            </div>
-
-            {{--
-                List layout, not a <table>, so the page still converts cleanly to markdown for
-                the ProvideMarkdownResponse middleware this route runs under (same pattern as
-                the comparison list in packages/Cloud/resources/views/marketing/pricing.blade.php).
-            --}}
-            <ul class="divide-y divide-gray-100 rounded-2xl border border-gray-200/80 bg-white dark:divide-white/[0.04] dark:border-white/[0.06] dark:bg-white/[0.02]">
-                @foreach([
-                    [__('Infrastructure'), __('Your own server, under your own operational control'), __('Relaticle-managed infrastructure')],
-                    [__('Updates and backups'), __('You pull new images and back up PostgreSQL yourself (the guide has the pg_dump commands)'), __('Handled by Relaticle, no maintenance window to schedule')],
-                    [__('AI models'), __('Bring your own provider key, or run a local model with Ollama'), __('Cloud-hosted models ready immediately, no provider key required')],
-                    [__('Getting help'), __('Community support on Discord and GitHub issues'), __('Email support')],
-                ] as [$rowLabel, $selfHostedValue, $hostedValue])
-                    {{-- Two columns on desktop so the two options can be read against each
-                         other, one under the other on mobile. Text order and the inline
-                         "Self-Hosted:" / "Cloud:" prefixes are unchanged: they are what the
-                         markdown variant renders, and a grid class does not reach it. --}}
-                    <li class="px-4 py-4 sm:px-6">
-                        <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ $rowLabel }}</p>
-                        <div class="mt-2 grid gap-2 sm:grid-cols-2 sm:gap-6">
-                            <p class="text-sm text-gray-600 dark:text-gray-400 sm:border-l-2 sm:border-primary/30 sm:pl-3">
-                                <span class="block text-pico font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ __('Self-Hosted') }}:</span>
-                                {{ $selfHostedValue }}
-                            </p>
-                            <p class="text-sm text-gray-600 dark:text-gray-400 sm:border-l-2 sm:border-gray-200 dark:sm:border-white/10 sm:pl-3">
-                                <span class="block text-pico font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ __('Cloud') }}:</span>
-                                {{ $hostedValue }}
-                            </p>
-                        </div>
-                    </li>
-                @endforeach
-            </ul>
-        </div>
-    </section>
-
-    {{-- Community --}}
-    <section class="py-20 md:py-28 bg-gray-50 dark:bg-gray-950">
-        <div class="max-w-4xl mx-auto px-6 lg:px-8">
-            <div class="max-w-2xl mx-auto text-center mb-12">
-                <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">
-                    {{ __('Built in the open') }}
-                </h2>
-                <p class="mt-4 text-base text-gray-500 dark:text-gray-400 leading-relaxed">
-                    {{ __('No private roadmap, no closed issue tracker. Every self-hosted install runs the same CRM the maintainers ship on.') }}
-                </p>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                @foreach(array_filter([
-                    ['url' => 'https://github.com/relaticle/relaticle', 'icon' => 'ri-github-fill', 'title' => __('GitHub'), 'desc' => __('Star the repo, browse the source, and open issues or pull requests directly against the codebase.'), 'cta' => __('View the repository'), 'external' => true],
-                    ['url' => route('discord'), 'icon' => 'ri-discord-fill', 'title' => __('Discord'), 'desc' => __('Ask deployment questions and get help from other self-hosters and the maintainers.'), 'cta' => __('Join the Discord'), 'external' => true],
-                    \Laravel\Pennant\Feature::active(App\Features\Documentation::class)
-                        ? ['url' => route('documentation.show', ['type' => 'contributing']), 'icon' => 'ri-git-repository-line', 'title' => __('Contributing'), 'desc' => __('Architecture overview, local setup, and coding conventions for anyone who wants to send a pull request.'), 'cta' => __('Read the contributing guide'), 'external' => false]
-                        : null,
-                ]) as $card)
-                    <a href="{{ $card['url'] }}"
-                       @if($card['external']) target="_blank" rel="noopener noreferrer" @endif
-                       class="group rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-6 transition-all duration-300 hover:border-gray-300 dark:hover:border-white/[0.10] hover:shadow-sm flex flex-col">
-                        <div class="flex items-center justify-between mb-3">
-                            <h3 class="font-display text-base font-semibold text-gray-900 dark:text-white inline-flex items-center gap-2">
-                                <x-dynamic-component :component="$card['icon']" class="w-4 h-4"/>
-                                {{ $card['title'] }}
-                            </h3>
-                            <x-ri-arrow-right-up-line class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 group-hover:text-gray-400 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-all duration-300"/>
-                        </div>
-                        <p class="text-[13px] leading-relaxed text-gray-500 dark:text-gray-400 mb-5">{{ $card['desc'] }}</p>
-                        <span class="mt-auto text-xs font-medium text-gray-900 dark:text-white group-hover:text-primary dark:group-hover:text-primary-400 transition-colors duration-300">
-                            {{ $card['cta'] }}
-                        </span>
-                    </a>
+    @if($stats !== [])
+        <x-cloud::marketing.frame>
+            <div class="bg-rail grid grid-cols-1 gap-px sm:grid-cols-[repeat(auto-fit,minmax(0,1fr))]">
+                @foreach($stats as [$value, $label, $href])
+                    <x-cloud::marketing.stat :value="$value" :label="$label" :href="$href"/>
                 @endforeach
             </div>
+        </x-cloud::marketing.frame>
+    @endif
+
+    <x-cloud::marketing.frame>
+        <x-cloud::marketing.frame-header :label="__('Open source')" :lead="__('Everything, under one license.')">
+            {{ __('Not a community edition.') }}
+        </x-cloud::marketing.frame-header>
+
+        <div class="bg-rail grid grid-cols-1 gap-px md:grid-cols-3">
+            @foreach($reasons as $index => [$reasonTitle, $reasonDescription])
+                <div class="bg-surface p-6 md:p-10">
+                    <x-cloud::marketing.eyebrow class="mb-4">{{ sprintf('%02d', $index + 1) }}</x-cloud::marketing.eyebrow>
+                    <h3 class="text-lg font-medium text-gray-950 dark:text-white">{{ $reasonTitle }}</h3>
+                    <p class="type-prose mt-2 text-gray-500 dark:text-gray-400">{{ $reasonDescription }}</p>
+                </div>
+            @endforeach
         </div>
-    </section>
+    </x-cloud::marketing.frame>
 
-    {{-- FAQ --}}
-    <section class="py-20 md:py-28 bg-white dark:bg-gray-950">
-        <div class="max-w-3xl mx-auto px-6 lg:px-8">
-            <div class="text-center mb-10">
-                <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">
-                    {{ __('Self-hosting questions, answered') }}
-                </h2>
-            </div>
+    <x-cloud::marketing.frame id="stack">
+        <x-cloud::marketing.frame-header :label="__('The stack')" :lead="__('Six containers from one command.')">
+            {{ __('Each one named in the published compose file.') }}
+        </x-cloud::marketing.frame-header>
 
-            <x-cloud::marketing.faq-accordion :faqs="$faqs" id-prefix="self-hosted-faq" />
+        <div class="bg-rail grid grid-cols-1 gap-px sm:grid-cols-2 lg:grid-cols-3">
+            @foreach($containers as [$container, $image, $purpose])
+                <div class="bg-surface flex flex-col gap-3 p-6 md:p-8">
+                    <div class="flex items-baseline justify-between gap-3">
+                        <h3 class="font-mono text-sm font-semibold text-gray-950 dark:text-white">{{ $container }}</h3>
+                        <span class="truncate font-mono text-xs text-gray-500 dark:text-gray-400">{{ $image }}</span>
+                    </div>
+                    <p class="type-prose text-gray-500 dark:text-gray-400">{{ $purpose }}</p>
+                </div>
+            @endforeach
         </div>
-    </section>
 
-    {{-- CTA --}}
-    <section class="py-20 md:py-28 bg-gray-50 dark:bg-gray-950">
-        <div class="max-w-xl mx-auto px-6 lg:px-8 text-center">
-            <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white">
-                {{ __('Run it your way') }}
-            </h2>
-            <p class="mt-4 text-base text-gray-500 dark:text-gray-400 leading-relaxed">
-                {{ __('Deploy the open-source image on your own server, or skip the ops and let Relaticle run it for you.') }}
+        <div class="bg-surface border-rail border-t px-6 py-5 md:px-8">
+            <p class="type-prose text-gray-700 dark:text-gray-300">
+                {{ __('The guide also covers Dokploy, Coolify, Laravel Cloud, reverse proxies, backups, and a Docker-free manual install.') }}
+                @if($documentationActive)
+                    <a href="{{ route('documentation.show', ['type' => 'self-hosting']) }}" class="{{ $linkClass }}">{{ __('Read the full self-hosting guide') }}</a>
+                @endif
             </p>
-            <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-                <x-cloud::marketing.button href="https://github.com/relaticle/relaticle" icon="ri-github-fill" external>
-                    {{ __('Deploy self-hosted') }}
-                </x-cloud::marketing.button>
-                <x-cloud::marketing.button variant="secondary" href="{{ route('login') }}">
-                    {{ __('Try Relaticle Cloud') }}
-                </x-cloud::marketing.button>
+        </div>
+    </x-cloud::marketing.frame>
+
+    <x-cloud::marketing.frame id="ai">
+        <x-cloud::marketing.frame-header :label="__(':name, self-hosted', ['name' => $assistantName])" :lead="__('Your keys, your models.')">
+            {{ __('Nothing answers until you configure a provider.') }}
+        </x-cloud::marketing.frame-header>
+
+        <div class="bg-rail grid gap-px">
+            <x-cloud::marketing.showcase
+                :label="__('Providers')"
+                :lead="__(':name ships in the image.', ['name' => $assistantName])"
+                :facts="[
+                    __('Relaticle does not meter AI credits on a self-hosted install.'),
+                    __('Claude or GPT with your own key, at your own usage rates'),
+                    __('Ollama, vLLM, or any OpenAI-compatible endpoint for a local model'),
+                ]"
+                :link-label="__('Choosing a model that calls tools')"
+                :link-href="$documentationActive ? route('documentation.show', ['type' => 'self-hosting']).'#ai-assistant' : null"
+            >
+                {{ __('You decide what it calls.') }}
+
+                <x-slot:visual>
+                    <div class="flex h-full items-center justify-center px-4 py-10 sm:px-8">
+                        <x-cloud::marketing.window class="w-full max-w-xl">
+                            <div class="border-rail flex items-center gap-3 border-b px-4 py-2.5">
+                                <span class="font-mono text-xs text-gray-500 dark:text-gray-400">.env</span>
+                            </div>
+                            <div class="px-4 py-4 font-mono text-[12px] leading-6 sm:text-[13px]">
+                                @foreach($providerLines as $providerLine)
+                                    @if($providerLine[0] === 'blank')
+                                        <div class="h-3" aria-hidden="true"></div>
+                                    @elseif($providerLine[0] === 'comment')
+                                        <p class="text-gray-500 dark:text-gray-400"><span>#</span> {{ $providerLine[1] }}</p>
+                                    @else
+                                        <p class="whitespace-pre-wrap break-all"><span class="text-gray-950 dark:text-white">{{ $providerLine[1] }}</span><span class="text-gray-400 dark:text-gray-500">=</span><span class="text-primary dark:text-primary-400">{{ $providerLine[2] }}</span></p>
+                                    @endif
+                                @endforeach
+                            </div>
+                        </x-cloud::marketing.window>
+                    </div>
+                </x-slot:visual>
+            </x-cloud::marketing.showcase>
+        </div>
+    </x-cloud::marketing.frame>
+
+    <x-cloud::marketing.frame id="cloud-or-self-hosted">
+        <x-cloud::marketing.frame-header :label="__('Self-hosted or Cloud')" :lead="__('Same CRM, two operators.')">
+            {{ __('Who runs the server, and who provisions the models.') }}
+        </x-cloud::marketing.frame-header>
+
+        <div class="bg-rail grid gap-px">
+            @foreach($comparison as [$rowLabel, $selfHostedValue, $hostedValue])
+                <div class="bg-rail grid grid-cols-1 gap-px md:grid-cols-12">
+                    <p class="bg-surface px-6 py-5 text-sm font-medium text-gray-950 md:col-span-3 md:px-10 dark:text-white">{{ $rowLabel }}</p>
+                    <p class="bg-surface px-6 py-5 md:col-span-5 md:px-8">
+                        <span class="type-label mb-1 block text-gray-500 dark:text-gray-400">{{ __('Self-hosted') }}:</span>
+                        <span class="type-prose text-gray-700 dark:text-gray-300">{{ $selfHostedValue }}</span>
+                    </p>
+                    <p class="bg-surface px-6 py-5 md:col-span-4 md:px-8">
+                        <span class="type-label mb-1 block text-gray-500 dark:text-gray-400">{{ __('Cloud') }}:</span>
+                        <span class="type-prose text-gray-700 dark:text-gray-300">{{ $hostedValue }}</span>
+                    </p>
+                </div>
+            @endforeach
+        </div>
+    </x-cloud::marketing.frame>
+
+    <x-cloud::marketing.frame id="self-hosted-faq">
+        <div class="bg-rail grid grid-cols-1 gap-px lg:grid-cols-12">
+            <div class="bg-surface px-6 pb-6 pt-16 md:px-10 md:pt-24 lg:col-span-4">
+                <div class="lg:sticky lg:top-28">
+                    <x-cloud::marketing.eyebrow class="mb-5">{{ __('FAQ') }}</x-cloud::marketing.eyebrow>
+                    <h2 class="type-title text-gray-950 dark:text-white">{{ __('Self-hosting questions, answered') }}</h2>
+                    <p class="mt-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+                        {{ __('Something else on your mind?') }}
+                        <a href="{{ route('discord') }}" class="{{ $linkClass }}">{{ __('Ask on Discord') }}</a>
+                        {{ __('or') }}
+                        <a href="https://github.com/relaticle/relaticle/issues" target="_blank" rel="noopener noreferrer" class="{{ $linkClass }}">{{ __('open an issue') }}</a>.
+                        @if($documentationActive)
+                            <a href="{{ route('documentation.show', ['type' => 'contributing']) }}" class="{{ $linkClass }}">{{ __('The contributing guide') }}</a>
+                            {{ __('covers local setup.') }}
+                        @endif
+                    </p>
+                </div>
+            </div>
+
+            <div class="bg-surface px-6 pb-16 md:px-10 lg:col-span-8 lg:pt-20">
+                <x-cloud::marketing.faq-accordion :faqs="$faqs" id-prefix="self-hosted-faq" />
             </div>
         </div>
-    </section>
+    </x-cloud::marketing.frame>
+
+    <x-cloud::marketing.closing-band :title="__('Run it your way.')" :continuation="__('Your server, or ours.')">
+        <x-cloud::marketing.button href="https://github.com/relaticle/relaticle" icon="ri-github-fill" external>
+            {{ __('Deploy self-hosted') }}
+        </x-cloud::marketing.button>
+        <x-cloud::marketing.button variant="secondary" href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="footer">
+            {{ __('Try Relaticle Cloud') }}
+        </x-cloud::marketing.button>
+    </x-cloud::marketing.closing-band>
 
     @php
         $schema = (new \Spatie\SchemaOrg\Graph())

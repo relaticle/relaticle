@@ -26,16 +26,6 @@
                 .slice(0, 8);
         },
 
-        initials(name) {
-            return String(name ?? '')
-                .trim()
-                .split(/\s+/)
-                .filter(Boolean)
-                .slice(0, 2)
-                .map((word) => word.charAt(0).toUpperCase())
-                .join('') || '?';
-        },
-
         optionVisible(option) {
             if (option.type === 'person') {
                 return ! this.selectedIds.includes(option.id);
@@ -99,7 +89,7 @@
                     x-bind:class="index === activeIndex ? 'bg-gray-50 dark:bg-white/5' : ''"
                     x-on:click="choose(chip)"
                 >
-                    <x-email-integration::recipient-avatar box="size-7" glyph="size-4" initials-size="text-[11px]" />
+                    <x-email-integration::recipient-avatar box="size-7" glyph="size-4" />
                     <span
                         class="min-w-0 flex-1"
                         x-tooltip="{ content: optionTooltip(chip), theme: $store.theme }"

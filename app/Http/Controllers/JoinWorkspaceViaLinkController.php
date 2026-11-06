@@ -34,7 +34,7 @@ final readonly class JoinWorkspaceViaLinkController
             return $this->redirectToWorkspace($workspace, __('workspaces.accept.already_member', ['workspace' => $workspace->name]));
         }
 
-        if ($workspace->isScheduledForDeletion()) {
+        if ($workspace->isScheduledOnRequest()) {
             return $this->workspaceDeleting($workspace);
         }
 
@@ -65,7 +65,7 @@ final readonly class JoinWorkspaceViaLinkController
             return $this->redirectToWorkspace($workspace, __('workspaces.accept.already_member', ['workspace' => $workspace->name]));
         }
 
-        if ($workspace->isScheduledForDeletion()) {
+        if ($workspace->isScheduledOnRequest()) {
             return $this->workspaceDeleting($workspace);
         }
 

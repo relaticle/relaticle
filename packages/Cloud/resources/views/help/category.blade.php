@@ -8,7 +8,7 @@
     <div class="mx-auto w-full max-w-[45rem]">
         <nav aria-label="{{ __('Breadcrumb') }}" class="mb-7 text-[13px] text-gray-500 dark:text-gray-400">
             <ol class="flex flex-wrap items-center gap-2">
-                <li><a href="{{ route('help.index') }}" class="transition-colors hover:text-gray-900 dark:hover:text-white">{{ __('Help Centre') }}</a></li>
+                <li><a href="{{ route('help.index') }}" class="transition-colors hover:text-gray-900 dark:hover:text-white">{{ __('Help center') }}</a></li>
                 <li aria-hidden="true" class="text-gray-300 dark:text-gray-600">/</li>
                 <li aria-current="page" class="text-gray-900 dark:text-white">{{ $category->title }}</li>
             </ol>
@@ -55,7 +55,7 @@
 
     @php
         $jsonLd = (new \Relaticle\Cloud\Docs\Support\DocsJsonLd)->breadcrumbs([
-            ['name' => __('Help Centre'), 'url' => route('help.index')],
+            ['name' => __('Help center'), 'url' => route('help.index')],
             ['name' => $category->title, 'url' => \Relaticle\Documentation\Support\DocUrl::category($category)],
         ]);
     @endphp

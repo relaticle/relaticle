@@ -71,6 +71,6 @@ final readonly class DocUrl
 
     public static function areaTitle(string $area): string
     {
-        return $area === self::HELP ? __('Help Centre') : __('Developers');
+        return $area === self::HELP ? __('Help center') : __('Developers');
     }
 }

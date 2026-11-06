@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Contracts\Entitlements;
 use App\Enums\BillingStatus;
+use App\Enums\DeletionReason;
 use App\Enums\Notifications\NotificationReason;
 use App\Enums\Plan;
 use App\Enums\SubscriptionType;
@@ -11,11 +12,13 @@ use App\Livewire\App\AppDatabaseNotifications;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CurrentWorkspace;
+use Illuminate\Events\CallQueuedListener;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Laravel\Cashier\Subscription;
@@ -24,8 +27,12 @@ use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Cloud\Admin\Actions\TransferWorkspaceBilling;
+use Relaticle\Cloud\Analytics\Actions\RecordSubscriptionOutcome;
+use Relaticle\Cloud\Analytics\Listeners\CaptureSubscriptionOutcome;
+use Relaticle\Cloud\Analytics\Models\Acquisition;
 use Relaticle\Cloud\Billing\Actions\ActivateManagedPlan;
 use Relaticle\Cloud\Billing\Actions\CancelWithUnusedTimeRefund;
+use Relaticle\Cloud\Billing\Actions\ExtendEndedTrial;
 use Relaticle\Cloud\Billing\Actions\GrantPurchasedCredits;
 use Relaticle\Cloud\Billing\Actions\NotifyWorkspaceOfPaymentFailure;
 use Relaticle\Cloud\Billing\Actions\StartProTrial;
@@ -51,6 +58,8 @@ mutates(RefreshManagedRenewal::class);
 mutates(PaymentFailedNotification::class);
 mutates(ManagedInvoiceOverdueNotification::class);
 mutates(StripeWebhookController::class);
+mutates(RecordSubscriptionOutcome::class);
+mutates(CaptureSubscriptionOutcome::class);
 
 beforeEach(function (): void {
     config()->set('cashier.webhook.secret', 'whsec_test_secret');
@@ -219,6 +228,35 @@ it('downgrades the workspace to Free when the subscription is deleted', function
         ->and($balance->credits_remaining)->toBe(Plan::Free->credits());
 });
 
+it('cancels an inactivity countdown when a subscription activates and keeps an owner request', function (DeletionReason $reason, bool $cancelled): void {
+    withHostedBilling();
+    $workspace = stripeBillingWorkspace();
+    $deletesAt = now()->addDays(14)->startOfSecond();
+    $workspace->forceFill(['scheduled_deletion_at' => $deletesAt, 'deletion_reason' => $reason])->save();
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created'))->assertSuccessful();
+
+    $workspace->refresh();
+
+    expect($workspace->plan)->toBe(Plan::Pro)
+        ->and($workspace->scheduled_deletion_at?->equalTo($deletesAt) ?? false)->toBe(! $cancelled)
+        ->and($workspace->deletion_reason)->toBe($cancelled ? null : $reason);
+})->with([
+    'inactivity' => [DeletionReason::Inactivity, true],
+    'requested' => [DeletionReason::Requested, false],
+]);
+
+it('keeps an inactivity countdown when a subscription that never charged is created', function (): void {
+    $workspace = stripeBillingWorkspace();
+    $deletesAt = now()->addDays(14)->startOfSecond();
+    $workspace->forceFill(['scheduled_deletion_at' => $deletesAt, 'deletion_reason' => DeletionReason::Inactivity])->save();
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created', ['status' => 'incomplete']))->assertSuccessful();
+
+    expect($workspace->refresh()->deletion_reason)->toBe(DeletionReason::Inactivity)
+        ->and($workspace->scheduled_deletion_at?->equalTo($deletesAt))->toBeTrue();
+});
+
 it('emails the owner once when the subscription ends', function (): void {
     Mail::fake();
     $workspace = stripeBillingWorkspace();
@@ -237,6 +275,21 @@ it('emails the owner once when the subscription ends', function (): void {
     Mail::assertQueued(ProEndedMail::class, 1);
     Mail::assertQueued(ProEndedMail::class, fn (ProEndedMail $mail): bool => $mail->hasTo($workspace->owner->email)
         && $mail->status === BillingStatus::SubscriptionEnded);
+});
+
+it('sends no ended email when the subscription of a workspace scheduled for deletion ends', function (): void {
+    Mail::fake();
+    $workspace = stripeBillingWorkspace();
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created'))->assertSuccessful();
+    $workspace->refresh()->forceFill(['scheduled_deletion_at' => now()->addDays(30)])->save();
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'deleted', [
+        'status' => 'canceled',
+        'ended_at' => now()->getTimestamp(),
+    ]))->assertSuccessful();
+
+    Mail::assertNotQueued(ProEndedMail::class);
+    expect($workspace->refresh()->plan)->toBe(Plan::Free);
 });
 
 it('sends no ended email when an Enterprise grant outlives the subscription', function (): void {
@@ -434,6 +487,107 @@ it('never double-grants across a mid-trial conversion', function (): void {
     expect($balance->period_starts_at->toDateTimeString())->toBe('2026-07-01 12:00:00')
         ->and($balance->period_ends_at->toDateTimeString())->toBe('2026-08-01 12:00:00')
         ->and($grantsQuery->count())->toBe(2); // trial start + first anniversary cycle, never a third
+});
+
+function extendedTrialWorkspaceWithSpentCredits(): Workspace
+{
+    $workspace = stripeBillingWorkspace();
+    $workspace->forceFill(['plan' => Plan::Free, 'trial_ends_at' => null, 'pro_trial_used_at' => now()->subDays(20)])->save();
+
+    /** @var User $owner */
+    $owner = $workspace->owner;
+    app(ExtendEndedTrial::class)->execute($owner, $workspace);
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->update(['credits_remaining' => 180, 'credits_used' => 120]);
+
+    return $workspace->refresh();
+}
+
+it('keeps the extension balance frozen when the owner subscribes during the extension', function (): void {
+    withHostedBilling();
+    $workspace = extendedTrialWorkspaceWithSpentCredits();
+    $extensionEndsAt = $workspace->trial_ends_at;
+    $this->travel(2)->days();
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created', ['status' => 'trialing', 'trial_end' => $extensionEndsAt->getTimestamp()]))->assertSuccessful();
+
+    $balance = fn (): AiCreditBalance => AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
+
+    expect(resolve(Entitlements::class)->creditAllowance($workspace->refresh()))->toBe(Plan::Free->credits())
+        ->and($balance()->credits_remaining)->toBe(180);
+
+    $this->travelTo($extensionEndsAt->addHour());
+    $this->artisan('chat:reset-credits')->assertSuccessful();
+
+    expect($balance()->credits_remaining)->toBe(Plan::Pro->credits());
+});
+
+it('releases the extension balance at once when a subscription bought during the extension charges immediately', function (): void {
+    withHostedBilling();
+    $workspace = extendedTrialWorkspaceWithSpentCredits();
+    $this->travel(6)->days();
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created'))->assertSuccessful();
+
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
+
+    expect(resolve(Entitlements::class)->creditAllowance($workspace->refresh()))->toBe(Plan::Pro->credits())
+        ->and($balance->credits_remaining)->toBe(Plan::Pro->credits());
+});
+
+it('keeps the extension balance frozen until the first charge when Stripe extends a late trial past the extension', function (): void {
+    withHostedBilling();
+    $workspace = extendedTrialWorkspaceWithSpentCredits();
+    $this->travel(6)->days();
+    $firstChargeAt = now()->addHours(48)->addSeconds(10);
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created', ['status' => 'trialing', 'trial_end' => $firstChargeAt->getTimestamp()]))->assertSuccessful();
+
+    $balance = fn (): AiCreditBalance => AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
+
+    expect(resolve(Entitlements::class)->creditAllowance($workspace->refresh()))->toBe(Plan::Free->credits())
+        ->and($balance()->credits_remaining)->toBe(180);
+
+    $this->travelTo($firstChargeAt->subHour());
+    $this->artisan('chat:reset-credits')->assertSuccessful();
+
+    expect($balance()->credits_remaining)->toBe(180);
+
+    $this->travelTo($firstChargeAt->addHour());
+    $this->artisan('chat:reset-credits')->assertSuccessful();
+
+    expect($balance()->credits_remaining)->toBe(Plan::Pro->credits());
+});
+
+it('grants the plan allowance to a trial subscription bought long after an extension ended', function (): void {
+    withHostedBilling();
+    $workspace = extendedTrialWorkspaceWithSpentCredits();
+    $this->travel(60)->days();
+    $workspace->forceFill(['plan' => Plan::Free, 'trial_ends_at' => null])->save();
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created', ['status' => 'trialing', 'trial_end' => now()->addDays(10)->getTimestamp()]))->assertSuccessful();
+
+    expect(resolve(Entitlements::class)->creditAllowance($workspace->refresh()))->toBe(Plan::Pro->credits());
+});
+
+it('keeps the extension balance frozen when the owner picks Scale during the extension', function (): void {
+    withHostedBilling();
+    config()->set('services.stripe.prices.scale_monthly', 'price_scale_monthly_test');
+    $workspace = extendedTrialWorkspaceWithSpentCredits();
+    $extensionEndsAt = $workspace->trial_ends_at;
+    $this->travel(2)->days();
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created', ['price' => 'price_scale_monthly_test', 'status' => 'trialing', 'trial_end' => $extensionEndsAt->getTimestamp()]))->assertSuccessful();
+
+    $balance = fn (): AiCreditBalance => AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
+
+    expect($workspace->refresh()->plan)->toBe(Plan::Scale)
+        ->and(resolve(Entitlements::class)->creditAllowance($workspace))->toBe(Plan::Free->credits())
+        ->and($balance()->credits_remaining)->toBe(180);
+
+    $this->travelTo($extensionEndsAt->addHour());
+    $this->artisan('chat:reset-credits')->assertSuccessful();
+
+    expect($balance()->credits_remaining)->toBe(Plan::Scale->credits());
 });
 
 /** @return array<string, mixed> */
@@ -912,6 +1066,38 @@ it('switches a managed plan on when its first invoice is paid', function (): voi
     expect(Subscription::query()->where('stripe_id', 'sub_managed_1')->sole()->type)->toBe(SubscriptionType::Managed->value)
         ->and($workspace->refresh()->plan)->toBe(Plan::Enterprise)
         ->and($balance->credits_remaining)->toBe(Plan::Enterprise->credits());
+});
+
+it('cancels an inactivity countdown when a managed plan is switched on', function (): void {
+    withHostedBilling();
+
+    $workspace = stripeBillingWorkspace();
+    $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(14), 'deletion_reason' => DeletionReason::Inactivity])->save();
+    pendingManagedSubscription($workspace);
+    stripeManagedSwitch($workspace);
+
+    sendStripeWebhook(invoicePaidEvent($workspace))->assertOk();
+
+    $workspace->refresh();
+
+    expect($workspace->plan)->toBe(Plan::Enterprise)
+        ->and($workspace->scheduled_deletion_at)->toBeNull()
+        ->and($workspace->deletion_reason)->toBeNull();
+});
+
+it('keeps an owner-requested deletion when a managed plan is switched on', function (): void {
+    withHostedBilling();
+
+    $workspace = stripeBillingWorkspace();
+    $deletesAt = now()->addDays(14)->startOfSecond();
+    $workspace->forceFill(['scheduled_deletion_at' => $deletesAt, 'deletion_reason' => DeletionReason::Requested])->save();
+    pendingManagedSubscription($workspace);
+    stripeManagedSwitch($workspace);
+
+    sendStripeWebhook(invoicePaidEvent($workspace))->assertOk();
+
+    expect($workspace->refresh()->deletion_reason)->toBe(DeletionReason::Requested)
+        ->and($workspace->scheduled_deletion_at?->equalTo($deletesAt))->toBeTrue();
 });
 
 it('marks the Stripe subscription as managed once it is paid', function (): void {
@@ -1817,4 +2003,292 @@ it('remembers no renewal for a Pro subscription update', function (): void {
     sendStripeWebhook($payload)->assertSuccessful();
 
     expect(Cache::get(RefreshManagedRenewal::CACHE_PREFIX.'sub_test_1'))->toBeNull();
+});
+
+function acquiredBillingWorkspace(Workspace $workspace): Acquisition
+{
+    return Acquisition::query()->create([
+        'user_id' => $workspace->user_id,
+        'workspace_id' => $workspace->getKey(),
+        'source' => 'google',
+        'landing' => 'pricing',
+        'captured_at' => now()->subDays(40),
+        'workspace_linked_at' => now()->subDays(40),
+    ]);
+}
+
+/**
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function acquisitionPaidEvent(Workspace $workspace, array $overrides = []): array
+{
+    return invoicePaidEvent($workspace, array_merge([
+        'id' => 'in_acquisition',
+        'status' => 'paid',
+        'amount_paid' => 1900,
+        'amount_paid_off_stripe' => 0,
+        'status_transitions' => ['paid_at' => 1_800_000_000],
+        'parent' => ['type' => 'subscription_details', 'subscription_details' => ['subscription' => 'sub_pro_1']],
+    ], $overrides));
+}
+
+it('keeps the earliest paid invoice atomically across duplicate and out of order deliveries', function (): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    proSubscriptionOn($workspace);
+
+    sendStripeWebhook(acquisitionPaidEvent($workspace))->assertOk();
+    sendStripeWebhook(acquisitionPaidEvent($workspace))->assertOk();
+    sendStripeWebhook(acquisitionPaidEvent($workspace, [
+        'id' => 'in_earlier', 'status_transitions' => ['paid_at' => 1_799_000_000],
+    ]))->assertOk();
+    sendStripeWebhook(acquisitionPaidEvent($workspace))->assertOk();
+
+    expect($acquisition->refresh()->first_paid_invoice_id)->toBe('in_earlier')
+        ->and($acquisition->first_paid_at->getTimestamp())->toBe(1_799_000_000);
+    $this->assertDatabaseCount('acquisitions', 1);
+});
+
+it('records a paid subscription before its local subscription created webhook arrives', function (): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    $body = stripeSubscriptionEvent($workspace, 'created', ['id' => 'sub_pro_1'])['data']['object'];
+    $recorder = StripeRecorder::install()->respondTo('/v1/subscriptions/sub_pro_1', $body);
+
+    sendStripeWebhook(acquisitionPaidEvent($workspace))->assertOk();
+
+    expect($acquisition->refresh()->first_paid_invoice_id)->toBe('in_acquisition')
+        ->and($recorder->countFor('GET /v1/subscriptions/sub_pro_1'))->toBe(1);
+    $this->assertDatabaseMissing('subscriptions', ['stripe_id' => 'sub_pro_1']);
+});
+
+it('refuses an out of order invoice when Stripe associates the subscription with another customer', function (): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    $body = stripeSubscriptionEvent($workspace, 'created', ['id' => 'sub_pro_1', 'customer' => 'cus_other'])['data']['object'];
+    StripeRecorder::install()->respondTo('/v1/subscriptions/sub_pro_1', $body);
+
+    sendStripeWebhook(acquisitionPaidEvent($workspace))->assertOk();
+
+    expect($acquisition->refresh()->first_paid_invoice_id)->toBeNull();
+});
+
+it('retries a paid conversion rather than losing it when subscription verification is unavailable', function (): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    $recorder = StripeRecorder::install()->respondTo('/v1/subscriptions/sub_pro_1', [
+        'error' => ['type' => 'invalid_request_error', 'message' => 'Subscription unavailable'],
+    ], 400);
+
+    sendStripeWebhook(acquisitionPaidEvent($workspace))->assertStatus(500);
+    expect($acquisition->refresh()->first_paid_invoice_id)->toBeNull();
+
+    $recorder->respondTo('/v1/subscriptions/sub_pro_1', stripeSubscriptionEvent($workspace, 'created', ['id' => 'sub_pro_1'])['data']['object']);
+
+    sendStripeWebhook(acquisitionPaidEvent($workspace))->assertOk();
+    expect($acquisition->refresh()->first_paid_invoice_id)->toBe('in_acquisition');
+});
+
+it('counts no paid conversion for a nonqualifying invoice', function (array $overrides): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    proSubscriptionOn($workspace);
+
+    sendStripeWebhook(acquisitionPaidEvent($workspace, $overrides))->assertOk();
+
+    expect($acquisition->refresh()->first_paid_at)->toBeNull()
+        ->and($acquisition->first_paid_invoice_id)->toBeNull();
+})->with([
+    'zero dollar trial invoice' => [['amount_paid' => 0]],
+    'negative payment' => [['amount_paid' => -1900]],
+    'unpaid invoice' => [['status' => 'open']],
+    'one off credit pack' => [['parent' => null, 'billing_reason' => 'manual']],
+    'wrong customer' => [['customer' => 'cus_other']],
+    'outside Stripe' => [['amount_paid_off_stripe' => 1900]],
+    'marked paid out of band' => [['paid_out_of_band' => true]],
+    'no provider payment timestamp' => [['status_transitions' => ['paid_at' => null]]],
+]);
+
+it('verifies off Stripe payment amounts when the webhook omits the includable field', function (int $offStripe, ?string $expected): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    proSubscriptionOn($workspace);
+    $event = acquisitionPaidEvent($workspace);
+    unset($event['data']['object']['amount_paid_off_stripe']);
+    $recorder = StripeRecorder::install()->respondTo('/v1/invoices/in_acquisition', [
+        'id' => 'in_acquisition', 'object' => 'invoice', 'amount_paid_off_stripe' => $offStripe,
+    ]);
+
+    sendStripeWebhook($event)->assertOk();
+
+    expect($acquisition->refresh()->first_paid_invoice_id)->toBe($expected)
+        ->and($recorder->paramsFor('GET /v1/invoices/in_acquisition'))->toBe(['expand' => ['amount_paid_off_stripe']]);
+})->with([
+    'Stripe collected payment' => [0, 'in_acquisition'],
+    'manually recorded payment' => [1900, null],
+]);
+
+it('does not attribute another workspaces local subscription to the invoice customer', function (): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    proSubscriptionOn(stripeBillingWorkspace());
+
+    sendStripeWebhook(acquisitionPaidEvent($workspace))->assertOk();
+
+    expect($acquisition->refresh()->first_paid_at)->toBeNull();
+});
+
+it('does not fabricate acquisition rows for legacy paid subscribers', function (): void {
+    $workspace = stripeBillingWorkspace();
+    proSubscriptionOn($workspace);
+
+    sendStripeWebhook(acquisitionPaidEvent($workspace))->assertOk();
+
+    $this->assertDatabaseCount('acquisitions', 0);
+});
+
+it('records one first renewal failure using provider time without counting retries or plan changes', function (): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    proSubscriptionOn($workspace, 'sub_test_1');
+    $acquisition->update(['first_paid_at' => now()->subMonth(), 'first_paid_invoice_id' => 'in_first']);
+    $failedAt = now()->getTimestamp();
+    $event = invoicePaymentFailedEvent($workspace, ['id' => 'in_failed']);
+    $event['created'] = $failedAt;
+
+    sendStripeWebhook($event)->assertOk();
+    sendStripeWebhook($event)->assertOk();
+    $event['data']['object']['attempt_count'] = 2;
+    $event['created'] += 60;
+    sendStripeWebhook($event)->assertOk();
+    $event['data']['object'] = array_merge($event['data']['object'], ['id' => 'in_plan_change', 'attempt_count' => 1, 'billing_reason' => 'subscription_update']);
+    sendStripeWebhook($event)->assertOk();
+
+    expect($acquisition->refresh()->first_renewal_failed_invoice_id)->toBe('in_failed')
+        ->and($acquisition->first_renewal_failed_at->getTimestamp())->toBe($failedAt);
+});
+
+it('does not record a failed first charge as a renewal failure', function (string $reason): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    proSubscriptionOn($workspace, 'sub_test_1');
+    StripeRecorder::install();
+    $event = invoicePaymentFailedEvent($workspace, ['billing_reason' => $reason]);
+    $event['created'] = now()->getTimestamp();
+
+    sendStripeWebhook($event)->assertOk();
+
+    expect($acquisition->refresh()->first_renewal_failed_at)->toBeNull();
+})->with(['subscription_create', 'subscription_cycle']);
+
+it('does not mistake nonrenewal failures or retries for the first renewal failure', function (array $overrides): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    proSubscriptionOn($workspace, 'sub_test_1');
+    $acquisition->update(['first_paid_at' => now()->subMonth(), 'first_paid_invoice_id' => 'in_first']);
+    $event = invoicePaymentFailedEvent($workspace, $overrides);
+    $event['created'] = now()->getTimestamp();
+
+    sendStripeWebhook($event)->assertOk();
+
+    expect($acquisition->refresh()->first_renewal_failed_at)->toBeNull()
+        ->and($acquisition->first_renewal_failed_invoice_id)->toBeNull();
+})->with([
+    'plan change' => [['billing_reason' => 'subscription_update']],
+    'first charge' => [['billing_reason' => 'subscription_create']],
+    'one off credit pack' => [['parent' => null]],
+    'automatic retry' => [['attempt_count' => 2]],
+    'unknown customer' => [['customer' => 'cus_other']],
+]);
+
+it('recognizes a renewal when its prior positive payment webhook has not arrived yet', function (): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    proSubscriptionOn($workspace, 'sub_test_1');
+    $paidAt = now()->subMonth()->getTimestamp();
+    $priorInvoice = acquisitionPaidEvent($workspace, [
+        'status_transitions' => ['paid_at' => $paidAt],
+        'parent' => ['type' => 'subscription_details', 'subscription_details' => ['subscription' => 'sub_test_1']],
+    ])['data']['object'];
+    StripeRecorder::install()->respondTo('GET /v1/invoices', [
+        'object' => 'list', 'has_more' => false, 'data' => [$priorInvoice],
+    ]);
+    $event = invoicePaymentFailedEvent($workspace, ['id' => 'in_failed']);
+    $event['created'] = now()->getTimestamp();
+
+    sendStripeWebhook($event)->assertOk();
+
+    expect($acquisition->refresh()->first_paid_invoice_id)->toBe('in_acquisition')
+        ->and($acquisition->first_paid_at->getTimestamp())->toBe($paidAt)
+        ->and($acquisition->first_renewal_failed_invoice_id)->toBe('in_failed');
+});
+
+it('does not count a historic payment from before acquisition capture', function (): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    proSubscriptionOn($workspace);
+
+    sendStripeWebhook(acquisitionPaidEvent($workspace, [
+        'status_transitions' => ['paid_at' => now()->subDays(50)->getTimestamp()],
+    ]))->assertOk();
+
+    expect($acquisition->refresh()->first_paid_at)->toBeNull();
+});
+
+it('finishes payment history verification before remembering its earliest payment', function (): void {
+    $this->travelTo(now()->startOfSecond());
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    proSubscriptionOn($workspace, 'sub_test_1');
+    $invoice = acquisitionPaidEvent($workspace, [
+        'customer' => $workspace->stripe_id,
+        'status_transitions' => ['paid_at' => now()->subDays(10)->getTimestamp()],
+        'parent' => ['type' => 'subscription_details', 'subscription_details' => ['subscription' => 'sub_test_1']],
+    ])['data']['object'];
+    $earlier = array_replace($invoice, ['id' => 'in_earlier', 'status_transitions' => ['paid_at' => now()->subDays(30)->getTimestamp()]]);
+    unset($earlier['amount_paid_off_stripe']);
+    $recorder = StripeRecorder::install()
+        ->respondTo('GET /v1/invoices/in_earlier', ['error' => ['type' => 'invalid_request_error', 'message' => 'Unavailable']], 400)
+        ->respondTo('GET /v1/invoices', ['object' => 'list', 'has_more' => false, 'data' => [$invoice, $earlier]]);
+    $event = invoicePaymentFailedEvent($workspace, ['id' => 'in_failed']);
+    $event['created'] = now()->getTimestamp();
+
+    sendStripeWebhook($event)->assertStatus(500);
+    expect($acquisition->refresh()->first_paid_at)->toBeNull();
+
+    $recorder->respondTo('GET /v1/invoices/in_earlier', ['id' => 'in_earlier', 'object' => 'invoice', 'amount_paid_off_stripe' => 0]);
+    sendStripeWebhook($event)->assertOk();
+
+    expect($acquisition->refresh()->first_paid_invoice_id)->toBe('in_earlier')
+        ->and($acquisition->first_paid_at->getTimestamp())->toBe(now()->subDays(30)->getTimestamp())
+        ->and($acquisition->first_renewal_failed_invoice_id)->toBe('in_failed');
+});
+
+it('uses Cashier subscription types regardless of invoice delivery order', function (array $metadata): void {
+    $workspace = stripeBillingWorkspace();
+    $acquisition = acquiredBillingWorkspace($workspace);
+    $body = stripeSubscriptionEvent($workspace, 'created', ['id' => 'sub_pro_1', 'metadata' => $metadata])['data']['object'];
+    StripeRecorder::install()->respondTo('/v1/subscriptions/sub_pro_1', $body);
+
+    sendStripeWebhook(acquisitionPaidEvent($workspace))->assertOk();
+
+    expect($acquisition->refresh()->first_paid_invoice_id)->toBe('in_acquisition');
+})->with(['dashboard subscription' => [[]], 'legacy name metadata' => [['name' => 'default']]]);
+
+it('notifies an acquired workspace of failed payment without waiting for analytics recovery', function (): void {
+    $workspace = stripeBillingWorkspace();
+    acquiredBillingWorkspace($workspace);
+    proSubscriptionOn($workspace, 'sub_test_1');
+    Queue::fake([CallQueuedListener::class]);
+    StripeRecorder::install()->respondTo('GET /v1/invoices', [
+        'error' => ['type' => 'invalid_request_error', 'message' => 'History unavailable'],
+    ], 400);
+    $event = invoicePaymentFailedEvent($workspace);
+    $event['created'] = now()->getTimestamp();
+
+    sendStripeWebhook($event)->assertOk();
+
+    expect($workspace->owner->notifications()->sole()->type)->toBe(PaymentFailedNotification::class);
+    Queue::assertPushed(CallQueuedListener::class);
 });

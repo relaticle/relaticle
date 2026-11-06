@@ -84,6 +84,28 @@ it('leaves out a workspace whose only records a mailbox sync created', function 
     leadsOn(LeadStage::Free)->assertCanNotSeeTableRecords([OverviewData::workspaceOf($synced)]);
 });
 
+it('lists a workspace that typed to the assistant on two days without records of its own', function (): void {
+    $chatter = OverviewData::owner(CarbonImmutable::parse('2026-09-01'));
+    $workspace = OverviewData::workspaceOf($chatter);
+    OverviewData::ownRecord($workspace, $chatter, now()->subDays(5), CreationSource::MAILBOX);
+    OverviewData::typedMessage($workspace, $chatter, now()->subDays(4));
+    OverviewData::typedMessage($workspace, $chatter, now()->subDays(4)->addHour());
+    OverviewData::typedMessage($workspace, $chatter, now()->subDay());
+
+    leadsOn(LeadStage::Free)
+        ->assertCanSeeTableRecords([$workspace])
+        ->assertSee('0 records, 3 chat messages on 2 days, 2 active days');
+});
+
+it('leaves out a workspace that typed to the assistant on one day only', function (): void {
+    $tryer = OverviewData::owner(CarbonImmutable::parse('2026-09-01'));
+    $workspace = OverviewData::workspaceOf($tryer);
+    OverviewData::typedMessage($workspace, $tryer, now()->subDay());
+    OverviewData::typedMessage($workspace, $tryer, now()->subDay()->addHour());
+
+    leadsOn(LeadStage::Free)->assertCanNotSeeTableRecords([$workspace]);
+});
+
 it('leaves out workspaces that already pay or are on a negotiated plan', function (): void {
     $subscriber = OverviewData::owner(CarbonImmutable::parse('2026-09-01'));
     $subscribed = OverviewData::workspaceOf($subscriber);

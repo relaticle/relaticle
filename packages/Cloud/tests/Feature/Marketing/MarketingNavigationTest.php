@@ -55,6 +55,15 @@ it('links a page for every connectable assistant from the footer', function (): 
     }
 });
 
+it('links the AI-native CRM page from the footer', function (): void {
+    $html = $this->get('/pricing')->assertOk()->getContent();
+
+    preg_match('/<footer[\s\S]*?<\/footer>/', $html, $footer);
+
+    expect($footer[0])->toContain('href="'.route('aiNativeCrm').'"')
+        ->and($footer[0])->toContain(__('AI-native CRM'));
+});
+
 it('names the assistant from config in both the header and the footer', function (): void {
     config()->set('chat.assistant_name', 'Testbot');
 
@@ -79,6 +88,18 @@ it('links llms.txt and the GitHub repository from the footer', function (): void
 
     expect($html)->toContain(route('llms-txt'))
         ->and($html)->toContain('https://github.com/relaticle/relaticle');
+});
+
+it('keeps the legal links and the company name in the copyright row, out of the footer columns', function (): void {
+    $html = $this->get('/')->assertOk()->getContent();
+
+    preg_match('/<footer[\s\S]*?<\/footer>/', $html, $footer);
+    $columns = extractNavRegion($footer[0], __('Footer'));
+
+    expect($footer[0])->toContain('© '.now()->year.' Relaticle, Inc.')
+        ->and($footer[0])->toContain('href="'.url('privacy-policy').'"', 'href="'.url('terms-of-service').'"')
+        ->and($columns)->not->toContain(url('privacy-policy'), url('terms-of-service'), 'https://github.com/relaticle/relaticle')
+        ->and($columns)->toContain('href="'.route('press').'"');
 });
 
 it('renders the same items in desktop and mobile navigation', function (): void {
@@ -211,11 +232,17 @@ it('renders the works-with strip on the homepage with links to the assistant pag
     expect($strip)->not->toBeEmpty()
         ->and($strip)->toContain('Claude', 'ChatGPT', 'Cursor', 'Gemini', '+ any MCP client')
         ->and($strip)->toContain('href="'.route('documentation.index').'"')
-        ->and($strip)->toContain('21,000+');
+        ->and($strip)->toContain('How approval works', 'See pricing');
 
     foreach (ConnectableAssistant::cases() as $assistant) {
         expect($strip)->toContain('href="'.route($assistant->routeName()).'"');
     }
+
+    preg_match('/<section[^>]*id="community"[^>]*>.*?<\/section>/s', $html, $communityMatches);
+    $community = $communityMatches[0] ?? '';
+
+    expect($community)->not->toBeEmpty()
+        ->and($community)->toContain('21,000+');
 });
 
 it('renders the homepage without the product hunt launch badge', function (): void {
@@ -255,6 +282,7 @@ it('suggests the page a missing url most likely meant on the 404 page', function
     expect($matches[1] ?? null)->toBe($suggestion);
 })->with([
     'a typo' => ['/pricng', 'Pricing'],
+    'a typo of a legal page' => ['/privacy-polcy', 'Privacy Policy'],
     'a removed help article' => ['/help/an-old-article', 'Help center'],
     'a sibling that is not a near spelling' => ['/compare/relaticle-vs-hubspot', null],
     'nothing alike' => ['/zz-qq-xx', null],

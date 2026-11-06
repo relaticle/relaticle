@@ -25,6 +25,11 @@ return [
         'workspace_logo' => [
             'label' => 'Workspace logo',
         ],
+        'web_search' => [
+            'label' => 'Let :assistant search the web',
+            'helper_text' => 'Search queries go to the AI provider\'s web search.',
+            'unavailable' => 'No model on this install can search the web.',
+        ],
     ],
 
     'sections' => [
@@ -35,6 +40,9 @@ return [
         'update_workspace_logo' => [
             'title' => 'Workspace Logo',
             'description' => 'Your logo appears in the workspace switcher, on invitations, and on the join page.',
+        ],
+        'assistant' => [
+            'description' => 'Choose what :assistant, the built-in AI assistant, may do for members of this workspace.',
         ],
         'invite_people' => [
             'description' => 'Each person gets an email with a link to join :workspace.',

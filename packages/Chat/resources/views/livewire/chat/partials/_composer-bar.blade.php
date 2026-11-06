@@ -21,6 +21,10 @@
 @php
     $showStopButton ??= true;
     $voiceAvailable = app(\Relaticle\Chat\Services\ModelRegistry::class)->voiceInputAvailable();
+    $streaming = $showStopButton ? 'isStreaming' : 'false';
+    $composerEmpty = $voiceAvailable ? '(text.trim().length === 0 && !pendingAttachment)' : 'false';
+    $micShown = "({$composerEmpty} && !{$streaming}) || recording || transcribing";
+    $sendShown = "!{$composerEmpty} && !recording && !transcribing && !{$streaming}";
 @endphp
 
 <div
@@ -108,9 +112,11 @@
                  feature is off or the transcription provider has no key: a
                  self-hosted install without one must not see a button that
                  500s. type="button" is load-bearing: this sits inside the
-                 composer's <form>, and a typeless button would submit it. --}}
-            @if ($voiceAvailable)
-                <div
+                 composer's <form>, and a typeless button would submit it.
+                 The mic holds the primary slot while the composer is empty and
+                 hands it to send once there is something to send. --}}
+            <div
+                @if ($voiceAvailable)
                     x-data="voiceRecorder({
                         transcribeUrl: @js(route('chat.transcribe')),
                         unsupportedText: @js(__('Voice input is not supported in this browser.')),
@@ -118,8 +124,12 @@
                         failedText: @js(__('Could not transcribe that recording. Try again.')),
                         silentText: @js(__('No speech was detected.')),
                     })"
-                    class="contents"
-                >
+                @else
+                    x-data="{ recording: false, transcribing: false }"
+                @endif
+                class="contents"
+            >
+                @if ($voiceAvailable)
                     {{-- Elapsed readout: the 2-minute auto-stop must not arrive
                          unannounced. tabular-nums keeps the tick from jittering. --}}
                     <span
@@ -131,6 +141,7 @@
                     ></span>
                     <button
                         type="button"
+                        x-show="{{ $micShown }}"
                         x-on:click="toggleRecording()"
                         :disabled="transcribing"
                         :aria-pressed="recording"
@@ -140,7 +151,7 @@
                         :aria-busy="transcribing"
                         :class="recording
                             ? 'bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-500/20 dark:text-red-400 dark:hover:bg-red-500/30'
-                            : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white'"
+                            : 'bg-primary-600 text-white hover:bg-primary-700'"
                     >
                         <span x-show="!transcribing" :class="recording ? 'motion-safe:animate-pulse' : ''">
                             <x-heroicon-o-microphone class="h-4 w-4" aria-hidden="true" />
@@ -167,18 +178,19 @@
                             <x-heroicon-m-x-mark class="h-3.5 w-3.5" aria-hidden="true" />
                         </button>
                     </div>
-                </div>
-            @endif
+                @endif
 
-            <button
-                @if ($showStopButton) x-show="!isStreaming" x-cloak @endif
-                type="submit"
-                class="flex h-7 w-7 items-center justify-center rounded-full bg-primary-600 text-white transition hover:bg-primary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 dark:disabled:bg-gray-700 dark:disabled:text-gray-500"
-                :disabled="{{ $sendDisabled }}"
-                aria-label="{{ __('Send message') }}"
-            >
-                <x-heroicon-s-arrow-up class="h-4 w-4" />
-            </button>
+                <button
+                    x-show="{{ $sendShown }}"
+                    @if ($voiceAvailable || $showStopButton) x-cloak @endif
+                    type="submit"
+                    class="flex h-7 w-7 items-center justify-center rounded-full bg-primary-600 text-white transition hover:bg-primary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 dark:disabled:bg-gray-700 dark:disabled:text-gray-500"
+                    :disabled="{{ $sendDisabled }}"
+                    aria-label="{{ __('Send message') }}"
+                >
+                    <x-heroicon-s-arrow-up class="h-4 w-4" />
+                </button>
+            </div>
 
             @if ($showStopButton)
                 <button

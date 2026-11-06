@@ -27,9 +27,11 @@ use Override;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Cloud\Billing\Actions\CreateCreditPackCheckout;
+use Relaticle\Cloud\Billing\Actions\ExtendEndedTrial;
 use Relaticle\Cloud\Billing\Actions\StartProTrial;
 use Relaticle\Cloud\Billing\CreditPackCatalog;
 use Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal;
+use Relaticle\Cloud\Billing\Queries\InactiveTrialWorkspacesQuery;
 use Throwable;
 
 final class Billing extends Page
@@ -119,6 +121,27 @@ final class Billing extends Page
         }
 
         Notification::make()->title(__('cloud::billing.trial.started'))->success()->send();
+    }
+
+    public function extendTrial(ExtendEndedTrial $extendEndedTrial): void
+    {
+        try {
+            $extended = $extendEndedTrial->execute($this->user(), $this->workspace());
+        } catch (AuthorizationException $exception) {
+            Notification::make()->title($exception->getMessage())->danger()->send();
+
+            return;
+        }
+
+        if (! $extended) {
+            Notification::make()->title(__('cloud::billing.trial.not_available'))->danger()->send();
+
+            return;
+        }
+
+        Notification::make()->title(__('cloud::billing.paused.extended', ['days' => Workspace::TRIAL_EXTENSION_DAYS]))->success()->send();
+
+        $this->redirect(self::getUrl());
     }
 
     public function managePortal(): void
@@ -218,15 +241,17 @@ final class Billing extends Page
         ]);
     }
 
-    /** @return array{billingStatus: BillingStatus, lapsedPlan: ?Plan, mailboxSyncPaused: bool, otherWorkspaces: Collection<int, Workspace>} */
+    /** @return array{billingStatus: BillingStatus, deletesWhenInactive: bool, lapsedPlan: ?Plan, mailboxSyncPaused: bool, trialExtensionAvailable: bool, otherWorkspaces: Collection<int, Workspace>} */
     private function pausedViewData(Workspace $workspace): array
     {
         $billingStatus = $workspace->billingStatus();
 
         return [
             'billingStatus' => $billingStatus,
+            'deletesWhenInactive' => ! $workspace->isScheduledForDeletion() && resolve(InactiveTrialWorkspacesQuery::class)->isEligible($workspace),
             'lapsedPlan' => $billingStatus === BillingStatus::SubscriptionEnded ? $workspace->lapsedManagedPlan() : null,
             'mailboxSyncPaused' => $workspace->hasConnectedMailbox(),
+            'trialExtensionAvailable' => $workspace->canExtendTrial(),
             'otherWorkspaces' => $this->user()->allWorkspaces()
                 ->reject(fn (Workspace $other): bool => $other->is($workspace))
                 ->values(),

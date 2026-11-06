@@ -17,7 +17,7 @@ final readonly class CancelUserDeletion
 
             $user->ownedWorkspaces()
                 ->where('personal_workspace', true)
-                ->update(['scheduled_deletion_at' => null]);
+                ->update(['scheduled_deletion_at' => null, 'deletion_reason' => null]);
         });
 
         $user->notify(new UserDeletionCancelledNotification($user));

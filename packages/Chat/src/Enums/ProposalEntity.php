@@ -24,6 +24,7 @@ enum ProposalEntity: string
     case WorkspaceInvitation = 'workspace_invitations';
     case CustomField = 'custom_field';
     case SampleData = 'sample_data';
+    case WebAccess = 'web_access';
 
     public function singularName(): string
     {
@@ -39,6 +40,7 @@ enum ProposalEntity: string
             self::WorkspaceInvitation => 'Teammate',
             self::CustomField => 'Custom Field',
             self::SampleData => 'Sample Data',
+            self::WebAccess => 'Web Search',
         };
     }
 
@@ -53,6 +55,7 @@ enum ProposalEntity: string
             self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry => 'subject',
             self::WorkspaceInvitation => 'email',
             self::CustomField, self::SampleData => 'name',
+            self::WebAccess => 'query',
         };
     }
 
@@ -63,6 +66,7 @@ enum ProposalEntity: string
             self::Task, self::Note => 'Title',
             self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry => 'Subject',
             self::WorkspaceInvitation => 'Email',
+            self::WebAccess => 'Search',
         };
     }
 
@@ -72,7 +76,7 @@ enum ProposalEntity: string
         return match ($this) {
             self::Company => [$this->titleKey(), 'account_owner_id'],
             self::WorkspaceInvitation => [$this->titleKey(), 'role'],
-            self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::CustomField, self::SampleData => [$this->titleKey()],
+            self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::CustomField, self::SampleData, self::WebAccess => [$this->titleKey()],
         };
     }
 
@@ -84,7 +88,7 @@ enum ProposalEntity: string
     public function isIndivisible(): bool
     {
         return match ($this) {
-            self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry => true,
+            self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WebAccess => true,
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::WorkspaceInvitation, self::CustomField, self::SampleData => false,
         };
     }
@@ -92,8 +96,16 @@ enum ProposalEntity: string
     public function needsOwnApproval(): bool
     {
         return match ($this) {
-            self::Email, self::EmailDraftSend, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation => true,
+            self::Email, self::EmailDraftSend, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::WebAccess => true,
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::EmailDraft, self::EmailDraftDelete, self::CustomField, self::SampleData => false,
+        };
+    }
+
+    public function approvesFromKeyboard(): bool
+    {
+        return match ($this) {
+            self::Email, self::EmailDraftSend, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation => false,
+            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::EmailDraft, self::EmailDraftDelete, self::CustomField, self::SampleData, self::WebAccess => true,
         };
     }
 
@@ -106,6 +118,7 @@ enum ProposalEntity: string
     {
         return match ($this) {
             self::WorkspaceInvitation => "Invite \"{$title}\"",
+            self::WebAccess => "Search the web for \"{$title}\"",
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::CustomField, self::SampleData => Str::ucfirst($this->verb(PendingActionOperation::Create)).' '.Str::lower($this->singularName())." \"{$title}\"",
         };
     }
@@ -121,6 +134,7 @@ enum ProposalEntity: string
             self::EmailReschedule => __('Reschedule'),
             self::EmailRetry => __('Send again'),
             self::WorkspaceInvitation => trans_choice('Send invitation|Send :count invitations', $count, ['count' => $count]),
+            self::WebAccess => __('Allow'),
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::CustomField, self::SampleData => $operation->action(),
         };
     }
@@ -136,6 +150,7 @@ enum ProposalEntity: string
             self::EmailReschedule => __('Rescheduled'),
             self::EmailRetry => __('Queued again'),
             self::WorkspaceInvitation => __('Invited'),
+            self::WebAccess => __('Web search allowed'),
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::CustomField, self::SampleData => $operation->done(),
         };
     }
@@ -151,6 +166,7 @@ enum ProposalEntity: string
             self::EmailReschedule => __(':count rescheduled'),
             self::EmailRetry => __(':count queued again'),
             self::WorkspaceInvitation => __(':count invited'),
+            self::WebAccess => __(':count web searches allowed'),
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::CustomField, self::SampleData => $operation->count(),
         };
     }
@@ -166,6 +182,7 @@ enum ProposalEntity: string
             self::EmailReschedule => 'reschedule',
             self::EmailRetry => 'retry',
             self::WorkspaceInvitation => 'invite',
+            self::WebAccess => 'search',
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::CustomField, self::SampleData => $operation->verb(),
         };
     }
@@ -181,6 +198,7 @@ enum ProposalEntity: string
             self::EmailReschedule => 'NOT rescheduled',
             self::EmailRetry => 'NOT queued again',
             self::WorkspaceInvitation => 'NOT invited',
+            self::WebAccess => 'NOT allowed, so answer without the web',
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::CustomField, self::SampleData => $operation->notDone(),
         };
     }
@@ -193,14 +211,28 @@ enum ProposalEntity: string
             self::EmailCancel, self::EmailReschedule => 'queued email',
             self::EmailRetry => 'failed email',
             self::WorkspaceInvitation => 'teammate',
+            self::WebAccess => 'the web for',
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::CustomField, self::SampleData => $this->value,
+        };
+    }
+
+    public function decisionWord(PendingActionStatus $status): string
+    {
+        return match ($this) {
+            self::WebAccess => match ($status) {
+                PendingActionStatus::Pending => 'PENDING',
+                PendingActionStatus::Approved => 'ALLOWED (web search for the resumed turn only, not a write)',
+                PendingActionStatus::Rejected => 'DENIED (no web for that request, not a write)',
+                PendingActionStatus::Expired, PendingActionStatus::Superseded => 'EXPIRED (no answer, no web for that request, not a write)',
+            },
+            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::CustomField, self::SampleData => $status->promptWord(),
         };
     }
 
     private function hasOwnReceipt(): bool
     {
         return match ($this) {
-            self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation => true,
+            self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::WebAccess => true,
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::CustomField, self::SampleData => false,
         };
     }

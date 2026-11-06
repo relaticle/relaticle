@@ -150,7 +150,7 @@ A self-hosted install ships no legal pages, and relaticle.com's policies do not 
 | `RELATICLE_PRIVACY_URL` | (empty) | Your privacy policy. Linked from the footer of the sign-in pages, the onboarding screens, the scheduled-deletion page, and the email accounts page. Unset means no link. |
 | `RELATICLE_TERMS_URL` | (empty) | Your terms of service. Linked from the sign-in footer, the onboarding screens, and the scheduled-deletion page. Unset means no link. |
 | `RELATICLE_CONTACT_URL` | (empty) | Your contact or support page. Linked from the sign-in footer. Unset means no link. |
-| `DOCUMENTATION_PUBLIC_URL` | `https://relaticle.com` | The site that serves the help centre and the developer guides. Rela and the panel's help links point here. Set it to your own mirror if you host one. |
+| `DOCUMENTATION_PUBLIC_URL` | `https://relaticle.com` | The site that serves the help center and the developer guides. Rela and the panel's help links point here. Set it to your own mirror if you host one. |
 
 ### Email and calendar
 

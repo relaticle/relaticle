@@ -41,17 +41,19 @@
      ring or shadow; the result block is a sibling below it. --}}
 <div class="flex w-full flex-col items-start gap-3">
     <div class="mcp-el mcp-avatar mcp-avatar-1 w-full min-w-0">
-        <span class="mcp-el mcp-label mcp-label-1 sr-only">Assistant</span>
+        <span class="sr-only">Assistant</span>
 
-        {{-- Tool status: the same dot + label row the transcript shows while a
-             tool runs (data-chat-loading-indicator). --}}
-        <div class="mcp-el mcp-tool mcp-tool-1 flex items-center gap-2 px-1 py-1 text-xs">
-            <span class="h-1.5 w-1.5 rounded-full bg-gray-400 motion-safe:animate-pulse dark:bg-gray-500" aria-hidden="true"></span>
-            <span class="text-gray-600 dark:text-gray-300">Searching tasks…</span>
-        </div>
+        {{-- The transcript shows its tool status row only while the tool runs, so the reply
+             takes over the same cell as it streams. --}}
+        <div class="grid">
+            <div class="mcp-el mcp-tool mcp-tool-1 col-start-1 row-start-1 flex items-center gap-2 self-start px-1 py-1 text-xs">
+                <span class="h-1.5 w-1.5 rounded-full bg-gray-400 motion-safe:animate-pulse dark:bg-gray-500" aria-hidden="true"></span>
+                <span class="text-gray-600 dark:text-gray-300">Searching tasks…</span>
+            </div>
 
-        <div class="mcp-el mcp-text mcp-text-1 px-1 py-1 text-sm leading-relaxed text-gray-900 dark:text-gray-100">
-            You have 3 overdue tasks, all past due this week.
+            <div class="mcp-el mcp-text mcp-text-1 col-start-1 row-start-1 px-1 py-1 text-sm leading-relaxed text-gray-900 dark:text-gray-100">
+                You have 3 overdue tasks, all past due this week.
+            </div>
         </div>
     </div>
 
@@ -126,10 +128,17 @@
 
 <div class="flex w-full flex-col items-start gap-3">
     <div class="mcp-el mcp-avatar mcp-avatar-2 w-full min-w-0">
-        <span class="mcp-el mcp-label mcp-label-2 sr-only">Assistant</span>
+        <span class="sr-only">Assistant</span>
 
-        <div class="mcp-el mcp-text mcp-text-2 px-1 py-1 text-sm leading-relaxed text-gray-900 dark:text-gray-100">
-            Review the proposal below to update the task.
+        <div class="grid">
+            <div class="mcp-el mcp-tool mcp-tool-2 col-start-1 row-start-1 flex items-center gap-2 self-start px-1 py-1 text-xs">
+                <span class="h-1.5 w-1.5 rounded-full bg-gray-400 motion-safe:animate-pulse dark:bg-gray-500" aria-hidden="true"></span>
+                <span class="text-gray-600 dark:text-gray-300">Preparing task changes…</span>
+            </div>
+
+            <div class="mcp-el mcp-text mcp-text-2 col-start-1 row-start-1 px-1 py-1 text-sm leading-relaxed text-gray-900 dark:text-gray-100">
+                Review the proposal below to update the task.
+            </div>
         </div>
     </div>
 
@@ -182,10 +191,17 @@
 
 <div class="flex w-full flex-col items-start gap-3">
     <div class="mcp-el mcp-avatar mcp-avatar-3 w-full min-w-0">
-        <span class="mcp-el mcp-label mcp-label-3 sr-only">Assistant</span>
+        <span class="sr-only">Assistant</span>
 
-        <div class="mcp-el mcp-text mcp-text-3 px-1 py-1 text-sm leading-relaxed text-gray-900 dark:text-gray-100">
-            Review the proposal below to add her to Kovra Systems.
+        <div class="grid">
+            <div class="mcp-el mcp-tool mcp-tool-3 col-start-1 row-start-1 flex items-center gap-2 self-start px-1 py-1 text-xs">
+                <span class="h-1.5 w-1.5 rounded-full bg-gray-400 motion-safe:animate-pulse dark:bg-gray-500" aria-hidden="true"></span>
+                <span class="text-gray-600 dark:text-gray-300">Drafting a person…</span>
+            </div>
+
+            <div class="mcp-el mcp-text mcp-text-3 col-start-1 row-start-1 px-1 py-1 text-sm leading-relaxed text-gray-900 dark:text-gray-100">
+                Review the proposal below to add her to Kovra Systems.
+            </div>
         </div>
     </div>
 

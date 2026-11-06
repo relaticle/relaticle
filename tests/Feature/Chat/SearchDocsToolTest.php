@@ -83,7 +83,7 @@ it('rewrites root-relative doc links to absolute urls on the documentation publi
         ->and($content)->toContain('](https://docs.example.test/');
 });
 
-it('reports no coverage and links the help centre when nothing matches', function (): void {
+it('reports no coverage and links the help center when nothing matches', function (): void {
     config()->set('documentation.public_url', 'https://docs.example.test');
 
     $payload = searchDocs('zzzqqxx unrelatedgibberish');

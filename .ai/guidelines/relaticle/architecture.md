@@ -50,8 +50,9 @@ anatomy mirrors a Laravel app: `src/`, `config/`, `routes/`, `resources/`,
 business half of the sysadmin panel (Overview, revenue, subscriptions, AI credits, trial and
 managed-plan actions), the marketing site, the docs and help website, and the blog: its pages,
 its authoring in the sysadmin panel and its `/mcp/blog` endpoint. Its own `LICENSE` allows
-development and testing use, and production use only under an agreement. The root `LICENSE` opens
-by naming that split, the shape GitLab, PostHog and Metabase use. The self-hosted build is this
+development and testing use, and production use only under an agreement. The root `LICENSE` stays
+the verbatim AGPL text, so GitHub still detects the repository as AGPL-3.0, and the README names the
+split. Plausible keeps its proprietary directory the same way. The self-hosted build is this
 repository without it.
 
 - Core never references it. `tests/Arch/ArchTest.php` fails a core layer that uses
@@ -177,6 +178,20 @@ final readonly class CreateOpportunity
   (`Relaticle\ImportWizard\Data\ColumnData`). Use a plain `final readonly` class when code
   builds the object with `new` (`App\Data\ListQuery`). No test tells the two apart, so a
   reviewer reads for a data object that only ever meets `new`
+- Settings that a feature will keep adding to share one nullable `jsonb` column on their
+  owner, named for the feature: `workspaces.ai_settings` holds every workspace-level setting
+  for the assistant. A new setting is a new property, not a migration. Use a boolean or enum
+  column only for a standalone setting that SQL filters or reports on
+- A laravel-data class types that column: `App\Data\AiSettings` is the worked example. The
+  model casts it with `AiSettings::class.':default'`, so a `null` column reads as the
+  defaults. Each property carries its default in the constructor, and
+  `#[MapName(SnakeCaseMapper::class)]` keeps the stored keys snake case. Readers use the typed
+  property (`$workspace->ai_settings->webSearch`) and never index the raw array. The action
+  that writes one setting rebuilds the object from the current values:
+  `AiSettings::from([...$workspace->ai_settings->toArray(), 'web_search' => $enabled])`.
+  `tests/Feature/Chat/AssistantSettingsTest.php` fails when the stored key or a default
+  changes. `users.ai_preferences` and `users.notification_preferences` predate this rule and
+  still use the `array` cast
 - Name domain concepts plainly (`Plan`, not `AiPlan`). Context comes from the
   namespace
 - `Support` holds code with no business rule in it: code that could ship as a standalone

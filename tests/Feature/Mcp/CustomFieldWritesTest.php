@@ -24,6 +24,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Rules\OwnedLookupRecords;
 use App\Rules\ValidCustomFields;
+use App\Support\ChecklistHtml;
 use App\Support\CustomFields\CustomFieldInput;
 use App\Support\CustomFields\CustomFieldOptionMap;
 use App\Support\CustomFields\RecordNameResolver;
@@ -37,7 +38,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Tests\Helpers\LegacyCompanyDomains;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(BaseCreateTool::class, BaseUpdateTool::class, CustomFieldInput::class, CustomFieldOptionMap::class, OwnedLookupRecords::class, ValidCustomFields::class, RecordNameResolver::class, FormatsCustomFields::class);
+mutates(BaseCreateTool::class, BaseUpdateTool::class, ChecklistHtml::class, CustomFieldInput::class, CustomFieldOptionMap::class, OwnedLookupRecords::class, ValidCustomFields::class, RecordNameResolver::class, FormatsCustomFields::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();
@@ -240,6 +241,23 @@ it('stores markdown for a rich editor field as html', function (): void {
     $stored = Task::query()->where('title', 'Md')->with('customFieldValues.customField.options')->firstOrFail()->getCustomFieldValue($description);
 
     expect($stored)->toContain('<h2>Plan</h2>')->toContain('<strong>Ada</strong>');
+});
+
+it('stores markdown checklist items through the create task tool', function (): void {
+    RelaticleServer::actingAs($this->user)
+        ->tool(CreateTaskTool::class, ['title' => 'Checklist', 'custom_fields' => ['description' => '- [ ] Call Bob']])
+        ->assertOk();
+
+    $description = CustomField::query()
+        ->where('tenant_id', $this->workspace->getKey())
+        ->where('entity_type', 'task')
+        ->where('code', 'description')
+        ->firstOrFail();
+    $stored = Task::query()->where('title', 'Checklist')->with('customFieldValues.customField.options')->firstOrFail()->getCustomFieldValue($description);
+
+    expect(substr_count($stored, 'data-type="taskItem"'))->toBe(1)
+        ->and($stored)->toContain('data-checked="false"')
+        ->toContain('<div><p>Call Bob</p></div>');
 });
 
 it('passes html through untouched for a rich editor field', function (): void {

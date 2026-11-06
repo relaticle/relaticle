@@ -19,6 +19,7 @@
     $canonical = $currentPage > 1
         ? url()->current().'?page='.$currentPage
         : url()->current();
+    $linkClass = 'font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white';
 @endphp
 
 <x-cloud::guest-layout
@@ -31,63 +32,58 @@
         <x-ink::feed-link />
     @endpush
 
-    <div class="pt-32 pb-24 md:pt-40 md:pb-32 bg-white dark:bg-black">
-        <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center space-y-5 mb-12">
-                <h1 class="font-display text-4xl sm:text-5xl font-bold text-gray-950 dark:text-white leading-[1.1] tracking-[-0.02em]">
-                    Engineering Blog
-                </h1>
+    <x-cloud::marketing.hero align="start">
+        <x-slot:eyebrow>
+            <x-cloud::marketing.eyebrow>{{ __('Blog') }}</x-cloud::marketing.eyebrow>
+        </x-slot:eyebrow>
 
+        <x-slot:title>
+            {{ __('Engineering Blog.') }}
+            <span class="text-gray-500 dark:text-gray-400">{{ __('How we build an open-source CRM.') }}</span>
+        </x-slot:title>
+
+        <x-slot:aside>
+            <p class="text-base leading-relaxed text-gray-500 md:text-lg dark:text-gray-400">
                 @if(isset($category))
-                    <p class="text-lg text-gray-500 dark:text-gray-400 leading-relaxed">
-                        Posts in <span class="font-medium text-gray-900 dark:text-white">{{ $category->name }}</span>
-                        &middot; <a href="{{ route('blog.index') }}" class="text-primary dark:text-primary-400 hover:underline">All posts</a>
-                    </p>
+                    {{ __('Posts in') }} <span class="font-medium text-gray-950 dark:text-white">{{ $category->name }}</span>
+                    &middot; <a href="{{ route('blog.index') }}" class="{{ $linkClass }}">{{ __('All posts') }}</a>
                 @elseif(isset($tag))
-                    <p class="text-lg text-gray-500 dark:text-gray-400 leading-relaxed">
-                        Posts tagged <span class="font-medium text-gray-900 dark:text-white">#{{ $tag->name }}</span>
-                        &middot; <a href="{{ route('blog.index') }}" class="text-primary dark:text-primary-400 hover:underline">All posts</a>
-                    </p>
+                    {{ __('Posts tagged') }} <span class="font-medium text-gray-950 dark:text-white">#{{ $tag->name }}</span>
+                    &middot; <a href="{{ route('blog.index') }}" class="{{ $linkClass }}">{{ __('All posts') }}</a>
                 @else
-                    <p class="text-lg text-gray-500 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
-                        Deep dives into building an open-source CRM for AI agents.
-                    </p>
+                    {{ __('Deep dives into self-hosting, MCP, custom fields and the code behind Relaticle.') }}
+                @endif
+            </p>
+        </x-slot:aside>
+    </x-cloud::marketing.hero>
+
+    <x-cloud::marketing.frame>
+        @if($posts->isEmpty())
+            <div class="flex flex-col items-start gap-4 px-6 py-12 md:px-10 md:py-16">
+                @if($posts->total() > 0)
+                    <p class="type-prose text-gray-700 dark:text-gray-200">{{ __("That page doesn't exist. The archive only goes up to page :page.", ['page' => $posts->lastPage()]) }}</p>
+                    <a href="{{ $posts->url(1) }}" class="{{ $linkClass }}">{{ __('Back to the first page') }}</a>
+                @elseif($searchQuery || isset($category) || isset($tag))
+                    {{-- total() counts the filtered set, so "no posts yet" would be a
+                         lie here: the archive has posts, this filter just matched none. --}}
+                    <p class="type-prose text-gray-700 dark:text-gray-200">{{ __('Nothing matched. Try another search or browse everything.') }}</p>
+                    <a href="{{ route('blog.index') }}" class="{{ $linkClass }}">{{ __('All posts') }}</a>
+                @else
+                    <p class="type-prose text-gray-700 dark:text-gray-200">{{ __('No posts yet. Check back soon.') }}</p>
                 @endif
             </div>
+        @else
+            <ul class="bg-rail grid gap-px">
+                @foreach($posts as $post)
+                    <x-cloud::blog.post-card :post="$post" />
+                @endforeach
+            </ul>
 
-            @if($posts->isEmpty())
-                <div class="text-center py-16 space-y-4">
-                    @if($posts->total() > 0)
-                        <p class="text-gray-500 dark:text-gray-400">That page doesn't exist. The archive only goes up to page {{ $posts->lastPage() }}.</p>
-                        <a href="{{ $posts->url(1) }}"
-                           class="inline-flex items-center gap-1.5 text-sm font-medium text-primary dark:text-primary-400 hover:underline">
-                            <x-ri-arrow-left-line class="w-4 h-4" />
-                            Back to the first page
-                        </a>
-                    @elseif($searchQuery || isset($category) || isset($tag))
-                        {{-- total() counts the filtered set, so "no posts yet" would be a
-                             lie here: the archive has posts, this filter just matched none. --}}
-                        <p class="text-gray-500 dark:text-gray-400">Nothing matched. Try another search or browse everything.</p>
-                        <a href="{{ route('blog.index') }}"
-                           class="inline-flex items-center gap-1.5 text-sm font-medium text-primary dark:text-primary-400 hover:underline">
-                            <x-ri-arrow-left-line class="w-4 h-4" />
-                            All posts
-                        </a>
-                    @else
-                        <p class="text-gray-500 dark:text-gray-400">No posts yet. Check back soon.</p>
-                    @endif
-                </div>
-            @else
-                <div class="divide-y divide-gray-200/60 dark:divide-white/[0.04]">
-                    @foreach($posts as $post)
-                        <x-cloud::blog.post-card :post="$post" />
-                    @endforeach
-                </div>
-
-                <div class="mt-12 pt-8 border-t border-gray-200/60 dark:border-white/[0.04]">
+            @if($posts->hasPages())
+                <div class="border-rail border-t px-6 py-5 md:px-10">
                     {{ $posts->links('cloud::blog.pagination') }}
                 </div>
             @endif
-        </div>
-    </div>
+        @endif
+    </x-cloud::marketing.frame>
 </x-cloud::guest-layout>

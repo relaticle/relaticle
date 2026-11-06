@@ -38,9 +38,11 @@
         @resize.window="if (window.innerWidth >= 768) mobileMenu = false">
     <div
         id="main-header"
-        class="fixed w-full top-0 z-50 bg-white/80 dark:bg-gray-950/90 backdrop-blur-md border-b border-gray-200/60 dark:border-white/[0.06]">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-16">
+        data-framed
+        class="pointer-events-none fixed w-full top-0 z-50">
+        <div class="mx-auto max-w-6xl px-2 pt-2 sm:px-3 md:px-6 md:pt-3">
+            <div class="pointer-events-auto rounded-2xl bg-white/95 px-2 shadow-navbar backdrop-blur-md sm:px-3 md:rounded-[1.25rem] md:px-4 dark:bg-gray-950/95">
+            <div class="flex h-16 items-center justify-between">
 
                 <div class="flex flex-1 items-center">
                     <a href="{{ url('/') }}" class="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary rounded-sm" aria-label="Relaticle Home">
@@ -181,7 +183,7 @@
                                         aria-haspopup="true"
                                         :aria-expanded="openDropdown === '{{ $slug }}'"
                                         aria-controls="menu-{{ $slug }}"
-                                        class="px-4 py-1.5 rounded-full text-gray-600 dark:text-gray-400 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-white dark:hover:bg-white/[0.08] text-[13px] font-medium transition-colors duration-200 flex items-center gap-1 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                                        class="px-4 py-1.5 rounded-full text-gray-600 dark:text-gray-400 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-white dark:hover:bg-white/[0.08] text-sm font-medium transition-colors duration-200 flex items-center gap-1 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                                         :class="openDropdown === '{{ $slug }}' && 'text-gray-900 bg-gray-100 dark:text-white dark:bg-white/[0.08]'">
                                     {{ $item->label }}
                                     <x-ri-arrow-down-s-line class="w-3.5 h-3.5 transition-transform duration-200"
@@ -192,7 +194,7 @@
                             <a href="{{ $item->url }}"
                                @if($item->external) target="_blank" rel="noopener noreferrer" @endif
                                @if(url()->current() === $item->url) aria-current="page" @endif
-                               class="px-4 py-1.5 rounded-full text-gray-600 dark:text-gray-400 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-white dark:hover:bg-white/[0.08] text-[13px] font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                               class="px-4 py-1.5 rounded-full text-gray-600 dark:text-gray-400 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-white dark:hover:bg-white/[0.08] text-sm font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
                                 {{ $item->label }}
                             </a>
                         @endif
@@ -298,15 +300,15 @@
                 <div class="flex flex-1 items-center justify-end gap-2 sm:gap-3">
                     <div class="hidden md:flex items-center gap-2">
                         @auth('web')
-                            <x-cloud::marketing.button size="sm" icon-trailing="ri-arrow-right-line" :href="app(\App\Support\Auth\LoginDestination::class)->resolve(auth('web')->user(), null)">
+                            <x-cloud::marketing.button size="sm" :href="app(\App\Support\Auth\LoginDestination::class)->resolve(auth('web')->user(), null)">
                                 {{ __('Open app') }}
                             </x-cloud::marketing.button>
                         @else
-                            <x-cloud::marketing.button variant="secondary" size="sm" href="{{ route('login') }}">
+                            <x-cloud::marketing.button variant="secondary" size="sm" href="{{ route('login') }}" data-analytics-intent="login" data-analytics-placement="header">
                                 Sign In
                             </x-cloud::marketing.button>
 
-                            <x-cloud::marketing.button size="sm" href="{{ route('login') }}">
+                            <x-cloud::marketing.button size="sm" href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="header">
                                 Start for free
                             </x-cloud::marketing.button>
                         @endauth
@@ -337,6 +339,14 @@
                     </button>
                 </div>
             </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-surface border-rail h-21 border-b md:h-23" aria-hidden="true">
+        <div class="border-rail relative mx-auto h-full max-w-6xl sm:border-x">
+            <x-cloud::marketing.cross class="-bottom-3 -left-3"/>
+            <x-cloud::marketing.cross class="-bottom-3 -right-3"/>
         </div>
     </div>
 

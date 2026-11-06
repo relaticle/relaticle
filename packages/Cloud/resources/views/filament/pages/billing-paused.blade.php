@@ -37,12 +37,12 @@
                             {{ __('cloud::billing.paused.member_body_managed', ['owner' => $workspace->owner->name, 'workspace' => $workspace->name, 'plan' => $lapsedPlan->marketingLabel()]) }}
                         @elseif(! $canManageBilling)
                             {{ $workspace->owner
-                                ? __('cloud::billing.paused.member_body', ['owner' => $workspace->owner->name, 'workspace' => $workspace->name])
+                                ? __($deletesWhenInactive ? 'cloud::billing.paused.member_body_trial' : 'cloud::billing.paused.member_body', ['owner' => $workspace->owner->name, 'workspace' => $workspace->name])
                                 : __('cloud::billing.paused.member_body_ownerless', ['workspace' => $workspace->name]) }}
                         @elseif($lapsedPlan)
                             {{ __('cloud::billing.paused.owner_body_managed', ['plan' => $lapsedPlan->marketingLabel(), 'workspace' => $workspace->name]) }}
                         @else
-                            {{ __('cloud::billing.paused.owner_body', ['workspace' => $workspace->name]) }}
+                            {{ __($deletesWhenInactive ? 'cloud::billing.paused.owner_body_trial' : 'cloud::billing.paused.owner_body', ['workspace' => $workspace->name]) }}
                         @endif
                         @if($mailboxSyncPaused)
                             {{ __('cloud::billing.paused.mailbox_sync') }}
@@ -60,6 +60,12 @@
                             <x-filament::button size="lg" :color="$lapsedPlan ? 'gray' : 'primary'" icon="ri-arrow-up-circle-line" class="w-full justify-center" x-on:click="$dispatch('open-modal', { id: {{ \Illuminate\Support\Js::from(\Relaticle\Cloud\Billing\Livewire\UpgradeModal::MODAL_ID) }} })">
                                 {{ __('cloud::billing.paused.continue') }}
                             </x-filament::button>
+                            @if($trialExtensionAvailable)
+                                <x-filament::button size="lg" color="gray" class="w-full justify-center" wire:click="extendTrial">
+                                    {{ __('cloud::billing.paused.extend', ['days' => \App\Models\Workspace::TRIAL_EXTENSION_DAYS]) }}
+                                </x-filament::button>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('cloud::billing.paused.extend_once') }}</p>
+                            @endif
                         </div>
                     @endif
 

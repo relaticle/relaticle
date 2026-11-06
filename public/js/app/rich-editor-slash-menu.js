@@ -73,6 +73,7 @@ class CanvasFitView {
     constructor(view) {
         this.content = view.dom.closest('.fi-fo-rich-editor-seamless .fi-fo-rich-editor-content')
         this.fit = this.fit.bind(this)
+        this.scheduleFit = this.scheduleFit.bind(this)
 
         // Only a modal form has slack to fill. Outside one (the chat proposal dock) the
         // viewport is no limit, and filling it overflows the card the editor sits in.
@@ -98,10 +99,15 @@ class CanvasFitView {
 
         window.addEventListener('resize', this.fit)
 
-        // Each pass closes the gap exactly, so the observer settles in one more frame.
-        // It also catches the fields above changing height without a window resize.
-        this.observer = new ResizeObserver(this.fit)
+        // Writing the height inside the observer's own callback is the loop Chromium
+        // reports, so the pass waits for the next frame. It also catches fields above resizing.
+        this.observer = new ResizeObserver(this.scheduleFit)
         this.observer.observe(this.extent)
+    }
+
+    scheduleFit() {
+        cancelAnimationFrame(this.frame)
+        this.frame = requestAnimationFrame(this.fit)
     }
 
     fit() {
@@ -120,6 +126,7 @@ class CanvasFitView {
     destroy() {
         window.removeEventListener('resize', this.fit)
         this.observer?.disconnect()
+        cancelAnimationFrame(this.frame)
     }
 }
 
@@ -139,7 +146,7 @@ class SlashMenuView {
         // fi-dropdown-list only to opt out of the panel's divide-y between children.
         this.panel.className = 'fi-dropdown-panel fi-dropdown-list fi-width-2xs fi-not-prose fi-slash-menu'
         this.panel.setAttribute('role', 'listbox')
-        this.panel.hidden = true
+        this.panel.popover = 'manual'
         document.body.appendChild(this.panel)
 
         this.onDocumentPointerDown = (event) => {
@@ -148,6 +155,14 @@ class SlashMenuView {
             }
         }
         document.addEventListener('mousedown', this.onDocumentPointerDown)
+
+        this.reposition = () => {
+            if (this.isOpen) {
+                this.position()
+            }
+        }
+        document.addEventListener('scroll', this.reposition, { capture: true, passive: true })
+        window.addEventListener('resize', this.reposition)
     }
 
     update() {
@@ -335,13 +350,21 @@ class SlashMenuView {
 
     open() {
         this.isOpen = true
-        this.panel.hidden = false
+
+        if (! this.panel.matches(':popover-open')) {
+            this.panel.showPopover()
+        }
+
         this.position()
     }
 
     close() {
         this.isOpen = false
-        this.panel.hidden = true
+
+        if (this.panel.matches(':popover-open')) {
+            this.panel.hidePopover()
+        }
+
         this.range = null
         this.items = []
         this.activeIndex = 0
@@ -364,12 +387,14 @@ class SlashMenuView {
         const top = placeAbove ? caret.top - height - margin : caret.bottom + margin
         const left = Math.min(caret.left, window.innerWidth - width - margin)
 
-        this.panel.style.top = `${Math.max(top, margin) + window.scrollY}px`
-        this.panel.style.left = `${Math.max(left, margin) + window.scrollX}px`
+        this.panel.style.top = `${Math.max(top, margin)}px`
+        this.panel.style.left = `${Math.max(left, margin)}px`
     }
 
     destroy() {
         document.removeEventListener('mousedown', this.onDocumentPointerDown)
+        document.removeEventListener('scroll', this.reposition, { capture: true })
+        window.removeEventListener('resize', this.reposition)
         this.panel.remove()
     }
 }

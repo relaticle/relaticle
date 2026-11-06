@@ -1805,10 +1805,10 @@ html.fi:has(body.fi-onboarding-wizard),
     }
 }
 
-/* The slash menu is appended to <body> to escape the modal's overflow clipping,
-   so z-40 has to clear the modal window at 30. */
+/* A manual popover in the top layer, so it clears every modal with no z-index to keep in
+   step. The resets undo the browser's popover defaults the dropdown styles leave set. */
 .fi-slash-menu {
-    @apply absolute z-40 max-h-[28rem] w-screen overflow-y-auto p-1;
+    @apply fixed inset-auto m-0 max-h-[28rem] w-screen overflow-y-auto border-0 p-1 text-inherit;
 }
 
 .fi-slash-menu-empty {
@@ -1867,6 +1867,39 @@ html.fi:has(body.fi-onboarding-wizard),
             @apply flex-1;
         }
     }
+}
+
+.fi-fo-rich-editor .ProseMirror ul[data-type='taskList'] {
+    @apply list-none ps-0;
+
+    > li {
+        @apply flex items-start gap-2.5 ps-0;
+
+        > label {
+            @apply -mx-1 flex shrink-0 cursor-pointer p-1 select-none;
+            margin-top: calc((1lh - 1rem) / 2 - 0.25rem);
+            margin-bottom: -0.25rem;
+
+            input {
+                @apply size-4 cursor-pointer rounded-sm accent-primary-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:accent-primary-500;
+            }
+        }
+
+        > div {
+            @apply mt-0 min-w-0 flex-1;
+        }
+
+        &[data-checked='true'] > div {
+            @apply text-gray-500 dark:text-gray-400;
+            --prose-code-color: currentColor;
+            --prose-link-color: currentColor;
+            --prose-strong-color: currentColor;
+        }
+    }
+}
+
+.fi-fo-rich-editor .ProseMirror[contenteditable='false'] ul[data-type='taskList'] > li > label {
+    @apply pointer-events-none cursor-default;
 }
 
 /* The editor draws its own placeholder so the trigger can be a key cap, which

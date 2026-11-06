@@ -16,7 +16,7 @@ final readonly class MeetingParticipantStackPresenter
     /**
      * @return array{
      *     attendees: list<array{name: string, email: string, avatar: string, has_name: bool, is_organizer: bool, response_status: AttendeeResponseStatus|null}>,
-     *     avatars: list<array{src: string, alt: string, has_name: bool, tooltip: string}>,
+     *     avatars: list<array{src: string, alt: string, tooltip: string}>,
      *     overflow: int,
      *     overflow_tooltip: string|null
      * }
@@ -33,7 +33,6 @@ final readonly class MeetingParticipantStackPresenter
                 fn (array $state): array => [
                     'src' => $state['avatar'],
                     'alt' => $state['name'],
-                    'has_name' => $state['has_name'],
                     'tooltip' => $this->tooltip($state),
                 ],
                 $visibleStates,
