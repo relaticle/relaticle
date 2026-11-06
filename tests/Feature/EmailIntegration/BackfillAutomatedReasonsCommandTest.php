@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 use App\Models\User;
 use Illuminate\Foundation\Console\QueuedCommand;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Relaticle\EmailIntegration\Console\Commands\BackfillAutomatedReasonsCommand;
 use Relaticle\EmailIntegration\Enums\AutomatedReason;
 use Relaticle\EmailIntegration\Enums\EmailCategory;
+use Relaticle\EmailIntegration\Events\ConversationChanged;
 use Relaticle\EmailIntegration\Models\AutomatedSenderOverride;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -183,4 +185,14 @@ it('writes nothing on a report-only run that spans pages', function (): void {
 
     expect(EmailConversation::query()->exists())->toBeFalse()
         ->and(Email::query()->withoutGlobalScopes()->whereNotNull('automated_reason')->exists())->toBeFalse();
+});
+
+it('refreshes the summaries it marks without signalling a conversation change', function (): void {
+    Event::fake([ConversationChanged::class]);
+    $noreply = ($this->history)('noreply@stripe.example');
+
+    ($this->backfill)()->expectsOutputToContain('1 email(s) marked')->assertSuccessful();
+
+    expect(EmailConversation::query()->where('conversation_key', $noreply->conversation_key)->sole()->is_automated)->toBeTrue();
+    Event::assertNotDispatched(ConversationChanged::class);
 });

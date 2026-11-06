@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Database\Query\Builder as BaseBuilder;
 use Illuminate\Pagination\Cursor;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
@@ -39,6 +40,8 @@ use Relaticle\EmailIntegration\Services\PrivacyService;
 
 final readonly class ConversationsQuery
 {
+    public const int COUNTS_CACHE_SECONDS = 60;
+
     public function __construct(
         private PrivacyService $privacy,
         private PreferredEmailCopyService $preferredCopies,
@@ -63,12 +66,31 @@ final readonly class ConversationsQuery
         );
     }
 
+    public static function countsCacheKey(User $viewer): string
+    {
+        return "email-conversation-counts:{$viewer->current_workspace_id}:{$viewer->getKey()}";
+    }
+
     /** @return array{needs_reply: int, unlinked: int, automated: int} */
     public function counts(User $viewer, ?ConversationFilters $filters = null): array
     {
         Gate::forUser($viewer)->authorize('viewAny', Email::class);
 
         $filters ??= new ConversationFilters;
+
+        // The key holds a generation, so forgetting it drops the counts cached for every filter at once.
+        $generation = Cache::remember(self::countsCacheKey($viewer), self::COUNTS_CACHE_SECONDS, fn (): string => Str::random(16));
+
+        return Cache::remember(
+            self::countsCacheKey($viewer).":{$generation}:".hash('xxh128', serialize($filters)),
+            self::COUNTS_CACHE_SECONDS,
+            fn (): array => $this->uncachedCounts($viewer, $filters),
+        );
+    }
+
+    /** @return array{needs_reply: int, unlinked: int, automated: int} */
+    private function uncachedCounts(User $viewer, ConversationFilters $filters): array
+    {
         $visible = new VisibleEmailScope($viewer);
         $counts = DB::query();
 
@@ -99,6 +121,72 @@ final readonly class ConversationsQuery
         return $this->visibleCopiesOf($viewer, new VisibleEmailScope($viewer), $filters)
             ->where('emails.conversation_key', $conversationKey)
             ->exists();
+    }
+
+    /**
+     * Members active in the workspace who may see the conversation, plus those named in $alsoNotify.
+     *
+     * @param  list<string>  $alsoNotify
+     * @return list<string>
+     */
+    public function audience(string $workspaceId, string $conversationKey, array $alsoNotify = []): array
+    {
+        $members = $this->activeMembers($workspaceId);
+        $seeing = $this->seeing($members, [$conversationKey])[$conversationKey] ?? [];
+
+        return array_values($members
+            ->map(fn (User $member): string => (string) $member->getKey())
+            ->filter(fn (string $id): bool => in_array($id, $seeing, true) || in_array($id, $alsoNotify, true))
+            ->all());
+    }
+
+    /**
+     * @param  list<string>  $conversationKeys
+     * @return array<string, list<string>> member ids by conversation key
+     */
+    public function audiences(string $workspaceId, array $conversationKeys): array
+    {
+        return $conversationKeys === [] ? [] : $this->seeing($this->activeMembers($workspaceId), $conversationKeys);
+    }
+
+    /** @return Collection<int, User> */
+    private function activeMembers(string $workspaceId): Collection
+    {
+        // The visibility scope binds the viewer's current workspace, so a member active elsewhere cannot be checked.
+        return User::query()
+            ->inWorkspace($workspaceId)
+            ->where('current_workspace_id', $workspaceId)
+            ->with('currentWorkspace')
+            ->get()
+            ->filter(fn (User $member): bool => Gate::forUser($member)->allows('viewAny', Email::class))
+            ->values()
+            ->toBase();
+    }
+
+    /**
+     * @param  Collection<int, User>  $members
+     * @param  list<string>  $conversationKeys
+     * @return array<string, list<string>>
+     */
+    private function seeing(Collection $members, array $conversationKeys): array
+    {
+        $seeing = [];
+        $visible = null;
+
+        foreach ($members as $member) {
+            $visible = $visible?->forTeammate($member) ?? new VisibleEmailScope($member);
+            $keys = $this->visibleCopiesOf($member, $visible, new ConversationFilters)
+                ->whereIn('emails.conversation_key', $conversationKeys)
+                ->toBase()
+                ->distinct()
+                ->pluck('emails.conversation_key');
+
+            foreach ($keys as $key) {
+                $seeing[(string) $key][] = (string) $member->getKey();
+            }
+        }
+
+        return $seeing;
     }
 
     /**

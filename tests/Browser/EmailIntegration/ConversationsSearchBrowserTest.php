@@ -2,10 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Features\EmailConversations;
 use App\Models\User;
 use Illuminate\Support\Str;
-use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -30,7 +28,7 @@ beforeEach(function (): void {
         'sync_cursor' => 'history-done',
     ]));
 
-    Feature::for($this->workspace)->activate(EmailConversations::class);
+    config(['relaticle.features.email_conversations' => [$this->workspace->id]]);
 });
 
 function searchBrowserMessage(ConnectedAccount $mailbox, string $key, string $from, string $subject, string $body): Email

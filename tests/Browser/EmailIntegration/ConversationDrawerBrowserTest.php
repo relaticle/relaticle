@@ -2,14 +2,12 @@
 
 declare(strict_types=1);
 
-use App\Features\EmailConversations;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\CompanyResource\RelationManagers\EmailsRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\NotesRelationManager;
 use App\Models\Company;
 use App\Models\User;
 use Illuminate\Support\Str;
-use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -30,7 +28,7 @@ beforeEach(function (): void {
     $this->teammateMailbox = drawerBrowserMailbox($this->teammate, 'ben@acme.test');
     $this->company = Company::factory()->create(['workspace_id' => $this->workspace->id, 'name' => 'Airbnb']);
 
-    Feature::for($this->workspace)->activate(EmailConversations::class);
+    config(['relaticle.features.email_conversations' => [$this->workspace->id]]);
 });
 
 function drawerBrowserMailbox(User $user, string $address): ConnectedAccount

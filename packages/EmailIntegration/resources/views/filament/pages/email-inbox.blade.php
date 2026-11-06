@@ -14,6 +14,10 @@
         />
     @endunless
 
+    @if ($this->showsConversations)
+        <x-email-integration::live-conversations :user-id="auth()->id()" :workspace-id="filament()->getTenant()?->getKey()" />
+    @endif
+
     @php
         $pageTabShown = $this->showsConversations ? $tab : ($tab ?? \Relaticle\EmailIntegration\Enums\EmailPageTab::DRAFTS);
     @endphp

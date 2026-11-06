@@ -178,6 +178,15 @@ abstract class BaseEmailsRelationManager extends RelationManager
             ->count($this->authUser(), ConversationView::Automated, ConversationFilters::forRecord($this->ownerRecordWithEmails()));
     }
 
+    public function refreshConversations(): void
+    {
+        if (! $this->showsConversations()) {
+            return;
+        }
+
+        unset($this->conversations, $this->automatedCount, $this->selectedEmail);
+    }
+
     public function updatedShowAutomated(): void
     {
         $this->conversationsCursor = null;

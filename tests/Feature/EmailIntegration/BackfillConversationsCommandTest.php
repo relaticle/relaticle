@@ -6,16 +6,19 @@ use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Console\QueuedCommand;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Relaticle\EmailIntegration\Console\Commands\BackfillConversationsCommand;
 use Relaticle\EmailIntegration\Enums\AutomatedReason;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Events\ConversationChanged;
+use Relaticle\EmailIntegration\Jobs\MergeConversations;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailConversation;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 
-mutates(BackfillConversationsCommand::class);
+mutates(BackfillConversationsCommand::class, MergeConversations::class);
 
 beforeEach(function (): void {
     $this->workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
@@ -70,6 +73,20 @@ it('joins an older reply whose stored in-reply-to is a raw header to its parent'
     expect($reply->fresh()->conversation_key)->toBe($parent->fresh()->conversation_key)
         ->and($reply->fresh()->in_reply_to)->toBe('<p@acme.example>')
         ->and(EmailConversation::query()->pluck('message_count')->all())->toBe([2]);
+});
+
+it('rebuilds and merges summaries without signalling a conversation change', function (): void {
+    Event::fake([ConversationChanged::class]);
+    $mailbox = ($this->mailbox)();
+    $reply = ($this->email)($mailbox, ['rfc_message_id' => '<r@acme.example>', 'thread_id' => 'tr', 'in_reply_to' => '<p@acme.example>', 'references' => '<z@acme.example>']);
+    $parent = ($this->email)($mailbox, ['rfc_message_id' => '<p@acme.example>', 'thread_id' => 'tp', 'sent_at' => now()->subDay()]);
+    ($this->email)($mailbox, ['rfc_message_id' => '<x@acme.example>', 'thread_id' => 'tx']);
+
+    $this->artisan('email:backfill-conversations', ['--force' => true])->assertSuccessful();
+
+    expect($reply->fresh()->conversation_key)->toBe($parent->fresh()->conversation_key)
+        ->and(EmailConversation::query()->count())->toBe(2);
+    Event::assertNotDispatched(ConversationChanged::class);
 });
 
 it('leaves an email unkeyed when its merge fails, so the next run merges it', function (): void {

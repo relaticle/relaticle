@@ -13,7 +13,9 @@ use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\Attributes\UniqueFor;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
+use Relaticle\EmailIntegration\Events\ConversationChanged;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Queries\ConversationsQuery;
 use Relaticle\EmailIntegration\Services\ConversationKeyResolver;
 
 #[Queue('emails-sync')]
@@ -26,6 +28,7 @@ final class MergeConversations implements ShouldBeUniqueUntilProcessing, ShouldQ
     public function __construct(
         public readonly string $workspaceId,
         public readonly string $emailId,
+        public readonly bool $broadcast = true,
     ) {}
 
     public function uniqueId(): string
@@ -38,11 +41,10 @@ final class MergeConversations implements ShouldBeUniqueUntilProcessing, ShouldQ
         // One transaction, so a failed refresh rolls the rewrite back and the retry merges again.
         $currentWorkspace->within($this->workspaceId, function () use ($resolver, $refresh): void {
             $keys = DB::transaction(function () use ($resolver, $refresh): array {
-                $keys = $this->mergeLinkedKeys($resolver);
-
-                foreach ($keys as $key) {
-                    $refresh->execute($this->workspaceId, $key);
-                }
+                $keys = $this->linkedKeys($resolver);
+                $audiences = $this->audiences($keys);
+                $this->rewrite(array_slice($keys, 1), $keys[0] ?? '');
+                $this->refreshMerged($keys, $audiences, $refresh);
 
                 return $keys;
             });
@@ -63,22 +65,62 @@ final class MergeConversations implements ShouldBeUniqueUntilProcessing, ShouldQ
         DB::transaction(function () use ($survivor, $absorbed, $refresh): void {
             DB::select('select pg_advisory_xact_lock(hashtext(?))', [$this->workspaceId]);
 
-            $moved = Email::query()->withoutGlobalScopes()
+            $stranded = Email::query()->withoutGlobalScopes()
                 ->where('workspace_id', $this->workspaceId)
                 ->whereIn('conversation_key', $absorbed)
-                ->toBase()
-                ->update(['conversation_key' => $survivor]);
+                ->exists();
 
-            if ($moved > 0) {
-                foreach ([$survivor, ...$absorbed] as $key) {
-                    $refresh->execute($this->workspaceId, $key);
-                }
+            if (! $stranded) {
+                return;
+            }
+
+            $audiences = $this->audiences([$survivor, ...$absorbed]);
+
+            if ($this->rewrite($absorbed, $survivor) > 0) {
+                $this->refreshMerged([$survivor, ...$absorbed], $audiences, $refresh);
             }
         });
     }
 
-    /** @return list<string> the surviving key first, then the keys it absorbed */
-    private function mergeLinkedKeys(ConversationKeyResolver $resolver): array
+    // Read before the rows move, so each absorbed key signals the members who saw it.
+    /**
+     * @param  list<string>  $keys
+     * @return array<string, list<string>>
+     */
+    private function audiences(array $keys): array
+    {
+        return $this->broadcast && count($keys) > 1 && ConversationChanged::broadcasts()
+            ? resolve(ConversationsQuery::class)->audiences($this->workspaceId, $keys)
+            : [];
+    }
+
+    /** @param  list<string>  $absorbed */
+    private function rewrite(array $absorbed, string $survivor): int
+    {
+        if ($absorbed === []) {
+            return 0;
+        }
+
+        return Email::query()->withoutGlobalScopes()
+            ->where('workspace_id', $this->workspaceId)
+            ->whereIn('conversation_key', $absorbed)
+            ->toBase()
+            ->update(['conversation_key' => $survivor]);
+    }
+
+    /**
+     * @param  list<string>  $keys  the surviving key first
+     * @param  array<string, list<string>>  $audiences
+     */
+    private function refreshMerged(array $keys, array $audiences, RefreshConversationSummary $refresh): void
+    {
+        foreach ($keys as $index => $key) {
+            $refresh->execute($this->workspaceId, $key, $this->broadcast, $index === 0 ? [] : ($audiences[$key] ?? []));
+        }
+    }
+
+    /** @return list<string> the surviving key first, then the keys it absorbs */
+    private function linkedKeys(ConversationKeyResolver $resolver): array
     {
         // One merge per workspace at a time, so each run reads the keys the previous one left.
         DB::select('select pg_advisory_xact_lock(hashtext(?))', [$this->workspaceId]);
@@ -99,15 +141,8 @@ final class MergeConversations implements ShouldBeUniqueUntilProcessing, ShouldQ
         }
 
         $survivor = $this->oldest($keys);
-        $absorbed = array_values(array_diff($keys, [$survivor]));
 
-        Email::query()->withoutGlobalScopes()
-            ->where('workspace_id', $this->workspaceId)
-            ->whereIn('conversation_key', $absorbed)
-            ->toBase()
-            ->update(['conversation_key' => $survivor]);
-
-        return [$survivor, ...$absorbed];
+        return [$survivor, ...array_values(array_diff($keys, [$survivor]))];
     }
 
     /** @param  non-empty-list<string>  $keys */

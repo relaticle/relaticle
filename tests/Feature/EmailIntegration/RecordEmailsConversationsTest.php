@@ -43,7 +43,7 @@ beforeEach(function (): void {
     $this->teammateMailbox = conversationsRecordMailbox($this->teammate, 'ben@acme.test');
     $this->company = Company::factory()->create(['workspace_id' => $this->workspace->id, 'name' => 'Airbnb']);
 
-    Feature::for($this->workspace)->activate(EmailConversations::class);
+    config(['relaticle.features.email_conversations' => [$this->workspace->id]]);
     actingAs($this->owner);
     Filament::setCurrentPanel(Filament::getPanel('app'));
     Filament::setTenant($this->workspace);
@@ -111,6 +111,16 @@ it('lists each conversation linked to the company once', function (): void {
         ->and($html)->toContain('data-message-count="2"');
 });
 
+it('picks up a conversation linked to the company when the tab is refreshed', function (): void {
+    $tab = livewire(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class]);
+
+    $email = conversationsRecordMessage($this->ownerMailbox, 'conv-renewal', 'brian@airbnb.test');
+    $this->company->emails()->attach($email->id);
+    $tab->call('refreshConversations');
+
+    expect(conversationsRecordKeys($tab->html()))->toBe(['conv-renewal']);
+});
+
 it('shows a teammate conversation on the company only while it is linked there', function (): void {
     $linked = conversationsRecordMessage($this->teammateMailbox, 'conv-linked', 'olivia@airbnb.test', [
         'subject' => 'Contract redlines',
@@ -170,7 +180,8 @@ it('opens the reader from the email in the URL only while conversations are on',
         ->assertSet('selectedEmailId', $email->id)
         ->assertSeeHtml('fi-email-reader-drawer');
 
-    Feature::for($this->workspace)->deactivate(EmailConversations::class);
+    config(['relaticle.features.email_conversations' => []]);
+    Feature::purge(EmailConversations::class);
 
     Livewire::withQueryParams(['email' => $email->id])
         ->test(EmailsRelationManager::class, ['ownerRecord' => $this->company, 'pageClass' => ViewCompany::class])
@@ -197,7 +208,6 @@ it('lists no conversations on a company whose mailbox is hidden', function (): v
         ->where('code', CompanyField::DOMAINS->value)
         ->firstOrFail();
     $this->company->saveCustomFieldValue($domains, ['https://airbnb.test'], $this->workspace);
-    Feature::for($this->workspace)->activate(EmailConversations::class);
     WorkspaceEmailBlocklist::factory()->protected()->domain('airbnb.test')->create([
         'workspace_id' => $this->workspace->id,
         'created_by' => $this->owner->id,

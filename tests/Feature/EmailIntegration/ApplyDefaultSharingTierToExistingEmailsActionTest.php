@@ -6,6 +6,8 @@ use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Actions\ApplyDefaultSharingTierToExistingEmailsAction;
 use Relaticle\EmailIntegration\Actions\SaveMailboxSharingTier;
 use Relaticle\EmailIntegration\Actions\SaveWorkspaceEmailSharingDefaultAction;
@@ -13,13 +15,16 @@ use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Listeners\ForgetConversationCountsListener;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Queries\ConversationsQuery;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 mutates(
     ApplyDefaultSharingTierToExistingEmailsAction::class,
     SaveMailboxSharingTier::class,
+    ForgetConversationCountsListener::class,
 );
 
 beforeEach(function (): void {
@@ -206,4 +211,38 @@ it('narrows past mail when the workspace default drops', function (): void {
 
     expect($open->fresh()->privacy_tier)->toBe(EmailPrivacyTier::METADATA_ONLY)
         ->and($private->fresh()->privacy_tier)->toBe(EmailPrivacyTier::PRIVATE);
+});
+
+it('forgets the cached conversation counts of the workspace members when a mailbox tier changes', function (): void {
+    $teammate = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+    $this->workspace->users()->attach($teammate, ['role' => 'member']);
+    $mailbox = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->owner->id,
+    ]));
+    resolve(ConversationsQuery::class)->counts($teammate);
+
+    expect(Cache::has(ConversationsQuery::countsCacheKey($teammate)))->toBeTrue();
+
+    resolve(SaveMailboxSharingTier::class)->execute($this->owner, $mailbox, EmailPrivacyTier::PRIVATE);
+
+    expect(Cache::has(ConversationsQuery::countsCacheKey($teammate)))->toBeFalse();
+});
+
+it('forgets the cached conversation counts only once the outer transaction commits', function (): void {
+    $teammate = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+    $this->workspace->users()->attach($teammate, ['role' => 'member']);
+    $mailbox = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->owner->id,
+    ]));
+    resolve(ConversationsQuery::class)->counts($teammate);
+
+    DB::transaction(function () use ($mailbox, $teammate): void {
+        resolve(SaveMailboxSharingTier::class)->execute($this->owner, $mailbox, EmailPrivacyTier::PRIVATE);
+
+        expect(Cache::has(ConversationsQuery::countsCacheKey($teammate)))->toBeTrue();
+    });
+
+    expect(Cache::has(ConversationsQuery::countsCacheKey($teammate)))->toBeFalse();
 });

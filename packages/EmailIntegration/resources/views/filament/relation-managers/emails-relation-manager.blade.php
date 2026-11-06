@@ -47,6 +47,8 @@
             </div>
 
             @if ($this->showsConversations)
+                <x-email-integration::live-conversations :user-id="auth()->id()" :workspace-id="filament()->getTenant()?->getKey()" />
+
                 <div class="flex min-h-[20rem] flex-col divide-y divide-gray-100 border-t border-gray-200 dark:divide-white/5 dark:border-white/10">
                     @forelse ($this->conversations->rows as $row)
                         <x-email-integration::conversation-row :row="$row" selectable :current="$row->conversationKey === $this->selectedEmail?->conversation_key" wire:key="record-conversation-{{ $row->conversationKey }}" />
