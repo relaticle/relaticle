@@ -28,6 +28,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\AutomatedReason;
 use Relaticle\EmailIntegration\Enums\EmailCategory;
@@ -210,6 +211,26 @@ final class Email extends Model
         }
 
         return $query->selectRaw('exists (select 1 from emailables where emailables.email_id = emails.id) as is_linked_to_record');
+    }
+
+    /**
+     * @param  Builder<Email>  $query
+     * @return Builder<Email>
+     */
+    #[Scope]
+    protected function onRecord(Builder $query, Company|People|Opportunity $record): Builder
+    {
+        return $query
+            ->whereExists(fn (QueryBuilder $link): QueryBuilder => $link
+                ->from('emailables')
+                ->whereColumn('emailables.email_id', $query->qualifyColumn('id'))
+                ->where('emailables.emailable_type', $record->getMorphClass())
+                ->where('emailables.emailable_id', $record->getKey()))
+            ->whereNotExists(fn (QueryBuilder $suppression): QueryBuilder => $suppression
+                ->from('email_link_suppressions')
+                ->whereColumn('email_link_suppressions.email_id', $query->qualifyColumn('id'))
+                ->where('email_link_suppressions.emailable_type', $record->getMorphClass())
+                ->where('email_link_suppressions.emailable_id', $record->getKey()));
     }
 
     /**

@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Queries;
 
 use App\Enums\CrmEntity;
+use App\Models\Company;
+use App\Models\Opportunity;
+use App\Models\People;
 use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Queries\CustomFieldFilterSchema;
@@ -287,6 +290,19 @@ final readonly class ConversationsQuery
             ->get();
     }
 
+    /** @return EloquentCollection<int, Email> */
+    public function copies(User $viewer, string $conversationKey): EloquentCollection
+    {
+        Gate::forUser($viewer)->authorize('viewAny', Email::class);
+
+        return Email::query()
+            ->withGlobalScope('visible', new VisibleEmailScope($viewer))
+            ->where('emails.workspace_id', $viewer->current_workspace_id)
+            ->where('emails.conversation_key', $conversationKey)
+            ->orderBy('emails.id')
+            ->get();
+    }
+
     // A link may name any copy of a message; the viewer opens their own preferred copy of it.
     public function viewerCopy(User $viewer, Email $email): ?Email
     {
@@ -455,14 +471,24 @@ final readonly class ConversationsQuery
                 ->whereLike($type->titleColumn(), LikePattern::escape($name).'%')
                 ->orderBy($type->titleColumn())
                 ->orderBy((new $model)->getQualifiedKeyName())
-                ->limit(CustomFieldFilterSchema::MAX_LIST_VALUES))
-            ->select((new $model)->getQualifiedKeyName());
+                ->limit(CustomFieldFilterSchema::MAX_LIST_VALUES));
+
+        // One named record is a record's mail, which Email::onRecord() owns; a set of records matches stored links.
+        if (count($filters->recordIds) === 1) {
+            $record = $records->first();
+
+            $record instanceof Company || $record instanceof People || $record instanceof Opportunity
+                ? $query->onRecord($record)
+                : $query->whereRaw('false');
+
+            return;
+        }
 
         $query->whereExists(fn (BaseBuilder $link): BaseBuilder => $link
             ->from('emailables')
             ->whereColumn('emailables.email_id', 'emails.id')
             ->where('emailables.emailable_type', $type->value)
-            ->whereIn('emailables.emailable_id', $records->toBase()));
+            ->whereIn('emailables.emailable_id', $records->select((new $model)->getQualifiedKeyName())->toBase()));
     }
 
     /**
