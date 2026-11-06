@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Filament\Pages\Dashboard;
+use App\Filament\Resources\CompanyResource;
+use App\Filament\Resources\OpportunityResource;
+use App\Filament\Resources\PeopleResource;
 use App\Models\Company;
 use App\Models\People;
 use App\Models\Task;
@@ -27,6 +31,22 @@ function phoneCompaniesPage(User $user): mixed
         ->resize(393, 852)
         ->navigate("/app/{$workspace->slug}/companies");
 }
+
+it('puts Home, People, Companies and Opportunities in the tab bar', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+
+    $labels = phoneCompaniesPage($user)
+        ->script("[...document.querySelectorAll('.fi-bottom-nav a span')].map((label) => label.textContent.trim())");
+
+    expect($labels)->toBe([
+        Dashboard::getNavigationLabel(),
+        PeopleResource::getNavigationLabel(),
+        CompanyResource::getNavigationLabel(),
+        OpportunityResource::getNavigationLabel(),
+    ]);
+});
 
 it('shows a tab bar on phones whose More button opens the sidebar', function (): void {
     $this->withVite();

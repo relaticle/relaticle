@@ -1,8 +1,13 @@
-{{-- The phone tab bar: the sidebar's first four items, then More, which opens the sidebar for the rest. --}}
+{{-- The phone tab bar: four fixed destinations, then More, which opens the sidebar for the rest. --}}
 @php
-    $items = collect(filament()->getNavigation())
-        ->flatMap(fn (\Filament\Navigation\NavigationGroup $group): iterable => $group->getItems())
-        ->take(4);
+    $items = collect([
+        \App\Filament\Pages\Dashboard::class,
+        \App\Filament\Resources\PeopleResource::class,
+        \App\Filament\Resources\CompanyResource::class,
+        \App\Filament\Resources\OpportunityResource::class,
+    ])
+        ->filter(fn (string $destination): bool => $destination::canAccess())
+        ->flatMap(fn (string $destination): array => $destination::getNavigationItems());
 
     $tenantRoot = rtrim((string) filament()->getUrl(filament()->getTenant()), '/');
 
