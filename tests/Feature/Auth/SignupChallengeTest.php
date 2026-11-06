@@ -280,6 +280,29 @@ it('refuses a signup from a tor exit relay at the email step', function (): void
     expect(User::where('email', $email)->exists())->toBeFalse();
 });
 
+it('reports a signup refused over tor to analytics', function (): void {
+    enableSignupChallengeWithoutTurnstile();
+    Http::fake([TorExitNodes::SOURCE_URL => Http::response(torExitListBody('127.0.0.1'))]);
+    $this->artisan('tor:update-exit-nodes')->assertSuccessful();
+
+    livewire(Login::class)
+        ->fillForm(['email' => 'jane-tor-event-'.uniqid().'@gmail.com'])
+        ->call('authenticate')
+        ->assertDispatched('analytics-event', name: 'signup_refused_tor')
+        ->assertNotDispatched('analytics-event', name: 'signup_started');
+});
+
+it('reports a refused challenge to analytics', function (): void {
+    enableSignupChallenge();
+    fakeSiteverify(false, ['invalid-input-response']);
+
+    startSignup('jane-challenge-event-'.uniqid().'@gmail.com')
+        ->fillForm(['password' => 'Password123!', 'cf_turnstile_response' => 'a-bad-token'])
+        ->call('authenticate')
+        ->assertDispatched('analytics-event', name: 'signup_refused_challenge')
+        ->assertNotDispatched('analytics-event', name: 'signup_refused_password');
+});
+
 it('refuses a signup whose address joined the tor exit list after the email step', function (): void {
     enableSignupChallengeWithoutTurnstile();
     Http::fake([TorExitNodes::SOURCE_URL => Http::sequence()

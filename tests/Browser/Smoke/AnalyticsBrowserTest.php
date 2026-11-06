@@ -86,6 +86,39 @@ it('tracks live discovery immediately and distinguishes explicit signup and logi
         ->assertNoJavaScriptErrors();
 });
 
+it('tracks a social sign-in click on the login page', function (string $provider): void {
+    config(["services.{$provider}.client_id" => "test-{$provider}-client"]);
+
+    $page = $this->visit('/app/login');
+    $page->script(analyticsBrowserTracker());
+    $page->script(analyticsBrowserScript());
+    $page->script(<<<JS
+        const button = document.querySelector('a[href$="/auth/redirect/{$provider}"]');
+        button.addEventListener('click', event => event.preventDefault());
+        button.click();
+        JS);
+
+    $page->assertScript('window.analyticsCalls.map(call => call.name).filter(Boolean)', ["{$provider}_auth_started"])
+        ->assertNoJavaScriptErrors();
+})->with(['google', 'microsoft']);
+
+it('tracks a refused signup on the login page', function (): void {
+    $page = $this->visit('/app/login');
+    $page->script(analyticsBrowserTracker());
+    $page->script(analyticsBrowserScript());
+
+    $page->type('[id="form.email"]', 'jane-refused-'.uniqid().'@gmail.com')
+        ->click('button[type="submit"]')
+        ->assertVisible('[id="form.password"]')
+        ->assertScript(asyncAlpineComponentsLoaded())
+        ->type('[id="form.password"]', 'short')
+        ->click('button[type="submit"]')
+        ->assertSee(__('validation.min.string', ['attribute' => 'password', 'min' => 8]));
+
+    $page->assertScript('window.analyticsCalls.map(call => call.name).filter(Boolean)', ['signup_started', 'signup_refused_password'])
+        ->assertNoJavaScriptErrors();
+});
+
 it('names the homepage capabilities signup click by its own placement', function (): void {
     $script = analyticsBrowserScript(false);
     $page = $this->visit('/');
