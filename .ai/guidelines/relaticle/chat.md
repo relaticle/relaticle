@@ -36,8 +36,8 @@ production: message ordering, approval races, duplicate proposals.
   `SendEmailTool` takes one email per call, and `PendingAction::isEmailSend()` makes
   `approveStep()` refuse a batch of them. An invitation step may hold several
   addresses, and its button sends them all. `tests/Feature/Chat/EmailToolsTest.php`
-  and `tests/Feature/Chat/InviteWorkspaceMemberToolTest.php` fail when "Approve all"
-  or its shortcut sends either.
+  and `tests/Feature/Chat/InviteWorkspaceMemberToolTest.php` fail when approving the
+  plan, or its shortcut, sends either.
 - `Relaticle\Chat\Enums\ProposalEntity` owns every fact that follows from what a proposal
   writes: its title key, its core fields, its verbs, and whether it is approved on its own.
   `PendingAction::entity_type` is cast to it. A new kind of proposal is a new case, and every

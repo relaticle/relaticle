@@ -230,37 +230,119 @@ describe('an invitation proposal', function (): void {
     });
 
     it('labels its own button with the invitations still to send', function (): void {
-        $task = ($this->planTask)();
         $invite = ($this->planInvite)(['alex@example.com', 'jamie@example.com', 'sam@example.com']);
 
-        openInvitationDock($task)
-            ->assertSeeHtml('data-proposal-send-step="'.$invite->getKey().'"')
-            ->assertSee('Send 3 invitations')
+        $dock = openInvitationDock($invite)
+            ->assertSee('alex@example.com')
+            ->assertSee('jamie@example.com')
+            ->assertSee('sam@example.com')
+            ->assertSeeHtmlInOrder(['wire:click="createCurrent"', '<span>Send 3 invitations</span>'])
+            ->assertSee("Don't send")
             ->assertDontSee('3 records')
-            ->call('skipItem', (string) $invite->getKey(), 0)
-            ->assertSee('Send 2 invitations');
+            ->assertDontSeeHtml('data-proposal-shortcut')
+            ->call('toggleLeftOutRow', (string) $invite->getKey(), 0)
+            ->assertSeeHtml('<span>Send 2 invitations</span>');
+
+        expect(substr_count($dock->html(), 'data-proposal-batch-row'))->toBe(3);
     });
 
-    it('heads a paginated card with the one invitation its button sends', function (): void {
+    it('lists an invitation step inside a plan as a follow-up line with no button of its own', function (): void {
+        $task = ($this->planTask)();
+        $invite = ($this->planInvite)(['alex@example.com', 'jamie@example.com']);
+
+        openInvitationDock($task)
+            ->assertSeeText('Then invite')
+            ->assertSeeText('you approve it on its own, next')
+            ->assertDontSeeHtml('data-proposal-send-step="'.$invite->getKey().'"');
+    });
+
+    it('sends every address of a standalone card with its footer button', function (): void {
+        Mail::fake();
         $invite = ($this->planInvite)(['alex@example.com', 'jamie@example.com']);
 
         openInvitationDock($invite)
-            ->assertSee('Invite alex@example.com as Member')
-            ->assertDontSee('Invite 2 teammates')
-            ->call('nextItem')
-            ->assertSee('Invite jamie@example.com as Member')
-            ->assertDontSee('Invite alex@example.com as Member');
+            ->assertDontSeeHtml('wire:click="nextItem"')
+            ->call('createCurrent')
+            ->assertHasNoErrors();
+
+        expect(WorkspaceInvitation::query()->orderBy('email')->pluck('email')->all())->toBe(['alex@example.com', 'jamie@example.com'])
+            ->and($invite->fresh()->status)->toBe(PendingActionStatus::Approved);
+
+        Mail::assertQueued(WorkspaceInvitationMail::class, 2);
     });
 
-    it('counts only the steps approve all will approve, and says some steps have their own button', function (): void {
+    it('sends only the addresses left in when the standalone card has one left out', function (): void {
+        Mail::fake();
+        $invite = ($this->planInvite)(['alex@example.com', 'jamie@example.com']);
+
+        openInvitationDock($invite)
+            ->call('toggleLeftOutRow', (string) $invite->getKey(), 1)
+            ->assertSet('leftOutRows', [(string) $invite->getKey() => [1]])
+            ->call('createCurrent')
+            ->assertHasNoErrors();
+
+        expect(WorkspaceInvitation::query()->pluck('email')->all())->toBe(['alex@example.com'])
+            ->and($invite->fresh()->status)->toBe(PendingActionStatus::Approved)
+            ->and($invite->fresh()->result_data['items'][1]['status'])->toBe('rejected');
+
+        Mail::assertQueued(WorkspaceInvitationMail::class, 1);
+    });
+
+    it('sends nothing when every address of the standalone card is left out', function (): void {
+        Mail::fake();
+        $invite = ($this->planInvite)(['alex@example.com', 'jamie@example.com']);
+
+        openInvitationDock($invite)
+            ->call('toggleLeftOutRow', (string) $invite->getKey(), 0)
+            ->call('toggleLeftOutRow', (string) $invite->getKey(), 1)
+            ->call('createCurrent')
+            ->assertSet('pendingActionId', null);
+
+        expect($invite->fresh()->status)->toBe(PendingActionStatus::Rejected);
+
+        Mail::assertNothingQueued();
+    });
+
+    it('keeps an invitation step inside a plan out of row leave-out', function (): void {
+        $task = ($this->planTask)();
+        $invite = ($this->planInvite)(['alex@example.com', 'jamie@example.com']);
+
+        openInvitationDock($task)
+            ->call('toggleLeftOutRow', (string) $invite->getKey(), 1)
+            ->assertSet('leftOutRows', []);
+    });
+
+    it('names the invitation that could not be sent when a later one in its step fails', function (): void {
+        $sent = 0;
+        Mail::shouldReceive('to')->andReturnSelf();
+        Mail::shouldReceive('queue')->andReturnUsing(function () use (&$sent): void {
+            if (++$sent === 2) {
+                throw new TransportException('Connection could not be established with host "smtp.internal.test:587"');
+            }
+        });
+
+        $invite = ($this->planInvite)(['alex@example.com', 'jamie@example.com']);
+
+        $component = openInvitationDock($invite)
+            ->call('createCurrent')
+            ->assertDispatched('proposal:resolve-failed');
+
+        expect($component->errors()->first('resolve'))->toContain('jamie@example.com')
+            ->and($component->errors()->first('resolve'))->not->toContain('alex@example.com')
+            ->and($component->errors()->first('resolve'))->not->toContain('smtp.internal.test')
+            ->and(WorkspaceInvitation::query()->pluck('email')->all())->toBe(['alex@example.com']);
+    });
+
+    it('counts only the records approve will write, and announces the invitation as a follow-up', function (): void {
         ($this->planTask)('First task');
         ($this->planTask)('Second task');
         $invite = ($this->planInvite)();
 
         openInvitationDock($invite)
-            ->assertSee('Approve all 2')
-            ->assertSee('Send invitation')
-            ->assertSee(__('Some steps have their own button'))
+            ->assertSee('2 changes')
+            ->assertSee('Approve 2 changes')
+            ->assertSee('Then invite')
+            ->assertSee('you approve it on its own, next')
             ->assertDontSee(__('Approved together, in order'));
     });
 

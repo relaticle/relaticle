@@ -226,19 +226,19 @@
                                 <p class="max-w-[85%] rounded-2xl rounded-br-md bg-gray-100 px-3.5 py-2.5 text-sm leading-relaxed text-gray-900 dark:bg-white/10 dark:text-gray-100">{{ __('Move the Northwind renewal to Negotiation') }}</p>
                             </div>
                             <div class="border-rail rounded-lg border">
-                                <div class="border-rail flex items-center justify-between gap-3 border-b px-3 py-2">
-                                    <span class="text-sm font-medium text-gray-950 dark:text-white">{{ __('Northwind renewal') }}</span>
-                                    <span class="type-label text-gray-500 dark:text-gray-400">{{ __('Update') }}</span>
-                                </div>
+                                <p class="border-rail truncate border-b px-3 py-2 text-sm">
+                                    <span class="text-gray-500 dark:text-gray-400">{{ __('Update') }}</span>
+                                    <span class="font-semibold text-gray-950 dark:text-white">{{ __('Northwind renewal') }}</span>
+                                </p>
                                 <p class="flex items-center gap-2 px-3 py-2 text-sm">
                                     <span class="text-gray-500 dark:text-gray-400">{{ __('Stage') }}</span>
                                     <span class="text-gray-500 line-through dark:text-gray-400">{{ __('Proposal/Price Quote') }}</span>
                                     <x-ri-arrow-right-line class="size-3.5 text-gray-400" aria-hidden="true"/>
                                     <span class="font-medium text-gray-950 dark:text-white">{{ __('Negotiation/Review') }}</span>
                                 </p>
-                                <div class="border-rail flex gap-2 border-t px-3 py-2">
-                                    <span class="inline-flex h-7 items-center rounded-md bg-primary px-3 text-xs font-semibold text-white">{{ __('Approve') }}</span>
-                                    <span class="border-rail inline-flex h-7 items-center rounded-md border px-3 text-xs font-medium text-gray-700 dark:text-gray-300">{{ __('Reject') }}</span>
+                                <div class="border-rail flex items-center justify-end gap-2 border-t px-3 py-2">
+                                    <span class="inline-flex h-7 items-center rounded-md px-2.5 text-xs font-medium text-gray-600 dark:text-gray-300">{{ __('Discard') }}</span>
+                                    <x-cloud::marketing.rela-approve tabindex="-1" :label="__('Approve')"/>
                                 </div>
                             </div>
                         </div>
@@ -247,7 +247,7 @@
                 <div class="border-rail border-t p-6 md:p-10">
                     <x-cloud::marketing.eyebrow class="mb-4">{{ __('Through :name', ['name' => $assistantName]) }}</x-cloud::marketing.eyebrow>
                     <h3 class="text-lg font-medium text-gray-950 dark:text-white">{{ __('The built-in assistant asks first') }}</h3>
-                    <p class="type-prose mt-2 text-gray-500 dark:text-gray-400">{{ __(':name proposes every change as a card and waits. You approve or reject each record before anything is written, and an unanswered proposal expires on its own.', ['name' => $assistantName]) }}</p>
+                    <p class="type-prose mt-2 text-gray-500 dark:text-gray-400">{{ __(':name proposes every change as a card and waits. You approve or discard it before anything is written, and an unanswered proposal expires on its own.', ['name' => $assistantName]) }}</p>
                 </div>
             </div>
         </div>

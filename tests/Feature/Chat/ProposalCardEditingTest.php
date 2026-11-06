@@ -395,32 +395,33 @@ it('rebuilds a company record (with account owner + custom field) without diverg
         ->and(collect($fields)->pluck('new')->all())->toBe(collect($stored)->pluck('new')->all());
 });
 
-it('ignores skipItem while a field edit is open', function (): void {
+it('points the editor at the batch row whose field is edited', function (): void {
     Bus::fake();
     $action = ProposalCardFixture::batchCompany($this->user, ['Alpha', 'Beta']);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
-        ->call('editField', 'name')
-        ->call('skipItem', (string) $action->getKey(), 1)
-        ->assertNotDispatched('proposal:resolved');
-
-    expect($action->fresh()->result_data)->toBeNull();
+        ->call('editField', 'name', (string) $action->getKey(), 1)
+        ->assertSet('cursor', 1)
+        ->assertSet('editingFieldCode', 'name')
+        ->assertSet('editingStepId', (string) $action->getKey());
 });
 
-it('shrinks the pagination count as records are skipped and hides it for the last one', function (): void {
+it('shrinks the approvable count as rows are left out and shows no paging', function (): void {
     Bus::fake();
     $action = ProposalCardFixture::batchCompany($this->user, ['Alpha', 'Beta', 'Gamma']);
+    $stepId = (string) $action->getKey();
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
-        ->assertSee('1/3')
-        ->call('skipItem', (string) $action->getKey(), 2)
-        ->assertSee('1/2')
-        ->assertDontSee('Gamma')
-        ->call('skipItem', (string) $action->getKey(), 1)
-        ->assertSee('Create')
-        ->assertDontSee('1/1');
+        ->assertViewHas('approvableRecordCount', 3)
+        ->assertDontSee('1/3')
+        ->call('toggleLeftOutRow', $stepId, 2)
+        ->assertViewHas('approvableRecordCount', 2)
+        ->call('toggleLeftOutRow', $stepId, 1)
+        ->assertViewHas('approvableRecordCount', 1)
+        ->assertSee('Gamma')
+        ->assertSeeText('Approve 1 change');
 });
 
 it('opens no edit form on an invitation card', function (): void {

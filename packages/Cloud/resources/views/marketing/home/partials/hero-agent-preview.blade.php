@@ -402,7 +402,6 @@
 
                 this.find('.mcp-dock-update').classList.toggle('hidden', isCreate);
                 this.find('.mcp-dock-create').classList.toggle('hidden', !isCreate);
-                this.find('.mcp-dock-label').textContent = isCreate ? 'Create' : 'Save changes';
             },
 
             setSendActive(composer, active) {

@@ -29,17 +29,17 @@ function aiFocusState(mixed $page): mixed
         JS);
 }
 
-it('decides a batch one record at a time and reports what it saved', function (): void {
+it('approves a batch with one record left out and reports what it moved', function (): void {
     $page = $this->visit('/ai');
     $page->wait(1);
 
-    expect(aiPlayground($page, "root.querySelector('[data-ai-batch-record]').innerText"))->toBe('Kovra renewal');
+    expect(aiPlayground($page, "[...root.querySelectorAll('[data-ai-batch-record]')].map((row) => row.innerText.replace(/\\s+/g, ' ').trim())"))
+        ->toBe(['Kovra renewal Qualification', 'Kovra add-on seats Proposal/Price Quote', 'Kovra platform expansion Qualification']);
 
-    $page->click('[data-ai-batch-save]');
+    $page->click('[aria-label="Leave out Kovra add-on seats"]');
 
-    expect(aiPlayground($page, "root.querySelector('[data-ai-batch-record]').innerText"))->toBe('Kovra add-on seats');
+    expect(aiPlayground($page, "root.querySelector('[data-ai-batch-save]').innerText.trim()"))->toStartWith('Approve 2 changes');
 
-    $page->click('[data-ai-scenario="batch"] button:text-is("Discard")');
     $page->click('[data-ai-batch-save]');
     $page->wait(0.5);
 
@@ -47,10 +47,29 @@ it('decides a batch one record at a time and reports what it saved', function ()
         ->and(aiPlayground($page, "getComputedStyle(root.querySelector('[data-ai-batch-card]')).visibility"))->toBe('hidden')
         ->and(aiPlayground($page, "root.querySelector('[data-ai-scenario=\"batch\"] p[x-text]').innerText"))
         ->toBe('Done. Moved 2 of 3 opportunities to Negotiation/Review.')
-        ->and(aiPlayground($page, "[...root.querySelectorAll('[data-ai-batch-decided] li')].map((item) => item.innerText.replace(/\\s+/g, ' ').trim())"))
-        ->toBe(['Kovra renewal Updated', 'Kovra add-on seats Skipped', 'Kovra platform expansion Updated'])
+        ->and(aiPlayground($page, "[...root.querySelectorAll('[data-ai-batch-decided] li')].filter((item) => item.offsetParent !== null).map((item) => item.innerText.replace(/\\s+/g, ' ').trim())"))
+        ->toBe(['Moved 2 opportunities to Negotiation/Review', 'Kovra add-on seats · left out'])
         ->and(aiPlayground($page, "[...root.querySelectorAll('[data-ai-deal-stage]')].map((stage) => stage.innerText)"))
         ->toBe(['Negotiation/Review', 'Proposal/Price Quote', 'Negotiation/Review']);
+
+    $page->assertNoJavaScriptErrors();
+});
+
+it('counts a single kept opportunity in the singular', function (): void {
+    $page = $this->visit('/ai');
+    $page->wait(1);
+
+    $page->click('[aria-label="Leave out Kovra add-on seats"]');
+    $page->click('[aria-label="Leave out Kovra platform expansion"]');
+
+    expect(aiPlayground($page, "root.querySelector('[data-ai-batch-save]').innerText.trim()"))->toStartWith('Approve 1 change')
+        ->and(aiPlayground($page, "root.querySelector('[data-ai-batch-save]').innerText.trim()"))->not->toContain('changes');
+
+    $page->click('[data-ai-batch-save]');
+    $page->wait(0.5);
+
+    expect(aiPlayground($page, "root.querySelector('[data-ai-batch-decided] p').innerText.trim()"))->toBe('Applied 1 change · just now')
+        ->and(aiPlayground($page, "root.querySelector('[data-ai-batch-decided] li').innerText.replace(/\\s+/g, ' ').trim()"))->toBe('Moved 1 opportunity to Negotiation/Review');
 
     $page->assertNoJavaScriptErrors();
 });
@@ -62,7 +81,7 @@ it('creates a person with only the fields the visitor keeps', function (): void 
 
     $page->click('#ai-ask-create');
     $page->wait(1);
-    $page->click('[aria-label="Include Company"]');
+    $page->click('[aria-label="Leave out Company"]');
     $page->click('[data-ai-create-confirm]');
 
     expect(aiPlayground($page, "root.querySelector('[data-ai-scenario=\"create\"] p[x-text]').innerText"))->toBe('Sarah Chen has been created.')
@@ -90,8 +109,6 @@ it('keeps focus on a visible result once the visitor has decided', function (): 
     $page = $this->visit('/ai');
     $page->wait(1);
 
-    $page->click('[data-ai-batch-save]');
-    $page->click('[data-ai-batch-save]');
     $page->click('[data-ai-batch-save]');
     $page->wait(0.6);
 

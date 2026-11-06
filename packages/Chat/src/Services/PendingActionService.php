@@ -48,6 +48,7 @@ use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Events\PendingActionResolved;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Queries\ProposalReceiptsQuery;
 use Relaticle\Chat\Support\ProposalLabel;
 use Relaticle\Chat\Support\ProposalOwnership;
 use Relaticle\Chat\Support\ProposalPayload;
@@ -462,6 +463,9 @@ final readonly class PendingActionService
                 status: $status,
                 index: $index,
                 finalized: $finalized,
+                receipts: $finalized
+                    ? resolve(ProposalReceiptsQuery::class)->forPlanBroadcastOf($pendingAction)
+                    : resolve(ProposalReceiptsQuery::class)->forStep($pendingAction),
             ));
         } catch (Throwable $e) {
             report($e);

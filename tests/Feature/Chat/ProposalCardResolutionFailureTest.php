@@ -31,7 +31,7 @@ beforeEach(function (): void {
     Filament::setTenant($this->workspace);
 });
 
-it('keeps a batch open when the active record fails and keeps the earlier commits', function (): void {
+it('keeps a batch open when a record fails and keeps the earlier commits', function (): void {
     Bus::fake();
     $company = Company::factory()->for($this->workspace)->create(['name' => 'Old name']);
 
@@ -61,15 +61,15 @@ it('keeps a batch open when the active record fails and keeps the earlier commit
         'expires_at' => now()->addMinutes(15),
     ]);
 
-    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+    $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->call('createCurrent')
-        ->assertDispatched('proposal:resolved')
-        ->call('createCurrent')
-        ->assertDispatched('proposal:resolve-failed');
+        ->assertDispatched('proposal:resolve-failed')
+        ->assertNotDispatched('proposal:resolved');
 
-    // The first record committed; the vanished one failed its own approval
-    // without undoing it, and the batch stays open on the failing record.
+    expect($component->errors()->first('resolve'))->toContain('Update company "Ghost"')
+        ->and($component->errors()->first('resolve'))->not->toContain('Update 2 companies');
+
     expect($company->fresh()->name)->toBe('New name')
         ->and($action->fresh()->status)->toBe(PendingActionStatus::Pending)
         ->and($action->fresh()->result_data['items'][0]['status'] ?? null)->toBe('approved');
@@ -104,14 +104,14 @@ it('resolves a delete batch per item through the component, deleting only approv
 
     $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
-        ->call('skipItem', (string) $action->getKey(), 1); // keep task 1
+        ->call('toggleLeftOutRow', (string) $action->getKey(), 1); // keep task 1
 
-    // The batch is not yet finalized: item 1 is skipped, item 0 still pending.
+    // Leaving a row out decides nothing until Approve.
     expect(Task::query()->whereKey($tasks[1]->getKey())->exists())->toBeTrue()
         ->and(Task::query()->whereKey($tasks[0]->getKey())->exists())->toBeTrue()
         ->and($action->fresh()->status)->toBe(PendingActionStatus::Pending);
 
-    $component->call('createCurrent'); // delete the remaining item 0 -> finalize
+    $component->call('createCurrent'); // delete the rows still in -> finalize
 
     expect($action->fresh()->status)->toBe(PendingActionStatus::Approved)
         ->and(Task::query()->whereKey($tasks[0]->getKey())->exists())->toBeFalse()

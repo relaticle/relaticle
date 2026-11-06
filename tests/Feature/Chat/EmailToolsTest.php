@@ -866,7 +866,6 @@ it('writes the whole draft when the card is told to leave fields out', function 
 
     openChatEmailDock($pending)
         ->call('toggleField', 'to')
-        ->call('toggleAllFields')
         ->set('excludedFields', ['to', 'cc', 'body', 'include_signature'])
         ->call('createCurrent')
         ->assertNotDispatched('proposal:resolve-failed');
@@ -1166,6 +1165,15 @@ it('approves a send card from the dock without a link or an error', function ():
     expect(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(1);
 });
 
+it('marks a lone email send as a risky primary', function (): void {
+    $pending = pendingChatEmail(proposeChatEmails($this->viewer, SendEmailTool::class, [chatSendRecord($this->viewerAccount)]));
+
+    $this->actingAs($this->viewer);
+    Filament::setTenant($this->workspace);
+
+    expect(openChatEmailDock($pending)->instance()->primaryIsRisky())->toBeTrue();
+});
+
 function proposeChatPlanTask(User $user, string $conversationId, string $turnId, string $title): PendingAction
 {
     auth()->setUser($user);
@@ -1273,7 +1281,7 @@ describe('a send inside a plan', function (): void {
             ->assertSee('Second paragraph of the message.');
     });
 
-    it('has its own Send button while a task step keeps the icon', function (): void {
+    it('lists a send as a follow-up line with no button of its own beside a task', function (): void {
         $task = ($this->planTask)();
         $send = ($this->planSend)();
 
@@ -1282,40 +1290,88 @@ describe('a send inside a plan', function (): void {
 
         expect($views['emails']['needsOwnApproval'])->toBeTrue()
             ->and($views['task']['needsOwnApproval'])->toBeFalse()
-            ->and(substr_count($dock->html(), 'data-proposal-send-step'))->toBe(1);
+            ->and(substr_count($dock->html(), 'data-proposal-send-step'))->toBe(0);
 
-        $dock->assertSeeHtml('data-proposal-send-step="'.$send->getKey().'"');
+        $dock->assertSeeText('Then email')
+            ->assertSeeText('you approve it on its own, next')
+            ->assertDontSeeHtml('data-proposal-send-step="'.$send->getKey().'"');
     });
 
-    it('counts only the steps approve all will approve, and says some steps have their own button', function (): void {
+    it('counts only the records approve will write, and announces the send as a follow-up', function (): void {
         ($this->planTask)('First task');
         ($this->planTask)('Second task');
         $send = ($this->planSend)();
 
         openChatEmailDock($send)
-            ->assertSee('Approve all 2')
-            ->assertSee(__('Some steps have their own button'))
-            ->assertDontSee(__('Approved together, in order'));
+            ->assertSeeText('2 changes')
+            ->assertSeeText('Approve 2 changes')
+            ->assertSeeText('Then email')
+            ->assertDontSeeText('Approved together, in order');
     });
 
-    it('names a single approvable step beside a send without calling it all', function (): void {
+    it('names a single approvable record beside a send by its entity and keeps the shortcut', function (): void {
         $task = ($this->planTask)();
-        ($this->planSend)();
+        ($this->planSend)('Renewal options for Figma');
 
         openChatEmailDock($task)
-            ->assertSee('Approve 1 step')
-            ->assertDontSee('Approve all');
+            ->assertSeeText('Approve task')
+            ->assertSeeTextInOrder(['Then email', 'Renewal options for Figma'])
+            ->assertSeeText('you approve it on its own, next')
+            ->assertSeeHtml('data-proposal-shortcut')
+            ->assertDontSeeText('Approve all');
     });
 
-    it('offers no approve all for a plan made only of sends', function (): void {
+    it('shows the email alone with its own decision and no shortcut once the plan is approved', function (): void {
+        $task = ($this->planTask)();
+        ($this->planSend)('Renewal options for Figma');
+
+        openChatEmailDock($task)
+            ->call('approveAll')
+            ->assertSeeText('Renewal options for Figma')
+            ->assertSeeText('Send email')
+            ->assertSeeText("Don't send")
+            ->assertSeeText('Own approval')
+            ->assertDontSeeHtml('data-proposal-shortcut')
+            ->assertDontSeeHtml('<kbd');
+    });
+
+    it('docks the first send alone when a plan is made only of sends, the rest waiting', function (): void {
         $first = ($this->planSend)('First');
-        ($this->planSend)('Second');
+        $second = ($this->planSend)('Second');
 
         $dock = openChatEmailDock($first)
-            ->assertSee('Discard all')
-            ->assertDontSee('Approve all');
+            ->assertSeeText('First')
+            ->assertDontSeeText('Second')
+            ->assertSeeText('Send email')
+            ->assertSeeText("Don't send")
+            ->assertSeeText('Own approval')
+            ->assertDontSeeText('Discard all')
+            ->assertDontSeeHtml('data-proposal-shortcut')
+            ->assertDontSeeHtml('<kbd')
+            ->assertSet('activeStepId', (string) $first->getKey())
+            ->dispatch('proposal:create-current', context: 'conversation');
 
-        expect(substr_count($dock->html(), 'data-proposal-send-step'))->toBe(2);
+        expect($first->fresh()->status)->toBe(PendingActionStatus::Pending);
+
+        $dock->call('createCurrent')
+            ->assertSeeText('Second')
+            ->assertSet('activeStepId', (string) $second->getKey());
+
+        expect($first->fresh()->status)->toBe(PendingActionStatus::Approved)
+            ->and($second->fresh()->status)->toBe(PendingActionStatus::Pending);
+    });
+
+    it('declines only the docked send and leaves the next one waiting', function (): void {
+        $first = ($this->planSend)('First');
+        $second = ($this->planSend)('Second');
+
+        openChatEmailDock($first)
+            ->call('discardCurrent')
+            ->assertSeeText('Second')
+            ->assertSet('activeStepId', (string) $second->getKey());
+
+        expect($first->fresh()->status)->toBe(PendingActionStatus::Rejected)
+            ->and($second->fresh()->status)->toBe(PendingActionStatus::Pending);
     });
 
     it('is not sent by the keyboard shortcut on a plan', function (): void {
@@ -1402,17 +1458,16 @@ describe('a send inside a plan', function (): void {
         openChatEmailDock(($this->planTask)())->assertSeeHtml('<kbd');
     });
 
-    it('disables its Send button while a field of another step is being edited', function (): void {
+    it('blocks the plan primary while a field of a step is being edited', function (): void {
         $task = ($this->planTask)();
-        $send = ($this->planSend)();
+        ($this->planSend)();
 
         $dock = openChatEmailDock($task);
 
-        expect($dock->html())->not->toMatch('/data-proposal-send-step="'.$send->getKey().'"\s+disabled/');
+        $dock->assertDontSeeHtml('Finish editing the field first');
 
-        $dock->call('editField', 'title', (string) $task->getKey());
-
-        expect($dock->html())->toMatch('/data-proposal-send-step="'.$send->getKey().'"\s+disabled/');
+        $dock->call('editField', 'title', (string) $task->getKey())
+            ->assertSeeHtml('Finish editing the field first');
     });
 
     it('names its own step when a draft step fails after an earlier approval', function (): void {
@@ -1608,18 +1663,18 @@ describe('an email card', function (): void {
         $dock->assertSeeHtmlInOrder(['wire:click="createCurrent"', "<span>{$label}</span>"])
             ->assertDontSeeHtml('<span>Create</span>');
     })->with([
-        'a send' => ['sendCard', 'Send'],
-        'a draft' => ['draftCard', 'Save draft'],
+        'a send' => ['sendCard', 'Send email'],
+        'a draft' => ['draftCard', 'Approve'],
     ]);
 
-    it('labels the decision of a draft batch with the draft verb', function (): void {
+    it('counts a draft batch as the changes it will save', function (): void {
         $proposal = proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [
             chatDraftRecord($this->viewerAccount, ['subject' => 'First']),
             chatDraftRecord($this->viewerAccount, ['subject' => 'Second']),
         ]);
 
         openChatEmailDock(pendingChatEmail($proposal))
-            ->assertSeeHtmlInOrder(['wire:click="createCurrent"', '<span>Save draft</span>'])
+            ->assertSeeHtmlInOrder(['wire:click="approveAll"', '<span>Approve 2 changes</span>'])
             ->assertDontSeeHtml('<span>Create</span>');
     });
 
@@ -1884,6 +1939,27 @@ describe('a saved draft or a queued email', function (): void {
 
         expect($refused['error'])->toContain('No draft of yours has that ID')
             ->and(Email::query()->pluck('id')->all())->toBe([$teammateDraft->getKey()]);
+    });
+
+    it('words a draft delete as a delete with no shortcut', function (): void {
+        $draft = ($this->draftOf)($this->viewer, $this->viewerAccount);
+        $card = pendingChatEmail(proposeChatEmails($this->viewer, DeleteEmailDraftTool::class, [['draft_id' => $draft->getKey()]]));
+
+        openChatEmailDock($card)
+            ->assertSeeText('Delete draft')
+            ->assertDontSeeHtml('data-proposal-shortcut')
+            ->assertDontSeeHtml('<kbd')
+            ->assertSeeHtml('bg-red-600');
+    });
+
+    it('deletes no draft when the shortcut event reaches the delete card', function (): void {
+        $draft = ($this->draftOf)($this->viewer, $this->viewerAccount);
+        $card = pendingChatEmail(proposeChatEmails($this->viewer, DeleteEmailDraftTool::class, [['draft_id' => $draft->getKey()]]));
+
+        openChatEmailDock($card)->dispatch('proposal:create-current', context: 'conversation');
+
+        expect($card->fresh()->status)->toBe(PendingActionStatus::Pending)
+            ->and(Email::query()->whereKey($draft->getKey())->exists())->toBeTrue();
     });
 
     it('cancels a queued email once the card is approved', function (): void {
