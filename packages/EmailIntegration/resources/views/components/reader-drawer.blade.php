@@ -193,7 +193,7 @@
                                 aria-label="{{ __('filament/pages/email-inbox.triage.actions.reopen') }}"
                                 x-bind:title="$store.shortcuts?.hint('done', {{ Js::from(__('filament/pages/email-inbox.triage.actions.reopen')) }})"
                                 x-bind:aria-keyshortcuts="$store.shortcuts?.keysFor('done')"
-                                x-on:click="window.dispatchEvent(new CustomEvent('email-triage', { detail: { verb: 'reopen', keys: {{ Js::from($triageKeys) }} } }))"
+                                x-on:click="window.dispatchEvent(new CustomEvent('email-triage', { detail: { verb: 'reopen', keys: {{ Js::from($triageKeys) }}, seen: {{ Js::from($triageSeen) }} } }))"
                             >
                                 <span class="hidden sm:inline">{{ __('filament/pages/email-inbox.triage.actions.reopen') }}</span>
                             </x-filament::button>

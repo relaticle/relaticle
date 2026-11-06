@@ -365,3 +365,26 @@ it('empties the search box on Escape and keeps the selection', function (string 
         ->assertScript('document.querySelectorAll("[data-selected=true]").length', 1)
         ->assertNoJavaScriptErrors();
 })->with(['inLightMode', 'inDarkMode']);
+
+it('undoes a reopen from the reader of a conversation the list does not show', function (string $theme): void {
+    triageBrowserInbound($this->mailbox, 'conv-linked', now()->subHour());
+    $email = Email::query()->where('conversation_key', 'conv-linked')->sole();
+    EmailConversationState::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->owner->id,
+        'conversation_key' => 'conv-linked',
+        'done_through' => $email->sent_at,
+    ]);
+
+    loginViaBrowser($this->owner, $theme)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->navigate("/app/{$this->workspace->slug}/email?view=awaiting_reply&email={$email->id}")
+        ->assertMissing('[data-conversation="conv-linked"]')
+        ->click('[data-email-reader] [data-reader-action=reopen]')
+        ->assertVisible('[data-undo-action]')
+        ->click('[data-undo-action]')
+        ->wait(1.5)
+        ->navigate("/app/{$this->workspace->slug}/email?view=done")
+        ->assertPresent('[data-conversation="conv-linked"]')
+        ->assertNoJavaScriptErrors();
+})->with(['inLightMode', 'inDarkMode']);

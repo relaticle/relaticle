@@ -1485,3 +1485,24 @@ it('marks done from the reader a conversation the list does not show', function 
     expect(conversationsPageViewKeys(ConversationView::Done))->toBe(['conv-pricing'])
         ->and(conversationsPageViewKeys(ConversationView::NeedsReply))->toBe([]);
 });
+
+it('reads one conversation row as the list shows it to a teammate below full', function (EmailPrivacyTier $tier): void {
+    $email = conversationsPageMessage($this->teammateMailbox, 'conv-shared', 'olivia@stripe.test', ['subject' => 'Security review findings', 'privacy_tier' => $tier]);
+    $this->company->emails()->attach($email->id);
+    $query = resolve(ConversationsQuery::class);
+
+    $listed = $query->paginate($this->owner, ConversationView::All, new ConversationFilters)->rows[0];
+    $row = $query->conversationRow($this->owner, 'conv-shared');
+
+    expect($row?->subject)->toBe($listed->subject)
+        ->and($row?->subject)->toBe($tier === EmailPrivacyTier::SUBJECT ? 'Security review findings' : null)
+        ->and($row?->access)->toBe($listed->access)
+        ->and($row?->viewerCopyEmailId)->toBe($listed->viewerCopyEmailId);
+})->with([EmailPrivacyTier::METADATA_ONLY, EmailPrivacyTier::SUBJECT]);
+
+it('reads no conversation row from another workspace', function (): void {
+    $outsider = User::factory()->withWorkspace()->create();
+    conversationsPageMessage(conversationsPageMailbox($outsider, 'eve@other.test'), 'conv-outside', 'brian@airbnb.test');
+
+    expect(resolve(ConversationsQuery::class)->conversationRow($this->owner, 'conv-outside'))->toBeNull();
+});
