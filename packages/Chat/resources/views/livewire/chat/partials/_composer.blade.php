@@ -23,7 +23,7 @@
             x-transition:leave="motion-safe:transition motion-safe:duration-[var(--duration-fast)] motion-safe:ease-in"
             x-transition:leave-start="motion-safe:translate-y-0 motion-safe:opacity-100"
             x-transition:leave-end="motion-safe:translate-y-1 motion-safe:opacity-0"
-            class="mb-3"
+            class="mb-3 outline-none"
         >
             {{-- No visible eyebrow above the card (Attio): the halo marks it as
                  the pending decision, and the wrapper's aria-label plus the locked

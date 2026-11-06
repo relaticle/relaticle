@@ -111,6 +111,20 @@ it('shows the locked line while a proposal waits and removes it after a decision
     $page->assertNoJavaScriptErrors();
 });
 
+it('moves focus onto a docked proposal without drawing an outline around it', function (): void {
+    $conversation = lockTestConversation();
+    lockTestCompanies($conversation, ['Northwind Traders'])[0]->update(['turn_id' => null]);
+
+    $page = ChatBrowser::logIn($conversation['user'], $conversation['workspace']->slug, $conversation['conversationId'])
+        ->resize(1440, 900)
+        ->assertSee('Northwind Traders');
+
+    $dock = LOCK_TEST_DOCK;
+
+    expect($page->script("(() => { const dock = document.querySelector('{$dock}'); dock.focus(); return { focused: document.activeElement === dock, outline: getComputedStyle(dock).outlineStyle }; })()"))
+        ->toBe(['focused' => true, 'outline' => 'none']);
+});
+
 it('approves a three-step plan with Cmd+Enter', function (): void {
     $conversation = lockTestConversation();
     $steps = lockTestCompanies($conversation, ['Northwind Traders', 'Acme Corp', 'Globex']);
