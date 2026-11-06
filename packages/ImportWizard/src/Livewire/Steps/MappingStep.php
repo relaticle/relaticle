@@ -171,7 +171,7 @@ final class MappingStep extends Component implements HasActions, HasForms
     /** @return array<string> */
     public function previewValues(string $column, int $limit = 5): array
     {
-        return array_slice($this->previews()[$column] ?? [], 0, $limit);
+        return array_slice($this->previews[$column] ?? [], 0, $limit);
     }
 
     public function canProceed(): bool
