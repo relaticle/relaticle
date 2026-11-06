@@ -20,6 +20,7 @@ use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\RelinkRecordHistoryJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailLinkSuppression;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
@@ -272,4 +273,19 @@ it('does not touch a participant already linked to another person', function ():
     ]);
 
     expect($email->people()->count())->toBe(0);
+});
+
+it('keeps an unlinked company off the mail when a new person of that company relinks it', function (): void {
+    $email = ($this->linkedEmailFrom)('ana@airbnb.com');
+    $company = resolve(CreateCompany::class)->execute($this->user, ['name' => 'Airbnb']);
+    EmailLinkSuppression::factory()->create(['email_id' => $email->getKey(), 'emailable_id' => $company->getKey()]);
+
+    resolve(CreatePeople::class)->execute($this->user, [
+        'name' => 'Ana Ruiz',
+        'company_id' => $company->getKey(),
+        'custom_fields' => ['emails' => ['ana@airbnb.com']],
+    ]);
+
+    expect($email->people()->count())->toBe(1)
+        ->and($email->companies()->whereKey($company->getKey())->exists())->toBeFalse();
 });

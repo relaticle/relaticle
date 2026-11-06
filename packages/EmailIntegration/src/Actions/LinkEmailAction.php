@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailLinkSuppression;
 use Relaticle\EmailIntegration\Models\Scopes\ActiveAccountScope;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 use Relaticle\EmailIntegration\Services\RecordCommunicationMetrics;
@@ -101,7 +102,7 @@ final readonly class LinkEmailAction
         $workspaceId = $email->workspace_id;
         $connectedAccount = $email->connectedAccount;
         $skippedDomains = $this->domainMatcher->skippedHosts($workspaceId);
-
+        $suppressed = $this->suppressedPairs($email);
         $workspace = $email->workspace;
 
         // A single email can resolve to the same company/person/opportunity through
@@ -150,7 +151,7 @@ final readonly class LinkEmailAction
                 if ($company instanceof Company) {
                     $participant->update(['company_id' => $company->getKey()]);
 
-                    if ($this->autoAttach($email->companies(), $company->getKey()) && ! isset($countedCompanies[$company->getKey()])) {
+                    if ($this->autoAttach($email->companies(), $company->getKey(), $suppressed) && ! isset($countedCompanies[$company->getKey()])) {
                         $countedCompanies[$company->getKey()] = true;
                         $counted[] = $company;
                     }
@@ -171,7 +172,7 @@ final readonly class LinkEmailAction
             if ($person instanceof People) {
                 $participant->update(['contact_id' => $person->getKey()]);
 
-                if ($this->autoAttach($email->people(), $person->getKey()) && ! isset($countedPeople[$person->getKey()])) {
+                if ($this->autoAttach($email->people(), $person->getKey(), $suppressed) && ! isset($countedPeople[$person->getKey()])) {
                     $countedPeople[$person->getKey()] = true;
                     $counted[] = $person;
                 }
@@ -179,7 +180,7 @@ final readonly class LinkEmailAction
                 $personCompany = $person->company;
 
                 if ($personCompany instanceof Company
-                    && $this->autoAttach($email->companies(), $personCompany->getKey())
+                    && $this->autoAttach($email->companies(), $personCompany->getKey(), $suppressed)
                     && ! isset($countedCompanies[$personCompany->getKey()])) {
                     $countedCompanies[$personCompany->getKey()] = true;
                     $counted[] = $personCompany;
@@ -190,7 +191,7 @@ final readonly class LinkEmailAction
                     ->get();
 
                 foreach ($opportunities as $opportunity) {
-                    if ($this->autoAttach($email->opportunities(), $opportunity->getKey()) && ! isset($countedOpportunities[$opportunity->getKey()])) {
+                    if ($this->autoAttach($email->opportunities(), $opportunity->getKey(), $suppressed) && ! isset($countedOpportunities[$opportunity->getKey()])) {
                         $countedOpportunities[$opportunity->getKey()] = true;
                         $counted[] = $opportunity;
                     }
@@ -260,6 +261,16 @@ final readonly class LinkEmailAction
         return count($parts) === 2 ? strtolower($parts[1]) : null;
     }
 
+    /** @return array<string, true> keyed "type:id" */
+    private function suppressedPairs(Email $email): array
+    {
+        return array_fill_keys(EmailLinkSuppression::query()
+            ->matchingConversationOf($email)
+            ->get(['emailable_type', 'emailable_id'])
+            ->map(fn (EmailLinkSuppression $suppression): string => "{$suppression->emailable_type}:{$suppression->emailable_id}")
+            ->all(), true);
+    }
+
     /**
      * Attaches a record to the email via the given morph relation if not already linked.
      * Returns true only when a new pivot row was created, so metric increments stay
@@ -268,10 +279,11 @@ final readonly class LinkEmailAction
      * @template TRelated of Model
      *
      * @param  MorphToMany<TRelated, Email>  $relation
+     * @param  array<string, true>  $suppressed
      */
-    private function autoAttach(MorphToMany $relation, string $relatedId): bool
+    private function autoAttach(MorphToMany $relation, string $relatedId, array $suppressed): bool
     {
-        if ($relation->whereKey($relatedId)->exists()) {
+        if (isset($suppressed["{$relation->getRelated()->getMorphClass()}:{$relatedId}"]) || $relation->whereKey($relatedId)->exists()) {
             return false;
         }
 

@@ -26,6 +26,7 @@ use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBlocklist;
+use Relaticle\EmailIntegration\Models\EmailLinkSuppression;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\PublicEmailDomain;
 use Relaticle\EmailIntegration\Models\WorkspaceEmailBlocklist;
@@ -1473,6 +1474,41 @@ it('also links email to opportunity via person relationship', function (): void 
     app(LinkEmailAction::class)->execute($email);
 
     expect($email->opportunities()->where('opportunities.id', $opportunity->getKey())->exists())->toBeTrue();
+});
+
+it('does not link a company again after a user unlinked it, on sync or history import', function (): void {
+    $company = makeAcmeCompanyWithDomain() ?? $this->markTestSkipped('No domains custom field seeded for this workspace.');
+    $email = makeLinkEmail();
+    EmailParticipant::factory()->from()->create(['email_id' => $email->getKey(), 'email_address' => 'ceo@acme.com']);
+    resolve(LinkEmailAction::class)->execute($email);
+
+    $email->companies()->detach($company->getKey());
+    EmailLinkSuppression::factory()->create(['email_id' => $email->getKey(), 'emailable_id' => $company->getKey()]);
+    resolve(LinkEmailAction::class)->reapply($email->fresh());
+
+    expect($email->companies()->whereKey($company->getKey())->exists())->toBeFalse()
+        ->and(EmailLinkSuppression::query()->where('email_id', $email->getKey())->count())->toBe(1);
+});
+
+it('does not link a later reply in the same conversation to the record a user unlinked', function (): void {
+    $company = makeAcmeCompanyWithDomain() ?? $this->markTestSkipped('No domains custom field seeded for this workspace.');
+    $first = makeLinkEmail(['conversation_key' => 'acme-renewal']);
+    EmailParticipant::factory()->from()->create(['email_id' => $first->getKey(), 'email_address' => 'ceo@acme.com']);
+    resolve(LinkEmailAction::class)->execute($first);
+    $first->companies()->detach($company->getKey());
+    EmailLinkSuppression::factory()->create(['email_id' => $first->getKey(), 'emailable_id' => $company->getKey()]);
+
+    $reply = makeLinkEmail(['conversation_key' => 'acme-renewal']);
+    $elsewhere = makeLinkEmail(['conversation_key' => 'acme-onboarding']);
+
+    foreach ([$reply, $elsewhere] as $email) {
+        EmailParticipant::factory()->from()->create(['email_id' => $email->getKey(), 'email_address' => 'ceo@acme.com']);
+        resolve(LinkEmailAction::class)->execute($email);
+    }
+
+    expect($reply->companies()->whereKey($company->getKey())->exists())->toBeFalse()
+        ->and($elsewhere->companies()->whereKey($company->getKey())->exists())->toBeTrue()
+        ->and($company->fresh()->email_count)->toBe(2);
 });
 
 function makeAcmeCompanyWithDomain(): ?Company
