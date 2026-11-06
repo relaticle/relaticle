@@ -193,6 +193,14 @@ it('keeps move to off a card a viewer cannot change', function (): void {
     expect($storedValue)->toBe($todo->getKey());
 });
 
+it('names the move to choices for a screen reader', function (): void {
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire(TasksBoard::class)
+        ->call('mountAction', 'moveTo', [], ['recordKey' => (string) $task->id])
+        ->assertMountedActionModalSeeHtml('role="radiogroup" aria-label="Move to"');
+});
+
 it('moves a card between two cards of another column', function (): void {
     $todo = $this->statusField->options->firstWhere('name', 'To do');
     $inProgress = $this->statusField->options->firstWhere('name', 'In progress');

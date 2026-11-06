@@ -4,7 +4,7 @@
     use function Filament\Support\get_color_css_variables;
 @endphp
 
-<div role="radiogroup" class="divide-y divide-gray-950/5 border-y border-gray-950/5 dark:divide-white/10 dark:border-white/10">
+<div role="radiogroup" aria-label="{{ __('filament/pages/boards.move_to.label') }}" class="divide-y divide-gray-950/5 border-y border-gray-950/5 dark:divide-white/10 dark:border-white/10">
     @foreach ($columns as $column)
         @php
             $isCurrent = $column->getName() === $currentColumn;
