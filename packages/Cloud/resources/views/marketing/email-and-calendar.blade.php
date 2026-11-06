@@ -54,8 +54,7 @@
         ],
         $billingActive ? [
             __('How many mailboxes can I connect?'),
-            __('The Free plan connects :free, Cloud Pro up to :pro, and Cloud Scale up to :scale. Enterprise has no limit.', [
-                'free' => trans_choice('{1} one mailbox|[2,*] :count mailboxes', \App\Enums\Plan::Free->connectedMailboxes()),
+            __('Cloud Pro connects up to :pro mailboxes, also during the free trial, and Cloud Scale up to :scale. Enterprise has no limit.', [
                 'pro' => \App\Enums\Plan::Pro->connectedMailboxes(),
                 'scale' => \App\Enums\Plan::Scale->connectedMailboxes(),
             ]),
