@@ -251,7 +251,7 @@
         </div>
     </x-cloud::marketing.frame>
 
-    <x-cloud::marketing.frame class="spotlight dark">
+    <x-cloud::marketing.frame>
         <x-cloud::marketing.frame-header :label="__('Control')" :lead="__('You stay in control.')">
             {{ __('It earns trust by asking first.') }}
         </x-cloud::marketing.frame-header>

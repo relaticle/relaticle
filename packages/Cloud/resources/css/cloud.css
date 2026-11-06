@@ -46,11 +46,6 @@ html:has(#main-header[data-framed]) {
     --color-tint: var(--color-gray-900);
 }
 
-/* A section that stays dark in both themes; on a dark page it lifts one step so it still reads as a band. */
-.dark .spotlight {
-    --color-surface: var(--color-gray-900);
-}
-
 @utility shadow-navbar {
     box-shadow:
         0 0 0 1px var(--color-gray-200),

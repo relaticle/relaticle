@@ -22,9 +22,8 @@ outside the roles.
 | `surface` | white | gray-950 | every cell |
 | `tint` | gray-50 | gray-900 | cells that hold product UI, link hover |
 
-Four treatments sit on top of the tokens. A `spotlight dark` frame stays dark in both themes and
-lifts to `gray-900` on a dark page. A page has at most one dark moment: the `closing-band` on the
-homepage, `/ai` and `/email-and-calendar`, the Control section on `/ai`. `bg-hero-panel` is the
+Three treatments sit on top of the tokens. A page has at most one dark moment: the `closing-band` on
+the homepage, `/ai` and `/email-and-calendar`. `bg-hero-panel` is the
 gradient in the logo's colours (`#4038CD` to `#5D54E8`) under a hero's product window; it never
 carries copy. `bg-cta-band` is the closing band's surface. `bg-warm` is a static radial wash for the
 human moments (the homepage email visual), never behind body text.
@@ -143,9 +142,10 @@ reach it. Change the header height and the token together. `html` also carries `
   space around it, one sentence (the suggestion when `MarketingNavigation::closestTo()` finds one) and at
   most two buttons, then the popular pages as linked cells. It carries no illustration; a drawn mark
   next to the header logo read as a second logo.
-- `theme-image`: a light and a dark WebP of a real app screenshot. It loads only the current
-  theme's file and swaps on theme change. It lazy-loads unless `loading="eager"` is passed, which a
-  hero image needs, because the LCP image is never lazy-loaded.
+- `theme-image`: a light and a dark WebP of a real app screenshot. The server renders the light
+  `srcset`, and Alpine swaps in the dark one when the page is dark or turns dark. It lazy-loads unless
+  `loading="eager"` is passed, which a hero image needs, because the LCP image is never lazy-loaded.
+  An eager image in dark mode therefore downloads both files.
 - `actor`: the You, Rela, Claude, ChatGPT and Mailbox chips, in `sm` and `lg`. They are the site's
   signature: every place that shows who did something uses them, and nothing else uses those colors.
   ChatGPT stays neutral gray, as the works-with strip draws it, and differs from You by its icon. A
