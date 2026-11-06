@@ -68,8 +68,7 @@ final readonly class UnlinkedSendersQuery
         Gate::forUser($viewer)->authorize('viewAny', Email::class);
 
         return array_values(DB::query()
-            ->fromSub($this->grouped($viewer, new VisibleEmailScope($viewer)), 'grouped')
-            ->where('address', Str::lower($address))
+            ->fromSub($this->grouped($viewer, new VisibleEmailScope($viewer), Str::lower($address)), 'grouped')
             ->groupBy('conversation_key')
             ->orderByRaw('max(sent_at) desc')
             ->orderBy('conversation_key')
@@ -96,34 +95,53 @@ final readonly class UnlinkedSendersQuery
      *
      * @param  VisibleEmailScope<Model>  $visible
      */
-    private function grouped(User $viewer, VisibleEmailScope $visible): BaseBuilder
+    private function grouped(User $viewer, VisibleEmailScope $visible, ?string $address = null): BaseBuilder
     {
-        return $this->fromSenders($viewer, $visible)->unionAll($this->toFirstRecipients($viewer, $visible));
+        $firstRecipients = DB::query()
+            ->fromSub($this->toFirstRecipients($viewer, $visible, $address), 'first_recipients')
+            ->when($address, fn (BaseBuilder $named, string $value): BaseBuilder => $named->where('address', $value));
+
+        return $this->fromSenders($viewer, $visible, $address)->unionAll($firstRecipients);
     }
 
     /** @param  VisibleEmailScope<Model>  $visible */
-    private function fromSenders(User $viewer, VisibleEmailScope $visible): BaseBuilder
+    private function fromSenders(User $viewer, VisibleEmailScope $visible, ?string $address): BaseBuilder
     {
         return $this->receivedUnlinked($this->ownDelivered($viewer, $visible))
             ->join('email_participants', 'email_participants.email_id', '=', 'emails.id')
             ->where('email_participants.role', EmailParticipantRole::FROM->value)
+            ->when($address, fn (Builder $named, string $value): Builder => $named->whereRaw('lower(email_participants.email_address) = ?', [$value]))
             ->toBase()
             ->selectRaw('lower(email_participants.email_address) as address')
             ->addSelect('email_participants.name', 'emails.conversation_key', 'emails.sent_at');
     }
 
-    /** @param  VisibleEmailScope<Model>  $visible */
-    private function toFirstRecipients(User $viewer, VisibleEmailScope $visible): BaseBuilder
+    /**
+     * The address filter keeps every message of a conversation that names it, so the first recipient is still chosen over all of them.
+     *
+     * @param  VisibleEmailScope<Model>  $visible
+     */
+    private function toFirstRecipients(User $viewer, VisibleEmailScope $visible, ?string $address): BaseBuilder
     {
         $recipientRoles = [EmailParticipantRole::TO->value, EmailParticipantRole::CC->value, EmailParticipantRole::BCC->value];
 
         return $this->unlinked($this->ownDelivered($viewer, $visible))
             ->where('emails.direction', EmailDirection::OUTBOUND)
             ->where('emails.is_internal', false)
-            ->whereNotIn('emails.conversation_key', $this->receivedUnlinked($this->ownDelivered($viewer, $visible))->select('emails.conversation_key')->toBase())
+            ->whereNotExists(fn (BaseBuilder $received): BaseBuilder => $received
+                ->fromSub($this->receivedUnlinked($this->ownDelivered($viewer, $visible))->select('emails.conversation_key')->toBase(), 'received')
+                ->whereColumn('received.conversation_key', 'emails.conversation_key'))
+            ->when($address, fn (Builder $named, string $value): Builder => $named->whereExists(fn (BaseBuilder $naming): BaseBuilder => $naming
+                ->from('email_participants as named')
+                ->join('emails as named_copies', 'named_copies.id', '=', 'named.email_id')
+                ->whereColumn('named_copies.workspace_id', 'emails.workspace_id')
+                ->whereColumn('named_copies.conversation_key', 'emails.conversation_key')
+                ->whereRaw('lower(named.email_address) = ?', [$value])))
             ->join('email_participants', 'email_participants.email_id', '=', 'emails.id')
             ->whereIn('email_participants.role', $recipientRoles)
-            ->whereNotIn(DB::raw('lower(email_participants.email_address)'), $this->memberAddresses($viewer))
+            ->whereNotExists(fn (BaseBuilder $member): BaseBuilder => $member
+                ->fromSub($this->memberAddresses($viewer), 'member_addresses')
+                ->whereColumn('member_addresses.address', DB::raw('lower(email_participants.email_address)')))
             ->toBase()
             ->selectRaw('distinct on (emails.conversation_key) lower(email_participants.email_address) as address')
             ->addSelect('email_participants.name', 'emails.conversation_key')
@@ -170,7 +188,7 @@ final readonly class UnlinkedSendersQuery
     private function memberAddresses(User $viewer): BaseBuilder
     {
         return DB::table('users')
-            ->selectRaw('lower(users.email)')
+            ->selectRaw('lower(users.email) as address')
             ->where(fn (BaseBuilder $members): BaseBuilder => $members
                 ->whereIn('users.id', DB::table((new Membership)->getTable())->where('workspace_id', $viewer->current_workspace_id)->select('user_id'))
                 ->orWhereIn('users.id', DB::table('workspaces')->where('id', $viewer->current_workspace_id)->select('user_id')));

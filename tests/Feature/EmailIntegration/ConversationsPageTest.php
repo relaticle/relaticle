@@ -1560,7 +1560,9 @@ it('groups a conversation the viewer only wrote in under its first outside recip
 
     expect($senders)->toBe(['ana@acme.test', 'brian@airbnb.test'])
         ->and($rows)->toEqualCanonicalizing(['conv-pitch', 'conv-brian'])
-        ->and($page->instance()->viewCounts['unlinked'])->toBe(count($rows));
+        ->and($page->instance()->viewCounts['unlinked'])->toBe(count($rows))
+        ->and(resolve(UnlinkedSendersQuery::class)->conversationKeys($this->owner, 'Ana@Acme.test'))->toBe(['conv-pitch'])
+        ->and(resolve(UnlinkedSendersQuery::class)->conversationKeys($this->owner, 'zoe@acme.test'))->toBe([]);
 });
 
 it('groups an automated message in a conversation people answered, as the badge counts it', function (): void {
