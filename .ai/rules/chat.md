@@ -85,8 +85,8 @@ filters user rows any other way is the bug this design removed: `sentBy()` once 
 the filter and tagged users `has-ai-usage` who had only seen the greeting. The setup greeting
 (`StartSetupGreeting`) uses the same mechanism with `MessageOrigin::Greeting`.
 Prompt and UI follow from this: the assistant must never ask the user to say "continue"
-or "next", and a decided proposal card collapses to one line (pending stays fully
-expanded, you may not approve what you were not shown).
+or "next", and a decided proposal collapses to its receipt lines (pending shows every
+value it will write, you may not approve what you were not shown).
 
 ## The sidebar chat list cannot repaint itself
 `ChatSidebarNav` is mounted through a Filament render hook, so it is a Livewire
@@ -107,41 +107,47 @@ detached node and the stale title returns with the template. And the all-chats
 panel is nested the same way and has the same defect, still unfixed: it shows
 the list as of its last full page load.
 
-## The footer decides exactly what is rendered; a paginated batch shows ONE record
-Since 2026-08 (user-directed Attio redesign) a standalone batch docks as
-pagination: the card renders ONLY the active record, the footer arrows
-(`prevItem`/`nextItem`) page through the undecided ones ("2/3"), and the
-footer's "Create"/"Discard" resolve the ACTIVE record alone
-(`ProposalCard::createCurrent` -> `approveActiveItem`, `discardCurrent` ->
-`rejectActiveItem`), advancing to the next undecided record. ⌘⏎ therefore
-creates one record per press mid-batch.
-The invariant that makes a per-record footer safe: the card must never render
-more than the record those buttons decide. In 2026 the footer decided ONE
-hidden record under the cursor while the card LISTED every record, so a user
-who clicked Discard to dismiss the card silently rejected a contact the card
-still reported as created. Re-adding a visible record list beside a per-record
-footer recreates that bug; a footer deciding more than what is rendered
-recreates its mirror image.
-A PLAN's batch step still lists every record row (the plan footer is
-"Approve all N", so everything it decides must be on screen) with per-row skip
-(`skipItem`, hover-revealed on `sm:`+ but ALWAYS visible below it: touch has no
-hover, and an invisible skip control was its own past defect).
+## The dock lists every write; the footer decides exactly what is listed
+Since 2026-11 (user-directed redesign, spec `docs/superpowers/specs/2026-11-06-rela-approvals-redesign-design.md`)
+a proposal docks as a change list: one line per write showing every value it sets, and a
+batch, standalone or inside a plan, lists every record. Paging one record at a time
+(`prevItem`/`nextItem`, 2026-08) is gone. The invariant it protected still holds in its
+other form: the footer never decides more than the card shows, and it counts what it will
+write ("Approve 7 changes" counts records, never steps; `ProposalCard::approvableRecordCount()`).
+In 2026 the footer decided one hidden record while the card listed every record, and a user
+who clicked Discard to dismiss the card rejected a record the card reported as created.
+- Leaving a write out is card state until Approve (`$leftOutSteps`, `$leftOutRows`), the same
+  way `$excludedFields` is. `ProposalPlanService::approveAll()` rejects the left-out steps first
+  (with their `cancelDependentsOf` cascade), then the left-out rows, then approves the rest, so a
+  failure mid-plan never leaves a left-out step pending. Both properties are client-writable and
+  `public mixed`; read them only through `cleanLeftOutSteps()` / `cleanLeftOutRows()`.
+- A line whose `$ref` points at a left-out step goes with it and says so ("{Name} is left out,
+  so this task is left out too"), with a Keep button that restores the left-out ancestor. A batch
+  row a later step links to (`$ref:<id>#n`) has no leave-out control, because `dependencyIds()`
+  drops the row index.
+- The leave-out x is hover-revealed on `sm:`+ with opacity (never `invisible`, which drops it from
+  the tab order) and always visible below `sm`: touch has no hover.
+- Cmd/Ctrl+Enter runs only a primary that carries `data-proposal-shortcut`, which the card renders
+  only when `primaryIsRisky()` is false: never a delete (`ProposalEntity::deletes()`), a plan holding
+  a delete, an email send or an invitation. `createCurrentFromShortcut()` checks `primaryIsRisky()`
+  again server side. A WebAccess Allow keeps the shortcut.
+- While a proposal is pending the message box is locked: the dock sits where the input was, over
+  the line "Approve or discard the proposal to keep chatting" (`_composer.blade.php`,
+  `data-composer-locked`). The user decides before typing again. `tests/Browser/Chat/ProposalDockLockTest.php`.
 
-## Attribute checkboxes exclude fields at approval time, never from action_data
-Each excludable field row of a standalone card carries a checkbox
-(`ProposalCard::$excludedFields`, applied by `PendingActionService::approve`/
-`approveItem` via `sanitizedExclusions` + `withoutExcludedFields`). Unchecked
-codes are stripped from the write IN MEMORY at execution; the stored
-action_data stays frozen (replay/prompt-cache contract). The list is
-client-writable checkbox state, so the SERVICE guard is the defense: payload
-markers and the entity's title key are never excludable, delete excludes
-nothing. Exclusions reset on every navigation (setActive, focusItem,
-prev/next, each decided item) so one record's exclusions cannot leak onto the
-next. Audit truth: excluded codes persist in `result_data.excluded` (single)
-or `result_data.items[i].excluded` (batch item) and reach the model via
-`excludedFieldEntries()` -> `<resolved_actions>` ("fields unchecked by the
-user, NOT written"). Without that line the model reports values it never
-set, the same defect class `skippedItemLabels()` exists to prevent.
+## The x leaves a field out at approval time, never from action_data
+Each excludable field row of a single-record card carries a leave-out x
+(`ProposalCard::$excludedFields` via `toggleField`, applied by `PendingActionService::approve`/
+`approveItem` via `sanitizedExclusions` + `withoutExcludedFields`). Plans and batch rows leave
+out whole lines and rows, never single fields. Left-out codes are stripped from the write IN
+MEMORY at execution; the stored action_data stays frozen (replay/prompt-cache contract). The list
+is client-writable, so the SERVICE guard is the defense: payload markers and the entity's title
+key are never excludable, delete excludes nothing. Exclusions reset on `setActive` so one
+proposal's exclusions cannot leak onto the next. Audit truth: excluded codes persist in
+`result_data.excluded` (single) or `result_data.items[i].excluded` (batch item), reach the model
+via `excludedFieldEntries()` -> `<resolved_actions>` ("fields unchecked by the user, NOT
+written"), and reach the receipt ("Updated {chip} · Amount (Name left out)"). Without the model
+line it reports values it never set, the same defect class `skippedItemLabels()` exists to prevent.
 
 ## Duplicates are caught by the REAL field rules, which need the tenant bound
 The card-level "Heads up: already proposed a moment ago" warning was removed
@@ -166,14 +172,14 @@ lie the real rule blocks later. Two load-bearing pieces:
 `finalizeBatchIfComplete` marks the row Approved when ANY item was created, so
 `pending_actions.status` cannot describe a mixed outcome. Two readers must derive
 from `result_data.items` instead:
-- the transcript header chip, via `batchOutcome()` in `transcript.js` ("2 created"
-  + "1 skipped"), never `action.status`;
+- the transcript receipt, via `Support\ProposalReceipts` (server side: `outcome`, `excluded`,
+  `moved_to`, `resolved_at` per action and per item), never `action.status`;
 - the model's `<resolved_actions>` block, via `PendingActionService::
   skippedItemLabels()` -> `CrmAssistant::resolvedBlock()`, which names each skipped
   record as "skipped by the user, NOT created".
 Without the second one the assistant reads "approved" plus the proposal's full
 record list and tells the user every record was created, including the ones they
-declined. Both are asserted (`ProposalCardComponentTest`, `BatchResolvedActionsTest`).
+declined. Both are asserted (`BatchCreateApprovalTest`, `BatchResolvedActionsTest`).
 
 ## The table's paint budget is client-only: the model can never state a row count
 `BaseReadListTool` stopped slicing server-side, so `display_block.rows` carries the
@@ -374,3 +380,14 @@ The marker lives in the cache, so web and workers must share one store. The Dock
 The Echo client is Filament's own: `config/filament.php` `broadcasting.echo` is rendered per request,
 so nothing about the websocket address is baked into the built bundle. Never read `import.meta.env`
 for it: the published image is built once and runs on every host.
+
+## Receipts carry no colour; ProposalOutcome owns their words and icons
+A decided proposal renders as "Applied N changes · {when}" over one check line per write, each
+with its record chip, or one grey settled line ("discarded", "expired", "replaced by a newer
+proposal") with "Propose again" on the latest group only. Status dots are gone (founder,
+2026-11-06): icon shape and words carry the outcome, and `ProposalOutcome` owns both, including
+the mixed-group rule (`forGroup()`) and the client-only transitions (`forClient()`'s local map
+for expired and superseded). JS never re-derives an outcome; it reads `action.outcome` from
+`ProposalReceipts`, which groups by `turn_id` on reload exactly as `ProposalPlanService::steps()`
+does live. A row decision broadcasts only its step's receipt; a finalizing step broadcasts the
+plan. `tests/Browser/Chat/PlanCardTest.php` fails a receipt that renders a coloured dot.
