@@ -90,7 +90,7 @@
     $limits = [
         __('Deleting a record never removes the records linked to it. Ask for each one by name.'),
         __('It cannot export records to a file. It links you to the export page instead.'),
-        __('It reads your workspace, Relaticle\'s documentation and the files you attach. It cannot open a web page.'),
+        __('It searches the web only after you allow it.'),
     ];
 
     $faqs = [
@@ -111,7 +111,7 @@
         [
             __('Does :name invent data?', ['name' => $assistantName]),
             __(
-                ':name answers from the records in your workspace and Relaticle\'s product documentation. It links the records it names, so you can open the source. Like any AI model, it can misread a record. Check an answer that matters, and read each proposal before you approve it.',
+                ':name answers from the records in your workspace, Relaticle\'s product documentation and, when you allow it, the web. It links the records it names, so you can open the source. Like any AI model, it can misread a record. Check an answer that matters, and read each proposal before you approve it.',
                 ['name' => $assistantName]
             ),
         ],

@@ -460,7 +460,7 @@
                                     <span class="size-1.5 rounded-full bg-gray-400 motion-safe:animate-pulse dark:bg-gray-500"></span>
                                     {{ __('Searching tasks…') }}
                                 </p>
-                                <p class="{{ $reply }} col-start-1 row-start-1" x-bind:class="{ 'opacity-0': thinking, '{{ $fade }}': ! thinking }">{{ __('You have 3 overdue tasks. Reading never needs your approval.') }}</p>
+                                <p class="{{ $reply }} col-start-1 row-start-1" x-bind:class="{ 'opacity-0': thinking, '{{ $fade }}': ! thinking }">{{ __('You have 3 overdue tasks. Reading your workspace never needs your approval.') }}</p>
                             </div>
 
                             <div class="overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)]" x-bind:class="{ 'translate-y-2 opacity-0': thinking, '{{ $fade }}': ! thinking }">

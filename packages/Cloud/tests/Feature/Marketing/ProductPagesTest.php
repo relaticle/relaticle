@@ -128,6 +128,15 @@ it('lists no limit that is really a capability', function (): void {
         ->and($html)->not->toContain('cannot import a file');
 });
 
+it('says Rela searches the web only after the user allows it', function (): void {
+    $html = $this->get('/ai')->assertOk()->getContent();
+
+    expect($html)->toContain(__('It searches the web only after you allow it.'))
+        ->and($html)->toContain(__('and, when you allow it, the web'))
+        ->and($html)->not->toContain('cannot open a web page')
+        ->and($html)->not->toContain('Reading never needs your approval');
+});
+
 it('says Rela takes an attached file and hands a bigger CSV to the import wizard', function (): void {
     $html = $this->get('/ai')->assertOk()->getContent();
 
