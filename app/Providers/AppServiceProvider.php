@@ -848,14 +848,7 @@ final class AppServiceProvider extends ServiceProvider
         $this->registerPanelScripts();
 
         // App assets are otherwise versioned with Filament's release, so an edit would keep its cached URL.
-        FilamentAsset::appVersion($this->richEditorScriptsVersion());
-    }
-
-    private function richEditorScriptsVersion(): string
-    {
-        return (string) collect(glob(public_path('js/app/rich-editor-*.js')) ?: [])
-            ->map(filemtime(...))
-            ->max();
+        FilamentAsset::appVersion((string) filemtime(public_path('js/app/rich-editor-slash-menu.js')));
     }
 
     private function registerPanelScripts(): void
