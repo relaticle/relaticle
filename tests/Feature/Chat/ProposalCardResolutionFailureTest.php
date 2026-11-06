@@ -61,11 +61,14 @@ it('keeps a batch open when a record fails and keeps the earlier commits', funct
         'expires_at' => now()->addMinutes(15),
     ]);
 
-    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+    $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->call('createCurrent')
         ->assertDispatched('proposal:resolve-failed')
         ->assertNotDispatched('proposal:resolved');
+
+    expect($component->errors()->first('resolve'))->toContain('Update company "Ghost"')
+        ->and($component->errors()->first('resolve'))->not->toContain('Update 2 companies');
 
     expect($company->fresh()->name)->toBe('New name')
         ->and($action->fresh()->status)->toBe(PendingActionStatus::Pending)

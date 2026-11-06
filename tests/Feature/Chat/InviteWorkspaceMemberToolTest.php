@@ -256,6 +256,68 @@ describe('an invitation proposal', function (): void {
         Mail::assertQueued(WorkspaceInvitationMail::class, 2);
     });
 
+    it('sends only the addresses left in when the standalone card has one left out', function (): void {
+        Mail::fake();
+        $invite = ($this->planInvite)(['alex@example.com', 'jamie@example.com']);
+
+        openInvitationDock($invite)
+            ->call('toggleLeftOutRow', (string) $invite->getKey(), 1)
+            ->assertSet('leftOutRows', [(string) $invite->getKey() => [1]])
+            ->call('createCurrent')
+            ->assertHasNoErrors();
+
+        expect(WorkspaceInvitation::query()->pluck('email')->all())->toBe(['alex@example.com'])
+            ->and($invite->fresh()->status)->toBe(PendingActionStatus::Approved)
+            ->and($invite->fresh()->result_data['items'][1]['status'])->toBe('rejected');
+
+        Mail::assertQueued(WorkspaceInvitationMail::class, 1);
+    });
+
+    it('sends nothing when every address of the standalone card is left out', function (): void {
+        Mail::fake();
+        $invite = ($this->planInvite)(['alex@example.com', 'jamie@example.com']);
+
+        openInvitationDock($invite)
+            ->call('toggleLeftOutRow', (string) $invite->getKey(), 0)
+            ->call('toggleLeftOutRow', (string) $invite->getKey(), 1)
+            ->call('createCurrent')
+            ->assertSet('pendingActionId', null);
+
+        expect($invite->fresh()->status)->toBe(PendingActionStatus::Rejected);
+
+        Mail::assertNothingQueued();
+    });
+
+    it('keeps an invitation step inside a plan out of row leave-out', function (): void {
+        $task = ($this->planTask)();
+        $invite = ($this->planInvite)(['alex@example.com', 'jamie@example.com']);
+
+        openInvitationDock($task)
+            ->call('toggleLeftOutRow', (string) $invite->getKey(), 1)
+            ->assertSet('leftOutRows', []);
+    });
+
+    it('names the invitation that could not be sent when a later one in its step fails', function (): void {
+        $sent = 0;
+        Mail::shouldReceive('to')->andReturnSelf();
+        Mail::shouldReceive('queue')->andReturnUsing(function () use (&$sent): void {
+            if (++$sent === 2) {
+                throw new TransportException('Connection could not be established with host "smtp.internal.test:587"');
+            }
+        });
+
+        $invite = ($this->planInvite)(['alex@example.com', 'jamie@example.com']);
+
+        $component = openInvitationDock($invite)
+            ->call('createCurrent')
+            ->assertDispatched('proposal:resolve-failed');
+
+        expect($component->errors()->first('resolve'))->toContain('jamie@example.com')
+            ->and($component->errors()->first('resolve'))->not->toContain('alex@example.com')
+            ->and($component->errors()->first('resolve'))->not->toContain('smtp.internal.test')
+            ->and(WorkspaceInvitation::query()->pluck('email')->all())->toBe(['alex@example.com']);
+    });
+
     it('counts only the steps approve all will approve, and says some steps have their own button', function (): void {
         ($this->planTask)('First task');
         ($this->planTask)('Second task');

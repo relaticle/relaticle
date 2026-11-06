@@ -422,6 +422,14 @@ it('allows a lone web access request from the keyboard shortcut', function (): v
     Queue::assertPushed(ProcessChatMessage::class);
 });
 
+it('does not mark a lone web access request as a risky primary', function (): void {
+    $user = webAccessUser();
+    Queue::fake();
+    $request = requestWebAccess($user, (string) str()->ulid());
+
+    expect(openWebAccessDock($request)->instance()->primaryIsRisky())->toBeFalse();
+});
+
 it('keeps asking for the web on a later typed turn after an allowed request', function (): void {
     $user = webAccessUser();
     Queue::fake();

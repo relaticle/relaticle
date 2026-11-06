@@ -186,8 +186,11 @@ describe('leaving steps and rows out', function (): void {
             ->and($note->refresh()->status)->toBe(PendingActionStatus::Pending);
 
         $component->call('toggleLeftOut', (string) $person->getKey())
-            ->assertSet('leftOutSteps', [])
-            ->call('approveAll');
+            ->assertSet('leftOutSteps', []);
+
+        expect($component->instance()->leftOutDependents())->toBe([]);
+
+        $component->call('approveAll');
 
         expect($person->refresh()->status)->toBe(PendingActionStatus::Approved)
             ->and($task->refresh()->status)->toBe(PendingActionStatus::Approved)
@@ -301,6 +304,31 @@ describe('leaving steps and rows out', function (): void {
             ->and($batch->refresh()->status)->toBe(PendingActionStatus::Approved)
             ->and(Task::query()->where('title', 'Review')->exists())->toBeTrue();
     });
+
+    it('ignores malformed leave-out state sent by the client', function (mixed $malformed): void {
+        [$person, $task, $note] = ($this->chainedPlan)();
+
+        $component = Livewire::test(ProposalCard::class)
+            ->call('setActive', $person->getKey())
+            ->set('leftOutRows', $malformed)
+            ->set('leftOutSteps', $malformed);
+
+        expect($component->instance()->approvableRecordCount())->toBe(3)
+            ->and($component->instance()->leftOutDependents())->toBe([]);
+
+        $component->call('toggleLeftOutRow', (string) $person->getKey(), 0)
+            ->call('approveAll')
+            ->assertHasNoErrors();
+
+        expect($person->refresh()->status)->toBe(PendingActionStatus::Approved)
+            ->and($task->refresh()->status)->toBe(PendingActionStatus::Approved)
+            ->and($note->refresh()->status)->toBe(PendingActionStatus::Approved);
+    })->with([
+        'a string' => ['x'],
+        'a string value' => [['x' => 'y']],
+        'a string list' => [['x', 'y']],
+        'a nested non-int list' => [['x' => ['a', 1.5, null]]],
+    ]);
 
     it('rejects the left-out rows of a batch step and approves the others', function (): void {
         [$conversationId, $turnId] = ProposalCardFixture::startPlan($this->user);

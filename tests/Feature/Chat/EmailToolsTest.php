@@ -1166,6 +1166,15 @@ it('approves a send card from the dock without a link or an error', function ():
     expect(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(1);
 });
 
+it('marks a lone email send as a risky primary', function (): void {
+    $pending = pendingChatEmail(proposeChatEmails($this->viewer, SendEmailTool::class, [chatSendRecord($this->viewerAccount)]));
+
+    $this->actingAs($this->viewer);
+    Filament::setTenant($this->workspace);
+
+    expect(openChatEmailDock($pending)->instance()->primaryIsRisky())->toBeTrue();
+});
+
 function proposeChatPlanTask(User $user, string $conversationId, string $turnId, string $title): PendingAction
 {
     auth()->setUser($user);

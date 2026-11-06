@@ -88,12 +88,11 @@ final class ProposalCard extends BaseLivewireComponent
      * Steps and batch rows the user left out. Nothing is rejected until Approve:
      * approveAll() hands both lists to the plan service, which rejects them first.
      *
-     * @var list<string>
+     * Typed mixed on purpose: a forged non-array value must reach the sanitizers, not a TypeError.
      */
-    public array $leftOutSteps = [];
+    public mixed $leftOutSteps = [];
 
-    /** @var array<string, list<int>> */
-    public array $leftOutRows = [];
+    public mixed $leftOutRows = [];
 
     /**
      * Which field is open for inline editing, and on which step. Both are set
@@ -889,11 +888,11 @@ final class ProposalCard extends BaseLivewireComponent
 
         $this->ensureTenantContext();
 
-        $leftOutRows = $this->leftOutRows;
+        $leftOutRows = $this->leftOutRowMap();
         $affectedIds = $this->leftOutAffectedIds();
 
         try {
-            $result = $plan->approveAll($anchor, $this->authUser(), $this->leftOutSteps, $leftOutRows);
+            $result = $plan->approveAll($anchor, $this->authUser(), $this->leftOutStepIds(), $leftOutRows);
         } catch (QueryException $exception) {
             $this->reportDatabaseFailure($anchor, $exception);
 
@@ -919,7 +918,7 @@ final class ProposalCard extends BaseLivewireComponent
 
         if ($result['failed'] !== null) {
             $this->reportResolveFailure($result['failed']['step'], __(':step could not be completed: :message', [
-                'step' => $this->stepSummary($result['failed']['step']),
+                'step' => $this->failingRowSummary($result['failed']['step']) ?? $this->stepSummary($result['failed']['step']),
                 'message' => $result['failed']['message'],
             ]));
 
@@ -948,26 +947,35 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         }
 
-        $this->leftOutSteps = in_array($stepId, $this->leftOutSteps, true)
-            ? array_values(array_diff($this->leftOutSteps, [$stepId]))
-            : [...$this->leftOutSteps, $stepId];
+        $leftOut = $this->leftOutStepIds();
+        $rows = $this->leftOutRowMap();
 
-        unset($this->leftOutRows[$stepId]);
+        unset($rows[$stepId]);
+
+        $this->leftOutRows = $rows;
+        $this->leftOutSteps = in_array($stepId, $leftOut, true)
+            ? array_values(array_diff($leftOut, [$stepId]))
+            : [...$leftOut, $stepId];
     }
 
     /**
      * Leave one row of a batch step out of the approval, or keep it again. A row that a
-     * later step links to, and any row of a step with its own button, stays in.
+     * later step links to, and any row of a step with its own button inside a plan,
+     * stays in.
      */
     public function toggleLeftOutRow(string $stepId, int $index): void
     {
         $step = $this->planStepById($stepId);
 
-        if (! $step instanceof PendingAction || $step->needsOwnApproval() || ! ProposalPayload::from($step)->isBatch) {
+        if (! $step instanceof PendingAction || ! ProposalPayload::from($step)->isBatch) {
             return;
         }
 
-        if (in_array($stepId, $this->leftOutSteps, true) || ! in_array($index, $this->unresolvedIndices($step), true)) {
+        if ($step->needsOwnApproval() && count($this->planSteps()) > 1) {
+            return;
+        }
+
+        if (in_array($stepId, $this->leftOutStepIds(), true) || ! in_array($index, $this->unresolvedIndices($step), true)) {
             return;
         }
 
@@ -975,11 +983,14 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         }
 
-        $rows = $this->leftOutRows[$stepId] ?? [];
+        $map = $this->leftOutRowMap();
+        $rows = $map[$stepId] ?? [];
 
-        $this->leftOutRows[$stepId] = in_array($index, $rows, true)
+        $map[$stepId] = in_array($index, $rows, true)
             ? array_values(array_diff($rows, [$index]))
             : [...$rows, $index];
+
+        $this->leftOutRows = $map;
     }
 
     /**
@@ -989,7 +1000,7 @@ final class ProposalCard extends BaseLivewireComponent
      */
     public function leftOutDependents(): array
     {
-        return resolve(ProposalPlanService::class)->dependentsOfLeftOut($this->planAllSteps(), $this->leftOutSteps);
+        return resolve(ProposalPlanService::class)->dependentsOfLeftOut($this->planAllSteps(), $this->leftOutStepIds());
     }
 
     /**
@@ -1022,7 +1033,7 @@ final class ProposalCard extends BaseLivewireComponent
             $stepId = (string) $step->getKey();
 
             $count += ProposalPayload::from($step)->isBatch
-                ? count(array_diff($this->unresolvedIndices($step), $this->leftOutRows[$stepId] ?? []))
+                ? count(array_diff($this->unresolvedIndices($step), $this->leftOutRowMap()[$stepId] ?? []))
                 : 1;
         }
 
@@ -1031,7 +1042,7 @@ final class ProposalCard extends BaseLivewireComponent
 
     /**
      * Whether the primary must lose its shortcut and turn danger: it would run a
-     * delete, or the one thing left in is a step that is approved on its own.
+     * delete, or the one thing left in is approved on its own and never from the keyboard.
      */
     public function primaryIsRisky(): bool
     {
@@ -1043,7 +1054,7 @@ final class ProposalCard extends BaseLivewireComponent
             }
         }
 
-        return count($stillIn) === 1 && $stillIn[0]->needsOwnApproval();
+        return count($stillIn) === 1 && $stillIn[0]->needsOwnApproval() && ! $stillIn[0]->entity_type->approvesFromKeyboard();
     }
 
     /**
@@ -1054,12 +1065,29 @@ final class ProposalCard extends BaseLivewireComponent
     private function stepsStillIn(): array
     {
         $taken = $this->leftOutDependents();
+        $leftOut = $this->leftOutStepIds();
 
         return array_values(array_filter(
             $this->planSteps(),
-            fn (PendingAction $step): bool => ! in_array((string) $step->getKey(), $this->leftOutSteps, true)
+            fn (PendingAction $step): bool => ! in_array((string) $step->getKey(), $leftOut, true)
                 && ! isset($taken[(string) $step->getKey()]),
         ));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function leftOutStepIds(): array
+    {
+        return ProposalPlanService::cleanLeftOutSteps($this->leftOutSteps);
+    }
+
+    /**
+     * @return array<string, list<int>>
+     */
+    private function leftOutRowMap(): array
+    {
+        return ProposalPlanService::cleanLeftOutRows($this->leftOutRows);
     }
 
     private function planStepById(string $stepId): ?PendingAction
@@ -1081,9 +1109,9 @@ final class ProposalCard extends BaseLivewireComponent
         $planIds = array_map(static fn (PendingAction $step): string => (string) $step->getKey(), $this->planSteps());
 
         return array_values(array_intersect($planIds, [
-            ...$this->leftOutSteps,
+            ...$this->leftOutStepIds(),
             ...array_keys($this->leftOutDependents()),
-            ...array_keys($this->leftOutRows),
+            ...array_keys($this->leftOutRowMap()),
         ]));
     }
 
@@ -1156,7 +1184,7 @@ final class ProposalCard extends BaseLivewireComponent
 
             return;
         } catch (RuntimeException|ValidationException $exception) {
-            $this->reportResolveFailure($step, ApprovalFailureMessage::for($exception));
+            $this->reportResolveFailure($step, $this->labelledFailure($step, ApprovalFailureMessage::for($exception)));
 
             return;
         }
@@ -1338,9 +1366,37 @@ final class ProposalCard extends BaseLivewireComponent
     {
         $plan = resolve(ProposalPlanService::class);
 
-        $batch->needsOwnApproval()
-            ? $this->approveStep((string) $batch->getKey(), $plan)
-            : $this->approveAll($plan);
+        if (! $batch->needsOwnApproval()) {
+            $this->approveAll($plan);
+
+            return;
+        }
+
+        $stepId = (string) $batch->getKey();
+        $leftOutRows = $this->leftOutRowMap();
+
+        try {
+            $plan->rejectRows($batch, $this->authUser(), $leftOutRows[$stepId] ?? []);
+        } catch (QueryException $exception) {
+            $this->reportDatabaseFailure($batch, $exception);
+
+            return;
+        } catch (RuntimeException $exception) {
+            $this->reportResolveFailure($batch, $exception->getMessage());
+
+            return;
+        }
+
+        $this->leftOutRows = [];
+        $this->announceLeftOut([$stepId], $leftOutRows);
+
+        if ($batch->refresh()->isPending()) {
+            $this->approveStep($stepId, $plan);
+
+            return;
+        }
+
+        $this->settleAfterResolution($batch);
     }
 
     /**
@@ -1630,7 +1686,30 @@ final class ProposalCard extends BaseLivewireComponent
     {
         report($exception);
 
-        $this->reportResolveFailure($pendingAction, ApprovalFailureMessage::forDelivery());
+        $this->reportResolveFailure($pendingAction, $this->labelledFailure($pendingAction, ApprovalFailureMessage::forDelivery()));
+    }
+
+    /**
+     * On a batch step the earlier rows have committed, so the message names the row
+     * that stopped the run: the first one still undecided.
+     */
+    private function labelledFailure(PendingAction $step, string $message): string
+    {
+        $record = $this->failingRowSummary($step);
+
+        return $record === null ? $message : __(':record: :message', ['record' => $record, 'message' => $message]);
+    }
+
+    private function failingRowSummary(PendingAction $step): ?string
+    {
+        if (! ProposalPayload::from($step)->isBatch || $step->isEmailSend()) {
+            return null;
+        }
+
+        $fresh = $step->fresh() ?? $step;
+        $summary = ProposalPayload::from($fresh)->displayAt($this->firstUnresolvedIndex($fresh))['summary'] ?? null;
+
+        return is_string($summary) && $summary !== '' ? $summary : null;
     }
 
     // The page expires proposals on its own clock, which can run behind the server's.

@@ -214,15 +214,15 @@ final readonly class ProposalPlanService
     /**
      * Approve what is left of the plan, in order, after applying what the user left out:
      * left-out steps are rejected (with their dependents), then left-out batch rows.
-     * Both lists name ids the client sent, so they are intersected with the plan.
+     * Both lists name ids the client sent, so they are sanitized and intersected with the plan.
      *
-     * @param  list<string>  $leftOutSteps
-     * @param  array<string, list<int>>  $leftOutRows
+     * @param  array<array-key, mixed>  $leftOutSteps
+     * @param  array<array-key, mixed>  $leftOutRows
      * @return array{approved: list<PendingAction>, failed: array{step: PendingAction, message: string}|null}
      */
     public function approveAll(PendingAction $action, User $user, array $leftOutSteps = [], array $leftOutRows = []): array
     {
-        $this->applyLeftOut($this->steps($action), $user, $leftOutSteps, $leftOutRows);
+        $this->applyLeftOut($this->steps($action), $user, self::cleanLeftOutSteps($leftOutSteps), self::cleanLeftOutRows($leftOutRows));
 
         $approved = [];
 
@@ -254,6 +254,56 @@ final readonly class ProposalPlanService
     }
 
     /**
+     * Keeps only string step ids: the list is client-writable state.
+     *
+     * @return list<string>
+     */
+    public static function cleanLeftOutSteps(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter($value, is_string(...))));
+    }
+
+    /**
+     * Keeps only step ids mapped to lists of integer row indexes: the map is client-writable state.
+     *
+     * @return array<string, list<int>>
+     */
+    public static function cleanLeftOutRows(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $clean = [];
+
+        foreach ($value as $stepId => $indexes) {
+            if (is_array($indexes)) {
+                $clean[(string) $stepId] = array_values(array_unique(array_filter($indexes, is_int(...))));
+            }
+        }
+
+        return $clean;
+    }
+
+    /**
+     * Reject the given unresolved rows of a batch step, skipping any already decided.
+     *
+     * @param  list<int>  $indexes
+     */
+    public function rejectRows(PendingAction $step, User $user, array $indexes): void
+    {
+        $rows = array_intersect($indexes, ProposalProgress::for($step->refresh())->unresolvedIndices());
+
+        foreach ($rows as $index) {
+            $this->pendingActions->rejectItem($step->refresh(), $user, $index);
+        }
+    }
+
+    /**
      * @param  list<PendingAction>  $steps
      * @param  list<string>  $leftOutSteps
      * @param  array<string, list<int>>  $leftOutRows
@@ -277,14 +327,7 @@ final readonly class ProposalPlanService
                 continue;
             }
 
-            $indexes = array_diff(
-                array_intersect(array_map(intval(...), $leftOutRows[$stepId] ?? []), ProposalProgress::for($step)->unresolvedIndices()),
-                array_keys($linked[$stepId] ?? []),
-            );
-
-            foreach ($indexes as $index) {
-                $this->pendingActions->rejectItem($step->refresh(), $user, $index);
-            }
+            $this->rejectRows($step, $user, array_values(array_diff($leftOutRows[$stepId] ?? [], array_keys($linked[$stepId] ?? []))));
         }
     }
 
