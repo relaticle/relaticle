@@ -1880,11 +1880,12 @@ html.fi:has(body.fi-onboarding-wizard),
         @apply flex items-start gap-2.5 ps-0;
 
         > label {
-            @apply flex shrink-0 select-none;
-            margin-top: calc((1lh - 1rem) / 2);
+            @apply -mx-1 flex shrink-0 cursor-pointer p-1 select-none;
+            margin-top: calc((1lh - 1rem) / 2 - 0.25rem);
+            margin-bottom: -0.25rem;
 
             input {
-                @apply size-4 cursor-pointer accent-primary-600 dark:accent-primary-500;
+                @apply size-4 cursor-pointer rounded-sm accent-primary-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:accent-primary-500;
             }
         }
 

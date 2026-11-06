@@ -357,6 +357,7 @@ it('builds, ticks and saves a checklist in a task description', function (): voi
         ->assertScript("document.querySelectorAll('{$editor} ul[data-type=\"taskList\"] > li').length === 3")
         ->assertScript("getComputedStyle(document.querySelector('{$editor} ul[data-type=\"taskList\"]')).listStyleType === 'none'")
         ->assertScript("getComputedStyle(document.querySelector('{$editor} ul[data-type=\"taskList\"] > li')).display === 'flex'")
+        ->assertScript("(() => { const box = document.querySelector('{$editor} ul[data-type=\"taskList\"] > li > label').getBoundingClientRect(); return box.width >= 24 && box.height >= 24; })()")
         ->click("{$editor} input[aria-label=\"Task item checkbox for Call Bob\"]")
         ->assertScript("document.querySelectorAll('{$editor} li[data-checked=\"true\"]').length === 1")
         ->assertScript("(() => { const bold = document.querySelector('{$editor} li[data-checked=\"true\"] strong'); return getComputedStyle(bold).color === getComputedStyle(bold.closest('p')).color; })()")
