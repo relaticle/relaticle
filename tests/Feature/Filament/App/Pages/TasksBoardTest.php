@@ -486,6 +486,24 @@ it('shows markup typed into a card description as text', function (): void {
         ->assertDontSeeHtml('<b>literal</b>');
 });
 
+it('turns the checklist badge green once every item is ticked', function (): void {
+    tasksBoardCardWithDescription($this, str_replace('data-checked="false"', 'data-checked="true"', tasksBoardChecklistHtml()));
+
+    livewire(TasksBoard::class)
+        ->assertSee('2/2')
+        ->assertSeeHtml('fi-color-success')
+        ->assertSeeHtml('2 of 2 items done');
+});
+
+it('keeps an unfinished checklist badge gray with its count in a tooltip', function (): void {
+    tasksBoardCardWithDescription($this, tasksBoardChecklistHtml());
+
+    livewire(TasksBoard::class)
+        ->assertSee('1/2')
+        ->assertDontSeeHtml('fi-color-success')
+        ->assertSeeHtml('1 of 2 items done');
+});
+
 it('names the checklist badge from the lang file', function (): void {
     app('translator')->addLines(['filament/pages/boards.tasks.checklist_progress' => 'Steps done'], 'en');
     tasksBoardCardWithDescription($this, tasksBoardChecklistHtml());
