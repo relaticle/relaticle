@@ -258,7 +258,7 @@ final class Email extends Model
                                     ->where('emailables.emailable_id', $id));
                             }
                         }))))
-            ->where(fn (Builder $unsuppressed): Builder => $this->withoutSuppressions($unsuppressed, $query, fn (QueryBuilder $suppression): QueryBuilder => $suppression
+            ->where(fn (Builder $unsuppressed): QueryBuilder => $this->withoutSuppressions($unsuppressed->getQuery(), $query, fn (QueryBuilder $suppression): QueryBuilder => $suppression
                 ->where('email_link_suppressions.emailable_type', $record->getMorphClass())
                 ->where('email_link_suppressions.emailable_id', $record->getKey())));
     }
@@ -293,14 +293,10 @@ final class Email extends Model
      * conversation the same user holds unless that user pinned the record on one of their copies. Another member's
      * unlink never hides it. Two probes, so each reads the unique key on `email_id` rather than every suppression of the record.
      *
-     * @template TTarget of Builder<Email>|QueryBuilder
-     *
-     * @param  TTarget  $target
      * @param  Builder<Email>  $query
      * @param  Closure(QueryBuilder): QueryBuilder  $forRecord
-     * @return TTarget
      */
-    private function withoutSuppressions(Builder|QueryBuilder $target, Builder $query, Closure $forRecord): Builder|QueryBuilder
+    private function withoutSuppressions(QueryBuilder $target, Builder $query, Closure $forRecord): QueryBuilder
     {
         $onThisCopy = EmailLinkSuppression::query()
             ->whereColumn('email_link_suppressions.email_id', $query->qualifyColumn('id'))
