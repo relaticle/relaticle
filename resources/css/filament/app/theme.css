@@ -1809,10 +1809,10 @@ html.fi:has(body.fi-onboarding-wizard),
     }
 }
 
-/* Appended to the body, so it must clear the modals email-integration.css lifts to 60
-   and 70. It stays under toasts at 80. */
+/* A manual popover in the top layer, so it clears every modal with no z-index to keep in
+   step. The resets undo the browser's popover defaults the dropdown styles leave set. */
 .fi-slash-menu {
-    @apply absolute z-[75] max-h-[28rem] w-screen overflow-y-auto p-1;
+    @apply fixed inset-auto m-0 max-h-[28rem] w-screen overflow-y-auto border-0 p-1 text-inherit;
 }
 
 .fi-slash-menu-empty {

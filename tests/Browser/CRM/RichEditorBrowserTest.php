@@ -296,7 +296,7 @@ it('spaces paragraphs apart in the note editor', function (): void {
     expect($gap)->toBeGreaterThan(0);
 });
 
-it('paints the slash menu above the task modal', function (): void {
+it('opens the slash menu in the top layer, above the task modal', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
@@ -314,11 +314,14 @@ it('paints the slash menu above the task modal', function (): void {
             const menu = [...document.querySelectorAll('.fi-slash-menu')].find((panel) => panel.getBoundingClientRect().height > 0);
             const box = menu.getBoundingClientRect();
 
-            return menu.contains(document.elementFromPoint(box.left + box.width / 2, box.top + 20));
+            return {
+                onTop: menu.contains(document.elementFromPoint(box.left + box.width / 2, box.top + 20)),
+                topLayer: menu.matches(':popover-open'),
+            };
         })();
     JS);
 
-    expect($menuOnTop)->toBeTrue();
+    expect($menuOnTop)->toBe(['onTop' => true, 'topLayer' => true]);
 });
 
 it('builds, ticks and saves a checklist in a task description', function (): void {
