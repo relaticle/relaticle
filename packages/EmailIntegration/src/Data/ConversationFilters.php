@@ -25,6 +25,7 @@ final readonly class ConversationFilters
      * @param  list<string>  $mailboxIds
      * @param  list<string>  $recordIds
      * @param  list<EmailCategory>  $categories
+     * @param  list<string>|null  $conversationKeys  null reads every conversation, a list only those
      */
     public function __construct(
         public array $mailboxIds = [],
@@ -39,6 +40,7 @@ final readonly class ConversationFilters
         public ?string $from = null,
         public ?string $to = null,
         public ?string $search = null,
+        public ?array $conversationKeys = null,
     ) {}
 
     public static function forRecord(Company|People|Opportunity $record, ?string $search = null): self

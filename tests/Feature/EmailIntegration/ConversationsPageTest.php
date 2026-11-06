@@ -1545,6 +1545,22 @@ it('groups the unlinked conversations of one sender into one row, the senders yo
     expect(conversationsPageKeys($page->call('toggleSender', 'brian@airbnb.test')->html()))->toBe(['conv-brian-2', 'conv-brian-1']);
 });
 
+it('groups a conversation the viewer only wrote in under its first outside recipient, so the badge counts the rows shown', function (): void {
+    conversationsPageMessage($this->ownerMailbox, 'conv-brian', 'brian@airbnb.test', ['sent_at' => now()->subDay()]);
+    $pitch = conversationsPageMessage($this->ownerMailbox, 'conv-pitch', $this->ownerMailbox->email_address);
+    EmailParticipant::factory()->to()->create(['email_id' => $pitch->id, 'email_address' => $this->teammate->email]);
+    EmailParticipant::factory()->to()->create(['email_id' => $pitch->id, 'email_address' => 'Ana@Acme.test', 'name' => 'Ana Lopez']);
+    EmailParticipant::factory()->to()->create(['email_id' => $pitch->id, 'email_address' => 'zoe@acme.test']);
+
+    $page = livewire(EmailInboxPage::class)->call('setView', ConversationView::Unlinked->value);
+    $senders = unlinkedSenderAddresses($page);
+    $rows = array_merge(...array_map(fn (string $address): array => conversationsPageKeys($page->call('toggleSender', $address)->html()), $senders));
+
+    expect($senders)->toBe(['ana@acme.test', 'brian@airbnb.test'])
+        ->and($rows)->toEqualCanonicalizing(['conv-pitch', 'conv-brian'])
+        ->and($page->instance()->viewCounts['unlinked'])->toBe(count($rows));
+});
+
 it('leaves a teammate unlinked mail and linked conversations out of the sender groups', function (): void {
     conversationsPageMessage($this->teammateMailbox, 'conv-ben', 'olivia@stripe.test');
     $linked = conversationsPageMessage($this->ownerMailbox, 'conv-linked', 'kim@notion.test');

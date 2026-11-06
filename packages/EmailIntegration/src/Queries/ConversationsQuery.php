@@ -433,6 +433,7 @@ final readonly class ConversationsQuery
     private function visibleCopiesOf(User $viewer, VisibleEmailScope $visible, ConversationFilters $filters): Builder
     {
         $query = $this->delivered(Email::query()->withGlobalScope('visible', $visible))
+            ->when($filters->conversationKeys !== null, fn (Builder $copies): Builder => $copies->whereIn('emails.conversation_key', $filters->conversationKeys ?? []))
             ->when($filters->mailboxIds !== [], fn (Builder $copies): Builder => $copies->whereIn('emails.connected_account_id', $filters->mailboxIds))
             ->when($filters->direction, fn (Builder $copies, EmailDirection $direction): Builder => $copies->where('emails.direction', $direction))
             ->when($filters->hasAttachment !== null, fn (Builder $copies): Builder => $copies->where('emails.has_attachments', $filters->hasAttachment))

@@ -60,8 +60,11 @@ trait HasUnlinkedSenders
             return [];
         }
 
+        $user = $this->authUser();
+        $keys = resolve(UnlinkedSendersQuery::class)->conversationKeys($user, $this->expandedSender);
+
         return resolve(ConversationsQuery::class)
-            ->paginate($this->authUser(), ConversationView::Unlinked, new ConversationFilters(from: $this->expandedSender), perPage: 20)
+            ->paginate($user, ConversationView::Unlinked, new ConversationFilters(conversationKeys: $keys), perPage: 20)
             ->rows;
     }
 
