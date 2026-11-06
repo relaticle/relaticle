@@ -23,6 +23,33 @@ it('renders the email and calendar page with its structured data', function (): 
         ->and($html)->toContain(route('emailAndCalendar'));
 });
 
+it('names Outlook and Microsoft accounts when the Microsoft app is configured', function (): void {
+    Feature::for(null)->activate(EmailIntegration::class);
+    config()->set('services.gmail.client_id', 'gmail-client');
+    config()->set('services.azure.client_id', 'azure-client');
+
+    $html = html_entity_decode($this->get('/email-and-calendar')->assertOk()->getContent());
+
+    expect($html)->toContain('Connect Gmail or Outlook to Relaticle.')
+        ->and($html)->toContain('Link a Google or Microsoft account')
+        ->and($html)->toContain('Google accounts, such as Gmail, and Microsoft accounts, such as Outlook and Microsoft 365.')
+        ->and($html)->toContain('Gmail and Outlook on every record');
+});
+
+it('names only Gmail and Google when the Microsoft app is not configured', function (): void {
+    Feature::for(null)->activate(EmailIntegration::class);
+    config()->set('services.gmail.client_id', 'gmail-client');
+    config()->set('services.azure.client_id', null);
+
+    $html = html_entity_decode($this->get('/email-and-calendar')->assertOk()->getContent());
+
+    expect($html)->toContain('Connect Gmail to Relaticle.')
+        ->and($html)->toContain('Link a Google account')
+        ->and($html)->toContain('Gmail on every record')
+        ->and($html)->not->toContain('Outlook')
+        ->and($html)->not->toContain('Microsoft');
+});
+
 it('quotes the mailbox limit of each plan when billing is on', function (): void {
     Feature::for(null)->activate(EmailIntegration::class);
     Feature::define(BillingFeature::class, true);

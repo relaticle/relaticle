@@ -32,6 +32,7 @@
         flash: null,
         played: false,
         seer: 'you',
+        seers: ['you', 'teammate'],
         shows: @js(['subject' => $teammateView->showsSubject(), 'body' => $teammateView->showsBody()]),
         timers: [],
         init() {
@@ -74,6 +75,12 @@
             this.finish()
             this.seer = seer
         },
+        step(offset) {
+            const next = this.seers[(this.seers.indexOf(this.seer) + offset + this.seers.length) % this.seers.length]
+
+            this.lookAs(next)
+            this.$nextTick(() => this.$refs[next].focus())
+        },
         get showsSubject() {
             return this.seer === 'you' || this.shows.subject
         },
@@ -83,16 +90,24 @@
     }"
     x-bind:data-demo-state="played ? 'done' : (added ? 'playing' : 'idle')"
 >
-    <noscript><style>[data-email-demo] [data-mail-landing] { visibility: visible !important; opacity: 1 !important; }</style></noscript>
+    <noscript><style>[data-email-demo] [data-mail-landing] { visibility: visible !important; opacity: 1 !important; } [data-email-demo] [data-mail-placeholder] { display: none !important; }</style></noscript>
 
-    <div class="flex flex-wrap justify-center gap-2" role="radiogroup" aria-label="{{ __('See the record as') }}">
-        <button type="button" role="radio" class="{{ $choice }}" aria-checked="true" x-bind:aria-checked="(seer === 'you').toString()" x-on:click="lookAs('you')" data-mail-seer="you">{{ __('As you') }}</button>
-        <button type="button" role="radio" class="{{ $choice }}" aria-checked="false" x-bind:aria-checked="(seer === 'teammate').toString()" x-on:click="lookAs('teammate')" data-mail-seer="teammate">{{ __('As a teammate') }}</button>
+    <div
+        class="flex flex-wrap justify-center gap-2"
+        role="radiogroup"
+        aria-label="{{ __('See the record as') }}"
+        x-on:keydown.left.prevent="step(-1)"
+        x-on:keydown.up.prevent="step(-1)"
+        x-on:keydown.right.prevent="step(1)"
+        x-on:keydown.down.prevent="step(1)"
+    >
+        <button type="button" role="radio" class="{{ $choice }}" aria-checked="true" tabindex="0" x-bind:aria-checked="(seer === 'you').toString()" x-bind:tabindex="seer === 'you' ? 0 : -1" x-ref="you" x-on:click="lookAs('you')" data-mail-seer="you">{{ __('As you') }}</button>
+        <button type="button" role="radio" class="{{ $choice }}" aria-checked="false" tabindex="-1" x-bind:aria-checked="(seer === 'teammate').toString()" x-bind:tabindex="seer === 'teammate' ? 0 : -1" x-ref="teammate" x-on:click="lookAs('teammate')" data-mail-seer="teammate">{{ __('As a teammate') }}</button>
     </div>
 
     <x-cloud::marketing.window class="w-full max-w-2xl">
         <div class="grid border-b border-gray-100 dark:border-white/[0.06]">
-            <div class="{{ $stack }} flex items-center gap-3 px-4 py-3.5 sm:px-5" x-bind:class="{ 'invisible': added }">
+            <div class="{{ $stack }} flex items-center gap-3 px-4 py-3.5 sm:px-5" x-bind:class="{ 'invisible': added }" data-mail-placeholder>
                 <span class="flex size-10 shrink-0 items-center justify-center rounded-full border border-dashed border-gray-300 text-gray-400 dark:border-white/15" aria-hidden="true">
                     <x-heroicon-o-user class="size-5"/>
                 </span>

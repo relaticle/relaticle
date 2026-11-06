@@ -42,3 +42,22 @@ it('shows a teammate who and when, and the owner everything', function (): void 
 
     $page->assertNoJavaScriptErrors();
 });
+
+it('moves the choice between the two views with the arrow keys', function (): void {
+    $page = $this->visit('/email-and-calendar');
+
+    $page->click('[data-mail-seer="you"]');
+    $page->keys('[data-mail-seer="you"]', 'ArrowRight');
+    $page->wait(0.3);
+
+    expect(emailDemo($page, "[...root.querySelectorAll('[data-mail-seer]')].map((radio) => radio.getAttribute('aria-checked'))"))->toBe(['false', 'true'])
+        ->and(emailDemo($page, "[...root.querySelectorAll('[data-mail-seer]')].map((radio) => radio.getAttribute('tabindex'))"))->toBe(['-1', '0'])
+        ->and(emailDemo($page, 'document.activeElement.dataset.mailSeer'))->toBe('teammate');
+
+    $page->keys('[data-mail-seer="teammate"]', 'ArrowLeft');
+    $page->wait(0.3);
+
+    expect(emailDemo($page, "[...root.querySelectorAll('[data-mail-seer]')].map((radio) => radio.getAttribute('aria-checked'))"))->toBe(['true', 'false']);
+
+    $page->assertNoJavaScriptErrors();
+});

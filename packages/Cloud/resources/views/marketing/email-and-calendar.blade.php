@@ -1,13 +1,44 @@
 @php
+    use Illuminate\Support\Arr;
+    use Illuminate\Support\Collection;
+    use Relaticle\EmailIntegration\Enums\EmailProvider;
+
     $assistantName = (string) config('chat.assistant_name');
     $billingActive = \Laravel\Pennant\Feature::active(\App\Features\Billing::class);
     $documentationActive = \Laravel\Pennant\Feature::active(\App\Features\Documentation::class);
 
+    $mailProviders = collect(EmailProvider::cases())
+        ->filter(fn (EmailProvider $provider): bool => $provider->isConfigured())
+        ->whenEmpty(fn (Collection $providers): Collection => collect([EmailProvider::GMAIL]));
+
+    $providerNames = Arr::join(
+        $mailProviders->map(fn (EmailProvider $provider): string => match ($provider) {
+            EmailProvider::GMAIL => 'Gmail',
+            EmailProvider::AZURE => 'Outlook',
+        })->all(),
+        ', ',
+        ' or ',
+    );
+
+    $vendorNames = $mailProviders->map(fn (EmailProvider $provider): string => match ($provider) {
+        EmailProvider::GMAIL => 'Google',
+        EmailProvider::AZURE => 'Microsoft',
+    })->all();
+
+    $accountKinds = Arr::join(
+        $mailProviders->map(fn (EmailProvider $provider): string => match ($provider) {
+            EmailProvider::GMAIL => __('Google accounts, such as Gmail'),
+            EmailProvider::AZURE => __('Microsoft accounts, such as Outlook and Microsoft 365'),
+        })->all(),
+        ', ',
+        ', and ',
+    );
+
     $title = __('Email and calendar sync for your CRM').' - Relaticle';
-    $description = __('Connect Gmail or Outlook to Relaticle. Email and meetings land on the people, companies and opportunities they involve, and you decide what your team sees.');
+    $description = __('Connect :providers to Relaticle. Email and meetings land on the people, companies and opportunities they involve, and you decide what your team sees.', ['providers' => $providerNames]);
 
     $steps = [
-        [__('Connect your inbox'), __('Link a Google or Microsoft account from your workspace settings. Your mailbox and calendar import in the background.')],
+        [__('Connect your inbox'), __('Link a :vendors account from your workspace settings. Your mailbox and calendar import in the background.', ['vendors' => Arr::join($vendorNames, ', ', ' or ')])],
         [__('Records fill in'), __('People you email are added for you, with their companies. Each email and meeting lands on the record it involves.')],
         [__('You choose who sees what'), __('Pick how much of each mailbox your workspace sees, and change it for any single email.')],
     ];
@@ -34,7 +65,7 @@
     $faqs = array_values(array_filter([
         [
             __('Which accounts can I connect?'),
-            __('Google accounts, such as Gmail, and Microsoft accounts, such as Outlook and Microsoft 365. Each member connects their own mailbox.'),
+            __(':accounts. Each member connects their own mailbox.', ['accounts' => $accountKinds]),
         ],
         [
             __('Does Relaticle change anything in my mailbox?'),
@@ -61,7 +92,7 @@
         ] : null,
         [
             __('Does it work when I self-host?'),
-            __('Yes. A self-hosted install connects mailboxes through its own Google and Microsoft app credentials, which the self-hosting guide explains.'),
+            __('Yes. A self-hosted install connects mailboxes through its own :vendors app credentials, which the self-hosting guide explains.', ['vendors' => Arr::join($vendorNames, ', ', ' and ')]),
         ],
     ]));
 @endphp
@@ -88,7 +119,7 @@
 
         <x-slot:aside>
             <p class="text-base leading-relaxed text-gray-500 md:text-lg dark:text-gray-400">
-                {{ __('Connect Gmail or Outlook. Every email and meeting lands on the person, company and opportunity it involves, and you decide what your team sees.') }}
+                {{ __('Connect :providers. Every email and meeting lands on the person, company and opportunity it involves, and you decide what your team sees.', ['providers' => $providerNames]) }}
             </p>
 
             <div class="mt-7 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
@@ -112,7 +143,7 @@
                 <div class="bg-surface p-6 md:p-10">
                     <x-cloud::marketing.eyebrow class="mb-4">{{ sprintf('%02d', $index + 1) }}</x-cloud::marketing.eyebrow>
                     <h2 class="text-lg font-medium text-gray-950 dark:text-white">{{ $stepTitle }}</h2>
-                    <p class="mt-2 text-sm leading-relaxed text-gray-500 dark:text-gray-400">{{ $stepDescription }}</p>
+                    <p class="type-prose mt-2 text-gray-500 dark:text-gray-400">{{ $stepDescription }}</p>
                 </div>
             @endforeach
         </div>
@@ -137,7 +168,7 @@
                             <span class="rounded-md bg-gray-100 px-1.5 py-0.5 text-micro font-medium text-gray-600 dark:bg-white/[0.08] dark:text-gray-300">{{ __('Default') }}</span>
                         @endif
                     </h3>
-                    <p class="mt-1.5 text-sm leading-relaxed text-gray-500 dark:text-gray-400">{{ $levelDescription }}</p>
+                    <p class="type-prose mt-1.5 text-gray-500 dark:text-gray-400">{{ $levelDescription }}</p>
                 </div>
             @endforeach
         </div>
@@ -146,7 +177,7 @@
             @foreach($privacyControls as [$controlTitle, $controlDescription])
                 <div class="bg-surface p-6 md:p-8">
                     <h3 class="text-base font-medium text-gray-950 dark:text-white">{{ $controlTitle }}</h3>
-                    <p class="mt-1.5 text-sm leading-relaxed text-gray-500 dark:text-gray-400">{{ $controlDescription }}</p>
+                    <p class="type-prose mt-1.5 text-gray-500 dark:text-gray-400">{{ $controlDescription }}</p>
                 </div>
             @endforeach
         </div>
@@ -154,7 +185,7 @@
 
     <x-cloud::marketing.frame>
         <x-cloud::marketing.frame-header :label="__('Work from the record')" :lead="__('Reply where the context is.')">
-            {{ __('Then let :name take the first draft.', ['name' => $assistantName]) }}
+            {{ __('Then let :name, the built-in AI assistant, take the first draft.', ['name' => $assistantName]) }}
         </x-cloud::marketing.frame-header>
 
         <div class="bg-rail grid gap-px">
@@ -203,7 +234,7 @@
                 :link-label="__('Meet :name', ['name' => $assistantName])"
                 :link-href="route('ai')"
             >
-                {{ __(':name, the built-in AI assistant, puts each email on its own card. Nothing leaves until you click Send.', ['name' => $assistantName]) }}
+                {{ __(':name puts each email on its own card. Nothing leaves until you click Send.', ['name' => $assistantName]) }}
 
                 <x-slot:visual>
                     <div class="flex min-h-[inherit] items-center justify-center p-4 sm:p-8 md:p-12">
@@ -246,7 +277,7 @@
             @foreach($meetingPoints as [$pointTitle, $pointDescription])
                 <div class="bg-surface p-6 md:p-8">
                     <h3 class="text-base font-medium text-gray-950 dark:text-white">{{ $pointTitle }}</h3>
-                    <p class="mt-1.5 text-sm leading-relaxed text-gray-500 dark:text-gray-400">{{ $pointDescription }}</p>
+                    <p class="type-prose mt-1.5 text-gray-500 dark:text-gray-400">{{ $pointDescription }}</p>
                 </div>
             @endforeach
         </div>
@@ -261,9 +292,9 @@
                         {{ __('Questions about email') }}
                     </h2>
                     @if($documentationActive)
-                        <p class="mt-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+                        <p class="type-prose mt-4 text-gray-500 dark:text-gray-400">
                             {{ __('Step-by-step guides live in the') }}
-                            <a href="{{ url('/help/email-and-calendar') }}" class="font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white">{{ __('help center') }}</a>.
+                            <a href="{{ route('help.category', ['category' => 'email-and-calendar']) }}" class="font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white">{{ __('help center') }}</a>.
                         </p>
                     @endif
                 </div>

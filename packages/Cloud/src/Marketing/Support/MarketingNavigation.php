@@ -7,8 +7,10 @@ namespace Relaticle\Cloud\Marketing\Support;
 use App\Features\Blog;
 use App\Features\Documentation;
 use App\Features\EmailIntegration;
+use Illuminate\Support\Arr;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Marketing\Enums\ConnectableAssistant;
+use Relaticle\EmailIntegration\Enums\EmailProvider;
 
 final readonly class MarketingNavigation
 {
@@ -33,7 +35,7 @@ final readonly class MarketingNavigation
                     __('Email and calendar'),
                     route('emailAndCalendar'),
                     icon: 'email',
-                    description: __('Gmail and Outlook on every record'),
+                    description: __(':providers on every record', ['providers' => $this->mailProviderNames()]),
                 ) : null,
                 new NavItem(
                     __('Self-hosted'),
@@ -106,6 +108,16 @@ final readonly class MarketingNavigation
                 new NavItem(__('Press kit'), route('press')),
             ]),
         ];
+    }
+
+    private function mailProviderNames(): string
+    {
+        $configured = array_filter(EmailProvider::cases(), fn (EmailProvider $provider): bool => $provider->isConfigured());
+
+        return Arr::join(array_map(fn (EmailProvider $provider): string => match ($provider) {
+            EmailProvider::GMAIL => 'Gmail',
+            EmailProvider::AZURE => 'Outlook',
+        }, $configured === [] ? [EmailProvider::GMAIL] : $configured), ', ', ' and ');
     }
 
     /** @return list<NavItem> */
