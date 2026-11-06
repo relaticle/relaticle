@@ -52,6 +52,34 @@ final readonly class RecordCommunicationMetrics
         );
     }
 
+    public function recomputeEmailMetrics(People|Company|Opportunity $record): void
+    {
+        $inbound = 0;
+        $outbound = 0;
+        $lastEmailAt = null;
+
+        foreach ($record->emails()->reorder()->with('participants')->lazyById(500, 'emails.id', 'id') as $email) {
+            if (! $this->visibility->countsTowardCommunicationIntelligence($email)) {
+                continue;
+            }
+
+            if ($email->direction === EmailDirection::INBOUND) {
+                $inbound++;
+            } else {
+                $outbound++;
+            }
+
+            if ($email->sent_at !== null && ($lastEmailAt === null || $email->sent_at->greaterThan($lastEmailAt))) {
+                $lastEmailAt = $email->sent_at;
+            }
+        }
+
+        DB::update(
+            'update '.$record->getTable().' set email_count = ?, inbound_email_count = ?, outbound_email_count = ?, last_email_at = ?, last_interaction_at = GREATEST(last_meeting_at, ?), updated_at = ? where '.$record->getKeyName().' = ?',
+            [$inbound + $outbound, $inbound, $outbound, $lastEmailAt, $lastEmailAt, now(), $record->getKey()],
+        );
+    }
+
     public function incrementMeetingMetrics(People|Company|Opportunity $record, Meeting $meeting): void
     {
         if (! $this->visibility->meetingCountsTowardCommunicationIntelligence($meeting)) {

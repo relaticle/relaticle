@@ -21,6 +21,7 @@ use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\EmailIntegration\Actions\AutoCreateCompanyAction;
 use Relaticle\EmailIntegration\Actions\AutoCreatePersonAction;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
+use Relaticle\EmailIntegration\Actions\UnlinkEmailFromRecord;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -36,6 +37,7 @@ mutates(LinkEmailAction::class);
 mutates(AutoCreatePersonAction::class);
 mutates(AutoCreateCompanyAction::class);
 mutates(PersonEmailMatcher::class);
+mutates(UnlinkEmailFromRecord::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -1482,8 +1484,7 @@ it('does not link a company again after a user unlinked it, on sync or history i
     EmailParticipant::factory()->from()->create(['email_id' => $email->getKey(), 'email_address' => 'ceo@acme.com']);
     resolve(LinkEmailAction::class)->execute($email);
 
-    $email->companies()->detach($company->getKey());
-    EmailLinkSuppression::factory()->create(['email_id' => $email->getKey(), 'emailable_id' => $company->getKey()]);
+    resolve(UnlinkEmailFromRecord::class)->execute($this->user, $email, $company);
     resolve(LinkEmailAction::class)->reapply($email->fresh());
 
     expect($email->companies()->whereKey($company->getKey())->exists())->toBeFalse()
@@ -1495,8 +1496,7 @@ it('does not link a later reply in the same conversation to the record a user un
     $first = makeLinkEmail(['conversation_key' => 'acme-renewal']);
     EmailParticipant::factory()->from()->create(['email_id' => $first->getKey(), 'email_address' => 'ceo@acme.com']);
     resolve(LinkEmailAction::class)->execute($first);
-    $first->companies()->detach($company->getKey());
-    EmailLinkSuppression::factory()->create(['email_id' => $first->getKey(), 'emailable_id' => $company->getKey()]);
+    resolve(UnlinkEmailFromRecord::class)->execute($this->user, $first, $company);
 
     $reply = makeLinkEmail(['conversation_key' => 'acme-renewal']);
     $elsewhere = makeLinkEmail(['conversation_key' => 'acme-onboarding']);
@@ -1508,7 +1508,7 @@ it('does not link a later reply in the same conversation to the record a user un
 
     expect($reply->companies()->whereKey($company->getKey())->exists())->toBeFalse()
         ->and($elsewhere->companies()->whereKey($company->getKey())->exists())->toBeTrue()
-        ->and($company->fresh()->email_count)->toBe(2);
+        ->and($company->fresh()->email_count)->toBe(1);
 });
 
 function makeAcmeCompanyWithDomain(): ?Company
