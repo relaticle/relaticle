@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Company;
+use App\Models\CustomField;
 use App\Models\Opportunity;
 use App\Models\User;
 use App\Models\Workspace;
@@ -29,8 +30,10 @@ use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailLinkSuppression;
+use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Queries\ConversationsQuery;
+use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 use Relaticle\EmailIntegration\Services\RecordCommunicationMetrics;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -346,6 +349,57 @@ it('recounts in its own workspace after a real round trip through the queue payl
     expect($boundDuringRecount)->toBe($this->workspace->getKey())
         ->and($currentWorkspace->get())->toBeNull()
         ->and($this->company->fresh()->email_count)->toBe(1);
+});
+
+it('keeps the owner\'s linked copy on the record when a teammate unlinks their own copy', function (): void {
+    $owners = linkingEmail($this->owner);
+    $teammates = linkingEmail($this->teammate, ['rfc_message_id' => '<renewal-cc@airbnb.test>']);
+    $owners->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
+    $teammates->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
+    resolve(RefreshConversationSummary::class)->execute($this->workspace->getKey(), 'airbnb-renewal');
+
+    resolve(UnlinkEmailFromRecord::class)->execute($this->teammate, $teammates, $this->company);
+    resolve(LinkEmailAction::class)->reapply($owners->fresh());
+
+    expect(resolve(ConversationsQuery::class)->paginate($this->owner, ConversationView::All, ConversationFilters::forRecord($this->company))->rows)->toHaveCount(1)
+        ->and(resolve(EmailVisibilityService::class)->visibleEmailCountBadge($this->company, $this->owner))->toBe('1')
+        ->and(linkSource($owners, $this->company))->toBe('auto');
+});
+
+it('shows a pinned copy on the record whatever a teammate suppressed on theirs', function (): void {
+    $domains = CustomField::query()->withoutGlobalScopes()->where('tenant_id', $this->workspace->getKey())->where('entity_type', 'company')->where('code', 'domains')->firstOrFail();
+    $this->company->saveCustomFieldValue($domains, 'https://airbnb.test', $this->workspace);
+    $owners = linkingEmail($this->owner);
+    $teammates = linkingEmail($this->teammate, ['rfc_message_id' => '<renewal-cc@airbnb.test>']);
+    EmailParticipant::factory()->from()->create(['email_id' => $teammates->getKey(), 'email_address' => 'brian@airbnb.test']);
+    $owners->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
+    $teammates->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
+
+    resolve(UnlinkEmailFromRecord::class)->execute($this->teammate, $teammates, $this->company);
+    resolve(UnlinkEmailFromRecord::class)->execute($this->owner, $owners, $this->company);
+    resolve(LinkEmailToRecord::class)->execute($this->owner, $owners, $this->company);
+    resolve(LinkEmailAction::class)->reapply($teammates->fresh());
+
+    expect(Email::query()->onRecord($this->company)->pluck('id')->all())->toBe([$owners->getKey()])
+        ->and(resolve(EmailVisibilityService::class)->visibleEmailCountBadge($this->company, $this->owner))->toBe('1')
+        ->and(linkSource($teammates, $this->company))->toBeNull();
+});
+
+it('leaves a copy off the opportunity tab once its company link is suppressed on that copy', function (): void {
+    $opportunity = Opportunity::factory()->for($this->workspace)->create(['name' => 'Airbnb renewal', 'company_id' => $this->company->getKey()]);
+    $email = linkingEmail($this->owner);
+    $email->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
+
+    expect(Email::query()->onRecord($opportunity)->pluck('id')->all())->toBe([$email->getKey()]);
+
+    EmailLinkSuppression::factory()->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'email_id' => $email->getKey(),
+        'emailable_type' => $this->company->getMorphClass(),
+        'emailable_id' => $this->company->getKey(),
+    ]);
+
+    expect(Email::query()->onRecord($opportunity)->pluck('id')->all())->toBe([]);
 });
 
 function linkingPage(Email $email): mixed

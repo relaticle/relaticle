@@ -10,6 +10,7 @@ use App\Models\People;
 use App\Models\Workspace;
 use App\Support\CurrentWorkspace;
 use Illuminate\Contracts\Database\Query\Builder;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Support\Facades\DB;
@@ -91,9 +92,8 @@ final readonly class LinkEmailAction
 
             $applyMetricsForPrelinkedRecords = $locked->linked_at === null;
 
-            $suppressed = $this->suppressedPairs($email);
-            $this->detachSuppressed($email, $suppressed);
-            $this->link($email, $applyMetricsForPrelinkedRecords, $suppressed);
+            $this->detachSuppressed($email, $this->suppressedPairs($email, onThisCopyOnly: true));
+            $this->link($email, $applyMetricsForPrelinkedRecords, $this->suppressedPairs($email, onThisCopyOnly: false));
 
             if ($locked->linked_at === null) {
                 $locked->updateQuietly(['linked_at' => now()]);
@@ -266,12 +266,21 @@ final readonly class LinkEmailAction
         return count($parts) === 2 ? strtolower($parts[1]) : null;
     }
 
-    /** @return array<string, true> keyed "type:id" */
-    private function suppressedPairs(Email $email): array
+    /**
+     * A suppression on this copy always holds; one on another copy of the conversation holds until a pin on the record overrides it.
+     *
+     * @return array<string, true> keyed "type:id"
+     */
+    private function suppressedPairs(Email $email, bool $onThisCopyOnly): array
     {
         return array_fill_keys(EmailLinkSuppression::query()
-            ->matchingConversationOf($email)
-            ->inForce()
+            ->when(
+                $onThisCopyOnly,
+                fn (EloquentBuilder $own): EloquentBuilder => $own->where('email_id', $email->getKey()),
+                fn (EloquentBuilder $conversation): EloquentBuilder => $conversation
+                    ->matchingConversationOf($email)
+                    ->where(fn (EloquentBuilder $holding): EloquentBuilder => $holding->where('email_id', $email->getKey())->orWhere(fn (EloquentBuilder $elsewhere): EloquentBuilder => $elsewhere->inForce())),
+            )
             ->get(['emailable_type', 'emailable_id'])
             ->map(fn (EmailLinkSuppression $suppression): string => "{$suppression->emailable_type}:{$suppression->emailable_id}")
             ->all(), true);

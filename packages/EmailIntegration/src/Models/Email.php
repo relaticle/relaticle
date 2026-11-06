@@ -254,13 +254,13 @@ final class Email extends Model
                                     ->where('emailables.emailable_id', $id));
                             }
                         }))))
-            ->whereNotExists($this->suppressionsOnConversation($query)
+            ->whereNotExists(fn (QueryBuilder $suppression): QueryBuilder => $this->suppressionsOf($suppression, $query->qualifyColumn('id'))
                 ->where('email_link_suppressions.emailable_type', $record->getMorphClass())
                 ->where('email_link_suppressions.emailable_id', $record->getKey()));
     }
 
     /**
-     * Stored links to any of the records that no user removed from the email's conversation.
+     * Stored links to any of the records that no user removed from that copy.
      *
      * @param  Builder<Email>  $query
      * @param  QueryBuilder|list<string>  $recordIds
@@ -271,32 +271,26 @@ final class Email extends Model
     {
         return $query->whereExists(fn (QueryBuilder $link): QueryBuilder => $this->linksOf($link, $query)
             ->where('emailables.emailable_type', $morphType)
-            ->whereIn('emailables.emailable_id', $recordIds)
-            ->whereNotExists($this->suppressionsOnConversation($query)
-                ->whereColumn('email_link_suppressions.emailable_type', 'emailables.emailable_type')
-                ->whereColumn('email_link_suppressions.emailable_id', 'emailables.emailable_id')));
+            ->whereIn('emailables.emailable_id', $recordIds));
     }
 
-    /** @param  Builder<Email>  $query */
+    /**
+     * A copy's links that no user removed from that copy; another copy's suppression never hides this one.
+     *
+     * @param  Builder<Email>  $query
+     */
     private function linksOf(QueryBuilder $link, Builder $query): QueryBuilder
     {
-        return $link->from('emailables')->whereColumn('emailables.email_id', $query->qualifyColumn('id'));
+        return $link->from('emailables')
+            ->whereColumn('emailables.email_id', $query->qualifyColumn('id'))
+            ->whereNotExists(fn (QueryBuilder $suppression): QueryBuilder => $this->suppressionsOf($suppression, 'emailables.email_id')
+                ->whereColumn('email_link_suppressions.emailable_type', 'emailables.emailable_type')
+                ->whereColumn('email_link_suppressions.emailable_id', 'emailables.emailable_id'));
     }
 
-    /** @param  Builder<Email>  $query */
-    private function suppressionsOnConversation(Builder $query): QueryBuilder
+    private function suppressionsOf(QueryBuilder $suppression, string $emailIdColumn): QueryBuilder
     {
-        return EmailLinkSuppression::query()
-            ->inForce()
-            ->join('emails as suppressed_copies', 'suppressed_copies.id', '=', 'email_link_suppressions.email_id')
-            ->whereColumn('email_link_suppressions.workspace_id', $query->qualifyColumn('workspace_id'))
-            ->where(fn (Builder $same): Builder => $same
-                ->whereColumn('suppressed_copies.id', $query->qualifyColumn('id'))
-                ->orWhereColumn('suppressed_copies.conversation_key', $query->qualifyColumn('conversation_key'))
-                ->orWhere(fn (Builder $unkeyed): Builder => $unkeyed
-                    ->whereNull($query->qualifyColumn('conversation_key'))
-                    ->whereColumn('suppressed_copies.rfc_message_id', $query->qualifyColumn('rfc_message_id'))))
-            ->toBase();
+        return $suppression->from('email_link_suppressions')->whereColumn('email_link_suppressions.email_id', $emailIdColumn);
     }
 
     // Manual linking and sync linking take this first in their transactions, so neither reads the other's half-written links.
