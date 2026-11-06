@@ -52,30 +52,16 @@
         : 'editField('.\Illuminate\Support\Js::from($row['code']).', '.\Illuminate\Support\Js::from($stepId).', '.$index.')';
 @endphp
 
-@php
-    $renderedPairs = [];
-
-    foreach ($pairs as $row) {
-        $valueHtml = view('chat::livewire.chat.partials._dock-value', ['row' => $row, 'stack' => mb_strlen((string) ($row['old'] ?? '')) + mb_strlen((string) ($row['new'] ?? $row['value'] ?? '')) > 28, 'clampable' => false, 'refLinks' => $refLinks])->render();
-
-        if (trim($valueHtml) !== '') {
-            $renderedPairs[] = ['row' => $row, 'valueHtml' => $valueHtml];
-        }
-    }
-@endphp
-
-@if ($renderedPairs !== [])
+@if ($pairs !== [])
     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        @foreach ($renderedPairs as $pair)
-            @php($row = $pair['row'])
-
+        @foreach ($pairs as $row)
             @if (! $loop->first)
                 <span class="text-gray-300 dark:text-gray-600" aria-hidden="true">&middot;</span>
             @endif
 
             <span class="group/pair inline-flex min-w-0 max-w-full items-baseline gap-1.5" data-proposal-field-row>
                 <span class="shrink-0 text-xs text-gray-500 dark:text-gray-400">{{ $row['label'] ?? '' }}</span>
-                {!! $pair['valueHtml'] !!}
+                @include('chat::livewire.chat.partials._dock-value', ['row' => $row, 'stack' => mb_strlen((string) ($row['old'] ?? '')) + mb_strlen((string) ($row['new'] ?? $row['value'] ?? '')) > 28, 'clampable' => false, 'refLinks' => $refLinks])
                 @if ($editFor($row))
                     <button
                         type="button"
