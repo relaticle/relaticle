@@ -27,12 +27,6 @@ use Relaticle\Cloud\Billing\Queries\InactiveTrialWorkspacesQuery;
 #[Signature('billing:schedule-inactive-deletions')]
 final class ScheduleInactiveTrialDeletionsCommand extends Command
 {
-    public const int KEEP_DAYS = 60;
-
-    public const int WARNING_DAYS = 14;
-
-    public const int REMINDER_DAYS = 5;
-
     public function handle(InactiveTrialWorkspacesQuery $inactive, CancelInactivityDeletion $cancel): int
     {
         if (Feature::inactive(Billing::class)) {
@@ -51,7 +45,9 @@ final class ScheduleInactiveTrialDeletionsCommand extends Command
     {
         $scheduled = 0;
 
-        $inactive->candidates()->each(function (Workspace $workspace) use ($inactive, &$scheduled): void {
+        $pausedBy = now()->subDays(InactiveTrialWorkspacesQuery::KEEP_DAYS - InactiveTrialWorkspacesQuery::WARNING_DAYS - 1);
+
+        $inactive->candidates($pausedBy)->each(function (Workspace $workspace) use ($inactive, &$scheduled): void {
             $owner = $workspace->owner;
 
             if (! $owner instanceof User) {
@@ -59,8 +55,8 @@ final class ScheduleInactiveTrialDeletionsCommand extends Command
             }
 
             $lastActiveAt = $inactive->lastActivity($workspace);
-            $deletesAt = $lastActiveAt->addDays(self::KEEP_DAYS);
-            $earliest = now()->addDays(self::WARNING_DAYS);
+            $deletesAt = $lastActiveAt->addDays(InactiveTrialWorkspacesQuery::KEEP_DAYS);
+            $earliest = now()->addDays(InactiveTrialWorkspacesQuery::WARNING_DAYS);
 
             if ($deletesAt->greaterThan($earliest->addDay())) {
                 return;
@@ -110,7 +106,7 @@ final class ScheduleInactiveTrialDeletionsCommand extends Command
 
     private function sendReminders(InactiveTrialWorkspacesQuery $inactive, CancelInactivityDeletion $cancel): void
     {
-        $reminderDate = now()->addDays(self::REMINDER_DAYS);
+        $reminderDate = now()->addDays(InactiveTrialWorkspacesQuery::REMINDER_DAYS);
         $reminded = 0;
 
         Workspace::query()

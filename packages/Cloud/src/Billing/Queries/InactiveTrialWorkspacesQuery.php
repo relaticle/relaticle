@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Relaticle\Cloud\Billing\Queries;
 
 use App\Enums\BillingStatus;
-use App\Models\Membership;
 use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
@@ -15,17 +14,23 @@ use Illuminate\Support\LazyCollection;
 use Laravel\Cashier\Subscription;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditTransaction;
-use Relaticle\Cloud\Billing\Commands\ScheduleInactiveTrialDeletionsCommand;
 
 final readonly class InactiveTrialWorkspacesQuery
 {
+    public const int KEEP_DAYS = 60;
+
+    public const int WARNING_DAYS = 14;
+
+    public const int REMINDER_DAYS = 5;
+
     /**
      * @return LazyCollection<int, Workspace>
      */
-    public function candidates(): LazyCollection
+    public function candidates(?CarbonImmutable $pausedBy = null): LazyCollection
     {
         return $this->eligible()
             ->notScheduledForDeletion()
+            ->when($pausedBy, static fn (Builder $query, CarbonImmutable $pausedBy): Builder => $query->where('paused_at', '<=', $pausedBy))
             ->whereHas('owner')
             ->with(['owner', 'subscriptions'])
             ->lazyById(100)
@@ -51,7 +56,7 @@ final readonly class InactiveTrialWorkspacesQuery
         $scheduledFor = $workspace->scheduled_deletion_at ?? now();
 
         return $this->isEligible($workspace)
-            && $this->lastActivity($workspace)->addDays(ScheduleInactiveTrialDeletionsCommand::KEEP_DAYS)->lessThanOrEqualTo($scheduledFor->addDay());
+            && $this->lastActivity($workspace)->addDays(self::KEEP_DAYS)->lessThanOrEqualTo($scheduledFor->addDay());
     }
 
     /**
@@ -62,7 +67,7 @@ final readonly class InactiveTrialWorkspacesQuery
         return BillingStatus::TrialEnded->applyToQuery(Workspace::query())
             ->whereNotNull('paused_at')
             ->whereNull('trial_ends_at')
-            ->whereNotIn('id', $this->creditPurchases()->select('workspace_id'));
+            ->whereNotExists($this->creditPurchases()->whereColumn('ai_credit_transactions.workspace_id', 'workspaces.id')->toBase());
     }
 
     /**
@@ -82,10 +87,7 @@ final readonly class InactiveTrialWorkspacesQuery
     {
         $pausedAt = $workspace->paused_at ?? $workspace->created_at;
 
-        $lastLogin = User::query()
-            ->whereKey($workspace->user_id)
-            ->orWhereIn('id', Membership::query()->where('workspace_id', $workspace->getKey())->select('user_id'))
-            ->max('last_login_at');
+        $lastLogin = User::query()->inWorkspace($workspace->getKey())->max('last_login_at');
 
         if (! is_string($lastLogin)) {
             return $pausedAt;

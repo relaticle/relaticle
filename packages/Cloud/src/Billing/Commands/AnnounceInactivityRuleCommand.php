@@ -48,7 +48,7 @@ final class AnnounceInactivityRuleCommand extends Command
                 }
 
                 $startsAt = now()->startOfSecond();
-                $deletesAt = $startsAt->addDays(ScheduleInactiveTrialDeletionsCommand::KEEP_DAYS);
+                $deletesAt = $startsAt->addDays(InactiveTrialWorkspacesQuery::KEEP_DAYS);
 
                 $notified = DB::transaction(function () use ($workspace, $owner, $startsAt, $deletesAt): bool {
                     $updated = Workspace::query()
