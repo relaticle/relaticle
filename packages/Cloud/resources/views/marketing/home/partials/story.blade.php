@@ -4,7 +4,7 @@
 
     $steps = array_values(array_filter([
         $emailIntegrationActive ? ['mailbox', __('Mon 9:12'), __('Adds Lena Ortiz and Northwind after your first email.')] : null,
-        ['you', __('Tue 14:30'), __('Moves Northwind renewal to Negotiation on the board.')],
+        ['you', __('Tue 14:30'), __('Moves Northwind renewal to Negotiation/Review on the board.')],
         ['claude', __('Wed 10:05'), __('Creates a follow-up task for Thursday from a chat in Claude.')],
         ['rela', __('Fri 16:48'), __('Marks the opportunity as won after you approve the change.')],
     ]));

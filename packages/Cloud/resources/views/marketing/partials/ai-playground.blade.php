@@ -7,7 +7,7 @@
     ];
 
     $scenarios = [
-        'batch' => [__('Update three deals'), __('Move the three Kovra deals to Negotiation')],
+        'batch' => [__('Update three opportunities'), __('Move the three Kovra deals to Negotiation')],
         'create' => [__('Add a person'), __('Add Sarah Chen at Kovra Systems. She is VP of Engineering.')],
         'read' => [__('Find overdue tasks'), __('What is overdue?')],
     ];
@@ -20,19 +20,19 @@
 
     $deals = [
         ['name' => __('Kovra renewal'), 'from' => __('Qualification'), 'amount' => '$24,000'],
-        ['name' => __('Kovra add-on seats'), 'from' => __('Proposal'), 'amount' => '$8,500'],
+        ['name' => __('Kovra add-on seats'), 'from' => __('Proposal/Price Quote'), 'amount' => '$8,500'],
         ['name' => __('Kovra platform expansion'), 'from' => __('Qualification'), 'amount' => '$62,000'],
     ];
 
     $opportunityRows = [
         ['deal' => 0],
-        ['name' => 'Trellis Labs pilot', 'company' => 'Trellis Labs', 'stage' => __('Negotiation'), 'amount' => '$12,000'],
+        ['name' => 'Trellis Labs pilot', 'company' => 'Trellis Labs', 'stage' => __('Negotiation/Review'), 'amount' => '$12,000'],
         ['deal' => 1],
-        ['name' => 'Lumen Health onboarding', 'company' => 'Lumen Health', 'stage' => __('Proposal'), 'amount' => '$18,000'],
+        ['name' => 'Lumen Health onboarding', 'company' => 'Lumen Health', 'stage' => __('Proposal/Price Quote'), 'amount' => '$18,000'],
         ['deal' => 2],
-        ['name' => 'Northwind renewal', 'company' => 'Northwind', 'stage' => __('Won'), 'amount' => '$48,000'],
+        ['name' => 'Northwind renewal', 'company' => 'Northwind', 'stage' => __('Closed Won'), 'amount' => '$48,000'],
         ['name' => 'Halcyon Freight rollout', 'company' => 'Halcyon Freight', 'stage' => __('Qualification'), 'amount' => '$31,000'],
-        ['name' => 'Brightline analytics seats', 'company' => 'Brightline', 'stage' => __('Proposal'), 'amount' => '$9,600'],
+        ['name' => 'Brightline analytics seats', 'company' => 'Brightline', 'stage' => __('Proposal/Price Quote'), 'amount' => '$9,600'],
     ];
 
     $people = [
@@ -60,8 +60,8 @@
         __('Okay, I left all :count opportunities as they were.', ['count' => count($deals)]),
         ...array_map(
             fn (int $saved): string => $saved === count($deals)
-                ? __('Done. Moved all :count opportunities to Negotiation.', ['count' => $saved])
-                : __('Done. Moved :saved of :count opportunities to Negotiation.', ['saved' => $saved, 'count' => count($deals)]),
+                ? __('Done. Moved all :count opportunities to Negotiation/Review.', ['count' => $saved])
+                : __('Done. Moved :saved of :count opportunities to Negotiation/Review.', ['saved' => $saved, 'count' => count($deals)]),
             range(1, count($deals)),
         ),
     ];
@@ -157,9 +157,11 @@
             this.reset()
         },
         move(step) {
-            const next = (this.order.indexOf(this.scenario) + step + this.order.length) % this.order.length
-            this.select(this.order[next])
-            this.$nextTick(() => this.$refs['tab-' + this.order[next]].focus())
+            this.moveTo((this.order.indexOf(this.scenario) + step + this.order.length) % this.order.length)
+        },
+        moveTo(index) {
+            this.select(this.order[index])
+            this.$nextTick(() => this.$refs['tab-' + this.order[index]].focus())
         },
         reset() {
             clearTimeout(this.timer)
@@ -186,6 +188,10 @@
             if (decision === 'saved') {
                 this.land(deal)
             }
+
+            if (! this.undecided.length) {
+                this.$nextTick(() => this.$refs.batchResult.focus())
+            }
         },
         decidePerson(decision) {
             this.person.decision = decision
@@ -193,6 +199,8 @@
             if (decision === 'created') {
                 this.land(this.person)
             }
+
+            this.$nextTick(() => this.$refs['person' + decision].focus())
         },
     }"
 >
@@ -227,7 +235,7 @@
 
                             @if($key === 'batch')
                                 <div class="border-t border-gray-100 dark:border-white/[0.06]">
-                                    <div class="{{ $head }} grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.7fr)]">
+                                    <div class="{{ $head }} grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1.1fr)_minmax(0,1.3fr)_minmax(0,0.7fr)]">
                                         <span>{{ __('Name') }}</span>
                                         <span class="hidden sm:block">{{ __('Company') }}</span>
                                         <span>{{ __('Stage') }}</span>
@@ -235,14 +243,14 @@
                                     </div>
                                     @foreach($opportunityRows as $index => $opportunity)
                                         @php($deal = isset($opportunity['deal']) ? $deals[$opportunity['deal']] : null)
-                                        <div class="{{ $row }} {{ $index >= 5 ? 'max-sm:hidden' : '' }} grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.7fr)]" @if($deal) data-ai-deal-row="{{ $opportunity['deal'] }}" @endif>
+                                        <div class="{{ $row }} {{ $index >= 5 ? 'max-sm:hidden' : '' }} grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1.1fr)_minmax(0,1.3fr)_minmax(0,0.7fr)]" @if($deal) data-ai-deal-row="{{ $opportunity['deal'] }}" @endif>
                                             @if($deal)
                                                 <span class="{{ $flash }} opacity-0" x-bind:class="{ 'opacity-0': ! deals[{{ $opportunity['deal'] }}].flash }"></span>
                                             @endif
                                             <span class="relative truncate font-medium text-gray-900 dark:text-white">{{ $deal['name'] ?? $opportunity['name'] }}</span>
                                             <span class="relative hidden truncate text-gray-600 sm:block dark:text-gray-300">{{ $deal ? 'Kovra Systems' : $opportunity['company'] }}</span>
                                             @if($deal)
-                                                <span class="relative truncate text-gray-600 dark:text-gray-300" x-bind:class="{ 'font-medium text-gray-900 dark:text-white': deals[{{ $opportunity['deal'] }}].decision === 'saved' }" x-text="deals[{{ $opportunity['deal'] }}].decision === 'saved' ? @js(__('Negotiation')) : deals[{{ $opportunity['deal'] }}].from" data-ai-deal-stage>{{ $deal['from'] }}</span>
+                                                <span class="relative truncate text-gray-600 dark:text-gray-300" x-bind:class="{ 'font-medium text-gray-900 dark:text-white': deals[{{ $opportunity['deal'] }}].decision === 'saved' }" x-text="deals[{{ $opportunity['deal'] }}].decision === 'saved' ? @js(__('Negotiation/Review')) : deals[{{ $opportunity['deal'] }}].from" data-ai-deal-stage>{{ $deal['from'] }}</span>
                                             @else
                                                 <span class="relative truncate text-gray-600 dark:text-gray-300">{{ $opportunity['stage'] }}</span>
                                             @endif
@@ -303,7 +311,7 @@
                         </span>
                     </div>
 
-                    <div id="ai-ask-panel" role="tabpanel" x-bind:aria-labelledby="'ai-ask-' + scenario" class="grid flex-1 content-start p-4" aria-live="polite">
+                    <div id="ai-ask-panel" role="tabpanel" x-bind:aria-labelledby="'ai-ask-' + scenario" class="grid flex-1 content-start p-4">
 
                         {{-- Batch update: one record at a time, as a standalone batch card shows it. --}}
                         <div class="{{ $panel }} {{ $fadeOpacity }}" x-bind:class="{ 'invisible opacity-0': scenario !== 'batch', '{{ $fadeOpacity }}': scenario === 'batch' }" data-ai-scenario="batch">
@@ -314,7 +322,7 @@
                                     <span class="size-1.5 rounded-full bg-gray-400 motion-safe:animate-pulse dark:bg-gray-500"></span>
                                     {{ __('Preparing opportunity changes…') }}
                                 </p>
-                                <p class="{{ $reply }} {{ $fade }} col-start-1 row-start-1" x-bind:class="{ 'opacity-0': thinking, '{{ $fade }}': ! thinking }" x-text="undecided.length ? @js($batchPrompt) : batchSummary">{{ $batchPrompt }}</p>
+                                <p class="{{ $reply }} {{ $fade }} col-start-1 row-start-1" x-bind:class="{ 'opacity-0': thinking, '{{ $fade }}': ! thinking }" aria-live="polite" x-text="undecided.length ? @js($batchPrompt) : batchSummary">{{ $batchPrompt }}</p>
                                 @foreach([$batchPrompt, ...$batchReplies] as $variant)
                                     <p class="{{ $reply }} {{ $ghost }}" aria-hidden="true">{{ $variant }}</p>
                                 @endforeach
@@ -347,7 +355,7 @@
                                                     <span class="{{ $ghost }}" aria-hidden="true">{{ $widestStage }}</span>
                                                 </span>
                                                 <x-heroicon-m-arrow-right class="size-3 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true"/>
-                                                <span class="font-medium text-gray-900 dark:text-white">{{ __('Negotiation') }}</span>
+                                                <span class="font-medium text-gray-900 dark:text-white">{{ __('Negotiation/Review') }}</span>
                                             </span>
                                         </div>
                                     </div>
@@ -370,7 +378,7 @@
                                     </div>
                                 </div>
 
-                                <ul class="col-start-1 row-start-1 self-start overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] invisible opacity-0" x-bind:class="{ 'invisible opacity-0': undecided.length > 0, '{{ $fade }}': undecided.length === 0 }" data-ai-batch-decided>
+                                <ul tabindex="-1" x-ref="batchResult" class="col-start-1 row-start-1 self-start overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] invisible opacity-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500" x-bind:class="{ 'invisible opacity-0': undecided.length > 0, '{{ $fade }}': undecided.length === 0 }" data-ai-batch-decided>
                                     @foreach($deals as $index => $deal)
                                         <li class="flex items-center gap-2.5 border-b border-gray-100 px-4 py-2.5 last:border-b-0 dark:border-white/5">
                                             <span class="chat-chip min-w-0" data-record-type="opportunity">
@@ -396,7 +404,7 @@
                                     <span class="size-1.5 rounded-full bg-gray-400 motion-safe:animate-pulse dark:bg-gray-500"></span>
                                     {{ __('Drafting a person…') }}
                                 </p>
-                                <p class="{{ $reply }} col-start-1 row-start-1" x-bind:class="{ 'opacity-0': thinking, '{{ $fade }}': ! thinking }" x-text="personReply">{{ $personReplies['prompt'] }}</p>
+                                <p class="{{ $reply }} col-start-1 row-start-1" x-bind:class="{ 'opacity-0': thinking, '{{ $fade }}': ! thinking }" aria-live="polite" x-text="personReply">{{ $personReplies['prompt'] }}</p>
                                 @foreach($personReplies as $variant)
                                     <p class="{{ $reply }} {{ $ghost }}" aria-hidden="true">{{ $variant }}</p>
                                 @endforeach
@@ -439,11 +447,11 @@
                                         <button type="button" class="{{ $discardButton }}" x-on:click="decidePerson('discarded')" x-bind:disabled="thinking">{{ __('Discard') }}</button>
                                         <button type="button" class="{{ $confirmButton }}" x-on:click="decidePerson('created')" x-bind:disabled="thinking" data-ai-create-confirm>{{ __('Create') }}</button>
                                     </div>
-                                    <p class="invisible col-start-1 row-start-1 flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium text-emerald-700 dark:text-emerald-400" x-bind:class="{ 'invisible': person.decision !== 'created' }" data-ai-create-done>
+                                    <p tabindex="-1" x-ref="personcreated" class="invisible col-start-1 row-start-1 flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium text-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-emerald-400" x-bind:class="{ 'invisible': person.decision !== 'created' }" data-ai-create-done>
                                         <x-ri-checkbox-circle-fill class="size-4" aria-hidden="true"/>
                                         {{ __('Approved by you. Sarah Chen was created.') }}
                                     </p>
-                                    <p class="invisible col-start-1 row-start-1 flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium text-gray-600 dark:text-gray-300" x-bind:class="{ 'invisible': person.decision !== 'discarded' }">
+                                    <p tabindex="-1" x-ref="persondiscarded" data-ai-create-discarded class="invisible col-start-1 row-start-1 flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium text-gray-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-300" x-bind:class="{ 'invisible': person.decision !== 'discarded' }">
                                         <x-ri-close-circle-line class="size-4" aria-hidden="true"/>
                                         {{ __('Discarded. Nothing was written.') }}
                                     </p>
@@ -486,7 +494,7 @@
                     </div>
 
                     <div class="flex flex-col gap-3 p-4 pt-0">
-                        <div class="flex flex-wrap gap-2" role="tablist" aria-label="{{ __('Example requests') }}" x-on:keydown.right.prevent="move(1)" x-on:keydown.left.prevent="move(-1)">
+                        <div class="flex flex-wrap gap-2" role="tablist" aria-label="{{ __('Example requests') }}" x-on:keydown.right.prevent="move(1)" x-on:keydown.left.prevent="move(-1)" x-on:keydown.home.prevent="moveTo(0)" x-on:keydown.end.prevent="moveTo(order.length - 1)">
                             @foreach($scenarios as $key => [$label, $ask])
                                 <button
                                     type="button"

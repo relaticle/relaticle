@@ -110,7 +110,7 @@ it('saves the change when the visitor approves it and Rela confirms', function (
     $page->click('[data-approval-button]');
 
     expect(approvalOutcome($page))->toBe(['decision' => 'approved', 'pending' => 'hidden', 'done' => 'visible', 'discarded' => 'hidden', 'followup' => 'visible'])
-        ->and($page->script("document.querySelector('[data-approval-followup]').textContent"))->toStartWith('Done. Northwind renewal is Won, closing');
+        ->and($page->script("document.querySelector('[data-approval-followup]').textContent"))->toStartWith('Done. Northwind renewal is Closed Won, closing');
 
     $page->assertNoJavaScriptErrors();
 });
@@ -138,7 +138,7 @@ it('saves an edited close date and leaves an unticked field out', function (): v
     $page->click('[data-approval-button]');
 
     expect($page->script("document.querySelector('[data-approval-close-date]').textContent"))->toBe('Nov 20, 2026')
-        ->and($page->script("document.querySelector('[data-approval-followup]').textContent"))->toBe('Done. Northwind renewal now closes Nov 20, 2026. The stage stays Negotiation.');
+        ->and($page->script("document.querySelector('[data-approval-followup]').textContent"))->toBe('Done. Northwind renewal now closes Nov 20, 2026. The stage stays Negotiation/Review.');
 
     $page->assertNoJavaScriptErrors();
 });

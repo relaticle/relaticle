@@ -35,7 +35,7 @@
     <div class="w-full max-w-xs space-y-3">
         <x-cloud::marketing.actor as="rela"/>
         <p class="px-1 text-sm leading-7 text-gray-100">
-            {!! __(':deal is in Negotiation, worth $48,000. :person at :company is the point of contact.', [
+            {!! __(':deal is in Negotiation/Review, worth $48,000. :person at :company is the point of contact.', [
                 'deal' => $chip('opportunity', __('Kovra renewal')),
                 'person' => $chip('people', 'Sarah Chen'),
                 'company' => $chip('company', 'Kovra Systems'),

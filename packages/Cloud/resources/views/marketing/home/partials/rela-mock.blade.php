@@ -41,12 +41,12 @@
             const date = this.formatted(this.closeDate)
 
             if (this.stageIncluded && this.closeIncluded) {
-                return @js(__('Done. Northwind renewal is Won, closing :date.')).replace(':date', date)
+                return @js(__('Done. Northwind renewal is Closed Won, closing :date.')).replace(':date', date)
             }
 
             return this.stageIncluded
-                ? @js(__('Done. Northwind renewal is Won. The close date stays as it was.'))
-                : @js(__('Done. Northwind renewal now closes :date. The stage stays Negotiation.')).replace(':date', date)
+                ? @js(__('Done. Northwind renewal is Closed Won. The close date stays as it was.'))
+                : @js(__('Done. Northwind renewal now closes :date. The stage stays Negotiation/Review.')).replace(':date', date)
         },
     }"
     x-bind:data-decision="decision"
@@ -98,7 +98,7 @@
             </div>
 
             @foreach([
-                ['stageIncluded', __('Stage'), __('Negotiation'), null],
+                ['stageIncluded', __('Stage'), __('Negotiation/Review'), null],
                 ['closeIncluded', __('Close date'), __('Not set'), $closeDate],
             ] as [$included, $field, $before, $date])
                 <div class="flex items-start gap-3 px-4 py-2.5 text-sm" data-approval-field="{{ $included }}">
@@ -148,7 +148,7 @@
                                 <x-heroicon-o-pencil-square class="size-3.5" aria-hidden="true"/>
                             </button>
                         @else
-                            <span class="font-medium text-gray-900 dark:text-white">{{ __('Won') }}</span>
+                            <span class="font-medium text-gray-900 dark:text-white">{{ __('Closed Won') }}</span>
                         @endif
                     </span>
                 </div>

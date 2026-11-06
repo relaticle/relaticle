@@ -78,7 +78,7 @@ it('renders the ask playground at the #demo anchor the hero points to', function
     $html = $this->get('/ai')->assertOk()->getContent();
 
     expect($html)->toContain('id="demo"')
-        ->and($html)->toContain(__('Update three deals'))
+        ->and($html)->toContain(__('Update three opportunities'))
         ->and($html)->toContain(__('Add a person'))
         ->and($html)->toContain(__('Find overdue tasks'));
 

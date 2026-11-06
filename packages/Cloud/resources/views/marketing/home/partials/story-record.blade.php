@@ -11,9 +11,9 @@
     ];
 
     $stages = [
-        'proposal' => [__('Proposal'), 'bg-gray-100 text-gray-700 dark:bg-white/[0.08] dark:text-gray-200', null],
-        'negotiation' => [__('Negotiation'), 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300', 'you'],
-        'won' => [__('Won'), 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300', 'rela'],
+        'proposal' => [__('Proposal/Price Quote'), 'bg-gray-100 text-gray-700 dark:bg-white/[0.08] dark:text-gray-200', null],
+        'negotiation' => [__('Negotiation/Review'), 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300', 'you'],
+        'won' => [__('Closed Won'), 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300', 'rela'],
     ];
 
     $flash = 'pointer-events-none absolute inset-0 bg-primary-500/10 opacity-0 dark:bg-primary-400/15';

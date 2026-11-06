@@ -204,7 +204,7 @@
                                 {{ __('Update opportunity') }}
                                 <x-ri-check-line class="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400"/>
                             </p>
-                            <p class="text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ __('Done. Northwind renewal is now in Negotiation.') }}</p>
+                            <p class="text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ __('Done. Northwind renewal is now in Negotiation/Review.') }}</p>
                         </div>
                     </x-cloud::marketing.window>
                 </div>
@@ -232,9 +232,9 @@
                                 </div>
                                 <p class="flex items-center gap-2 px-3 py-2 text-sm">
                                     <span class="text-gray-500 dark:text-gray-400">{{ __('Stage') }}</span>
-                                    <span class="text-gray-500 line-through dark:text-gray-400">{{ __('Proposal') }}</span>
+                                    <span class="text-gray-500 line-through dark:text-gray-400">{{ __('Proposal/Price Quote') }}</span>
                                     <x-ri-arrow-right-line class="size-3.5 text-gray-400" aria-hidden="true"/>
-                                    <span class="font-medium text-gray-950 dark:text-white">{{ __('Negotiation') }}</span>
+                                    <span class="font-medium text-gray-950 dark:text-white">{{ __('Negotiation/Review') }}</span>
                                 </p>
                                 <div class="border-rail flex gap-2 border-t px-3 py-2">
                                     <span class="inline-flex h-7 items-center rounded-md bg-primary px-3 text-xs font-semibold text-white">{{ __('Approve') }}</span>
