@@ -477,6 +477,26 @@ it('shows a pinned copy on the record whatever a teammate suppressed on theirs',
         ->and(linkSource($teammates, $this->company))->toBeNull();
 });
 
+it('keeps the user\'s later replies off a record they unlinked when a teammate pins it on their own copy', function (): void {
+    $domains = CustomField::query()->withoutGlobalScopes()->where('tenant_id', $this->workspace->getKey())->where('entity_type', 'company')->where('code', 'domains')->firstOrFail();
+    $this->company->saveCustomFieldValue($domains, 'https://airbnb.test', $this->workspace);
+    $owners = linkingEmail($this->owner);
+    $teammates = linkingEmail($this->teammate, ['rfc_message_id' => '<renewal-cc@airbnb.test>']);
+    $owners->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
+
+    resolve(UnlinkEmailFromRecord::class)->execute($this->owner, $owners, $this->company);
+    resolve(LinkEmailToRecord::class)->execute($this->teammate, $teammates, $this->company);
+
+    $synced = linkingEmail($this->owner, ['rfc_message_id' => '<renewal-reply@airbnb.test>', 'linked_at' => null]);
+    EmailParticipant::factory()->from()->create(['email_id' => $synced->getKey(), 'email_address' => 'brian@airbnb.test']);
+    resolve(LinkEmailAction::class)->execute($synced);
+    $stored = linkingEmail($this->owner, ['rfc_message_id' => '<renewal-second@airbnb.test>']);
+    $stored->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
+
+    expect(linkSource($synced, $this->company))->toBeNull()
+        ->and(Email::query()->onRecord($this->company)->pluck('id')->all())->toBe([$teammates->getKey()]);
+});
+
 it('leaves a copy off the opportunity tab once its company link is suppressed on that copy', function (): void {
     $opportunity = Opportunity::factory()->for($this->workspace)->create(['name' => 'Airbnb renewal', 'company_id' => $this->company->getKey()]);
     $email = linkingEmail($this->owner);

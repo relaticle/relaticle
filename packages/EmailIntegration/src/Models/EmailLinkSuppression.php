@@ -82,7 +82,7 @@ final class EmailLinkSuppression extends Model
     }
 
     /**
-     * Suppressions no pin overrides: a manual link of the same record on any copy of the suppressed copy's conversation wins.
+     * Suppressions no pin overrides: a manual link of the same record on a copy of the conversation held by the suppressed copy's holder wins.
      *
      * @param  Builder<EmailLinkSuppression>  $query
      * @return Builder<EmailLinkSuppression>
@@ -98,6 +98,7 @@ final class EmailLinkSuppression extends Model
             ->whereColumn('pins.emailable_type', $query->qualifyColumn('emailable_type'))
             ->whereColumn('pins.emailable_id', $query->qualifyColumn('emailable_id'))
             ->whereColumn('pinned_copies.workspace_id', 'suppressed_on.workspace_id')
+            ->whereColumn('pinned_copies.user_id', 'suppressed_on.user_id')
             ->where(fn (QueryBuilder $same): QueryBuilder => $same
                 ->whereColumn('pinned_copies.id', 'suppressed_on.id')
                 ->orWhereColumn('pinned_copies.conversation_key', 'suppressed_on.conversation_key')));

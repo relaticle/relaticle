@@ -609,7 +609,7 @@ were skipped and why.
 - An unlink is about the unlinker's own mail. Its suppressions hide and block links only on
   copies the same member holds: the copy itself and, through sync, that member's later
   copies of the conversation (the copy alone when it has no conversation key). A pin on
-  any copy overrides them. Another member's unlink never hides, blocks or detaches a link
+  a copy the same member holds overrides them; a teammate's pin on their own copy does not. Another member's unlink never hides, blocks or detaches a link
   on my copies, at read time or at sync time, so the outcome never depends on when sync runs.
 - The Unlinked view groups the viewer's own conversations by sender, with "Create person"
   (prefilled from the address and name) and "Link to existing".
