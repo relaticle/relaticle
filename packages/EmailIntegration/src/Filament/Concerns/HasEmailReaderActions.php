@@ -381,7 +381,9 @@ trait HasEmailReaderActions
 
                 abort_unless($email instanceof Email && $record !== null, 404);
 
-                if (! $this->wroteLinks(fn (): mixed => resolve(UnlinkEmailFromRecord::class)->execute($this->readerUser(), $email, $record))) {
+                if (! $this->wroteLinks(function () use ($email, $record): void {
+                    resolve(UnlinkEmailFromRecord::class)->execute($this->readerUser(), $email, $record);
+                })) {
                     return;
                 }
 
@@ -402,7 +404,7 @@ trait HasEmailReaderActions
             });
     }
 
-    /** @param  Closure(): mixed  $write */
+    /** @param  Closure(): void  $write */
     private function wroteLinks(Closure $write): bool
     {
         try {
@@ -423,7 +425,9 @@ trait HasEmailReaderActions
 
         abort_unless($email instanceof Email && $record !== null, 404);
 
-        if (! $this->wroteLinks(fn (): mixed => resolve(LinkEmailToRecord::class)->execute($this->readerUser(), $email, $record))) {
+        if (! $this->wroteLinks(function () use ($email, $record): void {
+            resolve(LinkEmailToRecord::class)->execute($this->readerUser(), $email, $record);
+        })) {
             return;
         }
 
