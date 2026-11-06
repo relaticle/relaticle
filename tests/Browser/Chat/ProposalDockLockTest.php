@@ -7,6 +7,7 @@ use App\Actions\Task\DeleteTask;
 use App\Models\Company;
 use App\Models\Task;
 use App\Models\User;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
@@ -16,6 +17,10 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Tests\Helpers\ChatBrowser;
 
 const LOCK_TEST_DOCK = '[aria-label="Proposal awaiting your decision"]';
+
+beforeEach(function (): void {
+    Queue::fake();
+});
 
 /** @return array{user: User, workspace: mixed, conversationId: string, turnId: string} */
 function lockTestConversation(): array
