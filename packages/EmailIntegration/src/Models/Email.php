@@ -297,6 +297,7 @@ final class Email extends Model
     {
         return EmailLinkSuppression::query()
             ->join('emails as suppressed_copies', 'suppressed_copies.id', '=', 'email_link_suppressions.email_id')
+            ->whereColumn('email_link_suppressions.workspace_id', $query->qualifyColumn('workspace_id'))
             ->whereColumn('suppressed_copies.workspace_id', $query->qualifyColumn('workspace_id'))
             ->where(fn (Builder $copy): Builder => $copy
                 ->whereColumn('suppressed_copies.id', $query->qualifyColumn('id'))
