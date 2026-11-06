@@ -13,7 +13,7 @@ it('stacks the entity tabs above the fields and keeps the name column readable o
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $tabsAboveFields = '(() => { const tabs = document.querySelector(".fi-page-content .fi-tabs.fi-vertical").getBoundingClientRect(); const table = document.querySelector(".fi-page-content .fi-ta").getBoundingClientRect(); return tabs.bottom <= table.top; })()';
+    $tabsAboveFields = '(() => { const tabs = [...document.querySelectorAll(".fi-page-content .fi-tabs")].find((tabs) => tabs.getClientRects().length).getBoundingClientRect(); const table = document.querySelector(".fi-page-content .fi-ta").getBoundingClientRect(); return tabs.bottom <= table.top; })()';
     $nameColumnReadable = '(() => { const header = [...document.querySelectorAll(".fi-page-content .fi-ta *")].find((element) => getComputedStyle(element).display === "grid"); return header.children[1].getBoundingClientRect().width >= 150; })()';
 
     loginViaBrowser($user)

@@ -1411,26 +1411,6 @@ html.fi-record-stacked .fi-record-layout {
     @apply mx-0;
 }
 
-.fi-custom-fields-page {
-    /* The packaged screen puts its entity tabs beside the fields. On a phone that leaves the fields ~140px. */
-    .fi-page-content > :has(> div > .fi-tabs.fi-vertical) {
-        @apply max-md:flex-col;
-
-        & > div:has(> .fi-tabs) {
-            @apply max-md:min-w-0;
-        }
-
-        .fi-tabs.fi-vertical {
-            @apply max-md:flex-row max-md:gap-x-1 max-md:gap-y-0 max-md:overflow-x-auto max-md:overflow-y-hidden;
-        }
-    }
-
-    /* The name is 1fr beside capped tracks, so the package's 600px scroll width left it ~90px. */
-    .fi-ta .min-w-\[600px\] {
-        @apply min-w-2xl;
-    }
-}
-
 /* Dropdowns */
 
 /* asmit/resized-column lifts the table toolbar (`.fi-ta-header-ctn`) to
