@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\Jetstream\AcceptWorkspaceInvitation;
+use App\Enums\DeletionReason;
 use App\Filament\Pages\Dashboard;
 use App\Models\User;
 use App\Models\Workspace;
@@ -658,4 +659,26 @@ test('the accept page counts the people already in the workspace', function (): 
         ->get(route('workspace-invitations.token.accept', ['token' => $raw]))
         ->assertOk()
         ->assertSee('1 person is already in this workspace');
+});
+
+test('an invitation to a workspace on an inactivity countdown joins it and stops the countdown', function (): void {
+    $workspace = Workspace::factory()->create();
+    $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(10), 'deletion_reason' => DeletionReason::Inactivity])->save();
+
+    /** @var WorkspaceInvitation $invitation */
+    $invitation = $workspace->workspaceInvitations()->create([
+        'email' => $this->user->email,
+        'role' => 'member',
+        'expires_at' => now()->addDays(7),
+    ]);
+
+    $this->actingAs($this->user)
+        ->post(route('workspace-invitations.token.join', ['token' => rawTokenFor($invitation)]))
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $workspace]));
+
+    $workspace->refresh();
+
+    expect($workspace->hasUser($this->user))->toBeTrue()
+        ->and($workspace->scheduled_deletion_at)->toBeNull()
+        ->and($workspace->deletion_reason)->toBeNull();
 });

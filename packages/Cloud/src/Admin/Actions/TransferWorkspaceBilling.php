@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Admin\Actions;
 
+use App\Actions\Jetstream\CancelInactivityDeletion;
 use App\Enums\Plan;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +16,10 @@ use Throwable;
 
 final readonly class TransferWorkspaceBilling
 {
-    public function __construct(private CreditService $credits) {}
+    public function __construct(
+        private CreditService $credits,
+        private CancelInactivityDeletion $cancelInactivityDeletion,
+    ) {}
 
     /**
      * Move a workspace's Stripe customer and every subscription it owns to
@@ -59,6 +63,8 @@ final readonly class TransferWorkspaceBilling
                 'plan' => $plan,
                 'trial_ends_at' => null,
             ])->save();
+
+            $this->cancelInactivityDeletion->execute($lockedTarget);
 
             Subscription::query()
                 ->where('workspace_id', $lockedSource->getKey())
@@ -107,7 +113,7 @@ final readonly class TransferWorkspaceBilling
         throw_if($source->stripe_id === null, TransferRefused::class, 'The source workspace has no Stripe customer.');
         throw_if($target->stripe_id !== null, TransferRefused::class, 'The target workspace already has its own Stripe customer. Cancel and re-subscribe manually instead.');
         throw_if($source->user_id !== $target->user_id, TransferRefused::class, 'Both workspaces must have the same owner.');
-        throw_if($target->isScheduledForDeletion(), TransferRefused::class, 'The target workspace is scheduled for deletion.');
+        throw_if($target->isScheduledOnRequest(), TransferRefused::class, 'The target workspace is scheduled for deletion.');
 
         $source->loadMissing('subscriptions');
 

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\DeletionReason;
 use App\Filament\Pages\Dashboard;
 use App\Models\User;
 use App\Models\Workspace;
@@ -76,4 +77,20 @@ it('the join controller still works when the token is within expiry', function (
         ->assertRedirect(Dashboard::getUrl(['tenant' => $workspace]));
 
     expect($workspace->fresh()->users()->where('users.id', $joiner->id)->exists())->toBeTrue();
+});
+
+it('joins a workspace on an inactivity countdown through the invite link and stops the countdown', function (): void {
+    $owner = User::factory()->create();
+    $workspace = Workspace::factory()->create(['user_id' => $owner->id]);
+    $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(10), 'deletion_reason' => DeletionReason::Inactivity])->save();
+    $joiner = User::factory()->create(['email_verified_at' => now()]);
+
+    $this->actingAs($joiner)
+        ->post(route('workspaces.join.confirm', ['token' => $workspace->invite_link_token]))
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $workspace]));
+
+    $workspace->refresh();
+
+    expect($workspace->users()->where('users.id', $joiner->id)->exists())->toBeTrue()
+        ->and($workspace->scheduled_deletion_at)->toBeNull();
 });
