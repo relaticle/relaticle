@@ -22,7 +22,7 @@
     </x-cloud::marketing.frame-header>
 
     @if($stats !== [])
-        <div class="bg-rail border-rail grid grid-cols-1 gap-px border-b sm:grid-cols-3">
+        <div class="bg-rail border-rail grid grid-cols-1 gap-px border-b sm:grid-cols-[repeat(auto-fit,minmax(0,1fr))]">
             @foreach($stats as [$value, $label, $href])
                 <x-cloud::marketing.stat :value="$value" :label="$label" :href="$href"/>
             @endforeach
