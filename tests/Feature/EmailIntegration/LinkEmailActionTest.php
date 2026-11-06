@@ -1481,7 +1481,7 @@ it('also links email to opportunity via person relationship', function (): void 
 });
 
 it('does not link a company again after a user unlinked it, on sync or history import', function (): void {
-    $company = makeAcmeCompanyWithDomain() ?? $this->markTestSkipped('No domains custom field seeded for this workspace.');
+    $company = makeAcmeCompanyWithDomain();
     $email = makeLinkEmail();
     EmailParticipant::factory()->from()->create(['email_id' => $email->getKey(), 'email_address' => 'ceo@acme.com']);
     resolve(LinkEmailAction::class)->execute($email);
@@ -1494,7 +1494,7 @@ it('does not link a company again after a user unlinked it, on sync or history i
 });
 
 it('does not link a later reply in the same conversation to the record a user unlinked', function (): void {
-    $company = makeAcmeCompanyWithDomain() ?? $this->markTestSkipped('No domains custom field seeded for this workspace.');
+    $company = makeAcmeCompanyWithDomain();
     $first = makeLinkEmail(['conversation_key' => 'acme-renewal']);
     EmailParticipant::factory()->from()->create(['email_id' => $first->getKey(), 'email_address' => 'ceo@acme.com']);
     resolve(LinkEmailAction::class)->execute($first);
@@ -1514,7 +1514,7 @@ it('does not link a later reply in the same conversation to the record a user un
 });
 
 it('links a later reply when a teammate unlinked their copy and the user pinned theirs', function (): void {
-    $company = makeAcmeCompanyWithDomain() ?? $this->markTestSkipped('No domains custom field seeded for this workspace.');
+    $company = makeAcmeCompanyWithDomain();
     $bob = User::factory()->create(['current_workspace_id' => $this->workspace->getKey()]);
     $this->workspace->users()->attach($bob, ['role' => 'member']);
     $bobsAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create(['workspace_id' => $this->workspace->id, 'user_id' => $bob->id]));
@@ -1539,7 +1539,7 @@ it('links a later reply when a teammate unlinked their copy and the user pinned 
 });
 
 it('keeps an unlink to its conversation when another conversation holds the same message id', function (): void {
-    $company = makeAcmeCompanyWithDomain() ?? $this->markTestSkipped('No domains custom field seeded for this workspace.');
+    $company = makeAcmeCompanyWithDomain();
     $unlinked = makeLinkEmail(['conversation_key' => 'acme-renewal', 'rfc_message_id' => '<deal@acme.com>']);
     $secondMailbox = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create(['workspace_id' => $this->workspace->id, 'user_id' => $this->user->id]));
     $elsewhere = makeLinkEmail(['conversation_key' => 'acme-forward', 'rfc_message_id' => '<deal@acme.com>', 'connected_account_id' => $secondMailbox->getKey()]);
@@ -1554,18 +1554,14 @@ it('keeps an unlink to its conversation when another conversation holds the same
         ->and(Email::query()->onRecord($company)->pluck('id')->all())->toBe([$elsewhere->getKey()]);
 });
 
-function makeAcmeCompanyWithDomain(): ?Company
+function makeAcmeCompanyWithDomain(): Company
 {
     $domainsField = CustomField::query()
         ->withoutGlobalScopes()
         ->where('tenant_id', test()->workspace->getKey())
         ->where('entity_type', 'company')
         ->where('code', 'domains')
-        ->first();
-
-    if (! $domainsField) {
-        return null;
-    }
+        ->firstOrFail();
 
     $company = Company::create([
         'workspace_id' => test()->workspace->id,
@@ -1580,10 +1576,6 @@ function makeAcmeCompanyWithDomain(): ?Company
 
 it('counts company email metrics once per email despite multiple participants at the same domain', function (): void {
     $company = makeAcmeCompanyWithDomain();
-
-    if (! $company) {
-        $this->markTestSkipped('No domains custom field seeded for this team.');
-    }
 
     $email = makeLinkEmail(['direction' => EmailDirection::INBOUND, 'sent_at' => now()]);
 
@@ -1604,10 +1596,6 @@ it('counts company email metrics once per email despite multiple participants at
 
 it('does not move last_email_at backwards when an older email is linked after a newer one', function (): void {
     $company = makeAcmeCompanyWithDomain();
-
-    if (! $company) {
-        $this->markTestSkipped('No domains custom field seeded for this team.');
-    }
 
     $newerSentAt = now();
     $newer = makeLinkEmail(['direction' => EmailDirection::INBOUND, 'sent_at' => $newerSentAt]);

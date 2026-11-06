@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
 use Filament\Facades\Filament;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Database\QueryException;
@@ -325,6 +326,26 @@ it('reads the named record once while it counts every view of the record', funct
     resolve(ConversationsQuery::class)->counts($this->owner, ConversationFilters::forRecord($this->company));
 
     expect($reads)->toBe(1);
+});
+
+it('recounts in its own workspace after a real round trip through the queue payload', function (): void {
+    $email = linkingEmail($this->owner);
+    $email->companies()->attach($this->company->getKey(), ['link_source' => 'manual']);
+    $job = unserialize(serialize(new RecomputeRecordEmailMetricsJob($this->company)));
+    $currentWorkspace = resolve(CurrentWorkspace::class);
+    $currentWorkspace->forget();
+    $boundDuringRecount = null;
+    DB::listen(function (QueryExecuted $query) use (&$boundDuringRecount, $currentWorkspace): void {
+        if (str_starts_with($query->sql, 'update companies')) {
+            $boundDuringRecount = $currentWorkspace->get()?->getKey();
+        }
+    });
+
+    app()->call($job->handle(...));
+
+    expect($boundDuringRecount)->toBe($this->workspace->getKey())
+        ->and($currentWorkspace->get())->toBeNull()
+        ->and($this->company->fresh()->email_count)->toBe(1);
 });
 
 function linkingPage(Email $email): mixed
