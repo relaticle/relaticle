@@ -53,9 +53,20 @@ other people's BCC rows (same gate as recipient suggestions).
 `PrivacyService::effectiveTier()` applies a viewer's share before the email's
 `privacy_tier`. Search must do the same. Do not `OR` `privacy_tier` FULL or
 SUBJECT with a share: a metadata-only share on a FULL email would still match
-subject and snippet. Use the share when one exists (direct first, then another
-copy of the same `rfc_message_id`). Fall back to `privacy_tier` only when the
-viewer has no share.
+subject and snippet. Use the share on that email when one exists. Fall back to
+`privacy_tier` only when the viewer has no share.
+
+## A Message-ID is never proof of access
+
+Anyone can put a message with a chosen `Message-ID` into their own mailbox, and a
+reply carries the original's ID in `In-Reply-To`. So a copy of the same
+`rfc_message_id` in the viewer's mailbox grants nothing on a teammate's copy, and a
+share applies only to the email it was made on. `PrivacyService::effectiveTier()`,
+`VisibleEmailScope` and `EmailSearchService` read each copy on its own.
+`PreferredEmailCopyService` still shows one row per message: the viewer's own copy,
+then the copy most open to them, counting their share on it.
+`tests/Feature/Mcp/EmailToolsTest.php` fails when a held copy or a share on another
+copy opens a teammate's email.
 
 ## Meeting attendee "self"
 
