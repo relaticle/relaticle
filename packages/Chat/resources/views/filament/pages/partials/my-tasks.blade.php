@@ -6,7 +6,7 @@
     $canEdit = $this->canEditTasks;
 @endphp
 
-<div class="mt-14">
+<div class="mt-14 max-sm:mt-8">
     <div class="mb-3 flex items-center justify-between">
         <h2 class="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
             <x-filament::icon :icon="\App\Enums\CrmEntity::Task->icon()" class="size-4 shrink-0 text-gray-400 dark:text-gray-500" />
@@ -71,7 +71,7 @@
                                 x-on:click="checked = true; setTimeout(() => $wire.completeTask(@js($task->id)).catch(() => checked = false), 450)"
                                 title="{{ __('filament/pages/dashboard.tasks.complete') }}"
                                 aria-label="{{ __('filament/pages/dashboard.tasks.complete') }}"
-                                class="flex size-4 flex-shrink-0 items-center justify-center rounded-full border transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
+                                class="relative flex size-4 flex-shrink-0 items-center justify-center rounded-full border max-sm:size-6 max-sm:after:absolute max-sm:after:-inset-2.5 transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
                                 :class="checked
                                     ? 'border-primary-600 bg-primary-600 dark:border-primary-500 dark:bg-primary-500'
                                     : 'border-gray-400 hover:border-primary-500 dark:border-gray-500 dark:hover:border-primary-400'"

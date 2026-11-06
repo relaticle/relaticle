@@ -63,7 +63,7 @@
                     :aria-busy="uploading"
                     aria-label="{{ __('Attach a CSV, TXT or MD file') }}"
                     title="{{ __('Attach a CSV, TXT or MD file') }}"
-                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-progress dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
+                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full max-sm:size-10 text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-progress dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
                 >
                     <x-heroicon-o-paper-clip x-show="!uploading" class="h-4 w-4" aria-hidden="true" />
                     <x-heroicon-o-arrow-path x-show="uploading" x-cloak class="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" />
@@ -147,7 +147,7 @@
                         :aria-pressed="recording"
                         :aria-label="recording ? @js(__('Stop recording')) : @js(__('Start voice input'))"
                         :title="recording ? @js(__('Stop recording')) : @js(__('Start voice input'))"
-                        class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-progress"
+                        class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full max-sm:size-10 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-progress"
                         :aria-busy="transcribing"
                         :class="recording
                             ? 'bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-500/20 dark:text-red-400 dark:hover:bg-red-500/30'
@@ -184,7 +184,7 @@
                     x-show="{{ $sendShown }}"
                     @if ($voiceAvailable || $showStopButton) x-cloak @endif
                     type="submit"
-                    class="flex h-7 w-7 items-center justify-center rounded-full bg-primary-600 text-white transition hover:bg-primary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 dark:disabled:bg-gray-700 dark:disabled:text-gray-500"
+                    class="flex h-7 w-7 items-center justify-center rounded-full max-sm:size-10 bg-primary-600 text-white transition hover:bg-primary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 dark:disabled:bg-gray-700 dark:disabled:text-gray-500"
                     :disabled="{{ $sendDisabled }}"
                     aria-label="{{ __('Send message') }}"
                 >
@@ -198,7 +198,7 @@
                     x-cloak
                     type="button"
                     x-on:click="cancelStream()"
-                    class="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-white transition hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-gray-300"
+                    class="flex h-7 w-7 items-center justify-center rounded-full max-sm:size-10 bg-gray-900 text-white transition hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-gray-300"
                     aria-label="{{ __('Stop generation') }}"
                 >
                     <svg class="h-3 w-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

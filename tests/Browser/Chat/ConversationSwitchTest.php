@@ -124,6 +124,21 @@ it('places the conversation title in the topbar and the toggle beside the worksp
     $page->assertSeeIn('[data-page-heading]', 'Updated pipeline review');
 });
 
+it('does not scroll sideways on a phone', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'Pipeline review');
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertVisible('[data-page-heading]');
+
+    foreach ([390, 320] as $width) {
+        $page->resize($width, 700)->wait(0.3);
+
+        expect($page->script('document.documentElement.scrollWidth - window.innerWidth'))->toBeLessThanOrEqual(0);
+    }
+});
+
 /**
  * Cache-first conversation switching: a wire:navigate sidebar link destroys
  * and remounts the `chatInterface` Alpine component (confirmed empirically,

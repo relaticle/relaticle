@@ -18,7 +18,7 @@
 
     {{-- The shared page heading lives in the topbar. The conversation surface
          starts directly beneath it and fills what the topbar, the phone tab bar and the safe areas leave. --}}
-    <div class="-mx-6 -mb-6 -mt-6 flex flex-1 flex-col" style="height: calc(100dvh - var(--topbar-height) - var(--bottom-nav-height) - env(safe-area-inset-top) - env(safe-area-inset-bottom));">
+    <div class="-mx-4 -mb-6 -mt-6 flex flex-1 flex-col sm:-mx-6" style="height: calc(100dvh - var(--topbar-height) - var(--bottom-nav-height) - env(safe-area-inset-top) - env(safe-area-inset-bottom));">
         <livewire:chat.chat-interface
             :conversation-id="$conversationId"
             :initial-message="$initialMessage"
