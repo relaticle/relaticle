@@ -243,8 +243,8 @@ describe('Hero AI tab: conversation', function () {
         // The decided row names the record as a chip plus an operation label,
         // so assert the label, not a "Update task \"...\"" sentence that a
         // restyle of the row legitimately changes.
-        $response->assertSee('Review before continuing');
-        $response->assertSee('Save changes');
+        $response->assertSee('Approve or discard the proposal to keep chatting');
+        $response->assertSee('Approve');
         $response->assertSee('Add Sarah Chen');
         $response->assertSee('VP of Engineering');
     });
@@ -257,12 +257,12 @@ describe('Hero AI tab: conversation', function () {
         $response->assertSee('You have 3 overdue tasks');
         // Exchange 2 climax. Approving resumes the turn, so the line under the
         // decided row is the agent's own reply, as in the shipped transcript.
-        $response->assertSee('Review the proposal below to update the task');
+        $response->assertSee("I'll mark it done", false);
         $response->assertSee('has been marked done');
         // Exchange 3 is a WRITE, so it is gated by review exactly like exchange 2
         // (CreatePersonTool returns a proposal for approval). It must never show
         // a create landing unattended.
-        $response->assertSee('Review the proposal below to add her to Kovra Systems');
+        $response->assertSee("I'll add her to Kovra Systems as VP of Engineering", false);
         $response->assertSee('has been created and linked to');
         // The turn ends on the next-step strip (NextStepSuggester), which is
         // what the shipped transcript puts at its floor once nothing is docked.
@@ -284,11 +284,11 @@ describe('Hero AI tab: conversation', function () {
         // operation label, and pinning that wording made this test fail on a
         // pure restyle while the invariant it guards -- no write without an
         // approval -- still held.
-        expect(substr_count($body, 'Review before continuing'))->toBeGreaterThanOrEqual(1)
-            ->and($body)->toContain('Review the proposal below to update the task')
-            ->and($body)->toContain('Review the proposal below to add her to Kovra Systems')
+        expect(substr_count($body, 'Approve or discard the proposal to keep chatting'))->toBeGreaterThanOrEqual(1)
+            ->and($body)->toContain("I'll mark it done")
+            ->and($body)->toContain("I'll add her to Kovra Systems as VP of Engineering")
             ->and($body)->toContain('Discard')
-            ->and($body)->toContain('Save changes');
+            ->and($body)->toContain('Approve');
     });
 
     it('mirrors the shipped transcript surfaces rather than the components it replaced', function () {
@@ -305,8 +305,8 @@ describe('Hero AI tab: conversation', function () {
         // decided row it collapses into carries only the operation-tinted entity
         // tile and the record label in bold, NOT a record pill (chips are
         // reserved for inline clickable references).
-        expect($body)->toContain('Create Person')
-            ->and($body)->toContain('Update Task')
+        expect($body)->toContain('Create person')
+            ->and($body)->toContain('Applied 1 change')
             ->and($body)->not->toContain('uppercase tracking-wider text-amber-600');
 
         // Read results render as a records_table with a chip-linked core column,

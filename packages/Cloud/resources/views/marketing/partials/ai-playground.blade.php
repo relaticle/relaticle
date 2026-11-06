@@ -66,12 +66,11 @@
         ),
     ];
 
-    $widestStage = array_reduce(array_column($deals, 'from'), fn (string $widest, string $stage): string => mb_strlen($stage) > mb_strlen($widest) ? $stage : $widest, '');
 
-    $batchPrompt = __('Review the proposal below to update 3 opportunities.');
+    $batchPrompt = __('Three Kovra opportunities will move to Negotiation/Review.');
 
     $personReplies = [
-        'prompt' => __('Review the proposal below to add her to Kovra Systems.'),
+        'prompt' => __('I will add Sarah Chen at Kovra Systems as VP of Engineering.'),
         'linked' => __('Sarah Chen has been created at Kovra Systems.'),
         'created' => __('Sarah Chen has been created.'),
         'discarded' => __('Okay, I did not add Sarah Chen.'),
@@ -94,9 +93,6 @@
     $tile = 'flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400';
     $footerButton = 'inline-flex h-7 cursor-pointer items-center rounded-md px-2.5 text-xs font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-50';
     $discardButton = $footerButton.' text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white';
-    $confirmButton = $footerButton.' bg-primary-600 text-white shadow-sm hover:bg-primary-500';
-    $pageButton = 'inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-white/10 dark:hover:text-gray-200';
-    $checkbox = 'mt-0.5 flex size-4 shrink-0 cursor-pointer items-center justify-center rounded border border-primary-600 bg-primary-600 text-white transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-default aria-[checked=false]:border-gray-300 aria-[checked=false]:bg-white aria-[checked=false]:text-transparent dark:aria-[checked=false]:border-white/20 dark:aria-[checked=false]:bg-white/5';
     $textLink = 'font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white';
 @endphp
 
@@ -109,18 +105,16 @@
         order: @js(array_keys($scenarios)),
         reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
         thinking: false,
-        swapping: false,
         timer: null,
-        deals: @js(array_map(fn (array $deal): array => $deal + ['decision' => null, 'flash' => false], $deals)),
+        deals: @js(array_map(fn (array $deal): array => $deal + ['decision' => null, 'flash' => false, 'out' => false], $deals)),
         batchReplies: @js($batchReplies),
         personReplies: @js($personReplies),
-        cursor: 0,
         person: { decision: null, title: true, company: true, flash: false },
         get undecided() {
             return this.deals.filter((deal) => deal.decision === null)
         },
-        get activeDeal() {
-            return this.undecided[Math.min(this.cursor, this.undecided.length - 1)] ?? null
+        get keptCount() {
+            return this.deals.filter((deal) => ! deal.out).length
         },
         get batchSummary() {
             return this.batchReplies[this.deals.filter((deal) => deal.decision === 'saved').length]
@@ -135,18 +129,6 @@
             }
 
             return this.person.company ? this.personReplies.linked : this.personReplies.created
-        },
-        swap() {
-            if (this.reducedMotion) {
-                return
-            }
-
-            this.swapping = true
-            requestAnimationFrame(() => requestAnimationFrame(() => this.swapping = false))
-        },
-        page(step) {
-            this.cursor = Math.min(this.undecided.length - 1, Math.max(0, this.cursor + step))
-            this.swap()
         },
         select(key) {
             if (key === this.scenario) {
@@ -165,8 +147,7 @@
         },
         reset() {
             clearTimeout(this.timer)
-            this.deals.forEach((deal) => Object.assign(deal, { decision: null, flash: false }))
-            this.cursor = 0
+            this.deals.forEach((deal) => Object.assign(deal, { decision: null, flash: false, out: false }))
             this.person = { decision: null, title: true, company: true, flash: false }
             this.thinking = ! this.reducedMotion
             this.timer = setTimeout(() => this.thinking = false, 700)
@@ -179,19 +160,19 @@
             record.flash = true
             setTimeout(() => record.flash = false, 900)
         },
-        decideDeal(decision) {
-            const deal = this.activeDeal
-            deal.decision = decision
-            this.cursor = Math.min(this.cursor, Math.max(0, this.undecided.length - 1))
-            this.swap()
+        approveBatch() {
+            this.deals.forEach((deal) => {
+                deal.decision = deal.out ? 'skipped' : 'saved'
 
-            if (decision === 'saved') {
-                this.land(deal)
-            }
-
-            if (! this.undecided.length) {
-                this.$nextTick(() => this.$refs.batchResult.focus())
-            }
+                if (! deal.out) {
+                    this.land(deal)
+                }
+            })
+            this.$nextTick(() => this.$refs.batchResult.focus())
+        },
+        discardBatch() {
+            this.deals.forEach((deal) => deal.decision = 'discarded')
+            this.$nextTick(() => this.$refs.batchResult.focus())
         },
         decidePerson(decision) {
             this.person.decision = decision
@@ -329,69 +310,78 @@
                             </div>
 
                             <div class="grid">
-                                <div class="{{ $card }} {{ $fade }} col-start-1 row-start-1" x-bind:class="{ 'translate-y-2 opacity-0': thinking, 'invisible opacity-0': ! thinking && ! undecided.length, '{{ $fade }}': ! thinking && undecided.length > 0 }" data-ai-batch-card>
-                                    <div class="flex items-center gap-2 px-4 pt-3 text-xs font-medium text-gray-500 dark:text-gray-400">
-                                        <span class="min-w-0 flex-1 truncate">{{ __('Update Opportunity') }}</span>
-                                        <span class="tabular-nums text-gray-400 dark:text-gray-500" x-show="undecided.length > 1" x-text="undecided.length + ' ' + @js(__('records'))">3 {{ __('records') }}</span>
-                                    </div>
-
-                                    <div class="flex min-w-0 items-center gap-2.5 px-4 pb-2.5 pt-1.5">
-                                        <span class="{{ $tile }}" aria-hidden="true">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons['opportunity'] }}"/></svg>
-                                        </span>
-                                        <p class="min-w-0 truncate text-sm font-semibold text-gray-900 dark:text-white" x-bind:class="{ 'translate-x-1.5 opacity-0': swapping, '{{ $fade }}': ! swapping }" x-text="activeDeal?.name" data-ai-batch-record>{{ $deals[0]['name'] }}</p>
-                                    </div>
-
-                                    <div class="divide-y divide-gray-100 border-t border-gray-100 dark:divide-white/5 dark:border-white/5">
-                                        <div class="flex items-center gap-3 px-4 py-2 text-xs font-medium text-gray-500 dark:text-gray-400" aria-hidden="true">
-                                            <span class="w-20 shrink-0">{{ __('Attribute') }}</span>
-                                            <span>{{ __('New value') }}</span>
-                                        </div>
-                                        <div class="flex items-start gap-3 px-4 py-2.5 text-sm">
-                                            <span class="w-20 shrink-0 leading-5 text-gray-700 dark:text-gray-300">{{ __('Stage') }}</span>
-                                            <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5" x-bind:class="{ 'translate-x-1.5 opacity-0': swapping, '{{ $fade }}': ! swapping }">
-                                                <span class="grid">
-                                                    <span class="col-start-1 row-start-1 text-gray-500 line-through decoration-gray-300 dark:text-gray-400 dark:decoration-gray-600" x-text="activeDeal?.from">{{ $deals[0]['from'] }}</span>
-                                                    <span class="{{ $ghost }}" aria-hidden="true">{{ $widestStage }}</span>
+                                <div class="col-start-1 row-start-1 space-y-2 {{ $fade }}" x-bind:class="{ 'translate-y-2 opacity-0': thinking, 'invisible opacity-0': ! thinking && ! undecided.length, '{{ $fade }}': ! thinking && undecided.length > 0 }" data-ai-batch-card>
+                                    <div class="{{ $card }}">
+                                        <div class="flex items-start gap-2.5 px-4 pb-1.5 pt-3">
+                                            <span class="{{ $tile }} mt-px" aria-hidden="true">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons['opportunity'] }}"/></svg>
+                                            </span>
+                                            <span class="min-w-0 flex-1">
+                                                <span class="block truncate text-sm leading-6">
+                                                    <span class="text-gray-500 dark:text-gray-400">{{ __('Move') }}</span>
+                                                    <span class="font-semibold text-gray-900 dark:text-white" x-text="keptCount + ' ' + @js(__('opportunities'))">3 {{ __('opportunities') }}</span>
                                                 </span>
-                                                <x-heroicon-m-arrow-right class="size-3 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true"/>
-                                                <span class="font-medium text-gray-900 dark:text-white">{{ __('Negotiation/Review') }}</span>
+                                                <span class="block text-xs leading-5 text-gray-500 dark:text-gray-400">{{ __('Stage to :value', ['value' => __('Negotiation/Review')]) }}</span>
                                             </span>
                                         </div>
+
+                                        <ul class="pb-2 pe-3 ps-[3.125rem]">
+                                            @foreach($deals as $index => $deal)
+                                                <li class="group/row flex items-center gap-2 border-t border-gray-100 text-sm first:border-t-0 dark:border-white/5" data-ai-batch-record>
+                                                    <span class="min-w-0 flex-1 truncate leading-8 text-gray-900 dark:text-white" x-bind:class="{ 'text-gray-400 line-through dark:text-gray-500': deals[{{ $index }}].out }">{{ $deal['name'] }}</span>
+                                                    <span class="shrink-0 text-xs text-gray-500 line-through decoration-gray-300 dark:text-gray-400 dark:decoration-gray-600">{{ $deal['from'] }}</span>
+                                                    <button
+                                                        type="button"
+                                                        class="inline-flex min-h-8 min-w-8 shrink-0 cursor-pointer items-center justify-center rounded-md transition focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
+                                                        x-bind:class="deals[{{ $index }}].out ? 'px-1.5 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-700 sm:opacity-0 sm:group-hover/row:opacity-100 dark:hover:bg-white/10 dark:hover:text-gray-200'"
+                                                        x-on:click="deals[{{ $index }}].out = ! deals[{{ $index }}].out"
+                                                        x-bind:disabled="thinking"
+                                                        x-bind:aria-label="deals[{{ $index }}].out ? @js(__('Keep :name', ['name' => $deal['name']])) : @js(__('Leave out :name', ['name' => $deal['name']]))"
+                                                        aria-label="{{ __('Leave out :name', ['name' => $deal['name']]) }}"
+                                                    >
+                                                        <x-heroicon-o-x-mark class="h-3.5 w-3.5" x-show="! deals[{{ $index }}].out" aria-hidden="true"/>
+                                                        <span x-show="deals[{{ $index }}].out" style="display: none">{{ __('Keep') }}</span>
+                                                    </button>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+
+                                        <div class="flex items-center justify-end gap-2 border-t border-gray-100 px-4 py-2 dark:border-white/5">
+                                            <button type="button" class="{{ $discardButton }}" x-on:click="discardBatch()" x-bind:disabled="thinking">{{ __('Discard all') }}</button>
+                                            <x-cloud::marketing.rela-approve
+                                                x-on:click="approveBatch()"
+                                                x-bind:disabled="thinking || ! keptCount"
+                                                data-ai-batch-save
+                                            ><span x-text="@js(__('Approve :count changes')).replace(':count', keptCount)">{{ __('Approve :count changes', ['count' => 3]) }}</span></x-cloud::marketing.rela-approve>
+                                        </div>
                                     </div>
 
-                                    <div class="flex items-center gap-2 border-t border-gray-100 px-4 py-2 dark:border-white/5">
-                                        <div class="flex items-center gap-1 text-xs font-medium tabular-nums text-gray-500 dark:text-gray-400" x-show="undecided.length > 1">
-                                            <button type="button" class="{{ $pageButton }}" x-on:click="page(-1)" x-bind:disabled="cursor === 0" aria-label="{{ __('Previous record') }}">
-                                                <x-heroicon-m-chevron-left class="h-3.5 w-3.5" aria-hidden="true"/>
-                                            </button>
-                                            <span class="select-none px-0.5" x-text="(cursor + 1) + '/' + undecided.length">1/3</span>
-                                            <button type="button" class="{{ $pageButton }}" x-on:click="page(1)" x-bind:disabled="cursor >= undecided.length - 1" aria-label="{{ __('Next record') }}">
-                                                <x-heroicon-m-chevron-right class="h-3.5 w-3.5" aria-hidden="true"/>
-                                            </button>
-                                        </div>
-
-                                        <div class="ms-auto flex items-center gap-2">
-                                            <button type="button" class="{{ $discardButton }}" x-on:click="decideDeal('discarded')" x-bind:disabled="thinking">{{ __('Discard') }}</button>
-                                            <button type="button" class="{{ $confirmButton }}" x-on:click="decideDeal('saved')" x-bind:disabled="thinking" data-ai-batch-save>{{ __('Save changes') }}</button>
-                                        </div>
-                                    </div>
+                                    <x-cloud::marketing.rela-locked/>
                                 </div>
 
-                                <ul tabindex="-1" x-ref="batchResult" class="col-start-1 row-start-1 self-start overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] invisible opacity-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500" x-bind:class="{ 'invisible opacity-0': undecided.length > 0, '{{ $fade }}': undecided.length === 0 }" data-ai-batch-decided>
-                                    @foreach($deals as $index => $deal)
-                                        <li class="flex items-center gap-2.5 border-b border-gray-100 px-4 py-2.5 last:border-b-0 dark:border-white/5">
-                                            <span class="chat-chip min-w-0" data-record-type="opportunity">
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons['opportunity'] }}"/></svg>
-                                                <span class="chat-chip-label">{{ $deal['name'] }}</span>
-                                            </span>
-                                            <span class="ms-auto inline-flex shrink-0 items-center gap-1.5 text-micro font-medium text-gray-500 dark:text-gray-400">
-                                                <span class="h-1.5 w-1.5 shrink-0 rounded-full" x-bind:class="deals[{{ $index }}].decision === 'saved' ? 'bg-green-500' : 'bg-gray-400'"></span>
-                                                <span x-text="deals[{{ $index }}].decision === 'saved' ? @js(__('Updated')) : @js(__('Skipped'))">{{ __('Updated') }}</span>
-                                            </span>
-                                        </li>
-                                    @endforeach
-                                </ul>
+                                <div tabindex="-1" x-ref="batchResult" class="col-start-1 row-start-1 self-start invisible opacity-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500" x-bind:class="{ 'invisible opacity-0': undecided.length > 0, '{{ $fade }}': undecided.length === 0 }" data-ai-batch-decided>
+                                    <template x-if="deals.some((deal) => deal.decision === 'saved')">
+                                        <div>
+                                            <p class="px-2 text-xs text-gray-500 dark:text-gray-400" x-text="@js(__('Applied :count changes · just now')).replace(':count', keptCount)"></p>
+                                            <ul class="mt-1">
+                                                <li class="flex min-w-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-gray-700 dark:text-gray-300">
+                                                    <x-heroicon-o-check class="size-4 shrink-0 text-gray-500 dark:text-gray-400" aria-hidden="true"/>
+                                                    <span class="min-w-0 truncate" x-text="@js(__('Moved :count opportunities to :stage')).replace(':count', keptCount).replace(':stage', @js(__('Negotiation/Review')))"></span>
+                                                </li>
+                                                @foreach($deals as $index => $deal)
+                                                    <li class="flex min-w-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm" x-show="deals[{{ $index }}].decision === 'skipped'">
+                                                        <x-heroicon-o-no-symbol class="size-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true"/>
+                                                        <span class="min-w-0 truncate text-gray-500 line-through decoration-gray-300 dark:text-gray-400 dark:decoration-gray-600">{{ $deal['name'] }}</span>
+                                                        <span class="shrink-0 text-gray-500 dark:text-gray-400">&middot; {{ __('left out') }}</span>
+                                                    </li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    </template>
+                                    <template x-if="deals.every((deal) => deal.decision === 'discarded')">
+                                        <x-cloud::marketing.rela-settled class="py-1.5" :summary="__('Move 3 opportunities to :stage', ['stage' => __('Negotiation/Review')])"/>
+                                    </template>
+                                </div>
                             </div>
                         </div>
 
@@ -410,51 +400,69 @@
                                 @endforeach
                             </div>
 
-                            <div class="{{ $card }}" x-bind:class="{ 'translate-y-2 opacity-0': thinking, '{{ $fade }}': ! thinking }">
-                                <div class="px-4 pt-3 text-xs font-medium text-gray-500 dark:text-gray-400">{{ __('Create Person') }}</div>
-
-                                <div class="flex min-w-0 items-center gap-2.5 px-4 pb-2.5 pt-1.5">
-                                    <span class="{{ $tile }}" aria-hidden="true">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons['people'] }}"/></svg>
-                                    </span>
-                                    <p class="min-w-0 truncate text-sm font-semibold text-gray-900 dark:text-white">Sarah Chen</p>
-                                </div>
-
-                                <div class="divide-y divide-gray-100 border-t border-gray-100 dark:divide-white/5 dark:border-white/5">
-                                    <div class="flex items-center gap-3 px-4 py-2 text-xs font-medium text-gray-500 dark:text-gray-400" aria-hidden="true">
-                                        <span class="size-4 shrink-0"></span>
-                                        <span class="w-20 shrink-0">{{ __('Attribute') }}</span>
-                                        <span>{{ __('New value') }}</span>
-                                    </div>
-                                    <div class="flex items-start gap-3 px-4 py-2.5 text-sm">
-                                        <x-cloud::home.hero-dock-checkbox class="mt-0.5" :locked="true"/>
-                                        <span class="w-20 shrink-0 leading-5 text-gray-700 dark:text-gray-300">{{ __('Name') }}</span>
-                                        <span class="min-w-0 flex-1 font-medium text-gray-900 dark:text-white">Sarah Chen</span>
-                                    </div>
-                                    @foreach([['title', __('Job Title'), __('VP of Engineering')], ['company', __('Company'), 'Kovra Systems']] as [$key, $field, $value])
-                                        <div class="flex items-start gap-3 px-4 py-2.5 text-sm">
-                                            <button type="button" role="checkbox" class="{{ $checkbox }}" aria-checked="true" x-bind:aria-checked="person.{{ $key }}.toString()" x-bind:disabled="person.decision !== null" x-on:click="person.{{ $key }} = ! person.{{ $key }}" aria-label="{{ __('Include :field', ['field' => $field]) }}">
-                                                <x-heroicon-m-check class="size-3" aria-hidden="true"/>
-                                            </button>
-                                            <span class="w-20 shrink-0 leading-5 text-gray-700 dark:text-gray-300" x-bind:class="{ 'opacity-50': ! person.{{ $key }} }">{{ $field }}</span>
-                                            <span class="min-w-0 flex-1 font-medium text-gray-900 dark:text-white" x-bind:class="{ 'opacity-50': ! person.{{ $key }} }">{{ $value }}</span>
+                            <div class="grid" x-bind:class="{ 'translate-y-2 opacity-0': thinking, '{{ $fade }}': ! thinking }">
+                                <div class="col-start-1 row-start-1 space-y-2" x-bind:class="{ 'invisible': person.decision !== null }">
+                                    <div class="{{ $card }}">
+                                        <div class="flex items-start gap-2.5 px-4 pb-1.5 pt-3">
+                                            <span class="{{ $tile }} mt-px" aria-hidden="true">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons['people'] }}"/></svg>
+                                            </span>
+                                            <p class="min-w-0 truncate text-sm leading-6">
+                                                <span class="text-gray-500 dark:text-gray-400">{{ __('Create person') }}</span>
+                                                <span class="font-semibold text-gray-900 dark:text-white">Sarah Chen</span>
+                                            </p>
                                         </div>
-                                    @endforeach
+
+                                        <div class="pb-2 pe-3 ps-[3.125rem]">
+                                            <div class="flex items-center gap-3 text-sm">
+                                                <span class="w-24 shrink-0 text-xs leading-8 text-gray-500 dark:text-gray-400">{{ __('Name') }}</span>
+                                                <span class="min-w-0 flex-1 leading-8 text-gray-900 dark:text-white">Sarah Chen</span>
+                                                <x-cloud::home.hero-dock-field :locked="true"/>
+                                            </div>
+                                            @foreach([['title', __('Job Title'), __('VP of Engineering')], ['company', __('Company'), 'Kovra Systems']] as [$key, $field, $value])
+                                                <div class="group/field flex items-center gap-3 text-sm">
+                                                    <span class="w-24 shrink-0 text-xs leading-8 text-gray-500 dark:text-gray-400" x-bind:class="{ 'line-through opacity-60': ! person.{{ $key }} }">{{ $field }}</span>
+                                                    <span class="min-w-0 flex-1 leading-8 text-gray-900 dark:text-white" x-bind:class="{ 'line-through opacity-60': ! person.{{ $key }} }">{{ $value }}</span>
+                                                    <button
+                                                        type="button"
+                                                        class="inline-flex min-h-8 min-w-8 shrink-0 cursor-pointer items-center justify-center rounded-md transition focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
+                                                        x-bind:class="person.{{ $key }} ? 'text-gray-400 hover:bg-gray-100 hover:text-gray-700 sm:opacity-0 sm:group-hover/field:opacity-100 dark:hover:bg-white/10 dark:hover:text-gray-200' : 'px-1.5 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400'"
+                                                        x-bind:disabled="person.decision !== null"
+                                                        x-on:click="person.{{ $key }} = ! person.{{ $key }}"
+                                                        x-bind:aria-label="person.{{ $key }} ? @js(__('Leave out :field', ['field' => $field])) : @js(__('Keep :field', ['field' => $field]))"
+                                                        aria-label="{{ __('Leave out :field', ['field' => $field]) }}"
+                                                    >
+                                                        <x-heroicon-o-x-mark class="h-3.5 w-3.5" x-show="person.{{ $key }}" aria-hidden="true"/>
+                                                        <span x-show="! person.{{ $key }}" style="display: none">{{ __('Keep') }}</span>
+                                                    </button>
+                                                </div>
+                                            @endforeach
+                                        </div>
+
+                                        <div class="flex items-center justify-end gap-2 border-t border-gray-100 px-4 py-2 dark:border-white/5">
+                                            <button type="button" class="{{ $discardButton }}" x-on:click="decidePerson('discarded')" x-bind:disabled="thinking">{{ __('Discard') }}</button>
+                                            <x-cloud::marketing.rela-approve :label="__('Approve')" x-on:click="decidePerson('created')" x-bind:disabled="thinking" data-ai-create-confirm/>
+                                        </div>
+                                    </div>
+
+                                    <x-cloud::marketing.rela-locked/>
                                 </div>
 
-                                <div class="grid border-t border-gray-100 dark:border-white/5">
-                                    <div class="col-start-1 row-start-1 flex items-center justify-end gap-2 px-4 py-2" x-bind:class="{ 'invisible': person.decision !== null }">
-                                        <button type="button" class="{{ $discardButton }}" x-on:click="decidePerson('discarded')" x-bind:disabled="thinking">{{ __('Discard') }}</button>
-                                        <button type="button" class="{{ $confirmButton }}" x-on:click="decidePerson('created')" x-bind:disabled="thinking" data-ai-create-confirm>{{ __('Create') }}</button>
+                                <div tabindex="-1" x-ref="personcreated" class="invisible col-start-1 row-start-1 self-start focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500" x-bind:class="{ 'invisible': person.decision !== 'created' }" data-ai-create-done>
+                                    <p class="px-2 text-xs text-gray-500 dark:text-gray-400">{{ __('Applied 1 change · just now') }}</p>
+                                    <div class="mt-1 flex min-w-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-gray-700 dark:text-gray-300">
+                                        <x-heroicon-o-check class="size-4 shrink-0 text-gray-500 dark:text-gray-400" aria-hidden="true"/>
+                                        <span class="shrink-0 whitespace-nowrap">{{ __('Created') }}</span>
+                                        <span class="chat-chip min-w-0" data-record-type="people">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3 w-3" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons['people'] }}"/></svg>
+                                            <span class="chat-chip-label">Sarah Chen</span>
+                                        </span>
+                                        <span class="min-w-0 truncate text-gray-500 dark:text-gray-400" x-show="! person.title || ! person.company" x-text="'· ' + @js(__('(:fields left out)')).replace(':fields', [person.title ? null : @js(__('Job Title')), person.company ? null : @js(__('Company'))].filter(Boolean).join(', '))"></span>
                                     </div>
-                                    <p tabindex="-1" x-ref="personcreated" class="invisible col-start-1 row-start-1 flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium text-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-emerald-400" x-bind:class="{ 'invisible': person.decision !== 'created' }" data-ai-create-done>
-                                        <x-ri-checkbox-circle-fill class="size-4" aria-hidden="true"/>
-                                        {{ __('Approved by you. Sarah Chen was created.') }}
-                                    </p>
-                                    <p tabindex="-1" x-ref="persondiscarded" data-ai-create-discarded class="invisible col-start-1 row-start-1 flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium text-gray-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-300" x-bind:class="{ 'invisible': person.decision !== 'discarded' }">
-                                        <x-ri-close-circle-line class="size-4" aria-hidden="true"/>
-                                        {{ __('Discarded. Nothing was written.') }}
-                                    </p>
+                                </div>
+
+                                <div tabindex="-1" x-ref="persondiscarded" class="invisible col-start-1 row-start-1 self-start focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500" x-bind:class="{ 'invisible': person.decision !== 'discarded' }" data-ai-create-discarded>
+                                    <x-cloud::marketing.rela-settled class="py-1.5" :summary="__('Create person Sarah Chen')"/>
                                 </div>
                             </div>
                         </div>

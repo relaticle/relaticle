@@ -40,9 +40,9 @@
                     </div>
                     <p class="mt-3 text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ $action }}</p>
                     @if($actor === 'rela')
-                        <p class="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                            <x-ri-checkbox-circle-fill class="h-4 w-4"/>
-                            {{ __('Approved by you') }}
+                        <p class="mt-3 inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                            <x-heroicon-o-check class="size-4 shrink-0" aria-hidden="true"/>
+                            {{ __('Applied 1 change after you approved it') }}
                         </p>
                     @endif
                 </div>
