@@ -21,9 +21,11 @@
         $discardLabel = __('Discard all');
     } else {
         $isBatchApproval = $isStandaloneBatch && ! $holdsOwnApproval && ! $steps[0]['deletes'];
-        $primaryLabel = $isBatchApproval
-            ? trans_choice('Approve :count change|Approve :count changes', $approvableRecordCount, ['count' => $approvableRecordCount])
-            : ($proposal?->entity_type->confirmLabel($proposal->operation, max($decisionCount, 1)) ?? __('Approve'));
+        $primaryLabel = match (true) {
+            $isBatchApproval => trans_choice('Approve :count change|Approve :count changes', $approvableRecordCount, ['count' => $approvableRecordCount]),
+            $overwrites => __('Overwrite'),
+            default => $proposal?->entity_type->confirmLabel($proposal->operation, max($decisionCount, 1)) ?? __('Approve'),
+        };
         $showPrimary = ! $isStandaloneBatch || $decisionCount > 0;
         $discardLabel = $isBatchApproval ? __('Discard all') : ($proposal?->entity_type->declineLabel() ?? __('Discard'));
     }

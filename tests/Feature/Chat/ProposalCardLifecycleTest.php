@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use App\Actions\CustomFields\CreateCustomField;
+use App\Actions\Opportunity\UpdateOpportunity;
 use App\Features\OnboardSeed;
 use App\Models\Company;
+use App\Models\Opportunity;
 use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -16,11 +18,13 @@ use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Queries\ProposalConflictsQuery;
 use Relaticle\Chat\Support\RecordChipRenderer;
+use Relaticle\Chat\Tools\Opportunity\UpdateOpportunityTool;
 use Relaticle\Chat\Tools\Task\DeleteTaskTool;
 use Tests\Helpers\ProposalCardFixture;
 
-mutates(ProposalCard::class);
+mutates(ProposalCard::class, ProposalConflictsQuery::class);
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
@@ -531,4 +535,164 @@ it('stacks an old and new value that are longer than 28 characters together', fu
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->assertSeeHtml('flex min-w-0 gap-x-1.5 gap-y-0.5 flex-col')
         ->assertSeeText('Approve');
+});
+
+function proposeOpportunityUpdate(User $user, array $records): PendingAction
+{
+    resolve(UpdateOpportunityTool::class)->handle(new Request(['records' => $records]));
+
+    return PendingAction::query()->where('user_id', $user->getKey())->latest()->firstOrFail();
+}
+
+function editAsTeammate(User $teammate, Opportunity $opportunity, array $data): void
+{
+    $viewer = auth()->user();
+    test()->actingAs($teammate);
+    resolve(UpdateOpportunity::class)->execute($teammate, $opportunity->fresh(), $data);
+    test()->actingAs($viewer);
+}
+
+function amountOf(Opportunity $opportunity): mixed
+{
+    return $opportunity->fresh()->load('customFieldValues.customField.options')->getCustomFieldValue(
+        $opportunity->customFields()->where('code', 'amount')->firstOrFail(),
+    );
+}
+
+describe('an edit made after the proposal', function (): void {
+    beforeEach(function (): void {
+        Bus::fake();
+        $this->travelTo(now()->setTime(14, 30));
+        $this->teammate = User::factory()->create(['name' => 'Maya Chen', 'current_workspace_id' => $this->workspace->getKey()]);
+        $this->workspace->users()->attach($this->teammate, ['role' => 'member']);
+        $this->opportunity = Opportunity::factory()->for($this->workspace)->create([
+            'name' => 'Figma Enterprise Renewal',
+            'custom_fields' => ['amount' => 10000],
+        ]);
+        $this->travel(5)->seconds();
+    });
+
+    it('names who set the field and when, and asks for Overwrite without the shortcut', function (): void {
+        $proposal = proposeOpportunityUpdate($this->user, [['id' => $this->opportunity->getKey(), 'custom_fields' => ['amount' => 48000]]]);
+
+        $this->travel(2)->minutes();
+        editAsTeammate($this->teammate, $this->opportunity, ['custom_fields' => ['amount' => 20000]]);
+
+        Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+            ->dispatch('proposal:set-active', id: $proposal->getKey(), context: 'conversation')
+            ->assertSee('Maya Chen set Amount to $20,000.00 at 14:32, after Rela proposed this. Approving replaces that change.')
+            ->assertSeeHtml('line-through decoration-gray-300 dark:text-gray-500 dark:decoration-gray-600">$20,000.00</span>')
+            ->assertDontSee('$10,000.00')
+            ->assertSee('Overwrite')
+            ->assertDontSeeHtml('data-proposal-shortcut')
+            ->call('createCurrent')
+            ->assertHasNoErrors()
+            ->assertDispatched('proposal:resolved');
+
+        expect($proposal->fresh()->status)->toBe(PendingActionStatus::Approved)
+            ->and((float) amountOf($this->opportunity))->toBe(48000.0);
+    });
+
+    it('keeps Approve and its shortcut when the edit touched a field the proposal does not write', function (): void {
+        $proposal = proposeOpportunityUpdate($this->user, [['id' => $this->opportunity->getKey(), 'custom_fields' => ['amount' => 48000]]]);
+
+        $this->travel(2)->minutes();
+        editAsTeammate($this->teammate, $this->opportunity, ['name' => 'Figma Renewal 2027']);
+
+        Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+            ->dispatch('proposal:set-active', id: $proposal->getKey(), context: 'conversation')
+            ->assertDontSeeHtml('data-proposal-overwrite-notice')
+            ->assertDontSee('Overwrite')
+            ->assertSeeHtml('data-proposal-shortcut');
+    });
+
+    it('refuses an approval that would overwrite an edit the card never showed, then shows it', function (): void {
+        $proposal = proposeOpportunityUpdate($this->user, [['id' => $this->opportunity->getKey(), 'custom_fields' => ['amount' => 48000]]]);
+
+        $card = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+            ->dispatch('proposal:set-active', id: $proposal->getKey(), context: 'conversation')
+            ->assertDontSeeHtml('data-proposal-overwrite-notice');
+
+        $this->travel(2)->minutes();
+        editAsTeammate($this->teammate, $this->opportunity, ['custom_fields' => ['amount' => 20000]]);
+
+        $card->call('createCurrent')
+            ->assertHasErrors('resolve')
+            ->assertNotDispatched('proposal:resolved')
+            ->assertSee('Maya Chen set Amount to $20,000.00 at 14:32');
+
+        expect($proposal->fresh()->status)->toBe(PendingActionStatus::Pending)
+            ->and((float) amountOf($this->opportunity))->toBe(20000.0);
+
+        $card->call('createCurrent')->assertDispatched('proposal:resolved');
+
+        expect((float) amountOf($this->opportunity))->toBe(48000.0);
+    });
+
+    it('never overwrites from the keyboard shortcut', function (): void {
+        $proposal = proposeOpportunityUpdate($this->user, [['id' => $this->opportunity->getKey(), 'custom_fields' => ['amount' => 48000]]]);
+
+        $this->travel(2)->minutes();
+        editAsTeammate($this->teammate, $this->opportunity, ['custom_fields' => ['amount' => 20000]]);
+
+        Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+            ->dispatch('proposal:set-active', id: $proposal->getKey(), context: 'conversation')
+            ->dispatch('proposal:create-current', context: 'conversation')
+            ->assertNotDispatched('proposal:resolved');
+
+        expect($proposal->fresh()->status)->toBe(PendingActionStatus::Pending);
+    });
+
+    it('drops the warning once the edited field is left out of the write', function (): void {
+        $proposal = proposeOpportunityUpdate($this->user, [[
+            'id' => $this->opportunity->getKey(),
+            'name' => 'Figma Enterprise Renewal 2027',
+            'custom_fields' => ['amount' => 48000],
+        ]]);
+
+        $this->travel(2)->minutes();
+        editAsTeammate($this->teammate, $this->opportunity, ['custom_fields' => ['amount' => 20000]]);
+
+        Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+            ->dispatch('proposal:set-active', id: $proposal->getKey(), context: 'conversation')
+            ->assertSeeHtml('data-proposal-overwrite-notice')
+            ->call('toggleField', 'amount')
+            ->assertDontSeeHtml('data-proposal-overwrite-notice')
+            ->assertSeeHtml('data-proposal-shortcut');
+    });
+
+    it('says you made the change when the viewer edited the record', function (): void {
+        $proposal = proposeOpportunityUpdate($this->user, [['id' => $this->opportunity->getKey(), 'custom_fields' => ['amount' => 48000]]]);
+
+        $this->travel(2)->minutes();
+        resolve(UpdateOpportunity::class)->execute($this->user, $this->opportunity->fresh(), ['custom_fields' => ['amount' => 20000]]);
+
+        Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+            ->dispatch('proposal:set-active', id: $proposal->getKey(), context: 'conversation')
+            ->assertSee('You set Amount to $20,000.00 at 14:32, after Rela proposed this.');
+    });
+
+    it('warns on the batch row whose record changed and drops the shortcut for the whole batch', function (): void {
+        $other = Opportunity::factory()->for($this->workspace)->create(['name' => 'Notion Expansion']);
+
+        $proposal = proposeOpportunityUpdate($this->user, [
+            ['id' => $this->opportunity->getKey(), 'custom_fields' => ['amount' => 48000]],
+            ['id' => $other->getKey(), 'custom_fields' => ['amount' => 9000]],
+        ]);
+
+        $this->travel(2)->minutes();
+        editAsTeammate($this->teammate, $this->opportunity, ['custom_fields' => ['amount' => 20000]]);
+
+        $card = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+            ->dispatch('proposal:set-active', id: $proposal->getKey(), context: 'conversation')
+            ->assertSee('Maya Chen set Amount to $20,000.00 at 14:32')
+            ->assertSee('Approve 2 changes')
+            ->assertDontSeeHtml('data-proposal-shortcut');
+
+        expect(substr_count($card->html(), 'data-proposal-overwrite-notice'))->toBe(1);
+
+        $card->call('toggleLeftOutRow', (string) $proposal->getKey(), 0)
+            ->assertDontSeeHtml('data-proposal-overwrite-notice')
+            ->assertSeeHtml('data-proposal-shortcut');
+    });
 });

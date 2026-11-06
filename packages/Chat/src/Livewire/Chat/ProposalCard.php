@@ -21,11 +21,13 @@ use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Relaticle\Chat\Actions\SetWebSearchPreference;
+use Relaticle\Chat\Data\ProposalConflict;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Enums\WebSearchPreference;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Queries\ProposalConflictsQuery;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\ProposalEditor;
 use Relaticle\Chat\Services\ProposalPlanService;
@@ -34,6 +36,7 @@ use Relaticle\Chat\Services\Tools\ProposalFieldSchemaDescriber;
 use Relaticle\Chat\Services\TurnContinuationService;
 use Relaticle\Chat\Support\ApprovalFailureMessage;
 use Relaticle\Chat\Support\PlanReference;
+use Relaticle\Chat\Support\ProposalConflictNotice;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\ProposalProgress;
 use Relaticle\Chat\Support\ProposalReceipts;
@@ -110,6 +113,15 @@ final class ProposalCard extends BaseLivewireComponent
 
     #[Locked]
     public ?string $editingStepId = null;
+
+    /**
+     * Activity ids of the overwrite warnings the last render showed. Approve refuses an
+     * overwrite the user was never shown.
+     *
+     * @var list<string>
+     */
+    #[Locked]
+    public array $shownOverwrites = [];
 
     /** @var array<string, mixed> */
     public array $data = [];
@@ -511,6 +523,9 @@ final class ProposalCard extends BaseLivewireComponent
      */
     private ?array $planAllStepsCache = null;
 
+    /** @var array<string, array<int, non-empty-list<ProposalConflict>>>|null */
+    private ?array $overwritesCache = null;
+
     /**
      * Per-request memo for editableCodes(), keyed by entity type.
      *
@@ -548,6 +563,7 @@ final class ProposalCard extends BaseLivewireComponent
     private function forgetPlanSteps(): void
     {
         $this->planAllStepsCache = null;
+        $this->overwritesCache = null;
     }
 
     /**
@@ -597,7 +613,7 @@ final class ProposalCard extends BaseLivewireComponent
             'summary' => $this->stepSummary($step),
             'title' => is_string($step->display_data['title'] ?? null) ? $step->display_data['title'] : '',
             'recordLabel' => $this->stepRecordLabel($step),
-            'fields' => $this->visibleRows($step, $this->recordFieldsOf($step)),
+            'fields' => $this->withOverwrittenValues($step, 0, $this->visibleRows($step, $this->recordFieldsOf($step))),
             'editableCodes' => $this->editableCodesOf($step),
             'isActive' => (string) $step->getKey() === $this->activeStepId(),
             'needsOwnApproval' => $step->needsOwnApproval(),
@@ -614,6 +630,7 @@ final class ProposalCard extends BaseLivewireComponent
             'declineLabel' => $entity->declineLabel(),
             'followUpLabel' => $entity->followUpLabel(),
             'refLinks' => $this->refLinksOf($step, $pendingIds),
+            'overwriteNotices' => $this->overwriteNoticesOf($step),
         ];
     }
 
@@ -751,7 +768,7 @@ final class ProposalCard extends BaseLivewireComponent
                 'summary' => is_string($summary) ? $summary : '',
                 'label' => $this->itemLabel($step->entity_type, $display),
                 'isActive' => $index === $cursor,
-                'fields' => $this->visibleRows($step, is_array($fields) ? array_values($fields) : []),
+                'fields' => $this->withOverwrittenValues($step, $index, $this->visibleRows($step, is_array($fields) ? array_values($fields) : [])),
             ];
         }, $this->unresolvedIndices($step));
     }
@@ -935,7 +952,7 @@ final class ProposalCard extends BaseLivewireComponent
      */
     public function approveAll(ProposalPlanService $plan): void
     {
-        if ($this->editingFieldCode !== null) {
+        if ($this->editingFieldCode !== null || $this->refusesUnseenOverwrite()) {
             return;
         }
 
@@ -1140,8 +1157,8 @@ final class ProposalCard extends BaseLivewireComponent
     }
 
     /**
-     * Whether the primary must lose its shortcut and turn danger: it would run a
-     * delete, or the one thing left in is approved on its own and never from the keyboard.
+     * Whether the primary must lose its shortcut: it would run a delete, overwrite an edit
+     * made after the proposal, or the one thing left in is approved on its own.
      */
     public function primaryIsRisky(): bool
     {
@@ -1149,6 +1166,10 @@ final class ProposalCard extends BaseLivewireComponent
 
         if ($docked instanceof PendingAction) {
             return ! $docked->entity_type->approvesFromKeyboard();
+        }
+
+        if ($this->overwrites() !== []) {
+            return true;
         }
 
         $stillIn = $this->stepsStillIn();
@@ -1177,6 +1198,113 @@ final class ProposalCard extends BaseLivewireComponent
             fn (PendingAction $step): bool => ! in_array((string) $step->getKey(), $leftOut, true)
                 && ! isset($taken[(string) $step->getKey()]),
         ));
+    }
+
+    /**
+     * Edits made after the proposal to a field Approve would write. A step, row or field
+     * the user left out writes nothing, so it overwrites nothing.
+     *
+     * @return array<string, array<int, non-empty-list<ProposalConflict>>>
+     */
+    private function overwrites(): array
+    {
+        if ($this->overwritesCache !== null) {
+            return $this->overwritesCache;
+        }
+
+        $found = resolve(ProposalConflictsQuery::class)->forSteps($this->authUser(), $this->stepsStillIn());
+        $leftOutRows = $this->leftOutRowMap();
+        $excludedFields = count($this->planSteps()) > 1 ? [] : $this->excludedFields;
+        $overwrites = [];
+
+        foreach ($found as $stepId => $byIndex) {
+            foreach ($byIndex as $index => $conflicts) {
+                $written = array_values(array_filter(
+                    $conflicts,
+                    static fn (ProposalConflict $conflict): bool => ! in_array($conflict->key, $excludedFields, true),
+                ));
+
+                if ($written !== [] && ! in_array($index, $leftOutRows[$stepId] ?? [], true)) {
+                    $overwrites[$stepId][$index] = $written;
+                }
+            }
+        }
+
+        return $this->overwritesCache = $overwrites;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function overwriteIds(): array
+    {
+        $ids = [];
+
+        foreach ($this->overwrites() as $byIndex) {
+            foreach ($byIndex as $conflicts) {
+                array_push($ids, ...array_map(static fn (ProposalConflict $conflict): string => $conflict->activityId, $conflicts));
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * An edit landed after the card last rendered: approving now would overwrite it
+     * without the warning, so the card refuses once and shows it.
+     */
+    private function refusesUnseenOverwrite(): bool
+    {
+        $this->overwritesCache = null;
+
+        if (array_diff($this->overwriteIds(), $this->shownOverwrites) === []) {
+            return false;
+        }
+
+        $this->addError('resolve', __('This record changed while you were reviewing. Check the change, then decide again.'));
+
+        return true;
+    }
+
+    /**
+     * An overwritten row strikes the value it now replaces, not the one the proposal read.
+     * A link list has no single value to strike, so it keeps its row.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array<string, mixed>>
+     */
+    private function withOverwrittenValues(PendingAction $step, int $index, array $rows): array
+    {
+        $conflicts = $this->overwrites()[(string) $step->getKey()][$index] ?? [];
+
+        if ($conflicts === []) {
+            return $rows;
+        }
+
+        return array_map(static function (array $row) use ($conflicts): array {
+            foreach ($conflicts as $conflict) {
+                $matches = isset($row['code'])
+                    ? $row['code'] === $conflict->key
+                    : ($row['label'] ?? null) === $conflict->field;
+
+                if ($matches && ! str_ends_with($conflict->key, '_ids')) {
+                    return [...$row, 'old' => $conflict->value];
+                }
+            }
+
+            return $row;
+        }, $rows);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function overwriteNoticesOf(PendingAction $step): array
+    {
+        return array_map(
+            fn (array $conflicts): string => ProposalConflictNotice::for($conflicts, $this->authUser()),
+            $this->overwrites()[(string) $step->getKey()] ?? [],
+        );
     }
 
     /**
@@ -1261,7 +1389,7 @@ final class ProposalCard extends BaseLivewireComponent
      */
     public function approveStep(string $stepId, ProposalPlanService $plan): void
     {
-        if ($this->editingFieldCode !== null) {
+        if ($this->editingFieldCode !== null || $this->refusesUnseenOverwrite()) {
             return;
         }
 
@@ -1392,7 +1520,7 @@ final class ProposalCard extends BaseLivewireComponent
 
     public function createCurrent(PendingActionService $service): void
     {
-        if ($this->editingFieldCode !== null) {
+        if ($this->editingFieldCode !== null || $this->refusesUnseenOverwrite()) {
             return;
         }
 
@@ -1942,6 +2070,7 @@ final class ProposalCard extends BaseLivewireComponent
 
         $proposal = $this->loadStep($this->activeStepId());
         $steps = $this->stepViews();
+        $this->shownOverwrites = $this->overwriteIds();
 
         // recordFields and editableCodes are dropped: no partial reads them, and each
         // ran its own CustomField query (editableCodes two more for workspace members) on
@@ -1954,6 +2083,7 @@ final class ProposalCard extends BaseLivewireComponent
             'isPlan' => count($steps) > 1,
             'approvableRecordCount' => $this->approvableRecordCount(),
             'primaryIsRisky' => $this->primaryIsRisky(),
+            'overwrites' => $this->shownOverwrites !== [],
             'leftOutStepIds' => $this->leftOutStepIds(),
             'leftOutRowIndexes' => $this->leftOutRowMap(),
             'takenBy' => $this->leftOutDependents(),

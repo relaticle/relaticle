@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 use App\Actions\Company\CreateCompany;
+use App\Actions\Opportunity\UpdateOpportunity;
 use App\Actions\Task\DeleteTask;
 use App\Models\Company;
+use App\Models\Opportunity;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\CurrentWorkspace;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Enums\PendingActionOperation;
@@ -231,4 +234,51 @@ it('locks the box and approves a plan with Cmd+Enter in the side panel', functio
         ->each->toBe(PendingActionStatus::Approved);
 
     $page->assertNoJavaScriptErrors();
+});
+
+it('warns about an edit made after the proposal and overwrites it only on a click', function (): void {
+    $conversation = lockTestConversation();
+    $workspace = $conversation['workspace'];
+    $teammate = User::factory()->create(['name' => 'Maya Chen', 'current_workspace_id' => $workspace->getKey()]);
+    $workspace->users()->attach($teammate, ['role' => 'member']);
+
+    $opportunity = resolve(CurrentWorkspace::class)->within($workspace, fn (): Opportunity => Opportunity::factory()->for($workspace)->create([
+        'name' => 'Figma Enterprise Renewal',
+        'custom_fields' => ['amount' => 10000],
+    ]));
+
+    $this->travel(5)->seconds();
+
+    $proposal = lockTestProposal($conversation, UpdateOpportunity::class, 'opportunity', [
+        '_record_id' => $opportunity->getKey(),
+        '_model_class' => Opportunity::class,
+        'custom_fields' => ['amount' => 48000],
+    ], [
+        'title' => 'Update Opportunity',
+        'summary' => 'Update opportunity "Figma Enterprise Renewal"',
+        'fields' => [['label' => 'Amount', 'code' => 'amount', 'old' => '$10,000.00', 'new' => '$48,000.00', 'type' => 'currency']],
+    ], PendingActionOperation::Update, inPlan: false);
+
+    $this->travel(2)->minutes();
+    $this->actingAs($teammate);
+    resolve(CurrentWorkspace::class)->within($workspace, fn (): Opportunity => resolve(UpdateOpportunity::class)->execute($teammate, $opportunity->fresh(), ['custom_fields' => ['amount' => 20000]]));
+    $this->app['auth']->forgetGuards();
+
+    $page = ChatBrowser::logIn($conversation['user'], $workspace->slug, $conversation['conversationId'])
+        ->resize(1440, 900)
+        ->assertSee('Maya Chen set Amount to $20,000.00')
+        ->assertSee('Approving replaces that change.')
+        ->assertSeeIn(LOCK_TEST_DOCK, 'Overwrite')
+        ->assertMissing('[data-proposal-shortcut]');
+
+    $page->keys(LOCK_TEST_DOCK, 'Control+Enter')->wait(1.2);
+
+    expect($proposal->fresh()->status)->toBe(PendingActionStatus::Pending);
+
+    $page->click(LOCK_TEST_DOCK.' button:has-text("Overwrite")')
+        ->wait(1.2)
+        ->assertMissing('[data-proposal-overwrite-notice]')
+        ->assertNoJavaScriptErrors();
+
+    expect($proposal->fresh()->status)->toBe(PendingActionStatus::Approved);
 });
