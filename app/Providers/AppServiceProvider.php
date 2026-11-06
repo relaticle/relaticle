@@ -868,7 +868,11 @@ final class AppServiceProvider extends ServiceProvider
             Js::make('linked-records-picker', resource_path('js/filament/linked-records-picker.js')),
         ]);
 
-        FilamentAsset::registerScriptData(['payloadTooLarge' => __('filament/panel.payload_too_large')]);
+        FilamentAsset::registerScriptData([
+            'payloadTooLarge' => __('filament/panel.payload_too_large'),
+            'checklistItemLabel' => __('filament/rich-editor.checklist.item'),
+            'checklistEmptyItemLabel' => __('filament/rich-editor.checklist.empty_item'),
+        ]);
     }
 
     private function configureMacros(): void

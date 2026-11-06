@@ -358,7 +358,7 @@ it('builds, ticks and saves a checklist in a task description', function (): voi
         ->assertScript("getComputedStyle(document.querySelector('{$editor} ul[data-type=\"taskList\"]')).listStyleType === 'none'")
         ->assertScript("getComputedStyle(document.querySelector('{$editor} ul[data-type=\"taskList\"] > li')).display === 'flex'")
         ->assertScript("(() => { const box = document.querySelector('{$editor} ul[data-type=\"taskList\"] > li > label').getBoundingClientRect(); return box.width >= 24 && box.height >= 24; })()")
-        ->click("{$editor} input[aria-label=\"Task item checkbox for Call Bob\"]")
+        ->click("{$editor} input[aria-label=\"Checklist item: Call Bob\"]")
         ->assertScript("document.querySelectorAll('{$editor} li[data-checked=\"true\"]').length === 1")
         ->assertScript("(() => { const bold = document.querySelector('{$editor} li[data-checked=\"true\"] strong'); return getComputedStyle(bold).color === getComputedStyle(bold.closest('p')).color; })()")
         ->press('Create')
@@ -382,6 +382,6 @@ it('builds, ticks and saves a checklist in a task description', function (): voi
 
     $page->click('Prepare the offsite')
         ->assertVisible($editor)
-        ->assertScript("document.querySelector('{$editor} input[aria-label=\"Task item checkbox for Call Bob\"]')?.checked === true")
+        ->assertScript("document.querySelector('{$editor} input[aria-label=\"Checklist item: Call Bob\"]')?.checked === true")
         ->assertNoJavaScriptErrors();
 });
