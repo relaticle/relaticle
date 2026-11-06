@@ -105,6 +105,44 @@ it('puts the badges of a task card below a short description', function (): void
     expect($layout)->toBe(['badgesBelowText' => true, 'sameLeftEdge' => true]);
 });
 
+it('shows checklist progress as a sized badge on a task card', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    TenantContextService::setTenantId($workspace->getKey());
+
+    $statusField = CustomField::query()->forEntity(Task::class)->where('code', TaskField::STATUS->value)->firstOrFail();
+    $descriptionField = CustomField::query()->forEntity(Task::class)->where('code', TaskField::DESCRIPTION->value)->firstOrFail();
+
+    $task = Task::factory()->recycle([$user, $workspace])->create(['title' => 'Checklist card']);
+    $task->saveCustomFieldValue($statusField, $statusField->options->first()->getKey());
+    $task->saveCustomFieldValue($descriptionField, '<ul data-type="taskList">'
+        .'<li data-checked="true" data-type="taskItem"><label><input type="checkbox" checked="checked"><span></span></label><div><p>Call Bob</p></div></li>'
+        .'<li data-checked="false" data-type="taskItem"><label><input type="checkbox"><span></span></label><div><p>Send quote</p></div></li>'
+        .'</ul>');
+
+    TenantContextService::setTenantId(null);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/tasks/board")
+        ->assertVisible("[data-card-id=\"{$task->getKey()}\"] [data-checklist-progress]")
+        ->assertNoJavaScriptErrors();
+
+    $badge = $page->script(<<<JS
+        (() => {
+            const badge = document.querySelector('[data-card-id="{$task->getKey()}"] [data-checklist-progress]');
+            const icon = badge.querySelector('svg').getBoundingClientRect();
+
+            return { text: badge.textContent.trim(), iconSized: icon.width > 0 && icon.height > 0 };
+        })();
+    JS);
+
+    expect($badge)->toBe(['text' => '1/2', 'iconSized' => true]);
+});
+
 it('fills the viewport with a grouped board and lines its headers up with the flat board', function (): void {
     $this->withVite();
 
