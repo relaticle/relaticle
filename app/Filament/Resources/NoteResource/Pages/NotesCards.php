@@ -32,6 +32,7 @@ final class NotesCards extends ManageRecords
     {
         return $table
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['opportunities', 'creator']))
+            ->emptyStateDescription(__('filament/resources/note.empty_state.description'))
             ->columns([
                 Stack::make([
                     NoteCardColumn::make('title')->searchable(),

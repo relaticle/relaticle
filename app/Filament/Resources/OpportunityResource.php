@@ -61,6 +61,7 @@ final class OpportunityResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->emptyStateDescription(__('filament/resources/opportunity.empty_state.description'))
             ->columns([
                 TextColumn::make('name')
                     ->searchable(),
@@ -69,6 +70,7 @@ final class OpportunityResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->toggleable()
+                    ->visibleFrom('sm')
                     ->getStateUsing(fn (Opportunity $record): string => $record->created_by),
                 TextColumn::make('deleted_at')
                     ->dateTime()
@@ -77,6 +79,7 @@ final class OpportunityResource extends Resource
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
+                    ->visibleFrom('sm')
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('updated_at')
                     ->dateTime()

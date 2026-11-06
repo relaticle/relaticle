@@ -92,6 +92,7 @@ final class TaskResource extends Resource
         $valueResolver = resolve(ValueResolvers::class);
 
         return $table
+            ->emptyStateDescription(__('filament/resources/task.empty_state.description'))
             ->columns(self::columns())
             ->defaultSort('created_at', 'desc')
             ->searchable()
@@ -158,10 +159,12 @@ final class TaskResource extends Resource
                 ->searchable()
                 ->sortable()
                 ->toggleable()
+                ->visibleFrom('sm')
                 ->getStateUsing(fn (Task $record): string => $record->createdBy),
             TextColumn::make('created_at')
                 ->dateTime()
                 ->sortable()
+                ->visibleFrom('sm')
                 ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('updated_at')
                 ->dateTime()

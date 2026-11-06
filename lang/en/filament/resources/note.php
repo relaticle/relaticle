@@ -54,6 +54,10 @@ return [
         'deleted' => 'Deleted',
     ],
 
+    'empty_state' => [
+        'description' => 'Notes you add appear here.',
+    ],
+
     'pages' => [
         'list' => [
             'actions' => [

@@ -34,6 +34,11 @@ it('can render the index page', function (): void {
         ->assertOk();
 });
 
+it('describes an empty list in one line', function (): void {
+    livewire(ListCompanies::class)
+        ->assertSee('Companies you add or import appear here.');
+});
+
 it('can render the view page', function (): void {
     $record = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
