@@ -84,16 +84,14 @@
                 >
             </label>
 
-            <div class="flex-1 px-4 py-4 font-mono text-[12px] leading-6 sm:text-[13px]">
+            <div class="flex-1 overflow-x-auto py-4 pr-10 pl-4 font-mono [mask-image:linear-gradient(to_right,black_calc(100%-2.5rem),transparent)] text-[12px] leading-6 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary sm:text-[13px]" tabindex="0" role="region" aria-label="{{ __('Install commands') }}">
                 @foreach($installLines as $line)
                     @if($line['type'] === 'blank')
                         <div class="h-3" aria-hidden="true"></div>
                     @elseif($line['type'] === 'comment')
-                        <p class="text-gray-500 dark:text-gray-400">
-                            <span>#</span> {{ $line['text'] }}
-                        </p>
+                        <p class="whitespace-pre text-gray-500 dark:text-gray-400"># {{ $line['text'] }}</p>
                     @else
-                        <p class="flex gap-2 whitespace-pre-wrap break-all text-gray-800 dark:text-gray-200">
+                        <p class="flex w-max gap-2 whitespace-pre text-gray-800 dark:text-gray-200">
                             <span class="shrink-0 select-none {{ ($line['continuation'] ?? false) ? 'text-gray-400 dark:text-gray-500' : 'text-primary dark:text-primary-400' }}" aria-hidden="true">{{ ($line['continuation'] ?? false) ? '>' : '$' }}</span>
                             @if(isset($line['bind']))
                                 <span x-text="{{ $line['bind'] }}">{{ $line['text'] }}</span>
