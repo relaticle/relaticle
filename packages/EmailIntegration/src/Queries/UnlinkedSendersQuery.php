@@ -141,7 +141,7 @@ final readonly class UnlinkedSendersQuery
             ->whereIn('email_participants.role', $recipientRoles)
             ->whereNotExists(fn (BaseBuilder $member): BaseBuilder => $member
                 ->fromSub($this->memberAddresses($viewer), 'member_addresses')
-                ->whereColumn('member_addresses.address', DB::raw('lower(email_participants.email_address)')))
+                ->whereRaw('member_addresses.address = lower(email_participants.email_address)'))
             ->toBase()
             ->selectRaw('distinct on (emails.conversation_key) lower(email_participants.email_address) as address')
             ->addSelect('email_participants.name', 'emails.conversation_key')
