@@ -20,7 +20,7 @@ TipTap instance. Filament ships no task list, up to and including v5.11.1, the l
 | 1 | Where items are ticked | In the task edit modal only, saved with the form's Save. No autosave, no ticking on the board |
 | 2 | Which editors get checklists | The task description field only (`TaskField::DESCRIPTION`). Notes and custom rich-text fields do not |
 | 3 | How a checklist starts | Slash menu item plus the typed `[ ] ` shortcut. `Cmd/Ctrl+Shift+9` comes with TipTap and stays |
-| 4 | How the official extension loads | Add `@tiptap/extension-list`. Build it as an ES module whose `@tiptap/*` imports resolve to `window.FilamentRichEditor.tiptap`, and commit the output under `public/js/app/` |
+| 4 | How the official extension loads | Add `@tiptap/extension-list`. Build it as an input of the main Vite build, whose `@tiptap/*` imports resolve to `window.FilamentRichEditor.tiptap`. Revised after review: nothing built is committed |
 | 5 | Board card | A "checked/total" progress badge beside priority and due date. The stripped description text stays as it is |
 | 6 | Agents | `- [ ]` and `- [x]` markdown becomes a real checklist in the task description. Reads stay HTML |
 | 7 | Read-only rendering | Ticked state visible, ticked items muted. Revised while planning: the read-only task view is the disabled editor, so boxes come from TipTap and CSS, with no sanitizer change |
@@ -91,13 +91,13 @@ Each was run in this checkout on 2026-11-06.
 - Add `@tiptap/extension-list` to `dependencies` at `^3.32.2`, the line the other `@tiptap` packages use.
 - Source: a small module in `resources/js/filament/rich-content-plugins/` whose default export is one
   TipTap `Extension` with `addExtensions()` returning `TaskList` and `TaskItem` (finding 3).
-- A build script resolves `@tiptap/core`, `@tiptap/pm/state`, `@tiptap/pm/model` and `@tiptap/pm/view`
-  to the four `window.FilamentRichEditor.tiptap` objects, so the output carries no TipTap or ProseMirror
-  code of its own. It writes an ES module that `FilamentAsset` registers and `filament:assets` publishes
-  to `public/js/app/`. That copy is committed, like `rich-editor-slash-menu.js`.
-- `FilamentAsset::appVersion()` keys on the slash menu file's mtime today (`AppServiceProvider.php:851`).
-  It must also change when the checklist bundle changes.
-- The output must contain no ProseMirror class definitions. The build or a check fails if it does.
+- The module is an input of `vite.config.js`. Its `filament-rich-editor-modules` plugin resolves
+  `@tiptap/core`, `@tiptap/pm/state`, `@tiptap/pm/model` and `@tiptap/pm/view` to the four
+  `window.FilamentRichEditor.tiptap` objects, for the plugin files and `@tiptap/extension-list` only.
+  The chat composer keeps its own TipTap. `ChecklistPlugin` loads the chunk with `Vite::asset()`, so the
+  hashed file name busts the cache and nothing built is committed.
+- The build fails when a plugin imports another TipTap or ProseMirror module, when other code imports
+  `@tiptap/extension-list`, or when the chunk loses its default export.
 
 ### Read-only rendering (revised while planning)
 
@@ -179,9 +179,6 @@ Entry points only, per `.ai/rules` testing rules. Extend the existing files that
 
 ## Left to the builder
 
-- The build tool: a Vite config, Rolldown or esbuild, and how the four `@tiptap` specifiers map to the
-  globals. Mirror `bin/build-brand-assets.mjs` and its `--check` mode. Whether CI runs that check is the
-  builder's call, stated in the PR.
 - Where the badge sits in the card, its icon, and its colour, within the existing badge style.
 - The CSS for the drawn box, checked in light and dark mode, Chromium and WebKit.
 - Whether the slash menu skips missing tools or reads its item list from the field.
