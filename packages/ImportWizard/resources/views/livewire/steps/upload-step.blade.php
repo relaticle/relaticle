@@ -7,7 +7,7 @@
             $fileExtension = strtoupper(pathinfo($fileName, PATHINFO_EXTENSION));
             $fileSizeFormatted = Number::fileSize($uploadedFile?->getSize() ?? 0, precision: 1);
         @endphp
-        <div class="flex-1 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-12 flex items-center justify-center">
+        <div class="flex-1 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4 md:p-12 flex items-center justify-center">
             {{-- File Info Card --}}
             <div x-data class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 w-full max-w-sm">
                 {{-- Hidden file input for replace --}}
@@ -85,7 +85,7 @@
             x-bind:class="dragging
                 ? 'border-primary-500 bg-primary-50 dark:bg-primary-950 ring-2 ring-primary-500/20'
                 : 'border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900'"
-            class="flex-1 relative rounded-xl border border-dashed p-12 transition-all duration-200 grid place-items-center"
+            class="flex-1 relative rounded-xl border border-dashed p-6 md:p-12 transition-all duration-200 grid place-items-center"
         >
             {{-- Hidden file input (NOT covering the zone) --}}
             <input
