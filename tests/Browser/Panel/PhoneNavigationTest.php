@@ -41,6 +41,81 @@ it('shows a tab bar on phones whose More button opens the sidebar', function ():
         ->assertNoJavaScriptErrors();
 });
 
+it('closes the drawer on Escape', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+
+    phoneCompaniesPage($user)
+        ->click('.fi-bottom-nav button')
+        ->assertScript("Alpine.store('sidebar').isOpen", true)
+        ->keys('#fi-main-sidebar nav a >> nth=0', 'Escape')
+        ->assertScript("Alpine.store('sidebar').isOpen", false)
+        ->assertNoJavaScriptErrors();
+});
+
+it('closes the drawer from a 44px close button in its header', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+
+    phoneCompaniesPage($user)
+        ->click('.fi-bottom-nav button')
+        ->assertScript("Alpine.store('sidebar').isOpen", true)
+        ->assertScript("(() => { const box = document.querySelector('.fi-sidebar-drawer-close-btn').getBoundingClientRect(); return Math.round(box.width) >= 44 && Math.round(box.height) >= 44 && document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2).closest('.fi-sidebar-drawer-close-btn') !== null; })()", true)
+        ->click('.fi-sidebar-drawer-close-btn')
+        ->assertScript("Alpine.store('sidebar').isOpen", false)
+        ->assertNoJavaScriptErrors();
+});
+
+it('shows the drawer close button wherever the sidebar is a drawer and hides it on desktop', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $closeButtonDisplay = "getComputedStyle(document.querySelector('.fi-sidebar-drawer-close-btn')).display";
+
+    $page = phoneCompaniesPage($user)->resize(768, 1024);
+    $page->script("Alpine.store('sidebar').open()");
+
+    expect($page->script($closeButtonDisplay))->not->toBe('none');
+
+    $page->resize(1440, 900);
+
+    expect($page->script($closeButtonDisplay))->toBe('none');
+});
+
+it('keeps a tab active on the pages beneath it and not More', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    phoneCompaniesPage($user)
+        ->navigate("/app/{$workspace->slug}/companies/import")
+        ->assertScript("document.querySelector('.fi-bottom-nav [aria-current=page]').getAttribute('href').endsWith('/companies')", true)
+        ->assertScript("document.querySelectorAll('.fi-bottom-nav .fi-active').length", 1)
+        ->assertScript("document.querySelector('.fi-bottom-nav button').classList.contains('fi-active')", false)
+        ->navigate("/app/{$workspace->slug}/tasks")
+        ->assertScript("document.querySelector('.fi-bottom-nav button').classList.contains('fi-active')", true)
+        ->assertScript("document.querySelectorAll('.fi-bottom-nav [aria-current=page]').length", 0)
+        ->assertNoJavaScriptErrors();
+});
+
+it('keeps the drawer search reachable with the getting started checklist on a phone', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+
+    $workspace = $user->ownedWorkspaces()->first();
+    $page = phoneCompaniesPage($user);
+    $page->script("localStorage.setItem('activation-checklist:open', 'true')");
+
+    $page->navigate("/app/{$workspace->slug}/companies")
+        ->click('.fi-bottom-nav button')
+        ->assertScript("(() => { const search = document.querySelector('.fi-sidebar-search input').getBoundingClientRect(); return document.elementFromPoint(search.x + search.width / 2, search.y + search.height / 2).closest('.fi-sidebar-search') !== null; })()", true)
+        ->assertNoJavaScriptErrors();
+});
+
 it('keeps the tab bar off desktop', function (): void {
     $this->withVite();
 

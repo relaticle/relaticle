@@ -14,6 +14,8 @@ use App\Filament\Pages\SetupWorkspace;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\NoBilling;
+use Filament\Actions\Action;
+use Filament\Facades\Filament;
 use Filament\Schemas\Components\Wizard;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\UploadedFile;
@@ -819,6 +821,28 @@ it('shows the account menu links inside a workspace', function (): void {
         ->assertSee(__('filament/panel.user_menu.settings'))
         ->assertSee(__('access-tokens.user_menu'));
 });
+
+it('offers workspace settings in the user menu only to members who can manage the workspace', function (string $role, bool $offered): void {
+    $owner = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
+    $user = $role === 'owner' ? $owner : User::factory()->create();
+
+    if ($user !== $owner) {
+        $workspace->users()->attach($user, ['role' => $role]);
+        $user->switchWorkspace($workspace);
+    }
+
+    $this->actingAs($user);
+    Filament::setTenant($workspace);
+
+    $names = collect(Filament::getUserMenuItems())->map(fn (Action $item): string => $item->getName());
+
+    expect($names->contains('workspace_settings'))->toBe($offered);
+})->with([
+    'owner' => ['owner', true],
+    'admin' => ['admin', false],
+    'member' => ['member', false],
+]);
 
 it('automatically starts one 14-day Cloud Pro trial after hosted onboarding', function (): void {
     withHostedBilling();

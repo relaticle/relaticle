@@ -24,13 +24,21 @@
 
     {{-- format-ignore-start --}}
     <div
-        x-data="{}"
+        x-data="filamentSidebar({
+            hasTopNavigation: @js(filament()->hasTopNavigation()),
+            isSidebarCollapsibleOnDesktop: @js($isSidebarCollapsibleOnDesktop),
+            isSidebarFullyCollapsibleOnDesktop: @js($isSidebarFullyCollapsibleOnDesktop),
+        })"
         @if ($isCollapsible)
             x-cloak
         @else
             x-cloak="-lg"
         @endif
         x-bind:class="{ 'fi-sidebar-open': $store.sidebar.isOpen }"
+        x-bind:inert="isHidden"
+        x-effect="focusInitialNavigation()"
+        x-on:keydown.tab="handleTab($event)"
+        x-on:keydown.escape.document="handleEscape($event)"
         id="fi-main-sidebar"
         class="fi-sidebar fi-main-sidebar"
     >
@@ -106,6 +114,18 @@
                 </div>
 
                 {{ \Filament\Support\Facades\FilamentView::renderHook(\Filament\View\PanelsRenderHook::SIDEBAR_LOGO_AFTER) }}
+
+                <x-filament::icon-button
+                    color="gray"
+                    :icon="\Filament\Support\Icons\Heroicon::OutlinedXMark"
+                    icon-size="lg"
+                    :label="__('filament-panels::layout.actions.sidebar.collapse.label')"
+                    x-data="{}"
+                    aria-controls="fi-main-sidebar"
+                    x-bind:aria-expanded="$store.sidebar.isOpen"
+                    x-on:click="$store.sidebar.close()"
+                    class="fi-sidebar-drawer-close-btn"
+                />
             </header>
         </div>
 

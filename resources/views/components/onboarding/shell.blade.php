@@ -13,7 +13,7 @@
         <span>&middot;</span>
         <form method="POST" action="{{ filament()->getLogoutUrl() }}" class="inline">
             @csrf
-            <button type="submit" class="hover:text-gray-600 dark:hover:text-gray-300">{{ __('auth.verify_email.sign_out') }}</button>
+            <button type="submit" class="fi-onboarding-link hover:text-gray-600 dark:hover:text-gray-300">{{ __('auth.verify_email.sign_out') }}</button>
         </form>
     </div>
 </div>

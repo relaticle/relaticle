@@ -3,6 +3,7 @@
     $chips = $getLinkedRecordChips();
     $excerpt = $getExcerpt();
     $creator = $getCreatorChip();
+    $title = filled($note->title) ? $note->title : __('filament/resources/note.cards.untitled');
 @endphp
 
 <article @class(['fi-note-card', 'fi-note-card-deleted' => $note->trashed()])>
@@ -22,8 +23,8 @@
         </div>
     @endif
 
-    <h3 class="fi-note-card-title">
-        {{ filled($note->title) ? $note->title : __('filament/resources/note.cards.untitled') }}
+    <h3 class="fi-note-card-title" title="{{ $title }}">
+        {{ $title }}
     </h3>
 
     <p @class(['fi-note-card-excerpt', 'fi-note-card-excerpt-empty' => blank($excerpt)])>

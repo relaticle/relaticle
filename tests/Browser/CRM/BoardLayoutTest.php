@@ -227,3 +227,19 @@ it('joins the active filter trigger and its clear button into one pill', functio
     'phone' => [390, true],
     'desktop' => [1440, false],
 ]);
+
+it('lets the next board column peek past the first on a 320px phone', function (string $path): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(320, 568)
+        ->navigate("/app/{$workspace->slug}/{$path}")
+        ->assertVisible('.ff-column >> nth=0')
+        ->assertNoJavaScriptErrors();
+
+    expect($page->script('Math.round(document.querySelectorAll(".ff-column")[1].getBoundingClientRect().left)'))->toBeLessThanOrEqual(304);
+})->with(['tasks/board', 'opportunities/board']);

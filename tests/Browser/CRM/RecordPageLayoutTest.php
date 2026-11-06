@@ -6,6 +6,7 @@ use App\Filament\Concerns\CountsRelatedRecords;
 use App\Filament\Concerns\HasRecordPageLayout;
 use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\Opportunity;
 use App\Models\User;
 use Relaticle\CustomFields\Services\TenantContextService;
 
@@ -46,6 +47,41 @@ it('sets the details rail beside the work pane on desktop and stacks it on a pho
 
     expect($page->script($placement))->toMatchArray(['stacked' => true, 'overflows' => false]);
 });
+
+it('keeps the details rail collapsed after a reload', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $company = Company::factory()->recycle([$user, $workspace])->create();
+    $isCollapsed = "document.querySelector('#record-details section').classList.contains('fi-collapsed')";
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/companies/{$company->getKey()}")
+        ->assertScript($isCollapsed, false)
+        ->click('#record-details .fi-section-collapse-btn')
+        ->assertScript($isCollapsed, true);
+
+    $page->navigate("/app/{$workspace->slug}/companies/{$company->getKey()}")
+        ->assertScript($isCollapsed, true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('gives a long record name the full width of the header on a phone', function (int $width): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $company = Company::factory()->recycle([$user, $workspace])->create(['name' => 'MOBILE-AUDIT Long Name Industries International Holdings']);
+
+    loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize($width, 844)
+        ->navigate("/app/{$workspace->slug}/companies/{$company->getKey()}")
+        ->assertScript("(() => { const name = document.querySelector('.fi-record-title .truncate'); const header = document.querySelector('.fi-record-title').closest('.fi-sc-flex'); return name.scrollHeight <= name.clientHeight && name.getBoundingClientRect().width >= header.getBoundingClientRect().width * 0.8; })()", true)
+        ->assertNoJavaScriptErrors();
+})->with([390, 320]);
 
 it('reveals details past the first eight with view all', function (): void {
     $this->withVite();
@@ -101,4 +137,32 @@ it('raises the notes tab count when a note is added from the tab', function (): 
         '(() => document.querySelector(".fi-record-pane .fi-tabs-item:nth-child(3)").innerText.replace(/\s+/g, " ").trim())()',
         'Notes 1',
     );
+});
+
+it('wraps a long rail label and gives the record buttons a 44px target on a phone', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $opportunity = Opportunity::factory()->recycle([$user, $workspace])->create();
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(390, 844)
+        ->navigate("/app/{$workspace->slug}/opportunities/{$opportunity->getKey()}")
+        ->assertVisible('.fi-record-rail')
+        ->assertNoJavaScriptErrors();
+
+    $measure = <<<'JS'
+        (() => {
+            const shown = (elements) => [...elements].filter((element) => element.checkVisibility());
+
+            return {
+                labelsClipped: shown(document.querySelectorAll('.fi-record-rail .fi-in-entry-label:not(.fi-sr-only)')).some((label) => label.scrollWidth > label.clientWidth),
+                smallButtons: shown(document.querySelectorAll('.fi-record-page .fi-sc-actions :is(.fi-btn, .fi-icon-btn)')).filter((button) => button.getBoundingClientRect().height < 44).length,
+            };
+        })();
+    JS;
+
+    expect($page->script($measure))->toBe(['labelsClipped' => false, 'smallButtons' => 0]);
 });

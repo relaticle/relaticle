@@ -13,8 +13,8 @@
             @if ($this->emailSyncProgress !== null) wire:poll.30s.visible="refreshEmailSyncProgress" @endif
             class="relative mb-2 border-b border-gray-200/60 px-4 pb-2 dark:border-white/10"
         >
-            {{-- The expanded card floats above the pill rather than pushing the
-                 sidebar taller, so opening it never scrolls the nav. --}}
+            {{-- On desktop the expanded card floats above the pill rather than pushing the
+                 sidebar taller. On a phone it sits in the flow, so it never covers the drawer. --}}
             <div
                 x-show="open"
                 x-cloak
@@ -22,7 +22,7 @@
                 x-transition:enter-start="opacity-0 translate-y-1"
                 x-transition:enter-end="opacity-100 translate-y-0"
                 x-on:keydown.escape.window="close()"
-                class="absolute inset-x-2 bottom-full z-20 mx-auto mb-2 max-w-80 rounded-xl border border-gray-200 bg-white p-3 shadow-xl dark:border-white/10 dark:bg-gray-900"
+                class="absolute inset-x-2 bottom-full z-20 mx-auto mb-2 max-w-80 rounded-xl max-sm:static max-sm:max-w-none max-sm:shadow-none border border-gray-200 bg-white p-3 shadow-xl dark:border-white/10 dark:bg-gray-900"
             >
                 <div class="flex items-start justify-between gap-2">
                     <div class="min-w-0 self-center">
@@ -38,7 +38,7 @@
                             x-on:click.outside="menu = false"
                             :aria-expanded="menu ? 'true' : 'false'"
                             aria-label="{{ __('filament/pages/dashboard.activation.more_actions') }}"
-                            class="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/5 dark:hover:text-gray-200"
+                            class="rounded-lg p-1.5 text-gray-400 transition max-sm:flex max-sm:size-11 max-sm:items-center max-sm:justify-center hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/5 dark:hover:text-gray-200"
                         >
                             <x-heroicon-m-ellipsis-horizontal class="h-4 w-4" />
                         </button>
@@ -47,7 +47,7 @@
                             type="button"
                             x-on:click="close()"
                             aria-label="{{ __('filament/pages/dashboard.activation.collapse') }}"
-                            class="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/5 dark:hover:text-gray-200"
+                            class="rounded-lg p-1.5 text-gray-400 transition max-sm:flex max-sm:size-11 max-sm:items-center max-sm:justify-center hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/5 dark:hover:text-gray-200"
                         >
                             <x-heroicon-m-arrow-down-left class="h-4 w-4" />
                         </button>
@@ -174,7 +174,7 @@
             init() {
                 const stored = this.read();
 
-                this.open = stored === null ? true : stored;
+                this.open = stored ?? window.matchMedia('(min-width: 40rem)').matches;
             },
 
             read() {

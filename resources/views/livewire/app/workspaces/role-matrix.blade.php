@@ -3,14 +3,14 @@
 @endphp
 
 <div class="overflow-x-auto">
-    <table class="w-full text-sm" data-role-matrix>
+    <table class="w-full text-xs sm:text-sm" data-role-matrix>
         <thead>
             <tr class="border-b border-gray-200 dark:border-white/10">
-                <th scope="col" class="px-3 py-2 text-left font-medium text-gray-500 dark:text-gray-400">
+                <th scope="col" class="px-1 py-2 text-left sm:px-3 font-medium text-gray-500 dark:text-gray-400">
                     <span class="sr-only">{{ __('workspaces.role_matrix.capability_column') }}</span>
                 </th>
                 @foreach ($roleKeys as $roleKey)
-                    <th scope="col" class="px-3 py-2 text-center font-medium text-gray-700 dark:text-gray-200">
+                    <th scope="col" class="px-0.5 py-2 text-center font-medium sm:px-3 text-gray-700 dark:text-gray-200">
                         {{ __("workspaces.roles.{$roleKey}.label") }}
                     </th>
                 @endforeach
@@ -19,11 +19,11 @@
         <tbody>
             @foreach ($matrix as $capabilityValue => $roles)
                 <tr class="border-b border-gray-100 dark:border-white/5">
-                    <th scope="row" class="px-3 py-2 text-left font-normal text-gray-700 dark:text-gray-200">
+                    <th scope="row" class="px-1 py-2 text-left sm:px-3 font-normal text-gray-700 dark:text-gray-200">
                         {{ \App\Enums\WorkspaceCapability::from($capabilityValue)->label() }}
                     </th>
                     @foreach ($roleKeys as $roleKey)
-                        <td class="px-3 py-2 text-center" data-capability="{{ $capabilityValue }}" data-role="{{ $roleKey }}">
+                        <td class="px-0.5 py-2 text-center sm:px-3" data-capability="{{ $capabilityValue }}" data-role="{{ $roleKey }}">
                             @if ($roles[$roleKey])
                                 <x-heroicon-o-check class="mx-auto h-4 w-4 text-success-600 dark:text-success-400" />
                                 <span class="sr-only">{{ __('workspaces.role_matrix.granted') }}</span>
