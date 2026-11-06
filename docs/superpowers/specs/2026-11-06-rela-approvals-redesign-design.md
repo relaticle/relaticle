@@ -39,7 +39,7 @@ user decides. What changes is how the dock and the transcript read:
 | 7 | Leaving one write out | Hover x per line (always visible below `sm`); a line that loses its link says so with "Keep Priya Nair" |
 | 8 | An email in a plan | The plan card lists "Then email ... you approve it on its own, next". After the plan is approved the email card takes the dock alone, with Send email and no shortcut |
 | 9 | While Rela works | Unchanged: one quiet line with the result ("Searched companies, found Figma ›") |
-| 10 | Record changed after the proposal | Follow-up PR. Needs a new staleness check (see Out of scope) |
+| 10 | Record changed after the proposal | An amber notice naming who changed which field, to what and when; a single update's button reads "Overwrite"; no shortcut (see Design, section 7) |
 
 Four calls made in brainstorming (founder approved "go ahead with your recommendations"):
 
@@ -246,14 +246,42 @@ and stays.
 - Help docs under `packages/Documentation/resources/content`: update any page that describes "Approve
   all", status dots, or paging a batch. The plan greps for them.
 
+### 7. The record changed after the proposal (decision 10)
+
+Founder call (2026-11-06): ship it in this PR, not a follow-up.
+
+- **What counts.** An edit to an update proposal's record, made at or after the proposal's
+  `created_at`, on a field the proposal writes. An edit to another field is not an overwrite: the
+  update writes only the keys it carries. A step, row or field the user left out writes nothing, so it
+  overwrites nothing.
+- **Source.** The activity log, read by `Relaticle\Chat\Queries\ProposalConflictsQuery`. It already
+  records every kind of field an update writes, with causer and time: native columns (`updated`),
+  foreign keys (`RelationChangeLog`, code `company` for `company_id`), link lists (`LogsLinkChanges`,
+  code `people` for `people_ids`) and custom fields (`CustomFieldChangeLog`). `ActivityChangeSummary`
+  rows gain a `code` key so the query reuses that one decoder. Nothing is stored at proposal time:
+  `action_data` is frozen and `createProposal` dedupes by strict equality, and `updated_at` misses
+  custom fields and links. No migration.
+- **Same second.** Both timestamps are stored to the second, so an edit in the proposal's second
+  counts. A spare warning costs less than a missed one.
+- **Card.** The line (or the batch row) gets an amber notice: "Maya Chen set Amount to $20,000.00 at
+  14:32, after Rela proposed this. Approving replaces that change." The viewer's own edit reads "You";
+  a cleared field reads "cleared"; several fields list their names. The time is in the viewer's
+  timezone, with the date when it is not today. A custom field's value renders the way the card renders
+  it, and the overwritten row strikes that current value rather than the one the proposal read. No
+  pronoun is inferred for the editor. A single update's primary reads "Overwrite"; a plan or
+  batch keeps its "Approve n changes". Either way `primaryIsRisky()` is true, so the shortcut goes and
+  `createCurrentFromShortcut()` refuses.
+- **Approval guard.** The card keeps the activity ids its last render showed (`$shownOverwrites`,
+  locked). `createCurrent`, `approveAll` and `approveStep` refuse once when an overwrite appears that the
+  card never showed: nothing is written, the card shows "This record changed while you were reviewing",
+  and the next render shows the notice. The rule "the footer never decides more than the card shows"
+  covers edits that land while the card is open.
+- **Not covered.** Creates (no record yet) and deletes (already no shortcut). Marketing mocks stay as
+  they are: this is an edge state, not a pitch.
+
 ## Out of scope
 
 - Undo (founder: not needed).
-- Decision 10, the "changed after Rela proposed" warning. Today a proposal only expires on a timer
-  (`PendingActionService::expireStale`) or is superseded by a new message
-  (`supersedePendingForConversation`); nothing compares the record with the proposal. A follow-up PR adds
-  the check (store the read values or `updated_at` at proposal time, compare at approval) and the
-  amber notice with "Overwrite" and no shortcut.
 - Apply-first writes. The "Rela never writes without your approval" promise stays.
 - The web-access dock layout.
 

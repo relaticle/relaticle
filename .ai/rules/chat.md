@@ -129,8 +129,18 @@ who clicked Discard to dismiss the card rejected a record the card reported as c
   the tab order) and always visible below `sm`: touch has no hover.
 - Cmd/Ctrl+Enter runs only a primary that carries `data-proposal-shortcut`, which the card renders
   only when `primaryIsRisky()` is false: never a delete (`ProposalEntity::deletes()`), a plan holding
-  a delete, an email send or an invitation. `createCurrentFromShortcut()` checks `primaryIsRisky()`
-  again server side. A WebAccess Allow keeps the shortcut.
+  a delete, an email send, an invitation or an overwrite. `createCurrentFromShortcut()` checks
+  `primaryIsRisky()` again server side. A WebAccess Allow keeps the shortcut.
+- An edit made to a record after an update proposal for it, on a field the proposal writes, is an
+  overwrite. `ProposalConflictsQuery` reads it from the activity log (proposal `created_at` against
+  each logged change's code), so nothing is stored at proposal time and `action_data` stays frozen.
+  The line gets an amber notice naming who, the field, the value and the time
+  (`ProposalConflictNotice`), the row strikes the current value instead of the one the proposal
+  read, a single update's primary reads "Overwrite", and the shortcut goes.
+  A left-out step, row or field writes nothing, so it overwrites nothing. The card keeps the
+  activity ids it rendered in `$shownOverwrites`, and an approval that would overwrite an edit the
+  card never showed is refused once, writing nothing, so the next render shows it.
+  `tests/Feature/Chat/ProposalCardLifecycleTest.php` ("an edit made after the proposal").
 - While a proposal is pending the message box is locked: the dock sits where the input was, over
   the line "Approve or discard the proposal to keep chatting" (`_composer.blade.php`,
   `data-composer-locked`). The user decides before typing again. `tests/Browser/Chat/ProposalDockLockTest.php`.

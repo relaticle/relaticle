@@ -20,8 +20,8 @@ shows the old value struck through next to the new one. From there you can:
 
 - **Approve**. The button counts what it writes: **Approve**, or
   **Approve 3 changes** for several. A delete reads **Delete 2 tasks** in red.
-  `⌘↵` approves from the keyboard, except for deletes, emails and invitations,
-  which always take a click.
+  `⌘↵` approves from the keyboard, except for deletes, emails, invitations
+  and overwrites, which always take a click.
 - **Edit a field first**. Click the pencil next to a value, correct it, then
   **Save**. Approve when the card looks right.
 - **Leave something out**. Hover a field, a line or a record and click its
@@ -32,6 +32,16 @@ shows the old value struck through next to the new one. From there you can:
 The assistant can set any field you could set on the record's own form,
 including your workspace's custom fields, and every one appears on the card
 for review.
+
+## When someone changed the record meanwhile
+
+If someone edits a field after the assistant proposed changing it, the card
+says who changed it, to what, and when. The button then reads **Overwrite**
+and takes a click. Leave that field out to keep their value, or discard the
+proposal. An edit to a field the proposal doesn't touch changes nothing.
+
+If the edit lands while the card is open, your first click shows the change
+instead of approving it. Click again once you've read it.
 
 ## Batches and plans
 
