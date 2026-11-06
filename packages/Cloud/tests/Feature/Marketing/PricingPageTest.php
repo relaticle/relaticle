@@ -238,18 +238,24 @@ it('sells Cloud Scale as the highlighted self-serve plan', function (): void {
         ->and($offer['description'])->toContain('$588/year');
 });
 
-it('leaves the Enterprise AI allowance and API limits to the contract', function (): void {
+it('states the Enterprise AI allowance and API throughput the plan enforces', function (): void {
     withHostedBilling();
 
     $crawler = new Crawler((string) $this->get('/pricing')->assertOk()->getContent());
-    $enterprise = $crawler->filter('#enterprise-plan')->text();
 
-    expect($enterprise)->toContain('AI usage agreed in your contract')
-        ->toContain('API and MCP limits agreed in your contract')
-        ->not->toContain(number_format(Plan::Enterprise->credits()))
-        ->not->toContain(Plan::Enterprise->throughputMultiplier().'x')
-        ->and($crawler->filter('#compare')->text())->toContain('Agreed in your contract')
-        ->not->toContain(number_format(Plan::Enterprise->credits()).' credits');
+    expect($crawler->filter('#enterprise-plan')->text())
+        ->toContain(number_format(Plan::Enterprise->credits()).' AI credits / month')
+        ->toContain(Plan::Enterprise->throughputMultiplier().'x REST API and MCP throughput');
+});
+
+it('names the buyer each plan is for on the pricing page', function (): void {
+    withHostedBilling();
+
+    $this->get('/pricing')
+        ->assertOk()
+        ->assertSee('For one person selling to a named list')
+        ->assertSee('For a team working one pipeline all day')
+        ->assertSee('For a rollout with integrations and a timeline');
 });
 
 it('emits accurate product json-ld offers when billing is off', function (): void {

@@ -7,9 +7,9 @@
 
     $emailActive = \Laravel\Pennant\Feature::active(\App\Features\EmailIntegration::class);
     $rows = array_values(array_filter([
-        [__(':name, the AI assistant', ['name' => config('chat.assistant_name')]), __(':credits credits each month', ['credits' => $proCredits]), __(':credits credits each month', ['credits' => $scaleCredits]), __('Agreed in your contract')],
+        [__(':name, the AI assistant', ['name' => config('chat.assistant_name')]), __(':credits credits each month', ['credits' => $proCredits]), __(':credits credits each month', ['credits' => $scaleCredits]), __(':credits credits each month', ['credits' => number_format(\App\Enums\Plan::Enterprise->credits())])],
         $emailActive ? [__('Connected mailboxes'), __('Up to :count', ['count' => $proPlan->connectedMailboxes()]), __('Up to :count', ['count' => $scalePlan->connectedMailboxes()]), __('Unlimited')] : null,
-        [__('Connect your own tools'), __('REST API and MCP server'), __('REST API and MCP server, :multiplierx the request limit', ['multiplier' => $scalePlan->throughputMultiplier()]), __('Custom integrations and limits by agreement')],
+        [__('Connect your own tools'), __('REST API and MCP server'), __('REST API and MCP server, :multiplierx the request limit', ['multiplier' => $scalePlan->throughputMultiplier()]), __('REST API and MCP server, :multiplierx the request limit', ['multiplier' => \App\Enums\Plan::Enterprise->throughputMultiplier()])],
         [__('Setup'), __('You set it up yourself'), __('You set it up yourself'), __('A scoped implementation project')],
         [__('Hosting and updates'), __('Relaticle runs it'), __('Relaticle runs it'), __('Agreed deployment and maintenance')],
         [__('cloud::billing.comparison.support'), __('Email'), __('Priority email'), __('Agreed support with the founding team')],

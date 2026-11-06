@@ -23,7 +23,7 @@
                             <span class="type-label rounded-full bg-primary-50 px-2 py-1 text-primary-700 dark:bg-primary-500/15 dark:text-primary-300">{{ __('cloud::billing.scale_plan.badge') }}</span>
                         @endif
                     </div>
-                    <p class="mt-1.5 text-base text-gray-500 dark:text-gray-400">{{ __("cloud::billing.{$plan->value}_plan.tagline") }}</p>
+                    <p class="mt-1.5 text-base text-gray-500 dark:text-gray-400">{{ __("cloud::billing.{$plan->value}_plan.pricing_tagline") }}</p>
 
                     <div class="mt-8">
                         <p class="{{ $priceLabel }}">{{ __('Per workspace') }}</p>
@@ -63,7 +63,7 @@
         <section id="enterprise-plan" class="{{ $planCell }}">
             <div class="p-6 md:p-10">
                 <h2 class="text-lg font-medium text-gray-950 dark:text-white">{{ __('billing.plans.enterprise') }}</h2>
-                <p class="mt-1.5 text-base text-gray-500 dark:text-gray-400">{{ __('cloud::billing.enterprise.tagline') }}</p>
+                <p class="mt-1.5 text-base text-gray-500 dark:text-gray-400">{{ __('cloud::billing.enterprise.pricing_tagline') }}</p>
 
                 @php($enterprisePriceShort = '$'.rtrim(rtrim(number_format(config('relaticle.enterprise.starting_price_yearly') / 1000, 1), '0'), '.').'K')
                 <div class="mt-8" aria-label="{{ __('cloud::billing.enterprise.starting_price', ['price' => $enterprisePrice]) }}">
