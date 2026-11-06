@@ -24,3 +24,19 @@ it('keeps the list Import / Export menu inside the viewport', function (int $wid
     'phone' => [393, 852],
     'desktop' => [1440, 900],
 ]);
+
+it('keeps the list header actions inside the page padding on a phone', function (string $page): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $actionsFit = '[...document.querySelectorAll(".fi-header-actions-ctn > *")].every((action) => action.getBoundingClientRect().right <= window.innerWidth - 16)';
+
+    loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(393, 852)
+        ->navigate("/app/{$workspace->slug}/{$page}")
+        ->assertScript($actionsFit, true)
+        ->assertNoJavaScriptErrors();
+})->with(['opportunities', 'notes']);
