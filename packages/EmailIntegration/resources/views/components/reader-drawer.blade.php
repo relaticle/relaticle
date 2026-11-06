@@ -116,6 +116,7 @@
         x-init="$nextTick(() => document.getElementById('email-reader-heading')?.focus())"
         wire:key="email-reader-{{ $email->getKey() }}"
         data-conversation-key="{{ $email->conversation_key }}"
+        data-last-inbound="{{ $row?->lastInboundAt?->utc()->format('Y-m-d\TH:i:s\Z') }}"
         @if ($replyTarget !== null) data-reply-target="{{ $replyTarget->getKey() }}" @endif
         style="--ei-reader-width: 55vw"
         x-bind:style="{ '--ei-reader-width': width + 'vw', ...(closing ? { display: 'none' } : {}) }"
@@ -179,6 +180,7 @@
                     @if ($triage && filled($email->conversation_key))
                         @php
                             $triageKeys = [$email->conversation_key];
+                            $triageSeen = [$email->conversation_key => $row?->lastInboundAt?->utc()->format('Y-m-d\TH:i:s\Z')];
                             $nextEmailId = ($adjacent['next'] ?? null)?->viewerCopyEmailId;
                         @endphp
 
@@ -207,6 +209,7 @@
                                 x-on:click="window.dispatchEvent(new CustomEvent('email-triage', { detail: {
                                     verb: 'markDone',
                                     keys: {{ Js::from($triageKeys) }},
+                                    seen: {{ Js::from($triageSeen) }},
                                     then: () => {{ Js::from($nextEmailId) }} ? leaveReader(() => $wire.selectEmail({{ Js::from($nextEmailId) }})) : closeReader(),
                                 } }))"
                             >

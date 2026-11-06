@@ -287,3 +287,19 @@ it('clears the selection with Escape', function (string $theme): void {
         ->assertScript('document.querySelectorAll("[data-selected=true]").length', 0)
         ->assertNoJavaScriptErrors();
 })->with(['inLightMode', 'inDarkMode']);
+
+it('marks done from the reader a conversation the list does not show', function (string $theme): void {
+    triageBrowserInbound($this->mailbox, 'conv-linked', now()->subHour());
+    $email = Email::query()->where('conversation_key', 'conv-linked')->sole();
+
+    loginViaBrowser($this->owner, $theme)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->navigate("/app/{$this->workspace->slug}/email?view=awaiting_reply&email={$email->id}")
+        ->assertVisible('[data-email-reader] [data-reader-action=done]')
+        ->assertMissing('[data-conversation="conv-linked"]')
+        ->click('[data-email-reader] [data-reader-action=done]')
+        ->wait(1.5)
+        ->navigate("/app/{$this->workspace->slug}/email?view=done")
+        ->assertPresent('[data-conversation="conv-linked"]')
+        ->assertNoJavaScriptErrors();
+})->with(['inLightMode', 'inDarkMode']);

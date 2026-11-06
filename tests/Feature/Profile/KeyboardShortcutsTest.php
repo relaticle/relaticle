@@ -19,12 +19,15 @@ it('turns single-key shortcuts off from the profile page', function (): void {
         ->assertSee(__('profile.form.single_key_shortcuts.label'))
         ->assertSee('data-single-key-shortcuts="true"', false);
 
-    Livewire::test(UpdateKeyboardShortcuts::class)
+    $toggle = Livewire::test(UpdateKeyboardShortcuts::class)
         ->assertSet('data.single_key_shortcuts', true)
         ->set('data.single_key_shortcuts', false)
         ->assertNotified(__('profile.notifications.keyboard_shortcuts_saved'));
 
-    expect($user->refresh()->single_key_shortcuts)->toBeFalse();
+    expect($user->refresh()->single_key_shortcuts)->toBeFalse()
+        ->and(collect($toggle->effects['xjs'] ?? [])->pluck('expression')->implode(';'))
+        ->toContain("setAttribute('data-single-key-shortcuts', 'false')")
+        ->toContain("store('shortcuts')?.readPreference()");
 
     $this->get(EditProfile::getUrl(tenant: $user->currentWorkspace))
         ->assertSee('data-single-key-shortcuts="false"', false);

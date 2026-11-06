@@ -125,9 +125,13 @@ function conversationsPageMessage(ConnectedAccount $mailbox, string $key, string
  */
 function conversationsPageSeen(array $keys): array
 {
-    $current = EmailConversation::query()->where('workspace_id', auth()->user()->current_workspace_id)->whereIn('conversation_key', $keys)->pluck('last_external_inbound_at', 'conversation_key');
+    $html = livewire(EmailInboxPage::class)->call('setView', ConversationView::All->value)->html();
 
-    return collect($keys)->mapWithKeys(fn (string $key): array => [$key => $current->get($key)?->utc()->format('Y-m-d\\TH:i:s\\Z')])->all();
+    return collect($keys)->mapWithKeys(function (string $key) use ($html): array {
+        preg_match('/data-conversation="'.preg_quote($key, '/').'"[^>]*?data-last-inbound="([^"]*)"/', $html, $rendered);
+
+        return [$key => ($rendered[1] ?? '') === '' ? null : $rendered[1]];
+    })->all();
 }
 
 /**
@@ -1414,16 +1418,16 @@ it('marks every selected conversation done in one call and reports the skipped o
 it('brings a done conversation back when the summary gained a reply the row had not shown yet', function (): void {
     $this->travelTo(CarbonImmutable::parse('2026-11-02 10:00'));
     conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'brian@airbnb.test');
-    $page = livewire(EmailInboxPage::class);
-    preg_match('/data-conversation="conv-pricing".*?data-last-inbound="([^"]*)"/s', $page->html(), $rendered);
+    $seen = conversationsPageSeen(['conv-pricing']);
 
     $this->travelTo(CarbonImmutable::parse('2026-11-02 10:01'));
     conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'brian@airbnb.test');
 
-    $page->call('markDone', ['conv-pricing' => $rendered[1]])
+    livewire(EmailInboxPage::class)
+        ->call('markDone', $seen)
         ->assertReturned(['applied' => ['conv-pricing'], 'skipped' => []]);
 
-    expect($rendered[1])->toBe('2026-11-02T10:00:00Z')
+    expect($seen)->toBe(['conv-pricing' => '2026-11-02T10:00:00Z'])
         ->and(conversationsPageViewKeys(ConversationView::NeedsReply))->toBe(['conv-pricing'])
         ->and(conversationsPageViewKeys(ConversationView::Done))->toBe([]);
 });
@@ -1461,4 +1465,23 @@ it('keeps a conversation with no inbound in done until external mail arrives', f
 
     expect(conversationsPageViewKeys(ConversationView::NeedsReply))->toBe(['conv-intro'])
         ->and(conversationsPageViewKeys(ConversationView::Done))->toBe([]);
+});
+
+it('marks done from the reader a conversation the list does not show', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-11-02 10:00'));
+    $email = conversationsPageMessage($this->ownerMailbox, 'conv-pricing', 'brian@airbnb.test');
+
+    $page = livewire(EmailInboxPage::class)
+        ->call('setView', ConversationView::AwaitingReply->value)
+        ->call('openRequestedEmail', $email->id);
+    preg_match('/data-conversation-key="conv-pricing"\s+data-last-inbound="([^"]*)"/', $page->html(), $rendered);
+
+    expect(conversationsPageKeys($page->html()))->toBe([])
+        ->and($rendered[1] ?? null)->toBe('2026-11-02T10:00:00Z');
+
+    $page->call('markDone', ['conv-pricing' => $rendered[1]])
+        ->assertReturned(['applied' => ['conv-pricing'], 'skipped' => []]);
+
+    expect(conversationsPageViewKeys(ConversationView::Done))->toBe(['conv-pricing'])
+        ->and(conversationsPageViewKeys(ConversationView::NeedsReply))->toBe([]);
 });

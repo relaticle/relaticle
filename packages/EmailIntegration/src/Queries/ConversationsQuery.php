@@ -66,6 +66,18 @@ final readonly class ConversationsQuery
         );
     }
 
+    public function conversationRow(User $viewer, string $conversationKey): ?ConversationRow
+    {
+        Gate::forUser($viewer)->authorize('viewAny', Email::class);
+
+        $conversations = EmailConversation::query()
+            ->where('workspace_id', $viewer->current_workspace_id)
+            ->where('conversation_key', $conversationKey)
+            ->get();
+
+        return $this->rows($viewer, new VisibleEmailScope($viewer), $conversations)->first();
+    }
+
     public static function countsCacheKey(User $viewer): string
     {
         return "email-conversation-counts:{$viewer->current_workspace_id}:{$viewer->getKey()}";

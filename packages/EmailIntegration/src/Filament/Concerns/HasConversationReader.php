@@ -65,7 +65,12 @@ trait HasConversationReader
     {
         $key = $this->selectedEmail?->conversation_key;
 
-        return collect($this->conversationRows())->first(fn (ConversationRow $row): bool => $row->conversationKey === $key);
+        if (! is_string($key)) {
+            return null;
+        }
+
+        return collect($this->conversationRows())->first(fn (ConversationRow $row): bool => $row->conversationKey === $key)
+            ?? resolve(ConversationsQuery::class)->conversationRow($this->readerUser(), $key);
     }
 
     /** @return array{previous: ConversationRow|null, next: ConversationRow|null} */

@@ -178,20 +178,21 @@ it('lists the shortcuts in the help sheet', function (string $theme): void {
         ->assertNoJavaScriptErrors();
 })->with(['inLightMode', 'inDarkMode']);
 
-it('turns letter keys off from the profile page without a reload', function (string $theme): void {
+it('turns single-character keys off from the profile page without a reload', function (string $theme): void {
     $page = loginViaBrowser($this->owner, $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->navigate("/app/{$this->workspace->slug}/settings/profile")
         ->assertScript('Alpine.store("shortcuts").singleKeys', true)
         ->assertSee('Single-key shortcuts');
 
-    $page->script('window.keyboardBrowserMarker = true');
+    $page->script('window.keyboardBrowserMarker = true; window.keyboardBrowserWarnings = []; const warn = console.warn; console.warn = (...args) => { window.keyboardBrowserWarnings.push(String(args[0])); warn.apply(console, args) }');
 
     $page->click('button[role="switch"]')
         ->assertSee('Keyboard shortcuts saved.')
         ->assertScript('window.keyboardBrowserMarker', true)
         ->assertScript('Alpine.store("shortcuts").singleKeys', false)
-        ->assertScript('Alpine.store("shortcuts").keysFor("next")', null);
+        ->assertScript('Alpine.store("shortcuts").keysFor("next")', null)
+        ->assertScript("[...(window.__pestBrowser?.jsErrors || []).map((error) => error.message), ...window.keyboardBrowserWarnings.filter((warning) => /Expression Error/.test(warning))].filter((message) => ! /collapsedGroups|reading 'includes'/.test(message)).join(' | ')", '');
 
     expect($this->owner->refresh()->single_key_shortcuts)->toBeFalse();
 })->with(['inLightMode', 'inDarkMode']);

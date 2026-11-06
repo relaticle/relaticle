@@ -6,7 +6,7 @@ return [
     'form' => [
         'single_key_shortcuts' => [
             'label' => 'Single-key shortcuts',
-            'helper_text' => 'Letter keys such as J, K and E act on the page. Turn off if you use speech input.',
+            'helper_text' => 'Single-character keys such as J, K, E, / and ? act on the page. Turn off if you use speech input.',
         ],
         'name' => [
             'label' => 'Name',
@@ -62,7 +62,7 @@ return [
         ],
         'keyboard_shortcuts' => [
             'title' => 'Keyboard shortcuts',
-            'description' => 'Choose whether single letter keys act on the page. Enter, Escape and keys with Ctrl or Cmd always work.',
+            'description' => 'Choose whether single-character keys act on the page. Enter, Escape and keys with Ctrl or Cmd always work.',
         ],
         'delete_account' => [
             'title' => 'Delete Account',
