@@ -152,7 +152,8 @@ enum ProposalEntity: string
         return match ($this) {
             self::Email => __('Send email'),
             self::EmailDraftDelete => trans_choice('Delete draft|Delete :count drafts', $count, ['count' => $count]),
-            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::CustomField, self::SampleData => $operation === PendingActionOperation::Delete
+            self::SampleData => __('Remove sample data'),
+            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::CustomField => $operation === PendingActionOperation::Delete
                 ? __('Delete :count :entities', ['count' => $count, 'entities' => Str::plural(Str::lower($this->singularName()), $count)])
                 : __('Approve'),
             self::EmailDraft => __('Approve'),
