@@ -13,6 +13,7 @@ use Relaticle\Cloud\Marketing\Http\Controllers\HomeController;
 use Relaticle\Cloud\Marketing\Http\Controllers\PrivacyPolicyController;
 use Relaticle\Cloud\Marketing\Http\Controllers\TermsOfServiceController;
 use Relaticle\Ink\Models\Post;
+use Symfony\Component\DomCrawler\Crawler;
 
 mutates(HomeController::class, TermsOfServiceController::class, PrivacyPolicyController::class, DetectsPublicMarkdownRequest::class);
 
@@ -243,8 +244,9 @@ describe('Hero AI tab: conversation', function () {
         // The decided row names the record as a chip plus an operation label,
         // so assert the label, not a "Update task \"...\"" sentence that a
         // restyle of the row legitimately changes.
-        $response->assertSee('Approve or discard the proposal to keep chatting');
-        $response->assertSee('Approve');
+        $dock = (new Crawler((string) $response->getContent()))->filter('#hero-dock');
+        expect($dock->text())->toContain('Approve or discard the proposal to keep chatting')
+            ->and($dock->filter('#hero-approve-btn')->text())->toStartWith('Approve');
         $response->assertSee('Add Sarah Chen');
         $response->assertSee('VP of Engineering');
     });
@@ -284,11 +286,13 @@ describe('Hero AI tab: conversation', function () {
         // operation label, and pinning that wording made this test fail on a
         // pure restyle while the invariant it guards -- no write without an
         // approval -- still held.
-        expect(substr_count($body, 'Approve or discard the proposal to keep chatting'))->toBeGreaterThanOrEqual(1)
+        $dock = (new Crawler($body))->filter('#hero-dock');
+
+        expect($dock->text())->toContain('Approve or discard the proposal to keep chatting')
+            ->and($dock->filter('button')->first()->text())->toBe('Discard')
+            ->and($dock->filter('#hero-approve-btn')->text())->toStartWith('Approve')
             ->and($body)->toContain("I'll mark it done")
-            ->and($body)->toContain("I'll add her to Kovra Systems as VP of Engineering")
-            ->and($body)->toContain('Discard')
-            ->and($body)->toContain('Approve');
+            ->and($body)->toContain("I'll add her to Kovra Systems as VP of Engineering");
     });
 
     it('mirrors the shipped transcript surfaces rather than the components it replaced', function () {
@@ -301,10 +305,6 @@ describe('Hero AI tab: conversation', function () {
             ->and($body)->not->toContain('rounded-br-md bg-primary-50')
             ->and($body)->not->toContain('rounded-br-md bg-primary-600');
 
-        // The docked proposal names the operation it is asking to approve; the
-        // decided row it collapses into carries only the operation-tinted entity
-        // tile and the record label in bold, NOT a record pill (chips are
-        // reserved for inline clickable references).
         expect($body)->toContain('Create person')
             ->and($body)->toContain('Applied 1 change')
             ->and($body)->not->toContain('uppercase tracking-wider text-amber-600');

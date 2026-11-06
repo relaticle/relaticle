@@ -82,7 +82,7 @@ it('renders the ask playground at the #demo anchor the hero points to', function
         ->and($html)->toContain(__('Add a person'))
         ->and($html)->toContain(__('Find overdue tasks'));
 
-    expect($html)->toContain(__('Move'))
+    expect($html)->toContain('>'.__('Move').'</span>')
         ->and($html)->toContain(__('Create person'))
         ->and($html)->toContain(__('Approve :count changes', ['count' => 3]))
         ->and($html)->toContain(__('Approve or discard the proposal to keep chatting'))
