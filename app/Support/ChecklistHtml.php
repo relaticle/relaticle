@@ -15,6 +15,8 @@ final readonly class ChecklistHtml
 
     private const string TASK_LIST_ATTRIBUTE = '/data-type\s*=\s*["\']?taskList/';
 
+    private const string SKIPPED_ANCESTORS = 'pre, code, li[data-type="taskItem"]';
+
     private const array LIST_TAGS = ['ul', 'ol'];
 
     private const array BLOCK_TAGS = [
@@ -32,7 +34,7 @@ final readonly class ChecklistHtml
         $converted = false;
 
         foreach ($document->querySelectorAll('ul') as $list) {
-            if ($list->closest('pre, code, li[data-type="taskItem"]') instanceof Element || ! self::startsChecklist($list)) {
+            if ($list->closest(self::SKIPPED_ANCESTORS) instanceof Element || ! self::startsChecklist($list)) {
                 continue;
             }
 
@@ -84,7 +86,7 @@ final readonly class ChecklistHtml
     private static function rebuild(HTMLDocument $document): string
     {
         foreach ($document->querySelectorAll('ul[data-type="taskList"]') as $list) {
-            if ($list->closest('pre, code, li[data-type="taskItem"]') instanceof Element) {
+            if ($list->closest(self::SKIPPED_ANCESTORS) instanceof Element) {
                 continue;
             }
 
@@ -100,7 +102,7 @@ final readonly class ChecklistHtml
     private static function startsChecklist(Element $list): bool
     {
         foreach ($list->children as $item) {
-            if ($item->localName === 'li' && self::marker($item) instanceof Text) {
+            if ($item->localName === 'li' && preg_match(self::MARKER, self::firstText($item)->data ?? '') === 1) {
                 return true;
             }
         }
@@ -122,7 +124,7 @@ final readonly class ChecklistHtml
 
     private static function consumeMarker(Element $item): bool
     {
-        $text = self::marker($item);
+        $text = self::firstText($item);
 
         if (! $text instanceof Text || preg_match(self::MARKER, $text->data, $matches) !== 1) {
             return false;
@@ -131,13 +133,6 @@ final readonly class ChecklistHtml
         $text->data = substr($text->data, strlen($matches[0]));
 
         return strtolower($matches[1]) === 'x';
-    }
-
-    private static function marker(Element $item): ?Text
-    {
-        $text = self::firstText($item);
-
-        return $text instanceof Text && preg_match(self::MARKER, $text->data) === 1 ? $text : null;
     }
 
     private static function firstText(Node $node): ?Text
