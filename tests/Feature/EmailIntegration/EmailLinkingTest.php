@@ -426,7 +426,7 @@ it('restores only pairs the user reached and the unlink suppressed', function ()
         ->and(EmailLinkSuppression::query()->count())->toBe(1);
 });
 
-it('reads an opportunity\'s close date once while it counts every view of its tab', function (): void {
+it('reads an opportunity\'s close date field once for its tab and once for its badge', function (): void {
     $opportunity = Opportunity::factory()->for($this->workspace)->create(['name' => 'Airbnb renewal', 'company_id' => $this->company->getKey()]);
     linkingEmail($this->owner)->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
     $reads = 0;
@@ -438,8 +438,9 @@ it('reads an opportunity\'s close date once while it counts every view of its ta
     $conversations->counts($this->owner, ConversationFilters::forRecord($opportunity));
     $conversations->paginate($this->owner, ConversationView::All, ConversationFilters::forRecord($opportunity));
     resolve(EmailVisibilityService::class)->visibleEmailCountBadge($opportunity, $this->owner);
+    resolve(EmailVisibilityService::class)->visibleEmailCountBadge($opportunity, $this->owner);
 
-    expect($reads)->toBe(1);
+    expect($reads)->toBe(2);
 });
 
 function linkingPage(Email $email): mixed

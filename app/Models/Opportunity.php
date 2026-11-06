@@ -116,12 +116,13 @@ final class Opportunity extends Model implements HasCustomFields, HasMedia, HasT
 
     public function closeDate(): ?CarbonImmutable
     {
-        $field = CustomField::query()
+        $workspaceId = $this->workspace_id;
+        $field = once(fn (): ?CustomField => CustomField::query()
             ->withoutGlobalScopes()
-            ->where('tenant_id', $this->workspace_id)
+            ->where('tenant_id', $workspaceId)
             ->where('entity_type', $this->getMorphClass())
             ->where('code', OpportunityField::CLOSE_DATE->value)
-            ->first();
+            ->first());
         $value = $field instanceof CustomField ? $this->loadMissing('customFieldValues.customField')->getCustomFieldValue($field) : null;
 
         return match (true) {

@@ -67,7 +67,6 @@ use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 use Relaticle\EmailIntegration\Services\Factories\CalendarServiceFactory;
 use Relaticle\EmailIntegration\Services\Factories\MailServiceFactory;
 use Relaticle\EmailIntegration\Services\MailboxDisplayNameDirectory;
-use Relaticle\EmailIntegration\Services\OpportunityWindows;
 use Relaticle\EmailIntegration\Services\WorkspaceMemberDirectory;
 use Relaticle\EmailIntegration\Support\ComposerPageTo;
 use Relaticle\EmailIntegration\Support\PublicSuffixList;
@@ -91,7 +90,6 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         $this->app->scoped(MailboxDisplayNameDirectory::class);
         $this->app->scoped(EmailVisibilityService::class);
         $this->app->scoped(QueueRecordHistoryRelink::class);
-        $this->app->scoped(OpportunityWindows::class);
         $this->app->tag([EmailAccessRequestSource::class], RequestSource::class);
 
         // Not gated by the feature flag: these are inert while the feature is off, and
@@ -117,7 +115,8 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
             return;
         }
 
-        $this->listenForCustomFieldValues();
+        CustomFieldValue::saved(fn (CustomFieldValue $value) => resolve(QueueRecordHistoryRelink::class)->forIdentityValue($value));
+        Event::listen(CustomFieldValuesImported::class, fn (CustomFieldValuesImported $event) => resolve(QueueRecordHistoryRelink::class)->forImportedValues($event));
 
         Event::listen(SocialiteWasCalled::class, [AzureExtendSocialite::class, 'handle']);
 
@@ -231,14 +230,6 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
             IncrementalEmailSyncCommand::class,
             RenewCalendarPushChannelsCommand::class,
         ]);
-    }
-
-    private function listenForCustomFieldValues(): void
-    {
-        CustomFieldValue::saved(fn (CustomFieldValue $value) => resolve(QueueRecordHistoryRelink::class)->forIdentityValue($value));
-        CustomFieldValue::saved(fn (CustomFieldValue $value) => resolve(OpportunityWindows::class)->forget($value));
-        CustomFieldValue::deleted(fn (CustomFieldValue $value) => resolve(OpportunityWindows::class)->forget($value));
-        Event::listen(CustomFieldValuesImported::class, fn (CustomFieldValuesImported $event) => resolve(QueueRecordHistoryRelink::class)->forImportedValues($event));
     }
 
     private function registerCleanupThatIgnoresTheFeatureFlag(): void
