@@ -4,5 +4,13 @@
 <link rel="manifest" href="/site.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-title" content="Relaticle">
-<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#18181b" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff">
+<script>
+    const syncThemeColor = () => {
+        document.querySelector('meta[name="theme-color"]').content = document.documentElement.classList.contains('dark') ? '#18181b' : '#ffffff'
+    }
+
+    syncThemeColor()
+
+    new MutationObserver(syncThemeColor).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+</script>
