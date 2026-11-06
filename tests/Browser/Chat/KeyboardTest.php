@@ -440,3 +440,37 @@ it('does not ask for confirmation when toggling off a thumbs-up rating', functio
     $calls = $page->script('window.__confirmCalls');
     expect($calls)->not->toContain('Remove this feedback? Your category and comment will be deleted.');
 });
+
+it('ignores j on the dashboard until the chat list has focus', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'Alpha planning thread');
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'Bravo onboarding notes');
+    $links = '[...document.querySelectorAll(".fi-sidebar-chats a[wire\\\\:navigate]")]';
+
+    $page = ChatBrowser::logIn($user, $workspace->slug)
+        ->assertScript("{$links}.length", 2);
+
+    $second = $page->script("new URL({$links}[1].href).pathname");
+
+    $page->keys('.fi-main', 'j')
+        ->wait(1)
+        ->assertPathIs("/app/{$workspace->slug}");
+
+    $page->keys('.fi-sidebar-chats a[wire\\:navigate] >> nth=0', 'j')
+        ->assertPathIs($second);
+});
+
+it('ignores chat letter keys when single-key shortcuts are off', function (): void {
+    $user = User::factory()->withWorkspace()->create(['single_key_shortcuts' => false]);
+    $workspace = $user->ownedWorkspaces()->first();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'Alpha planning thread');
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'Bravo onboarding notes');
+
+    $page = ChatBrowser::logIn($user, $workspace->slug)
+        ->assertScript('Alpine.store("shortcuts").singleKeys', false);
+
+    $page->keys('.fi-sidebar-chats a[wire\\:navigate] >> nth=0', 'j')
+        ->wait(1)
+        ->assertPathIs("/app/{$workspace->slug}");
+});
