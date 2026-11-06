@@ -475,3 +475,49 @@ it('strikes a left-out field in the disclosure of an update', function (): void 
 
     expect($rows)->toBe([['true', true], ['false', false]]);
 });
+
+it('settles a proposal that lapses or is replaced while open, with the outcome the server would give', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'local settle', $conversationId);
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $page->script(seedReceiptMessages(<<<'JS'
+        [message('m1', [Object.assign(step('pa-1', 'pending', 'company', 'create', 'Create company "Acme"'), { expires_at: new Date(Date.now() - 1000).toISOString() })])]
+    JS));
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+
+    $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
+
+            data.sweepLapsedProposals();
+
+            return true;
+        })();
+    JS);
+
+    $page->assertSee('Create company "Acme" · expired')
+        ->assertVisible('[data-propose-again]');
+
+    $page->script(seedReceiptMessages(<<<'JS'
+        [message('m1', [step('pa-2', 'pending', 'task', 'create', 'Create task "Call Jane"')])]
+    JS));
+
+    $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
+
+            data.markPendingActionsSuperseded();
+
+            return true;
+        })();
+    JS);
+
+    $page->assertSee('Create task "Call Jane" · replaced by a newer proposal')
+        ->assertMissing('[data-propose-again]');
+});

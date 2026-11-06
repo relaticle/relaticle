@@ -928,7 +928,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         for (const message of this.messages) {
             for (const action of (message.pending_actions || [])) {
                 if (action.status === 'pending' && this.proposalHasLapsed(action, now)) {
-                    action.status = 'expired';
+                    this.settleLocally(action, 'expired');
                 }
             }
         }
@@ -1203,6 +1203,8 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         head: { one: ':count change', other: ':count changes' },
         justNow: 'just now',
         leftOut: '(:fields left out)',
+        localOutcomes: {},
+        settleOrder: [],
         changes: { one: ':count change', other: ':count changes' },
         receipts: {},
         proposeAgain: 'Propose again',
@@ -1385,7 +1387,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
             for (const action of msg.pending_actions) {
                 if (action.status !== 'pending') continue;
                 if (idFilter && !idFilter.has(action.pending_action_id)) continue;
-                action.status = 'superseded';
+                this.settleLocally(action, 'superseded');
             }
         }
     },
@@ -1428,6 +1430,27 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     writtenCount(action) {
         const items = this.batchItems(action);
         return items.length === 0 ? 1 : items.filter((_, i) => !this.isSkipped(action, i)).length;
+    },
+
+    // A transition only the browser sees (a lapse, a newer message): the server
+    // broadcasts nothing for it, so the outcome comes from the enum's table and a
+    // plan with nothing approved re-reads as the one outcome its steps share.
+    settleLocally(action, status) {
+        action.status = status;
+        action.outcome = this.proposalTexts.localOutcomes[status] ?? null;
+
+        const group = this.messages
+            .flatMap((m) => this.proposalGroups(m))
+            .find((g) => g.actions.some((a) => a.pending_action_id === action.pending_action_id));
+
+        if (!group || this.receiptApplied(group)) return;
+
+        const outcomes = group.actions.map((a) => a.outcome).filter(Boolean);
+        const settled = this.proposalTexts.settleOrder.find((o) => outcomes.includes(o));
+
+        for (const step of group.actions) {
+            if (step.outcome) step.outcome = settled;
+        }
     },
 
     isExcluded(excluded, field) {

@@ -29,6 +29,8 @@ final readonly class ProposalReceipts
     ) {}
 
     /**
+     * What the transcript shows for every step of the plan the step belongs to.
+     *
      * @return array<string, Receipt>
      */
     public function forPlanOf(PendingAction $step): array
@@ -39,10 +41,82 @@ final readonly class ProposalReceipts
     }
 
     /**
+     * Only this step's receipt: what a row decision changes. A pending step has
+     * no outcome yet, so no sibling can alter it.
+     *
+     * @return array<string, Receipt>
+     */
+    public function forStep(PendingAction $step): array
+    {
+        $fresh = PendingAction::query()->whereKey($step->getKey())->first() ?? $step;
+
+        return $this->forGroup([$this->stepFromModel($fresh)]);
+    }
+
+    /**
      * @param  list<Step>  $steps
      * @return array<string, Receipt>
      */
     public function forGroup(array $steps): array
+    {
+        return $this->forGroups([$steps]);
+    }
+
+    /**
+     * Many plans at once, so the moved totals of all of them cost one query.
+     *
+     * @param  list<list<Step>>  $groups
+     * @return array<string, Receipt>
+     */
+    public function forGroups(array $groups): array
+    {
+        $receipts = [];
+        $movedIds = [];
+
+        foreach ($groups as $steps) {
+            $outcomes = $this->outcomes($steps);
+
+            foreach ($steps as $step) {
+                $entity = ProposalEntity::tryFrom((string) $step['entity_type']);
+                $resultData = $step['result_data'] ?? [];
+                $items = is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
+                $moved = $this->moved($step, $entity, $items);
+
+                if ($moved !== null) {
+                    $movedIds[$step['workspace_id']][$step['id']] = $moved['ids'];
+                }
+
+                $receipts[$step['id']] = [
+                    'outcome' => $outcomes[$step['id']]?->value,
+                    'resolved_at' => $step['resolved_at'],
+                    'excluded' => $this->codes($resultData['excluded'] ?? null),
+                    'moved_to' => $moved['to'] ?? null,
+                    'moved_total' => null,
+                    'itemResults' => $this->itemResults($items, $entity),
+                ];
+            }
+        }
+
+        $totals = [];
+
+        foreach ($movedIds as $workspaceId => $idsByStep) {
+            $totals += $this->amounts->formatted((string) $workspaceId, $idsByStep);
+        }
+
+        $complete = [];
+
+        foreach ($receipts as $id => $receipt) {
+            $complete[$id] = [...$receipt, 'moved_total' => $totals[$id] ?? null];
+        }
+
+        return $complete;
+    }
+
+    /**
+     * @param  list<Step>  $steps
+     * @return array<string, ?ProposalOutcome>
+     */
+    private function outcomes(array $steps): array
     {
         $decided = [];
 
@@ -53,27 +127,7 @@ final readonly class ProposalReceipts
             ];
         }
 
-        $outcomes = ProposalOutcome::forGroup($decided);
-
-        $receipts = [];
-
-        foreach ($steps as $step) {
-            $entity = ProposalEntity::tryFrom((string) $step['entity_type']);
-            $resultData = $step['result_data'] ?? [];
-            $items = is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
-            $moved = $this->moved($step, $entity, $items);
-
-            $receipts[$step['id']] = [
-                'outcome' => $outcomes[$step['id']]?->value,
-                'resolved_at' => $step['resolved_at'],
-                'excluded' => $this->codes($resultData['excluded'] ?? null),
-                'moved_to' => $moved['to'] ?? null,
-                'moved_total' => $moved === null ? null : $this->amounts->formatted($step['workspace_id'], $moved['ids']),
-                'itemResults' => $this->itemResults($items, $entity),
-            ];
-        }
-
-        return $receipts;
+        return ProposalOutcome::forGroup($decided);
     }
 
     /**

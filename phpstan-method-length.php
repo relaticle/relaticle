@@ -34,7 +34,7 @@ return [
                 'App\Services\AvatarService::getInitials' => 70,
                 'App\Support\CustomFieldOptionPlan::fromToolInput' => 77,
                 'App\Support\CustomFieldOptionPlan::validated' => 114,
-                'Relaticle\Chat\Queries\ConversationMessagesQuery::get' => 97,
+                'Relaticle\Chat\Queries\ConversationMessagesQuery::get' => 88,
                 'Relaticle\Chat\Agents\CrmAssistant::staticInstructions' => 119,
                 'Relaticle\Chat\Http\Controllers\ChatController::send' => 170,
                 'Relaticle\Chat\Http\Controllers\ChatController::supersedeMessages' => 62,

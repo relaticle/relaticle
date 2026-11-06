@@ -463,7 +463,9 @@ final readonly class PendingActionService
                 status: $status,
                 index: $index,
                 finalized: $finalized,
-                receipts: resolve(ProposalReceipts::class)->forPlanOf($pendingAction),
+                receipts: $finalized
+                    ? resolve(ProposalReceipts::class)->forPlanOf($pendingAction)
+                    : resolve(ProposalReceipts::class)->forStep($pendingAction),
             ));
         } catch (Throwable $e) {
             report($e);

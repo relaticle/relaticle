@@ -71,6 +71,17 @@ enum ProposalOutcome: string
     }
 
     /**
+     * Which outcome a wholly undone plan reads as when its steps ended
+     * differently: a discard outranks an expiry, and an expiry a replacement.
+     *
+     * @return list<self>
+     */
+    public static function settleOrder(): array
+    {
+        return [self::Discarded, self::Expired, self::Replaced];
+    }
+
+    /**
      * What happened to each step of one plan. A rejected step beside an
      * approved one was left out of it (or, for a send, not sent). With nothing
      * approved the plan ended as one outcome, a discard outranking an expiry
@@ -83,7 +94,7 @@ enum ProposalOutcome: string
     {
         $applied = array_filter($steps, fn (array $step): bool => $step['status'] === PendingActionStatus::Approved) !== [];
         $ended = array_values(array_filter(array_map(fn (array $step): ?self => self::forStatus($step['status']), $steps)));
-        $settled = in_array(self::Discarded, $ended, true) ? self::Discarded : ($ended[0] ?? null);
+        $settled = collect(self::settleOrder())->first(fn (self $outcome): bool => in_array($outcome, $ended, true));
 
         return array_map(function (array $step) use ($applied, $settled): ?self {
             $outcome = self::forStatus($step['status']);
@@ -103,7 +114,9 @@ enum ProposalOutcome: string
      *     outcomes: array<string, array{icon: string, label: string, leads: bool, again: bool}>,
      *     head: array{one: string, other: string},
      *     changes: array{one: string, other: string},
-     *     justNow: string
+     *     justNow: string,
+     *     localOutcomes: array<string, string>,
+     *     settleOrder: list<string>
      * }
      */
     public static function forClient(): array
@@ -126,6 +139,11 @@ enum ProposalOutcome: string
                 'other' => __(':count changes', ['count' => ':count']),
             ],
             'justNow' => __('just now'),
+            'localOutcomes' => [
+                PendingActionStatus::Expired->value => self::Expired->value,
+                PendingActionStatus::Superseded->value => self::Replaced->value,
+            ],
+            'settleOrder' => array_map(fn (self $outcome): string => $outcome->value, self::settleOrder()),
         ];
     }
 }

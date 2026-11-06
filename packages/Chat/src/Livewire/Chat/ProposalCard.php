@@ -1245,7 +1245,7 @@ final class ProposalCard extends BaseLivewireComponent
                     decision: 'rejected',
                     finalized: false,
                     record: null,
-                    receipts: $this->receiptsFor($step),
+                    receipts: resolve(ProposalReceipts::class)->forStep($step),
                     context: $this->context,
                 );
             }

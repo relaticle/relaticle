@@ -15,6 +15,7 @@ use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Enums\ProposalOutcome;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Queries\ConversationMessagesQuery;
+use Relaticle\Chat\Support\ProposalReceipts;
 use Tests\Helpers\ChatDocument;
 
 mutates(ConversationMessagesQuery::class);
@@ -349,6 +350,7 @@ function reloadedProposals(User $user, array $steps): array
     $results = [];
 
     foreach ($steps as $step) {
+        $message = $step['message'] ?? 0;
         $entityType = $step['entity_type'];
         $operation = $step['operation'] ?? PendingActionOperation::Create;
 
@@ -368,7 +370,7 @@ function reloadedProposals(User $user, array $steps): array
             'result_data' => $step['result'] ?? null,
         ]);
 
-        $results[] = [
+        $results[$message][] = [
             'id' => 'toolu_'.Str::random(8),
             'name' => 'ReceiptTool',
             'result' => json_encode([
@@ -382,24 +384,26 @@ function reloadedProposals(User $user, array $steps): array
         ];
     }
 
-    DB::table('agent_conversation_messages')->insert([
-        'id' => (string) Str::uuid7(),
-        'conversation_id' => $convId,
-        'participant_type' => 'user',
-        'participant_id' => (string) $user->getKey(),
-        'agent' => 'crm',
-        'role' => 'assistant',
-        'content' => 'Done.',
-        'document' => ChatDocument::emptyJson(),
-        'attachments' => '[]',
-        'steps' => storedToolSteps($results),
-        'usage' => '{}',
-        'meta' => '{}',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    foreach ($results as $toolResults) {
+        DB::table('agent_conversation_messages')->insert([
+            'id' => (string) Str::uuid7(),
+            'conversation_id' => $convId,
+            'participant_type' => 'user',
+            'participant_id' => (string) $user->getKey(),
+            'agent' => 'crm',
+            'role' => 'assistant',
+            'content' => 'Done.',
+            'document' => ChatDocument::emptyJson(),
+            'attachments' => '[]',
+            'steps' => storedToolSteps($toolResults),
+            'usage' => '{}',
+            'meta' => '{}',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
 
-    return collect(resolve(ConversationMessagesQuery::class)->get($user, $convId))->firstWhere('role', 'assistant')['pending_actions'];
+    return collect(resolve(ConversationMessagesQuery::class)->get($user, $convId))->pluck('pending_actions')->flatten(1)->all();
 }
 
 it('carries the excluded codes and the outcome of an approved update', function (): void {
@@ -522,4 +526,58 @@ it('sums the Amount of the moved opportunities in the field currency', function 
 
     expect($update['moved_to'])->toBe('Negotiation')
         ->and($update['moved_total'])->toBe('$110,200.00');
+});
+
+it('reads a plan that spans two messages the way the live payload does', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+    Filament::setTenant($user->currentWorkspace);
+
+    $actions = reloadedProposals($user, [
+        ['entity_type' => 'company', 'turn_id' => 'turn-span', 'message' => 0, 'status' => PendingActionStatus::Approved, 'result' => ['success' => true]],
+        ['entity_type' => 'task', 'turn_id' => 'turn-span', 'message' => 1, 'status' => PendingActionStatus::Rejected],
+    ]);
+
+    $live = resolve(ProposalReceipts::class)->forPlanOf(PendingAction::query()->where('turn_id', 'turn-span')->firstOrFail());
+
+    expect(array_column($actions, 'outcome'))->toBe(['applied', 'left_out'])
+        ->and(array_map(fn (array $receipt): ?string => $receipt['outcome'], array_values($live)))->toBe(['applied', 'left_out']);
+});
+
+it('does not read more as moved steps are added', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+    Filament::setTenant($user->currentWorkspace);
+
+    $opportunities = Opportunity::factory()->count(6)->for($user->currentWorkspace)->create();
+    $opportunities->each(fn (Opportunity $opportunity) => $opportunity->saveCustomFields(['amount' => 1000]));
+
+    $stage = ['label' => 'Stage', 'code' => 'stage', 'old' => 'Open', 'new' => 'Negotiation'];
+    $movedStep = fn (Opportunity $opportunity): array => [
+        'entity_type' => 'opportunity',
+        'operation' => PendingActionOperation::Update,
+        'status' => PendingActionStatus::Approved,
+        'action_data' => ['_batch' => true, 'records' => [['id' => 'x']]],
+        'display' => ['title' => 'Update', 'items' => [['summary' => 'x', 'fields' => [$stage]]]],
+        'result' => ['items' => [['status' => 'approved', 'id' => (string) $opportunity->getKey()]]],
+    ];
+
+    $queriesFor = function (array $steps) use ($user): int {
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+        reloadedProposals($user, $steps);
+        $count = count(array_filter(
+            DB::getQueryLog(),
+            fn (array $entry): bool => str_contains($entry['query'], 'custom_field_values') || str_contains($entry['query'], 'from "custom_fields"'),
+        ));
+        DB::disableQueryLog();
+
+        return $count;
+    };
+
+    $one = $queriesFor([$movedStep($opportunities[0])]);
+    $many = $queriesFor($opportunities->map($movedStep)->all());
+
+    expect($one)->toBeGreaterThan(0)
+        ->and($many)->toBe($one);
 });

@@ -6,9 +6,12 @@ namespace Relaticle\Chat\Queries;
 
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Enums\ProposalOutcome;
 use Relaticle\Chat\Models\AgentConversationMessage;
 use Relaticle\Chat\Support\AttachedRows;
 use Relaticle\Chat\Support\DisplayBlocks;
@@ -20,6 +23,9 @@ use Relaticle\Chat\Support\StoredSteps;
 use Relaticle\Chat\Support\WebSources;
 use stdClass;
 
+/**
+ * @phpstan-type PendingRecord array{status: string, operation: ?string, expires_at: ?string, resolved_at: ?string, entity_type: ?string, turn_id: ?string, workspace_id: string, result_data: ?array<string, mixed>, display: ?array<string, mixed>}
+ */
 final readonly class ConversationMessagesQuery
 {
     public function __construct(
@@ -56,7 +62,6 @@ final readonly class ConversationMessagesQuery
 
         $toolResultsByMessage = [];
         $envelopesByMessage = [];
-        $pendingIds = [];
 
         foreach ($messages as $msg) {
             $toolResults = StoredSteps::toolResults($msg->steps);
@@ -64,19 +69,11 @@ final readonly class ConversationMessagesQuery
 
             $envelopes = $this->pendingActionEnvelopes($toolResults);
             $envelopesByMessage[(string) $msg->id] = $envelopes;
-
-            foreach ($envelopes as $inner) {
-                if (isset($inner['pending_action_id'])) {
-                    $pendingIds[] = (string) $inner['pending_action_id'];
-                }
-            }
         }
 
-        $pendingIds = array_values(array_unique($pendingIds));
+        ['records' => $records, 'receipts' => $receipts] = $this->proposalState($envelopesByMessage, $user, $conversationId);
 
-        $records = $this->pendingRecords($pendingIds, $user);
-
-        return $messages->map(function (object $msg) use ($mentionsByMessage, $feedbackByMessage, $toolResultsByMessage, $envelopesByMessage, $records, $user): array {
+        return $messages->map(function (object $msg) use ($mentionsByMessage, $feedbackByMessage, $toolResultsByMessage, $envelopesByMessage, $records, $receipts): array {
             $meta = $this->metaFrom($msg->meta);
             $attachment = $this->attachmentFromMeta($meta);
 
@@ -99,7 +96,7 @@ final readonly class ConversationMessagesQuery
                 // gaps, day separators, and the bubble tooltips, which were
                 // already reading the wrong time before this fix).
                 'created_at' => $msg->created_at === null ? null : Date::parse((string) $msg->created_at, 'UTC')->toISOString(),
-                'pending_actions' => $this->extractPendingActions($envelopesByMessage[(string) $msg->id] ?? [], $records, (string) $user->current_workspace_id),
+                'pending_actions' => $this->extractPendingActions($envelopesByMessage[(string) $msg->id] ?? [], $records, $receipts),
                 'display_blocks' => DisplayBlocks::collect($toolResultsByMessage[(string) $msg->id]),
                 'next_steps' => NextSteps::fromMeta($meta),
                 'sources' => WebSources::fromMeta($meta),
@@ -130,34 +127,89 @@ final readonly class ConversationMessagesQuery
     }
 
     /**
-     * @param  list<string>  $pendingIds
-     * @return array<string, array{status: string, expires_at: ?string, resolved_at: ?string, entity_type: ?string, turn_id: ?string, result_data: ?array<string, mixed>}>
+     * The stored rows behind the page's proposals and the receipts of their
+     * plans. A plan is every proposal of one `turn_id`, wherever it sits in the
+     * conversation, so its siblings are read even when they are off this page.
+     *
+     * @param  array<string, list<array<string, mixed>>>  $envelopesByMessage
+     * @return array{records: array<string, PendingRecord>, receipts: array<string, array<string, mixed>>}
      */
-    private function pendingRecords(array $pendingIds, User $user): array
+    private function proposalState(array $envelopesByMessage, User $user, string $conversationId): array
     {
-        if ($pendingIds === []) {
+        $envelopes = array_merge(...array_values($envelopesByMessage) ?: [[]]);
+        $ids = array_values(array_unique(array_filter(array_map(fn (array $inner): string => (string) ($inner['pending_action_id'] ?? ''), $envelopes))));
+        $turns = array_values(array_unique(array_filter(array_map(fn (array $inner): string => (string) ($inner['turn_id'] ?? ''), $envelopes))));
+        $records = $this->pendingRecords($ids, $turns, $user, $conversationId);
+
+        return ['records' => $records, 'receipts' => $this->receipts->forGroups($this->plansOf($records))];
+    }
+
+    /**
+     * @param  array<string, PendingRecord>  $records
+     * @return list<list<array{id: string, status: string, entity_type: ?string, operation: ?string, workspace_id: string, resolved_at: ?string, result_data: ?array<array-key, mixed>, display: ?array<array-key, mixed>}>>
+     */
+    private function plansOf(array $records): array
+    {
+        $plans = [];
+
+        foreach ($records as $id => $record) {
+            $plans[$record['turn_id'] ?? $id][] = ProposalReceipts::step(
+                (string) $id,
+                $record['status'],
+                $record['entity_type'],
+                $record['operation'],
+                $record['workspace_id'],
+                $record['resolved_at'],
+                $record['result_data'],
+                $record['display'],
+            );
+        }
+
+        return array_values($plans);
+    }
+
+    /**
+     * @param  list<string>  $ids
+     * @param  list<string>  $turns
+     * @return array<string, PendingRecord>
+     */
+    private function pendingRecords(array $ids, array $turns, User $user, string $conversationId): array
+    {
+        if ($ids === []) {
             return [];
         }
 
         return DB::table('pending_actions')
-            ->whereIn('id', $pendingIds)
             ->where('user_id', $user->getKey())
             ->where('workspace_id', $user->current_workspace_id)
-            ->get(['id', 'status', 'entity_type', 'turn_id', 'result_data', 'expires_at', 'resolved_at'])
+            ->where(fn (QueryBuilder $query): QueryBuilder => $query
+                ->whereIn('id', $ids)
+                ->orWhere(fn (QueryBuilder $siblings): QueryBuilder => $siblings->where('conversation_id', $conversationId)->whereIn('turn_id', $turns)))
+            ->orderBy('id')
+            ->get(['id', 'status', 'operation', 'entity_type', 'turn_id', 'workspace_id', 'result_data', 'display_data', 'expires_at', 'resolved_at'])
             ->keyBy('id')
             ->map(fn (stdClass $row): array => [
                 'status' => (string) $row->status,
+                'operation' => $row->operation === null ? null : (string) $row->operation,
                 'expires_at' => $row->expires_at === null ? null : Date::parse((string) $row->expires_at)->toIso8601String(),
                 'resolved_at' => $row->resolved_at === null ? null : Date::parse((string) $row->resolved_at, 'UTC')->toIso8601String(),
                 'entity_type' => $row->entity_type === null ? null : (string) $row->entity_type,
                 'turn_id' => $row->turn_id === null ? null : (string) $row->turn_id,
-                'result_data' => $row->result_data === null ? null : (function (mixed $raw): ?array {
-                    $decoded = json_decode((string) $raw, true);
-
-                    return is_array($decoded) ? $decoded : null;
-                })($row->result_data),
+                'workspace_id' => (string) $row->workspace_id,
+                'result_data' => $this->jsonArray($row->result_data),
+                'display' => $this->jsonArray($row->display_data),
             ])
             ->all();
+    }
+
+    /**
+     * @return ?array<string, mixed>
+     */
+    private function jsonArray(mixed $raw): ?array
+    {
+        $decoded = $raw === null ? null : json_decode((string) $raw, true);
+
+        return is_array($decoded) ? $decoded : null;
     }
 
     /**
@@ -239,13 +291,13 @@ final readonly class ConversationMessagesQuery
 
     /**
      * @param  list<array<string, mixed>>  $envelopes
-     * @param  array<string, array{status: string, expires_at: ?string, resolved_at: ?string, entity_type: ?string, turn_id: ?string, result_data: ?array<string, mixed>}>  $records
+     * @param  array<string, PendingRecord>  $records
+     * @param  array<string, array<string, mixed>>  $receipts
      * @return array<int, mixed>
      */
-    private function extractPendingActions(array $envelopes, array $records, string $workspaceId): array
+    private function extractPendingActions(array $envelopes, array $records, array $receipts): array
     {
         $actions = [];
-        $steps = [];
 
         foreach ($envelopes as $inner) {
             $pendingId = (string) ($inner['pending_action_id'] ?? '');
@@ -260,7 +312,7 @@ final readonly class ConversationMessagesQuery
             // written before plans existed carries no turn.
             $inner['turn_id'] = $info['turn_id'] ?? ($inner['turn_id'] ?? null);
 
-            $resultData = is_array($info['result_data'] ?? null) ? $info['result_data'] : null;
+            $resultData = $info['result_data'] ?? null;
             $entityType = $info['entity_type'] ?? (isset($inner['entity_type']) ? (string) $inner['entity_type'] : null);
 
             if ($inner['status'] === 'approved' && $info !== null) {
@@ -273,23 +325,10 @@ final readonly class ConversationMessagesQuery
                 $inner['cancelled_by'] = $resultData['cancelled_by'];
             }
 
-            $steps[$pendingId] = ProposalReceipts::step(
-                $pendingId,
-                $inner['status'],
-                $entityType,
-                isset($inner['operation']) ? (string) $inner['operation'] : null,
-                $workspaceId,
-                $info['resolved_at'] ?? null,
-                $resultData,
-                is_array($inner['display'] ?? null) ? $inner['display'] : null,
-            );
-
-            $actions[] = $inner;
+            $actions[] = $this->withReceipt($inner, $receipts[$pendingId] ?? null, $info);
         }
 
-        $receipts = $this->receiptsByGroup($actions, $steps);
-
-        return array_map(fn (array $action): array => $this->withReceipt($action, $receipts[(string) ($action['pending_action_id'] ?? '')] ?? null, $steps[(string) ($action['pending_action_id'] ?? '')] ?? null), $actions);
+        return $actions;
     }
 
     /**
@@ -321,40 +360,19 @@ final readonly class ConversationMessagesQuery
     }
 
     /**
-     * Receipts are computed per plan (one `turn_id`), because what happened to a
-     * step depends on its siblings.
+     * A proposal whose stored row is gone reads as expired, so it gets that
+     * outcome rather than none.
      *
-     * @param  list<array<string, mixed>>  $actions
-     * @param  array<string, array{id: string, status: string, entity_type: ?string, operation: ?string, workspace_id: string, resolved_at: ?string, result_data: ?array<array-key, mixed>, display: ?array<array-key, mixed>}>  $steps
-     * @return array<string, array<string, mixed>>
-     */
-    private function receiptsByGroup(array $actions, array $steps): array
-    {
-        $groups = [];
-
-        foreach ($actions as $action) {
-            $id = (string) ($action['pending_action_id'] ?? '');
-            $groups[(string) ($action['turn_id'] ?? $id)][] = $steps[$id];
-        }
-
-        $receipts = [];
-
-        foreach ($groups as $group) {
-            $receipts = [...$receipts, ...$this->receipts->forGroup($group)];
-        }
-
-        return $receipts;
-    }
-
-    /**
      * @param  array<string, mixed>  $action
      * @param  array<string, mixed>|null  $receipt
-     * @param  array<string, mixed>|null  $step
+     * @param  PendingRecord|null  $record
      * @return array<string, mixed>
      */
-    private function withReceipt(array $action, ?array $receipt, ?array $step): array
+    private function withReceipt(array $action, ?array $receipt, ?array $record): array
     {
-        if ($receipt === null || $step === null) {
+        if ($receipt === null || $record === null) {
+            $action['outcome'] = ProposalOutcome::forStatus(PendingActionStatus::Expired)?->value;
+
             return $action;
         }
 
@@ -364,10 +382,8 @@ final readonly class ConversationMessagesQuery
         $action['moved_to'] = $receipt['moved_to'];
         $action['moved_total'] = $receipt['moved_total'];
 
-        $itemResults = $receipt['itemResults'];
-
-        if ($itemResults !== []) {
-            $action['itemResults'] = $this->withRecords($itemResults, $step['result_data'], $step['entity_type'], $step['operation']);
+        if ($receipt['itemResults'] !== []) {
+            $action['itemResults'] = $this->withRecords($receipt['itemResults'], $record['result_data'], $record['entity_type'], $record['operation']);
         }
 
         return $action;

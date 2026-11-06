@@ -45,12 +45,13 @@ beforeEach(function (): void {
     ]);
 });
 
-function makeBatchProposal(string $convId, User $user, array $records): PendingAction
+function makeBatchProposal(string $convId, User $user, array $records, ?string $turn = null): PendingAction
 {
     return PendingAction::query()->create([
         'workspace_id' => $user->currentWorkspace->getKey(),
         'user_id' => $user->getKey(),
         'conversation_id' => $convId,
+        'turn_id' => $turn,
         'action_class' => CreateTask::class,
         'operation' => PendingActionOperation::Create,
         'entity_type' => 'task',
@@ -61,12 +62,13 @@ function makeBatchProposal(string $convId, User $user, array $records): PendingA
     ]);
 }
 
-function makeSingleProposal(string $convId, User $user, string $title): PendingAction
+function makeSingleProposal(string $convId, User $user, string $title, ?string $turn = null): PendingAction
 {
     return PendingAction::query()->create([
         'workspace_id' => $user->currentWorkspace->getKey(),
         'user_id' => $user->getKey(),
         'conversation_id' => $convId,
+        'turn_id' => $turn,
         'action_class' => CreateTask::class,
         'operation' => PendingActionOperation::Create,
         'entity_type' => 'task',
@@ -363,6 +365,25 @@ it('broadcasts pending_action.resolved as finalized on the batch\'s last item', 
         && $event->finalized
         && $event->broadcastOn()[0]->name === "private-chat.conversation.{$this->convId}"
         && $event->broadcastAs() === 'pending_action.resolved');
+});
+
+it('broadcasts only the changed step on a row decision, and every step of the plan once a step finalizes', function (): void {
+    Event::fake([PendingActionResolved::class]);
+    $batch = makeBatchProposal($this->convId, $this->user, [['title' => 'Item A'], ['title' => 'Item B']], 'turn-plan');
+    $sibling = makeSingleProposal($this->convId, $this->user, 'Sibling', 'turn-plan');
+    $service = resolve(PendingActionService::class);
+
+    $service->approveItem($batch, $this->user, 0);
+
+    Event::assertDispatched(fn (PendingActionResolved $event): bool => $event->index === 0
+        && array_keys($event->receipts) === [$batch->getKey()]);
+
+    $service->approveItem($batch, $this->user, 1);
+
+    Event::assertDispatched(fn (PendingActionResolved $event): bool => $event->index === 1
+        && $event->finalized
+        && collect(array_keys($event->receipts))->sort()->values()->all() === collect([$batch->getKey(), $sibling->getKey()])->sort()->values()->all()
+        && $event->receipts[$batch->getKey()]['outcome'] === 'applied');
 });
 
 it('broadcasts pending_action.resolved with status rejected on a batch rejectItem', function (): void {
