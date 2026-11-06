@@ -282,7 +282,7 @@ it('takes a suppressed link off the email when sync linking finds both', functio
 });
 
 it('reads the copies it unlinks only after the conversation lock is free', function (): void {
-    if (! function_exists('pg_connect')) {
+    if (! extension_loaded('pgsql')) {
         $this->markTestSkipped('Needs ext-pgsql to hold the conversation lock from a second connection.');
     }
 
