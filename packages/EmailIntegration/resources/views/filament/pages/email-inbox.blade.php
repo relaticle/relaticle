@@ -150,6 +150,7 @@
                                 reply: () => this.reply('reply'),
                                 replyAll: () => this.reply('reply_all'),
                                 forward: () => this.reply('forward'),
+                                link: reader('link'),
                             },
                             isActive: () => document.querySelector('[data-email-reader]') !== null,
                         }),

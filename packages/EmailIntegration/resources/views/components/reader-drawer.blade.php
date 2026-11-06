@@ -267,11 +267,34 @@
                 </p>
             @endif
 
-            @if ($row !== null && $row->records !== [])
-                <div class="mt-2 flex flex-wrap items-center gap-1">
-                    @foreach ($row->records as $record)
-                        <x-email-integration::record-chip :record="$record" class="inline-flex" />
+            @if ($row !== null)
+                <div class="mt-2 flex flex-wrap items-center gap-1" data-reader-links>
+                    @foreach ($row->records as $index => $record)
+                        <x-email-integration::record-chip
+                            :record="$record"
+                            :unlink-email-id="$email->getKey()"
+                            :class="$index === 0 ? 'inline-flex' : 'hidden sm:inline-flex'"
+                            wire:key="reader-link-{{ $email->getKey() }}-{{ $record['type'] }}-{{ $record['id'] }}"
+                        />
                     @endforeach
+
+                    @if (count($row->records) > 1)
+                        <span class="text-xs font-medium text-gray-400 sm:hidden dark:text-gray-500">
+                            {{ __('filament/pages/email-inbox.conversation_row.more_records', ['count' => count($row->records) - 1]) }}
+                        </span>
+                    @endif
+
+                    <button
+                        type="button"
+                        data-reader-action="link"
+                        wire:click="mountAction('linkRecord', {{ Js::from(['emailId' => $email->getKey()]) }})"
+                        x-bind:title="$store.shortcuts?.hint('link', @js(__('filament/pages/email-inbox.drawer.links.add')))"
+                        x-bind:aria-keyshortcuts="$store.shortcuts?.keysFor('link')"
+                        class="inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-xs font-medium leading-4 text-gray-500 ring-1 ring-inset ring-gray-200 outline-none hover:bg-gray-50 hover:text-gray-700 focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-gray-400 dark:ring-white/10 dark:hover:bg-white/5 dark:hover:text-gray-200"
+                    >
+                        <x-filament::icon icon="ri-add-line" class="size-3.5" aria-hidden="true" />
+                        {{ __('filament/pages/email-inbox.drawer.links.add') }}
+                    </button>
                 </div>
             @endif
         </header>

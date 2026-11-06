@@ -4,7 +4,13 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Filament\Concerns;
 
+use App\Enums\CrmEntity;
+use App\Models\Company;
+use App\Models\Opportunity;
+use App\Models\People;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
+use App\Support\LikePattern;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
@@ -12,18 +18,24 @@ use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Support\Enums\Width;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
 use Laravel\Ai\Exceptions\AiException;
+use Livewire\Attributes\On;
 use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
+use Relaticle\EmailIntegration\Actions\LinkEmailToRecord;
 use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
+use Relaticle\EmailIntegration\Actions\UnlinkEmailFromRecord;
 use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailShare;
@@ -40,6 +52,10 @@ use Relaticle\EmailIntegration\Services\EmailThreadSummaryService;
  */
 trait HasEmailReaderActions
 {
+    abstract public function refreshConversations(): void;
+
+    abstract public function deselectEmail(): void;
+
     /** @var EloquentCollection<int, Email>|null */
     private ?EloquentCollection $copyConversation = null;
 
@@ -314,6 +330,144 @@ trait HasEmailReaderActions
                     ->title(__('filament/pages/record-emails.notifications.access_request_sent.title'))
                     ->send();
             });
+    }
+
+    protected function linkRecordAction(): Action
+    {
+        return Action::make('linkRecord')
+            ->label(__('filament/pages/email-inbox.drawer.links.add'))
+            ->icon('ri-link')
+            ->modalHeading(__('filament/pages/email-inbox.drawer.links.picker.heading'))
+            ->modalDescription(__('filament/pages/email-inbox.drawer.links.picker.description'))
+            ->modalWidth(Width::Medium)
+            ->modalSubmitActionLabel(__('filament/pages/email-inbox.drawer.links.picker.submit'))
+            ->schema([
+                Select::make('target_type')
+                    ->label(__('filament/pages/email-inbox.drawer.links.picker.type'))
+                    ->options(array_column(array_map(fn (CrmEntity $entity): array => [$entity->value, __("filament/pages/email-inbox.drawer.links.types.{$entity->value}")], CrmEntity::linkable()), 1, 0))
+                    ->default(CrmEntity::Company->value)
+                    ->selectablePlaceholder(false)
+                    ->required()
+                    ->live()
+                    ->afterStateUpdated(fn (Set $set): mixed => $set('target_id', null)),
+                Select::make('target_id')
+                    ->label(__('filament/pages/email-inbox.drawer.links.picker.record'))
+                    ->searchPrompt(__('filament/pages/email-inbox.drawer.links.picker.search'))
+                    ->searchable()
+                    ->getSearchResultsUsing(fn (string $search, Get $get): array => $this->linkTargetOptions((string) $get('target_type'), $search))
+                    ->getOptionLabelUsing(fn (mixed $value, Get $get): ?string => $this->findLinkTarget((string) $get('target_type'), (string) $value)?->name)
+                    ->required(),
+            ])
+            ->action(function (array $data, array $arguments): void {
+                $this->linkConversationTo((string) ($arguments['emailId'] ?? ''), (string) $data['target_type'], (string) $data['target_id']);
+            });
+    }
+
+    protected function unlinkRecordAction(): Action
+    {
+        return Action::make('unlinkRecord')
+            ->requiresConfirmation()
+            ->color('danger')
+            ->modalIcon('ri-link-unlink')
+            ->modalHeading(fn (array $arguments): string => __('filament/pages/email-inbox.drawer.links.confirm.heading', ['name' => $this->linkTargetName($arguments)]))
+            ->modalDescription(fn (array $arguments): string => __('filament/pages/email-inbox.drawer.links.confirm.description', ['name' => $this->linkTargetName($arguments)]))
+            ->modalSubmitActionLabel(__('filament/pages/email-inbox.drawer.links.confirm.submit'))
+            ->action(function (array $arguments): void {
+                $emailId = (string) ($arguments['emailId'] ?? '');
+                $type = (string) ($arguments['targetType'] ?? '');
+                $email = $this->resolveWorkspaceEmail($emailId, 'view');
+                $record = $this->findLinkTarget($type, (string) ($arguments['targetId'] ?? ''));
+
+                abort_unless($email instanceof Email && $record !== null, 404);
+
+                resolve(UnlinkEmailFromRecord::class)->execute($this->readerUser(), $email, $record);
+
+                Notification::make()
+                    ->success()
+                    ->title(__('filament/pages/email-inbox.drawer.links.notifications.unlinked', ['name' => $record->name]))
+                    ->actions([
+                        Action::make('undo')
+                            ->label(__('filament/pages/email-inbox.drawer.links.notifications.undo'))
+                            ->link()
+                            ->close()
+                            ->dispatchTo(EmailAccessNotificationHandler::LIVEWIRE_ALIAS, 'relink-email-record')
+                            ->eventData(['emailId' => $emailId, 'targetType' => $type, 'targetId' => (string) $record->getKey()]),
+                    ])
+                    ->send();
+
+                $this->dispatch('email:links-changed');
+            });
+    }
+
+    protected function linkConversationTo(string $emailId, string $targetType, string $targetId): void
+    {
+        $email = $this->resolveWorkspaceEmail($emailId, 'view');
+        $record = $this->findLinkTarget($targetType, $targetId);
+
+        abort_unless($email instanceof Email && $record !== null, 404);
+
+        resolve(LinkEmailToRecord::class)->execute($this->readerUser(), $email, $record);
+
+        Notification::make()
+            ->success()
+            ->title(__('filament/pages/email-inbox.drawer.links.notifications.linked', ['name' => $record->name]))
+            ->send();
+
+        $this->dispatch('email:links-changed');
+    }
+
+    #[On('email:links-changed')]
+    public function refreshEmailLinks(): void
+    {
+        $this->refreshConversations();
+
+        if ($this->selectedEmailId !== null && ! $this->selectedEmail instanceof Email) {
+            $this->deselectEmail();
+        }
+    }
+
+    /** @param  array<string, mixed>  $arguments */
+    private function linkTargetName(array $arguments): string
+    {
+        return $this->findLinkTarget((string) ($arguments['targetType'] ?? ''), (string) ($arguments['targetId'] ?? ''))->name
+            ?? __('filament/pages/email-inbox.drawer.links.this_record');
+    }
+
+    // Always bounded by the workspace id, so a forged id from another workspace finds nothing.
+    private function findLinkTarget(string $type, string $id): Company|People|Opportunity|null
+    {
+        $entity = CrmEntity::tryFrom($type);
+
+        if (! in_array($entity, CrmEntity::linkable(), true) || $id === '') {
+            return null;
+        }
+
+        $record = $entity->model()::query()
+            ->withoutGlobalScope(WorkspaceScope::class)
+            ->where('workspace_id', $this->readerUser()->current_workspace_id)
+            ->find($id);
+
+        return $record instanceof Company || $record instanceof People || $record instanceof Opportunity ? $record : null;
+    }
+
+    /** @return array<string, string> */
+    private function linkTargetOptions(string $type, string $search): array
+    {
+        $entity = CrmEntity::tryFrom($type);
+
+        if (! in_array($entity, CrmEntity::linkable(), true)) {
+            return [];
+        }
+
+        return $entity->model()::query()
+            ->withoutGlobalScope(WorkspaceScope::class)
+            ->where('workspace_id', $this->readerUser()->current_workspace_id)
+            ->whereLike($entity->titleColumn(), '%'.LikePattern::escape($search).'%')
+            ->orderBy($entity->titleColumn())
+            ->limit(20)
+            ->pluck($entity->titleColumn(), 'id')
+            ->map(fn (mixed $name): string => (string) $name)
+            ->all();
     }
 
     private function canOpenRequestAccess(Email $email): bool

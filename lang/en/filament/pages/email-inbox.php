@@ -322,6 +322,7 @@ return [
             'help' => 'Keyboard shortcuts',
             'undo' => 'Undo',
             'select' => 'Select conversation',
+            'link' => 'Link record',
         ],
         'scopes' => [
             'list' => 'Conversation list',
@@ -349,6 +350,36 @@ return [
             ],
             'request' => 'Request access',
             'requested' => 'Requested',
+        ],
+        'links' => [
+            'add' => 'Link record',
+            'menu' => 'Options for :name',
+            'open' => 'Open record',
+            'unlink' => 'Unlink',
+            'this_record' => 'this record',
+            'types' => [
+                'company' => 'Company',
+                'people' => 'Person',
+                'opportunity' => 'Opportunity',
+            ],
+            'picker' => [
+                'heading' => 'Link this conversation to a record',
+                'description' => 'Teammates will see this conversation on the record at your sharing level.',
+                'type' => 'Type',
+                'record' => 'Record',
+                'search' => 'Type a name to search',
+                'submit' => 'Link',
+            ],
+            'confirm' => [
+                'heading' => 'Remove this conversation from :name?',
+                'description' => 'It stays in your mail and will not be linked to :name again automatically.',
+                'submit' => 'Unlink',
+            ],
+            'notifications' => [
+                'linked' => 'Linked to :name',
+                'unlinked' => 'Removed from :name',
+                'undo' => 'Undo',
+            ],
         ],
     ],
 ];

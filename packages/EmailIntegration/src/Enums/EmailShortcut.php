@@ -20,6 +20,7 @@ enum EmailShortcut: string
     case Compose = 'compose';
     case Help = 'help';
     case Undo = 'undo';
+    case Link = 'link';
 
     /** @return list<string> keys in `KeyboardEvent.key` form */
     public function keys(): array
@@ -39,6 +40,7 @@ enum EmailShortcut: string
             self::Compose => ['c'],
             self::Help => ['?'],
             self::Undo => ['z'],
+            self::Link => ['l'],
         };
     }
 
@@ -49,7 +51,7 @@ enum EmailShortcut: string
             self::Next, self::Previous, self::Done, self::MarkUnread => [ShortcutScope::List, ShortcutScope::Reader],
             self::Open, self::Select, self::FocusSearch => [ShortcutScope::List],
             self::Close => [ShortcutScope::List, ShortcutScope::Reader, ShortcutScope::Composer],
-            self::Reply, self::ReplyAll, self::Forward => [ShortcutScope::Reader],
+            self::Reply, self::ReplyAll, self::Forward, self::Link => [ShortcutScope::Reader],
             self::Compose, self::Help, self::Undo => [ShortcutScope::Global],
         };
     }
@@ -80,6 +82,7 @@ enum EmailShortcut: string
             self::Compose => 'compose',
             self::Help => 'help',
             self::Undo => 'undo',
+            self::Link => 'link',
         };
     }
 
@@ -89,7 +92,7 @@ enum EmailShortcut: string
         return match ($this) {
             self::Close => false,
             self::Next, self::Previous, self::Open, self::Reply, self::ReplyAll, self::Forward, self::Done,
-            self::MarkUnread, self::Select, self::FocusSearch, self::Compose, self::Help, self::Undo => true,
+            self::MarkUnread, self::Select, self::FocusSearch, self::Compose, self::Help, self::Undo, self::Link => true,
         };
     }
 
@@ -98,7 +101,7 @@ enum EmailShortcut: string
         return match ($this) {
             self::Close => true,
             self::Next, self::Previous, self::Open, self::Reply, self::ReplyAll, self::Forward, self::Done,
-            self::MarkUnread, self::Select, self::FocusSearch, self::Compose, self::Help, self::Undo => false,
+            self::MarkUnread, self::Select, self::FocusSearch, self::Compose, self::Help, self::Undo, self::Link => false,
         };
     }
 

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Company;
+use App\Models\Opportunity;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
@@ -17,7 +18,10 @@ use Relaticle\EmailIntegration\Enums\ConversationView;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
+use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Jobs\RecomputeRecordEmailMetricsJob;
+use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailLinkSuppression;
@@ -31,6 +35,7 @@ mutates(
     PrepareEmailRecordLink::class,
     RecordCommunicationMetrics::class,
     RecomputeRecordEmailMetricsJob::class,
+    HasEmailReaderActions::class,
 );
 
 beforeEach(function (): void {
@@ -181,4 +186,88 @@ it('counts a newly linked email once and recounts the record after an unlink', f
         ->outbound_email_count->toBe(1)
         ->last_email_at->toEqual(now()->subDays(3))
         ->last_interaction_at->toEqual(now()->subDays(3));
+});
+
+function linkingPage(Email $email): mixed
+{
+    config(['relaticle.features.email_conversations' => [$email->workspace_id]]);
+    resolve(RefreshConversationSummary::class)->execute($email->workspace_id, (string) $email->conversation_key);
+    Filament::setCurrentPanel(Filament::getPanel('app'));
+
+    return livewire(EmailInboxPage::class)->call('selectEmail', $email->getKey());
+}
+
+it('links the open conversation from the drawer picker as a pin', function (): void {
+    $email = linkingEmail($this->owner);
+
+    linkingPage($email)
+        ->assertSeeHtml('data-reader-action="link"')
+        ->mountAction('linkRecord', arguments: ['emailId' => $email->getKey()])
+        ->setActionData(['target_type' => 'company', 'target_id' => $this->company->getKey()])
+        ->callMountedAction()
+        ->assertHasNoActionErrors()
+        ->assertNotified('Linked to Airbnb')
+        ->assertSeeHtml('data-linked-record="company:'.$this->company->getKey().'"');
+
+    expect(linkSource($email, $this->company))->toBe('manual');
+});
+
+it('searches only the records of the bound workspace and stops at twenty', function (): void {
+    $email = linkingEmail($this->owner);
+    Company::factory()->count(22)->for($this->workspace)->sequence(fn ($sequence): array => ['name' => 'Airline '.str_pad((string) $sequence->index, 2, '0', STR_PAD_LEFT)])->create();
+    Company::factory()->for(Workspace::factory())->create(['name' => 'Airbnb Elsewhere']);
+    Opportunity::factory()->for($this->workspace)->create(['name' => 'Airbnb renewal']);
+
+    $page = linkingPage($email)
+        ->mountAction('linkRecord', arguments: ['emailId' => $email->getKey()])
+        ->setActionData(['target_type' => 'company']);
+    $search = fn (string $term): array => array_column($page->instance()->callSchemaComponentMethod('mountedActionSchema0.target_id', 'getSearchResultsForJs', ['search' => $term]), 'label');
+
+    expect($search('airb'))->toBe(['Airbnb'])
+        ->and($search('Air'))->toHaveCount(20)
+        ->and($search('renewal'))->toBe([]);
+
+    $page->setActionData(['target_type' => 'opportunity']);
+
+    expect($search('renewal'))->toBe(['Airbnb renewal']);
+});
+
+it('answers a forged record from another workspace with not found and writes nothing', function (): void {
+    $email = linkingEmail($this->owner);
+    $foreign = Company::factory()->for(Workspace::factory())->create(['name' => 'Elsewhere']);
+
+    linkingPage($email)
+        ->mountAction('linkRecord', arguments: ['emailId' => $email->getKey()])
+        ->setActionData(['target_type' => 'company', 'target_id' => $foreign->getKey()])
+        ->callMountedAction()
+        ->assertHasActionErrors(['target_id']);
+
+    expect(DB::table('emailables')->where('email_id', $email->getKey())->count())->toBe(0);
+});
+
+it('unlinks a chip from the drawer and links it again from the undo', function (): void {
+    $email = linkingEmail($this->owner);
+    resolve(LinkEmailToRecord::class)->execute($this->owner, $email, $this->company);
+    $chip = 'data-linked-record="company:'.$this->company->getKey().'"';
+
+    linkingPage($email)
+        ->assertSeeHtml($chip)
+        ->mountAction('unlinkRecord', arguments: ['emailId' => $email->getKey(), 'targetType' => 'company', 'targetId' => $this->company->getKey()])
+        ->assertActionMounted('unlinkRecord')
+        ->assertMountedActionModalSee('Remove this conversation from Airbnb?')
+        ->callMountedAction()
+        ->assertNotified('Removed from Airbnb')
+        ->assertDispatched('email:links-changed')
+        ->call('refreshEmailLinks')
+        ->assertDontSeeHtml($chip);
+
+    expect(linkSource($email, $this->company))->toBeNull()
+        ->and(EmailLinkSuppression::query()->count())->toBe(1);
+
+    livewire(EmailAccessNotificationHandler::class)
+        ->dispatch('relink-email-record', emailId: $email->getKey(), targetType: 'company', targetId: $this->company->getKey())
+        ->assertNotified('Linked to Airbnb');
+
+    expect(linkSource($email, $this->company))->toBe('manual')
+        ->and(EmailLinkSuppression::query()->count())->toBe(0);
 });

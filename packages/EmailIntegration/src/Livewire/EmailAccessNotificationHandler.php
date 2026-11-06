@@ -31,7 +31,7 @@ use RuntimeException;
 
 /**
  * Panel-wide handler for notification clicks: the reader from the bell on pages
- * that host none, and Undo on the queued-send toast.
+ * that host none, Undo on the queued-send toast, and Undo after unlinking a record.
  *
  * @property-read Email|null $selectedEmail
  * @property-read bool $showsConversations
@@ -191,6 +191,17 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
             ->body(__('filament/notifications/mailbox-import-complete.retry.unavailable.body'))
             ->danger()
             ->send();
+    }
+
+    #[On('relink-email-record')]
+    public function relinkEmailRecord(string $emailId, string $targetType, string $targetId): void
+    {
+        $this->linkConversationTo($emailId, $targetType, $targetId);
+    }
+
+    public function refreshConversations(): void
+    {
+        unset($this->selectedEmail);
     }
 
     #[On('undo-queued-send')]
