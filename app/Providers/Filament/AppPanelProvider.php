@@ -693,11 +693,6 @@ final class AppPanelProvider extends PanelProvider
                 ->icon('heroicon-m-cog-6-tooth')
                 ->visible(fn (): bool => $this->shouldRegisterMenuItem())
                 ->url(fn (): string => url(Settings::getUrl())),
-            Action::make('workspace_settings')
-                ->label(EditWorkspace::getLabel())
-                ->icon(Heroicon::OutlinedBuildingOffice2)
-                ->visible(fn (): bool => $this->shouldRegisterMenuItem() && EditWorkspace::canView(Filament::getTenant()))
-                ->url(fn (): string => EditWorkspace::getUrl()),
         ];
 
         if (Features::hasApiFeatures()) {
