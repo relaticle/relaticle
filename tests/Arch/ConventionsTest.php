@@ -1362,4 +1362,25 @@ it('gives every email shortcut key one meaning per scope', function (): void {
     }
 
     expect($clashes)->toBeEmpty('A key means one thing wherever its scopes meet: '.implode('; ', $clashes));
+
+    foreach (EmailShortcut::cases() as $shortcut) {
+        $singleCharacters = array_filter($shortcut->keys(), fn (string $key): bool => mb_strlen($key) === 1);
+
+        expect($shortcut->isCharacterKey())->toBe(count($singleCharacters) === count($shortcut->keys()), "{$shortcut->name} marks its keys as character keys only when every key is one character")
+            ->and($shortcut->keys())->each->toMatch('/^(?:[a-z\/?]|[A-Z][a-zA-Z]+)$/');
+    }
+});
+
+it('commits a published copy of every panel script that matches its source', function (): void {
+    $root = dirname(__DIR__, 2);
+    preg_match_all("/Js::make\('([\w-]+)', resource_path\('([^']+)'\)\)/", (string) file_get_contents($root.'/app/Providers/AppServiceProvider.php'), $registered, PREG_SET_ORDER);
+    $sources = array_column($registered, 2, 1);
+    $published = array_map(fn (string $path): string => basename($path, '.js'), glob($root.'/public/js/app/*.js') ?: []);
+
+    expect($sources)->not->toBeEmpty()
+        ->and($published)->toEqualCanonicalizing(array_keys($sources));
+
+    foreach ($sources as $id => $source) {
+        expect(file_get_contents("{$root}/public/js/app/{$id}.js"))->toBe(file_get_contents("{$root}/resources/{$source}"), "Run `php artisan filament:assets` and commit public/js/app/{$id}.js");
+    }
 });

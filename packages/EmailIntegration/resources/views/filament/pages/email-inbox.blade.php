@@ -164,11 +164,20 @@
 
                     return this.focusedRow() ?? (hovered && ! hovered.hidden ? hovered : null)
                 },
-                tabIndexFor(key) {
-                    const current = this.row(this.focusedKey)
-                    const roving = current && ! current.hidden ? this.focusedKey : this.rows()[0]?.dataset.conversation
+                {{-- Reads the reactive overrides and render count, so the tab stop moves to a neighbour when its row is hidden or refetched away. --}}
+                rovingKey() {
+                    const keys = this.renders >= 0 ? [...this.$root.querySelectorAll('[data-conversation]')].map((row) => row.dataset.conversation) : []
+                    const visible = (key) => ! this.isHidden(key)
+                    const index = keys.indexOf(this.focusedKey)
 
-                    return roving === key ? 0 : -1
+                    if (index === -1) {
+                        return keys.find(visible)
+                    }
+
+                    return keys.slice(index).find(visible) ?? keys.slice(0, index).reverse().find(visible)
+                },
+                tabIndexFor(key) {
+                    return this.rovingKey() === key ? 0 : -1
                 },
                 focusRow(row) {
                     row?.querySelector(':scope > button')?.focus()

@@ -5,7 +5,7 @@
     $scopes = array_map(fn (ShortcutScope $scope): array => ['scope' => $scope->value, 'label' => $scope->label()], ShortcutScope::cases());
 @endphp
 
-{{-- Lists only keys some component on this page handles, so a key with no handler never appears. --}}
+{{-- Lists only keys some component on this page handles and the off switch lets fire, so a dead key never appears. --}}
 <div
     data-shortcut-sheet
     x-data="{
@@ -40,7 +40,9 @@
                     rows: registrations
                         .filter((registration) => registration.scope === group.scope)
                         .flatMap((registration) => registration.entries)
-                        .filter((entry, index, entries) => entries.findIndex((other) => other.action === entry.action) === index),
+                        .filter((entry, index, entries) => entries.findIndex((other) => other.action === entry.action) === index)
+                        .map((entry) => ({ ...entry, keys: this.$store.shortcuts.liveKeys(entry) }))
+                        .filter((entry) => entry.keys.length > 0),
                 }))
                 .filter((group) => group.rows.length > 0)
         },
@@ -85,10 +87,7 @@
                         <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400" x-text="group.label"></h3>
                         <dl class="divide-y divide-gray-100 dark:divide-white/5">
                             <template x-for="row in group.rows" x-bind:key="row.action">
-                                <div
-                                    class="flex items-center justify-between gap-4 py-1.5 text-sm"
-                                    x-bind:class="row.character && ! $store.shortcuts.singleKeys && 'opacity-50'"
-                                >
+                                <div class="flex items-center justify-between gap-4 py-1.5 text-sm">
                                     <dt class="text-gray-700 dark:text-gray-200" x-text="row.label"></dt>
                                     <dd class="flex shrink-0 gap-1">
                                         <template x-for="key in row.keys" x-bind:key="key">

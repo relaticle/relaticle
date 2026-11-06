@@ -4,6 +4,8 @@ const scopeOrder = ['composer', 'reader', 'list', 'global']
 
 const blockers = '[role=dialog][aria-modal=true], [role=menu], [role=listbox], .fi-modal'
 
+const hasOpenDropdown = () => document.querySelector(".fi-dropdown-panel[style*='display: block']") !== null
+
 const isEditable = (target) =>
     ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName) || target?.isContentEditable === true
 
@@ -68,7 +70,7 @@ const createStore = () => ({
             return false
         }
 
-        if (event.target?.closest?.(blockers) || document.querySelector('.fi-modal-open')) {
+        if (event.target?.closest?.(blockers) || document.querySelector('.fi-modal-open') || hasOpenDropdown()) {
             return false
         }
 
@@ -95,7 +97,7 @@ const createStore = () => ({
             for (const registration of registrations) {
                 const entry = registration.entries.find((candidate) => candidate.keys.includes(key))
 
-                if (! entry || ! registration.isActive() || ! this.allows(event, entry)) {
+                if (! entry || ! registration.isActive() || ! this.allows(event, { editors: entry.editors, character: key.length === 1 })) {
                     continue
                 }
 
@@ -112,14 +114,16 @@ const createStore = () => ({
         return this.registrations.flatMap((registration) => registration.entries).find((entry) => entry.action === action)
     },
 
+    // The off switch acts per key, so a hint or the sheet never shows a key that will not fire.
+    liveKeys(entry) {
+        return entry.keys.filter((key) => this.singleKeys || key.length !== 1)
+    },
+
     keysFor(action) {
         const entry = this.entryFor(action)
+        const keys = entry ? this.liveKeys(entry) : []
 
-        if (! entry || (entry.character && ! this.singleKeys)) {
-            return null
-        }
-
-        return entry.keys.map((key) => (key.length === 1 ? key.toUpperCase() : key)).join(' ')
+        return keys.length > 0 ? keys.map((key) => (key.length === 1 ? key.toUpperCase() : key)).join(' ') : null
     },
 
     hint(action, label) {

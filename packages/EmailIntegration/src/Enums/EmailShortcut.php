@@ -26,7 +26,7 @@ enum EmailShortcut: string
         return match ($this) {
             self::Next => ['j'],
             self::Previous => ['k'],
-            self::Open => ['Enter', 'o'],
+            self::Open => ['o'],
             self::Close => ['Escape'],
             self::Reply => ['r'],
             self::ReplyAll => ['a'],
@@ -80,8 +80,8 @@ enum EmailShortcut: string
     public function isCharacterKey(): bool
     {
         return match ($this) {
-            self::Open, self::Close => false,
-            self::Next, self::Previous, self::Reply, self::ReplyAll, self::Forward, self::Done,
+            self::Close => false,
+            self::Next, self::Previous, self::Open, self::Reply, self::ReplyAll, self::Forward, self::Done,
             self::MarkUnread, self::FocusSearch, self::Compose, self::Help, self::Undo => true,
         };
     }
