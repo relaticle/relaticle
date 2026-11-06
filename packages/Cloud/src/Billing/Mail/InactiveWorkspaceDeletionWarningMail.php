@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Billing\Mail;
 
-use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
@@ -53,13 +52,6 @@ final class InactiveWorkspaceDeletionWarningMail extends Mailable implements Sho
 
     private function onDate(CarbonImmutable $moment): string
     {
-        return $moment->setTimezone($this->ownerTimezone())->format('M j, Y');
-    }
-
-    private function ownerTimezone(): string
-    {
-        $owner = $this->workspace->owner;
-
-        return $owner instanceof User ? $owner->effectiveTimezone() : (string) config('app.timezone');
+        return $moment->setTimezone($this->workspace->ownerTimezone())->format('M j, Y');
     }
 }

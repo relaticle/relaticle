@@ -6,7 +6,6 @@ namespace Relaticle\Cloud\Billing\Mail;
 
 use App\Enums\BillingStatus;
 use App\Enums\Plan;
-use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
@@ -119,14 +118,7 @@ final class ProEndedMail extends Mailable implements ShouldQueue
             return null;
         }
 
-        return $this->keptUntil->setTimezone($this->ownerTimezone())->format('M j, Y');
-    }
-
-    private function ownerTimezone(): string
-    {
-        $owner = $this->workspace->owner;
-
-        return $owner instanceof User ? $owner->effectiveTimezone() : (string) config('app.timezone');
+        return $this->keptUntil->setTimezone($this->workspace->ownerTimezone())->format('M j, Y');
     }
 
     private function isGrandfathered(): bool

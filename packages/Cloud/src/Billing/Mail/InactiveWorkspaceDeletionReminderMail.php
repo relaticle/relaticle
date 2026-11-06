@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Billing\Mail;
 
-use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
@@ -51,9 +50,6 @@ final class InactiveWorkspaceDeletionReminderMail extends Mailable implements Sh
 
     private function deletionDate(): string
     {
-        $owner = $this->workspace->owner;
-        $timezone = $owner instanceof User ? $owner->effectiveTimezone() : (string) config('app.timezone');
-
-        return $this->deletesAt->setTimezone($timezone)->format('M j, Y');
+        return $this->deletesAt->setTimezone($this->workspace->ownerTimezone())->format('M j, Y');
     }
 }

@@ -420,6 +420,13 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
         return BillingStatus::fromWorkspace($this);
     }
 
+    public function ownerTimezone(): string
+    {
+        $owner = $this->owner;
+
+        return $owner instanceof User ? $owner->effectiveTimezone() : (string) config('app.timezone');
+    }
+
     public function extensionEndsAt(): ?CarbonImmutable
     {
         return $this->trial_extended_at?->addDays(self::TRIAL_EXTENSION_DAYS);

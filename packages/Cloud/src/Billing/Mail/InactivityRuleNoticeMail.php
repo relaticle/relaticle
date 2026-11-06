@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Billing\Mail;
 
-use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
@@ -40,16 +39,9 @@ final class InactivityRuleNoticeMail extends Mailable implements ShouldQueue
         return new Content(
             markdown: 'cloud::mail.inactivity-rule-notice',
             with: [
-                'date' => $this->deletesAt->setTimezone($this->ownerTimezone())->format('M j, Y'),
+                'date' => $this->deletesAt->setTimezone($this->workspace->ownerTimezone())->format('M j, Y'),
                 'billingUrl' => Billing::getUrl(panel: 'app', tenant: $this->workspace),
             ],
         );
-    }
-
-    private function ownerTimezone(): string
-    {
-        $owner = $this->workspace->owner;
-
-        return $owner instanceof User ? $owner->effectiveTimezone() : (string) config('app.timezone');
     }
 }

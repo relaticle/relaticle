@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Relaticle\Cloud\Billing\Mail;
 
 use App\Enums\Plan;
-use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
@@ -56,20 +55,13 @@ final class ProTrialEndingSoonMail extends Mailable implements ShouldQueue
 
     private function endsOn(string $format): string
     {
-        return $this->endsAt->setTimezone($this->ownerTimezone())->format($format);
+        return $this->endsAt->setTimezone($this->workspace->ownerTimezone())->format($format);
     }
 
     private function zoneLabel(): string
     {
-        $timezone = $this->ownerTimezone();
+        $timezone = $this->workspace->ownerTimezone();
 
         return $timezone === 'UTC' ? 'UTC' : str_replace('_', ' ', Str::afterLast($timezone, '/'));
-    }
-
-    private function ownerTimezone(): string
-    {
-        $owner = $this->workspace->owner;
-
-        return $owner instanceof User ? $owner->effectiveTimezone() : (string) config('app.timezone');
     }
 }
