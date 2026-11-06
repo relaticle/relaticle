@@ -46,11 +46,8 @@ describe('plan card', function (): void {
             ->stepViews();
 
         expect($steps)->toHaveCount(3)
-            ->and(array_column($steps, 'position'))->toBe([1, 2, 3])
             ->and(array_column($steps, 'entity_type'))->toBe(['company', 'people', 'task'])
-            ->and(array_column($steps, 'recordLabel'))->toBe(['Northwind Traders', 'Priya Raman', 'Call Priya'])
-            ->and($steps[1]['isActive'])->toBeFalse()
-            ->and($steps[0]['isActive'])->toBeTrue();
+            ->and(array_column($steps, 'recordLabel'))->toBe(['Northwind Traders', 'Priya Raman', 'Call Priya']);
     });
 
     it('creates every record from one approval', function (): void {

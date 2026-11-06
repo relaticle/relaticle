@@ -589,9 +589,8 @@ final class ProposalCard extends BaseLivewireComponent
         $pendingIds = array_map(static fn (PendingAction $pending): string => (string) $pending->getKey(), $this->planSteps());
 
         return array_map(
-            fn (PendingAction $step, int $position): array => $this->stepView($step, $position + 1, $pendingIds),
+            fn (PendingAction $step): array => $this->stepView($step, $pendingIds),
             $steps,
-            array_keys($steps),
         );
     }
 
@@ -599,13 +598,12 @@ final class ProposalCard extends BaseLivewireComponent
      * @param  list<string>  $pendingIds
      * @return array<string, mixed>
      */
-    private function stepView(PendingAction $step, int $position, array $pendingIds): array
+    private function stepView(PendingAction $step, array $pendingIds): array
     {
         $entity = $step->entity_type;
 
         return [
             'id' => (string) $step->getKey(),
-            'position' => $position,
             'operation' => $step->operation->value,
             'entity_type' => $entity->value,
             'summary' => $this->stepSummary($step),
@@ -613,19 +611,14 @@ final class ProposalCard extends BaseLivewireComponent
             'recordLabel' => $this->stepRecordLabel($step),
             'fields' => $this->withOverwrittenValues($step, 0, $this->visibleRows($step, $this->recordFieldsOf($step))),
             'editableCodes' => $this->editableCodesOf($step),
-            'isActive' => (string) $step->getKey() === $this->activeStepId(),
             'needsOwnApproval' => $step->needsOwnApproval(),
             'isBatch' => ProposalPayload::from($step)->isBatch,
-            'recordCount' => $this->recordCountOf($step),
-            'remainingCount' => $this->remainingCountOf($step),
             'items' => $this->batchItemViews($step),
             'excludableCodes' => $this->excludableCodesOf($step),
             'titleKey' => $entity->titleKey(),
             'titleLabel' => $entity->titleLabel(),
             'entityNoun' => Str::lower($entity->singularName()),
             'deletes' => $entity->deletes($step->operation),
-            'confirmLabel' => $entity->confirmLabel($step->operation, $this->remainingCountOf($step)),
-            'declineLabel' => $entity->declineLabel(),
             'followUpLabel' => $entity->followUpLabel(),
             'refLinks' => $this->refLinksOf($step, $pendingIds),
             'overwriteNotices' => $this->overwriteNoticesOf($step),
@@ -744,7 +737,7 @@ final class ProposalCard extends BaseLivewireComponent
      * One row per still-undecided record of a batch step. Every record is its
      * own visible row, so nothing can be approved or left out unseen.
      *
-     * @return list<array{index: int, summary: string, label: string, isActive: bool, fields: list<array<string, mixed>>}>
+     * @return list<array{index: int, summary: string, label: string, fields: list<array<string, mixed>>}>
      */
     private function batchItemViews(PendingAction $step): array
     {
@@ -754,9 +747,7 @@ final class ProposalCard extends BaseLivewireComponent
             return [];
         }
 
-        $cursor = $this->cursorFor($step);
-
-        return array_map(function (int $index) use ($payload, $cursor, $step): array {
+        return array_map(function (int $index) use ($payload, $step): array {
             $display = $payload->displayAt($index);
             $summary = $display['summary'] ?? $display['title'] ?? __('Record :position', ['position' => $index + 1]);
             $fields = $display['fields'] ?? [];
@@ -765,7 +756,6 @@ final class ProposalCard extends BaseLivewireComponent
                 'index' => $index,
                 'summary' => is_string($summary) ? $summary : '',
                 'label' => $this->itemLabel($step->entity_type, $display),
-                'isActive' => $index === $cursor,
                 'fields' => $this->withOverwrittenValues($step, $index, $this->visibleRows($step, is_array($fields) ? array_values($fields) : [])),
             ];
         }, $this->unresolvedIndices($step));
