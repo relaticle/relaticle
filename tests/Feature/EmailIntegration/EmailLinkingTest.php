@@ -13,6 +13,8 @@ use Filament\Notifications\NotificationMailbox;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Sleep;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Relaticle\EmailIntegration\Actions\ApplyEmailLinkChanges;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
@@ -277,6 +279,60 @@ it('takes a suppressed link off the email when sync linking finds both', functio
 
     expect(linkSource($email, $this->company))->toBeNull()
         ->and($this->company->fresh()->email_count)->toBe(0);
+});
+
+it('reads the copies it unlinks only after the conversation lock is free', function (): void {
+    $email = linkingEmail($this->owner);
+    $email->companies()->attach($this->company->getKey(), ['link_source' => 'auto']);
+    $late = Email::factory()->make([
+        'id' => strtolower((string) Str::ulid()),
+        'workspace_id' => $this->workspace->getKey(),
+        'user_id' => $this->owner->getKey(),
+        'connected_account_id' => $email->connected_account_id,
+        'conversation_key' => 'airbnb-renewal',
+        'rfc_message_id' => '<renewal-late@airbnb.test>',
+        'direction' => EmailDirection::INBOUND,
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => EmailPrivacyTier::SUBJECT,
+        'is_internal' => false,
+        'sent_at' => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $row = array_map(fn (mixed $value): mixed => $value instanceof BackedEnum ? $value->value : $value, $late->getAttributes());
+    $insert = DB::table('emails')->getGrammar()->compileInsert(DB::table('emails'), [$row]);
+    $lock = DB::getQueryGrammar()->substituteBindingsIntoRawSql('select pg_advisory_xact_lock(?, hashtext(?))', [Email::CONVERSATION_LOCK_CLASS, $this->workspace->getKey().':airbnb-renewal']);
+    $waiting = 'select 1 from pg_locks where locktype = \'advisory\' and classid = '.Email::CONVERSATION_LOCK_CLASS.' and objsubid = 2 and database = (select oid from pg_database where datname = current_database())';
+    $connection = config('database.connections.'.config('database.default'));
+    $holder = pg_connect(sprintf("host='%s' port='%s' dbname='%s' user='%s' password='%s'", $connection['host'], $connection['port'], $connection['database'], $connection['username'], $connection['password']), PGSQL_CONNECT_FORCE_NEW);
+    $this->beforeApplicationDestroyed(function () use ($holder, $late): void {
+        pg_query_params($holder, 'delete from emails where id = $1', [$late->getKey()]);
+        pg_close($holder);
+    });
+
+    pg_send_query($holder, implode(";\n", [
+        'begin',
+        $lock,
+        "do \$\$ begin for attempt in 1..1000 loop exit when exists ({$waiting} and not granted); perform pg_sleep(0.01); end loop; end \$\$",
+        'set local session_replication_role = replica',
+        DB::getQueryGrammar()->substituteBindingsIntoRawSql($insert, array_values($row)),
+        'commit',
+    ]));
+
+    $deadline = now()->addSeconds(10);
+
+    while (DB::selectOne("select exists ({$waiting} and granted and pid <> pg_backend_pid()) as held")->held === false && now()->lessThan($deadline)) {
+        Sleep::for(10)->milliseconds();
+    }
+
+    $changed = resolve(UnlinkEmailFromRecord::class)->execute($this->owner, $email, $this->company);
+
+    while (($result = pg_get_result($holder)) !== false) {
+        expect(pg_result_error($result))->toBe('');
+    }
+
+    expect($changed)->toEqualCanonicalizing([$email->getKey() => 'auto', $late->getKey() => null])
+        ->and(EmailLinkSuppression::query()->where('email_id', $late->getKey())->exists())->toBeTrue();
 });
 
 it('takes every conversation lock of a batch in key order before it changes a link', function (): void {
