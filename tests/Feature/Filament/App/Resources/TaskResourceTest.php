@@ -588,7 +588,7 @@ it('offers the checklist in the task description slash menu', function (): void 
         ->and($item['group'])->toBe('Lists');
 });
 
-it('keeps the checklist out of a custom rich-text field on a task', function (): void {
+it('keeps the checklist and the document canvas out of a custom rich-text field on a task', function (): void {
     CustomField::factory()->create([
         'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'task',
@@ -610,7 +610,8 @@ it('keeps the checklist out of a custom rich-text field on a task', function ():
     $menu = json_decode(base64_decode(SlashMenuPlugin::attributes($agenda)['data-slash-menu']), associative: true);
 
     expect(collect($menu['items'])->pluck('id')->all())->not->toContain('taskList')
-        ->and(collect($agenda->getPlugins())->contains(fn (object $plugin): bool => $plugin instanceof ChecklistPlugin))->toBeFalse();
+        ->and(collect($agenda->getPlugins())->contains(fn (object $plugin): bool => $plugin instanceof ChecklistPlugin))->toBeFalse()
+        ->and($agenda->getExtraAttributes()['class'] ?? '')->not->toContain('fi-fo-rich-editor-seamless');
 });
 
 it('groups tasks by a select custom field and titles each group with its option label', function (string $code): void {
