@@ -21,6 +21,7 @@ return [
     ],
     'filters' => [
         'status' => 'Status',
+        'status_indicator' => 'Status: :status',
     ],
     'tabs' => [
         'queued' => 'Queued',

@@ -189,7 +189,7 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
             ->indicateUsing(function (array $state): Indicator {
                 $tab = OutboxTab::tryFrom((string) ($state['value'] ?? '')) ?? OutboxTab::QUEUED;
 
-                return Indicator::make(__('filament/pages/email-outbox.filters.status').': '.$tab->getLabel())
+                return Indicator::make(__('filament/pages/email-outbox.filters.status_indicator', ['status' => $tab->getLabel()]))
                     ->removable($tab !== OutboxTab::QUEUED);
             })
             ->query(fn (Builder $query, array $data): Builder => $this->applyStatusTab(

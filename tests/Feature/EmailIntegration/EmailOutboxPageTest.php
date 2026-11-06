@@ -298,9 +298,10 @@ it('names the status it shows and lets only a non-default one be removed', funct
     $component = livewire(OutboxTable::class)->filterTable('status_tab', $status);
 
     $indicators = $component->instance()->getTable()->getFilterIndicators();
+    $label = OutboxTab::from($status)->getLabel();
 
     expect($indicators)->toHaveCount(1)
-        ->and((string) $indicators[0]->getLabel())->toBe(__('filament/pages/email-outbox.filters.status').': '.OutboxTab::from($status)->getLabel())
+        ->and((string) $indicators[0]->getLabel())->toBe("Status: {$label}")
         ->and($indicators[0]->isRemovable())->toBe($removable);
 })->with([
     'queued' => ['queued', false],
