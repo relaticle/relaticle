@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "0dd9daeb969f6acf9efc8937b56f1f31",
+    "content-hash": "7e424cf8f2f408d60c53b3901bf257f6",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -10533,16 +10533,16 @@
         },
         {
             "name": "relaticle/custom-fields",
-            "version": "v3.16.2",
+            "version": "dev-fix/escape-uncoloured-option-labels",
             "source": {
                 "type": "git",
                 "url": "https://github.com/relaticle/custom-fields.git",
-                "reference": "e9881826c49f77b28566ee9248731e5f80b84234"
+                "reference": "60b58da40f64945c396f75b420b4a270b30e2663"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/relaticle/custom-fields/zipball/e9881826c49f77b28566ee9248731e5f80b84234",
-                "reference": "e9881826c49f77b28566ee9248731e5f80b84234",
+                "url": "https://api.github.com/repos/relaticle/custom-fields/zipball/60b58da40f64945c396f75b420b4a270b30e2663",
+                "reference": "60b58da40f64945c396f75b420b4a270b30e2663",
                 "shasum": ""
             },
             "require": {
@@ -10628,7 +10628,7 @@
                 "issues": "https://github.com/relaticle/custom-fields/issues",
                 "source": "https://github.com/relaticle/custom-fields"
             },
-            "time": "2026-11-05T21:35:49+00:00"
+            "time": "2026-11-06T11:24:31+00:00"
         },
         {
             "name": "relaticle/flowforge",
@@ -24447,11 +24447,18 @@
             "version": "dev-tia-warmup-worktrees",
             "alias": "5.3.0",
             "alias_normalized": "5.3.0.0"
+        },
+        {
+            "package": "relaticle/custom-fields",
+            "version": "dev-fix/escape-uncoloured-option-labels",
+            "alias": "3.16.3",
+            "alias_normalized": "3.16.3.0"
         }
     ],
     "minimum-stability": "beta",
     "stability-flags": {
         "pestphp/pest": 20,
+        "relaticle/custom-fields": 20,
         "spatie/guidelines-skills": 20
     },
     "prefer-stable": true,
