@@ -7,6 +7,7 @@ namespace Relaticle\Cloud\Billing\Mail;
 use App\Enums\BillingStatus;
 use App\Enums\Plan;
 use App\Models\Workspace;
+use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -16,6 +17,7 @@ use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\SerializesModels;
 use Relaticle\Cloud\Billing\Filament\Billing;
+use Relaticle\Cloud\Billing\Queries\InactiveTrialWorkspacesQuery;
 use Relaticle\Cloud\Billing\Queries\TrialUsageQuery;
 
 #[Tries(3)]
@@ -29,11 +31,19 @@ final class ProEndedMail extends Mailable implements ShouldQueue
         public BillingStatus $status,
         public ?Plan $plan = null,
         public bool $extended = false,
+        public ?CarbonImmutable $keptUntil = null,
     ) {}
 
     public static function afterTrial(Workspace $workspace): self
     {
-        return new self($workspace, BillingStatus::TrialEnded, extended: $workspace->trial_extended_at !== null);
+        return new self(
+            $workspace,
+            BillingStatus::TrialEnded,
+            extended: $workspace->trial_extended_at !== null,
+            keptUntil: resolve(InactiveTrialWorkspacesQuery::class)->isEligible($workspace)
+                ? $workspace->paused_at?->addDays(InactiveTrialWorkspacesQuery::KEEP_DAYS)
+                : null,
+        );
     }
 
     public static function afterSubscription(Workspace $workspace): self
@@ -67,6 +77,7 @@ final class ProEndedMail extends Mailable implements ShouldQueue
                 'ctaLabel' => $this->ctaLabel(),
                 'managedPlan' => $this->plan?->marketingLabel(),
                 'grandfathered' => $this->isGrandfathered(),
+                'keptOn' => $this->keptOnDate(),
                 'mailboxSyncPaused' => $this->workspace->hasConnectedMailbox(),
             ],
         );
@@ -99,6 +110,15 @@ final class ProEndedMail extends Mailable implements ShouldQueue
         return $this->offersExtension()
             ? __('mail.pro_ended.trial_ended.preheader', $this->replacements())
             : __('mail.pro_ended.extension_ended.preheader');
+    }
+
+    private function keptOnDate(): ?string
+    {
+        if (! $this->keptUntil instanceof CarbonImmutable) {
+            return null;
+        }
+
+        return $this->keptUntil->setTimezone($this->workspace->ownerTimezone())->format('M j, Y');
     }
 
     private function isGrandfathered(): bool

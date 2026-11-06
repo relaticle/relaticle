@@ -31,6 +31,7 @@ use Relaticle\Cloud\Billing\Actions\ExtendEndedTrial;
 use Relaticle\Cloud\Billing\Actions\StartProTrial;
 use Relaticle\Cloud\Billing\CreditPackCatalog;
 use Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal;
+use Relaticle\Cloud\Billing\Queries\InactiveTrialWorkspacesQuery;
 use Throwable;
 
 final class Billing extends Page
@@ -240,13 +241,14 @@ final class Billing extends Page
         ]);
     }
 
-    /** @return array{billingStatus: BillingStatus, lapsedPlan: ?Plan, mailboxSyncPaused: bool, trialExtensionAvailable: bool, otherWorkspaces: Collection<int, Workspace>} */
+    /** @return array{billingStatus: BillingStatus, deletesWhenInactive: bool, lapsedPlan: ?Plan, mailboxSyncPaused: bool, trialExtensionAvailable: bool, otherWorkspaces: Collection<int, Workspace>} */
     private function pausedViewData(Workspace $workspace): array
     {
         $billingStatus = $workspace->billingStatus();
 
         return [
             'billingStatus' => $billingStatus,
+            'deletesWhenInactive' => ! $workspace->isScheduledForDeletion() && resolve(InactiveTrialWorkspacesQuery::class)->isEligible($workspace),
             'lapsedPlan' => $billingStatus === BillingStatus::SubscriptionEnded ? $workspace->lapsedManagedPlan() : null,
             'mailboxSyncPaused' => $workspace->hasConnectedMailbox(),
             'trialExtensionAvailable' => $workspace->canExtendTrial(),

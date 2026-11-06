@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Admin\Actions;
 
+use App\Actions\Jetstream\CancelInactivityDeletion;
 use App\Enums\Plan;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +15,10 @@ use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 final readonly class ResetCreditPeriod
 {
-    public function __construct(private CreditService $credits) {}
+    public function __construct(
+        private CreditService $credits,
+        private CancelInactivityDeletion $cancelInactivityDeletion,
+    ) {}
 
     /**
      * @param  iterable<Workspace>  $workspaces
@@ -27,6 +31,10 @@ final readonly class ResetCreditPeriod
             foreach ($workspaces as $workspace) {
                 $workspace->plan = $plan;
                 $workspace->save();
+
+                if ($plan !== Plan::default()) {
+                    $this->cancelInactivityDeletion->execute($workspace);
+                }
 
                 $this->credits->resetPeriod($workspace, (string) $admin->getKey());
             }

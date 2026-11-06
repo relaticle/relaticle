@@ -11,9 +11,12 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Enums\MessageOrigin;
+use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Cloud\Billing\Filament\Billing;
 use Relaticle\Cloud\Billing\Mail\ProTrialEndingSoonMail;
 
@@ -82,6 +85,7 @@ it('renders the trial end time in the owner timezone with the paused-access outc
     $mail->assertSeeInHtml('Pro for Acme ends on Sep 9');
     $mail->assertSeeInHtml('Your Pro trial ends on Sep 9, 2026 at 2:30 PM (Berlin time).');
     $mail->assertSeeInHtml('After that, Acme pauses until you choose a plan.');
+    $mail->assertSeeInHtml('If no one signs in for 60 days after that, we delete the workspace and its records.');
     $mail->assertSeeInHtml('Questions? Reply to this email.');
     $mail->assertSeeInHtml('Choose a plan');
     $mail->assertSeeInHtml('One flat price covers the whole workspace.');
@@ -91,6 +95,16 @@ it('renders the trial end time in the owner timezone with the paused-access outc
     $mail->assertSeeInHtml(__('mail.footer.reason.owner', ['workspace' => 'Acme']));
     $mail->assertSeeInText('Choose a plan: '.Billing::getUrl(panel: 'app', tenant: $workspace));
 });
+
+it('states no 60-day rule to a workspace that bought a credit pack or owes a managed invoice', function (Closure $arrange): void {
+    $workspace = trialWorkspace();
+    $arrange($workspace);
+
+    endingSoonMail($workspace)->assertDontSeeInHtml('60 days');
+})->with([
+    'credit pack' => fn (Workspace $workspace): Model => AiCreditTransaction::factory()->create(['workspace_id' => $workspace->getKey(), 'type' => AiCreditType::Purchase]),
+    'managed invoice' => fn (Workspace $workspace): Model => $workspace->subscriptions()->create(['type' => 'managed_pending', 'stripe_id' => 'sub_managed', 'stripe_status' => 'incomplete', 'stripe_price' => 'price_pro_monthly_test', 'quantity' => 1]),
+]);
 
 it('names UTC when the owner has no city timezone', function (): void {
     $mail = endingSoonMail(trialWorkspace('UTC'));
@@ -110,6 +124,7 @@ it('describes the grandfathered outcome for grandfathered workspaces', function 
 
     $mail->assertSeeInHtml(__('mail.trial_ending.grandfathered', ['workspace' => 'Acme']));
     $mail->assertDontSeeInHtml('After that, Acme pauses');
+    $mail->assertDontSeeInHtml('60 days');
 });
 
 it('promises a return to Cloud Free in the preheader of a grandfathered workspace', function (): void {

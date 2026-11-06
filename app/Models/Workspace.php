@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Contracts\Entitlements;
 use App\Data\AiSettings;
 use App\Enums\BillingStatus;
+use App\Enums\DeletionReason;
 use App\Enums\MediaCollection;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
@@ -74,6 +75,10 @@ use Spatie\Sluggable\SlugOptions;
  * @property ?string $onboarding_referral_prompt
  * @property WorkspaceSetupStep|null $onboarding_step
  * @property CarbonImmutable|null $scheduled_deletion_at
+ * @property DeletionReason|null $deletion_reason
+ * @property CarbonImmutable|null $paused_at
+ * @property CarbonImmutable|null $inactivity_notice_sent_at
+ * @property CarbonImmutable|null $inactivity_reminded_at
  * @property ?string $stripe_id
  * @property ?string $pm_type
  * @property ?string $pm_last_four
@@ -246,6 +251,10 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
             'setup_nudge_sent_at' => 'datetime',
             'invite_link_token_expires_at' => 'datetime',
             'scheduled_deletion_at' => 'datetime',
+            'deletion_reason' => DeletionReason::class,
+            'paused_at' => 'datetime',
+            'inactivity_notice_sent_at' => 'datetime',
+            'inactivity_reminded_at' => 'datetime',
             'trial_ends_at' => 'datetime',
             'trial_extended_at' => 'datetime',
             'trial_reminded_for' => 'datetime',
@@ -374,6 +383,11 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
         return $this->scheduled_deletion_at !== null;
     }
 
+    public function isScheduledOnRequest(): bool
+    {
+        return $this->isScheduledForDeletion() && $this->deletion_reason !== DeletionReason::Inactivity;
+    }
+
     public function isDeletionDue(): bool
     {
         return $this->scheduled_deletion_at?->lessThanOrEqualTo(now()) ?? false;
@@ -381,7 +395,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
 
     public function queuePurge(): void
     {
-        $this->forceFill(['scheduled_deletion_at' => now()])->save();
+        $this->forceFill(['scheduled_deletion_at' => now(), 'deletion_reason' => DeletionReason::Requested])->save();
 
         dispatch(new PurgeWorkspace($this));
     }
@@ -406,6 +420,13 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
     public function billingStatus(): BillingStatus
     {
         return BillingStatus::fromWorkspace($this);
+    }
+
+    public function ownerTimezone(): string
+    {
+        $owner = $this->owner;
+
+        return $owner instanceof User ? $owner->effectiveTimezone() : (string) config('app.timezone');
     }
 
     public function extensionEndsAt(): ?CarbonImmutable
@@ -436,7 +457,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
     {
         return $this->trial_ends_at === null
             && $this->trial_extended_at === null
-            && ! $this->isScheduledForDeletion()
+            && ! $this->isScheduledOnRequest()
             && $this->billingStatus() === BillingStatus::TrialEnded;
     }
 
@@ -580,6 +601,29 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
     protected function scheduledForDeletion(Builder $query): Builder
     {
         return $query->whereNotNull('scheduled_deletion_at');
+    }
+
+    /**
+     * @param  Builder<Workspace>  $query
+     * @return Builder<Workspace>
+     */
+    #[Scope]
+    protected function scheduledForInactivity(Builder $query): Builder
+    {
+        return $query->where('deletion_reason', DeletionReason::Inactivity->value);
+    }
+
+    /**
+     * @param  Builder<Workspace>  $query
+     * @return Builder<Workspace>
+     */
+    #[Scope]
+    protected function scheduledOnRequest(Builder $query): Builder
+    {
+        return $query->whereNotNull('scheduled_deletion_at')
+            ->where(fn (Builder $reason): Builder => $reason
+                ->whereNull('deletion_reason')
+                ->orWhere('deletion_reason', '!=', DeletionReason::Inactivity->value));
     }
 
     /**

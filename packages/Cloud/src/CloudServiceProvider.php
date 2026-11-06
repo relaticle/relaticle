@@ -8,6 +8,7 @@ use App\Contracts\Billing as BillingContract;
 use App\Contracts\Entitlements;
 use App\Enums\Plan;
 use App\Events\WorkspaceCreated;
+use App\Events\WorkspaceDeleted;
 use App\Events\WorkspaceSetupCompleted;
 use App\Features\Billing;
 use App\Features\Documentation;
@@ -21,6 +22,7 @@ use Carbon\CarbonImmutable;
 use Filament\Auth\Events\Registered;
 use Filament\Panel;
 use Filament\View\PanelsRenderHook;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Foundation\Application;
@@ -44,12 +46,20 @@ use Relaticle\Cloud\Analytics\Actions\RecordAcquisition;
 use Relaticle\Cloud\Analytics\Attribution;
 use Relaticle\Cloud\Analytics\Http\Middleware\CaptureAcquisition;
 use Relaticle\Cloud\Analytics\Listeners\CaptureSubscriptionOutcome;
+use Relaticle\Cloud\Billing\Commands\AnnounceInactivityRuleCommand;
 use Relaticle\Cloud\Billing\Commands\ProcessTrialsCommand;
+use Relaticle\Cloud\Billing\Commands\ScheduleInactiveTrialDeletionsCommand;
 use Relaticle\Cloud\Billing\Filament\Billing as BillingPage;
 use Relaticle\Cloud\Billing\Filament\BillingPanelHooks;
 use Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal;
+use Relaticle\Cloud\Billing\Listeners\CancelInactivityDeletionOnLogin;
+use Relaticle\Cloud\Billing\Listeners\SendInactiveWorkspaceDeletedMail;
 use Relaticle\Cloud\Billing\Listeners\SyncPlanOnStripeSubscriptionChange;
 use Relaticle\Cloud\Billing\Livewire\UpgradeModal;
+use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletedMail;
+use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletionReminderMail;
+use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletionWarningMail;
+use Relaticle\Cloud\Billing\Mail\InactivityRuleNoticeMail;
 use Relaticle\Cloud\Billing\Mail\ProEndedMail;
 use Relaticle\Cloud\Billing\Mail\ProTrialEndingSoonMail;
 use Relaticle\Cloud\Billing\Notifications\ManagedInvoiceOverdueNotification;
@@ -108,11 +118,14 @@ final class CloudServiceProvider extends ServiceProvider
 
         Event::listen(WebhookHandled::class, [SyncPlanOnStripeSubscriptionChange::class, 'handle']);
         Event::listen(WebhookHandled::class, [CaptureSubscriptionOutcome::class, 'handle']);
+        Event::listen(Login::class, [CancelInactivityDeletionOnLogin::class, 'handle']);
+        Event::listen(WorkspaceDeleted::class, [SendInactiveWorkspaceDeletedMail::class, 'handle']);
 
-        $this->commands([ProcessTrialsCommand::class, GenerateSitemapCommand::class, ReportStaleCompetitorFactsCommand::class]);
+        $this->commands([ProcessTrialsCommand::class, ScheduleInactiveTrialDeletionsCommand::class, AnnounceInactivityRuleCommand::class, GenerateSitemapCommand::class, ReportStaleCompetitorFactsCommand::class]);
 
         $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {
             $schedule->command('billing:process-trials')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
+            $schedule->command('billing:schedule-inactive-deletions')->dailyAt('02:00')->withoutOverlapping()->onOneServer();
             $schedule->command('app:generate-sitemap')->daily()->onOneServer();
         });
 
@@ -260,6 +273,26 @@ final class CloudServiceProvider extends ServiceProvider
         MailPreview::register('extension-ended', static fn (User $owner, Workspace $workspace): Mailable => ProEndedMail::afterTrial(self::pausedTrial($workspace, now()->subWeek())));
 
         MailPreview::register('subscription-ended', static fn (User $owner, Workspace $workspace): Mailable => ProEndedMail::afterSubscription($workspace));
+
+        MailPreview::register('inactive-deletion-warning', static function (User $owner, Workspace $workspace): Mailable {
+            $workspace->setRelation('owner', $owner);
+
+            return new InactiveWorkspaceDeletionWarningMail($workspace, now()->addDays(14), now()->subDays(46));
+        });
+
+        MailPreview::register('inactive-deletion-reminder', static function (User $owner, Workspace $workspace): Mailable {
+            $workspace->setRelation('owner', $owner);
+
+            return new InactiveWorkspaceDeletionReminderMail($workspace, now()->addDays(5));
+        });
+
+        MailPreview::register('inactivity-rule-notice', static function (User $owner, Workspace $workspace): Mailable {
+            $workspace->setRelation('owner', $owner);
+
+            return new InactivityRuleNoticeMail($workspace, now()->addDays(60));
+        });
+
+        MailPreview::register('inactive-deleted', static fn (User $owner, Workspace $workspace): Mailable => new InactiveWorkspaceDeletedMail($workspace->name));
 
         MailPreview::register('contact-submission', static fn (): Mailable => new NewContactSubmissionMail([
             'name' => 'Ana Reyes',

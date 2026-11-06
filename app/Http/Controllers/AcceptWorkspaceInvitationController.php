@@ -42,7 +42,7 @@ final readonly class AcceptWorkspaceInvitationController
             return $this->render($request, $invitation);
         }
 
-        if ($invitation->workspace->isScheduledForDeletion()) {
+        if ($invitation->workspace->isScheduledOnRequest()) {
             return $this->render($request, $invitation);
         }
 
@@ -89,7 +89,7 @@ final readonly class AcceptWorkspaceInvitationController
             return $this->redirectToWorkspace($invitation->workspace, __('workspaces.accept.already_member', ['workspace' => $invitation->workspace->name]));
         }
 
-        if ($invitation->workspace->isScheduledForDeletion()) {
+        if ($invitation->workspace->isScheduledOnRequest()) {
             return response()->view('workspaces.workspace-deleting', ['workspaceName' => $invitation->workspace->name], 410);
         }
 

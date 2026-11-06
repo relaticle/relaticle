@@ -6,6 +6,10 @@
 {{ $managedPlan ? __('mail.pro_ended.managed_ended.grandfathered', ['workspace' => $workspace->name]) : __('mail.pro_ended.grandfathered', ['workspace' => $workspace->name]) }}
 @else
 {{ __($isTrial ? 'mail.pro_ended.trial_paused' : 'mail.pro_ended.paused', ['workspace' => $workspace->name]) }}
+@if($keptOn)
+
+{{ __('mail.pro_ended.kept', ['workspace' => $workspace->name, 'date' => $keptOn]) }}
+@endif
 @if($mailboxSyncPaused)
 
 {{ $managedPlan ? __('mail.pro_ended.managed_ended.mailbox_sync_paused', ['plan' => $managedPlan]) : __('mail.pro_ended.mailbox_sync_paused') }}

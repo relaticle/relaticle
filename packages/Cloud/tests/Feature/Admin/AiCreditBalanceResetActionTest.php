@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\DeletionReason;
 use App\Enums\Plan;
 use App\Models\Workspace;
 use Filament\Actions\Testing\TestAction;
@@ -138,3 +139,23 @@ it('warns that webhook sync restores a paid managed plan', function (): void {
         ->assertMountedActionModalSee('Webhook sync restores that plan over a Free grant')
         ->assertMountedActionModalDontSee('Start managed plan');
 });
+
+it('cancels an inactivity countdown when the reset grants a paid plan, and keeps an owner request', function (DeletionReason $reason, string $plan, bool $cancelled): void {
+    withHostedBilling();
+
+    $workspace = Workspace::factory()->create(['scheduled_deletion_at' => now()->addDays(14)->startOfSecond(), 'deletion_reason' => $reason]);
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->firstOr(fn (): AiCreditBalance => AiCreditBalance::factory()->create(['workspace_id' => $workspace->getKey()]));
+
+    livewire(ListAiCreditBalances::class)
+        ->callAction(TestAction::make('resetPeriod')->table($balance), ['plan' => $plan])
+        ->assertHasNoActionErrors();
+
+    $workspace->refresh();
+
+    expect($workspace->scheduled_deletion_at === null)->toBe($cancelled)
+        ->and($workspace->deletion_reason)->toBe($cancelled ? null : $reason);
+})->with([
+    'inactivity, pro' => [DeletionReason::Inactivity, 'pro', true],
+    'inactivity, free' => [DeletionReason::Inactivity, 'free', false],
+    'requested, pro' => [DeletionReason::Requested, 'pro', false],
+]);

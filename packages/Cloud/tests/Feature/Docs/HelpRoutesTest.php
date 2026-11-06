@@ -34,6 +34,18 @@ it('renders an article with its rendered body', function (): void {
         ->assertSee('Create your first company', false);
 });
 
+it('tells the reader a paused trial workspace is deleted after 60 days with no sign-in', function (): void {
+    $this->get('/help/workspace/billing-and-plans')
+        ->assertOk()
+        ->assertSeeText('We keep a paused trial workspace for 60 days after the last sign-in. If no one signs in or chooses a plan in that time, we delete it and its records. We email the owner twice first.');
+});
+
+it('says the personal workspace cannot be deleted from the delete page only', function (): void {
+    $this->get('/help/workspace/rename-or-delete-your-workspace')
+        ->assertOk()
+        ->assertSeeText("You can't delete your original personal workspace from this page.");
+});
+
 it('offers a direct contact path from the hub and the article footer', function (): void {
     $this->get('/help')
         ->assertOk()

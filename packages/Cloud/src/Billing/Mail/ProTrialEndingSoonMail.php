@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Relaticle\Cloud\Billing\Mail;
 
 use App\Enums\Plan;
-use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
@@ -18,6 +17,7 @@ use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Str;
 use Relaticle\Cloud\Billing\Filament\Billing;
+use Relaticle\Cloud\Billing\Queries\InactiveTrialWorkspacesQuery;
 use Relaticle\Cloud\Billing\Queries\TrialUsageQuery;
 
 #[Tries(3)]
@@ -48,26 +48,20 @@ final class ProTrialEndingSoonMail extends Mailable implements ShouldQueue
                 'usage' => resolve(TrialUsageQuery::class)->forWorkspace($this->workspace),
                 'billingUrl' => Billing::getUrl(panel: 'app', tenant: $this->workspace),
                 'grandfathered' => $this->workspace->hosted_free_grandfathered_at !== null,
+                'deletesWhenInactive' => ! resolve(InactiveTrialWorkspacesQuery::class)->isExempt($this->workspace),
             ],
         );
     }
 
     private function endsOn(string $format): string
     {
-        return $this->endsAt->setTimezone($this->ownerTimezone())->format($format);
+        return $this->endsAt->setTimezone($this->workspace->ownerTimezone())->format($format);
     }
 
     private function zoneLabel(): string
     {
-        $timezone = $this->ownerTimezone();
+        $timezone = $this->workspace->ownerTimezone();
 
         return $timezone === 'UTC' ? 'UTC' : str_replace('_', ' ', Str::afterLast($timezone, '/'));
-    }
-
-    private function ownerTimezone(): string
-    {
-        $owner = $this->workspace->owner;
-
-        return $owner instanceof User ? $owner->effectiveTimezone() : (string) config('app.timezone');
     }
 }

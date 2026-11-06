@@ -7,6 +7,9 @@ use App\Enums\Plan;
 use App\Models\Company;
 use App\Models\User;
 use App\Models\Workspace;
+use Illuminate\Database\Eloquent\Model;
+use Relaticle\Chat\Enums\AiCreditType;
+use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Cloud\Billing\Filament\Billing;
 use Relaticle\Cloud\Billing\Mail\ProEndedMail;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -27,7 +30,8 @@ function proEndedWorkspace(array $attributes = []): Workspace
 }
 
 it('tells the owner the trial ended, the workspace is paused, and how to reopen it', function (): void {
-    $workspace = proEndedWorkspace();
+    $this->travelTo('2026-09-06 12:00:00');
+    $workspace = proEndedWorkspace(['paused_at' => now()]);
     $billingUrl = Billing::getUrl(panel: 'app', tenant: $workspace);
 
     $mail = ProEndedMail::afterTrial($workspace);
@@ -36,6 +40,7 @@ it('tells the owner the trial ended, the workspace is paused, and how to reopen 
     $mail->assertSeeInHtml('Your Pro trial for Acme has ended');
     $mail->assertSeeInHtml('Your records are safe. Choose a plan, or extend the trial by 7 days.');
     $mail->assertSeeInHtml('Acme is paused. Your records are safe.');
+    $mail->assertSeeInHtml('If no one signs in, we delete Acme on Nov 5, 2026. Choose a plan before then to keep it.');
     $mail->assertSeeInHtml(__('mail.trial_ending.keeps', ['credits' => number_format(Plan::Pro->credits())]));
     $mail->assertSeeInHtml('Choose a plan');
     $mail->assertSeeInHtml('Need more time?');
@@ -48,6 +53,50 @@ it('tells the owner the trial ended, the workspace is paused, and how to reopen 
     $mail->assertDontSeeInHtml('mail.pro_ended.');
 
     expect($mail->envelope()->subject)->not->toStartWith('mail.');
+});
+
+it('dates the 60-day line from the pause in the owner timezone', function (): void {
+    $workspace = proEndedWorkspace(['paused_at' => '2026-09-06 23:30:00']);
+    $workspace->owner->forceFill(['timezone' => 'Pacific/Auckland'])->save();
+
+    ProEndedMail::afterTrial($workspace->refresh())->assertSeeInHtml('on Nov 6, 2026. Choose a plan before then to keep it.');
+});
+
+it('states no 60-day rule when the workspace was never paused', function (): void {
+    ProEndedMail::afterTrial(proEndedWorkspace())->assertDontSeeInHtml('60 days');
+});
+
+it('states no 60-day rule to a workspace that bought a credit pack or owes a managed invoice', function (Closure $arrange): void {
+    $workspace = proEndedWorkspace(['paused_at' => now()]);
+    $arrange($workspace);
+
+    ProEndedMail::afterTrial($workspace)->assertDontSeeInHtml('60 days');
+})->with([
+    'credit pack' => fn (Workspace $workspace): Model => AiCreditTransaction::factory()->create(['workspace_id' => $workspace->getKey(), 'type' => AiCreditType::Purchase]),
+    'managed invoice' => fn (Workspace $workspace): Model => $workspace->subscriptions()->create(['type' => 'managed_pending', 'stripe_id' => 'sub_managed', 'stripe_status' => 'incomplete', 'stripe_price' => 'price_pro_monthly_test', 'quantity' => 1]),
+]);
+
+it('keeps the date chosen when the mail was built, even if the pause date moves before it renders', function (): void {
+    $workspace = proEndedWorkspace(['paused_at' => '2026-09-06 12:00:00']);
+    $mail = ProEndedMail::afterTrial($workspace);
+
+    $workspace->forceFill(['paused_at' => '2026-09-20 12:00:00'])->save();
+
+    $mail->assertSeeInHtml('on Nov 5, 2026. Choose a plan before then to keep it.');
+});
+
+it('states the 60-day rule on an extended trial that ended', function (): void {
+    $mail = ProEndedMail::afterTrial(proEndedWorkspace(['trial_extended_at' => now()->subWeek(), 'paused_at' => now()]));
+
+    $mail->assertSeeInHtml('Choose a plan before then to keep it.');
+});
+
+it('states no 60-day rule for a grandfathered workspace, a subscription or a managed plan', function (): void {
+    $grandfathered = proEndedWorkspace(['hosted_free_grandfathered_at' => now()->subYear()]);
+
+    ProEndedMail::afterTrial($grandfathered)->assertDontSeeInHtml('60 days');
+    ProEndedMail::afterSubscription(proEndedWorkspace())->assertDontSeeInHtml('60 days');
+    ProEndedMail::afterManagedPlan(proEndedWorkspace(), Plan::Enterprise)->assertDontSeeInHtml('60 days');
 });
 
 it('drops the extension offer once the trial was extended', function (): void {

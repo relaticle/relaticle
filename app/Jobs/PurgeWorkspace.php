@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Actions\Jetstream\CancelInactivityDeletion;
+use App\Contracts\Billing;
+use App\Enums\DeletionReason;
 use App\Models\Workspace;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -35,16 +38,30 @@ final class PurgeWorkspace implements ShouldBeUnique, ShouldQueue
         return $this->workspace->getKey();
     }
 
-    public function handle(DeletesTeams $deletesWorkspaces): void
+    public function handle(DeletesTeams $deletesWorkspaces, Billing $billing, CancelInactivityDeletion $cancelInactivityDeletion): void
     {
-        if (! $this->workspace->isDeletionDue()) {
-            return;
-        }
+        $purged = DB::transaction(function () use ($deletesWorkspaces, $billing, $cancelInactivityDeletion): bool {
+            $workspace = Workspace::query()->whereKey($this->workspace->getKey())->lockForUpdate()->first();
 
-        DB::transaction(function () use ($deletesWorkspaces): void {
-            $deletesWorkspaces->delete($this->workspace);
+            if (! $workspace instanceof Workspace || ! $workspace->isDeletionDue()) {
+                return false;
+            }
+
+            if ($workspace->deletion_reason === DeletionReason::Inactivity && ! $billing->inactivityDeletionStands($workspace)) {
+                $cancelInactivityDeletion->execute($workspace);
+
+                Log::info('Cancelled an inactivity deletion that no longer stands', ['workspace_id' => $workspace->getKey()]);
+
+                return false;
+            }
+
+            $deletesWorkspaces->delete($workspace);
+
+            return true;
         });
 
-        Log::info('Purged workspace', ['workspace_id' => $this->workspace->getKey(), 'name' => $this->workspace->name]);
+        if ($purged) {
+            Log::info('Purged workspace', ['workspace_id' => $this->workspace->getKey(), 'name' => $this->workspace->name]);
+        }
     }
 }

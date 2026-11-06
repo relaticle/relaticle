@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Billing\Actions;
 
+use App\Actions\Jetstream\CancelInactivityDeletion;
 use App\Enums\Plan;
 use App\Enums\StripeSubscriptionStatus;
 use App\Enums\SubscriptionType;
@@ -20,7 +21,10 @@ use Relaticle\Cloud\Billing\Mail\ProEndedMail;
 
 final readonly class SyncWorkspacePlanFromSubscription
 {
-    public function __construct(private CreditService $credits) {}
+    public function __construct(
+        private CreditService $credits,
+        private CancelInactivityDeletion $cancelInactivityDeletion,
+    ) {}
 
     public function execute(Workspace $workspace, Subscription $subscription): void
     {
@@ -55,6 +59,10 @@ final readonly class SyncWorkspacePlanFromSubscription
             $workspace->save();
 
             $this->grantPlanCredits($workspace, $subscription);
+
+            if ($target !== Plan::default()) {
+                $this->cancelInactivityDeletion->execute($workspace);
+            }
 
             Log::info('Workspace plan synced from Stripe subscription', [
                 'workspace_id' => $workspace->getKey(),

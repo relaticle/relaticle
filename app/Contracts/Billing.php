@@ -20,4 +20,6 @@ interface Billing
     public function blocksDeletion(Workspace $workspace): bool;
 
     public function deletionNotice(Workspace $workspace): ?string;
+
+    public function inactivityDeletionStands(Workspace $workspace): bool;
 }
