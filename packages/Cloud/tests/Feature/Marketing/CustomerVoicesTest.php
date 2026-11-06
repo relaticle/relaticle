@@ -9,6 +9,9 @@ mutates(CloudServiceProvider::class);
 
 describe('Customer voices', function (): void {
     it('renders nothing while the customer config is empty', function (): void {
+        config()->set('marketing.testimonials', []);
+        config()->set('marketing.logos', []);
+
         $html = view('cloud::marketing.home.partials.customer-voices')->render();
 
         expect(trim($html))->toBe('');
