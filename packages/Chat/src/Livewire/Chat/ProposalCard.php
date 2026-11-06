@@ -978,8 +978,10 @@ final class ProposalCard extends BaseLivewireComponent
 
         $this->announceLeftOut($affectedIds, $leftOutRows);
 
+        $receipts = $result['approved'] === [] ? [] : $this->receiptsFor($anchor);
+
         foreach ($result['approved'] as $step) {
-            $this->announceResolution($step, 'approved');
+            $this->announceResolution($step, 'approved', $receipts);
         }
 
         if ($result['failed'] !== null) {
@@ -1477,10 +1479,12 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         }
 
-        $this->announceResolution($step, 'rejected');
+        $receipts = $this->receiptsFor($step);
+
+        $this->announceResolution($step, 'rejected', $receipts);
 
         foreach ($cancelled as $cancelledStep) {
-            $this->announceResolution($cancelledStep, 'rejected');
+            $this->announceResolution($cancelledStep, 'rejected', $receipts);
         }
 
         $this->settleAfterResolution($step);
@@ -1715,7 +1719,10 @@ final class ProposalCard extends BaseLivewireComponent
         return resolve(ProposalReceiptsQuery::class)->forPlanOf($step);
     }
 
-    private function announceResolution(PendingAction $step, string $decision): void
+    /**
+     * @param  array<string, array<string, mixed>>|null  $receipts
+     */
+    private function announceResolution(PendingAction $step, string $decision, ?array $receipts = null): void
     {
         $record = null;
 
@@ -1742,7 +1749,7 @@ final class ProposalCard extends BaseLivewireComponent
             finalized: true,
             record: $record,
             cancelledBy: is_string($cancelledBy) ? $cancelledBy : null,
-            receipts: $this->receiptsFor($step),
+            receipts: $receipts ?? $this->receiptsFor($step),
             context: $this->context,
         );
     }
