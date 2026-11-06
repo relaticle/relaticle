@@ -57,7 +57,9 @@ final class SlashMenuPlugin implements RichContentPlugin
                 continue;
             }
 
-            $tool ??= throw new LogicException("Slash menu item [{$name}] is not a rich editor tool.");
+            if ($tool === null) {
+                throw new LogicException("Slash menu item [{$name}] is not a rich editor tool.");
+            }
 
             $items[] = [
                 'id' => $name,
