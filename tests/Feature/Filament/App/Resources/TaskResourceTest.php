@@ -366,6 +366,38 @@ it('notifies only the member newly assigned through the edit action', function (
         ->and($kept->notifications()->count())->toBe(0);
 });
 
+it('removes one assignee, then clears every assignee, through the edit action', function (): void {
+    [$kept, $removed] = User::factory()->count(2)->create()->all();
+    $this->workspace->users()->attach([$kept->id, $removed->id], ['role' => 'member']);
+
+    $record = Task::factory()->recycle([$this->user, $this->workspace])->create();
+    $record->assignees()->attach([$kept->id, $removed->id]);
+
+    livewire(ManageTasks::class)
+        ->callAction(TestAction::make('edit')->table($record), data: ['assignees' => [$kept->id]])
+        ->assertHasNoActionErrors();
+
+    expect($record->refresh()->assignees->modelKeys())->toBe([$kept->id]);
+
+    livewire(ManageTasks::class)
+        ->callAction(TestAction::make('edit')->table($record), data: ['assignees' => []])
+        ->assertHasNoActionErrors();
+
+    expect($record->refresh()->assignees)->toBeEmpty();
+});
+
+it('rejects an edit payload naming an assignee outside the workspace', function (): void {
+    $outsider = User::factory()->withWorkspace()->create();
+    $record = Task::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire(ManageTasks::class)
+        ->callAction(TestAction::make('edit')->table($record), data: ['assignees' => [$outsider->id]])
+        ->assertHasActionErrors(['assignees.0']);
+
+    expect($record->refresh()->assignees)->toBeEmpty()
+        ->and($outsider->notifications()->count())->toBe(0);
+});
+
 it('can delete a task', function (): void {
     $record = Task::factory()->recycle([$this->user, $this->workspace])->create();
 
