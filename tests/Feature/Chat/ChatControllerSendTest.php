@@ -8,12 +8,14 @@ use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
+use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Http\Controllers\ChatController;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Services\CreditService;
 use Tests\Helpers\ChatDocument;
 
-mutates(ChatController::class);
+mutates(ChatController::class, ProcessChatMessage::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();
@@ -160,3 +162,79 @@ it('silently drops mentions whose records do not belong to the current workspace
         return $job->mentions === [];
     });
 });
+
+function seedSendableConversation(): string
+{
+    $conversationId = (string) Str::uuid7();
+
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) test()->user->getKey(),
+        'workspace_id' => test()->workspace->getKey(),
+        'title' => 'seed',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    return $conversationId;
+}
+
+it('records which setup button sent a message', function (): void {
+    Queue::fake();
+    $conversationId = seedSendableConversation();
+
+    $this->postJson(route('chat.send'), [
+        'conversation_id' => $conversationId,
+        'document' => ChatDocument::fromText('Pick who to work on first'),
+        'next_step' => 'pick_first',
+    ])->assertOk();
+
+    Queue::assertPushed(ProcessChatMessage::class, fn (ProcessChatMessage $job): bool => $job->nextStep === 'pick_first');
+
+    CrmAssistant::fake(['Done.']);
+    Queue::pushed(ProcessChatMessage::class)->sole()->handle(resolve(CreditService::class));
+
+    $userRow = DB::table('agent_conversation_messages')
+        ->where('conversation_id', $conversationId)
+        ->where('role', 'user')
+        ->sole();
+
+    expect(json_decode((string) $userRow->meta, true)['next_step'])->toBe('pick_first');
+});
+
+it('leaves the user row without a next step when no button sent the message', function (): void {
+    Queue::fake();
+    $conversationId = seedSendableConversation();
+
+    $this->postJson(route('chat.send'), [
+        'conversation_id' => $conversationId,
+        'document' => ChatDocument::fromText('Typed by hand'),
+    ])->assertOk();
+
+    CrmAssistant::fake(['Done.']);
+    Queue::pushed(ProcessChatMessage::class)->sole()->handle(resolve(CreditService::class));
+
+    $userRow = DB::table('agent_conversation_messages')
+        ->where('conversation_id', $conversationId)
+        ->where('role', 'user')
+        ->sole();
+
+    expect(json_decode((string) $userRow->meta, true))->not->toHaveKey('next_step');
+});
+
+it('rejects a malformed next step id', function (string $nextStep): void {
+    Queue::fake();
+
+    $this->postJson(route('chat.send'), [
+        'conversation_id' => seedSendableConversation(),
+        'document' => ChatDocument::fromText('hi'),
+        'next_step' => $nextStep,
+    ])->assertStatus(422)->assertJsonValidationErrors('next_step');
+
+    Queue::assertNothingPushed();
+})->with([
+    'spaces and punctuation' => ['Pick First!'],
+    'uppercase' => ['PICK_FIRST'],
+    'too long' => [str_repeat('a', 41)],
+]);

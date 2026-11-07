@@ -75,17 +75,24 @@ final readonly class ChatController
         return ['auto', ...array_map(static fn (ModelDescriptor $m): string => $m->id, $this->registry->all())];
     }
 
-    public function send(Request $request, ?string $conversation = null): JsonResponse
+    /** @return array<string, list<mixed>> */
+    private function sendRules(): array
     {
-        $validated = $request->validate([
+        return [
             'document' => ['required', 'array'],
             'model' => ['nullable', 'string', Rule::in($this->modelIds())],
             'conversation_id' => ['nullable', 'string', 'uuid'],
             'attachment_id' => ['nullable', 'string', 'uuid'],
+            'next_step' => ['nullable', 'string', 'max:40', 'regex:/^[a-z_]+$/'],
             'page_context' => ['nullable', 'array'],
             'page_context.type' => ['required_with:page_context', 'string', 'max:32'],
             'page_context.id' => ['required_with:page_context', 'string', 'max:26'],
-        ]);
+        ];
+    }
+
+    public function send(Request $request, ?string $conversation = null): JsonResponse
+    {
+        $validated = $request->validate($this->sendRules());
 
         /** @var User $user */
         $user = $request->user();
@@ -234,6 +241,7 @@ final readonly class ChatController
             pageContext: $pageContext,
             turnId: $turnId,
             attachment: $attachment?->meta(),
+            nextStep: $validated['next_step'] ?? null,
         ));
 
         if ($attachment instanceof ChatAttachment) {

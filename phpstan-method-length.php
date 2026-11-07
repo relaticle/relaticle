@@ -30,7 +30,7 @@ return [
                 'App\Support\CustomFieldOptionPlan::validated' => 114,
                 'Relaticle\Chat\Queries\ConversationMessagesQuery::get' => 88,
                 'Relaticle\Chat\Agents\CrmAssistant::staticInstructions' => 110,
-                'Relaticle\Chat\Http\Controllers\ChatController::send' => 170,
+                'Relaticle\Chat\Http\Controllers\ChatController::send' => 163,
                 'Relaticle\Chat\Http\Controllers\ChatController::supersedeMessages' => 62,
                 'Relaticle\Chat\Jobs\ProcessChatMessage::process' => 135,
                 'Relaticle\Chat\Jobs\ProcessChatMessage::persistFailedTurn' => 69,

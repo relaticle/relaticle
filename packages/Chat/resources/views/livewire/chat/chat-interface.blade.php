@@ -193,6 +193,10 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     // and only one of them can be on screen. Seeded from the last assistant row
     // on mount, replaced by the `.next_steps` broadcast, emptied on every send.
     nextSteps: [],
+    pendingNextStepId: null,
+    isSetupConversation: @js($isSetupConversation),
+    {{-- Each icon carries its own size: an SVG that arrives as a string collapses to 0x0 in WebKit without one. --}}
+    setupButtonIcons: @js(collect(\Relaticle\Chat\Data\SetupOption::ICONS)->mapWithKeys(fn (string $name): array => [$name => svg($name, 'size-4 shrink-0')->toHtml()])->all()),
     @include('chat::livewire.chat.partials._model-state', ['persistSelection' => true])
     pageContext: @js($pageContextType && $pageContextId ? ['type' => $pageContextType, 'id' => $pageContextId] : null),
     pageContextLabel: @js($pageContextLabel),

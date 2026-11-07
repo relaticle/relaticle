@@ -416,3 +416,26 @@ it('reads a stored link button and drops one without a url', function (): void {
         ['id' => 'upload_file', 'kind' => 'link', 'label' => 'Upload my file', 'prompt' => null, 'url' => 'https://app.test/import', 'icon' => 'heroicon-o-arrow-up-tray'],
     ]);
 });
+
+it('draws every option with an icon the chat ships', function (): void {
+    ConnectedAccount::factory()->create(['workspace_id' => $this->workspace->getKey(), 'user_id' => $this->user->getKey()]);
+
+    $icons = [];
+
+    foreach (OnboardingDataSource::cases() as $source) {
+        answeredWith($source);
+
+        foreach (resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh()) as $option) {
+            $icons[] = $option->icon;
+        }
+    }
+
+    arrivedFrom(CreationSource::IMPORT);
+
+    foreach (resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh()) as $option) {
+        $icons[] = $option->icon;
+    }
+
+    expect(array_values(array_unique($icons)))->not->toBeEmpty()
+        ->and(array_diff($icons, SetupOption::ICONS))->toBe([]);
+});

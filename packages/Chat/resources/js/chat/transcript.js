@@ -244,7 +244,33 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         if (!step?.prompt || this.isStreaming || this.rateLimit) return;
         this.input = step.prompt;
         this.localEditor()?.setText(step.prompt);
-        this.$nextTick(() => this.sendMessage());
+        this.$nextTick(() => {
+            // sendMessage() reads the id before its first await, so clearing it
+            // right after the call keeps a send it refused from tagging the next one.
+            this.pendingNextStepId = step.id ?? null;
+            this.sendMessage();
+            this.pendingNextStepId = null;
+        });
+    },
+
+    // The setup chat offers its options as bordered buttons. Plain suggester
+    // chips in the same conversation carry no id and keep the quiet list.
+    showsSetupButtons() {
+        return this.isSetupConversation
+            && this.nextSteps.length > 0
+            && this.nextSteps.every((step) => !!step.id);
+    },
+
+    // Only an http(s) address becomes a link: the row comes from stored meta.
+    nextStepLink(step) {
+        if (step?.kind !== 'link' || !step.url) return null;
+        try {
+            const url = new URL(step.url, window.location.href);
+            if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+            return { href: step.url, external: url.origin !== window.location.origin };
+        } catch {
+            return null;
+        }
     },
 
     // Normalizes a server-fetched message row for the transcript: stable

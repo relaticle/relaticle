@@ -12,6 +12,7 @@ use Illuminate\Support\Str;
 use Livewire\Attributes\Renderless;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AgentConversationMessage;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Queries\ConversationMessagesQuery;
@@ -50,6 +51,8 @@ final class ChatInterface extends BaseLivewireComponent
      * the streaming state and arm the watchdog from the first paint.
      */
     public bool $turnInFlight = false;
+
+    public bool $isSetupConversation = false;
 
     public string $context = 'conversation';
 
@@ -104,6 +107,11 @@ final class ChatInterface extends BaseLivewireComponent
             $this->oldestMessageId = $this->messages === [] ? null : ($this->messages[0]['id'] ?? null);
             $this->hasMoreMessages = count($this->messages) === self::PAGE_SIZE;
             $this->appendInFlightTurnState($this->conversationId);
+            $this->isSetupConversation = AgentConversation::query()
+                ->ownedBy($this->authUser())
+                ->whereKey($this->conversationId)
+                ->setup()
+                ->exists();
             $this->greetIfSetupConversation($this->conversationId);
         }
     }

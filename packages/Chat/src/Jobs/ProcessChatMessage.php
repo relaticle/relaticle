@@ -103,6 +103,7 @@ final class ProcessChatMessage implements ShouldQueue
         public readonly ?string $resumesTurnId = null,
         public readonly ?array $attachment = null,
         public readonly ?string $claimKey = null,
+        public readonly ?string $nextStep = null,
     ) {
         $this->onConnection('redis-chat');
         $this->onQueue('chat');
@@ -373,7 +374,7 @@ final class ProcessChatMessage implements ShouldQueue
 
                 $this->persistMentions($streamedResponse->userMessageId);
                 $this->persistUserDocument($streamedResponse->userMessageId);
-                $this->persistUserAttachment($streamedResponse->userMessageId);
+                $this->persistUserMeta($streamedResponse->userMessageId);
                 $this->materializeAssistantDocument($streamedResponse, $startedAt);
                 $this->maybeTitleFromTurn($streamedResponse);
                 $this->suggestNextSteps($streamedResponse);
@@ -598,6 +599,7 @@ final class ProcessChatMessage implements ShouldQueue
             resumesTurnId: $this->resumesTurnId,
             attachment: $this->attachment,
             claimKey: $this->claimKey,
+            nextStep: $this->nextStep,
         ));
     }
 
@@ -688,9 +690,12 @@ final class ProcessChatMessage implements ShouldQueue
      * note, and are accepted rather than solved with more machinery.
      */
     /** @return array<string, mixed> */
-    private function failedTurnUserMeta(): array
+    private function userRowMeta(): array
     {
-        return $this->attachment === null ? [] : ['attachment' => $this->attachment];
+        return array_filter([
+            'attachment' => $this->attachment,
+            'next_step' => $this->nextStep,
+        ], static fn (mixed $value): bool => $value !== null);
     }
 
     private function persistFailedTurn(?Throwable $exception): void
@@ -734,7 +739,7 @@ final class ProcessChatMessage implements ShouldQueue
                 'attachments' => '[]',
                 'steps' => '[]',
                 'usage' => '[]',
-                'meta' => json_encode($this->failedTurnUserMeta(), JSON_THROW_ON_ERROR),
+                'meta' => json_encode($this->userRowMeta(), JSON_THROW_ON_ERROR),
                 'document' => json_encode($this->document, JSON_THROW_ON_ERROR),
                 'origin' => $this->origin->value,
                 'created_at' => $now,
@@ -891,23 +896,19 @@ final class ProcessChatMessage implements ShouldQueue
             ->update(['document' => json_encode($this->document, JSON_THROW_ON_ERROR)]);
     }
 
-    private function persistUserAttachment(?string $userMessageId): void
+    private function persistUserMeta(?string $userMessageId): void
     {
-        if ($this->attachment === null) {
-            return;
-        }
+        $additions = $this->userRowMeta();
 
-        if ($userMessageId === null) {
+        if ($additions === [] || $userMessageId === null) {
             return;
         }
 
         $existing = json_decode((string) DB::table('agent_conversation_messages')->where('id', $userMessageId)->value('meta'), associative: true);
-        $meta = is_array($existing) ? $existing : [];
-        $meta['attachment'] = $this->attachment;
 
         DB::table('agent_conversation_messages')
             ->where('id', $userMessageId)
-            ->update(['meta' => json_encode($meta, JSON_THROW_ON_ERROR)]);
+            ->update(['meta' => json_encode([...(is_array($existing) ? $existing : []), ...$additions], JSON_THROW_ON_ERROR)]);
     }
 
     /**

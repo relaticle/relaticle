@@ -10,6 +10,19 @@ final readonly class SetupOption
 
     public const string KIND_LINK = 'link';
 
+    /** @var list<string> */
+    public const array ICONS = [
+        'heroicon-o-flag',
+        'heroicon-o-clock',
+        'heroicon-o-building-office-2',
+        'heroicon-o-briefcase',
+        'heroicon-o-envelope',
+        'heroicon-o-user-plus',
+        'heroicon-o-clipboard-document',
+        'heroicon-o-arrow-top-right-on-square',
+        'heroicon-o-arrow-up-tray',
+    ];
+
     public function __construct(
         public string $id,
         public string $kind,
