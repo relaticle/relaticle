@@ -24,8 +24,9 @@ const placed = (fraction) => {
     return `translate(${offset} ${offset}) scale(${scale})`;
 };
 const placement = placed(0.74);
+const brandColor = '#5D54E8';
 const variants = [
-    { id: 'purple', background: '#5D54E8', mark: whiteMark },
+    { id: 'purple', background: brandColor, mark: whiteMark },
     { id: 'light', background: '#FFFFFF', mark: colorMark },
     { id: 'dark', background: '#0F172A', mark: whiteMark },
 ];
@@ -132,7 +133,7 @@ try {
     );
     const favicon = svg(colorMark, '-24 -24 1206 1206', 1206, 1206);
     const appIcon = fs.readFileSync(path.join(output, 'avatars/purple.svg'));
-    const maskableIcon = svg(`<rect width="1024" height="1024" fill="#5D54E8"/><g transform="${placed(0.6)}">${whiteMark}</g>`);
+    const maskableIcon = svg(`<rect width="1024" height="1024" fill="${brandColor}"/><g transform="${placed(0.6)}">${whiteMark}</g>`);
     writeSite('favicon.svg', favicon);
     writeSite('favicon-96x96.png', rasterize(favicon, 96));
     writeSite('favicon.ico', ico([16, 32, 48], favicon));

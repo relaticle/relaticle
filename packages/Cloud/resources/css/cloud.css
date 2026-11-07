@@ -37,7 +37,6 @@ html:has(#main-header) {
     --color-tint: var(--color-gray-900);
 }
 
-/* The hero's product panel takes the logo's own colours, #4038CD to #5D54E8. */
 @utility bg-hero-panel {
     background-color: var(--color-indigo-50);
     background-image:
@@ -74,7 +73,7 @@ html:has(#main-header) {
 
     &:where(.dark, .dark *) {
         background-image:
-            radial-gradient(45% 60% at 15% 10%, rgb(124 58 237 / 0.14), transparent 70%),
+            radial-gradient(45% 60% at 15% 10%, rgb(93 84 232 / 0.14), transparent 70%),
             radial-gradient(40% 55% at 85% 20%, rgb(245 158 11 / 0.07), transparent 70%),
             radial-gradient(50% 60% at 50% 100%, rgb(16 185 129 / 0.07), transparent 70%);
     }

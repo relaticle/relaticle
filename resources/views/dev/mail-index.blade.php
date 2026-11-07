@@ -6,7 +6,7 @@
     <style>
         body { font-family: system-ui, sans-serif; margin: 40px; color: #18181b; }
         li { margin: 8px 0; }
-        a { color: #6d28d9; }
+        a { color: #5145d4; }
     </style>
 </head>
 <body>

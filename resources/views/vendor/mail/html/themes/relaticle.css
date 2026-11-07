@@ -1,8 +1,8 @@
 /* Relaticle mail theme. Hex only: Gmail drops the whole inline style
    attribute when it meets oklch(), and classic Outlook ignores it.
    Primary scale from resources/css/theme.css:
-   50 #f5f3ff 100 #ede9fe 200 #ddd6fe 300 #c4b5fd 400 #a78bfa
-   500 #8b5cf6 600 #7c3aed 700 #6d28d9 800 #5b21b6 900 #4c1d95 950 #2e1065 */
+   50 #f2f4fe 100 #e8ebfd 200 #d5d9fc 300 #b5bcfa 400 #9097f7
+   500 #6f6ff1 600 #5d54e8 700 #5145d4 800 #4339b2 900 #373092 950 #221c62 */
 
 /* Base */
 
@@ -34,7 +34,7 @@ blockquote {
 }
 
 a {
-    color: #6d28d9;
+    color: #5145d4;
     text-decoration: underline;
 }
 
@@ -261,23 +261,23 @@ img {
 .button-success,
 .button-red,
 .button-error {
-    background-color: #7c3aed;
-    border-bottom: 10px solid #7c3aed;
-    border-left: 24px solid #7c3aed;
-    border-right: 24px solid #7c3aed;
-    border-top: 10px solid #7c3aed;
+    background-color: #5d54e8;
+    border-bottom: 10px solid #5d54e8;
+    border-left: 24px solid #5d54e8;
+    border-right: 24px solid #5d54e8;
+    border-top: 10px solid #5d54e8;
     color: #ffffff;
 }
 
 /* Panels */
 
 .panel {
-    border-left: 4px solid #7c3aed;
+    border-left: 4px solid #5d54e8;
     margin: 24px 0;
 }
 
 .panel-content {
-    background-color: #f5f3ff;
+    background-color: #f2f4fe;
     color: #3f3f46;
     padding: 16px;
 }
