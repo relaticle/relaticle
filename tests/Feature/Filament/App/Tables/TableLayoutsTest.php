@@ -553,6 +553,23 @@ it('confirms a deleted layout', function (): void {
         ->assertNotified('"Renewals" deleted');
 });
 
+it('escapes the layout name in the toasts it sends', function (): void {
+    $name = '<a href="https://evil.example">Renewals</a>';
+    $escaped = e($name);
+
+    livewire(ListCompanies::class)
+        ->callAction('saveTableLayoutAs', ['name' => $name])
+        ->assertNotified("\"{$escaped}\" saved as a new layout");
+
+    $layout = TableLayout::query()->withoutGlobalScopes()->sole();
+
+    livewire(ListCompanies::class)
+        ->callAction('shareTableLayout', arguments: ['layout' => $layout->getKey()])
+        ->assertNotified("\"{$escaped}\" is shared with the workspace")
+        ->callAction('deleteTableLayout', arguments: ['layout' => $layout->getKey()])
+        ->assertNotified("\"{$escaped}\" deleted");
+});
+
 it('tells the owner when an admin deletes their layout', function (): void {
     $owner = tableLayoutMember(WorkspaceRole::Member);
     $layout = layoutFor($owner, ['name' => 'Renewals', 'is_shared' => true]);

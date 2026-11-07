@@ -107,7 +107,7 @@ trait HasTableLayouts
                 $this->appliedTableLayoutHash = $this->currentTableState()->withoutWidths()->hash();
                 $this->visibleTableLayouts = null;
 
-                Notification::make()->success()->title(__('filament/panel.tables.layouts.saved', ['name' => $layout->name]))->send();
+                Notification::make()->success()->title(__('filament/panel.tables.layouts.saved', ['name' => e($layout->name)]))->send();
             });
     }
 
@@ -148,7 +148,7 @@ trait HasTableLayouts
                 $this->appliedTableLayoutHash = $this->currentTableState()->withoutWidths()->hash();
                 $this->visibleTableLayouts = null;
 
-                Notification::make()->success()->title(__('filament/panel.tables.layouts.created', ['name' => $layout->name]))->send();
+                Notification::make()->success()->title(__('filament/panel.tables.layouts.created', ['name' => e($layout->name)]))->send();
             });
     }
 
@@ -235,7 +235,7 @@ trait HasTableLayouts
                 $this->defaultTableLayoutId = $this->defaultTableLayoutId === $layout->getKey() ? null : $this->defaultTableLayoutId;
                 $this->visibleTableLayouts = null;
 
-                Notification::make()->success()->title(__('filament/panel.tables.layouts.deleted', ['name' => $layout->name]))->send();
+                Notification::make()->success()->title(__('filament/panel.tables.layouts.deleted', ['name' => e($layout->name)]))->send();
             });
     }
 
@@ -249,7 +249,7 @@ trait HasTableLayouts
             $this->defaultTableLayoutId = $this->defaultTableLayoutId === $layout->getKey() ? null : $this->defaultTableLayoutId;
         }
 
-        Notification::make()->success()->title(__($isShared ? 'filament/panel.tables.layouts.shared' : 'filament/panel.tables.layouts.unshared', ['name' => $layout->name]))->send();
+        Notification::make()->success()->title(__($isShared ? 'filament/panel.tables.layouts.shared' : 'filament/panel.tables.layouts.unshared', ['name' => e($layout->name)]))->send();
     }
 
     /**

@@ -100,14 +100,14 @@ final class TableLayoutChangedNotification extends InboxNotification
         $urls = resolve(CanonicalRecordUrl::class);
         $table = $urls->entityPluralLabel($entity);
         $url = $row->workspace instanceof Workspace ? $urls->listPageUrl($entity, $row->workspace) : null;
-        $name = (string) data_get($row->data, 'layout_name');
         $actorName = $row->actor?->name;
-        $replace = ['name' => $name, 'previous' => (string) data_get($row->data, 'previous_name')];
+        // The panel renders a title as HTML, and a member types the names.
+        $replace = ['name' => e((string) data_get($row->data, 'layout_name')), 'previous' => e((string) data_get($row->data, 'previous_name'))];
 
         return FilamentNotification::make((string) $row->getKey())
             ->title($actorName === null
                 ? __("notifications.events.table_layout_changed.{$change}_title_without_actor", $replace)
-                : __("notifications.events.table_layout_changed.{$change}_title", ['actor' => $actorName, ...$replace]))
+                : __("notifications.events.table_layout_changed.{$change}_title", ['actor' => e($actorName), ...$replace]))
             ->body(__("notifications.events.table_layout_changed.{$change}_body", ['table' => $table]))
             ->icon(match ($change) {
                 self::DELETED => Heroicon::OutlinedTrash,
