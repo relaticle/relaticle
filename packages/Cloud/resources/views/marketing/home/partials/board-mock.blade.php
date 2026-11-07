@@ -27,7 +27,7 @@
                 <div class="flex min-w-0 items-center gap-2">
                     <span class="h-2 w-2 shrink-0 rounded-full" style="background-color: {{ $stageColors[$column['stage']] ?? 'currentColor' }}" aria-hidden="true"></span>
                     <h4 class="truncate text-sm font-medium text-gray-900 dark:text-white">{{ $column['label'] }}</h4>
-                    <span class="grid rounded-md bg-white px-1.5 py-0.5 text-xs font-medium tabular-nums text-gray-600 ring-1 ring-gray-950/5 dark:bg-white/[0.06] dark:text-gray-300 dark:ring-white/10" @if($column['count'][0] !== $column['count'][1]) data-board-count @endif>
+                    <span class="grid text-sm tabular-nums text-gray-500 dark:text-gray-400" @if($column['count'][0] !== $column['count'][1]) data-board-count @endif>
                         <span class="col-start-1 row-start-1" data-count-before>{{ $column['count'][0] }}</span>
                         @if($column['count'][0] !== $column['count'][1])
                             <span class="invisible col-start-1 row-start-1" data-count-after>{{ $column['count'][1] }}</span>
@@ -40,10 +40,7 @@
             <div class="flex-1 space-y-2 px-2 pb-2">
                 @foreach($column['cards'] as $card)
                     <div class="rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10" @if($card['dragged'] ?? false) data-board-card @endif>
-                        <div class="flex items-start justify-between gap-2">
-                            <p class="text-sm font-medium text-gray-900 dark:text-white">{{ $card['title'] }}</p>
-                            <x-lucide-ellipsis-vertical class="h-4 w-4 shrink-0 text-gray-400"/>
-                        </div>
+                        <p class="text-sm font-medium text-gray-900 dark:text-white">{{ $card['title'] }}</p>
                         <p class="mt-2 inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                             <x-dynamic-component :component="$card['icon']" class="h-4 w-4 text-gray-900 dark:text-white"/>
                             {{ $card['company'] }}
@@ -64,6 +61,11 @@
                 @if($column['slot'] ?? false)
                     <div class="rounded-xl opacity-0 outline-dashed outline-[1.5px] -outline-offset-[1.5px] outline-primary-500" data-board-slot aria-hidden="true"></div>
                 @endif
+
+                <p class="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-500 dark:text-gray-400" data-board-add>
+                    <x-lucide-plus class="size-4 shrink-0"/>
+                    {{ __('Add opportunity') }}
+                </p>
             </div>
         </div>
     @endforeach

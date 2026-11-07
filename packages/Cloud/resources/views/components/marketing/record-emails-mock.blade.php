@@ -52,6 +52,8 @@
     </div>
 
     <div class="flex gap-5 overflow-hidden border-b border-gray-100 px-4 text-xs font-medium text-gray-500 sm:px-5 dark:border-white/[0.06] dark:text-gray-400">
+        <span class="hidden py-2.5 sm:inline" aria-hidden="true">{{ __('Overview') }}</span>
+        <span class="hidden py-2.5 sm:inline" aria-hidden="true">{{ __('Activity') }}</span>
         <span class="py-2.5" aria-hidden="true">{{ __('Tasks') }}</span>
         <span class="py-2.5" aria-hidden="true">{{ __('Notes') }}</span>
         <div role="tablist" aria-label="{{ __('Lena Ortiz activity') }}" class="flex gap-5">
@@ -76,7 +78,6 @@
                 </button>
             @endforeach
         </div>
-        <span class="hidden py-2.5 sm:inline" aria-hidden="true">{{ __('Activity log') }}</span>
     </div>
 
     <div class="grid">

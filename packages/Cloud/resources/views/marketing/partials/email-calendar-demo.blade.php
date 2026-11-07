@@ -128,6 +128,8 @@
         </div>
 
         <div class="flex gap-5 overflow-hidden border-b border-gray-100 px-4 text-xs font-medium text-gray-500 sm:px-5 dark:border-white/[0.06] dark:text-gray-400" aria-hidden="true">
+            <span class="hidden py-2.5 sm:inline">{{ __('Overview') }}</span>
+            <span class="hidden py-2.5 sm:inline">{{ __('Activity') }}</span>
             <span class="py-2.5">{{ __('Tasks') }}</span>
             <span class="py-2.5">{{ __('Notes') }}</span>
             <span class="-mb-px border-b-2 border-primary py-2.5 text-primary dark:border-primary-400 dark:text-primary-400">
@@ -135,7 +137,6 @@
                 <span class="ml-0.5 rounded bg-primary-50 px-1 text-micro tabular-nums text-primary dark:bg-primary-500/15 dark:text-primary-400" x-text="landed" data-mail-count>0</span>
             </span>
             <span class="py-2.5">{{ __('Meetings') }}</span>
-            <span class="hidden py-2.5 sm:inline">{{ __('Activity log') }}</span>
         </div>
 
         <ul class="divide-y divide-gray-100 dark:divide-white/[0.06]">
