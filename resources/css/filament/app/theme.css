@@ -51,6 +51,8 @@ html.fi:has(body.fi-panel-app) {
 .fi-body.fi-panel-app {
     height: 100dvh;
     overflow: hidden;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+        env(safe-area-inset-left);
 }
 
 /* The content area is the surface colour on every page; the sidebar carries the canvas grey.

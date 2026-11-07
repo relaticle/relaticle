@@ -299,6 +299,10 @@ final class AppPanelProvider extends PanelProvider
                 PanelsRenderHook::HEAD_END,
                 fn (): View|Factory => view('filament.app.analytics')
             )
+            ->renderHook(
+                PanelsRenderHook::HEAD_END,
+                fn (): View|Factory => view('filament.app.web-app-meta')
+            )
             // Filament loads the reveal script on demand, and the password field binds only then,
             // overwriting anything typed or autofilled before it arrived.
             ->renderHook(
