@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\CreationSource;
 use App\Enums\CustomFields\TaskField;
+use App\Enums\WorkspaceRole;
 use App\Features\EmailIntegration;
 use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Concerns\CountsRelatedRecords;
@@ -597,6 +598,19 @@ it('lists open tasks on the overview by due date with an undated one last', func
             'Send the contract',
             'Write the proposal',
         ]);
+});
+
+it('offers no overview create button to a member who can only view records', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $viewer = User::factory()->create();
+    $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
+    $viewer->switchWorkspace($this->workspace);
+
+    $this->actingAs($viewer);
+
+    livewire(ViewCompany::class, ['record' => $company->getKey()])
+        ->assertSeeHtml('fi-record-overview-related')
+        ->assertDontSeeHtml('fi-record-overview-add');
 });
 
 it('points the :dataset overview view all link at the activity log tab', function (string $model, string $page): void {

@@ -32,6 +32,7 @@ use Filament\Schemas\Components\View;
 use Filament\Support\Facades\FilamentTimezone;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Js;
 use Illuminate\Support\Str;
 use Relaticle\ActivityLog\Filament\Livewire\ActivityLogLivewire;
@@ -191,8 +192,8 @@ final readonly class RecordOverview
     private static function relatedSections(Company|People|Opportunity $record, array $tabKeys, array $counts, Collection $openTasks): array
     {
         $sections = [
-            self::section(__('filament/record-page.overview.notes'), $counts['notes'], $tabKeys['notes'], 'createNote', __('filament/record-page.actions.new_note'), self::noteItems($record)),
-            self::section(__('filament/record-page.overview.tasks'), $counts['tasks'], $tabKeys['tasks'], 'createTask', __('filament/record-page.actions.new_task'), self::taskItems($openTasks)),
+            self::section(__('filament/record-page.overview.notes'), $counts['notes'], $tabKeys['notes'], Gate::allows('create', Note::class) ? 'createNote' : null, __('filament/record-page.actions.new_note'), self::noteItems($record)),
+            self::section(__('filament/record-page.overview.tasks'), $counts['tasks'], $tabKeys['tasks'], Gate::allows('create', Task::class) ? 'createTask' : null, __('filament/record-page.actions.new_task'), self::taskItems($openTasks)),
         ];
 
         if ($tabKeys['emails'] !== null) {
