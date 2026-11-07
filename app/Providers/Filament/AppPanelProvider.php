@@ -315,6 +315,21 @@ final class AppPanelProvider extends PanelProvider
             );
     }
 
+    private function registerSidebarToggles(Panel $panel): void
+    {
+        // Collapse sits in the sidebar, level with the workspace switcher.
+        // Expand sits at the start of the top bar while the rail is collapsed.
+        $panel
+            ->renderHook(
+                PanelsRenderHook::TENANT_MENU_AFTER,
+                fn (): View|Factory => view('filament.app.sidebar-toggle', ['placement' => 'sidebar'])
+            )
+            ->renderHook(
+                PanelsRenderHook::TOPBAR_START,
+                fn (): View|Factory => view('filament.app.sidebar-toggle', ['placement' => 'topbar'])
+            );
+    }
+
     /**
      * BODY_START rather than a topbar slot: a banner has to be present on every
      * page of the panel, including the ones that render no topbar.
@@ -578,20 +593,9 @@ final class AppPanelProvider extends PanelProvider
         }
 
         $this->registerHeadHooks($panel);
+        $this->registerSidebarToggles($panel);
 
         $panel
-            /**
-             * Collapse sits in the sidebar, level with the workspace switcher;
-             * expand sits at the start of the top bar while the rail is collapsed.
-             */
-            ->renderHook(
-                PanelsRenderHook::TENANT_MENU_AFTER,
-                fn (): View|Factory => view('filament.app.sidebar-toggle', ['placement' => 'sidebar'])
-            )
-            ->renderHook(
-                PanelsRenderHook::TOPBAR_START,
-                fn (): View|Factory => view('filament.app.sidebar-toggle', ['placement' => 'topbar'])
-            )
             // STYLES_AFTER renders past the panel stylesheet, which is what lets the
             // `html[data-accent]` ramps outrank the `:root` defaults it emits.
             ->renderHook(
