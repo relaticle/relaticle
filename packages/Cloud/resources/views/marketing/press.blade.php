@@ -187,6 +187,7 @@
                     <a href="{{ $facts['source_urls']['repository'] }}" target="_blank" rel="noopener noreferrer" class="{{ $socialClass }}"><x-ri-github-fill class="size-4" aria-hidden="true"/>{{ __('GitHub') }}</a>
                     <a href="{{ route('discord') }}" target="_blank" rel="noopener noreferrer" class="{{ $socialClass }}"><x-ri-discord-fill class="size-4" aria-hidden="true"/>{{ __('Discord') }}</a>
                     <a href="https://x.com/relaticle" target="_blank" rel="noopener noreferrer" class="{{ $socialClass }}"><x-ri-twitter-x-fill class="size-4" aria-hidden="true"/>{{ __('X') }}</a>
+                    <a href="https://www.linkedin.com/company/relaticle" target="_blank" rel="noopener noreferrer" class="{{ $socialClass }}"><x-ri-linkedin-box-fill class="size-4" aria-hidden="true"/>{{ __('LinkedIn') }}</a>
                 </div>
             </div>
             <div class="bg-surface lg:col-span-8">
