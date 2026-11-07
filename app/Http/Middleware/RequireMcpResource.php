@@ -23,11 +23,12 @@ final readonly class RequireMcpResource
         $accepted = array_map($this->normalize(...), [URL::getMcpUrl(), url('/mcp')]);
 
         foreach ((array) $requested as $resource) {
-            abort_unless(
-                is_string($resource) && in_array($this->normalize($resource), $accepted, true),
-                Response::HTTP_BAD_REQUEST,
-                __('mcp.consent.invalid_resource'),
-            );
+            if (! is_string($resource) || ! in_array($this->normalize($resource), $accepted, true)) {
+                return response()->json([
+                    'error' => 'invalid_target',
+                    'error_description' => __('mcp.consent.invalid_resource'),
+                ], Response::HTTP_BAD_REQUEST);
+            }
         }
 
         return $next($request);

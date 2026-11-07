@@ -69,11 +69,15 @@ function authorizeUrl(Client $client, array $overrides = []): string
     ]);
 }
 
-it('refuses an authorization request meant for another server', function (): void {
+it('refuses an authorization request meant for another server with an oauth invalid_target error', function (): void {
     $this->actingAs($this->user);
 
     $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use', 'resource' => 'https://attacker.example/mcp']))
-        ->assertBadRequest();
+        ->assertBadRequest()
+        ->assertExactJson([
+            'error' => 'invalid_target',
+            'error_description' => __('mcp.consent.invalid_resource'),
+        ]);
 });
 
 it('authorizes a request that names this MCP server as its resource', function (string $resource): void {
