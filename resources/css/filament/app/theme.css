@@ -1836,6 +1836,15 @@ html.fi-record-stacked .fi-record-layout {
     --ff-tray-bg: color-mix(in oklab, var(--gray-950) 50%, transparent);
 }
 
+.ff-cards {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-gray-300) transparent;
+}
+
+.dark .ff-cards {
+    scrollbar-color: var(--color-gray-700) transparent;
+}
+
 /* Chat Side Panel */
 [data-chat-side-panel] [data-chat-messages] {
     scrollbar-width: thin;
