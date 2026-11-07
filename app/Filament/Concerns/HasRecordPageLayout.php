@@ -168,13 +168,17 @@ trait HasRecordPageLayout
         return Tab::make(__('filament/record-page.overview.label'))
             ->icon('lucide-layout-grid')
             ->extraAttributes(['class' => 'fi-record-overview-tab'])
-            ->schema(fn (): array => RecordOverview::components(
-                $this->crmRecord(),
-                static::nativeDetailEntries(),
-                static::highlightNames(),
-                $this->overviewTabKeys(),
-                $this->overviewCounts(),
-            ));
+            ->schema(function (): array {
+                $tabKeys = $this->overviewTabKeys();
+
+                return RecordOverview::components(
+                    $this->crmRecord(),
+                    static::nativeDetailEntries(),
+                    static::highlightNames(),
+                    $tabKeys,
+                    $this->overviewCounts($tabKeys),
+                );
+            });
     }
 
     public function editTaskAction(): EditTaskAction
@@ -257,20 +261,21 @@ trait HasRecordPageLayout
     }
 
     /**
+     * @param  array{activity: ?string, notes: ?string, tasks: ?string, emails: ?string}  $tabKeys
      * @return array{notes: ?string, tasks: ?string, emails: ?string}
      */
-    private function overviewCounts(): array
+    private function overviewCounts(array $tabKeys): array
     {
         return [
-            'notes' => $this->relationManagerBadge('NotesRelationManager'),
-            'tasks' => $this->relationManagerBadge('TasksRelationManager'),
-            'emails' => $this->relationManagerBadge('EmailsRelationManager'),
+            'notes' => $this->relationManagerBadge($tabKeys['notes']),
+            'tasks' => $this->relationManagerBadge($tabKeys['tasks']),
+            'emails' => $this->relationManagerBadge($tabKeys['emails']),
         ];
     }
 
     private function relationManagerKey(string $basename): ?string
     {
-        foreach ($this->getRelationManagers() as $key => $manager) {
+        foreach ($this->getCachedRelationManagers() as $key => $manager) {
             if (is_string($manager) && class_basename($manager) === $basename) {
                 return (string) $key;
             }
@@ -279,10 +284,9 @@ trait HasRecordPageLayout
         return null;
     }
 
-    private function relationManagerBadge(string $basename): ?string
+    private function relationManagerBadge(?string $key): ?string
     {
-        $key = $this->relationManagerKey($basename);
-        $manager = $key === null ? null : $this->getRelationManagers()[$key];
+        $manager = $key === null ? null : $this->getCachedRelationManagers()[$key];
 
         if (! is_string($manager) || ! is_subclass_of($manager, RelationManager::class)) {
             return null;
