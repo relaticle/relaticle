@@ -17,6 +17,8 @@ use Illuminate\Support\Str;
 
 mutates(RichEditorFieldType::class, SlashMenuPlugin::class, ChecklistPlugin::class, TaskItem::class);
 
+pest()->group('webkit');
+
 it('hides the heading toolbar when the caret has no text selection', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
@@ -183,6 +185,59 @@ it('persists a heading created from selected body text', function (): void {
         ->firstOrFail();
 
     expect($note->getCustomFieldValue($bodyField))->toContain('<h1>Quarterly review</h1>');
+});
+
+it('stops a detached text style dropdown from rewriting its trigger', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/notes")
+        ->press('New note')
+        ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
+        ->assertNoJavaScriptErrors();
+
+    $page->script(<<<'JS'
+        (() => {
+            const root = document.querySelector('.fi-fo-rich-editor-seamless');
+            const editorRoot = root.querySelector('[x-data^="richEditorFormComponent"]');
+            const editor = Alpine.$data(editorRoot).getEditor();
+
+            editor.commands.setContent('<p>Quarterly review</p>');
+            editor.chain().focus().setTextSelection({ from: 1, to: 17 }).run();
+        })();
+    JS);
+
+    $page->assertVisible('[x-ref="floatingToolbar::paragraph"] button[aria-label="Text style"]');
+
+    $ariaWrites = $page->script(<<<'JS'
+        (async () => {
+            const toolbar = document.querySelector('[x-ref="floatingToolbar::paragraph"]');
+            const trigger = toolbar.querySelector('button[aria-label="Text style"]');
+            const dropdown = Alpine.$data(trigger.closest('.fi-dropdown'));
+            let writes = 0;
+
+            const watcher = new MutationObserver((records) => {
+                writes += records.length;
+
+                if (writes > 100) {
+                    dropdown.observer?.disconnect();
+                }
+            });
+
+            Alpine.mutateDom(() => toolbar.remove());
+            watcher.observe(trigger, { attributeFilter: ['aria-controls', 'aria-expanded', 'aria-haspopup'] });
+            trigger.classList.add('fi-detached');
+
+            await new Promise((resolve) => setTimeout(resolve));
+            watcher.disconnect();
+
+            return writes;
+        })()
+    JS);
+
+    expect($ariaWrites)->toBe(0);
 });
 
 it('fits the selection toolbar inside a mobile viewport in both themes', function (): void {

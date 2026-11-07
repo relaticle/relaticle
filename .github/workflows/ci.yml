@@ -277,8 +277,14 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4, 5, 6]
+        browser: [chromium]
+        # Tests tagged `pest()->group('webkit')` cover surfaces where WebKit has broken
+        # while Chromium passed: the rich editor freeze, the model picker icons.
+        include:
+          - shard: webkit
+            browser: webkit
 
-    name: Browser Tests (Shard ${{ matrix.shard }}/6)
+    name: Browser Tests (${{ matrix.browser == 'webkit' && 'WebKit' || format('Shard {0}/6', matrix.shard) }})
 
     # A browser test that waits on an element which never appears hangs rather
     # than fails, and without a ceiling the job runs until GitHub cancels it at
@@ -341,7 +347,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-playwright-${{ matrix.browser }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Prepare Laravel
         run: |
@@ -356,17 +362,17 @@ jobs:
         run: pnpm run build
 
       - name: Install Playwright
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
         if: steps.playwright-cache.outputs.cache-hit != 'true'
 
       - name: Install Playwright system dependencies
-        run: pnpm exec playwright install-deps chromium
+        run: pnpm exec playwright install-deps ${{ matrix.browser }}
         if: steps.playwright-cache.outputs.cache-hit == 'true'
 
       # tests/.pest/shards.json times the Default suite only, so Pest splits these
       # classes round-robin and warns that the file is out of date.
       - name: Browser Tests
-        run: vendor/bin/pest tests/Browser/ --configuration phpunit.ci.xml --shard=${{ matrix.shard }}/6
+        run: vendor/bin/pest tests/Browser/ --configuration phpunit.ci.xml ${{ matrix.browser == 'webkit' && '--group=webkit --browser safari' || format('--shard={0}/6', matrix.shard) }}
 
       - name: Upload browser failure artifacts
         if: failure()
