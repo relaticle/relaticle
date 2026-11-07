@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Support;
 
+use Relaticle\Chat\Data\SetupOption;
+
 /**
  * Reads the next steps SuggestNextSteps wrote onto an assistant message's
  * `meta`, in the shape the transcript strip renders.
@@ -16,7 +18,14 @@ final readonly class NextSteps
 {
     /**
      * @param  array<mixed>  $meta
-     * @return list<array{label: string, prompt: string}>
+     * @return list<array{
+     *     id: ?string,
+     *     kind: string,
+     *     label: string,
+     *     prompt: ?string,
+     *     url: ?string,
+     *     icon: ?string
+     * }>
      */
     public static function fromMeta(array $meta): array
     {
@@ -31,16 +40,43 @@ final readonly class NextSteps
                 continue;
             }
 
-            $label = $step['label'] ?? null;
-            $prompt = $step['prompt'] ?? null;
+            $normalized = self::normalize($step);
 
-            if (! is_string($label) || ! is_string($prompt) || $label === '' || $prompt === '') {
-                continue;
+            if ($normalized !== null) {
+                $steps[] = $normalized;
             }
-
-            $steps[] = ['label' => $label, 'prompt' => $prompt];
         }
 
         return $steps;
+    }
+
+    /**
+     * @param  array<mixed>  $step
+     * @return array{id: ?string, kind: string, label: string, prompt: ?string, url: ?string, icon: ?string}|null
+     */
+    private static function normalize(array $step): ?array
+    {
+        $label = self::text($step['label'] ?? null);
+        $prompt = self::text($step['prompt'] ?? null);
+        $url = self::text($step['url'] ?? null);
+        $isLink = ($step['kind'] ?? null) === SetupOption::KIND_LINK;
+
+        if ($label === null || ($isLink ? $url : $prompt) === null) {
+            return null;
+        }
+
+        return [
+            'id' => self::text($step['id'] ?? null),
+            'kind' => $isLink ? SetupOption::KIND_LINK : SetupOption::KIND_PROMPT,
+            'label' => $label,
+            'prompt' => $prompt,
+            'url' => $url,
+            'icon' => self::text($step['icon'] ?? null),
+        ];
+    }
+
+    private static function text(mixed $value): ?string
+    {
+        return is_string($value) && $value !== '' ? $value : null;
     }
 }

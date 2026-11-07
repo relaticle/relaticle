@@ -36,7 +36,9 @@ use Laravel\Ai\Streaming\Events\StreamEvent;
 use Laravel\Ai\Streaming\Events\TextDelta;
 use Laravel\Ai\Streaming\Events\ToolCall;
 use Laravel\Pennant\Feature;
+use Relaticle\Chat\Actions\RecordNextSteps;
 use Relaticle\Chat\Agents\CrmAssistant;
+use Relaticle\Chat\Data\SetupOption;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Enums\EmailReach;
 use Relaticle\Chat\Enums\MessageOrigin;
@@ -54,6 +56,7 @@ use Relaticle\Chat\Services\AiModelResolver;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Services\SetupOptions;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Services\TurnContinuationService;
 use Relaticle\Chat\Support\AssistantText;
@@ -1092,6 +1095,12 @@ final class ProcessChatMessage implements ShouldQueue
             return;
         }
 
+        if ($this->isSetupConversation()) {
+            $this->offerSetupOptions($messageId);
+
+            return;
+        }
+
         dispatch(new SuggestNextSteps(
             conversationId: $this->conversationId,
             messageId: $messageId,
@@ -1104,6 +1113,21 @@ final class ProcessChatMessage implements ShouldQueue
                     ->all()
             )),
         ));
+    }
+
+    private function offerSetupOptions(string $messageId): void
+    {
+        $options = resolve(SetupOptions::class)->for($this->user, $this->workspace);
+
+        if ($options === []) {
+            return;
+        }
+
+        resolve(RecordNextSteps::class)->execute(
+            $this->conversationId,
+            $messageId,
+            array_map(static fn (SetupOption $option): array => $option->toArray(), $options),
+        );
     }
 
     private function turnLeftAProposal(): bool

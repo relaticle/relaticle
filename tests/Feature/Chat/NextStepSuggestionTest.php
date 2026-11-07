@@ -80,7 +80,15 @@ function seedSuggestibleMessage(string $role, string $content, array $meta = [])
 }
 
 /**
- * @return array<int, array{label: string, prompt: string}>
+ * @return array{id: null, kind: string, label: string, prompt: string, url: null, icon: null}
+ */
+function promptStep(string $label, string $prompt): array
+{
+    return ['id' => null, 'kind' => 'prompt', 'label' => $label, 'prompt' => $prompt, 'url' => null, 'icon' => null];
+}
+
+/**
+ * @return list<array{id: ?string, kind: string, label: string, prompt: ?string, url: ?string, icon: ?string}>
  */
 function persistedNextSteps(string $messageId): array
 {
@@ -107,8 +115,8 @@ it('persists the drafted steps on the assistant message and broadcasts them', fu
     ))->handle();
 
     expect(persistedNextSteps($messageId))->toBe([
-        ['label' => 'Import your companies', 'prompt' => 'Help me import my companies from a file'],
-        ['label' => 'Add Acme Corp', 'prompt' => 'Create a company called Acme Corp'],
+        promptStep('Import your companies', 'Help me import my companies from a file'),
+        promptStep('Add Acme Corp', 'Create a company called Acme Corp'),
     ]);
 
     Event::assertDispatched(
@@ -133,7 +141,7 @@ it('suggests next steps after a turn served by OpenAI', function (): void {
     ))->handle();
 
     expect(persistedNextSteps($messageId))->toBe([
-        ['label' => 'Add Acme Corp', 'prompt' => 'Create a company called Acme Corp'],
+        promptStep('Add Acme Corp', 'Create a company called Acme Corp'),
     ]);
 });
 
@@ -383,7 +391,7 @@ it('paints the persisted steps back onto a reloading page', function (): void {
 
     expect($messages[0]['next_steps'])->toBe([])
         ->and($messages[1]['next_steps'])->toBe([
-            ['label' => 'Import your companies', 'prompt' => 'Help me import my companies'],
+            promptStep('Import your companies', 'Help me import my companies'),
         ]);
 });
 
@@ -396,7 +404,7 @@ it('hands the persisted steps to the turn-end reconcile', function (): void {
         ->call('latestAssistantMessage', $this->conversationId)
         ->assertReturned(fn (array $payload): bool => $payload['id'] === $messageId
             && $payload['next_steps'] === [
-                ['label' => 'Import your companies', 'prompt' => 'Help me import my companies'],
+                promptStep('Import your companies', 'Help me import my companies'),
             ]);
 });
 
@@ -466,6 +474,6 @@ it('still persists the suggestions when the ledger write fails', function (): vo
     ))->handle();
 
     expect(persistedNextSteps($messageId))->toBe([
-        ['label' => 'Add a note', 'prompt' => 'Add a note to Acme Corp'],
+        promptStep('Add a note', 'Add a note to Acme Corp'),
     ]);
 });
