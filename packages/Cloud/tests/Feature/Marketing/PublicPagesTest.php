@@ -518,6 +518,42 @@ describe('Page metadata', function () {
         ['/terms-of-service', true],
     ]);
 
+    it('steps the headings of :path down one level at a time', function (string $path): void {
+        $levels = (new Crawler($this->get($path)->assertOk()->getContent()))
+            ->filter('h1, h2, h3, h4, h5, h6')
+            ->each(fn (Crawler $heading): int => (int) substr($heading->nodeName(), 1));
+
+        $skips = [];
+
+        foreach (array_slice($levels, 1, preserve_keys: true) as $index => $level) {
+            if ($level > $levels[$index - 1] + 1) {
+                $skips[] = "h{$levels[$index - 1]} to h{$level}";
+            }
+        }
+
+        expect($levels[0] ?? null)->toBe(1, "{$path} must open on its h1")
+            ->and($skips)->toBe([], "{$path} skips a heading level");
+    })->with([
+        '/',
+        '/pricing',
+        '/ai',
+        '/ai-native-crm',
+        '/crm-for-claude',
+        '/crm-for-chatgpt',
+        '/self-hosted',
+        '/security',
+        '/press',
+        '/contact',
+        '/email-and-calendar',
+        '/blog',
+        '/compare/relaticle-vs-twenty',
+        '/compare/relaticle-vs-espocrm',
+        '/alternatives/attio',
+        '/alternatives/hubspot',
+        '/privacy-policy',
+        '/terms-of-service',
+    ]);
+
     it('renders one heading on each legal page and keeps it in the markdown version', function (string $path, string $heading) {
         $html = $this->get($path)->assertOk()->getContent();
         $markdown = $this->get($path, ['Accept' => 'text/markdown'])->assertOk()->getContent();
