@@ -316,6 +316,22 @@ it('keeps a card in its stage when a viewer picks another from the move to sheet
     expect($storedValue)->toBe($prospecting->getKey());
 });
 
+it('shows a viewer no menu on a card they cannot change', function (): void {
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
+    $opportunity->saveCustomFieldValue($this->stageField, $this->stageField->options->firstWhere('name', 'Prospecting')->getKey());
+
+    livewire(OpportunitiesBoard::class)->assertSeeHtml('ff-card-actions');
+
+    $viewer = User::factory()->create();
+    $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
+    $viewer->switchWorkspace($this->workspace);
+    $this->actingAs($viewer);
+
+    livewire(OpportunitiesBoard::class)
+        ->assertSee($opportunity->name)
+        ->assertDontSeeHtml('ff-card-actions');
+});
+
 it('rejects a move to a stage option the board does not own', function (string $targetKind): void {
     $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');
     $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
