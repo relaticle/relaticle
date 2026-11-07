@@ -29,6 +29,7 @@ final class EmailSendHeldNotification extends InboxNotification
         private readonly Email $email,
         private readonly string $via,
         private readonly int $holdSeconds,
+        private readonly bool $rescheduled = false,
     ) {
         $this->deadline = $email->scheduled_for ?? now()->addSeconds($holdSeconds);
     }
@@ -62,6 +63,7 @@ final class EmailSendHeldNotification extends InboxNotification
             'via' => $this->via,
             'minutes' => max(1, intdiv($this->holdSeconds, 60)),
             'deadline' => $this->deadline->toIso8601ZuluString(),
+            'rescheduled' => $this->rescheduled,
         ];
     }
 
@@ -75,7 +77,12 @@ final class EmailSendHeldNotification extends InboxNotification
         $cancellable = $status === EmailStatus::QUEUED || ($status === null && $holdLasts);
 
         $notification = FilamentNotification::make((string) $row->getKey())
-            ->title(__('filament/concerns/email-compose.notifications.held.title', ['via' => e((string) data_get($row->data, 'via'))]))
+            ->title(__(
+                data_get($row->data, 'rescheduled') === true
+                    ? 'filament/concerns/email-compose.notifications.held.rescheduled_title'
+                    : 'filament/concerns/email-compose.notifications.held.title',
+                ['via' => e((string) data_get($row->data, 'via'))],
+            ))
             ->body(__(self::bodyKey($status, $holdLasts, $minutes > self::MINUTES_BEFORE_A_DATE), [
                 'subject' => e((string) data_get($row->data, 'email_subject')),
                 'recipients' => e(implode(', ', (array) data_get($row->data, 'recipients'))),

@@ -24,7 +24,7 @@ final readonly class RescheduleAgentEmail
 
         $email = $this->reschedule->execute($email, $scheduledFor);
 
-        $this->notifier->sendHeld($email, $user, $connection->name, (int) round(now()->diffInSeconds($scheduledFor)));
+        $this->notifier->sendRescheduled($email, $user, $connection->name, (int) round(now()->diffInSeconds($scheduledFor)));
 
         return $email;
     }

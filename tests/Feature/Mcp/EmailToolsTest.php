@@ -2198,7 +2198,7 @@ it('tells the user when it pulls forward an email they scheduled themselves', fu
     $data = emailToolData($this->viewer, RescheduleEmailTool::class, ['id' => $composed->id, 'scheduled_for' => now()->addMinute()->toIso8601String()]);
 
     expect($data['scheduled_for'])->toBe(now()->addSeconds(300)->toIso8601String())
-        ->and($this->viewer->notifications()->where('type', EmailSendHeldNotification::class)->count())->toBe(1);
+        ->and(EmailSendHeldNotification::present($this->viewer->notifications()->where('type', EmailSendHeldNotification::class)->sole())->getTitle())->toBe('An AI assistant rescheduled an email');
 });
 
 it('requeues a failed email behind the hold and tells the user', function (): void {

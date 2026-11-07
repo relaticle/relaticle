@@ -42,7 +42,17 @@ final readonly class QueuedSendNotifier
 
     public function sendHeld(Email $email, User $user, string $via, int $holdSeconds): void
     {
+        $this->notifyNow($user, new EmailSendHeldNotification($email, $via, $holdSeconds));
+    }
+
+    public function sendRescheduled(Email $email, User $user, string $via, int $holdSeconds): void
+    {
+        $this->notifyNow($user, new EmailSendHeldNotification($email, $via, $holdSeconds, rescheduled: true));
+    }
+
+    private function notifyNow(User $user, EmailSendHeldNotification $notification): void
+    {
         // The queued channel could deliver this after the hold has passed.
-        $user->notifyNow(new EmailSendHeldNotification($email, $via, $holdSeconds));
+        $user->notifyNow($notification);
     }
 }
