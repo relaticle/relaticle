@@ -1372,10 +1372,6 @@ html.fi-record-stacked .fi-record-layout {
         & ol > li > span[aria-hidden] {
             @apply start-1 top-7 -bottom-1.5;
         }
-
-        & div:has(> .fi-btn[wire\:click='loadMore']) {
-            @apply hidden;
-        }
     }
 
     .fi-record-overview-related {

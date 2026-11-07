@@ -26,7 +26,6 @@ use Filament\Infolists\Components\ViewEntry;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Icon;
-use Filament\Schemas\Components\Livewire;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\View;
 use Filament\Support\Facades\FilamentTimezone;
@@ -35,7 +34,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Js;
 use Illuminate\Support\Str;
-use Relaticle\ActivityLog\Filament\Livewire\ActivityLogLivewire;
+use Relaticle\ActivityLog\Renderers\RendererRegistry;
 
 final readonly class RecordOverview
 {
@@ -171,13 +170,14 @@ final readonly class RecordOverview
             ]))
             ->schema([
                 Group::make([
-                    Livewire::make(ActivityLogLivewire::class, [
-                        'subjectClass' => $record::class,
-                        'subjectKey' => $record->getKey(),
-                        'groupByDate' => false,
-                        'perPage' => self::LISTED_ITEMS,
+                    View::make('activity-log::timeline')->viewData([
+                        'entries' => $record->timeline()->paginate(self::LISTED_ITEMS)->getCollection(),
+                        'grouped' => null,
+                        'registry' => resolve(RendererRegistry::class),
+                        'emptyState' => __('activity-log::messages.empty_state'),
+                        'hasMore' => false,
                         'infiniteScroll' => false,
-                    ])->key("record-overview-activity-{$record->getKey()}"),
+                    ]),
                 ])->extraAttributes(['class' => 'fi-record-overview-card fi-record-overview-activity']),
             ])
             ->extraAttributes(['class' => 'fi-record-overview-section']);

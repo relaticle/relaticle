@@ -630,6 +630,22 @@ it('marks a task due earlier today as overdue on the overview, as the tasks boar
         ->assertDontSeeHtml('fi-record-due-today');
 });
 
+it('lists the three latest activity entries on the overview', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+    foreach (['Call one', 'Call two', 'Call three', 'Call four'] as $index => $title) {
+        $this->travelTo(now()->addMinutes($index + 1));
+        $company->tasks()->attach(Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => $title]));
+    }
+
+    $html = livewire(ViewCompany::class, ['record' => $company->getKey()])->html();
+    $activity = Str::before(Str::after($html, 'fi-record-overview-activity'), __('filament/record-page.overview.notes'));
+
+    expect(substr_count($activity, 'timeline-entry-'))->toBe(3)
+        ->and($activity)->toContain('Call four')
+        ->and($activity)->not->toContain('Call one');
+});
+
 it('points the :dataset overview view all link at the activity log tab', function (string $model, string $page): void {
     $record = $model::factory()->recycle([$this->user, $this->workspace])->create();
     $component = livewire($page, ['record' => $record->getKey()]);
