@@ -117,6 +117,28 @@ it('keeps sorting on the header and gives the title column a handle', function (
         ->assertNoJavaScriptErrors();
 });
 
+it('stays on the list when a column menu item is double-clicked', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
+    $page->script(openColumnMenu('created_at'));
+    waitUntil($page, menuItemFocused());
+
+    $page->script(sprintf(<<<'JS'
+        (() => {
+            const item = document.querySelector(`%s`);
+            const box = item.getBoundingClientRect();
+            const point = { bubbles: true, cancelable: true, clientX: box.left + box.width / 2, clientY: box.top + box.height / 2 };
+            item.dispatchEvent(new MouseEvent('click', { ...point, detail: 1 }));
+            requestAnimationFrame(() => document.elementFromPoint(point.clientX, point.clientY)?.dispatchEvent(new MouseEvent('click', { ...point, detail: 2 })));
+            return true;
+        })();
+    JS, columnMenuItem('Pin to left')));
+
+    waitUntil($page, sprintf('document.querySelector(`%s`)?.dataset.columnPinned === "1"', columnHeader('created_at')))
+        ->wait(0.5)
+        ->assertPathIs("/app/{$this->workspace->slug}/companies")
+        ->assertNoJavaScriptErrors();
+});
+
 it('disables the moves at the edges', function (): void {
     $page = companiesTable($this->user, $this->workspace->slug);
     $order = $page->script(headerOrder());

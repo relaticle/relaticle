@@ -537,6 +537,17 @@ function swallowNextClick() {
     setTimeout(() => window.removeEventListener('click', swallow, true))
 }
 
+// The second press of a double-click lands on what the closed menu uncovered, often a row link.
+function swallowDoubleClickTail() {
+    const swallow = (clickEvent) => {
+        if (clickEvent.detail < 2) return
+        clickEvent.preventDefault()
+        clickEvent.stopPropagation()
+    }
+    window.addEventListener('click', swallow, { capture: true })
+    setTimeout(() => window.removeEventListener('click', swallow, true), 500)
+}
+
 function startColumnDrag(event, th, wire) {
 
     const table = th.closest('table')
@@ -706,6 +717,7 @@ function registerColumnMenu() {
             rememberColumnFocus(focusColumn)
             Promise.resolve(run()).catch(forgetColumnFocus)
             this.close(false)
+            swallowDoubleClickTail()
         },
     }))
 }
