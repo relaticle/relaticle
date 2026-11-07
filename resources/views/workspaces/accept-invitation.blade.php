@@ -23,12 +23,12 @@
             />
 
             <ul class="space-y-3">
-                <x-workspaces.invitation-fact icon="heroicon-m-user-group">
+                <x-workspaces.invitation-fact icon="lucide-users">
                     {{ trans_choice('workspaces.invitation.members', $memberCount, ['count' => $memberCount]) }}
                 </x-workspaces.invitation-fact>
 
                 @if($roleDescription)
-                    <x-workspaces.invitation-fact icon="heroicon-m-shield-check">
+                    <x-workspaces.invitation-fact icon="lucide-shield-check">
                         {{ $roleDescription }}
                     </x-workspaces.invitation-fact>
                 @endif
@@ -52,7 +52,7 @@
 @elseif($state === 'wrong-account')
     <x-layouts::invitation :title="__('workspaces.accept.wrong_account.heading')">
         <x-slot:icon>
-            <x-workspaces.invitation-icon icon="heroicon-o-user-circle" />
+            <x-workspaces.invitation-icon icon="lucide-circle-user" />
         </x-slot:icon>
 
         <x-slot:heading>
@@ -80,7 +80,7 @@
 @else
     <x-layouts::invitation :title="__('workspaces.accept.expired.heading')">
         <x-slot:icon>
-            <x-workspaces.invitation-icon icon="heroicon-o-clock" />
+            <x-workspaces.invitation-icon icon="lucide-clock" />
         </x-slot:icon>
 
         <x-slot:heading>

@@ -24,7 +24,7 @@ final class MoveCardAction extends Action
         parent::setUp();
 
         $this->label(__('filament/pages/boards.move_to.label'))
-            ->icon('heroicon-o-arrows-right-left')
+            ->icon('lucide-arrow-right-left')
             ->authorize('update')
             ->modalHeading(__('filament/pages/boards.move_to.label'))
             ->modalDescription(fn (Model $record, BoardResourcePage $livewire): string => (string) $record->getAttribute($livewire->getBoard()->getRecordTitleAttribute()))

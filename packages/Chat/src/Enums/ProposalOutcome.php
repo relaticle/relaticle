@@ -16,10 +16,10 @@ enum ProposalOutcome: string
     public function icon(): string
     {
         return match ($this) {
-            self::Applied => 'check',
-            self::LeftOut, self::Discarded, self::NotSent => 'no-symbol',
-            self::Expired => 'clock',
-            self::Replaced => 'arrow-path',
+            self::Applied => 'lucide-check',
+            self::LeftOut, self::Discarded, self::NotSent => 'lucide-ban',
+            self::Expired => 'lucide-clock',
+            self::Replaced => 'lucide-refresh-cw',
         };
     }
 
@@ -124,7 +124,7 @@ enum ProposalOutcome: string
         return [
             'outcomes' => collect(self::cases())
                 ->mapWithKeys(fn (self $outcome): array => [$outcome->value => [
-                    'icon' => svg("heroicon-o-{$outcome->icon()}", "size-4 shrink-0 {$outcome->iconClass()}")->toHtml(),
+                    'icon' => svg($outcome->icon(), "size-4 shrink-0 {$outcome->iconClass()}")->toHtml(),
                     'label' => $outcome->label(),
                     'leads' => $outcome->leadsText(),
                     'again' => $outcome->canProposeAgain(),

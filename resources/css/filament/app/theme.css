@@ -92,12 +92,6 @@ html.fi:has(body.fi-panel-app :is(.fi-app-layout, .fi-settings-layout)),
     @apply h-full border-r border-gray-200/60 bg-(--surface-sidebar-bg) dark:border-white/10;
 }
 
-/* Heroicons draw a 1.5 stroke on a 24 grid, a 1px line at the sidebar's 16px,
-   too faint beside a medium-weight label. Menus keep the panel-wide weight. */
-.fi-sidebar svg[stroke-width]:not(.fi-dropdown-panel *) {
-    stroke-width: 1.75;
-}
-
 .fi-sidebar .fi-dropdown-list-item-image,
 [data-workspace-switcher] .fi-dropdown-list-item-image {
     @apply rounded-md;

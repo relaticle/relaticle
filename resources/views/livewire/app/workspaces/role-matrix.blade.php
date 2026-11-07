@@ -25,10 +25,10 @@
                     @foreach ($roleKeys as $roleKey)
                         <td class="px-0.5 py-2 text-center sm:px-3" data-capability="{{ $capabilityValue }}" data-role="{{ $roleKey }}">
                             @if ($roles[$roleKey])
-                                <x-heroicon-o-check class="mx-auto h-4 w-4 text-success-600 dark:text-success-400" />
+                                <x-lucide-check class="mx-auto h-4 w-4 text-success-600 dark:text-success-400" />
                                 <span class="sr-only">{{ __('workspaces.role_matrix.granted') }}</span>
                             @else
-                                <x-heroicon-o-minus class="mx-auto h-4 w-4 text-gray-300 dark:text-gray-600" />
+                                <x-lucide-minus class="mx-auto h-4 w-4 text-gray-300 dark:text-gray-600" />
                                 <span class="sr-only">{{ __('workspaces.role_matrix.not_granted') }}</span>
                             @endif
                         </td>

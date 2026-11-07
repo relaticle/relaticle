@@ -23,7 +23,6 @@ use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\RichEditor;
 use Filament\Schemas\Components\Component;
 use Filament\Support\Enums\IconSize;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
@@ -75,7 +74,7 @@ it('heads every column but the task title with an icon', function (): void {
 });
 
 it('heads the relations column with the link icon', function (): void {
-    $linkIcon = generate_icon_html(Heroicon::OutlinedLink, size: IconSize::Small)->toHtml();
+    $linkIcon = generate_icon_html('lucide-link', size: IconSize::Small)->toHtml();
 
     livewire(ManageTasks::class)
         ->assertTableColumnExists('relations', fn (Column $column): bool => str_contains((string) $column->getLabel(), $linkIcon));

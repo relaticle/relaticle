@@ -21,7 +21,6 @@ use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\RateLimiter;
@@ -153,7 +152,7 @@ final class ConfirmIdentityAction extends Action
             }
 
             if ($this->confirmingUser()->hasPasskey()) {
-                $action->icon(Heroicon::FingerPrint);
+                $action->icon('lucide-fingerprint-pattern');
             }
 
             return $action;

@@ -21,14 +21,14 @@
             <div class="overflow-hidden rounded-xl border border-primary-200 bg-[var(--surface-block-bg)] ring-[3px] ring-primary-100 dark:border-primary-400/30 dark:ring-primary-400/10" data-ai-email>
                 <div class="flex items-start gap-2.5 px-4 pb-2.5 pt-3">
                     <span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400" aria-hidden="true">
-                        <x-heroicon-o-envelope class="h-3.5 w-3.5"/>
+                        <x-lucide-mail class="h-3.5 w-3.5"/>
                     </span>
                     <p class="min-w-0 flex-1 truncate text-sm leading-6">
                         <span class="text-gray-500 dark:text-gray-400">{{ __('Send email') }}</span>
                         <span class="font-semibold text-gray-900 dark:text-white">{{ $subject }}</span>
                     </p>
                     <span class="mt-1 inline-flex shrink-0 items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                        <x-heroicon-o-lock-closed class="h-3 w-3" aria-hidden="true"/>
+                        <x-lucide-lock class="h-3 w-3" aria-hidden="true"/>
                         {{ __('Own approval') }}
                     </span>
                 </div>

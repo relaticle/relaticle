@@ -63,7 +63,7 @@ final class EmailAccountsPage extends Page
     {
         return Action::make('editSettings')
             ->label(__('filament/pages/email-accounts.actions.edit_settings'))
-            ->icon('heroicon-o-cog-6-tooth')
+            ->icon('lucide-settings')
             ->color('gray')
             ->size(Size::Small)
             ->url(fn (array $arguments): string => EmailAccountSettingsPage::getUrl([

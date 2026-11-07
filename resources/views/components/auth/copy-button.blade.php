@@ -9,14 +9,14 @@
 >
     <template x-if="! copied">
         <span class="inline-flex items-center gap-1.5">
-            <x-ri-file-copy-line class="size-3.5" />
+            <x-lucide-copy class="size-3.5" />
             {{ __('profile.sections.mfa.copy') }}
         </span>
     </template>
 
     <template x-if="copied">
         <span class="inline-flex items-center gap-1.5 text-success-600 dark:text-success-400">
-            <x-ri-check-line class="size-3.5" />
+            <x-lucide-check class="size-3.5" />
             {{ __('profile.sections.mfa.copied') }}
         </span>
     </template>

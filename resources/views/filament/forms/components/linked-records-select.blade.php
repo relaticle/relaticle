@@ -86,7 +86,7 @@
             class="fi-linked-records-trigger"
             @disabled($isDisabled)
         >
-            <x-filament::icon icon="ri-arrow-down-s-line" />
+            <x-filament::icon icon="lucide-chevron-down" />
         </button>
     </div>
 
@@ -100,7 +100,7 @@
     >
         <div class="fi-linked-records-panel-body">
             <div class="fi-linked-records-search">
-                <x-filament::icon icon="ri-search-line" />
+                <x-filament::icon icon="lucide-search" />
 
                 <input
                     x-ref="search"
@@ -139,7 +139,7 @@
                             tabindex="-1"
                             class="fi-linked-records-remove"
                         >
-                            <x-filament::icon icon="ri-close-line" />
+                            <x-filament::icon icon="lucide-x" />
                         </button>
                     </span>
                 </template>

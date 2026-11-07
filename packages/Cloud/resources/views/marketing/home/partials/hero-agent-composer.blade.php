@@ -22,7 +22,7 @@
                 <div class="mcp-dock-update">
                     <div class="flex items-start gap-2.5 px-4 pb-1.5 pt-3" data-proposal-record-chip data-record-type="task">
                         <span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="h-3.5 w-3.5" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="{{ $heroDockIcons['task'] }}"/>
                             </svg>
                         </span>
@@ -36,7 +36,7 @@
                                 <span class="w-24 shrink-0 truncate text-xs leading-8 text-gray-500 sm:w-28 dark:text-gray-400">Status</span>
                                 <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 leading-8">
                                     <span class="text-gray-500 line-through decoration-gray-300 dark:text-gray-400 dark:decoration-gray-600">To do</span>
-                                    <x-heroicon-m-arrow-right class="h-3 w-3 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true"/>
+                                    <x-lucide-arrow-right class="h-3 w-3 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true"/>
                                     <span class="text-gray-900 dark:text-white">Done</span>
                                 </span>
                                 <x-cloud::home.hero-dock-field/>
@@ -48,7 +48,7 @@
                 <div class="mcp-dock-create hidden">
                     <div class="flex items-start gap-2.5 px-4 pb-1.5 pt-3" data-proposal-record-chip data-record-type="people">
                         <span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="h-3.5 w-3.5" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="{{ $heroDockIcons['people'] }}"/>
                             </svg>
                         </span>
@@ -104,19 +104,19 @@
                      same order and spacing as _composer-bar. --}}
                 <div class="flex items-center gap-2 px-3 pb-2">
                     <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-500 dark:text-gray-400">
-                        <x-heroicon-o-paper-clip class="h-4 w-4" aria-hidden="true"/>
+                        <x-lucide-paperclip class="h-4 w-4" aria-hidden="true"/>
                     </span>
 
                     <div class="ms-auto flex items-center gap-1.5">
                         <span class="inline-flex h-7 items-center gap-1 rounded-md border border-transparent px-2 text-xs font-medium text-gray-600 dark:text-gray-300">
                             <span>Auto</span>
-                            <x-heroicon-o-chevron-up-down class="h-3 w-3" aria-hidden="true"/>
+                            <x-lucide-chevrons-up-down class="h-3 w-3" aria-hidden="true"/>
                         </span>
 
                         {{-- Push-to-talk. Present in the real composer whenever a
                              transcription provider key is configured. --}}
                         <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-500 dark:text-gray-400">
-                            <x-heroicon-o-microphone class="h-4 w-4" aria-hidden="true"/>
+                            <x-lucide-mic class="h-4 w-4" aria-hidden="true"/>
                         </span>
 
                         {{-- ROUND, and gray while empty: the real send button carries
@@ -124,7 +124,7 @@
                              saturated purple square never appears on an idle
                              composer. The script tints it while a prompt is typed. --}}
                         <button id="hero-composer-send" type="button" tabindex="-1" aria-hidden="true" class="flex h-7 w-7 items-center justify-center rounded-full bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500">
-                            <x-heroicon-s-arrow-up class="h-4 w-4"/>
+                            <x-lucide-arrow-up class="h-4 w-4"/>
                         </button>
                     </div>
                 </div>

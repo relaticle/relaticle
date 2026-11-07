@@ -20,7 +20,7 @@ use Relaticle\Cloud\Admin\Metrics\OverviewCache;
 
 final class Overview extends BaseDashboard
 {
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-home';
+    protected static string|\BackedEnum|null $navigationIcon = 'lucide-house';
 
     protected static ?string $title = 'Overview';
 
@@ -64,7 +64,7 @@ final class Overview extends BaseDashboard
         return [
             Action::make('refresh')
                 ->label(__('cloud::admin.overview.refresh'))
-                ->icon('heroicon-o-arrow-path')
+                ->icon('lucide-refresh-cw')
                 ->color('gray')
                 ->action(function (): void {
                     (new OverviewCache)->flush();

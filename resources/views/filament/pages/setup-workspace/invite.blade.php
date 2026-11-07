@@ -49,7 +49,7 @@
     >
         <div class="flex items-center justify-between gap-3">
             <span class="flex items-center gap-2">
-                <x-filament::icon icon="ri-link" class="size-4 text-gray-400" />
+                <x-filament::icon icon="lucide-link" class="size-4 text-gray-400" />
                 {{ __('filament/pages/workspaces.setup_workspace.invite.link_label') }}
             </span>
 

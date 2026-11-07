@@ -52,7 +52,7 @@
             <span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-white/10">
                 {{
                     \Filament\Support\generate_icon_html(
-                        $icon ?? 'ri-notification-3-line',
+                        $icon ?? 'lucide-bell',
                         attributes: (new FilamentComponentAttributeBag)->color(IconComponent::class, $presented->getIconColor() ?? 'gray')->class(['size-4']),
                         size: IconSize::Medium,
                     )
@@ -107,7 +107,7 @@
             aria-label="{{ $unread ? __('notifications.panel.row.mark_read') : __('notifications.panel.row.mark_unread') }}"
             title="{{ $unread ? __('notifications.panel.row.mark_read') : __('notifications.panel.row.mark_unread') }}"
         >
-            <x-filament::icon :icon="$unread ? 'ri-mail-open-line' : 'ri-mail-line'" class="size-4" />
+            <x-filament::icon :icon="$unread ? 'lucide-mail-open' : 'lucide-mail'" class="size-4" />
         </button>
 
         <button
@@ -117,7 +117,7 @@
             aria-label="{{ __('notifications.panel.row.archive') }}"
             title="{{ __('notifications.panel.row.archive') }}"
         >
-            <x-filament::icon icon="ri-archive-line" class="size-4" />
+            <x-filament::icon icon="lucide-archive" class="size-4" />
         </button>
     </div>
 </li>

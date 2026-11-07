@@ -37,12 +37,12 @@ final class ListCompanies extends ListRecords
             ImportExportActionGroup::make([
                 Action::make('import')
                     ->label(__('filament/resources/company.pages.list.actions.import.label'))
-                    ->icon('heroicon-o-arrow-up-tray')
+                    ->icon('lucide-upload')
                     ->url(ImportCompanies::getUrl())
                     ->visible(ImportCompanies::canAccess(...)),
                 ExportAction::make()->exporter(CompanyExporter::class)->authorize('exportAny', Company::class),
             ])->label(__('filament/resources/company.pages.list.actions.import_export.label')),
-            CreateAction::make()->icon('heroicon-o-plus')->size(Size::Small),
+            CreateAction::make()->icon('lucide-plus')->size(Size::Small),
         ];
     }
 

@@ -29,7 +29,7 @@
                         </span>
                     </span>+ stars
                 </span>
-                <x-ri-arrow-right-up-line class="h-3 w-3 text-gray-400 dark:text-gray-500"/>
+                <x-lucide-arrow-up-right class="h-3 w-3 text-gray-400 dark:text-gray-500"/>
             </a>
 
             <h1 class="type-display mt-7 max-w-3xl md:mt-8">
@@ -64,9 +64,9 @@
                     @click="$dispatch('open-hero-demo')"
                     class="mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 transition-colors hover:text-gray-950 dark:text-gray-400 dark:hover:text-white"
                 >
-                    <x-ri-play-circle-line class="h-4 w-4"/>
+                    <x-lucide-circle-play class="h-4 w-4"/>
                     {{ __('Watch 30s demo') }}
-                    <x-ri-arrow-right-up-line class="h-3 w-3"/>
+                    <x-lucide-arrow-up-right class="h-3 w-3"/>
                 </button>
 
                 @include('cloud::marketing.home.partials.hero-demo-modal')

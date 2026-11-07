@@ -36,7 +36,6 @@ use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\Size;
 use Filament\Support\Enums\TextSize;
 use Filament\Support\Enums\Width;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Support\Facades\Gate;
@@ -184,7 +183,7 @@ trait HasRecordPageLayout
     {
         return Actions::make([
             EditAction::make()
-                ->icon('heroicon-o-pencil-square')
+                ->icon('lucide-square-pen')
                 ->color('gray')
                 ->size(Size::Small)
                 ->after(function (): void {
@@ -210,7 +209,7 @@ trait HasRecordPageLayout
                 ->hiddenLabel()
                 ->color('gray')
                 ->size(Size::Small)
-                ->icon('heroicon-m-ellipsis-horizontal')
+                ->icon('lucide-ellipsis')
                 ->dropdownPlacement('bottom-end'),
         ])
             ->key('recordActions')
@@ -226,7 +225,7 @@ trait HasRecordPageLayout
 
         $entries = collect($this->nativeDetailEntries())
             ->concat($customFields->values()->map(fn (Entry $entry): Entry => $entry
-                ->beforeLabel(Icon::make($customFieldIcons->get($entry->getName()) ?? Heroicon::OutlinedSquares2x2))))
+                ->beforeLabel(Icon::make($customFieldIcons->get($entry->getName()) ?? 'lucide-layout-grid'))))
             ->map(fn (Entry $entry): Entry => $entry
                 ->inlineLabel()
                 ->columnSpan(['default' => 'full', 'lg' => 'full'])
@@ -287,19 +286,19 @@ trait HasRecordPageLayout
             ->schema([
                 RecordChipEntry::make('creator.name')
                     ->label(__('filament/record-page.fields.created_by'))
-                    ->beforeLabel(Icon::make(Heroicon::OutlinedUserCircle))
+                    ->beforeLabel(Icon::make('lucide-circle-user'))
                     ->visible(fn (Company|People|Opportunity $record): bool => $this->hasMemberCreator($record)),
                 TextEntry::make('created_by')
                     ->label(__('filament/record-page.fields.created_by'))
-                    ->beforeLabel(Icon::make(Heroicon::OutlinedUserCircle))
+                    ->beforeLabel(Icon::make('lucide-circle-user'))
                     ->hidden(fn (Company|People|Opportunity $record): bool => $this->hasMemberCreator($record)),
                 TextEntry::make('created_at')
                     ->label(__('filament/record-page.fields.created_at'))
-                    ->beforeLabel(Icon::make(Heroicon::OutlinedCalendar))
+                    ->beforeLabel(Icon::make('lucide-calendar'))
                     ->dateTime(),
                 TextEntry::make('updated_at')
                     ->label(__('filament/record-page.fields.updated_at'))
-                    ->beforeLabel(Icon::make(Heroicon::OutlinedArrowPath))
+                    ->beforeLabel(Icon::make('lucide-refresh-cw'))
                     ->dateTime(),
             ])
             ->extraAttributes(['class' => 'fi-record-rail-section']);

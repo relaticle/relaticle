@@ -126,7 +126,7 @@
 
                     @if($index === 0 && $isChatGpt)
                         <div class="mt-auto">
-                            <x-cloud::marketing.button variant="secondary" size="sm" href="{{ $chatGptPluginUrl }}" :external="true" iconTrailing="ri-arrow-right-up-line">
+                            <x-cloud::marketing.button variant="secondary" size="sm" href="{{ $chatGptPluginUrl }}" :external="true" iconTrailing="lucide-arrow-up-right">
                                 {{ __('Open the ChatGPT plugin') }}
                             </x-cloud::marketing.button>
                         </div>

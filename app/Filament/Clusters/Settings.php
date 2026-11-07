@@ -13,7 +13,7 @@ final class Settings extends Cluster
 
     protected static ?SubNavigationPosition $subNavigationPosition = SubNavigationPosition::Start;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-cog-6-tooth';
+    protected static string|\BackedEnum|null $navigationIcon = 'lucide-settings';
 
     public static function shouldRegisterNavigation(): bool
     {

@@ -91,7 +91,7 @@ final class PeopleResource extends Resource
                                     ]))
                                     ->modalWidth(Width::Large)
                                     ->slideOver()
-                                    ->icon('heroicon-o-plus')
+                                    ->icon('lucide-plus')
                                     ->action(function (array $data, Set $set): void {
                                         $company = Company::query()->create($data);
                                         $set('company_id', $company->id);

@@ -82,8 +82,8 @@
                     class="ml-auto inline-flex min-h-7 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-xs font-medium text-gray-700 transition-colors hover:bg-tint hover:text-gray-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-gray-300 dark:hover:text-white"
                     data-self-hosted-copy
                 >
-                    <x-ri-file-copy-line x-show="! copied" class="h-3.5 w-3.5" aria-hidden="true"/>
-                    <x-ri-check-line x-show="copied" x-cloak class="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden="true"/>
+                    <x-lucide-copy x-show="! copied" class="h-3.5 w-3.5" aria-hidden="true"/>
+                    <x-lucide-check x-show="copied" x-cloak class="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden="true"/>
                     <span aria-live="polite" x-text="copied ? @js(__('Copied')) : (copyFailed ? @js(__('Press Cmd/Ctrl+C')) : @js(__('Copy')))">{{ __('Copy') }}</span>
                 </button>
             </div>

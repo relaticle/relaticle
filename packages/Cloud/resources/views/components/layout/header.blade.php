@@ -186,7 +186,7 @@
                                         class="px-4 py-1.5 rounded-full text-gray-600 dark:text-gray-400 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-white dark:hover:bg-white/[0.08] text-sm font-medium transition-colors duration-200 flex items-center gap-1 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                                         :class="openDropdown === '{{ $slug }}' && 'text-gray-900 bg-gray-100 dark:text-white dark:bg-white/[0.08]'">
                                     {{ $item->label }}
-                                    <x-ri-arrow-down-s-line class="w-3.5 h-3.5 transition-transform duration-200"
+                                    <x-lucide-chevron-down class="w-3.5 h-3.5 transition-transform duration-200"
                                                              ::class="openDropdown === '{{ $slug }}' && 'rotate-180'"/>
                                 </button>
                             </div>

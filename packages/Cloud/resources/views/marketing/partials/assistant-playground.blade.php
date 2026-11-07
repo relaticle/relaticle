@@ -21,7 +21,7 @@
             'prompt' => __('Create a task to send the proposal on Friday, on the Northwind opportunity.'),
             'tools' => [__('Create task')],
             'reply' => __('Done. The task is due Friday and attached to the Northwind renewal.'),
-            'record' => [__('Tasks'), __('Send the proposal'), [[__('Friday'), 'ri-calendar-line'], [__('Northwind renewal'), null]]],
+            'record' => [__('Tasks'), __('Send the proposal'), [[__('Friday'), 'lucide-calendar'], [__('Northwind renewal'), null]]],
         ],
         'notes' => [
             'label' => __('Recall a note'),
@@ -101,11 +101,11 @@
                                 <p class="flex flex-wrap items-center gap-1.5">
                                     @foreach($ask['tools'] as $tool)
                                         <span class="border-rail inline-flex items-center gap-1.5 rounded-md border bg-tint px-2 py-1 text-xs text-gray-600 dark:text-gray-300">
-                                            <x-ri-plug-line class="size-3.5 shrink-0 text-primary dark:text-primary-400"/>
+                                            <x-lucide-plug class="size-3.5 shrink-0 text-primary dark:text-primary-400"/>
                                             {{ __('Relaticle') }}
                                             <span aria-hidden="true">·</span>
                                             {{ $tool }}
-                                            <x-ri-check-line class="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400"/>
+                                            <x-lucide-check class="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400"/>
                                         </span>
                                     @endforeach
                                 </p>

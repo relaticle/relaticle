@@ -20,7 +20,7 @@
         <x-filament::modal
             :id="\Relaticle\Cloud\Billing\Livewire\UpgradeModal::MODAL_ID"
             width="3xl"
-            icon="ri-flashlight-line"
+            icon="lucide-zap"
             :heading="__('cloud::billing.upgrade.heading')"
             :description="__('cloud::billing.per_workspace')"
         >
@@ -38,7 +38,7 @@
                 <div class="space-y-6">
                     <div>
                         <h3 id="upgrade-plan" class="flex items-center gap-2 text-sm font-semibold text-gray-950 dark:text-white">
-                            <x-ri-stack-line class="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                            <x-lucide-layers class="h-4 w-4 text-gray-500 dark:text-gray-400" />
                             {{ __('cloud::billing.upgrade.review.plan') }}
                         </h3>
 
@@ -64,7 +64,7 @@
 
                     <div>
                         <h3 id="upgrade-billing-period" class="flex items-center gap-2 text-sm font-semibold text-gray-950 dark:text-white">
-                            <x-ri-calendar-line class="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                            <x-lucide-calendar class="h-4 w-4 text-gray-500 dark:text-gray-400" />
                             {{ __('cloud::billing.upgrade.review.billing_period') }}
                         </h3>
 
@@ -140,7 +140,7 @@
                     </x-filament::button>
 
                     <p class="mt-3 flex items-center justify-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                        <x-ri-lock-line class="h-3.5 w-3.5" />
+                        <x-lucide-lock class="h-3.5 w-3.5" />
                         {{ __('cloud::billing.upgrade.review.secure') }}
                     </p>
                 </aside>

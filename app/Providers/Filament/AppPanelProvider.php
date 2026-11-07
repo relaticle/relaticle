@@ -44,7 +44,6 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Support\BrandColors;
 use App\Support\Impersonation\Impersonator;
-use App\Support\OutlinedIcons;
 use App\Support\SupportForms;
 use Asmit\ResizedColumn\ResizedColumnPlugin;
 use Exception;
@@ -73,7 +72,6 @@ use Filament\Support\Enums\Platform;
 use Filament\Support\Enums\Size;
 use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentTimezone;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Filament\Tables\View\TablesRenderHook;
@@ -451,7 +449,6 @@ final class AppPanelProvider extends PanelProvider
             ->globalSearchFieldSuffix(fn (): string => Platform::detect() === Platform::Mac ? '⌘K' : 'Ctrl K')
             ->colors($this->panelColors())
             ->viteTheme('resources/css/filament/app/theme.css')
-            ->icons(OutlinedIcons::aliases())
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->discoverPages(in: base_path('packages/ImportWizard/src/Filament/Pages'), for: 'Relaticle\\ImportWizard\\Filament\\Pages')
@@ -503,7 +500,7 @@ final class AppPanelProvider extends PanelProvider
             ->navigationGroups([
                 NavigationGroup::make()
                     ->label(__('filament/panel.navigation_groups.tasks'))
-                    ->icon('heroicon-o-shopping-cart'),
+                    ->icon('lucide-shopping-cart'),
             ])
             ->middleware([
                 EncryptCookies::class,
@@ -671,7 +668,7 @@ final class AppPanelProvider extends PanelProvider
             ->tenantMenuItems([
                 Action::make('billing')
                     ->label(__('billing.title'))
-                    ->icon(Heroicon::OutlinedCreditCard)
+                    ->icon('lucide-credit-card')
                     ->sort(-1)
                     ->url(fn (): ?string => $this->billingUrl())
                     ->visible(fn (): bool => $this->billingUrl() !== null),
@@ -690,7 +687,7 @@ final class AppPanelProvider extends PanelProvider
         $items = [
             Action::make('settings')
                 ->label(__('filament/panel.user_menu.settings'))
-                ->icon('heroicon-m-cog-6-tooth')
+                ->icon('lucide-settings')
                 ->visible(fn (): bool => $this->shouldRegisterMenuItem())
                 ->url(fn (): string => url(Settings::getUrl())),
         ];
@@ -698,7 +695,7 @@ final class AppPanelProvider extends PanelProvider
         if (Features::hasApiFeatures()) {
             $items[] = Action::make('api_tokens')
                 ->label(__('access-tokens.user_menu'))
-                ->icon('heroicon-o-key')
+                ->icon('lucide-key')
                 ->visible(fn (): bool => $this->shouldRegisterMenuItem())
                 ->url(fn (): string => url(AccessTokens::getUrl()));
         }

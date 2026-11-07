@@ -7,7 +7,7 @@
         <template x-if="field.old">
             <span class="flex items-center gap-1.5">
                 <span class="text-gray-400 line-through decoration-gray-300 dark:text-gray-500 dark:decoration-gray-600" x-text="field.old"></span>
-                <x-heroicon-m-arrow-right class="h-3 w-3 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                <x-lucide-arrow-right class="h-3 w-3 text-gray-400 dark:text-gray-500" aria-hidden="true" />
             </span>
         </template>
 
@@ -57,7 +57,7 @@
         </template>
 
         <template x-if="field.icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="size-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="size-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" :d="field.icon"></path>
             </svg>
         </template>

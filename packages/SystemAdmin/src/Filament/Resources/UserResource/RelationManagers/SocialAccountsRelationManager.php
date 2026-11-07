@@ -16,7 +16,7 @@ final class SocialAccountsRelationManager extends RelationManager
 
     protected static ?string $title = 'Social Providers';
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-key';
+    protected static string|\BackedEnum|null $icon = 'lucide-key';
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {

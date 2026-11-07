@@ -7,7 +7,6 @@ namespace Relaticle\EmailIntegration\Enums;
 use Filament\Support\Contracts\HasDescription;
 use Filament\Support\Contracts\HasIcon;
 use Filament\Support\Contracts\HasLabel;
-use Filament\Support\Icons\Heroicon;
 
 enum EmailPrivacyTier: string implements HasDescription, HasIcon, HasLabel
 {
@@ -78,13 +77,13 @@ enum EmailPrivacyTier: string implements HasDescription, HasIcon, HasLabel
         };
     }
 
-    public function getIcon(): Heroicon
+    public function getIcon(): string
     {
         return match ($this) {
-            self::PRIVATE => Heroicon::OutlinedLockClosed,
-            self::METADATA_ONLY => Heroicon::OutlinedEnvelope,
-            self::SUBJECT => Heroicon::OutlinedEnvelopeOpen,
-            self::FULL => Heroicon::OutlinedInboxStack,
+            self::PRIVATE => 'lucide-lock',
+            self::METADATA_ONLY => 'lucide-mail',
+            self::SUBJECT => 'lucide-mail-open',
+            self::FULL => 'lucide-inbox',
         };
     }
 }

@@ -26,7 +26,7 @@
 <div {{ $attributes->class(['flex max-w-64 items-center gap-2.5 rounded-xl border border-gray-200 bg-white px-2.5 py-1.5 dark:border-gray-700 dark:bg-gray-900']) }}>
     <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[9px] font-bold leading-none {{ $tint }}">
         @if ($extension === '')
-            <x-heroicon-m-paper-clip class="h-4 w-4" />
+            <x-lucide-paperclip class="h-4 w-4" />
         @else
             {{ mb_substr($extension, 0, 4) }}
         @endif

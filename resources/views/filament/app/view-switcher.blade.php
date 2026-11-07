@@ -1,8 +1,8 @@
 @php
     $icons = [
-        'list' => 'heroicon-o-list-bullet',
-        'board' => 'heroicon-o-view-columns',
-        'cards' => 'heroicon-o-squares-2x2',
+        'list' => 'lucide-list',
+        'board' => 'lucide-columns-3',
+        'cards' => 'lucide-layout-grid',
     ];
 
     $active = collect($views)->search(fn (array $view): bool => $view['active']);
@@ -18,7 +18,7 @@
         >
             {{ __("filament/pages/boards.view_switcher.{$active}") }}
 
-            <x-filament::icon icon="heroicon-m-chevron-down" class="fi-view-switcher-chevron" />
+            <x-filament::icon icon="lucide-chevron-down" class="fi-view-switcher-chevron" />
         </x-filament::button>
     </x-slot>
 

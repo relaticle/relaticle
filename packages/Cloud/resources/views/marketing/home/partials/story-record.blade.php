@@ -22,7 +22,7 @@
 <x-cloud::marketing.window :class="$cardClass ?? 'w-full max-w-lg'">
     <div class="flex min-w-0 items-center gap-2.5 px-4 py-3">
         <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-500 text-white" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icon('opportunity') }}"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icon('opportunity') }}"/></svg>
         </span>
         <p class="min-w-0 flex-1 truncate text-sm font-semibold text-gray-900 dark:text-white">{{ __('Northwind renewal') }}</p>
         <span class="grid">
@@ -42,7 +42,7 @@
                 <dd @if($writer) data-story-field="{{ $writer }}" @endif class="relative flex min-w-0 flex-1 items-center justify-between gap-2 font-medium text-gray-900 dark:text-white">
                     @if($type)
                         <span class="{{ $chip }}">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3 w-3 text-gray-400" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icon($type) }}"/></svg>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="h-3 w-3 text-gray-400" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icon($type) }}"/></svg>
                             {{ $value }}
                         </span>
                     @else
@@ -78,7 +78,7 @@
             <span class="h-4 w-4 shrink-0 rounded-full border-2 border-gray-300 dark:border-white/20" aria-hidden="true"></span>
             <p class="min-w-0 flex-1 truncate text-sm font-medium text-gray-900 dark:text-white">{{ __('Follow up with Lena Ortiz') }}</p>
             <span class="inline-flex shrink-0 items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
-                <x-ri-calendar-line class="h-3 w-3"/>{{ __('Thursday') }}
+                <x-lucide-calendar class="h-3 w-3"/>{{ __('Thursday') }}
             </span>
             <x-cloud::marketing.actor as="claude" class="shrink-0"/>
         </div>

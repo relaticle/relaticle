@@ -32,7 +32,7 @@
 
             <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
                 <div class="flex items-center gap-2">
-                    <x-heroicon-o-clock class="h-4 w-4" />
+                    <x-lucide-clock class="h-4 w-4" />
                     <span>{{ __('filament/pages/record-emails.actions.summarize_thread.generated', ['time' => $summary->created_at->diffForHumans()]) }}</span>
                 </div>
 
@@ -43,13 +43,13 @@
                 >
                     <template x-if="! copied">
                         <span class="flex items-center gap-1.5">
-                            <x-heroicon-o-clipboard-document class="h-4 w-4" />
+                            <x-lucide-clipboard class="h-4 w-4" />
                             <span>{{ __('filament/pages/record-emails.actions.summarize_thread.copy') }}</span>
                         </span>
                     </template>
                     <template x-if="copied">
                         <span class="flex items-center gap-1.5 text-success-600 dark:text-success-400">
-                            <x-heroicon-o-check class="h-4 w-4" />
+                            <x-lucide-check class="h-4 w-4" />
                             <span>{{ __('filament/pages/record-emails.actions.summarize_thread.copied') }}</span>
                         </span>
                     </template>

@@ -20,7 +20,7 @@
     <div class="flex min-h-screen items-center justify-center bg-gray-50 px-4 dark:bg-gray-950">
         <div class="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
             <div class="mx-auto mb-5 flex size-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
-                <x-filament::icon icon="ri-inbox-archive-line" class="size-6 text-gray-500 dark:text-gray-400" />
+                <x-filament::icon icon="lucide-archive" class="size-6 text-gray-500 dark:text-gray-400" />
             </div>
 
             <h1 class="text-lg font-semibold text-gray-950 dark:text-white">

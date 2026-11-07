@@ -5,11 +5,11 @@
 
 @php
     $actors = [
-        'you' => [__('You'), 'ri-user-3-fill', 'bg-gray-900 text-white dark:bg-white dark:text-gray-950'],
-        'rela' => [(string) config('chat.assistant_name'), 'ri-sparkling-2-fill', 'bg-primary-600 text-white'],
+        'you' => [__('You'), 'lucide-user', 'bg-gray-900 text-white dark:bg-white dark:text-gray-950'],
+        'rela' => [(string) config('chat.assistant_name'), 'lucide-sparkles', 'bg-primary-600 text-white'],
         'claude' => ['Claude', 'ri-claude-fill', 'bg-anthropic-strong text-white'],
         'chatgpt' => ['ChatGPT', 'ri-openai-fill', 'bg-gray-600 text-white dark:bg-gray-300 dark:text-gray-950'],
-        'mailbox' => [__('Mailbox'), 'ri-mail-fill', 'bg-emerald-700 text-white'],
+        'mailbox' => [__('Mailbox'), 'lucide-mail', 'bg-emerald-700 text-white'],
     ];
 
     [$label, $icon, $classes] = $actors[$as];

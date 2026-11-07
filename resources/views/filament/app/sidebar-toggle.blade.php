@@ -45,6 +45,6 @@
     }"
     class="fi-sidebar-toggle-btn"
 >
-    <x-ri-sidebar-fold-line class="fi-sidebar-toggle-icon fi-sidebar-toggle-icon-collapse" aria-hidden="true" />
-    <x-ri-sidebar-unfold-line class="fi-sidebar-toggle-icon fi-sidebar-toggle-icon-expand" aria-hidden="true" />
+    <x-lucide-panel-left-close class="fi-sidebar-toggle-icon fi-sidebar-toggle-icon-collapse" aria-hidden="true" />
+    <x-lucide-panel-left-open class="fi-sidebar-toggle-icon fi-sidebar-toggle-icon-expand" aria-hidden="true" />
 </button>

@@ -14,7 +14,7 @@
         <img src="{{ $request['avatar'] }}" alt="" class="size-8 shrink-0 rounded-full object-cover" />
     @else
         <span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400">
-            <x-filament::icon icon="ri-inbox-line" class="size-4" />
+            <x-filament::icon icon="lucide-inbox" class="size-4" />
         </span>
     @endif
 

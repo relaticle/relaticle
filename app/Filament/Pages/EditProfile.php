@@ -24,7 +24,7 @@ final class EditProfile extends Page
 
     protected static ?int $navigationSort = 1;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-user-circle';
+    protected static string|\BackedEnum|null $navigationIcon = 'lucide-circle-user';
 
     /** @var class-string<Cluster>|null */
     protected static ?string $cluster = Settings::class;

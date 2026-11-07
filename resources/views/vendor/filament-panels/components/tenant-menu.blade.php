@@ -102,7 +102,7 @@
             </span>
 
             {{
-                \Filament\Support\generate_icon_html(\Filament\Support\Icons\Heroicon::ChevronDown, alias: \Filament\View\PanelsIconAlias::TENANT_MENU_TOGGLE_BUTTON, attributes: new \Filament\Support\View\ComponentAttributeBag([
+                \Filament\Support\generate_icon_html('lucide-chevron-down', alias: \Filament\View\PanelsIconAlias::TENANT_MENU_TOGGLE_BUTTON, attributes: new \Filament\Support\View\ComponentAttributeBag([
                     'x-show' => $isSidebarCollapsibleOnDesktop ? '$store.sidebar.isOpen' : null,
                     'x-transition:enter' => $isSidebarCollapsibleOnDesktop ? 'fi-transition-enter' : null,
                     'x-transition:enter-start' => $isSidebarCollapsibleOnDesktop ? 'fi-transition-enter-start' : null,

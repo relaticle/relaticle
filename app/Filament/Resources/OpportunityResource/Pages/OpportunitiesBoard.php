@@ -28,7 +28,6 @@ use Filament\Support\Enums\Size;
 use Filament\Support\Enums\TextSize;
 use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentTimezone;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\JoinClause;
@@ -90,7 +89,7 @@ final class OpportunitiesBoard extends BoardResourcePage
                     ?->visible(fn (?string $state): bool => filled($state))
                     ->badge()
                     ->color('success')
-                    ->icon(Heroicon::OutlinedCurrencyDollar)
+                    ->icon('lucide-circle-dollar-sign')
                     ->grow(false)
                     ->hiddenLabel();
 
@@ -98,7 +97,7 @@ final class OpportunitiesBoard extends BoardResourcePage
                     ?->visible(fn (?string $state): bool => filled($state))
                     ->badge()
                     ->color('gray')
-                    ->icon(Heroicon::OutlinedCalendar)
+                    ->icon('lucide-calendar')
                     ->grow(false)
                     ->hiddenLabel()
                     ->formatStateUsing(fn (?string $state): string => $this->formatCloseDateBadge($state));
@@ -141,7 +140,7 @@ final class OpportunitiesBoard extends BoardResourcePage
                 ->label(__('filament/pages/boards.opportunities.actions.edit'))
                 ->slideOver()
                 ->modalWidth(Width::ExtraLarge)
-                ->icon('heroicon-o-pencil-square')
+                ->icon('lucide-square-pen')
                 ->schema(OpportunityForm::get(...))
                 ->fillForm(fn (Opportunity $record): array => [
                     'name' => $record->name,
@@ -155,7 +154,7 @@ final class OpportunitiesBoard extends BoardResourcePage
             Action::make('delete')
                 ->authorize(fn (?Opportunity $record): bool => $record instanceof Opportunity && Gate::allows('delete', $record))
                 ->label(__('filament/pages/boards.opportunities.actions.delete'))
-                ->icon('heroicon-o-trash')
+                ->icon('lucide-trash')
                 ->color('danger')
                 ->requiresConfirmation()
                 ->action(function (Opportunity $record): void {
@@ -205,7 +204,7 @@ final class OpportunitiesBoard extends BoardResourcePage
         return CreateAction::make()
             ->authorize(fn (): bool => Gate::allows('create', Opportunity::class))
             ->label(__('filament/pages/boards.opportunities.actions.add'))
-            ->icon('heroicon-o-plus')
+            ->icon('lucide-plus')
             ->iconButton()
             ->modalWidth(Width::Large)
             ->slideOver(false)

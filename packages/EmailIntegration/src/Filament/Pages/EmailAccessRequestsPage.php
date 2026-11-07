@@ -32,7 +32,7 @@ final class EmailAccessRequestsPage extends Page implements HasTable
 
     protected static bool $shouldRegisterNavigation = false;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-key';
+    protected static string|\BackedEnum|null $navigationIcon = 'lucide-key';
 
     protected static ?int $navigationSort = 6;
 

@@ -8,7 +8,6 @@ use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -33,7 +32,7 @@ final class ImportHistory extends Page implements HasTable
      */
     private const int STALLED_AFTER_MINUTES = 30;
 
-    protected static string|null|BackedEnum $navigationIcon = Heroicon::OutlinedClock;
+    protected static string|null|BackedEnum $navigationIcon = 'lucide-clock';
 
     protected static ?string $navigationLabel = 'Import History';
 
@@ -120,7 +119,7 @@ final class ImportHistory extends Page implements HasTable
             ->actions([
                 Action::make('downloadFailedRows')
                     ->label('Failed Rows')
-                    ->icon(Heroicon::OutlinedArrowDownTray)
+                    ->icon('lucide-download')
                     ->color('danger')
                     ->url(fn (Import $record): string => URL::temporarySignedRoute(
                         'import-history.failed-rows.download',
@@ -135,7 +134,7 @@ final class ImportHistory extends Page implements HasTable
                 // Only offered once the run is old enough that it cannot still be working.
                 Action::make('markFailed')
                     ->label('Mark as failed')
-                    ->icon(Heroicon::OutlinedExclamationTriangle)
+                    ->icon('lucide-triangle-exclamation-point')
                     ->color('danger')
                     ->requiresConfirmation()
                     ->modalDescription('This import stopped responding. Marking it failed lets you start a new one from the same file.')

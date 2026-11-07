@@ -26,7 +26,7 @@ final class ComposeEmailAction extends Action
         parent::setUp();
 
         $this->label(__('filament/concerns/email-compose.actions.compose_email.label'))
-            ->icon('heroicon-o-envelope')
+            ->icon('lucide-mail')
             ->color('gray')
             ->visible(fn (Model $record): bool => Feature::active(EmailIntegration::class)
                 && ! resolve(EmailVisibilityService::class)->hidesRecordMailbox($record))

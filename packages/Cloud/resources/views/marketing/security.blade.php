@@ -22,60 +22,60 @@
     );
 
     $account = [
-        ['ri-fingerprint-line', __('Passkeys'), __('Sign in with a passkey instead of a password. Passwords are stored hashed, never in plain text.')],
-        ['ri-shield-keyhole-line', __('Two-factor authentication'), __('Require an authenticator code on every sign-in that does not use a passkey. You save recovery codes when you turn it on.')],
-        ['ri-login-circle-line', __('Google and Microsoft sign-in'), __('Sign in with the Google or Microsoft account you already use for work.')],
-        ['ri-logout-box-r-line', __('Session control'), __('Sign out every other browser session from Settings, Security.')],
+        ['lucide-fingerprint-pattern', __('Passkeys'), __('Sign in with a passkey instead of a password. Passwords are stored hashed, never in plain text.')],
+        ['lucide-shield-ellipsis', __('Two-factor authentication'), __('Require an authenticator code on every sign-in that does not use a passkey. You save recovery codes when you turn it on.')],
+        ['lucide-log-in', __('Google and Microsoft sign-in'), __('Sign in with the Google or Microsoft account you already use for work.')],
+        ['lucide-log-out', __('Session control'), __('Sign out every other browser session from Settings, Security.')],
     ];
 
     $workspace = [
-        ['ri-building-4-line', __('One workspace per record'), __('Every record belongs to one workspace. Each request is checked against that workspace before it reads or writes.')],
-        ['ri-team-line', __('Four roles'), __('Owner, Admin, Member and Viewer decide what each person can see and change.')],
-        ['ri-history-line', __('A log of every change'), __('The activity log on a record shows each field change and who made it.')],
+        ['lucide-building-complex', __('One workspace per record'), __('Every record belongs to one workspace. Each request is checked against that workspace before it reads or writes.')],
+        ['lucide-users', __('Four roles'), __('Owner, Admin, Member and Viewer decide what each person can see and change.')],
+        ['lucide-rotate-ccw-clock', __('A log of every change'), __('The activity log on a record shows each field change and who made it.')],
     ];
 
     $ai = [
         [
-            'ri-sparkling-2-line',
+            'lucide-sparkles',
             __('The built-in assistant'),
             $aiProviders->isEmpty()
                 ? __('A request to :name, a voice message or an email summary sends the content needed to answer it to an AI provider. :name proposes every change as a card and waits for your approval.', ['name' => $assistantName])
                 : __('A request to :name, a voice message or an email summary sends the content needed to answer it to an AI provider: :providers. :name proposes every change as a card and waits for your approval.', ['name' => $assistantName, 'providers' => $aiProviders->join(', ', ' or ')]),
         ],
         [
-            'ri-plug-line',
+            'lucide-plug',
             __('Assistants you connect'),
             __('Claude, ChatGPT and other MCP clients receive only what they request through the tools you authorized, inside the one workspace you picked. Their changes apply directly. Relaticle does not see or store the conversation in your assistant.'),
         ],
         [
-            'ri-hard-drive-3-line',
+            'lucide-hard-drive',
             __('On your own server'),
             __('Self-host Relaticle with your own provider key, or with a local model through Ollama. With a local model, the assistant sends nothing to an outside AI provider.'),
         ],
     ];
 
     $email = [
-        ['ri-mail-check-line', __('Only the account you connect'), __('Relaticle reads mail and calendar events only from an account you connect, and never changes, labels or deletes messages in your mailbox. It sends email and answers invitations only when you do that from Relaticle.')],
-        ['ri-lock-2-line', __('Encrypted tokens'), __('Mailbox access tokens are encrypted at rest. Disconnecting deletes them.')],
+        ['lucide-mail-check', __('Only the account you connect'), __('Relaticle reads mail and calendar events only from an account you connect, and never changes, labels or deletes messages in your mailbox. It sends email and answers invitations only when you do that from Relaticle.')],
+        ['lucide-lock', __('Encrypted tokens'), __('Mailbox access tokens are encrypted at rest. Disconnecting deletes them.')],
     ];
 
     $tokens = [
-        ['ri-key-2-line', __('Scoped tokens'), __('A personal access token is stored hashed and carries only the permissions you give it.')],
-        ['ri-timer-line', __('Expiring connector access'), __('Connector access tokens expire after 30 days and refresh tokens after 90.')],
-        ['ri-close-circle-line', __('Instant revoke'), __('Revoke a token or a connector under Settings, Access Tokens. It stops working at once.')],
+        ['lucide-key-round', __('Scoped tokens'), __('A personal access token is stored hashed and carries only the permissions you give it.')],
+        ['lucide-timer', __('Expiring connector access'), __('Connector access tokens expire after 30 days and refresh tokens after 90.')],
+        ['lucide-circle-x', __('Instant revoke'), __('Revoke a token or a connector under Settings, Access Tokens. It stops working at once.')],
     ];
 
     $ownership = [
-        ['ri-download-2-line', __('Export'), __('Download every record type as CSV or Excel, custom fields included. The REST API reads the same records. Export works while the workspace is active.')],
-        ['ri-delete-bin-line', __('Delete'), __('Ask for deletion at privacy@relaticle.com. An account scheduled for deletion is removed after a 30-day grace period. Records in shared workspaces remain. We delete a paused trial workspace that no one signs in to for 60 days, after two emails to the owner.')],
-        ['ri-server-line', __('Leave'), __('Relaticle is open source under AGPL-3.0. Move to your own server whenever you want.')],
+        ['lucide-download', __('Export'), __('Download every record type as CSV or Excel, custom fields included. The REST API reads the same records. Export works while the workspace is active.')],
+        ['lucide-trash', __('Delete'), __('Ask for deletion at privacy@relaticle.com. An account scheduled for deletion is removed after a 30-day grace period. Records in shared workspaces remain. We delete a paused trial workspace that no one signs in to for 60 days, after two emails to the owner.')],
+        ['lucide-server', __('Leave'), __('Relaticle is open source under AGPL-3.0. Move to your own server whenever you want.')],
     ];
 
     $glance = [
-        ['ri-brain-line', __('No training on your data'), __('Relaticle does not train AI models on your CRM data.'), '#ai'],
-        ['ri-checkbox-circle-line', __(':name asks first', ['name' => $assistantName]), __('The built-in assistant proposes each change and waits for you.'), '#ai'],
-        ['ri-fingerprint-line', __('Passkeys and two-factor'), __('Sign in with a passkey, or require an authenticator code.'), '#account'],
-        ['ri-open-source-line', __('Open source'), __('AGPL-3.0. Read the code, or run it on your own server.'), '#data'],
+        ['lucide-brain', __('No training on your data'), __('Relaticle does not train AI models on your CRM data.'), '#ai'],
+        ['lucide-circle-check', __(':name asks first', ['name' => $assistantName]), __('The built-in assistant proposes each change and waits for you.'), '#ai'],
+        ['lucide-fingerprint-pattern', __('Passkeys and two-factor'), __('Sign in with a passkey, or require an authenticator code.'), '#account'],
+        ['lucide-git-fork', __('Open source'), __('AGPL-3.0. Read the code, or run it on your own server.'), '#data'],
     ];
 
     $policyLink = [route('policy.show'), __('Read the privacy policy for sharing settings, deletion and the Google Limited Use commitment.')];

@@ -19,7 +19,7 @@
             </p>
             @if($inquiry)
                 <a href="{{ route('pricing') }}" class="mt-5 inline-flex items-center gap-2 text-sm font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white">
-                    <x-ri-arrow-left-line class="size-4" />
+                    <x-lucide-arrow-left class="size-4" />
                     {{ __('Back to pricing') }}
                 </a>
             @endif
@@ -37,8 +37,8 @@
                     <x-cloud::marketing.eyebrow class="mb-4">{{ __('Other ways in') }}</x-cloud::marketing.eyebrow>
                     <ul class="divide-rail border-rail divide-y border-y">
                         @feature(App\Features\Documentation::class)
-                            <li><a href="{{ route('help.index') }}" class="flex items-center gap-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-gray-950 dark:text-gray-300 dark:hover:text-white"><x-ri-lifebuoy-line class="size-4 text-gray-400"/>Help center</a></li>
-                            <li><a href="{{ route('documentation.index') }}" class="flex items-center gap-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-gray-950 dark:text-gray-300 dark:hover:text-white"><x-ri-book-open-line class="size-4 text-gray-400"/>Developer Docs</a></li>
+                            <li><a href="{{ route('help.index') }}" class="flex items-center gap-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-gray-950 dark:text-gray-300 dark:hover:text-white"><x-lucide-life-buoy class="size-4 text-gray-400"/>Help center</a></li>
+                            <li><a href="{{ route('documentation.index') }}" class="flex items-center gap-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-gray-950 dark:text-gray-300 dark:hover:text-white"><x-lucide-book-open class="size-4 text-gray-400"/>Developer Docs</a></li>
                         @endfeature
                         <li><a href="{{ route('discord') }}" target="_blank" class="flex items-center gap-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-gray-950 dark:text-gray-300 dark:hover:text-white"><x-ri-discord-fill class="size-4 text-gray-400"/>Join Discord community</a></li>
                         <li><a href="https://github.com/relaticle/relaticle" target="_blank" class="flex items-center gap-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-gray-950 dark:text-gray-300 dark:hover:text-white"><x-ri-github-fill class="size-4 text-gray-400"/>GitHub repository</a></li>
@@ -50,7 +50,7 @@
                 @if(session('success'))
                     <div class="border-rail rounded-xl border p-10 text-center">
                         <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                            <x-ri-check-line class="w-6 h-6 text-primary"/>
+                            <x-lucide-check class="w-6 h-6 text-primary"/>
                         </div>
                         <h3 class="text-lg font-semibold text-gray-950 dark:text-white">Message sent</h3>
                         <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ session('success') }}</p>

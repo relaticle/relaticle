@@ -11,7 +11,6 @@ use Filament\Forms\Components\RichEditor\Actions\LinkAction;
 use Filament\Forms\Components\RichEditor\Plugins\Contracts\RichContentPlugin;
 use Filament\Forms\Components\RichEditor\RichEditorTool;
 use Filament\Support\Facades\FilamentAsset;
-use Filament\Support\Icons\Heroicon;
 use LogicException;
 use Tiptap\Core\Extension;
 
@@ -20,7 +19,7 @@ use function Filament\Support\generate_icon_html;
 final class SlashMenuPlugin implements RichContentPlugin
 {
     // List only shortcuts verified to fire: there is no code-fence input rule.
-    /** @var array<string, array{group: string, shortcut?: string, icon?: Heroicon, optional?: bool}> */
+    /** @var array<string, array{group: string, shortcut?: string, icon?: string, optional?: bool}> */
     private const array ITEMS = [
         'h1' => ['group' => 'text', 'shortcut' => '#'],
         'h2' => ['group' => 'text', 'shortcut' => '##'],
@@ -34,7 +33,7 @@ final class SlashMenuPlugin implements RichContentPlugin
         'table' => ['group' => 'insert'],
         'details' => ['group' => 'insert'],
         'horizontalRule' => ['group' => 'insert', 'shortcut' => '---'],
-        'attachFiles' => ['group' => 'insert', 'icon' => Heroicon::OutlinedPhoto],
+        'attachFiles' => ['group' => 'insert', 'icon' => 'lucide-image'],
     ];
 
     public static function make(): self
@@ -116,11 +115,11 @@ final class SlashMenuPlugin implements RichContentPlugin
         ];
     }
 
-    private static function iconHtml(RichEditorTool $tool, ?Heroicon $icon): string
+    private static function iconHtml(RichEditorTool $tool, ?string $icon): string
     {
         return (string) generate_icon_html(
             $icon ?? $tool->getIcon(),
-            alias: $icon instanceof Heroicon ? null : $tool->getIconAlias(),
+            alias: $icon === null ? $tool->getIconAlias() : null,
         )?->toHtml();
     }
 }

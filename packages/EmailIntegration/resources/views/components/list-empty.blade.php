@@ -7,7 +7,7 @@
     @if (filled($search))
         <x-filament::empty-state
             :heading="__('filament/pages/email-inbox.list_empty.no_results', ['search' => $search])"
-            icon="heroicon-o-magnifying-glass"
+            icon="lucide-search"
             icon-color="gray"
             :contained="false"
         />
@@ -15,14 +15,14 @@
         <x-filament::empty-state
             :heading="__('filament/pages/record-emails.empty.heading')"
             :description="__('filament/pages/record-emails.empty.description')"
-            icon="heroicon-o-envelope"
+            icon="lucide-mail"
             icon-color="gray"
             :contained="false"
         >
             @if ($canCompose)
                 <x-slot:footer>
                     <x-filament::button
-                        icon="heroicon-o-envelope"
+                        icon="lucide-mail"
                         wire:click="$dispatch('composer:open')"
                     >
                         {{ __('filament/pages/record-emails.empty.compose') }}

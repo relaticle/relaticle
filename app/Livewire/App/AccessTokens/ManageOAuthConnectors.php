@@ -8,7 +8,6 @@ use App\Actions\Mcp\RevokeOAuthConnector;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\Workspace;
 use Filament\Actions\Action;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -75,7 +74,7 @@ final class ManageOAuthConnectors extends BaseLivewireComponent implements HasTa
             ->recordActions([
                 Action::make('revoke')
                     ->label(__('access-tokens.connectors.actions.revoke'))
-                    ->icon(Heroicon::OutlinedNoSymbol)
+                    ->icon('lucide-ban')
                     ->iconButton()
                     ->color('danger')
                     ->requiresConfirmation()

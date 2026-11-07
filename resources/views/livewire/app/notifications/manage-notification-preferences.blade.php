@@ -20,7 +20,7 @@
         <div class="-mx-6 -my-4 divide-y divide-gray-200 dark:divide-white/10">
             <div class="flex items-center gap-4 px-6 py-3">
                 <div class="flex flex-1 items-center gap-2 text-sm font-medium text-gray-500 dark:text-gray-400">
-                    <x-filament::icon icon="ri-notification-3-line" class="size-4" />
+                    <x-filament::icon icon="lucide-bell" class="size-4" />
                     {{ __('notifications.collaboration.notify_me_about') }}
                 </div>
                 @foreach($channels as $channel)

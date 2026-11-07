@@ -70,9 +70,15 @@
   build fails when a plugin imports an unlisted `@tiptap/` package or another ProseMirror module, when code outside the
   plugins imports a listed package, and when a plugin's chunk loses the default export Filament imports.
 
-## Icons (Remix Icon)
+## Icons (Lucide)
 
-- **Brand/social icons** (GitHub, Discord, Twitter, LinkedIn) → always `fill` variant
-- **UI/functional icons** (arrows, chevrons, checks, close) → always `line` variant
-- **Feature/section icons** → `line` variant, stay consistent within a section
-- **Status/emphasis icons** (success checkmarks, alerts) → `fill` variant
+- UI icons are Lucide through `mallardduck/blade-lucide-icons`: `lucide-<name>`, outline only. Take names from
+  Lucide's current list. The package still ships pre-1.0 aliases with stale artwork, such as `check-circle` for
+  `circle-check`.
+- Every Lucide icon carries the `lucide` class from `config/blade-lucide-icons.php`, and `resources/css/theme.css`
+  draws it at a 1.75 stroke. A raw `<svg>` that draws `IconPath` data sets `stroke-width="1.75"` itself.
+- Filament's own icons map to Lucide in `App\Support\PanelIcons`, registered for every panel in
+  `AppServiceProvider`. `tests/Feature/Filament/PanelIconsTest.php` fails when a panel draws Filament's default set.
+- Brand logos (GitHub, Discord, Claude, OpenAI, Google) stay Remix Icon `fill`, because Lucide draws no brand logos.
+- `App\Support\IconPath::for()` turns an icon into one `d` for chat chips and record glyphs. It throws on an SVG
+  element it cannot convert.

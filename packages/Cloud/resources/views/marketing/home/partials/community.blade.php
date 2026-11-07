@@ -8,11 +8,11 @@
     $links = [
         ['https://github.com/relaticle/relaticle', 'ri-github-fill', 'text-gray-900 dark:text-white', __('GitHub'), __('Star the repo, report issues, and read every line of code.'), true],
         [route('discord'), 'ri-discord-fill', 'text-[#5865F2]', __('Discord'), __('Talk with the team and other builders, and share ideas.'), true],
-        [route('selfHosted'), 'ri-server-line', 'text-gray-900 dark:text-white', __('Self-host'), __('Deploy with Docker Compose on your own server. Your CRM database stays there.'), false],
+        [route('selfHosted'), 'lucide-server', 'text-gray-900 dark:text-white', __('Self-host'), __('Deploy with Docker Compose on your own server. Your CRM database stays there.'), false],
     ];
 
     if (\Laravel\Pennant\Feature::active(\App\Features\Documentation::class)) {
-        $links[] = [route('documentation.index'), 'ri-book-open-line', 'text-primary dark:text-primary-400', __('Developer docs'), __('Self-host with Docker, use the REST API, and connect agents over MCP.'), false];
+        $links[] = [route('documentation.index'), 'lucide-book-open', 'text-primary dark:text-primary-400', __('Developer docs'), __('Self-host with Docker, use the REST API, and connect agents over MCP.'), false];
     }
 @endphp
 
@@ -38,7 +38,7 @@
             <a href="{{ $url }}" @if($external) target="_blank" rel="noopener noreferrer" @endif class="bg-surface hover:bg-tint group flex flex-col p-6 transition-colors md:p-8">
                 <div class="mb-5 flex items-center justify-between">
                     <x-dynamic-component :component="$icon" class="h-5 w-5 {{ $iconClass }}"/>
-                    <x-ri-arrow-right-up-line class="h-4 w-4 text-gray-300 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-gray-500 dark:text-gray-600"/>
+                    <x-lucide-arrow-up-right class="h-4 w-4 text-gray-300 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-gray-500 dark:text-gray-600"/>
                 </div>
                 <h3 class="text-base font-medium text-gray-950 dark:text-white">{{ $title }}</h3>
                 <p class="mt-1.5 text-sm leading-relaxed text-gray-500 dark:text-gray-400">{{ $description }}</p>

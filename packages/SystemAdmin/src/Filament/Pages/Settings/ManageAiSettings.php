@@ -23,7 +23,6 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Date;
 use Laravel\Ai\Enums\Lab;
@@ -48,7 +47,7 @@ use UnitEnum;
  */
 final class ManageAiSettings extends Page
 {
-    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-cpu-chip';
+    protected static string|BackedEnum|null $navigationIcon = 'lucide-cpu';
 
     protected static string|UnitEnum|null $navigationGroup = 'AI';
 
@@ -154,7 +153,7 @@ final class ManageAiSettings extends Page
                                     Hidden::make('output_per_mtok'),
                                     Toggle::make('auto')->inline(false),
                                     Toggle::make('enabled')->inline(false),
-                                    Icon::make(fn (Get $get): Heroicon => $this->capabilityBadge($get)['icon'])
+                                    Icon::make(fn (Get $get): string => $this->capabilityBadge($get)['icon'])
                                         ->color(fn (Get $get): string => $this->capabilityBadge($get)['color'])
                                         ->tooltip(fn (Get $get): string => $this->capabilityBadge($get)['tooltip']),
                                 ])
@@ -164,7 +163,7 @@ final class ManageAiSettings extends Page
                                 // readable.
                                 ->extraItemActions([
                                     Action::make('configure')
-                                        ->icon('heroicon-o-cog-6-tooth')
+                                        ->icon('lucide-settings')
                                         ->color('gray')
                                         ->modalHeading('Model configuration')
                                         ->modalDescription('Who may reach this model and what a turn on it costs.')
@@ -236,7 +235,7 @@ final class ManageAiSettings extends Page
         return [
             Action::make('refreshModelLists')
                 ->label('Refresh model lists')
-                ->icon('heroicon-o-arrow-path')
+                ->icon('lucide-refresh-cw')
                 ->color('gray')
                 ->action(function (): void {
                     $catalog = resolve(ProviderModelCatalog::class);
@@ -430,7 +429,7 @@ final class ManageAiSettings extends Page
      * row from every picker, or nothing has been measured yet. That last one is a
      * promise only an enabled row keeps, since verified() skips disabled entries.
      *
-     * @return array{icon: Heroicon, color: string, tooltip: string}
+     * @return array{icon: string, color: string, tooltip: string}
      */
     private function capabilityBadge(Get $get): array
     {
@@ -441,23 +440,23 @@ final class ManageAiSettings extends Page
 
         if (! $measurement instanceof Measurement) {
             return (bool) $get('enabled')
-                ? ['icon' => Heroicon::OutlinedClock, 'color' => 'warning', 'tooltip' => 'Not measured yet. Saving probes this model against its provider.']
-                : ['icon' => Heroicon::OutlinedMinusCircle, 'color' => 'gray', 'tooltip' => 'Disabled, so it is never probed and never served.'];
+                ? ['icon' => 'lucide-clock', 'color' => 'warning', 'tooltip' => 'Not measured yet. Saving probes this model against its provider.']
+                : ['icon' => 'lucide-circle-minus', 'color' => 'gray', 'tooltip' => 'Disabled, so it is never probed and never served.'];
         }
 
         $guard = $measurement->writeGuard->value;
 
         if (! $measurement->supportsTools) {
-            return ['icon' => Heroicon::OutlinedExclamationTriangle, 'color' => 'danger', 'tooltip' => "No tool calls, so this model is offered to nobody. Write guard: {$guard}."];
+            return ['icon' => 'lucide-triangle-exclamation-point', 'color' => 'danger', 'tooltip' => "No tool calls, so this model is offered to nobody. Write guard: {$guard}."];
         }
 
         $measured = $this->verifiedAgo($measurement->verifiedAt);
 
         if ($measured === null) {
-            return ['icon' => Heroicon::OutlinedCheckCircle, 'color' => 'gray', 'tooltip' => "Declares tool calls and the {$guard} write guard, but no probe has run on this install."];
+            return ['icon' => 'lucide-circle-check', 'color' => 'gray', 'tooltip' => "Declares tool calls and the {$guard} write guard, but no probe has run on this install."];
         }
 
-        return ['icon' => Heroicon::OutlinedCheckBadge, 'color' => 'success', 'tooltip' => "The provider accepted a real request {$measured}. Tool calls, {$guard} write guard."];
+        return ['icon' => 'lucide-badge-check', 'color' => 'success', 'tooltip' => "The provider accepted a real request {$measured}. Tool calls, {$guard} write guard."];
     }
 
     /**

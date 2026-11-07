@@ -32,7 +32,7 @@ final class Dashboard extends Page
 
     public const string AFTER_COMPOSER_RENDER_HOOK = 'dashboard.after-composer';
 
-    protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-home';
+    protected static string|null|BackedEnum $navigationIcon = 'lucide-house';
 
     protected static ?string $navigationLabel = null;
 
@@ -219,7 +219,7 @@ final class Dashboard extends Page
     {
         return $action
             ->model(Task::class)
-            ->icon('heroicon-o-plus')
+            ->icon('lucide-plus')
             ->slideOver()
             ->schema(fn (Schema $schema): Schema => TaskForm::get($schema));
     }

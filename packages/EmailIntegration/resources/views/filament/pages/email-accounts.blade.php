@@ -54,7 +54,7 @@
                                 @php($syncErrorLabel = $syncErrorReason ?? ($account->last_synced_at ? __('filament/pages/email-accounts.synced_at', ['time' => $account->last_synced_at->diffForHumans()]) : null))
                                 <x-filament::badge
                                     color="warning"
-                                    icon="heroicon-m-exclamation-triangle"
+                                    icon="lucide-triangle-exclamation-point"
                                     :tooltip="$syncErrorLabel"
                                     :aria-label="$syncErrorReason"
                                 >
@@ -63,7 +63,7 @@
                             @else
                                 <x-filament::badge
                                     :color="$account->status->getColor()"
-                                    :icon="$account->isActive() ? 'heroicon-m-bolt' : 'heroicon-m-exclamation-triangle'"
+                                    :icon="$account->isActive() ? 'lucide-zap' : 'lucide-triangle-exclamation-point'"
                                     :title="$account->last_synced_at ? __('filament/pages/email-accounts.synced_at', ['time' => $account->last_synced_at->diffForHumans()]) : null"
                                 >
                                     {{ $account->isActive() ? __('filament/pages/email-accounts.in_sync') : $account->status->getLabel() }}
@@ -73,7 +73,7 @@
                                 @php($sendMissingLabel = __('filament/emails/composer.grant_send.heading', ['email' => $account->email_address]).' '.__('filament/emails/composer.grant_send.description'))
                                 <x-filament::badge
                                     color="warning"
-                                    icon="heroicon-m-exclamation-triangle"
+                                    icon="lucide-triangle-exclamation-point"
                                     :tooltip="$sendMissingLabel"
                                     :aria-label="$sendMissingLabel"
                                 />

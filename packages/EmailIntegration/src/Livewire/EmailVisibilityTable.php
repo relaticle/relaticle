@@ -13,7 +13,6 @@ use Filament\Notifications\Notification;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
 use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Support\Enums\Size;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Collection as SupportCollection;
@@ -84,7 +83,7 @@ final class EmailVisibilityTable extends Component implements HasActions, HasSch
     {
         return Action::make('deleteVisibilityEntry')
             ->label(__('filament/pages/email-signatures.actions.delete'))
-            ->icon(Heroicon::OutlinedTrash)
+            ->icon('lucide-trash')
             ->color('danger')
             ->size(Size::Small)
             ->iconButton()

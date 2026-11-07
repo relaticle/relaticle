@@ -17,7 +17,7 @@ final class TasksRelationManager extends RelationManager
 {
     protected static string $relationship = 'tasks';
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-clipboard-document-check';
+    protected static string|\BackedEnum|null $icon = 'lucide-clipboard-check';
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {

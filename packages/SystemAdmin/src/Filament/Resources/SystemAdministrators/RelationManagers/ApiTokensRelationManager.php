@@ -118,7 +118,7 @@ final class ApiTokensRelationManager extends RelationManager
                     ])
                     ->suffixAction(
                         Action::make('copyToken')
-                            ->icon('heroicon-o-clipboard')
+                            ->icon('lucide-clipboard')
                             ->tooltip('Copy to clipboard')
                             ->alpineClickHandler(sprintf(
                                 'window.navigator.clipboard.writeText($wire.plainTextToken); $tooltip(%s);',

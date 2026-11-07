@@ -6,7 +6,6 @@ namespace Relaticle\EmailIntegration\Enums;
 
 use Filament\Support\Contracts\HasIcon;
 use Filament\Support\Contracts\HasLabel;
-use Filament\Support\Icons\Heroicon;
 
 /**
  * Top-level tabs on the email page. Each renders a nested Livewire component that
@@ -29,13 +28,13 @@ enum EmailPageTab: string implements HasIcon, HasLabel
         };
     }
 
-    public function getIcon(): Heroicon
+    public function getIcon(): string
     {
         return match ($this) {
-            self::DRAFTS => Heroicon::OutlinedPencilSquare,
-            self::OUTBOX => Heroicon::OutlinedClock,
-            self::FAILED => Heroicon::OutlinedExclamationCircle,
-            self::TEMPLATES => Heroicon::OutlinedDocumentDuplicate,
+            self::DRAFTS => 'lucide-square-pen',
+            self::OUTBOX => 'lucide-clock',
+            self::FAILED => 'lucide-circle-exclamation-point',
+            self::TEMPLATES => 'lucide-copy',
         };
     }
 

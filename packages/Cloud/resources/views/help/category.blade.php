@@ -41,7 +41,7 @@
                             </span>
                             <span class="mt-0.5 block text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">{{ $page->description }}</span>
                         </span>
-                        <x-ri-arrow-right-line class="h-4 w-4 shrink-0 text-gray-300 transition-all group-hover:translate-x-0.5 group-hover:text-primary-500 dark:text-gray-600" />
+                        <x-lucide-arrow-right class="h-4 w-4 shrink-0 text-gray-300 transition-all group-hover:translate-x-0.5 group-hover:text-primary-500 dark:text-gray-600" />
                     </a>
                 </li>
             @endforeach

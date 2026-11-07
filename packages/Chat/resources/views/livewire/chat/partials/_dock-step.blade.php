@@ -90,7 +90,7 @@
                         ])
                         aria-hidden="true"
                     >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="h-3.5 w-3.5" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="{{ $entityIcon }}" />
                         </svg>
                     </span>
@@ -119,7 +119,7 @@
 
             @if ($holdsOwnApproval && ! $isPlan)
                 <span class="mt-1 inline-flex shrink-0 items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                    <x-heroicon-o-lock-closed class="h-3 w-3" aria-hidden="true" />
+                    <x-lucide-lock class="h-3 w-3" aria-hidden="true" />
                     {{ __('Own approval') }}
                 </span>
             @endif
@@ -140,7 +140,7 @@
                     @if ($isLeftOut)
                         {{ __('Keep') }}
                     @else
-                        <x-heroicon-o-x-mark class="h-4 w-4" aria-hidden="true" />
+                        <x-lucide-x class="h-4 w-4" aria-hidden="true" />
                     @endif
                 </button>
             @endif
@@ -209,7 +209,7 @@
                                         @if ($rowOut)
                                             {{ __('Keep') }}
                                         @else
-                                            <x-heroicon-o-x-mark class="h-4 w-4" aria-hidden="true" />
+                                            <x-lucide-x class="h-4 w-4" aria-hidden="true" />
                                         @endif
                                     </button>
                                 @endif

@@ -3,9 +3,9 @@
     'rounded-xl p-4 ring-1 ring-gray-950/5 dark:ring-white/10' => $boxed ?? false,
 ])>
     @foreach ([
-        'ri-user-add-line' => 'benefit_records',
-        'ri-mail-line' => 'benefit_timeline',
-        'ri-send-plane-line' => 'benefit_send',
+        'lucide-user-plus' => 'benefit_records',
+        'lucide-mail' => 'benefit_timeline',
+        'lucide-send' => 'benefit_send',
     ] as $icon => $key)
         <li class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-300">
             <span class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-gray-50 text-gray-500 ring-1 ring-gray-950/5 dark:bg-white/5 dark:text-gray-400 dark:ring-white/10">

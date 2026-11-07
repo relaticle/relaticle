@@ -26,7 +26,6 @@ use Filament\Schemas\Concerns\InteractsWithSchemas;
 use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Size;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -160,15 +159,15 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
                 Tabs::make()
                     ->tabs([
                         Tab::make(__('filament/pages/email-account-settings.tabs.general'))
-                            ->icon(Heroicon::OutlinedCog6Tooth)
+                            ->icon('lucide-settings')
                             ->schema($this->generalTabSchema()),
 
                         Tab::make(__('filament/pages/email-account-settings.tabs.sharing'))
-                            ->icon(Heroicon::OutlinedShieldCheck)
+                            ->icon('lucide-shield-check')
                             ->schema([$this->sharingTierField()]),
 
                         Tab::make(__('filament/pages/email-account-settings.tabs.blocklist'))
-                            ->icon(Heroicon::OutlinedNoSymbol)
+                            ->icon('lucide-ban')
                             ->schema([
                                 Section::make(__('filament/pages/email-account-settings.blocklist.label'))
                                     ->description(__('filament/pages/email-account-settings.blocklist.hint'))
@@ -181,7 +180,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
                             ]),
 
                         Tab::make(__('filament/pages/email-account-settings.tabs.signatures'))
-                            ->icon(Heroicon::OutlinedPencilSquare)
+                            ->icon('lucide-square-pen')
                             ->schema([
                                 Section::make(__('filament/pages/email-account-settings.signatures.label'))
                                     ->description(__('filament/pages/email-account-settings.signatures.hint'))
@@ -258,7 +257,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
      */
     private function labelWithInfo(string $label, string $tooltip): Htmlable
     {
-        $icon = svg('heroicon-o-information-circle', 'h-4 w-4 text-gray-400 dark:text-gray-500')->toHtml();
+        $icon = svg('lucide-info', 'h-4 w-4 text-gray-400 dark:text-gray-500')->toHtml();
 
         return new HtmlString(
             e($label).' <span class="inline-flex translate-y-px align-middle" x-tooltip="{ content: '.Js::from($tooltip).', theme: $store.theme }">'.$icon.'</span>'
@@ -307,7 +306,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     {
         return Action::make('addBlocklist')
             ->label(__('filament/pages/email-account-settings.blocklist.add'))
-            ->icon(Heroicon::OutlinedPlus)
+            ->icon('lucide-plus')
             ->size(Size::Small)
             ->modalHeading(__('filament/pages/email-account-settings.blocklist.add'))
             ->schema($this->blocklistFormSchema())
@@ -331,7 +330,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     {
         return Action::make('deleteBlocklistEntry')
             ->label(__('filament/pages/email-signatures.actions.delete'))
-            ->icon(Heroicon::OutlinedTrash)
+            ->icon('lucide-trash')
             ->color('danger')
             ->size(Size::Small)
             ->iconButton()
@@ -458,7 +457,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     {
         return Action::make('createSignature')
             ->label(__('filament/pages/email-account-settings.signatures.add'))
-            ->icon(Heroicon::OutlinedPlus)
+            ->icon('lucide-plus')
             ->size(Size::Small)
             ->modalHeading(__('filament/pages/email-account-settings.signatures.add'))
             ->schema($this->signatureFormSchema())
@@ -478,7 +477,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     {
         return Action::make('editSignature')
             ->label(__('filament/pages/email-signatures.actions.edit'))
-            ->icon(Heroicon::OutlinedPencilSquare)
+            ->icon('lucide-square-pen')
             ->color('gray')
             ->size(Size::Small)
             ->iconButton()
@@ -502,7 +501,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     {
         return Action::make('deleteSignature')
             ->label(__('filament/pages/email-signatures.actions.delete'))
-            ->icon(Heroicon::OutlinedTrash)
+            ->icon('lucide-trash')
             ->color('danger')
             ->size(Size::Small)
             ->iconButton()

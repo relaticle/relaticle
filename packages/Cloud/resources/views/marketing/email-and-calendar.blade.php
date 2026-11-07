@@ -197,7 +197,7 @@
                         <x-cloud::marketing.window class="w-full max-w-lg">
                             <div class="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-white/[0.06]">
                                 <p class="text-sm font-medium text-gray-900 dark:text-white">{{ __('New email') }}</p>
-                                <x-ri-close-line class="h-4 w-4 text-gray-400"/>
+                                <x-lucide-x class="h-4 w-4 text-gray-400"/>
                             </div>
                             <dl class="divide-y divide-gray-100 text-sm dark:divide-white/[0.06]">
                                 @foreach([
@@ -217,9 +217,9 @@
                             </div>
                             <div class="flex items-center justify-between gap-3 border-t border-gray-100 px-4 py-3 dark:border-white/[0.06]">
                                 <div class="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                                    <span class="inline-flex items-center gap-1"><x-ri-attachment-2 class="h-3.5 w-3.5"/>{{ __('Attach') }}</span>
-                                    <span class="hidden items-center gap-1 sm:inline-flex"><x-ri-quill-pen-line class="h-3.5 w-3.5"/>{{ __('Signature') }}</span>
-                                    <span class="inline-flex items-center gap-1"><x-ri-file-copy-2-line class="h-3.5 w-3.5"/>{{ __('Template') }}</span>
+                                    <span class="inline-flex items-center gap-1"><x-lucide-paperclip class="h-3.5 w-3.5"/>{{ __('Attach') }}</span>
+                                    <span class="hidden items-center gap-1 sm:inline-flex"><x-lucide-feather class="h-3.5 w-3.5"/>{{ __('Signature') }}</span>
+                                    <span class="inline-flex items-center gap-1"><x-lucide-copy class="h-3.5 w-3.5"/>{{ __('Template') }}</span>
                                 </div>
                                 <span class="inline-flex h-7 items-center rounded-md bg-primary-600 px-3 text-xs font-medium text-white shadow-sm">{{ __('Send email') }}</span>
                             </div>

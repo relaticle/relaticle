@@ -48,6 +48,6 @@
     @endif
 
     @if($external && ! $iconTrailing)
-        <x-ri-arrow-right-up-line class="h-3 w-3 text-gray-400 dark:text-gray-500"/>
+        <x-lucide-arrow-up-right class="h-3 w-3 text-gray-400 dark:text-gray-500"/>
     @endif
 </{{ $tag }}>
