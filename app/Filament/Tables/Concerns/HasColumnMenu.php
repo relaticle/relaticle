@@ -8,6 +8,7 @@ use App\Enums\ColumnMenuState;
 use App\Filament\Tables\Actions\ColumnMenuAction;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
+use Filament\Support\Components\Attributes\Unexposed;
 use Filament\Support\Icons\Heroicon;
 use Livewire\Attributes\Locked;
 
@@ -25,6 +26,9 @@ trait HasColumnMenu
 
     /** @var array<string, string> */
     private array $originalTableColumnLabels = [];
+
+    /** @var list<string>|null */
+    private ?array $declaredTableColumnNames = null;
 
     /** @return array<int, array<int, ColumnMenuAction>> */
     public function columnMenuActions(): array
@@ -183,6 +187,23 @@ trait HasColumnMenu
 
         // The pins were stamped at boot, and this request renders none.
         $this->getTable()->resizableColumns();
+    }
+
+    /**
+     * @return array<int, array{type: string, name: string, label: string, isHidden: bool, isToggled: bool, isToggleable: bool, isToggledHiddenByDefault: ?bool, columns?: array<int, array{type: string, name: string, label: string, isHidden: bool, isToggled: bool, isToggleable: bool, isToggledHiddenByDefault: ?bool}>}>
+     */
+    #[Unexposed]
+    public function getDefaultTableColumnState(): array
+    {
+        $state = parent::getDefaultTableColumnState();
+
+        // Filament reorders the table's columns in place, so a default rebuilt later in the request follows the member's order.
+        $this->declaredTableColumnNames ??= array_column($state, 'name');
+        $position = array_flip($this->declaredTableColumnNames);
+
+        usort($state, fn (array $a, array $b): int => ($position[$a['name']] ?? PHP_INT_MAX) <=> ($position[$b['name']] ?? PHP_INT_MAX));
+
+        return $state;
     }
 
     private function applyTablePins(): void

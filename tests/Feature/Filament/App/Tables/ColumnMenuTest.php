@@ -87,6 +87,20 @@ it('moves a column before another and keeps the order on a new visit', function 
     expect(columnOrder(livewire($page)))->toBe($order);
 })->with('column menu pages');
 
+it('puts the columns back in their declared order with the standard layout', function (string $page, CrmEntity $entity): void {
+    $component = livewire($page);
+    $declared = columnOrder($component);
+    $movable = columnsBesideTitle($component, $entity);
+
+    $component->call('moveTableColumn', end($movable), $movable[0])->call('useStandardTableLayout');
+
+    expect(columnOrder($component))->toBe($declared);
+
+    session()->flush();
+
+    expect(columnOrder(livewire($page)))->toBe($declared);
+})->with('column menu pages');
+
 it('moves a column to the end when nothing follows it', function (string $page, CrmEntity $entity): void {
     $component = livewire($page);
     $first = columnsBesideTitle($component, $entity)[0];
