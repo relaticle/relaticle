@@ -69,7 +69,7 @@ final class PreviewRecordAction extends ViewAction
             ->modalClickThrough()
             ->modalWidth(Width::FourExtraLarge)
             ->modalCancelAction(false)
-            ->modalHeading(fn (Model $record): string => (string) $record->getAttribute('name'))
+            ->modalHeading(fn (Model $record): string => (string) Filament::getModelResource($record)::getRecordTitle($record))
             ->extraModalWindowAttributes(fn (Component $livewire): array => [
                 'class' => 'fi-record-preview',
                 'x-on:click.outside' => $this->closeOnOutsideClick($this->modalId($livewire)),

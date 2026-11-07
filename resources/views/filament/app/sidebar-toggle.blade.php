@@ -1,9 +1,4 @@
-{{--
-    The sidebar's collapse and expand controls. The `sidebar` placement sits in the
-    workspace switcher's row and collapses the panel; the `topbar` placement sits at
-    the start of the top bar and expands it again. Only one shows at a time, so no
-    control travels across the panel while it animates.
---}}
+{{-- Only one placement shows at a time, so no control travels across the panel while it animates. --}}
 @php
     $isSidebarPlacement = $placement === 'sidebar';
     $label = $isSidebarPlacement

@@ -192,12 +192,12 @@ final readonly class RecordOverview
     private static function relatedSections(Company|People|Opportunity $record, array $tabKeys, array $counts, Collection $openTasks): array
     {
         $sections = [
-            self::section(__('filament/record-page.overview.notes'), $counts['notes'], $tabKeys['notes'], Gate::allows('create', Note::class) ? 'createNote' : null, __('filament/record-page.actions.new_note'), self::noteItems($record)),
-            self::section(__('filament/record-page.overview.tasks'), $counts['tasks'], $tabKeys['tasks'], Gate::allows('create', Task::class) ? 'createTask' : null, __('filament/record-page.actions.new_task'), self::taskItems($openTasks)),
+            self::section(__('filament/record-page.overview.notes'), $counts['notes'], $tabKeys['notes'], self::noteItems($record), Gate::allows('create', Note::class) ? 'createNote' : null, __('filament/record-page.actions.new_note')),
+            self::section(__('filament/record-page.overview.tasks'), $counts['tasks'], $tabKeys['tasks'], self::taskItems($openTasks), Gate::allows('create', Task::class) ? 'createTask' : null, __('filament/record-page.actions.new_task')),
         ];
 
         if ($tabKeys['emails'] !== null) {
-            $sections[] = self::section(__('filament/record-page.overview.emails'), $counts['emails'], $tabKeys['emails'], null, '', []);
+            $sections[] = self::section(__('filament/record-page.overview.emails'), $counts['emails'], $tabKeys['emails']);
         }
 
         return $sections;
@@ -207,7 +207,7 @@ final readonly class RecordOverview
      * @param  array<int, array<string, mixed>>  $items
      * @return array<string, mixed>
      */
-    private static function section(string $label, ?string $count, ?string $tabKey, ?string $createAction, string $createLabel, array $items): array
+    private static function section(string $label, ?string $count, ?string $tabKey, array $items = [], ?string $createAction = null, string $createLabel = ''): array
     {
         return [
             'label' => $label,

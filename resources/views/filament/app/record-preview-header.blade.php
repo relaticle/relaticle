@@ -38,16 +38,14 @@
         </span>
     @endif
 
-    <div class="ms-auto flex">
-        <x-filament::icon-button
-            icon="lucide-maximize-2"
-            color="gray"
-            size="sm"
-            tag="a"
-            :href="$recordUrl"
-            :label="__('filament/record-page.actions.open_record')"
-            :tooltip="__('filament/record-page.actions.open_record')"
-            class="fi-record-preview-header-btn"
-        />
-    </div>
+    <x-filament::icon-button
+        icon="lucide-maximize-2"
+        color="gray"
+        size="sm"
+        tag="a"
+        :href="$recordUrl"
+        :label="__('filament/record-page.actions.open_record')"
+        :tooltip="__('filament/record-page.actions.open_record')"
+        class="fi-record-preview-header-btn ms-auto"
+    />
 </div>
