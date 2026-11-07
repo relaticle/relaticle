@@ -17,6 +17,8 @@ final readonly class TemporaryUploads
 
     public const string DIRECTORY = 'tmp';
 
+    public const int RETENTION_MINUTES = 60;
+
     public static function disk(): FilesystemAdapter
     {
         /** @var FilesystemAdapter $disk */

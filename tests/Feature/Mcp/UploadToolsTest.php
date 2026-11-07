@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Upload\StoreAgentUpload;
 use App\Enums\MediaCollection;
+use App\Enums\WorkspaceRole;
 use App\Exceptions\UploadException;
 use App\Http\Controllers\Mcp\ReceiveUploadController;
 use App\Mcp\Servers\RelaticleServer;
@@ -19,6 +20,8 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
+use Laravel\Mcp\Server\Registrar;
+use Laravel\Passport\Passport;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 mutates(StoreAgentUpload::class, ReceiveUploadController::class, TemporaryUploads::class, CreateUploadUrlTool::class, UploadFileTool::class);
@@ -225,6 +228,14 @@ describe('create-upload-url', function (): void {
         RelaticleServer::actingAs($this->user)
             ->tool(CreateUploadUrlTool::class, ['filename' => 'report'])
             ->assertHasErrors(['Give the file name an extension. Allowed: pdf, doc, docx, xlsx, pptx, jpg, png, gif, webp, jpeg.']);
+    });
+
+    it('caps how many upload urls a workspace can mint in an hour', function (): void {
+        RateLimiter::increment("mcp-upload-urls:{$this->workspace->getKey()}", 3600, 60);
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(CreateUploadUrlTool::class, ['filename' => 'deck.pdf'])
+            ->assertHasErrors([__('uploads.errors.rate_limited')]);
     });
 
     it('requires the create ability', function (): void {
@@ -491,4 +502,43 @@ describe('upload-file', function (): void {
 
         expect(Media::query()->count())->toBe(0);
     });
+});
+
+describe('a viewer', function (): void {
+    beforeEach(function (): void {
+        $this->viewer = User::factory()->create();
+        $this->workspace->users()->attach($this->viewer, ['role' => WorkspaceRole::Viewer->value]);
+        $this->viewer->forceFill(['current_workspace_id' => $this->workspace->getKey()])->save();
+    });
+
+    dataset('viewer credentials', [
+        'an oauth connector' => [fn (User $viewer, mixed $workspace): mixed => Passport::actingAs($viewer, [Registrar::OAUTH_SCOPE])],
+        'an unpinned access token holding create' => [fn (User $viewer, mixed $workspace): User => $viewer->withAccessToken($viewer->createToken('legacy', ['read', 'create'])->accessToken)],
+        'a pinned access token issued before demotion' => [function (User $viewer, mixed $workspace): User {
+            $workspace->users()->updateExistingPivot($viewer->getKey(), ['role' => WorkspaceRole::Member->value]);
+            $token = $viewer->createToken('pinned', ['read', 'create'])->accessToken;
+            $token->forceFill(['workspace_id' => $workspace->getKey()])->save();
+            $workspace->users()->updateExistingPivot($viewer->getKey(), ['role' => WorkspaceRole::Viewer->value]);
+
+            return $viewer->fresh()->withAccessToken($token);
+        }],
+    ]);
+
+    it('cannot mint an upload url', function (Closure $authenticate): void {
+        $viewer = $authenticate($this->viewer, $this->workspace);
+
+        RelaticleServer::actingAs($viewer instanceof User ? $viewer : $this->viewer)
+            ->tool(CreateUploadUrlTool::class, ['filename' => 'deck.pdf'])
+            ->assertHasErrors(['Your role in this workspace does not allow this.']);
+    })->with('viewer credentials');
+
+    it('cannot store a file', function (Closure $authenticate): void {
+        $viewer = $authenticate($this->viewer, $this->workspace);
+
+        RelaticleServer::actingAs($viewer instanceof User ? $viewer : $this->viewer)
+            ->tool(UploadFileTool::class, ['base64' => base64_encode(pdfBytes()), 'filename' => 'a.pdf'])
+            ->assertHasErrors(['Your role in this workspace does not allow this.']);
+
+        expect(Media::query()->where('collection_name', MediaCollection::PendingUploads->value)->count())->toBe(0);
+    })->with('viewer credentials');
 });

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Jobs;
 
+use App\Queries\Tokens\LiveAgentCredentialsQuery;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Backoff;
@@ -124,6 +125,15 @@ final class SendEmailJob implements ShouldQueue
                 resolve(MarkEmailsSendFailedAction::class)->execute(
                     collect([$lockedEmail]),
                     __('filament/notifications/email-send-failed.reasons.mailbox_needs_reconnect'),
+                );
+
+                return null;
+            }
+
+            if (! resolve(LiveAgentCredentialsQuery::class)->isLive((string) $lockedEmail->user_id, $lockedEmail->oauth_client_id, $lockedEmail->personal_access_token_id)) {
+                resolve(MarkEmailsSendFailedAction::class)->execute(
+                    collect([$lockedEmail]),
+                    __('filament/notifications/email-send-failed.reasons.agent_connection_revoked'),
                 );
 
                 return null;

@@ -6,6 +6,7 @@ namespace Relaticle\EmailIntegration\Actions;
 
 use App\Models\User;
 use App\Models\Workspace;
+use Relaticle\EmailIntegration\Data\AgentConnection;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Models\Email;
 
@@ -29,10 +30,10 @@ final readonly class QueueAgentEmailAction
      *     scheduled_for?: ?string,
      * }  $data
      */
-    public function execute(User $user, array $data, EmailCreationSource $source, string $via): Email
+    public function execute(User $user, array $data, EmailCreationSource $source, AgentConnection $connection): Email
     {
         abort_unless($user->currentWorkspace instanceof Workspace, 403);
 
-        return $this->holdEmail->execute($user, $this->prepareEmail->execute($user, $data, $source), $via);
+        return $this->holdEmail->execute($user, $this->prepareEmail->execute($user, $data, $source), $connection);
     }
 }

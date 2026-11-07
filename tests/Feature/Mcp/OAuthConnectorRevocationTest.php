@@ -119,3 +119,24 @@ it('leaves other users tokens for the same client untouched', function (): void 
 
     expect(DB::table('oauth_access_tokens')->where('id', $otherTokenId)->value('revoked'))->toBeFalse();
 });
+
+it('keeps listing a dormant connector whose refresh token still works, and revokes it', function (): void {
+    $connector = connectorFor($this->user, $this->workspace);
+    DB::table('oauth_access_tokens')->where('client_id', $connector->getKey())->update(['expires_at' => now()->subDay()]);
+
+    Livewire::test(ManageOAuthConnectors::class)
+        ->assertCanSeeTableRecords([$connector])
+        ->callAction(TestAction::make('revoke')->table($connector))
+        ->assertNotified();
+
+    expect(DB::table('oauth_refresh_tokens')->value('revoked'))->toBeTrue();
+});
+
+it('drops a connector once its refresh token has expired too', function (): void {
+    $connector = connectorFor($this->user, $this->workspace);
+    DB::table('oauth_access_tokens')->where('client_id', $connector->getKey())->update(['expires_at' => now()->subDay()]);
+    DB::table('oauth_refresh_tokens')->update(['expires_at' => now()->subDay()]);
+
+    Livewire::test(ManageOAuthConnectors::class)
+        ->assertCanNotSeeTableRecords([$connector]);
+});

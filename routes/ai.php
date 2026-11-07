@@ -6,6 +6,7 @@ use App\Http\Controllers\Mcp\ApproveAuthorizationController;
 use App\Http\Controllers\Mcp\ReceiveUploadController;
 use App\Http\Middleware\EnsureHostedWorkspaceAccess;
 use App\Http\Middleware\RequireConsent;
+use App\Http\Middleware\RequireMcpResource;
 use App\Http\Middleware\SetApiWorkspaceContext;
 use App\Http\Middleware\ValidateMcpOrigin;
 use App\Mcp\Servers\RelaticleServer;
@@ -27,7 +28,7 @@ app()->booted(static function (): void {
         ->post('/oauth/authorize', [ApproveAuthorizationController::class, 'approve'])
         ->name('passport.authorizations.approve');
 
-    Route::middleware(['web', RequireConsent::class])
+    Route::middleware(['web', RequireConsent::class, RequireMcpResource::class])
         ->get('/oauth/authorize', [AuthorizationController::class, 'authorize'])
         ->name('passport.authorizations.authorize');
 });

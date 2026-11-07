@@ -44,6 +44,18 @@ it('removes pending media and temp files older than a day, keeps the rest', func
     TemporaryUploads::disk()->assertExists(TemporaryUploads::path($freshTemp));
 });
 
+it('removes a temp file once its upload url is long expired, well inside the day', function (): void {
+    $this->travelTo(now()->subHours(2));
+    $stale = TemporaryUploads::newName('stale.pdf', (string) $this->workspace->getKey());
+    TemporaryUploads::disk()->put(TemporaryUploads::path($stale), pdfBytes());
+    touch(TemporaryUploads::disk()->path(TemporaryUploads::path($stale)), now()->getTimestamp());
+    $this->travelBack();
+
+    $this->artisan('app:purge-pending-uploads')->assertSuccessful();
+
+    TemporaryUploads::disk()->assertMissing(TemporaryUploads::path($stale));
+});
+
 it('is scheduled hourly without overlap on a single server', function (): void {
     $this->artisan('schedule:list')->assertSuccessful();
 

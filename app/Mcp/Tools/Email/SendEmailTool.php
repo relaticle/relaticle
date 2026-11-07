@@ -82,7 +82,7 @@ final class SendEmailTool extends Tool
         }
 
         try {
-            $email = $queueEmail->execute($user, $validated, EmailCreationSource::MCP, $this->connectionName());
+            $email = $queueEmail->execute($user, $validated, EmailCreationSource::MCP, $this->agentConnection());
         } catch (OutboxFull|AgentOutboxFull $exception) {
             return Response::error($exception->getMessage());
         }
