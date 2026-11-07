@@ -2,7 +2,7 @@
 title: Choose who sees your email
 description: Pick how much of each mailbox your workspace can see, from nothing to the full message, and change the level for one email at a time.
 order: 5
-updated: "2026-10-08"
+updated: "2026-11-08"
 related: [help/email-and-calendar/set-workspace-email-privacy, help/email-and-calendar/request-access-to-an-email, help/email-and-calendar/connect-your-google-account]
 ---
 
@@ -25,15 +25,12 @@ touch with a person or company, and not what was said.
 ## Set the level for a mailbox
 
 1. Open **Workspace Settings**, then **Email and Calendar**.
-2. Open the menu on your connected account and click **Manage**.
-3. Open the **Sharing** tab.
-4. Pick a level, or **Use workspace default** to follow what your admins set.
-5. Click **Save changes**.
+2. Click your connected account.
+3. On the **General** tab, pick a level under **Email sharing**.
+4. Click **Save changes**.
 
 The level applies to that mailbox only. Your other mailboxes keep their own
-levels. A mailbox with no level of its own follows the workspace default.
-The workspace default is never **Full access**. You set that level on a
-mailbox, in that mailbox's settings.
+levels.
 
 Saving also updates the email that mailbox has already synced, except any
 email you changed individually. Choosing **Full access** asks you to type a
@@ -67,7 +64,7 @@ mailbox in another workspace is not affected.
 
 ## Keep some senders out of a mailbox
 
-Open your account's **Manage** menu and the **Mailbox-only blocklist** tab.
+Click your connected account and open the **Mailbox-only blocklist** tab.
 Add addresses or domains under **Blocked addresses and domains**. Email
 from them stops appearing in that mailbox, and your other connected
 accounts are not affected.

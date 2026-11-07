@@ -433,8 +433,7 @@ it('hides the extension once it was used', function (): void {
 
     livewire(Billing::class)
         ->assertSee(__('cloud::billing.paused.continue'))
-        ->assertDontSee(__('cloud::billing.paused.extend'))
-        ->assertDontSee(__('cloud::billing.paused.extend_once'));
+        ->assertDontSee(__('cloud::billing.paused.extend'));
 });
 
 it('tells the owner of a paused trial workspace it is deleted after 60 days with no sign-in', function (): void {
@@ -483,8 +482,7 @@ it('hides the extension from a member', function (): void {
 
     livewire(Billing::class)
         ->assertSee(__('cloud::billing.paused.member_body_trial', ['owner' => $workspace->owner->name, 'workspace' => $workspace->name]))
-        ->assertDontSee(__('cloud::billing.paused.extend'))
-        ->assertDontSee(__('cloud::billing.paused.extend_once'));
+        ->assertDontSee(__('cloud::billing.paused.extend'));
 });
 
 it('refuses a member who calls the extension directly', function (): void {

@@ -44,19 +44,6 @@ enum EmailPrivacyTier: string implements HasDescription, HasIcon, HasLabel
         return '{'.implode(',', array_map(fn (self $tier): string => $tier->value, $tiers)).'}';
     }
 
-    public function canBeWorkspaceDefault(): bool
-    {
-        return $this !== self::FULL;
-    }
-
-    /**
-     * @return list<self>
-     */
-    public static function workspaceDefaults(): array
-    {
-        return array_values(array_filter(self::cases(), fn (self $tier): bool => $tier->canBeWorkspaceDefault()));
-    }
-
     public function getLabel(): string
     {
         return match ($this) {

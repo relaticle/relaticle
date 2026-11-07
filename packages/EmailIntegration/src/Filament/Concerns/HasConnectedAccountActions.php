@@ -19,7 +19,6 @@ use Relaticle\EmailIntegration\Actions\DisconnectConnectedAccountAction;
 use Relaticle\EmailIntegration\Actions\SetDefaultConnectedAccountAction;
 use Relaticle\EmailIntegration\Actions\StartMailboxHistoryImportAction;
 use Relaticle\EmailIntegration\Actions\StopCalendarPushChannelAction;
-use Relaticle\EmailIntegration\Filament\Pages\EmailAccountSettingsPage;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
@@ -59,20 +58,14 @@ trait HasConnectedAccountActions
      * each child action so the group can be rendered once per account in the blade.
      *
      * @param  array<int, Action>  $extraActions  page-specific entries, appended before Disconnect Mailbox
-     * @param  bool  $includeSettings  whether to show Manage (hidden on the settings page itself)
      */
-    public function accountActions(string $accountId, array $extraActions = [], bool $includeSettings = true): ActionGroup
+    public function accountActions(string $accountId, array $extraActions = []): ActionGroup
     {
         $arguments = ['account_id' => $accountId];
-
-        $settingsAction = $includeSettings
-            ? [($this->accountSettingsAction())($arguments)]
-            : [];
 
         // Invoke each action with the arguments (not ->arguments()) so account_id is encoded
         // into the mountAction() click handler, which reads getInvokedArguments().
         return ActionGroup::make([
-            ...$settingsAction,
             ($this->setDefaultAction())($arguments),
             ($this->reconnectAction())($arguments),
             ...array_map(fn (Action $action): Action => $action($arguments), $extraActions),
@@ -83,18 +76,6 @@ trait HasConnectedAccountActions
             ->color('gray')
             ->size(Size::Small)
             ->iconButton();
-    }
-
-    public function accountSettingsAction(): Action
-    {
-        return Action::make('accountSettings')
-            ->label(__('filament/pages/email-accounts.actions.manage'))
-            ->icon('lucide-settings')
-            ->color('gray')
-            ->size(Size::Small)
-            ->url(fn (array $arguments): string => EmailAccountSettingsPage::getUrl([
-                'account' => (string) $arguments['account_id'],
-            ]));
     }
 
     public function reconnectAction(): Action
