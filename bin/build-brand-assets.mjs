@@ -115,7 +115,8 @@ try {
     for (const [variant, mark] of [['color', colorMark], ['white', whiteMark]]) {
         const symbol = write(`logos/symbol-${variant}.svg`, svg(mark, '-35 62 1228 1035', 1228, 1035));
         const wordColor = variant === 'white' ? '#FFFFFF' : '#0F172A';
-        const glyphs = inner(wordmark).replace(/fill="#[^"]+"/g, `fill="${wordColor}"`);
+        const inked = inner(wordmark).replaceAll('#0F172A', wordColor);
+        const glyphs = variant === 'white' ? inked.replaceAll(brandColor, '#FFFFFF') : inked;
         const lockup = write(`logos/lockup-${variant}.svg`, svg(
             `<g transform="scale(0.055268)">${mark}</g><g transform="translate(68 3.4) scale(0.0445)" stroke="${wordColor}" stroke-width="8" stroke-linejoin="round">${glyphs}</g>`,
             '-6 -4 252 72', 252, 72,

@@ -1,7 +1,7 @@
 {
   "sources": {
     "logomark.svg": "ec072e5fe0c218bac6503a413d2718793f3a97019c61ad41ef10f90cf69f0eae",
-    "wordmark.svg": "7995c6ef612f644077424168a492f3487ce4ccb7aca75657dfbf143a0ac5b43a"
+    "wordmark.svg": "b4ec222da8dfd046c1c47ac6b6811133a17dc7e493c54a236a6836e0530c21ee"
   },
   "avatars": [
     {
@@ -336,12 +336,12 @@
     "platforms/dark/substack-1024.png": "330bba1a83c68064dd0f031449421eb1dddc8fccb861d42f317ccc0ecfb488ac",
     "platforms/dark/product-hunt-240.png": "61df8f0fc02e8bfd82e38a2e561bc0ff83b366f2663e2caaf645657edaa1dbb0",
     "logos/symbol-color.svg": "c0379244d502da5a8d5ac2b3b1e8b93adab4b3d4afc9b5156ca12a054dbcabfc",
-    "logos/lockup-color.svg": "e8ae911cb4bb074d38bc15e180e8b873e439a0a7c8c7947c15854bf2db701167",
-    "logos/lockup-color-2520.png": "e7ced09c4f1eb27471c11d0f487b9fe9a999b53a7581db242caf12ba50da0dc8",
+    "logos/lockup-color.svg": "1ccf9bf6f5aa5d4d9c26f7d5d0454031cca3785cec0c5c99240df26fd6b1332c",
+    "logos/lockup-color-2520.png": "4715a8423cb78769fbbd8c2ac41a145539ae98c883bf13cd4cdd25b7dd42864d",
     "logos/symbol-color-2048.png": "6f85d4301f4f458735c1dc27510288e04bd7e6c77e4de29969cba6500c102916",
     "logos/symbol-white.svg": "172c9a6a190ccee16e6aa229e30f43b312f728f4ada126e84064b7e9779c9476",
-    "logos/lockup-white.svg": "5b0e8f68c5ea46203dd004f6195cb2629358718bea350aa5e8224d112fa0b57a",
-    "logos/lockup-white-2520.png": "3ca8dc5dc40e6e9eaba2b136b8417858ddcb216ca4ae99889524a229c3caf8cc",
+    "logos/lockup-white.svg": "4b9037416cb06383fe549387165489d91a52473e51621c0e9428af16053dd6a9",
+    "logos/lockup-white-2520.png": "a14fa147521d3a2c329a9d2ff738d115164022404b2df678f5135412fa147968",
     "logos/symbol-white-2048.png": "27ee2fcc5b473964cbdf25ea64d6bd5384bff5fd36b5474dac6a085541089a3e",
     "watermarks/white.svg": "f764a259ef86ed31549fd6870e8de2bed9d36bf5abe73a6e6b1c3f6af13acadf",
     "watermarks/white-150.png": "1c5436ad425b27266a1ffb41b60e3ce89a86aa4cc7147d6ddd0017806d4d2fe5",
