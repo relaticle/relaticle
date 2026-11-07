@@ -460,7 +460,7 @@ final class AppPanelProvider extends PanelProvider
             ->discoverClusters(in: app_path('Filament/Clusters'), for: 'App\\Filament\\Clusters')
             ->readOnlyRelationManagersOnResourceViewPagesByDefault(false)
             ->spa()
-            ->sidebarWidth('16rem')
+            ->sidebarWidth('18rem')
             ->maxContentWidth(Width::Full)
             // The socialite entry points answer with a 302 to the provider's own
             // domain, and wire:navigate cannot follow a cross-origin redirect.

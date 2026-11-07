@@ -69,7 +69,7 @@ it('sizes the collapsed rail to the width that centres the navigation icons', fu
 });
 
 it('sizes the open sidebar with a css length rather than a bare number', function (): void {
-    expect(Filament::getPanel('app')->getSidebarWidth())->toBe('16rem');
+    expect(Filament::getPanel('app')->getSidebarWidth())->toBe('18rem');
 });
 
 it('renders a keyboard reachable resize handle inside the sidebar', function (): void {
