@@ -987,8 +987,7 @@ a.fi-linked-records-chip {
 
         &:is(
                 :has(.fi-ta-text:not(.fi-ta-text-item)):not(:has(.fi-ta-text:not(.fi-ta-text-item) > :not(.sr-only))),
-                :has(.fi-linked-records-cell-empty),
-                :has(.fi-ta-col > div > span:only-child:empty)
+                :has(.fi-linked-records-cell-empty)
             ) {
             @apply max-sm:hidden;
         }

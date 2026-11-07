@@ -15,12 +15,12 @@
         @forelse ($chips as $chip)
             @if (filled($url))
                 {{-- Filament wraps a cell with a URL in its own link, and a nested anchor gets pulled out of the cell. --}}
-                <span class="text-primary-600 hover:underline dark:text-primary-400">{{ $chip }}</span>
+                <span class="min-w-0 max-w-full text-primary-600 hover:underline dark:text-primary-400">{{ $chip }}</span>
             @else
                 {{ $chip }}
             @endif
         @empty
-            <span class="text-gray-400 dark:text-gray-500">{{ $getPlaceholder() }}</span>
+            <span class="fi-linked-records-cell-empty">{{ $getPlaceholder() }}</span>
         @endforelse
     </div>
 
