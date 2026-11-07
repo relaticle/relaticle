@@ -66,6 +66,8 @@ it('collapses the sidebar with an arrow key past its minimum and reopens it from
     loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")
         ->resize(1440, 900)
+        ->assertScript($width, 288)
+        ->assertScript('typeof Alpine.$data(document.querySelector(".fi-sidebar-resize-handle")).nudge', 'function')
         ->keys('.fi-sidebar-resize-handle', ['Home'])
         ->assertScript($width, 220)
         ->keys('.fi-sidebar-resize-handle', ['ArrowLeft'])
