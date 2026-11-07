@@ -101,6 +101,16 @@ final class PreviewStep extends Component implements HasActions, HasForms
     }
 
     #[Computed]
+    public function continueUrl(): ?string
+    {
+        if ($this->import()->status !== ImportStatus::Completed) {
+            return null;
+        }
+
+        return ImportWizard::continueUrl($this->import());
+    }
+
+    #[Computed]
     public function progressPercent(): int
     {
         if ($this->isCompleted) {
