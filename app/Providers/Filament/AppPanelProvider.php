@@ -581,14 +581,16 @@ final class AppPanelProvider extends PanelProvider
 
         $panel
             /**
-             * The sidebar collapse toggle is panel chrome, so the panel owns it.
-             * TENANT_MENU_AFTER puts it inside the sidebar, level with the
-             * workspace switcher; `.fi-sidebar-toggle-btn` places it in both the
-             * open and the collapsed rail.
+             * Collapse sits in the sidebar, level with the workspace switcher;
+             * expand sits at the start of the top bar while the rail is collapsed.
              */
             ->renderHook(
                 PanelsRenderHook::TENANT_MENU_AFTER,
-                fn (): View|Factory => view('filament.app.sidebar-toggle')
+                fn (): View|Factory => view('filament.app.sidebar-toggle', ['placement' => 'sidebar'])
+            )
+            ->renderHook(
+                PanelsRenderHook::TOPBAR_START,
+                fn (): View|Factory => view('filament.app.sidebar-toggle', ['placement' => 'topbar'])
             )
             // STYLES_AFTER renders past the panel stylesheet, which is what lets the
             // `html[data-accent]` ramps outrank the `:root` defaults it emits.

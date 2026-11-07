@@ -522,34 +522,38 @@ html.fi-chat-docked .fi-app-main-wrapper {
         @apply overflow-hidden;
     }
 
-    /* The lane the toggle sits in, beside the switcher when open. It has to
-       clear everything the button occupies, which is its 4.5 inset plus its own
-       8 of width: anything narrower and the trigger's box runs under the button
-       even though the workspace name still looks clear of it. It never animates:
-       animating it let the trigger's edge overtake the button. A collapse keeps
-       it until the rail is reached, since dropping it first slid the chevron
-       under the button. */
+    /* The lane the collapse button sits in, beside the switcher. It has to clear
+       the button's 4.5 inset plus its own 8 of width, or the trigger's box runs under
+       the button. It never animates, since that let the trigger's edge overtake the
+       button, and a collapse keeps it until the rail is reached, since dropping it
+       first slid the chevron under the button. */
     #fi-main-sidebar.fi-sidebar-open:has(> [data-sidebar-workspace-toggle]) > .fi-tenant-menu {
         margin-inline-end: calc(var(--spacing) * 14);
     }
 
-    /* On the rail the toggle drops below the switcher rather than beside it,
-       so the rail can be narrow enough to centre both on the navigation's icon
-       column. The avatar is pinned so the narrow box cannot squeeze it. */
+    /* The avatar is pinned so the narrow rail cannot squeeze it. */
     #fi-main-sidebar:not(.fi-sidebar-open):has(> [data-sidebar-workspace-toggle]) > .fi-tenant-menu {
-        margin-top: calc(var(--spacing) * 2);
         margin-inline: calc(var(--spacing) * 1);
-        padding-bottom: calc(var(--spacing) * 10);
-        transition-delay: calc(var(--sidebar-motion-duration) / 2), 0s, var(--sidebar-motion-duration);
+        transition-delay: 0s, var(--sidebar-motion-duration);
     }
 
-    /* The navigation moves down to make room for the toggle on the same curve
-       and at the same moment as the toggle drops into it. The avatar glides to
-       the rail's centre with the width. */
+    /* The avatar glides to the rail's centre with the width. */
     #fi-main-sidebar:has(> [data-sidebar-workspace-toggle]) > .fi-tenant-menu {
-        transition-property: padding-bottom, margin-inline-start, margin-inline-end;
-        transition-duration: calc(var(--sidebar-motion-duration) / 2), var(--sidebar-motion-duration), 0s;
+        transition-property: margin-inline-start, margin-inline-end;
+        transition-duration: var(--sidebar-motion-duration), 0s;
         transition-timing-function: var(--sidebar-motion-easing);
+    }
+
+    /* The top bar's start widens to hold the expand button on the same curve as
+       the rail, so the page heading glides aside instead of jumping when it appears. */
+    .fi-topbar {
+        transition-property: padding-inline-start;
+        transition-duration: var(--sidebar-motion-duration);
+        transition-timing-function: var(--sidebar-motion-easing);
+    }
+
+    .fi-topbar:has(> .fi-topbar-expand-sidebar-btn.fi-sidebar-collapsed) {
+        padding-inline-start: calc(var(--spacing) * 14);
     }
 
     .fi-tenant-menu-trigger .fi-avatar {
@@ -557,58 +561,56 @@ html.fi-chat-docked .fi-app-main-wrapper {
     }
 }
 
-/* The panel's own collapse button is inline in the topbar view, with no config
-   to turn it off. Hiding it leaves one toggle, in the sidebar it controls. */
+/* The panel's own collapse buttons are inline in the topbar view, with no config
+   to turn them off. Ours replace them. */
 body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
     display: none;
 }
 
-.fi-sidebar-toggle-btn {
+.fi-sidebar-toggle-btn,
+.fi-topbar-expand-sidebar-btn {
     @apply absolute top-2 z-20 hidden h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-(--surface-sidebar-hover-bg) hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 lg:flex dark:text-gray-500 dark:hover:text-gray-200;
-
-    /* 4.5 spacing from the trailing edge is also the centre of the collapsed
-       rail, so this one value serves both states and the button never moves
-       horizontally relative to the panel. It rides the edge as the panel
-       animates, which is the only path across the sidebar that crosses no
-       labels: everything beside it is clipped by that same edge. */
-    inset-inline-end: calc(var(--spacing) * 4.5);
-
-    /* Expanding: the button leaves the rail immediately, so it is back on the
-       header line before the panel is wide enough to show one. */
-    transition-property: color, background-color, top, inset-inline-end;
-    transition-duration: var(--sidebar-motion-duration),
-        var(--sidebar-motion-duration), calc(var(--sidebar-motion-duration) / 2),
-        var(--sidebar-motion-duration);
-    transition-timing-function: var(--sidebar-motion-easing);
 
     .fi-sidebar-toggle-icon {
         @apply h-5 w-5;
     }
 }
 
-/* On the rail the button drops to the row below the workspace avatar, which is
-   the only thing that changes between the two states.
+/* Collapse rides the panel's trailing edge. Expanding, it fades in only once the
+   edge has carried it past the workspace avatar. */
+.fi-sidebar-toggle-btn {
+    inset-inline-end: calc(var(--spacing) * 4.5);
+    transition-property: color, background-color, opacity, visibility;
+    transition-duration: var(--sidebar-motion-duration), var(--sidebar-motion-duration),
+        calc(var(--sidebar-motion-duration) / 4), 0s;
+    transition-delay: 0s, 0s, calc(var(--sidebar-motion-duration) / 2.5), 0s;
+    transition-timing-function: var(--sidebar-motion-easing);
+}
 
-   Collapsing, that drop is the last thing to happen: running it against the
-   width made the button descend past a sidebar still at full width. A CSS
-   transition is read off the state being entered, so the delay belongs here and
-   not on the rule above. */
+/* Collapsing, it is gone before the narrowing edge brings it to the avatar. */
 #fi-main-sidebar:not(.fi-sidebar-open) .fi-sidebar-toggle-btn {
-    top: calc(var(--spacing) * 11);
-    inset-inline-end: calc(var(--spacing) * 2);
-    transition-delay: 0s, 0s, calc(var(--sidebar-motion-duration) / 2), 0s;
+    @apply invisible opacity-0;
+    transition-delay: 0s, 0s, 0s, calc(var(--sidebar-motion-duration) / 4);
 }
 
-/* One glyph per direction, swapped by the sidebar's own state class so the icon
-   never lags a frame behind the panel it describes. */
-.fi-sidebar-toggle-icon-expand,
-#fi-main-sidebar.fi-sidebar-open .fi-sidebar-toggle-icon-collapse {
-    @apply block;
-}
+/* Expand fades in as the rail lands, over the top bar's widened start. */
+.fi-topbar-expand-sidebar-btn {
+    inset-inline-start: calc(var(--spacing) * 3);
 
-.fi-sidebar-toggle-icon-collapse,
-#fi-main-sidebar.fi-sidebar-open .fi-sidebar-toggle-icon-expand {
-    @apply hidden;
+    &.fi-transition-enter {
+        transition-property: opacity;
+        transition-duration: calc(var(--sidebar-motion-duration) / 2);
+        transition-delay: calc(var(--sidebar-motion-duration) * 0.6);
+        transition-timing-function: var(--sidebar-motion-easing);
+    }
+
+    &.fi-transition-enter-start {
+        @apply opacity-0;
+    }
+
+    &.fi-transition-enter-end {
+        @apply opacity-100;
+    }
 }
 
 /* Labels fade out before the panel narrows past them, and back in behind the
@@ -1751,7 +1753,7 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-header:not(.fi-header-page-heading-only) {
-        @apply flex-row items-center justify-between gap-3 border-b border-gray-200/60 px-4 py-3 lg:px-6 dark:border-white/10;
+        @apply flex-row items-center justify-between gap-3 border-b border-gray-200/60 min-h-14 px-4 py-2 lg:px-6 dark:border-white/10;
     }
 
     .fi-page-content .fi-ta-ctn:not(.fi-modal *) {
@@ -1827,7 +1829,7 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-board-header {
-        @apply flex items-center gap-x-4 border-b border-gray-200/60 bg-white px-4 py-2 lg:px-6 dark:border-white/10 dark:bg-gray-900;
+        @apply flex items-center gap-x-4 border-b border-gray-200/60 bg-white min-h-14 px-4 py-2 lg:px-6 dark:border-white/10 dark:bg-gray-900;
 
         /* Contents puts the clear filters button on the toolbar line, right after the filter trigger. */
         & > .ff-header {

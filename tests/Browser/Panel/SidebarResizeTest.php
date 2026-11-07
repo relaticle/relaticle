@@ -112,3 +112,33 @@ it('keeps every navigation row 32px tall on the collapsed rail', function (): vo
         ->assertScript($rowHeights, true)
         ->assertNoJavaScriptErrors();
 });
+
+it('hands the toggle to the top bar on collapse and back on expand, keeping the navigation in place', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $navTop = 'Math.round(document.querySelector(".fi-sidebar-nav .fi-sidebar-item-icon").getBoundingClientRect().top)';
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->assertVisible('[data-sidebar-workspace-toggle]')
+        ->assertMissing('[data-sidebar-expand-toggle]');
+
+    $openNavTop = $page->script($navTop);
+
+    $page->click('[data-sidebar-workspace-toggle]')
+        ->wait(0.5)
+        ->assertScript('Alpine.store("sidebar").isOpen', false)
+        ->assertScript('getComputedStyle(document.querySelector("[data-sidebar-workspace-toggle]")).visibility', 'hidden')
+        ->assertVisible('nav[aria-label=Topbar] [data-sidebar-expand-toggle]')
+        ->assertScript($navTop, $openNavTop)
+        ->click('[data-sidebar-expand-toggle]')
+        ->wait(0.5)
+        ->assertScript('Alpine.store("sidebar").isOpen', true)
+        ->assertMissing('[data-sidebar-expand-toggle]')
+        ->assertVisible('[data-sidebar-workspace-toggle]')
+        ->assertNoJavaScriptErrors();
+});

@@ -107,7 +107,7 @@ it('places the conversation title in the topbar and the toggle beside the worksp
 
     $page->click('[data-sidebar-workspace-toggle]')
         ->assertScript('(() => !document.querySelector("#fi-main-sidebar").classList.contains("fi-sidebar-open"))()')
-        ->click('[data-sidebar-workspace-toggle]')
+        ->click('[data-sidebar-expand-toggle]')
         ->assertScript('(() => document.querySelector("#fi-main-sidebar").classList.contains("fi-sidebar-open"))()')
         ->resize(390, 844)
         ->assertVisible('[data-page-heading]')
