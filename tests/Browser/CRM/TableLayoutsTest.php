@@ -39,3 +39,25 @@ it('applies a layout from the toolbar menu and marks a change as modified', func
         ->assertDontSee('(modified)')
         ->assertNoJavaScriptErrors();
 });
+
+it('keeps the layout list in step with the search box after Escape', function (): void {
+    foreach (range(1, 7) as $number) {
+        TableLayout::factory()->for($this->user)->for($this->workspace)->create(['name' => "Layout {$number}"]);
+    }
+
+    $visibleRows = '[...document.querySelectorAll(".fi-ta-layouts-row")].filter((row) => row.offsetParent !== null).length';
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-ta-layouts-trigger')
+        ->type('.fi-ta-layouts-search input', 'Layout 3')
+        ->assertScript($visibleRows, 1);
+
+    $page->keys('.fi-ta-layouts-search input', 'Escape')
+        ->assertScript('document.querySelector(".fi-ta-layouts-search input").offsetParent === null', true)
+        ->click('.fi-ta-layouts-trigger')
+        ->assertScript("{$visibleRows} === (document.querySelector('.fi-ta-layouts-search input').value === '' ? 7 : 1)", true)
+        ->assertNoJavaScriptErrors();
+});

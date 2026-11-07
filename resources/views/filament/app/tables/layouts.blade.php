@@ -29,7 +29,7 @@
         @if ($layouts->count() >= 7)
             <label class="fi-ta-layouts-search">
                 <x-filament::icon :icon="Heroicon::OutlinedMagnifyingGlass" />
-                <input type="search" x-model="query" x-on:keydown.stop placeholder="{{ __('filament/panel.tables.layouts.search') }}" aria-label="{{ __('filament/panel.tables.layouts.search') }}" />
+                <input type="search" x-model="query" x-on:search="query = $el.value" x-on:keydown.stop placeholder="{{ __('filament/panel.tables.layouts.search') }}" aria-label="{{ __('filament/panel.tables.layouts.search') }}" />
             </label>
         @endif
 
