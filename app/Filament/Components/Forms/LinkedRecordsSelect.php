@@ -8,6 +8,7 @@ use App\Actions\Note\UpdateNote;
 use App\Actions\Task\UpdateTask;
 use App\Enums\CrmEntity;
 use App\Filament\Concerns\HasRecordChips;
+use App\Filament\Concerns\RendersRecordPicker;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Task;
@@ -31,6 +32,7 @@ use Override;
 final class LinkedRecordsSelect extends Select
 {
     use HasRecordChips;
+    use RendersRecordPicker;
 
     private const int RECENT_LIMIT = 5;
 
@@ -93,27 +95,15 @@ final class LinkedRecordsSelect extends Select
         return is_array($state) ? array_values($this->optionsByKey($state)) : [];
     }
 
-    /**
-     * @return array<string, string>
-     */
-    public function getPickerMessages(): array
-    {
-        $keys = ['search', 'searching', 'failed', 'none', 'empty', 'linked', 'more', 'result', 'results', 'remove'];
-
-        return array_combine($keys, array_map(
-            fn (string $key): string => __("filament/components/linked-records.{$key}"),
-            $keys,
-        ));
-    }
-
     #[Override]
     public function toEmbeddedHtml(): string
     {
-        return $this->wrapEmbeddedHtml(
-            $this->wrapInputHtml(
-                view('filament.forms.components.linked-records-select', ['field' => $this])->render(),
-            ),
-        );
+        return $this->recordPickerHtml();
+    }
+
+    protected function pickerMessagesFile(): string
+    {
+        return 'filament/components/linked-records';
     }
 
     #[Override]

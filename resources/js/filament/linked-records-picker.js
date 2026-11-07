@@ -1,4 +1,4 @@
-// The picker behind `LinkedRecordsSelect`. Closed, it is one row of record links with a count
+// The picker behind `LinkedRecordsSelect` and the multiple `WorkspaceMemberSelect`. Closed, it is one row of record links with a count
 // of the ones that do not fit. Open, focus stays in the search box and the list follows it.
 const picker = (config) => ({
     state: config.state,

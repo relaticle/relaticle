@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Components\Forms;
 
 use App\Filament\Concerns\HasRecordChips;
+use App\Filament\Concerns\RendersRecordPicker;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\LikePattern;
@@ -36,6 +37,7 @@ use Override;
 final class WorkspaceMemberSelect extends Select
 {
     use HasRecordChips;
+    use RendersRecordPicker;
 
     /**
      * Namespaced defensively so it cannot collide with a real `users` column
@@ -166,6 +168,7 @@ final class WorkspaceMemberSelect extends Select
         $members = User::query()
             ->tap(self::currentWorkspaceMembers())
             ->when($search !== '', fn (Builder $query): Builder => $query->whereLike('users.name', '%'.LikePattern::escape($search).'%'))
+            ->limit($this->getOptionsLimit())
             ->get();
 
         if ($members->isEmpty()) {
@@ -189,23 +192,13 @@ final class WorkspaceMemberSelect extends Select
             return [];
         }
 
-        $options = collect($this->memberOptions(User::query()->tap(self::currentWorkspaceMembers())->whereKey($state)->get()))
-            ->keyBy('value');
+        $members = User::query()
+            ->tap(self::currentWorkspaceMembers())
+            ->whereKey($state)
+            ->get()
+            ->sortBy(fn (User $member): int|false => array_search((string) $member->getKey(), $state, true));
 
-        return array_values(array_filter(array_map(fn (string $id): ?array => $options->get($id), $state)));
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    public function getPickerMessages(): array
-    {
-        $keys = ['search', 'searching', 'failed', 'none', 'empty', 'linked', 'more', 'result', 'results', 'remove'];
-
-        return array_combine($keys, array_map(
-            fn (string $key): string => __("filament/components/member-picker.{$key}"),
-            $keys,
-        ));
+        return $this->memberOptions($members);
     }
 
     #[Override]
@@ -215,11 +208,12 @@ final class WorkspaceMemberSelect extends Select
             return parent::toEmbeddedHtml();
         }
 
-        return $this->wrapEmbeddedHtml(
-            $this->wrapInputHtml(
-                view('filament.forms.components.linked-records-select', ['field' => $this])->render(),
-            ),
-        );
+        return $this->recordPickerHtml();
+    }
+
+    protected function pickerMessagesFile(): string
+    {
+        return 'filament/components/member-picker';
     }
 
     /**
@@ -228,19 +222,15 @@ final class WorkspaceMemberSelect extends Select
      */
     private function memberOptions(Collection $members): array
     {
-        $options = [];
-
-        foreach ($members as $member) {
-            $options[] = [
+        return array_values($members
+            ->map(fn (User $member): array => [
                 'value' => (string) $member->getKey(),
                 'name' => (string) $member->name,
                 'html' => $this->memberLabel($member),
                 'hint' => null,
                 'url' => null,
-            ];
-        }
-
-        return $options;
+            ])
+            ->all());
     }
 
     private function memberLabel(User $member): string
