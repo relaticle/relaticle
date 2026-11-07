@@ -82,7 +82,22 @@
             }, { once: true })
         },
         nudge(delta) {
-            this.apply(this.clamp(this.width ?? this.target.offsetWidth) + (this.growsTowardLeft ? -delta : delta))
+            const grow = this.growsTowardLeft ? -delta : delta
+            const width = this.clamp(this.width ?? this.target.offsetWidth)
+
+            if (this.bounds.collapsedProperty && this.target.offsetWidth < this.bounds.min) {
+                if (grow > 0) this.$dispatch('resize-expand')
+
+                return
+            }
+
+            if (this.bounds.collapsedProperty && grow < 0 && width <= this.bounds.min) {
+                this.$dispatch('resize-collapse')
+
+                return
+            }
+
+            this.apply(width + grow)
             this.save()
         },
         jump(width) {

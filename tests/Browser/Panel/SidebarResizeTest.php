@@ -55,6 +55,28 @@ it('collapses the sidebar when dragged past half its minimum and reopens it from
         ->assertNoJavaScriptErrors();
 });
 
+it('collapses the sidebar with an arrow key past its minimum and reopens it from the rail', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $width = '(() => Math.round(document.querySelector(".fi-sidebar").getBoundingClientRect().width))()';
+
+    loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->keys('.fi-sidebar-resize-handle', ['Home'])
+        ->assertScript($width, 220)
+        ->keys('.fi-sidebar-resize-handle', ['ArrowLeft'])
+        ->assertScript('Alpine.store("sidebar").isOpen', false)
+        ->assertScript($width, 48)
+        ->keys('.fi-sidebar-resize-handle', ['ArrowRight'])
+        ->assertScript('Alpine.store("sidebar").isOpen', true)
+        ->assertScript($width, 220)
+        ->assertNoJavaScriptErrors();
+});
+
 it('fits every get started step on one line in the default sidebar', function (): void {
     $this->withVite();
 
