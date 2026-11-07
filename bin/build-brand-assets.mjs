@@ -9,6 +9,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const destination = path.join(root, 'public/brand');
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'relaticle-brand-'));
 const output = path.join(temporary, 'relaticle-brand-kit');
+const siteOutput = path.join(temporary, 'site');
 const check = process.argv.includes('--check');
 const hash = (contents) => createHash('sha256').update(contents).digest('hex');
 const inner = (svg) => svg.replace(/^[\s\S]*?<svg\b[^>]*>/, '').replace(/<\/svg>\s*$/, '');
@@ -16,9 +17,13 @@ const source = fs.readFileSync(path.join(destination, 'logomark.svg'), 'utf8');
 const wordmark = fs.readFileSync(path.join(destination, 'wordmark.svg'), 'utf8');
 const colorMark = inner(source);
 const whiteMark = colorMark.replace(/\sopacity="[^"]*"/g, '').replace(/(fill|stroke)="url\(#[^"]*\)"/g, '$1="#FFFFFF"');
-const scale = 1024 * 0.74 / 1158;
-const offset = (1024 - 1158 * scale) / 2;
-const placement = `translate(${offset} ${offset}) scale(${scale})`;
+const placed = (fraction) => {
+    const scale = 1024 * fraction / 1158;
+    const offset = (1024 - 1158 * scale) / 2;
+
+    return `translate(${offset} ${offset}) scale(${scale})`;
+};
+const placement = placed(0.74);
 const variants = [
     { id: 'purple', background: '#5D54E8', mark: whiteMark },
     { id: 'light', background: '#FFFFFF', mark: colorMark },
@@ -37,6 +42,7 @@ const manifest = {
     sources: { 'logomark.svg': hash(source), 'wordmark.svg': hash(wordmark) },
     avatars: [], logos: [], platforms, watermarks: [], files: {},
 };
+const siteFiles = [];
 
 function write(name, content) {
     const target = path.join(output, name);
@@ -48,6 +54,37 @@ function write(name, content) {
 
 function svg(content, viewBox = '0 0 1024 1024', width = 1024, height = 1024) {
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${viewBox}" fill="none">${content}</svg>\n`;
+}
+
+function writeSite(name, content) {
+    fs.mkdirSync(siteOutput, { recursive: true });
+    fs.writeFileSync(path.join(siteOutput, name), content);
+    siteFiles.push(name);
+}
+
+function rasterize(artwork, width) {
+    return execFileSync('rsvg-convert', ['-w', String(width)], { input: artwork, maxBuffer: 10 * 1024 * 1024 });
+}
+
+function ico(sizes, artwork) {
+    const images = sizes.map((size) => rasterize(artwork, size));
+    const header = Buffer.alloc(6 + 16 * images.length);
+    let offset = header.length;
+
+    header.writeUInt16LE(1, 2);
+    header.writeUInt16LE(images.length, 4);
+    images.forEach((image, index) => {
+        const entry = 6 + 16 * index;
+        header.writeUInt8(sizes[index], entry);
+        header.writeUInt8(sizes[index], entry + 1);
+        header.writeUInt16LE(1, entry + 4);
+        header.writeUInt16LE(32, entry + 6);
+        header.writeUInt32LE(image.length, entry + 8);
+        header.writeUInt32LE(offset, entry + 12);
+        offset += image.length;
+    });
+
+    return Buffer.concat([header, ...images]);
 }
 
 function render(master, name, width) {
@@ -88,11 +125,23 @@ try {
         );
     }
 
-    const watermark = write('watermarks/white.svg', svg(`<g transform="${placement}">${whiteMark}</g>`));
+    const watermark = write('watermarks/white.svg', svg(`<g transform="${placed(0.92)}">${whiteMark}</g>`));
     manifest.watermarks.push(
         { id: 'white', png: render(watermark, 'watermarks/white-150.png', 150) },
         { id: 'purple', png: render('avatars/purple.svg', 'watermarks/purple-150.png', 150) },
     );
+    const favicon = svg(colorMark, '-24 -24 1206 1206', 1206, 1206);
+    const appIcon = fs.readFileSync(path.join(output, 'avatars/purple.svg'));
+    const maskableIcon = svg(`<rect width="1024" height="1024" fill="#5D54E8"/><g transform="${placed(0.6)}">${whiteMark}</g>`);
+    writeSite('favicon.svg', favicon);
+    writeSite('favicon-96x96.png', rasterize(favicon, 96));
+    writeSite('favicon.ico', ico([16, 32, 48], favicon));
+    writeSite('apple-touch-icon.png', rasterize(appIcon, 180));
+    for (const size of [192, 512]) {
+        writeSite(`web-app-manifest-${size}x${size}.png`, rasterize(appIcon, size));
+        writeSite(`web-app-manifest-maskable-${size}x${size}.png`, rasterize(maskableIcon, size));
+    }
+
     write('README.txt', [
         'Relaticle brand kit', '',
         'Use the purple avatar consistently across social accounts.',
@@ -118,9 +167,13 @@ try {
     });
 
     if (check) {
-        const expected = [...files.map((name) => [`kit/${name}`, path.join(output, name)]), ['kit.zip', path.join(temporary, 'kit.zip')]];
+        const expected = [
+            ...files.map((name) => [`brand/kit/${name}`, path.join(output, name)]),
+            ['brand/kit.zip', path.join(temporary, 'kit.zip')],
+            ...siteFiles.map((name) => [name, path.join(siteOutput, name)]),
+        ];
         const changed = expected.filter(([name, generated]) => {
-            const existing = path.join(destination, name);
+            const existing = path.join(root, 'public', name);
             return !fs.existsSync(existing) || hash(fs.readFileSync(existing)) !== hash(fs.readFileSync(generated));
         });
         const extras = fs.existsSync(path.join(destination, 'kit'))
@@ -132,12 +185,15 @@ try {
         if (changed.length || extras.length) {
             throw new Error(`Brand assets need rebuilding: ${[...changed.map(([name]) => name), ...extras].join(', ')}`);
         }
-        console.log(`Verified ${files.length} brand files and the ZIP against a fresh build.`);
+        console.log(`Verified ${files.length} brand files, the ZIP and ${siteFiles.length} site icons against a fresh build.`);
     } else {
         fs.rmSync(path.join(destination, 'kit'), { recursive: true, force: true });
         fs.cpSync(output, path.join(destination, 'kit'), { recursive: true });
         fs.copyFileSync(path.join(temporary, 'kit.zip'), path.join(destination, 'kit.zip'));
-        console.log(`Built ${files.length} brand files and public/brand/kit.zip.`);
+        for (const name of siteFiles) {
+            fs.copyFileSync(path.join(siteOutput, name), path.join(root, 'public', name));
+        }
+        console.log(`Built ${files.length} brand files, public/brand/kit.zip and ${siteFiles.length} site icons.`);
     }
 } finally {
     fs.rmSync(temporary, { recursive: true, force: true });
