@@ -51,4 +51,16 @@ enum OnboardingDataSource: string implements HasLabel
             self::Spreadsheet, self::OtherCrm, self::Assistant => false,
         };
     }
+
+    /**
+     * @return list<CreationSource>
+     */
+    public function arrivalSources(): array
+    {
+        return match ($this) {
+            self::Spreadsheet, self::OtherCrm => [CreationSource::IMPORT],
+            self::Inbox => [CreationSource::MAILBOX],
+            self::Memory, self::Assistant => [CreationSource::IMPORT, CreationSource::MAILBOX],
+        };
+    }
 }

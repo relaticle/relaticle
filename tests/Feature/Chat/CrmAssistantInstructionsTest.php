@@ -639,11 +639,69 @@ it('tells rela to list only the companies that arrived and let the user pick', f
     $instructions = resolve(CrmAssistant::class)->staticInstructions();
 
     expect($instructions)
-        ->toContain('"creation_source": {"$in": ["import", "mailbox"]}')
+        ->toContain('"creation_source": {"$in": [<each value on the pick_sources line, quoted>]}')
         ->toContain('Never rank them')
         ->toContain('one opportunity per company')
         ->toContain('`$ref:<pending_action_id>#<index>`')
         ->toContain('`due_date`');
+});
+
+it('lets rela state the counts on the arrived line without a tool call', function (): void {
+    expect(resolve(CrmAssistant::class)->staticInstructions())
+        ->toContain('The one exception is the arrived line of the onboarding block: you may state its counts without a tool call.');
+});
+
+it('points the company pick at the creation sources the data source arrives from', function (OnboardingDataSource $source, string $line): void {
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+
+    expect(setupAgent($workspace, $source)->dynamicInstructions())->toContain("pick_sources: {$line}\n");
+})->with([
+    'spreadsheet' => [OnboardingDataSource::Spreadsheet, 'import'],
+    'other crm' => [OnboardingDataSource::OtherCrm, 'import'],
+    'inbox' => [OnboardingDataSource::Inbox, 'mailbox'],
+    'memory' => [OnboardingDataSource::Memory, 'import, mailbox'],
+    'assistant' => [OnboardingDataSource::Assistant, 'import, mailbox'],
+]);
+
+it('points the company pick at both sources when the user never answered', function (): void {
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+
+    expect(setupAgent($workspace)->dynamicInstructions())->toContain("pick_sources: import, mailbox\n");
+});
+
+it('keeps the arrived branch for a workspace with no answer that later gets mailbox records', function (): void {
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+
+    Company::factory()->count(2)->create(['workspace_id' => $workspace->getKey(), 'creator_id' => null, 'creation_source' => CreationSource::MAILBOX]);
+
+    expect(setupAgent($workspace)->dynamicInstructions())
+        ->toContain("data_source: none\n")
+        ->toContain("arrived: 0 people and 2 companies from mailbox today\n");
+});
+
+it('offers the company pick only when companies arrived', function (): void {
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+
+    People::factory()->count(3)->create(['workspace_id' => $workspace->getKey(), 'creation_source' => CreationSource::IMPORT]);
+
+    $agent = setupAgent($workspace, OnboardingDataSource::Spreadsheet)->withTurnOrigin(MessageOrigin::DataArrived);
+
+    expect($agent->dynamicInstructions())
+        ->toContain("arrived: 3 people and 0 companies from import today\n")
+        ->toContain('otherwise to add the companies they work with');
+
+    foreach ([MessageOrigin::Greeting, MessageOrigin::DataArrived] as $origin) {
+        expect($origin->directive())
+            ->toContain('when an arrived line counts more than 0 companies, otherwise to add the companies they work with')
+            ->toContain('one offer');
+    }
+});
+
+it('titles and links the follow-up proposals so rela asks for nothing', function (): void {
+    expect(resolve(CrmAssistant::class)->staticInstructions())
+        ->toContain("its `company_id` the picked company's id")
+        ->toContain('titled "Follow up with <company name>"')
+        ->toContain('when the user asks how to connect their assistant or accepts that offer');
 });
 
 it('has the greeting open on where the data lives and the data arrived turn offer to pick', function (): void {
@@ -882,7 +940,7 @@ it('emits the onboarding block with setup_mode even when the workspace has no us
     $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
     $agent = resolve(CrmAssistant::class)->withWorkspace($workspace)->withSetupMode(true);
 
-    expect($agent->instructions())->toContain("<onboarding>\ndata_source: none\nmembers: 1\nsetup_mode: true\n</onboarding>");
+    expect($agent->instructions())->toContain("<onboarding>\ndata_source: none\nmembers: 1\npick_sources: import, mailbox\nsetup_mode: true\n</onboarding>");
 });
 
 it('drops update, delete and field definition tools in setup mode and keeps the rest', function (): void {
