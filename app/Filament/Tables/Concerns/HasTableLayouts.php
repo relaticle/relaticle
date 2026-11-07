@@ -236,7 +236,11 @@ trait HasTableLayouts
             ->action(function (array $arguments): void {
                 $layout = $this->argumentTableLayout($arguments) ?? abort(404);
 
-                resolve(DeleteTableLayout::class)->execute($this->tableLayoutUser(), $layout);
+                if (! resolve(DeleteTableLayout::class)->execute($this->tableLayoutUser(), $layout)) {
+                    $this->handleMissingTableLayout($layout->getKey());
+
+                    return;
+                }
 
                 $this->forgetActiveTableLayout($layout);
                 $this->defaultTableLayoutId = $this->defaultTableLayoutId === $layout->getKey() ? null : $this->defaultTableLayoutId;

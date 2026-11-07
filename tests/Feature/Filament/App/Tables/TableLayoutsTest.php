@@ -588,6 +588,20 @@ it('tells the owner when an admin deletes their layout', function (): void {
         ->and($notice->data)->toBe(['layout_name' => 'Renewals', 'entity' => CrmEntity::Company->value, 'change' => TableLayoutChangedNotification::DELETED]);
 });
 
+it('tells the owner once when two admins delete their layout at the same moment', function (): void {
+    $owner = tableLayoutMember(WorkspaceRole::Member);
+    $layout = layoutFor($owner, ['name' => 'Renewals', 'is_shared' => true]);
+    $admin = tableLayoutMember(WorkspaceRole::Admin);
+    $sameLayoutInAnotherRequest = TableLayout::query()->withoutGlobalScopes()->findOrFail($layout->getKey());
+
+    $first = resolve(DeleteTableLayout::class)->execute($admin, $layout);
+    $second = resolve(DeleteTableLayout::class)->execute($admin, $sameLayoutInAnotherRequest);
+
+    expect($first)->toBeTrue()
+        ->and($second)->toBeFalse()
+        ->and($owner->notifications()->count())->toBe(1);
+});
+
 it('tells the owner when an admin stops sharing their layout', function (): void {
     $owner = tableLayoutMember(WorkspaceRole::Member);
     $layout = layoutFor($owner, ['name' => 'Renewals', 'is_shared' => true]);
