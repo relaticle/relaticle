@@ -281,7 +281,7 @@ jobs:
           path: junit.xml
 
   browser-tests:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.browser == 'webkit' && 'ubuntu-latest' || 'ubuntu-24.04-arm' }}
     strategy:
       fail-fast: false
       matrix:
@@ -326,9 +326,9 @@ jobs:
           path: |
             ~/.composer/cache
             vendor
-          key: ${{ runner.os }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
           restore-keys: |
-            ${{ runner.os }}-php-8.5-composer-
+            ${{ runner.os }}-${{ runner.arch }}-php-8.5-composer-
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -356,7 +356,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ matrix.browser }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ matrix.browser }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Prepare Laravel
         run: |
@@ -384,7 +384,7 @@ jobs:
         run: lscpu | grep -E 'Model name|^CPU\(s\)'
 
       - name: Browser Tests
-        run: vendor/bin/pest tests/Browser/ --configuration phpunit.ci.xml ${{ matrix.browser == 'webkit' && '--group=webkit --browser safari' || format('--shard={0}/4 --parallel --processes=2', matrix.shard) }} --log-junit junit.xml
+        run: vendor/bin/pest tests/Browser/ --configuration phpunit.ci.xml ${{ matrix.browser == 'webkit' && '--group=webkit --browser safari' || format('--shard={0}/4 --parallel --processes=3', matrix.shard) }} --log-junit junit.xml
 
       - name: Upload timings
         if: always()
