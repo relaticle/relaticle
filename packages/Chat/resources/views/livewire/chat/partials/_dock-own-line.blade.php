@@ -11,7 +11,7 @@
     <div class="flex items-start gap-2.5 px-4 py-2.5">
         <span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400" aria-hidden="true">
             @if ($entityIcon)
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="h-3.5 w-3.5" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="{{ $entityIcon }}" />
                 </svg>
             @endif
@@ -32,12 +32,12 @@
                     <span class="truncate">{{ __('to :recipient', ['recipient' => $recipient]) }}</span>
                     <span aria-hidden="true">&middot;</span>
                 @endif
-                <x-heroicon-o-lock-closed class="h-3 w-3 shrink-0" aria-hidden="true" />
+                <x-lucide-lock class="h-3 w-3 shrink-0" aria-hidden="true" />
                 <span>{{ __('you approve it on its own, next') }}</span>
             </span>
         </button>
 
-        <x-heroicon-o-chevron-down
+        <x-lucide-chevron-down
             class="mt-1.5 h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform dark:text-gray-500"
             x-bind:class="open && 'rotate-180'"
             aria-hidden="true"

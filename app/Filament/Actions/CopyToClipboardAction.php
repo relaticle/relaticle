@@ -14,7 +14,7 @@ final class CopyToClipboardAction extends Action
     {
         parent::setUp();
 
-        $this->icon('heroicon-o-clipboard-document');
+        $this->icon('lucide-clipboard');
     }
 
     public function copies(string|Closure $value, string $notification): static

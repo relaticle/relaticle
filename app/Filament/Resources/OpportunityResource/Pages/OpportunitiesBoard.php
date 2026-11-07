@@ -7,6 +7,7 @@ namespace App\Filament\Resources\OpportunityResource\Pages;
 use App\Actions\Opportunity\UpdateOpportunity;
 use App\Enums\CustomFields\OpportunityField as OpportunityCustomField;
 use App\Filament\Actions\MoveCardAction;
+use App\Filament\Actions\PreviewRecordAction;
 use App\Filament\Components\Forms\RecordSelect;
 use App\Filament\Components\Infolists\RecordChipEntry;
 use App\Filament\Components\Tables\Filters\RecordSelectFilter;
@@ -23,12 +24,12 @@ use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Size;
 use Filament\Support\Enums\TextSize;
 use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentTimezone;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\JoinClause;
@@ -85,41 +86,7 @@ final class OpportunitiesBoard extends BoardResourcePage
             ->positionIdentifier('order_column')
             ->searchable(['name'])
             ->columns($this->getColumns())
-            ->cardSchema(function (Schema $schema) use ($customFields): Schema {
-                $amountField = $customFields->get('custom_fields.'.OpportunityCustomField::AMOUNT->value)
-                    ?->visible(fn (?string $state): bool => filled($state))
-                    ->badge()
-                    ->color('success')
-                    ->icon(Heroicon::OutlinedCurrencyDollar)
-                    ->grow(false)
-                    ->hiddenLabel();
-
-                $closeDateField = $customFields->get('custom_fields.'.OpportunityCustomField::CLOSE_DATE->value)
-                    ?->visible(fn (?string $state): bool => filled($state))
-                    ->badge()
-                    ->color('gray')
-                    ->icon(Heroicon::OutlinedCalendar)
-                    ->grow(false)
-                    ->hiddenLabel()
-                    ->formatStateUsing(fn (?string $state): string => $this->formatCloseDateBadge($state));
-
-                return $schema
-                    ->components([
-                        CardFlex::make([
-                            RecordChipEntry::make('company.name')
-                                ->chipSize('sm')
-                                ->hiddenLabel()
-                                ->visible(fn (?string $state): bool => filled($state))
-                                ->color('gray')
-                                ->size(TextSize::ExtraSmall)
-                                ->grow(),
-                        ]),
-                        CardFlex::make([
-                            $amountField,
-                            $closeDateField,
-                        ])->align('center'),
-                    ]);
-            })
+            ->cardSchema(fn (Schema $schema): Schema => $this->cardSchema($schema, $customFields))
             ->createCardAction($this->cardCreation())
             ->cardAction('edit')
             ->cardActions($this->cardActions())
@@ -128,6 +95,57 @@ final class OpportunitiesBoard extends BoardResourcePage
             ->filtersFormWidth(Width::Medium)
             ->filtersTriggerAction(fn (Action $action): Action => $action->button()->labeledFrom('sm')->size(Size::Small)->label(__('filament/pages/boards.filters_button.label')))
             ->headerToolbar();
+    }
+
+    /**
+     * @param  Collection<string, mixed>  $customFields
+     */
+    private function cardSchema(Schema $schema, Collection $customFields): Schema
+    {
+        $amountField = $customFields->get('custom_fields.'.OpportunityCustomField::AMOUNT->value)
+            ?->visible(fn (?string $state): bool => filled($state))
+            ->badge()
+            ->color('success')
+            ->icon('lucide-circle-dollar-sign')
+            ->grow(false)
+            ->hiddenLabel();
+
+        $closeDateField = $customFields->get('custom_fields.'.OpportunityCustomField::CLOSE_DATE->value)
+            ?->visible(fn (?string $state): bool => filled($state))
+            ->badge()
+            ->color('gray')
+            ->icon('lucide-calendar')
+            ->grow(false)
+            ->hiddenLabel()
+            ->formatStateUsing(fn (?string $state): string => $this->formatCloseDateBadge($state));
+
+        return $schema
+            ->components([
+                View::make('filament.app.board-card-preview-trigger')
+                    ->viewData(fn (Opportunity $record): array => [
+                        'open' => PreviewRecordAction::mountForRecord($record),
+                    ]),
+                CardFlex::make([
+                    RecordChipEntry::make('company.name')
+                        ->chipSize('sm')
+                        ->hiddenLabel()
+                        ->visible(fn (?string $state): bool => filled($state))
+                        ->color('gray')
+                        ->size(TextSize::ExtraSmall)
+                        ->grow(),
+                ]),
+                CardFlex::make([
+                    $amountField,
+                    $closeDateField,
+                ])->align('center'),
+            ]);
+    }
+
+    public function previewAction(): PreviewRecordAction
+    {
+        return PreviewRecordAction::make()
+            ->page(ViewOpportunity::class)
+            ->record(fn (array $arguments): ?Opportunity => Opportunity::query()->whereKey($arguments['record'] ?? null)->first());
     }
 
     /**
@@ -141,7 +159,7 @@ final class OpportunitiesBoard extends BoardResourcePage
                 ->label(__('filament/pages/boards.opportunities.actions.edit'))
                 ->slideOver()
                 ->modalWidth(Width::ExtraLarge)
-                ->icon('heroicon-o-pencil-square')
+                ->icon('lucide-square-pen')
                 ->schema(OpportunityForm::get(...))
                 ->fillForm(fn (Opportunity $record): array => [
                     'name' => $record->name,
@@ -155,7 +173,7 @@ final class OpportunitiesBoard extends BoardResourcePage
             Action::make('delete')
                 ->authorize(fn (?Opportunity $record): bool => $record instanceof Opportunity && Gate::allows('delete', $record))
                 ->label(__('filament/pages/boards.opportunities.actions.delete'))
-                ->icon('heroicon-o-trash')
+                ->icon('lucide-trash')
                 ->color('danger')
                 ->requiresConfirmation()
                 ->action(function (Opportunity $record): void {
@@ -205,7 +223,7 @@ final class OpportunitiesBoard extends BoardResourcePage
         return CreateAction::make()
             ->authorize(fn (): bool => Gate::allows('create', Opportunity::class))
             ->label(__('filament/pages/boards.opportunities.actions.add'))
-            ->icon('heroicon-o-plus')
+            ->icon('lucide-plus')
             ->iconButton()
             ->modalWidth(Width::Large)
             ->slideOver(false)

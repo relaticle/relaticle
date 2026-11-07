@@ -7,7 +7,7 @@
     <x-filament::empty-state
         :heading="$heading"
         :description="$description"
-        icon="heroicon-o-shield-check"
+        icon="lucide-shield-check"
         icon-color="primary"
         :contained="false"
     />

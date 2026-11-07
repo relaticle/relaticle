@@ -1,6 +1,6 @@
 <x-layouts::invitation :title="__('workspaces.invite_link.expired.heading')">
     <x-slot:icon>
-        <x-workspaces.invitation-icon icon="heroicon-o-clock" />
+        <x-workspaces.invitation-icon icon="lucide-clock" />
     </x-slot:icon>
 
     <x-slot:heading>

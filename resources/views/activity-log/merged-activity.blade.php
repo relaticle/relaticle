@@ -15,7 +15,7 @@
     $isChange = $summary->operation === ActivityLogOperation::Updated
         || ($summary->operation === null && $count > 0);
     $hasDiff = $isChange && $count > 0;
-    $icon = $summary->operation?->icon() ?? 'heroicon-o-adjustments-horizontal';
+    $icon = $summary->operation?->icon() ?? 'lucide-sliders-horizontal';
 @endphp
 
 <div
@@ -85,7 +85,7 @@
                                 >
                                     {{ $row['old'] }}
                                 </span>
-                                <x-filament::icon icon="heroicon-m-arrow-right" class="h-3 w-3 shrink-0 text-gray-400" />
+                                <x-filament::icon icon="lucide-arrow-right" class="h-3 w-3 shrink-0 text-gray-400" />
                                 <span
                                     class="line-clamp-2 font-medium text-gray-900 dark:text-gray-100"
                                     @if ($row['full'] === null) title="{{ $row['new'] }}" @endif
@@ -128,7 +128,7 @@
         </time>
         @if ($hasDiff)
             <x-filament::icon
-                icon="heroicon-m-chevron-down"
+                icon="lucide-chevron-down"
                 class="h-4 w-4 text-gray-400 transition-transform"
                 x-bind:class="open ? 'rotate-180' : ''"
                 aria-hidden="true"

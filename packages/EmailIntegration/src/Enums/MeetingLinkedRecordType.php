@@ -7,7 +7,6 @@ namespace Relaticle\EmailIntegration\Enums;
 use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasIcon;
 use Filament\Support\Contracts\HasLabel;
-use Filament\Support\Icons\Heroicon;
 use InvalidArgumentException;
 
 enum MeetingLinkedRecordType: string implements HasColor, HasIcon, HasLabel
@@ -25,12 +24,12 @@ enum MeetingLinkedRecordType: string implements HasColor, HasIcon, HasLabel
         };
     }
 
-    public function getIcon(): Heroicon
+    public function getIcon(): string
     {
         return match ($this) {
-            self::People => Heroicon::OutlinedUser,
-            self::Company => Heroicon::OutlinedBuildingOffice,
-            self::Opportunity => Heroicon::OutlinedCurrencyDollar,
+            self::People => 'lucide-user',
+            self::Company => 'lucide-building',
+            self::Opportunity => 'lucide-circle-dollar-sign',
         };
     }
 

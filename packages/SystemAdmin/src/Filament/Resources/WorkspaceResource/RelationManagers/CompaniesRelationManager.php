@@ -17,7 +17,7 @@ final class CompaniesRelationManager extends RelationManager
 {
     protected static string $relationship = 'companies';
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-building-office';
+    protected static string|\BackedEnum|null $icon = 'lucide-building';
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {

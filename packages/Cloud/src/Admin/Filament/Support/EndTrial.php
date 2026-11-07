@@ -18,7 +18,7 @@ final class EndTrial
     {
         return Action::make('endTrial')
             ->label(__('cloud::admin.trials.end_trial'))
-            ->icon('heroicon-o-no-symbol')
+            ->icon('lucide-ban')
             ->color('danger')
             ->authorize('endTrial')
             ->requiresConfirmation()
@@ -36,7 +36,7 @@ final class EndTrial
     {
         return BulkAction::make('endTrials')
             ->label(__('cloud::admin.trials.end_trials'))
-            ->icon('heroicon-o-no-symbol')
+            ->icon('lucide-ban')
             ->color('danger')
             ->visible(fn (): bool => self::administrator()->role->canManageCustomerAccess())
             ->authorizeIndividualRecords('endTrial')

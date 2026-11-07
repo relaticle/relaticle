@@ -141,15 +141,15 @@
             <span class="flex-1 text-left text-gray-900 dark:text-white truncate text-sm">
                 {{ $selectedEntityLink->label }}
                 @if ($selectedMatcher)
-                    <x-filament::icon icon="heroicon-m-chevron-right" class="inline w-3 h-3 text-gray-400 dark:text-gray-500 mx-0.5" />
+                    <x-filament::icon icon="lucide-chevron-right" class="inline w-3 h-3 text-gray-400 dark:text-gray-500 mx-0.5" />
                     <span class="text-gray-500 dark:text-gray-400">{{ $selectedMatcher->label }}</span>
                 @endif
             </span>
         @elseif ($selectedField)
-            <x-filament::icon icon="{{ $selectedField->icon ?? 'heroicon-o-squares-2x2' }}" class="w-3.5 h-3.5 text-gray-500 dark:text-gray-400 shrink-0" />
+            <x-filament::icon icon="{{ $selectedField->icon ?? 'lucide-layout-grid' }}" class="w-3.5 h-3.5 text-gray-500 dark:text-gray-400 shrink-0" />
             <span class="flex-1 text-left text-gray-900 dark:text-white truncate text-sm">{{ $selectedField->label }}</span>
         @else
-            <x-filament::icon icon="heroicon-o-squares-2x2" class="w-3.5 h-3.5 text-gray-400 shrink-0" />
+            <x-filament::icon icon="lucide-layout-grid" class="w-3.5 h-3.5 text-gray-400 shrink-0" />
             <span class="flex-1 text-left text-gray-400 truncate text-sm">{{ $placeholder }}</span>
         @endif
 
@@ -163,11 +163,11 @@
                 aria-label="Clear mapping"
                 class="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0 transition-colors"
             >
-                <x-filament::icon icon="heroicon-o-x-mark" class="w-3.5 h-3.5" />
+                <x-filament::icon icon="lucide-x" class="w-3.5 h-3.5" />
             </span>
         @else
             <x-filament::icon
-                icon="heroicon-o-chevron-down"
+                icon="lucide-chevron-down"
                 class="w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform duration-150"
                 x-bind:class="open && 'rotate-180'"
             />
@@ -189,7 +189,7 @@
     >
         {{-- Search Header --}}
         <div class="relative border-b border-gray-200 dark:border-gray-700">
-            <x-filament::icon icon="heroicon-o-magnifying-glass" class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+            <x-filament::icon icon="lucide-search" class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
             <input
                 type="text"
                 placeholder="Search..."
@@ -220,12 +220,12 @@
                             {{ $isSelected ? 'bg-primary-50 dark:bg-primary-950/50 text-primary-700 dark:text-primary-300' : '' }}
                             {{ $isMapped ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200' }}"
                     >
-                        <x-filament::icon icon="{{ $field->icon ?? 'heroicon-o-squares-2x2' }}" class="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                        <x-filament::icon icon="{{ $field->icon ?? 'lucide-layout-grid' }}" class="w-3.5 h-3.5 text-gray-400 shrink-0" />
                         <span class="truncate flex-1 text-left">{{ $field->label }}{{ $field->required ? ' *' : '' }}</span>
                         @if ($isMapped)
                             <span class="text-[9px] text-gray-400 dark:text-gray-500 italic">in use</span>
                         @elseif ($isSelected)
-                            <x-filament::icon icon="heroicon-s-check" class="w-3 h-3 text-primary-500 shrink-0" />
+                            <x-filament::icon icon="lucide-check" class="w-3 h-3 text-primary-500 shrink-0" />
                         @endif
                     </button>
                 @else
@@ -265,9 +265,9 @@
                                 <span class="text-[9px] text-gray-400 dark:text-gray-500 italic">in use</span>
                             @else
                                 @if ($isLinkSelected)
-                                    <x-filament::icon icon="heroicon-s-check" class="w-3 h-3 text-primary-500 shrink-0" />
+                                    <x-filament::icon icon="lucide-check" class="w-3 h-3 text-primary-500 shrink-0" />
                                 @endif
-                                <x-filament::icon icon="heroicon-s-chevron-right" class="w-3.5 h-3.5 shrink-0 {{ $isLinkSelected ? 'text-primary-400' : 'text-gray-400' }}" />
+                                <x-filament::icon icon="lucide-chevron-right" class="w-3.5 h-3.5 shrink-0 {{ $isLinkSelected ? 'text-primary-400' : 'text-gray-400' }}" />
                             @endif
                         </button>
                     </div>
@@ -322,7 +322,7 @@
                         >
                             <div class="flex items-center gap-1.5">
                                 @if ($isMatcherSelected)
-                                    <x-filament::icon icon="heroicon-s-check" class="w-3 h-3 text-primary-500 shrink-0" />
+                                    <x-filament::icon icon="lucide-check" class="w-3 h-3 text-primary-500 shrink-0" />
                                 @endif
                                 <span class="text-sm font-medium {{ $isMatcherSelected ? 'text-primary-700 dark:text-primary-300' : 'text-gray-900 dark:text-white' }}">
                                     {{ $matcher->label }}

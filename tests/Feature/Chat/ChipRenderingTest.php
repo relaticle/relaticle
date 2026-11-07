@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Enums\CrmEntity;
 use App\Filament\Pages\Workspace\CustomFields;
 use App\Support\IconPath;
-use Filament\Support\Enums\IconSize;
 use Relaticle\Chat\Support\ImageAltTextRenderer;
 use Relaticle\Chat\Support\MarkdownRenderer;
 use Relaticle\Chat\Support\RecordChipRenderer;
@@ -167,5 +166,5 @@ it('draws its chip icons from the shared CRM entity enum, not a private copy', f
 
 it('draws a custom field with the icon its settings page carries in the navigation', function (): void {
     expect(RecordChipRenderer::iconPath('custom_field'))
-        ->toBe(IconPath::for(CustomFields::NAVIGATION_ICON->getIconForSize(IconSize::Medium)));
+        ->toBe(IconPath::for(CustomFields::NAVIGATION_ICON));
 });

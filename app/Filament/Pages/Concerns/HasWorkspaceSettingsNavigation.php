@@ -14,7 +14,6 @@ use Closure;
 use Filament\Facades\Filament;
 use Filament\Navigation\NavigationItem;
 use Filament\Pages\Enums\SubNavigationPosition;
-use Filament\Support\Icons\Heroicon;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccessRequestsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountSettingsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
@@ -51,14 +50,14 @@ trait HasWorkspaceSettingsNavigation
         return [
             NavigationItem::make()
                 ->label(__('workspaces.tabs.general'))
-                ->icon(Heroicon::OutlinedCog6Tooth)
+                ->icon('lucide-settings')
                 ->url(fn (): string => EditWorkspace::getUrl())
                 ->isActiveWhen($this->isCurrentPage(EditWorkspace::class))
                 ->visible(fn (): bool => EditWorkspace::canView($tenant)),
 
             NavigationItem::make()
                 ->label(__('workspaces.tabs.members'))
-                ->icon(Heroicon::OutlinedUsers)
+                ->icon('lucide-users')
                 ->url(fn (): string => Members::getUrl())
                 ->isActiveWhen($this->isCurrentPage(Members::class))
                 ->visible(fn (): bool => Members::canAccess()),
@@ -72,7 +71,7 @@ trait HasWorkspaceSettingsNavigation
 
             NavigationItem::make()
                 ->label(__('workspaces.tabs.email'))
-                ->icon(Heroicon::OutlinedEnvelope)
+                ->icon('lucide-mail')
                 ->url(fn (): string => EmailAccountsPage::getUrl())
                 ->isActiveWhen($this->isCurrentPage(
                     EmailAccountsPage::class,
@@ -86,14 +85,14 @@ trait HasWorkspaceSettingsNavigation
 
             NavigationItem::make()
                 ->label(__('workspaces.tabs.import_history'))
-                ->icon(Heroicon::OutlinedArrowUpTray)
+                ->icon('lucide-upload')
                 ->url(fn (): string => ImportHistory::getUrl())
                 ->isActiveWhen($this->isCurrentPage(ImportHistory::class))
                 ->visible(fn (): bool => ImportHistory::canAccess()),
 
             NavigationItem::make()
                 ->label(__('workspaces.tabs.activity'))
-                ->icon(Heroicon::OutlinedClock)
+                ->icon('lucide-clock')
                 ->url(fn (): string => ActivityLog::getUrl())
                 ->isActiveWhen($this->isCurrentPage(ActivityLog::class))
                 ->visible(fn (): bool => ActivityLog::canAccess()),
@@ -108,7 +107,7 @@ trait HasWorkspaceSettingsNavigation
 
         return NavigationItem::make()
             ->label(__('workspaces.tabs.billing'))
-            ->icon(Heroicon::OutlinedCreditCard)
+            ->icon('lucide-credit-card')
             ->url($billingUrl)
             ->isActiveWhen(fn (): bool => static::getSlug() === self::BILLING_SLUG)
             ->visible($billingUrl !== null);

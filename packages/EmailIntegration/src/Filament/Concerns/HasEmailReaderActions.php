@@ -83,7 +83,7 @@ trait HasEmailReaderActions
     {
         return Action::make('manageSharing')
             ->label(__('filament/pages/record-emails.actions.manage_sharing.label'))
-            ->icon('ri-share-line')
+            ->icon('lucide-share-2')
             ->color('gray')
             ->iconButton()
             ->extraAttributes(['class' => 'fi-email-reader-action'])
@@ -102,7 +102,7 @@ trait HasEmailReaderActions
             })
             ->schema([
                 Section::make(__('filament/pages/record-emails.fields.privacy_tier.label'))
-                    ->icon('heroicon-o-globe-alt')
+                    ->icon('lucide-globe')
                     ->compact()
                     ->columnSpanFull()
                     ->schema([
@@ -116,7 +116,7 @@ trait HasEmailReaderActions
 
                 Section::make(__('filament/pages/record-emails.fields.shares.label'))
                     ->description(__('filament/pages/email-inbox.sharing.fields.shares.description'))
-                    ->icon('heroicon-o-user-group')
+                    ->icon('lucide-users')
                     ->compact()
                     ->columnSpanFull()
                     ->schema([
@@ -187,7 +187,7 @@ trait HasEmailReaderActions
     {
         return Action::make('summarizeThread')
             ->label(__('filament/pages/record-emails.actions.summarize_thread.label'))
-            ->icon('heroicon-o-sparkles')
+            ->icon('lucide-sparkles')
             ->color('gray')
             ->iconButton()
             ->extraAttributes(['class' => 'fi-email-reader-action'])
@@ -201,7 +201,7 @@ trait HasEmailReaderActions
                     || $this->readerUser()->can('viewBody', $record);
             })
             ->modalHeading(__('filament/pages/record-emails.actions.summarize_thread.modal_heading'))
-            ->modalIcon('heroicon-o-sparkles')
+            ->modalIcon('lucide-sparkles')
             ->modalSubmitAction(false)
             ->modalCancelActionLabel(__('filament/emails/composer.actions.close'))
             ->modalContent(function (array $arguments, mixed $record = null): View {
@@ -219,7 +219,7 @@ trait HasEmailReaderActions
     {
         return Action::make('requestAccess')
             ->label(__('filament/pages/record-emails.actions.request_access.label'))
-            ->icon('heroicon-o-key')
+            ->icon('lucide-key')
             ->color('gray')
             ->iconButton()
             ->extraAttributes(['class' => 'fi-email-reader-action'])
@@ -424,7 +424,7 @@ trait HasEmailReaderActions
     {
         return Action::make('approveAccessRequest')
             ->requiresConfirmation()
-            ->modalIcon('heroicon-o-check-circle')
+            ->modalIcon('lucide-circle-check')
             ->modalIconColor('success')
             ->modalHeading(__('filament/pages/email-access-requests.actions.approve.modal_heading'))
             ->modalDescription(fn (array $arguments): string => __('filament/pages/email-access-requests.actions.approve.modal_description', [

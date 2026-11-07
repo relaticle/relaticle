@@ -17,7 +17,7 @@ final class SubscriptionsRelationManager extends RelationManager
 {
     protected static string $relationship = 'subscriptions';
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-credit-card';
+    protected static string|\BackedEnum|null $icon = 'lucide-credit-card';
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {

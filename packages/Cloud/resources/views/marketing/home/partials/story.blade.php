@@ -41,7 +41,7 @@
                     <p class="mt-3 text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ $action }}</p>
                     @if($actor === 'rela')
                         <p class="mt-3 inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                            <x-heroicon-o-check class="size-4 shrink-0" aria-hidden="true"/>
+                            <x-lucide-check class="size-4 shrink-0" aria-hidden="true"/>
                             {{ __('Applied 1 change after you approved it') }}
                         </p>
                     @endif

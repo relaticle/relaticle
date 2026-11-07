@@ -1,6 +1,6 @@
 <x-layouts::invitation :title="__('workspaces.accept.deleting.heading', ['workspace' => $workspaceName])">
     <x-slot:icon>
-        <x-workspaces.invitation-icon icon="heroicon-o-archive-box-x-mark" />
+        <x-workspaces.invitation-icon icon="lucide-archive-x" />
     </x-slot:icon>
 
     <x-slot:heading>

@@ -49,7 +49,7 @@
 
     @if (filled($createLabel))
         <x-filament::dropdown.list>
-            <x-filament::dropdown.list.item wire:click="{{ $createClick }}" icon="heroicon-m-plus" color="gray">
+            <x-filament::dropdown.list.item wire:click="{{ $createClick }}" icon="lucide-plus" color="gray">
                 {{ $createLabel }}
             </x-filament::dropdown.list.item>
         </x-filament::dropdown.list>

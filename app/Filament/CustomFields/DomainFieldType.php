@@ -23,7 +23,7 @@ final class DomainFieldType extends BaseFieldType
         return FieldSchema::multiChoice()
             ->key(CustomFieldType::DOMAIN->value)
             ->label(__('workspaces.custom_field_types.domain'))
-            ->icon('heroicon-o-globe-alt')
+            ->icon('lucide-globe')
             ->formComponent(LinkComponent::class)
             ->tableColumn(LinkColumn::class)
             ->infolistEntry(LinkEntry::class)

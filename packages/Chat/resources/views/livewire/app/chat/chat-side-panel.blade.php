@@ -244,7 +244,7 @@
             {{-- Panel Header --}}
             <div class="flex items-center justify-between gap-2 border-b border-gray-200 px-4 py-3 max-sm:py-1.5 dark:border-gray-700">
                 <div class="flex min-w-0 items-center gap-2">
-                    <x-heroicon-o-chat-bubble-left-right class="h-5 w-5 shrink-0 text-primary-600 dark:text-primary-400" />
+                    <x-lucide-messages-square class="h-5 w-5 shrink-0 text-primary-600 dark:text-primary-400" />
                     <h3 class="truncate text-sm font-semibold text-gray-900 dark:text-white">{{ config('chat.assistant_name') }}</h3>
                 </div>
 
@@ -260,7 +260,7 @@
                             class="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition max-sm:size-11 hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
                             :class="{ 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300': historyOpen }"
                         >
-                            <x-ri-history-line class="h-4 w-4" aria-hidden="true" />
+                            <x-lucide-rotate-ccw-clock class="h-4 w-4" aria-hidden="true" />
                         </button>
 
                         <div
@@ -274,7 +274,7 @@
                             class="absolute end-0 z-20 mt-1.5 w-80 max-w-[calc(100vw-2rem)] max-sm:inset-x-2 max-sm:w-auto origin-top-right overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
                         >
                             <div class="flex items-center gap-2 border-b border-gray-200 px-3 py-2 dark:border-gray-700">
-                                <x-heroicon-o-magnifying-glass class="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
+                                <x-lucide-search class="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
                                 <input
                                     x-ref="historySearch"
                                     x-model="historySearch"
@@ -290,7 +290,7 @@
                                     title="{{ __('New chat') }}"
                                     class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-white/5 dark:hover:text-primary-400"
                                 >
-                                    <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
+                                    <x-lucide-plus class="h-4 w-4" aria-hidden="true" />
                                 </button>
                             </div>
 
@@ -320,7 +320,7 @@
                                         :class="{ 'bg-gray-50 font-medium dark:bg-white/5': item.id === currentConversationId }"
                                         :aria-current="item.id === currentConversationId ? 'true' : null"
                                     >
-                                        <x-heroicon-o-chat-bubble-left class="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
+                                        <x-lucide-message-square class="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
                                         <span class="truncate" x-text="item.title || @js(__('Untitled chat'))" :title="item.title || @js(__('Untitled chat'))"></span>
                                     </button>
                                 </template>
@@ -339,7 +339,7 @@
                             class="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition max-sm:size-11 hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
                             :class="{ 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300': menuOpen }"
                         >
-                            <x-heroicon-o-ellipsis-vertical class="h-4 w-4" aria-hidden="true" />
+                            <x-lucide-ellipsis-vertical class="h-4 w-4" aria-hidden="true" />
                         </button>
 
                         <div
@@ -359,7 +359,7 @@
                                 x-show="fullPageUrl()"
                                 class="flex w-full items-center gap-2.5 px-3 py-2 text-start text-sm text-gray-700 transition hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-200 dark:hover:bg-white/5"
                             >
-                                <x-heroicon-o-arrows-pointing-out class="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
+                                <x-lucide-maximize-2 class="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
                                 {{ __('Open in full page') }}
                             </button>
 
@@ -370,7 +370,7 @@
                                 x-show="currentConversationId"
                                 class="flex w-full items-center gap-2.5 px-3 py-2 text-start text-sm text-gray-700 transition hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-200 dark:hover:bg-white/5"
                             >
-                                <x-heroicon-o-document-duplicate class="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
+                                <x-lucide-copy class="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
                                 <span x-text="copied ? @js(__('Copied!')) : @js(__('Copy chat ID'))"></span>
                             </button>
 
@@ -383,7 +383,7 @@
                                 x-show="currentConversationId"
                                 class="flex w-full items-center gap-2.5 px-3 py-2 text-start text-sm text-danger-600 transition hover:bg-danger-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-danger-500 dark:text-danger-400 dark:hover:bg-danger-500/10"
                             >
-                                <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                <x-lucide-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Delete') }}
                             </button>
                         </div>
@@ -395,7 +395,7 @@
                         aria-label="{{ __('Close chat panel') }}"
                         class="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition max-sm:size-11 hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
                     >
-                        <x-heroicon-o-x-mark class="h-5 w-5" aria-hidden="true" />
+                        <x-lucide-x class="h-5 w-5" aria-hidden="true" />
                     </button>
                 </div>
             </div>

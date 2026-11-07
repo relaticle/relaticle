@@ -32,7 +32,7 @@ final class ActivityResource extends Resource
 {
     protected static ?string $model = Activity::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-clock';
+    protected static string|\BackedEnum|null $navigationIcon = 'lucide-clock';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Dashboards';
 

@@ -68,7 +68,7 @@
                 <div class="bg-white p-6 sm:col-span-3 dark:bg-transparent">
                     <div class="flex items-center gap-3">
                         <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/[0.08] dark:bg-primary/[0.15]">
-                            <x-ri-flashlight-line class="h-5 w-5 text-primary dark:text-primary-400" />
+                            <x-lucide-zap class="h-5 w-5 text-primary dark:text-primary-400" />
                         </div>
                         <div>
                             <div class="flex flex-wrap items-center gap-2">
@@ -153,7 +153,7 @@
         @if($pastDue && ! $managedPastDue)
             <div class="rounded-2xl border border-danger-200 bg-danger-50 p-5 dark:border-danger-400/20 dark:bg-danger-400/[0.06]">
                 <div class="flex gap-3">
-                    <x-ri-error-warning-fill class="mt-0.5 h-5 w-5 shrink-0 text-danger-500 dark:text-danger-400" />
+                    <x-lucide-circle-exclamation-point class="mt-0.5 h-5 w-5 shrink-0 text-danger-500 dark:text-danger-400" />
                     <div class="flex-1">
                         <h3 class="text-sm font-semibold text-danger-800 dark:text-danger-300">{{ __('cloud::billing.manage.past_due_title') }}</h3>
                         <p class="mt-0.5 text-sm text-danger-700/80 dark:text-danger-400/70">{{ $isManaged ? __('cloud::billing.managed.previous_subscription_past_due') : __('cloud::billing.manage.past_due_body') }}</p>
@@ -170,7 +170,7 @@
         @if($managedPastDue && $canManageBilling)
             <div class="rounded-2xl border border-danger-200 bg-danger-50 p-5 dark:border-danger-400/20 dark:bg-danger-400/[0.06]">
                 <div class="flex gap-3">
-                    <x-ri-error-warning-fill class="mt-0.5 h-5 w-5 shrink-0 text-danger-500 dark:text-danger-400" />
+                    <x-lucide-circle-exclamation-point class="mt-0.5 h-5 w-5 shrink-0 text-danger-500 dark:text-danger-400" />
                     <div class="flex-1">
                         <h3 class="text-sm font-semibold text-danger-800 dark:text-danger-300">{{ __('cloud::billing.managed.overdue_title', ['plan' => $workspace->plan->marketingLabel()]) }}</h3>
                         <p class="mt-0.5 text-sm text-danger-700/80 dark:text-danger-400/70">{{ __('cloud::billing.managed.overdue_body', ['button' => __('cloud::billing.manage.button')]) }}</p>
@@ -185,7 +185,7 @@
         @if($onGrace)
             <div class="rounded-2xl border border-warning-200 bg-warning-50 p-5 dark:border-warning-400/20 dark:bg-warning-400/[0.06]">
                 <div class="flex gap-3">
-                    <x-ri-time-line class="mt-0.5 h-5 w-5 shrink-0 text-warning-500 dark:text-warning-400" />
+                    <x-lucide-clock class="mt-0.5 h-5 w-5 shrink-0 text-warning-500 dark:text-warning-400" />
                     <div class="flex-1">
                         <h3 class="text-sm font-semibold text-warning-800 dark:text-warning-300">{{ __('cloud::billing.manage.cancel_scheduled_title') }}</h3>
                         <p class="mt-0.5 text-sm text-warning-700/80 dark:text-warning-400/70">
@@ -202,7 +202,7 @@
 
         @if(! $canManageBilling)
             <div class="{{ $card }} flex items-start gap-3 p-6">
-                <x-ri-information-line class="mt-0.5 h-5 w-5 shrink-0 text-gray-400" />
+                <x-lucide-info class="mt-0.5 h-5 w-5 shrink-0 text-gray-400" />
                 <p class="text-sm text-gray-600 dark:text-gray-300">{{ __('cloud::billing.member.ask_owner', ['owner' => $workspace->owner->name]) }}</p>
             </div>
         @elseif($showsManagedCard)
@@ -227,14 +227,14 @@
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div class="flex flex-1 items-start gap-3">
                         <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-success-50 text-success-600 dark:bg-success-400/10 dark:text-success-400">
-                            <x-ri-checkbox-circle-fill class="h-5 w-5" />
+                            <x-lucide-circle-check class="h-5 w-5" />
                         </div>
                         <div>
                             <h3 class="font-display text-lg font-semibold text-gray-900 dark:text-white">{{ __('cloud::billing.manage.title', ['plan' => $planLabel]) }}</h3>
                             <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{{ __('cloud::billing.manage.body') }}</p>
                         </div>
                     </div>
-                    <x-filament::button size="lg" icon="heroicon-m-arrow-top-right-on-square" wire:click="managePortal" class="shrink-0 whitespace-nowrap">
+                    <x-filament::button size="lg" icon="lucide-external-link" wire:click="managePortal" class="shrink-0 whitespace-nowrap">
                         {{ __('cloud::billing.manage.button') }}
                     </x-filament::button>
                 </div>
@@ -242,7 +242,7 @@
         @else
             @if($onLegacyFree)
                 <div class="{{ $card }} flex items-start gap-3 p-5">
-                    <x-ri-shield-check-fill class="mt-0.5 h-5 w-5 shrink-0 text-primary dark:text-primary-400" />
+                    <x-lucide-shield-check class="mt-0.5 h-5 w-5 shrink-0 text-primary dark:text-primary-400" />
                     <div>
                         <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('cloud::billing.legacy_free.title') }}</h3>
                         <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{{ __('cloud::billing.legacy_free.body') }}</p>
@@ -297,7 +297,7 @@
                             <ul @class(['grid gap-2.5', 'mt-2.5' => $isScale, 'mt-5' => ! $isScale])>
                                 @foreach(__("cloud::billing.{$plan->value}_plan.features") as $feature)
                                     <li class="flex items-start gap-2.5 text-sm text-gray-600 dark:text-gray-300">
-                                        <x-ri-check-line class="mt-0.5 h-4 w-4 shrink-0 text-primary dark:text-primary-400" />
+                                        <x-lucide-check class="mt-0.5 h-4 w-4 shrink-0 text-primary dark:text-primary-400" />
                                         {{ $feature }}
                                     </li>
                                 @endforeach

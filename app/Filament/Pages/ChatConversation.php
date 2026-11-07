@@ -12,7 +12,7 @@ use Relaticle\Chat\Queries\ConversationsQuery;
 
 final class ChatConversation extends Page
 {
-    protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-chat-bubble-left-right';
+    protected static string|null|BackedEnum $navigationIcon = 'lucide-messages-square';
 
     protected static ?string $slug = 'chats/{conversationId?}';
 

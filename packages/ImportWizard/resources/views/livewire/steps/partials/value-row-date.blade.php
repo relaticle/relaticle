@@ -36,7 +36,7 @@
         @if ($isValid)
             {{-- Valid: Show formatted date --}}
             <div class="flex-1 flex items-center gap-2 px-2 py-1 pointer-events-none">
-                <x-filament::icon icon="heroicon-o-calendar" class="w-4 h-4 text-gray-400 shrink-0"/>
+                <x-filament::icon icon="lucide-calendar" class="w-4 h-4 text-gray-400 shrink-0"/>
                 <span class="text-sm text-gray-900 dark:text-white">{{ $formattedDisplay }}</span>
             </div>
 
@@ -51,7 +51,7 @@
                 x-tooltip="{ content: @js($validationError . ' Click the edit button or select a different format.'), theme: $store.theme }"
                 class="relative z-10 ml-2 cursor-help shrink-0"
             >
-                <x-filament::icon icon="heroicon-o-exclamation-triangle" class="w-4 h-4 text-warning-500"/>
+                <x-filament::icon icon="lucide-triangle-exclamation-point" class="w-4 h-4 text-warning-500"/>
             </span>
 
             <div class="flex-1 flex items-center gap-2 px-2 py-1 pointer-events-none">
@@ -67,7 +67,7 @@
                     class="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:text-primary-400 dark:hover:bg-primary-950/50 transition-colors"
                     title="Fix this value"
                 >
-                    <x-filament::icon icon="heroicon-o-pencil-square" class="w-4 h-4"/>
+                    <x-filament::icon icon="lucide-square-pen" class="w-4 h-4"/>
                 </button>
                 <div class="w-px h-4 bg-gray-200 dark:bg-gray-700"></div>
                 <button
@@ -75,7 +75,7 @@
                     class="p-1.5 text-gray-400 hover:text-warning-600 hover:bg-warning-50 dark:hover:text-warning-400 dark:hover:bg-warning-950/50 transition-colors"
                     title="Skip this value"
                 >
-                    <x-filament::icon icon="heroicon-o-no-symbol" class="w-4 h-4"/>
+                    <x-filament::icon icon="lucide-ban" class="w-4 h-4"/>
                 </button>
             </div>
         @endif

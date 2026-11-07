@@ -20,7 +20,7 @@
             title="{{ $undoTitle }}"
             aria-label="{{ $undoTitle }}"
         >
-            <x-filament::icon icon="heroicon-o-arrow-uturn-left" class="w-4 h-4"/>
+            <x-filament::icon icon="lucide-undo-2" class="w-4 h-4"/>
         </button>
         @if ($showSkip)
             <div class="w-px h-4 bg-gray-200 dark:bg-gray-700"></div>
@@ -34,7 +34,7 @@
             title="Skip this value"
             aria-label="Skip this value"
         >
-            <x-filament::icon icon="heroicon-o-no-symbol" class="w-4 h-4"/>
+            <x-filament::icon icon="lucide-ban" class="w-4 h-4"/>
         </button>
     @endif
 

@@ -40,7 +40,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
     protected static string $relationship = 'emails';
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-envelope';
+    protected static string|\BackedEnum|null $icon = 'lucide-mail';
 
     protected static ?string $badgeColor = 'gray';
 

@@ -1,8 +1,8 @@
 @php
     $themeIcons = [
-        'light' => 'ri-sun-line',
-        'dark' => 'ri-moon-line',
-        'system' => 'ri-computer-line',
+        'light' => 'lucide-sun',
+        'dark' => 'lucide-moon',
+        'system' => 'lucide-monitor',
     ];
 @endphp
 

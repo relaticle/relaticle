@@ -40,7 +40,7 @@
                                 </span>
                                 <span class="mt-5 inline-flex items-center gap-1 text-xs font-medium text-gray-900 transition-colors group-hover:text-primary-600 dark:text-white dark:group-hover:text-primary-400">
                                     {{ __('Read guide') }}
-                                    <x-ri-arrow-right-line class="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+                                    <x-lucide-arrow-right class="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
                                 </span>
                             </a>
                         </li>
@@ -60,7 +60,7 @@
                 </p>
             </div>
             <div class="mt-4 shrink-0 sm:mt-0">
-                <x-cloud::marketing.button variant="secondary" size="sm" href="{{ route('help.index') }}" icon-trailing="ri-arrow-right-line">
+                <x-cloud::marketing.button variant="secondary" size="sm" href="{{ route('help.index') }}" icon-trailing="lucide-arrow-right">
                     {{ __('Visit the help center') }}
                 </x-cloud::marketing.button>
             </div>

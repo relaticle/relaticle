@@ -49,7 +49,7 @@
     <x-filament::button
         type="button"
         color="gray"
-        icon="heroicon-m-finger-print"
+        icon="lucide-fingerprint-pattern"
         x-on:click="signIn()"
         x-bind:disabled="loading"
         class="w-full"

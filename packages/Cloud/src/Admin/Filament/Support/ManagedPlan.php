@@ -27,7 +27,7 @@ final class ManagedPlan
     {
         return Action::make('startManagedPlan')
             ->label(__('cloud::admin.managed_plan.start'))
-            ->icon('heroicon-o-document-currency-dollar')
+            ->icon('lucide-receipt')
             ->authorize('manageManagedPlan')
             ->modalHeading(__('cloud::admin.managed_plan.start_heading'))
             ->modalDescription('Stripe emails a yearly invoice. The plan switches on when it is paid.')
@@ -63,7 +63,7 @@ final class ManagedPlan
     {
         return Action::make('withdrawManagedInvoice')
             ->label(__('cloud::admin.managed_plan.withdraw'))
-            ->icon('heroicon-o-x-circle')
+            ->icon('lucide-circle-x')
             ->color('danger')
             ->authorize('manageManagedPlan')
             ->visible(fn (Workspace $record): bool => $record->pendingManagedSubscription() instanceof Subscription)

@@ -11,7 +11,6 @@ use App\Models\Workspace;
 use App\Notifications\InboxNotification;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification as FilamentNotification;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Notifications\Messages\MailMessage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
@@ -118,13 +117,13 @@ final class MailboxHistoryImportCompletedNotification extends InboxNotification
         if ($kind !== 'partial') {
             return $notification
                 ->success()
-                ->icon(Heroicon::OutlinedCheckCircle)
+                ->icon('lucide-circle-check')
                 ->actions(self::inboxActions($row->workspace));
         }
 
         return $notification
             ->warning()
-            ->icon(Heroicon::OutlinedExclamationTriangle)
+            ->icon('lucide-triangle-exclamation-point')
             ->actions(self::retryActions($row->data));
     }
 

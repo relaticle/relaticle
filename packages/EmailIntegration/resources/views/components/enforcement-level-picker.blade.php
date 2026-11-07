@@ -50,7 +50,7 @@
             <span class="truncate">{{ $current->getLabel() }}</span>
 
             <x-filament::icon
-                icon="heroicon-m-chevron-up-down"
+                icon="lucide-chevrons-up-down"
                 class="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500"
             />
         </button>
@@ -101,7 +101,7 @@
 
                         @if ($isSelected)
                             <x-filament::icon
-                                icon="heroicon-s-check-circle"
+                                icon="lucide-circle-check"
                                 class="absolute end-3 top-3 h-5 w-5 text-primary-600 dark:text-primary-400"
                             />
                         @endif

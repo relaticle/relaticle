@@ -11,7 +11,6 @@ use Filament\Actions\ActionGroup;
 use Filament\Notifications\Notification;
 use Filament\Support\Enums\IconSize;
 use Filament\Support\Enums\Size;
-use Filament\Support\Icons\Heroicon;
 use Filament\Support\View\ComponentAttributeBag;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
@@ -49,7 +48,7 @@ trait HasConnectedAccountActions
     public function syncingIcon(): Htmlable
     {
         return generate_icon_html(
-            'heroicon-m-arrow-path',
+            'lucide-refresh-cw',
             attributes: new ComponentAttributeBag(['class' => 'motion-safe:animate-spin']),
             size: IconSize::Small,
         ) ?? new HtmlString('');
@@ -80,7 +79,7 @@ trait HasConnectedAccountActions
             ($this->disconnectAction())($arguments),
         ])
             ->label(__('filament/pages/email-accounts.actions.manage'))
-            ->icon(Heroicon::EllipsisVertical)
+            ->icon('lucide-ellipsis-vertical')
             ->color('gray')
             ->size(Size::Small)
             ->iconButton();
@@ -90,7 +89,7 @@ trait HasConnectedAccountActions
     {
         return Action::make('accountSettings')
             ->label(__('filament/pages/email-accounts.actions.manage'))
-            ->icon('heroicon-o-cog-6-tooth')
+            ->icon('lucide-settings')
             ->color('gray')
             ->size(Size::Small)
             ->url(fn (array $arguments): string => EmailAccountSettingsPage::getUrl([
@@ -102,7 +101,7 @@ trait HasConnectedAccountActions
     {
         return Action::make('reconnect')
             ->label(__('filament/pages/email-accounts.actions.reconnect'))
-            ->icon('heroicon-o-arrow-path')
+            ->icon('lucide-refresh-cw')
             ->color('gray')
             ->size(Size::Small)
             ->visible(fn (array $arguments): bool => $this->findAccount($arguments) instanceof ConnectedAccount)
@@ -119,7 +118,7 @@ trait HasConnectedAccountActions
             ->label(fn (array $arguments): string => $this->findAccount($arguments)?->hasCalendar()
                 ? __('filament/pages/email-accounts.actions.sync_calendar.disable_label')
                 : __('filament/pages/email-accounts.actions.sync_calendar.enable_label'))
-            ->icon('heroicon-o-calendar')
+            ->icon('lucide-calendar')
             ->color(fn (array $arguments): string => $this->findAccount($arguments)?->hasCalendar() ? 'warning' : 'success')
             ->size(Size::Small)
             ->visible(fn (array $arguments): bool => $this->findAccount($arguments) instanceof ConnectedAccount)
@@ -152,7 +151,7 @@ trait HasConnectedAccountActions
     {
         return Action::make('syncCalendarNow')
             ->label(__('filament/pages/email-accounts.actions.sync_calendar_now'))
-            ->icon('heroicon-o-arrow-path')
+            ->icon('lucide-refresh-cw')
             ->color('primary')
             ->size(Size::Small)
             ->visible(fn (array $arguments): bool => (bool) $this->findAccount($arguments)?->hasCalendar())
@@ -174,7 +173,7 @@ trait HasConnectedAccountActions
     {
         return Action::make('reimportHistory')
             ->label(__('filament/pages/email-accounts.actions.reimport_history.label'))
-            ->icon('heroicon-o-arrow-path')
+            ->icon('lucide-refresh-cw')
             ->color('gray')
             ->size(Size::Small)
             ->requiresConfirmation()
@@ -197,7 +196,7 @@ trait HasConnectedAccountActions
     {
         return Action::make('setDefault')
             ->label(__('filament/pages/email-accounts.actions.set_default'))
-            ->icon('heroicon-o-star')
+            ->icon('lucide-star')
             ->color('warning')
             ->size(Size::Small)
             ->visible(fn (array $arguments): bool => $this->findAccount($arguments)?->is_default === false)
@@ -222,7 +221,7 @@ trait HasConnectedAccountActions
     {
         return Action::make('disconnect')
             ->label(__('filament/pages/email-accounts.actions.disconnect'))
-            ->icon('heroicon-o-trash')
+            ->icon('lucide-trash')
             ->color('danger')
             ->size(Size::Small)
             ->requiresConfirmation()

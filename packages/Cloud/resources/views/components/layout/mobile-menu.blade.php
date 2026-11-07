@@ -55,7 +55,7 @@
                                 aria-controls="mobile-menu-{{ $slug }}"
                                 class="w-full flex items-center justify-between active:opacity-60 transition-[color,opacity] duration-200 cursor-pointer px-4 py-3.5 text-lg font-medium text-gray-600 hover:text-gray-950 dark:text-gray-300 dark:hover:text-white">
                             <span>{{ $item->label }}</span>
-                            <x-ri-arrow-down-s-line class="h-5 w-5 shrink-0 text-gray-400 dark:text-gray-500 transition-transform duration-200"
+                            <x-lucide-chevron-down class="h-5 w-5 shrink-0 text-gray-400 dark:text-gray-500 transition-transform duration-200"
                                                      ::class="mobileExpanded === '{{ $slug }}' && 'rotate-180'"/>
                         </button>
                         <div id="mobile-menu-{{ $slug }}" x-show="mobileExpanded === '{{ $slug }}'" x-collapse x-cloak>

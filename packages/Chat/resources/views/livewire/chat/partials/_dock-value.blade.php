@@ -25,7 +25,7 @@
         @if ($hasOld)
             <span class="text-gray-400 line-through decoration-gray-300 dark:text-gray-500 dark:decoration-gray-600">{{ $oldValue }}</span>
             @if (! $stacked && ($hasNew || $values !== []))
-                <x-heroicon-m-arrow-right class="h-3 w-3 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                <x-lucide-arrow-right class="h-3 w-3 text-gray-400 dark:text-gray-500" aria-hidden="true" />
             @endif
         @endif
 
@@ -50,7 +50,7 @@
             <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[length:var(--text-micro)] font-medium text-gray-600 dark:bg-white/10 dark:text-gray-400">{{ $newValue }}</span>
         @elseif ($hasNew)
             @if (is_string($row['icon'] ?? null) && $row['icon'] !== '')
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="size-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="size-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="{{ $row['icon'] }}"></path>
                 </svg>
             @endif

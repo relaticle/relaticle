@@ -7,7 +7,6 @@ namespace Relaticle\EmailIntegration\Enums;
 use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasIcon;
 use Filament\Support\Contracts\HasLabel;
-use Filament\Support\Icons\Heroicon;
 use Relaticle\EmailIntegration\Services\EmailClassifier;
 
 /**
@@ -44,16 +43,16 @@ enum EmailCategory: string implements HasColor, HasIcon, HasLabel
         };
     }
 
-    public function getIcon(): Heroicon
+    public function getIcon(): string
     {
         return match ($this) {
-            self::Scheduling => Heroicon::CalendarDays,
-            self::Marketing => Heroicon::Megaphone,
-            self::Invoice => Heroicon::Banknotes,
-            self::Support => Heroicon::Lifebuoy,
-            self::Sales => Heroicon::ArrowTrendingUp,
-            self::Personal => Heroicon::User,
-            self::Other => Heroicon::Tag,
+            self::Scheduling => 'lucide-calendar-days',
+            self::Marketing => 'lucide-megaphone',
+            self::Invoice => 'lucide-banknote',
+            self::Support => 'lucide-life-buoy',
+            self::Sales => 'lucide-trending-up',
+            self::Personal => 'lucide-user',
+            self::Other => 'lucide-tag',
         };
     }
 

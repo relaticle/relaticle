@@ -5,7 +5,7 @@
 <div class="w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8 dark:border-gray-800 dark:bg-gray-900">
     <div class="text-center">
         <div class="mx-auto flex size-12 items-center justify-center rounded-full bg-primary-50 dark:bg-primary-500/10">
-            <x-filament::icon icon="ri-shield-keyhole-line" class="size-6 text-primary-600 dark:text-primary-400" />
+            <x-filament::icon icon="lucide-shield-ellipsis" class="size-6 text-primary-600 dark:text-primary-400" />
         </div>
 
         <h1 class="mt-4 text-xl font-semibold tracking-tight text-gray-950 dark:text-white">

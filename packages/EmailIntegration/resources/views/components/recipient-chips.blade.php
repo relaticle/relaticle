@@ -267,7 +267,7 @@
             <x-email-integration::recipient-avatar box="size-4" glyph="size-2.5" />
             <span class="min-w-0 truncate" x-text="chip.label"></span>
             <button type="button" x-on:click="remove(chip.value)" :aria-label="removeLabel + ': ' + chip.value" class="shrink-0 rounded-full p-px text-gray-400 transition hover:bg-gray-950/5 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200">
-                <x-heroicon-m-x-mark class="h-2.5 w-2.5" />
+                <x-lucide-x class="h-2.5 w-2.5" />
             </button>
         </span>
     </template>

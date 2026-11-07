@@ -58,7 +58,7 @@ final class WorkspaceResource extends Resource
 {
     protected static ?string $model = Workspace::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-user-group';
+    protected static string|\BackedEnum|null $navigationIcon = 'lucide-users';
 
     protected static string|\UnitEnum|null $navigationGroup = 'User Management';
 

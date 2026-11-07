@@ -13,7 +13,7 @@
                     href="{{ \App\Filament\Pages\ChatConversation::getUrl(['conversationId' => $recentChatId]) }}"
                     class="mt-2 inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md text-sm text-gray-500 transition hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:text-white"
                 >
-                    <x-heroicon-o-chat-bubble-left class="h-3.5 w-3.5 shrink-0" />
+                    <x-lucide-message-square class="h-3.5 w-3.5 shrink-0" />
                     <span class="truncate" title="{{ $recentChatTitle ?? __('Untitled chat') }}">{{ __('Recent chat') }} &middot; {{ \Illuminate\Support\Str::limit($recentChatTitle ?? __('Untitled chat'), 50) }}</span>
                 </a>
             @endif

@@ -128,7 +128,7 @@ final class CreateAccessToken extends BaseLivewireComponent
                     ->readOnly()
                     ->suffixAction(
                         Action::make('copyToken')
-                            ->icon('heroicon-o-clipboard')
+                            ->icon('lucide-clipboard')
                             ->tooltip(__('access-tokens.modals.show_token.copy_to_clipboard_tooltip'))
                             ->alpineClickHandler(sprintf(
                                 'window.navigator.clipboard.writeText($wire.plainTextToken); $tooltip(%s);',

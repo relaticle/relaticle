@@ -24,7 +24,6 @@ use Filament\Schemas\Schema;
 use Filament\Support\Enums\Alignment;
 use Filament\Support\Enums\Size;
 use Filament\Support\Enums\Width;
-use Filament\Support\Icons\Heroicon;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Url;
 use Relaticle\EmailIntegration\Actions\SaveWorkspaceEmailSharingDefaultAction;
@@ -95,11 +94,11 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
 
     public bool $auto_create_companies = true;
 
-    /** @var array<string, Heroicon> */
+    /** @var array<string, string> */
     public const array TABS = [
-        'visibility' => Heroicon::OutlinedNoSymbol,
-        'sharing' => Heroicon::OutlinedShieldCheck,
-        'record_creation' => Heroicon::OutlinedUserPlus,
+        'visibility' => 'lucide-ban',
+        'sharing' => 'lucide-shield-check',
+        'record_creation' => 'lucide-user-plus',
     ];
 
     #[Url]
@@ -207,7 +206,7 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
     {
         return Action::make('addVisibilityContact')
             ->label(__('filament/pages/email-privacy-settings.visibility.add'))
-            ->icon(Heroicon::OutlinedPlus)
+            ->icon('lucide-plus')
             ->size(Size::Small)
             ->modalHeading(__('filament/pages/email-privacy-settings.visibility.add'))
             ->schema([

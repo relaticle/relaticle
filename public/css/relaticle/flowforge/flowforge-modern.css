@@ -315,7 +315,8 @@
         flex-direction: column;
         min-height: 4rem;
         max-height: calc(100vh - 13rem);
-        padding: 0.5rem;
+        /* macOS overlay scrollbars paint inside the inline padding. At 0.5rem the thumb touched the card ring. */
+        padding: 0.5rem 0.75rem;
         overflow-x: hidden;
         overflow-y: auto;
         overscroll-behavior-y: contain;

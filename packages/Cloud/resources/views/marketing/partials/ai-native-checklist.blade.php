@@ -62,7 +62,7 @@
                         class="bg-surface mt-px flex size-6 cursor-pointer items-center justify-center rounded-md border border-gray-500 text-white transition-colors hover:border-gray-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary aria-pressed:border-primary aria-pressed:bg-primary dark:border-gray-500 dark:hover:border-white dark:aria-pressed:border-primary"
                         data-ai-native-toggle
                     >
-                        <x-ri-check-line class="size-4" aria-hidden="true" x-show="marks[{{ $index }}]" x-cloak/>
+                        <x-lucide-check class="size-4" aria-hidden="true" x-show="marks[{{ $index }}]" x-cloak/>
                         <span class="sr-only" x-text="marks[{{ $index }}] ? @js(__('Yes')) : @js(__('Not yet'))">{{ __('Not yet') }}</span>
                     </button>
 
@@ -75,11 +75,11 @@
                         <span class="type-label mb-1.5 block text-gray-500 md:hidden dark:text-gray-400">{{ __('Relaticle') }}</span>
                         <p class="flex items-start gap-2.5 text-sm leading-relaxed text-gray-700 dark:text-gray-300">
                             <span class="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded bg-emerald-600 text-white" aria-hidden="true">
-                                <x-ri-check-line class="size-3"/>
+                                <x-lucide-check class="size-3"/>
                             </span>
                             <span>
                                 <span class="sr-only">{{ __('Yes.') }} </span>{{ $answer }}
-                                <a href="{{ $proofHref }}" class="inline-flex items-center gap-0.5 font-medium whitespace-nowrap text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white">{{ $proofLabel }}<x-ri-arrow-right-line class="size-3.5" aria-hidden="true"/></a>
+                                <a href="{{ $proofHref }}" class="inline-flex items-center gap-0.5 font-medium whitespace-nowrap text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white">{{ $proofLabel }}<x-lucide-arrow-right class="size-3.5" aria-hidden="true"/></a>
                             </span>
                         </p>
                     </div>

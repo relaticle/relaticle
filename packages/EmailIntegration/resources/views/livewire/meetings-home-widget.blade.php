@@ -6,7 +6,7 @@
 <div class="mt-14 max-sm:mt-8" data-testid="meetings-home">
     <div class="mb-3 flex items-center justify-between gap-3">
         <h2 class="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-            <x-filament::icon :icon="\Filament\Support\Icons\Heroicon::OutlinedCalendar" class="size-4 shrink-0 text-gray-400 dark:text-gray-500" />
+            <x-filament::icon icon="lucide-calendar" class="size-4 shrink-0 text-gray-400 dark:text-gray-500" />
             <span>{{ __('filament/pages/dashboard.meetings.heading') }}</span>
             @if ($mailboxConnected && ! $mailboxSyncing)
                 <span class="text-gray-400 dark:text-gray-500">{{ $this->meetings->count() }}</span>
@@ -29,7 +29,7 @@
                     color="gray"
                     size="xs"
                     class="max-sm:size-8"
-                    :icon="\Filament\Support\Icons\Heroicon::OutlinedChevronLeft"
+                    icon="lucide-chevron-left"
                     :label="__('filament/pages/dashboard.meetings.previous_day')"
                     wire:click="previousDay"
                 />
@@ -37,7 +37,7 @@
                     color="gray"
                     size="xs"
                     class="max-sm:size-8"
-                    :icon="\Filament\Support\Icons\Heroicon::OutlinedChevronRight"
+                    icon="lucide-chevron-right"
                     :label="__('filament/pages/dashboard.meetings.next_day')"
                     wire:click="nextDay"
                 />
@@ -47,14 +47,14 @@
                         <x-filament::icon-button
                             color="gray"
                             size="sm"
-                            :icon="\Filament\Support\Icons\Heroicon::OutlinedEllipsisVertical"
+                            icon="lucide-ellipsis-vertical"
                             :label="__('filament/pages/dashboard.meetings.more_actions')"
                         />
                     </x-slot>
 
                     <x-filament::dropdown.list>
                         <x-filament::dropdown.list.item
-                            :icon="\Filament\Support\Icons\Heroicon::OutlinedCalendarDays"
+                            icon="lucide-calendar-days"
                             wire:click="goToToday"
                         >
                             {{ __('filament/pages/dashboard.meetings.go_to_today') }}
@@ -62,7 +62,7 @@
 
                         <x-filament::dropdown.list.item
                             tag="a"
-                            :icon="\Filament\Support\Icons\Heroicon::OutlinedCog6Tooth"
+                            icon="lucide-settings"
                             :href="\Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage::getUrl()"
                         >
                             {{ __('filament/pages/dashboard.meetings.calendar_settings') }}
@@ -108,7 +108,7 @@
                         color="gray"
                         size="sm"
                         outlined
-                        :icon="\Filament\Support\Icons\Heroicon::OutlinedCalendarDays"
+                        icon="lucide-calendar-days"
                         wire:click="goToNextDayWithMeetings"
                         wire:loading.attr="disabled"
                     >
@@ -129,8 +129,8 @@
                     $meetingKey = $card['id'];
                     $openTarget = "openMeeting('{$meetingKey}')";
                     $timeIcon = $card['all_day']
-                        ? \Filament\Support\Icons\Heroicon::OutlinedCalendarDays
-                        : \Filament\Support\Icons\Heroicon::OutlinedClock;
+                        ? 'lucide-calendar-days'
+                        : 'lucide-clock';
                 @endphp
                 <li
                     wire:key="meeting-home-{{ $meetingKey }}"

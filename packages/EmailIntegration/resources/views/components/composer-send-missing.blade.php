@@ -9,14 +9,14 @@
             <span class="absolute inset-0 rounded-full border border-dashed border-primary-400/40"></span>
             <span class="absolute inset-2 rounded-full border border-primary-500/50"></span>
             <span class="flex h-10 w-10 items-center justify-center rounded-full bg-primary-50 dark:bg-primary-500/10">
-                <x-heroicon-o-envelope class="h-5 w-5 text-primary-600 dark:text-primary-400" />
+                <x-lucide-mail class="h-5 w-5 text-primary-600 dark:text-primary-400" />
             </span>
         </div>
 
         <span class="w-8 border-t border-dashed border-gray-300 dark:border-gray-600"></span>
 
         <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-50 ring-1 ring-gray-200 dark:bg-white/5 dark:ring-white/10">
-            <x-heroicon-o-cube class="h-5 w-5 text-gray-400 dark:text-gray-500" />
+            <x-lucide-box class="h-5 w-5 text-gray-400 dark:text-gray-500" />
         </div>
     </div>
 

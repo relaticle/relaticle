@@ -11,7 +11,6 @@ use App\Models\Workspace;
 use App\Notifications\InboxNotification;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification as FilamentNotification;
-use Filament\Support\Icons\Heroicon;
 use Relaticle\Cloud\Billing\Filament\Billing;
 
 final class ManagedInvoiceOverdueNotification extends InboxNotification
@@ -67,7 +66,7 @@ final class ManagedInvoiceOverdueNotification extends InboxNotification
                 'plan' => $plan,
                 'button' => __('cloud::billing.manage.button'),
             ]))
-            ->icon(Heroicon::OutlinedExclamationTriangle)
+            ->icon('lucide-triangle-exclamation-point')
             ->iconColor('danger')
             ->actions($workspace instanceof Workspace ? [
                 Action::make('billing')

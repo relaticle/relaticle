@@ -93,6 +93,19 @@ final class LinkedRecordsSelect extends Select
         return is_array($state) ? array_values($this->optionsByKey($state)) : [];
     }
 
+    /**
+     * @return array<string, string>
+     */
+    public function getPickerMessages(): array
+    {
+        $keys = ['search', 'searching', 'failed', 'none', 'empty', 'linked', 'more', 'result', 'results', 'remove'];
+
+        return array_combine($keys, array_map(
+            fn (string $key): string => __("filament/components/linked-records.{$key}"),
+            $keys,
+        ));
+    }
+
     #[Override]
     public function toEmbeddedHtml(): string
     {

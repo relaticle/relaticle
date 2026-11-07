@@ -6,7 +6,9 @@ namespace App\Filament\Resources;
 
 use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
+use App\Filament\Actions\PreviewRecordAction;
 use App\Filament\Components\Tables\EmptyListDescription;
+use App\Filament\Components\Tables\RecordChipColumn;
 use App\Filament\Concerns\RemembersViewMode;
 use App\Filament\Exports\OpportunityExporter;
 use App\Filament\Resources\OpportunityResource\Forms\OpportunityForm;
@@ -64,7 +66,8 @@ final class OpportunityResource extends Resource
         return $table
             ->emptyStateDescription(EmptyListDescription::unlessFiltered(__('filament/resources/opportunity.empty_state.description')))
             ->columns([
-                TextColumn::make('name')
+                RecordChipColumn::make('name')
+                    ->previewable()
                     ->searchable(),
                 TextColumn::make('creator.name')
                     ->label(__('filament/resources/opportunity.fields.creator.label'))
@@ -97,6 +100,7 @@ final class OpportunityResource extends Resource
             ])
             ->recordActions([
                 ActionGroup::make([
+                    PreviewRecordAction::make()->page(ViewOpportunity::class),
                     ViewAction::make(),
                     EditAction::make(),
                     RestoreAction::make(),
@@ -119,11 +123,11 @@ final class OpportunityResource extends Resource
     public static function getRelations(): array
     {
         return [
+            ActivityLogRelationManager::class,
             TasksRelationManager::class,
             NotesRelationManager::class,
             EmailsRelationManager::class,
             MeetingsRelationManager::class,
-            ActivityLogRelationManager::class,
         ];
     }
 

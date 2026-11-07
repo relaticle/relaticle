@@ -126,7 +126,7 @@
                                 aria-label="{{ __('notifications.panel.settings') }}"
                                 title="{{ __('notifications.panel.settings') }}"
                             >
-                                <x-filament::icon icon="ri-settings-3-line" class="size-4" />
+                                <x-filament::icon icon="lucide-settings" class="size-4" />
                             </a>
                         @endif
 
@@ -137,7 +137,7 @@
                             aria-label="{{ __('notifications.panel.close') }}"
                             title="{{ __('notifications.panel.close') }}"
                         >
-                            <x-filament::icon icon="ri-close-line" class="size-4" />
+                            <x-filament::icon icon="lucide-x" class="size-4" />
                         </button>
                     </div>
                 </div>
@@ -215,7 +215,7 @@
                         @endif
                     @else
                         @include('livewire.app.notifications.panel-empty-state', [
-                            'icon' => 'ri-notification-3-line',
+                            'icon' => 'lucide-bell',
                             'heading' => __('notifications.panel.empty.notifications.heading'),
                             'description' => __('notifications.panel.empty.notifications.description'),
                         ])
@@ -237,7 +237,7 @@
                         </ul>
                     @else
                         @include('livewire.app.notifications.panel-empty-state', [
-                            'icon' => 'ri-inbox-line',
+                            'icon' => 'lucide-inbox',
                             'heading' => __('notifications.panel.empty.requests.heading'),
                             'description' => __('notifications.panel.empty.requests.description'),
                         ])

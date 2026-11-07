@@ -23,12 +23,12 @@ trait InvitesWorkspaceMembers
     {
         return Action::make('invitePeople')
             ->label(__('workspaces.actions.invite_people'))
-            ->icon('heroicon-m-user-plus')
+            ->icon('lucide-user-plus')
             ->button()
             ->authorize(fn (): bool => Gate::check('addWorkspaceMember', $this->workspace))
             ->modalHeading(__('workspaces.actions.invite_people'))
             ->modalDescription(fn (): string => __('workspaces.sections.invite_people.description', ['workspace' => $this->workspace->name]))
-            ->modalIcon('heroicon-o-user-plus')
+            ->modalIcon('lucide-user-plus')
             ->modalWidth('lg')
             ->modalSubmitActionLabel(__('workspaces.actions.send_invitations'))
             ->schema([

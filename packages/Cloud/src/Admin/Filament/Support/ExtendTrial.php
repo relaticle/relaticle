@@ -21,7 +21,7 @@ final class ExtendTrial
     {
         return Action::make('extendTrial')
             ->label(fn (Workspace $record): string => self::isRestart($record) ? __('cloud::admin.trials.restart') : __('cloud::admin.trials.extend'))
-            ->icon('heroicon-o-calendar-days')
+            ->icon('lucide-calendar-days')
             ->authorize('extendTrial')
             ->modalHeading(fn (Workspace $record): string => self::isRestart($record) ? __('cloud::admin.trials.restart_heading') : __('cloud::admin.trials.extend_heading'))
             ->modalDescription(fn (Workspace $record): string => self::isRestart($record)

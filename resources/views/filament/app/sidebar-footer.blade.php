@@ -35,7 +35,7 @@
                     x-on:click="$dispatch('open-invite-workspace-members')"
                     class="fi-sidebar-item-btn w-full text-start"
                 >
-                    <x-heroicon-o-user-plus class="fi-icon fi-size-lg fi-sidebar-item-icon" />
+                    <x-lucide-user-plus class="fi-icon fi-size-lg fi-sidebar-item-icon" />
                     <span class="fi-sidebar-item-label">{{ __('filament/pages/dashboard.activation.invite_members') }}</span>
                 </button>
             </div>

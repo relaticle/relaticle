@@ -7,5 +7,5 @@
     wire:loading.attr="disabled"
     wire:target="removeTableFilters"
 >
-    <x-filament::icon icon="heroicon-m-x-mark" class="fi-board-filter-clear-icon" />
+    <x-filament::icon icon="lucide-x" class="fi-board-filter-clear-icon" />
 </button>

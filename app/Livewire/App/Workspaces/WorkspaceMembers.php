@@ -23,7 +23,6 @@ use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Radio;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -83,7 +82,7 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
             ->searchPlaceholder(__('workspaces.table.search_placeholder'))
             // The roster always holds the owner, so the only way to empty it is
             // a search that matches nobody.
-            ->emptyStateIcon(Heroicon::OutlinedMagnifyingGlass)
+            ->emptyStateIcon('lucide-search')
             ->emptyStateHeading(__('workspaces.table.no_results.heading'))
             ->emptyStateDescription(__('workspaces.table.no_results.description'))
             ->columns([
@@ -373,7 +372,7 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
     {
         return Action::make('updateWorkspaceRole')
             ->label(__('workspaces.actions.update_workspace_role'))
-            ->icon('heroicon-m-user-circle')
+            ->icon('lucide-circle-user')
             ->visible(fn (?array $record): bool => $this->isMember($record)
                 && ! $record['is_owner']
                 && $this->canActOnRole($record)
@@ -433,7 +432,7 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
     {
         return Action::make('removeWorkspaceMember')
             ->label(__('workspaces.actions.remove_workspace_member'))
-            ->icon('heroicon-m-user-minus')
+            ->icon('lucide-user-minus')
             ->color('danger')
             ->modalDescription(fn (array $record): string => Feature::active(EmailIntegration::class)
                 ? __('workspaces.modals.remove_workspace_member.mailbox_notice', ['name' => $record['name']])
@@ -464,7 +463,7 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
     {
         return Action::make('leaveWorkspace')
             ->label(__('workspaces.actions.leave_workspace'))
-            ->icon('heroicon-m-arrow-right-start-on-rectangle')
+            ->icon('lucide-log-out')
             ->color('danger')
             ->modalDescription(fn (): string => Feature::active(EmailIntegration::class)
                 ? __('workspaces.modals.leave_workspace.mailbox_notice')
@@ -492,7 +491,7 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
     {
         return Action::make('resendWorkspaceInvitation')
             ->label(__('workspaces.actions.resend_workspace_invitation'))
-            ->icon('heroicon-m-paper-airplane')
+            ->icon('lucide-send')
             ->requiresConfirmation()
             ->visible(fn (?array $record): bool => $this->isInvitation($record)
                 && Gate::check('updateWorkspaceMember', $this->workspace))
@@ -534,7 +533,7 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
     {
         return Action::make('revokeWorkspaceInvitation')
             ->label(__('workspaces.actions.revoke_workspace_invitation'))
-            ->icon('heroicon-m-x-circle')
+            ->icon('lucide-circle-x')
             ->color('danger')
             ->requiresConfirmation()
             ->visible(fn (?array $record): bool => $this->isInvitation($record)

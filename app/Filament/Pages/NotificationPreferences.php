@@ -18,7 +18,7 @@ final class NotificationPreferences extends Page
 
     protected static ?int $navigationSort = 3;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-bell';
+    protected static string|\BackedEnum|null $navigationIcon = 'lucide-bell';
 
     /** @var class-string<Cluster>|null */
     protected static ?string $cluster = Settings::class;

@@ -32,7 +32,7 @@ final class AssistantSettings extends Page
 
     protected static ?int $navigationSort = 3;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-sparkles';
+    protected static string|\BackedEnum|null $navigationIcon = 'lucide-sparkles';
 
     /** @var class-string<Cluster>|null */
     protected static ?string $cluster = Settings::class;

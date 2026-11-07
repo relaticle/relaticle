@@ -12,7 +12,7 @@
         @if ($state['location'] !== null)
             <div class="flex min-w-0 flex-1 items-center gap-2" data-testid="meeting-location-row">
                 <x-filament::icon
-                    :icon="\Filament\Support\Icons\Heroicon::OutlinedMapPin"
+                    icon="lucide-map-pin"
                     class="{{ $iconClass }}"
                     aria-hidden="true"
                 />
@@ -43,7 +43,7 @@
             >
                 <span>{{ $state['calendar_label'] }}</span>
                 <x-filament::icon
-                    :icon="\Filament\Support\Icons\Heroicon::ArrowTopRightOnSquare"
+                    icon="lucide-external-link"
                     class="size-3.5 shrink-0"
                     aria-hidden="true"
                 />

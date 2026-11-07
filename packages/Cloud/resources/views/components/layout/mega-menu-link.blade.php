@@ -25,7 +25,7 @@
     <span class="min-w-0">
         <span class="flex items-center gap-1 text-[13px] font-medium text-gray-900 dark:text-white">
             {{ $item->label }}
-            <x-ri-arrow-right-line class="h-3 w-3 shrink-0 -translate-x-1 opacity-0 text-gray-400 transition duration-200 group-hover:translate-x-0 group-hover:opacity-100 motion-reduce:transition-none"/>
+            <x-lucide-arrow-right class="h-3 w-3 shrink-0 -translate-x-1 opacity-0 text-gray-400 transition duration-200 group-hover:translate-x-0 group-hover:opacity-100 motion-reduce:transition-none"/>
         </span>
 
         @if($item->description)

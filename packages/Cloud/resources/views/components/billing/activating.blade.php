@@ -8,7 +8,7 @@
 
     <div class="rounded-2xl border border-warning-200 bg-warning-50 p-5 dark:border-warning-400/20 dark:bg-warning-400/[0.06]" x-show="waited" x-cloak>
         <div class="flex gap-3">
-            <x-ri-time-line class="mt-0.5 h-5 w-5 shrink-0 text-warning-500 dark:text-warning-400" />
+            <x-lucide-clock class="mt-0.5 h-5 w-5 shrink-0 text-warning-500 dark:text-warning-400" />
             <div>
                 <h3 class="text-sm font-semibold text-warning-800 dark:text-warning-300">{{ __('cloud::billing.upgrade.activation_delayed_title') }}</h3>
                 <p class="mt-0.5 text-sm text-warning-700/80 dark:text-warning-400/70">{{ __('cloud::billing.upgrade.activation_delayed_body') }}</p>

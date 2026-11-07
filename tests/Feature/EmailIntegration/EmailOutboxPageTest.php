@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
-use Filament\Support\Icons\Heroicon;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -165,7 +164,7 @@ it('locked failed mode has a dedicated empty state', function (): void {
         ->assertSee(__('filament/pages/email-inbox.failed.empty.description'));
 
     expect($component->instance()->getTable()->getEmptyStateIcon())
-        ->toBe(Heroicon::OutlinedExclamationCircle);
+        ->toBe('lucide-circle-exclamation-point');
 });
 
 it('uses an outlined clock for the outbox empty state', function (): void {
@@ -174,7 +173,7 @@ it('uses an outlined clock for the outbox empty state', function (): void {
         ->assertSee(__('filament/pages/email-inbox.outbox.empty.description'));
 
     expect($component->instance()->getTable()->getEmptyStateIcon())
-        ->toBe(Heroicon::OutlinedClock);
+        ->toBe('lucide-clock');
 });
 
 it('can exclude failed from the status filter without changing standalone outbox', function (): void {

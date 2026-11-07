@@ -14,7 +14,7 @@
 
         <!-- Delete Workspace Confirmation Modal -->
         <x-filament::modal id="delete-workspace-modal"
-                           icon="heroicon-o-exclamation-triangle"
+                           icon="lucide-triangle-exclamation-point"
                            icon-color="danger"
                            width="md"
                            alignment="center"

@@ -109,7 +109,7 @@
         <div class="grid border-b border-gray-100 dark:border-white/[0.06]">
             <div class="{{ $stack }} flex items-center gap-3 px-4 py-3.5 sm:px-5" x-bind:class="{ 'invisible': added }" data-mail-placeholder>
                 <span class="flex size-10 shrink-0 items-center justify-center rounded-full border border-dashed border-gray-300 text-gray-400 dark:border-white/15" aria-hidden="true">
-                    <x-heroicon-o-user class="size-5"/>
+                    <x-lucide-user class="size-5"/>
                 </span>
                 <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('Lena Ortiz is not in your CRM yet.') }}</p>
             </div>
@@ -121,7 +121,7 @@
                     <p class="truncate text-xs text-gray-500 dark:text-gray-400">{{ __('Head of Operations at Northwind') }}</p>
                 </div>
                 <span class="hidden shrink-0 items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-micro font-medium text-emerald-700 ring-1 ring-emerald-600/20 ring-inset sm:inline-flex dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-400/20">
-                    <x-ri-sparkling-line class="size-3" aria-hidden="true"/>
+                    <x-lucide-sparkle class="size-3" aria-hidden="true"/>
                     {{ __('Added from your inbox') }}
                 </span>
             </div>
@@ -147,7 +147,7 @@
                         <div class="flex items-baseline gap-2">
                             <p class="min-w-0 flex-1 truncate text-sm font-medium text-gray-900 dark:text-white" x-bind:class="{ 'text-gray-900 dark:text-white': showsSubject, 'text-gray-500 dark:text-gray-400': ! showsSubject }" x-text="showsSubject ? @js($subject) : @js(__('(subject hidden)'))" data-mail-subject>{{ $subject }}</p>
                             <span class="hidden shrink-0 items-center gap-1 text-micro text-gray-500 sm:inline-flex dark:text-gray-400">
-                                <x-ri-mail-fill class="size-3 text-gray-400 dark:text-gray-500" aria-hidden="true"/>
+                                <x-lucide-mail class="size-3 text-gray-400 dark:text-gray-500" aria-hidden="true"/>
                                 {{ __('via :name', ['name' => 'Sam Patel']) }}
                             </span>
                             <span class="shrink-0 text-micro text-gray-500 dark:text-gray-400">{{ $time }}</span>
@@ -156,7 +156,7 @@
                         <div class="mt-0.5 grid">
                             <p class="{{ $stack }} truncate text-xs text-gray-500 dark:text-gray-400" x-bind:class="{ 'invisible': ! showsBody }" data-mail-preview>{{ $preview }}</p>
                             <span class="{{ $stack }} invisible inline-flex w-fit items-center gap-1 rounded-md border border-gray-200 px-1.5 py-0.5 text-micro text-gray-600 dark:border-white/[0.1] dark:text-gray-400" x-bind:class="{ 'invisible': showsBody }" data-mail-lock>
-                                <x-ri-lock-line class="size-3" aria-hidden="true"/>
+                                <x-lucide-lock class="size-3" aria-hidden="true"/>
                                 {{ __('Request access from :name', ['name' => 'Sam']) }}
                             </span>
                         </div>

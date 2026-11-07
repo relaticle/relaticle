@@ -14,7 +14,7 @@
             </h2>
 
             <div class="mcp-entry mcp-entry-recent mt-2 inline-flex items-center gap-1.5 text-xs sm:text-sm text-gray-500 dark:text-zinc-400">
-                <x-heroicon-o-chat-bubble-left class="h-3.5 w-3.5"/>
+                <x-lucide-message-square class="h-3.5 w-3.5"/>
                 <span>Recent chat · This week's pipeline review</span>
             </div>
         </div>
@@ -33,13 +33,13 @@
                     <div class="ms-auto flex items-center gap-1.5">
                         <span class="inline-flex h-7 items-center gap-1 rounded-md border border-transparent px-2 text-xs font-medium text-gray-600 dark:text-gray-300">
                             <span>Auto</span>
-                            <x-heroicon-o-chevron-up-down class="h-3 w-3" aria-hidden="true"/>
+                            <x-lucide-chevrons-up-down class="h-3 w-3" aria-hidden="true"/>
                         </span>
                         <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-500 dark:text-gray-400">
-                            <x-heroicon-o-microphone class="h-4 w-4" aria-hidden="true"/>
+                            <x-lucide-mic class="h-4 w-4" aria-hidden="true"/>
                         </span>
                         <button id="hero-entry-send" type="button" tabindex="-1" aria-hidden="true" class="flex h-7 w-7 items-center justify-center rounded-full bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500">
-                            <x-heroicon-s-arrow-up class="h-4 w-4"/>
+                            <x-lucide-arrow-up class="h-4 w-4"/>
                         </button>
                     </div>
                 </div>
@@ -59,7 +59,7 @@
                 </h3>
                 <div class="flex items-center gap-3">
                     <span class="text-xs text-gray-500 dark:text-gray-400">View all</span>
-                    <x-heroicon-o-plus class="h-4 w-4 text-gray-400 dark:text-gray-500"/>
+                    <x-lucide-plus class="h-4 w-4 text-gray-400 dark:text-gray-500"/>
                 </div>
             </div>
 

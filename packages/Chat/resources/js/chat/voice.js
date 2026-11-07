@@ -51,6 +51,11 @@ export function voiceRecorder({ transcribeUrl, unsupportedText, deniedText, fail
 
         init() {
             this._root = this.$el;
+
+            this.$watch('recording || transcribing', (busy) => {
+                const editor = this.editorScope();
+                if (editor) editor.dictating = busy;
+            });
         },
 
         // wire:navigate tears this component down without firing onstop, so a

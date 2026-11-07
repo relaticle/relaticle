@@ -91,7 +91,7 @@
                         x-on:click.stop
                         class="relative flex min-w-0 items-center gap-1 text-gray-500 dark:text-gray-400"
                     >
-                        <x-heroicon-m-envelope class="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                        <x-lucide-mail class="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
                         <span class="whitespace-nowrap">{{ trans_choice('filament/pages/email-inbox.list_row.via_mailboxes', count($email->accessMailboxes), ['count' => count($email->accessMailboxes)]) }}</span>
                         <span
                             x-cloak
@@ -116,14 +116,14 @@
                     </span>
                 @elseif (filled($mailboxViaName))
                     <span class="flex min-w-0 items-center gap-1 text-gray-500 dark:text-gray-400">
-                        <x-heroicon-m-envelope class="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                        <x-lucide-mail class="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
                         <span class="max-w-[7rem] truncate" title="{{ $mailboxViaName }}">{{ __('filament/pages/email-inbox.list_row.via', ['name' => $mailboxViaName]) }}</span>
                     </span>
                 @endif
 
                 <span class="flex items-center gap-1.5 whitespace-nowrap">
                     @if ($email->has_attachments)
-                        <x-heroicon-m-paper-clip class="h-3.5 w-3.5" aria-hidden="true" />
+                        <x-lucide-paperclip class="h-3.5 w-3.5" aria-hidden="true" />
                     @endif
                     <time
                         class="tabular-nums"
@@ -142,9 +142,9 @@
                 @if (filled($snippet))
                     <span class="flex min-w-0 items-center gap-1 truncate text-xs leading-5 text-gray-500 dark:text-gray-400">
                         @if ($isReply)
-                            <x-ri-reply-line class="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                            <x-lucide-reply class="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
                         @else
-                            <x-ri-file-text-line class="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                            <x-lucide-file-text class="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
                         @endif
                         <span class="truncate">{{ $snippet }}</span>
                     </span>

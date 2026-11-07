@@ -7,7 +7,6 @@ namespace Relaticle\EmailIntegration\Enums;
 use Filament\Support\Contracts\HasDescription;
 use Filament\Support\Contracts\HasIcon;
 use Filament\Support\Contracts\HasLabel;
-use Filament\Support\Icons\Heroicon;
 
 enum ContactCreationMode: string implements HasDescription, HasIcon, HasLabel
 {
@@ -35,12 +34,12 @@ enum ContactCreationMode: string implements HasDescription, HasIcon, HasLabel
         };
     }
 
-    public function getIcon(): Heroicon
+    public function getIcon(): string
     {
         return match ($this) {
-            self::All => Heroicon::OutlinedUserGroup,
-            self::Selective => Heroicon::OutlinedUserPlus,
-            self::None => Heroicon::OutlinedNoSymbol,
+            self::All => 'lucide-users',
+            self::Selective => 'lucide-user-plus',
+            self::None => 'lucide-ban',
         };
     }
 

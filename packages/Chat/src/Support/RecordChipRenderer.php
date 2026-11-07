@@ -7,7 +7,6 @@ namespace Relaticle\Chat\Support;
 use App\Enums\CrmEntity;
 use App\Filament\Pages\Workspace\CustomFields;
 use App\Support\IconPath;
-use Filament\Support\Enums\IconSize;
 use League\CommonMark\Extension\CommonMark\Node\Inline\Link;
 use League\CommonMark\Node\Node;
 use League\CommonMark\Renderer\ChildNodeRendererInterface;
@@ -50,7 +49,7 @@ final readonly class RecordChipRenderer implements NodeRendererInterface
      */
     public static function icons(): array
     {
-        $icons = ['custom_field' => IconPath::for(CustomFields::NAVIGATION_ICON->getIconForSize(IconSize::Medium))];
+        $icons = ['custom_field' => IconPath::for(CustomFields::NAVIGATION_ICON)];
 
         foreach (CrmEntity::cases() as $case) {
             $icons[$case->value] = $case->iconPath();
@@ -84,7 +83,7 @@ final readonly class RecordChipRenderer implements NodeRendererInterface
         // and every inline renderer in the chain escapes its own literals.
         return sprintf(
             '<a class="chat-chip" data-record-type="%s" href="%s">'
-            .'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">'
+            .'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">'
             .'<path stroke-linecap="round" stroke-linejoin="round" d="%s"></path>'
             .'</svg>'
             .'<span class="chat-chip-label">%s</span>'
