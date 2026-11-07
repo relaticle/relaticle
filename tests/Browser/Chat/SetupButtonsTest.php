@@ -237,6 +237,36 @@ it('hides the setup buttons while a turn streams', function (): void {
         ->and($page->script($countVisible))->toBe(0);
 });
 
+it('keeps the setup buttons hidden when they arrive before the turn stops streaming', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'setup', $conversationId);
+    seedButtonsTurn($conversationId, $user, 'Welcome to your workspace.', setupButtonRows("/app/{$workspace->slug}/companies"), setup: true);
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSourceHas('Welcome to your workspace.');
+
+    $resolve = ChatBrowser::resolveInterface();
+
+    $display = $page->script(<<<JS
+        (async () => {
+            {$resolve}
+            const rows = data.nextSteps;
+            data.isStreaming = true;
+            data.nextSteps = [];
+            await data.\$nextTick();
+            data.nextSteps = rows;
+            await data.\$nextTick();
+            await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+
+            return getComputedStyle(document.querySelector('[aria-label="Suggested next steps"]')).display;
+        })();
+    JS);
+
+    expect($display)->toBe('none');
+});
+
 it('clears the strip when a turn this tab did not send starts streaming', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
