@@ -60,12 +60,6 @@
                             <x-filament::button size="lg" :color="$lapsedPlan ? 'gray' : 'primary'" icon="lucide-circle-arrow-up" class="w-full justify-center" x-on:click="$dispatch('open-modal', { id: {{ \Illuminate\Support\Js::from(\Relaticle\Cloud\Billing\Livewire\UpgradeModal::MODAL_ID) }} })">
                                 {{ __('cloud::billing.paused.continue') }}
                             </x-filament::button>
-                            @if($trialExtensionAvailable)
-                                <x-filament::button size="lg" color="gray" class="w-full justify-center" wire:click="extendTrial">
-                                    {{ __('cloud::billing.paused.extend', ['days' => \App\Models\Workspace::TRIAL_EXTENSION_DAYS]) }}
-                                </x-filament::button>
-                                <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('cloud::billing.paused.extend_once') }}</p>
-                            @endif
                         </div>
                     @endif
 
@@ -92,6 +86,11 @@
 
                     <div @class(['mt-14 flex flex-col items-center gap-3', 'hidden' => $lapsedPlan && $canManageBilling])>
                         <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('cloud::billing.paused.help') }}</p>
+                        @if($canManageBilling && $trialExtensionAvailable)
+                            <x-filament::button color="gray" icon="lucide-clock" class="w-full justify-center" wire:click="extendTrial">
+                                {{ __('cloud::billing.paused.extend') }}
+                            </x-filament::button>
+                        @endif
                         <x-filament::button tag="a" color="gray" icon="lucide-headset" class="w-full justify-center"
                             :href="url()->getPublicUrl(route('contact', absolute: false))">
                             {{ __('cloud::billing.paused.contact') }}
