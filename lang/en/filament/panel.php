@@ -36,7 +36,7 @@ return [
             'options' => 'Column options',
             'edit_label' => 'Edit column label',
             'label' => 'Label',
-            'label_hint' => 'Only your table shows this name. Leave it empty to use the original.',
+            'label_hint' => 'Only you see this name until you save it in a layout you share. Leave it empty to use the original.',
             'save_label' => 'Save',
             'move_left' => 'Move left',
             'move_right' => 'Move right',
