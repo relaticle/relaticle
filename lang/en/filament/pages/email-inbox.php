@@ -10,7 +10,6 @@ return [
     'tabs' => [
         'drafts' => 'Drafts',
         'outbox' => 'Outbox',
-        'failed' => 'Failed',
         'templates' => 'Templates',
     ],
     'drafts' => [
@@ -36,12 +35,6 @@ return [
         'empty' => [
             'heading' => 'No emails in the outbox',
             'description' => 'Queued and scheduled emails appear here until they send.',
-        ],
-    ],
-    'failed' => [
-        'empty' => [
-            'heading' => 'No failed emails',
-            'description' => 'Emails that could not be delivered will appear here.',
         ],
     ],
     'search' => [

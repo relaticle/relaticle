@@ -2,7 +2,7 @@
 title: Read and reply to email on a record
 description: Find every synced conversation on a person, company, or opportunity, then reply, forward, or compose a new email without leaving the record.
 order: 3
-updated: "2026-10-05"
+updated: "2026-11-08"
 related: [help/email-and-calendar/connect-your-google-account, help/email-and-calendar/connect-your-microsoft-account, help/email-and-calendar/send-email-to-many-people, help/email-and-calendar/request-access-to-an-email]
 ---
 
@@ -58,15 +58,15 @@ account's **Signatures** tab under **Workspace Settings**.
 
 ## Follow what you sent
 
-The **Emails** page in the sidebar tracks your own outgoing mail in four
+The **Emails** page in the sidebar tracks your own outgoing mail in three
 tabs.
 
 - **Drafts**: messages you closed before sending. **Continue writing**
   reopens one.
 - **Outbox**: email waiting to go, split into **Queued**, **Scheduled**,
   **Sending**, **Failed**, and **Sent in the last 24 hours**. You can cancel
-  a queued email or change its **Send at** time.
-- **Failed**: email that could not be delivered, which you can retry.
+  a queued email or change its **Send at** time. Pick **Failed** to see
+  email that could not be delivered, with the reason, and click **Retry**.
 - **Templates**: messages you saved to reuse.
 
 ## If Relaticle can't send from your account
