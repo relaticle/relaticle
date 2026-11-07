@@ -1,9 +1,10 @@
 # Citation panel
 
-Monthly tracker for whether AI answer engines mention or cite Relaticle in
-response to a fixed set of prompts. Re-run the same 10 prompts, verbatim,
-against the same 3 engines every month and append a new dated block of rows.
-Never edit past rows.
+We retired this panel on 2026-11-08. OpenSEO's AI Visibility tracker runs
+these 10 prompts word for word each day, under the topic "Citation panel". It
+asks ChatGPT, Gemini and Google AI Overviews. Read the results there.
+
+The rows below are the August baseline. Never edit them.
 
 ## Prompts (fixed, reused every month)
 
