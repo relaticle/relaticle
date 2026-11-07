@@ -411,6 +411,17 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
         return $this->connectedAccounts()->connected()->exists();
     }
 
+    public function effectiveDataSource(): OnboardingDataSource
+    {
+        $answer = $this->onboarding_data_source ?? OnboardingDataSource::Memory;
+
+        if ($answer === OnboardingDataSource::Inbox && ! $this->hasConnectedMailbox()) {
+            return OnboardingDataSource::Memory;
+        }
+
+        return $answer;
+    }
+
     public function hasMailboxCapacity(): bool
     {
         $limit = resolve(Entitlements::class)->mailboxLimit($this);

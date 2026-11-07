@@ -11,7 +11,7 @@ return [
             'prompt' => 'I want to add a company I work with and the people there. Ask me for the details.',
         ],
         'add_deal' => [
-            'label' => 'Add a deal',
+            'label' => 'Add an opportunity',
             'prompt' => 'I want to add an opportunity for a company I am working with. Ask me which company and what it is worth.',
         ],
         'show_synced' => [
@@ -24,7 +24,7 @@ return [
         ],
         'copy_prompt' => [
             'label' => 'Copy the prompt',
-            'prompt' => 'Write the prompt I can paste into my AI assistant so it moves my current companies, people and opportunities into Relaticle.',
+            'prompt' => 'Show me the prompt to paste into my AI assistant.',
         ],
         'connect_steps' => [
             'label' => 'Open connection steps',

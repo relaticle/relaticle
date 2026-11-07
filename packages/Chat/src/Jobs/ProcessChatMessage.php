@@ -1114,7 +1114,7 @@ final class ProcessChatMessage implements ShouldQueue
             return;
         }
 
-        if ($this->isSetupConversation()) {
+        if ($this->offersSetupOptions()) {
             $this->offerSetupOptions($messageId);
 
             return;
@@ -1132,6 +1132,14 @@ final class ProcessChatMessage implements ShouldQueue
                     ->all()
             )),
         ));
+    }
+
+    private function offersSetupOptions(): bool
+    {
+        return (bool) config('chat.next_steps.enabled', true)
+            && in_array($this->origin, [MessageOrigin::Greeting, MessageOrigin::DataArrived], true)
+            && $this->workspace->onboarding_data_source !== null
+            && $this->isSetupConversation();
     }
 
     private function offerSetupOptions(string $messageId): void

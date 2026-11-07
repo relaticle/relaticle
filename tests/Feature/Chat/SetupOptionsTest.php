@@ -68,6 +68,11 @@ function optionIds(?User $user = null, ?Workspace $workspace = null): array
 
 function arrivedFrom(CreationSource $source): void
 {
+    Company::factory()->create(['workspace_id' => test()->workspace->getKey(), 'creator_id' => null, 'creation_source' => $source]);
+}
+
+function peopleArrivedFrom(CreationSource $source): void
+{
     People::factory()->create(['workspace_id' => test()->workspace->getKey(), 'creator_id' => null, 'creation_source' => $source]);
 }
 
@@ -137,9 +142,16 @@ it('offers pick who to work on first once records arrived today', function (Onbo
     'assistant mailbox' => [OnboardingDataSource::Assistant, CreationSource::MAILBOX],
 ]);
 
-it('counts companies as arrived records too', function (): void {
+it('does not offer the company pick when only people arrived', function (): void {
     answeredWith(OnboardingDataSource::Spreadsheet);
-    Company::factory()->create(['workspace_id' => $this->workspace->getKey(), 'creation_source' => CreationSource::IMPORT]);
+    peopleArrivedFrom(CreationSource::IMPORT);
+
+    expect(optionIds())->toBe(['upload_file']);
+});
+
+it('offers the memory buttons to an inbox answer with no mailbox when a file import brought companies', function (): void {
+    answeredWith(OnboardingDataSource::Inbox);
+    arrivedFrom(CreationSource::IMPORT);
 
     expect(optionIds())->toBe(['pick_first', 'later']);
 });
@@ -156,7 +168,7 @@ it('ignores records that arrived before the owner day began', function (): void 
     $this->travelTo('2026-11-08 02:00:00');
     $this->user->forceFill(['timezone' => 'America/New_York'])->save();
     answeredWith(OnboardingDataSource::Spreadsheet);
-    People::factory()->create(['workspace_id' => $this->workspace->getKey(), 'creation_source' => CreationSource::IMPORT, 'created_at' => '2026-11-07 03:00:00']);
+    Company::factory()->create(['workspace_id' => $this->workspace->getKey(), 'creation_source' => CreationSource::IMPORT, 'created_at' => '2026-11-07 03:00:00']);
 
     expect(optionIds())->toBe(['upload_file']);
 });
@@ -180,7 +192,15 @@ it('keeps the link that needs no capability for a user without data import', fun
     expect(optionIds($viewer->fresh()))->toBe(['copy_prompt', 'connect_steps']);
 });
 
-it('drops a link whose page is unavailable', function (bool $emailIntegration): void {
+it('drops a link whose page is unavailable', function (): void {
+    answeredWith(OnboardingDataSource::Assistant);
+    config()->set('documentation.public_url', null);
+
+    expect(resolve(DestinationResolver::class)->resolve('connect_assistant', $this->workspace))->toBeNull()
+        ->and(optionIds())->toBe(['copy_prompt']);
+});
+
+it('never links to the email accounts page', function (bool $emailIntegration): void {
     config()->set('relaticle.features.email_integration', $emailIntegration);
     Feature::flushCache();
 
@@ -261,18 +281,28 @@ function lastAssistantNextSteps(string $conversationId): mixed
     return json_decode((string) $meta, true)['next_steps'] ?? null;
 }
 
-it('writes setup buttons instead of suggested next steps in the setup chat', function (): void {
+function suggestNextStepsFake(): void
+{
     Queue::fake();
     Event::fake([NextStepsSuggested::class]);
-    answeredWith(OnboardingDataSource::Memory);
-    CrmAssistant::fake(['Tell me who you work with.']);
+}
 
-    runSetupTurn($this->user, $this->workspace->fresh());
-
-    $expected = array_map(
+function expectedOptionArrays(): array
+{
+    return array_map(
         fn (SetupOption $option): array => $option->toArray(),
-        resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh()),
+        resolve(SetupOptions::class)->for(test()->user, test()->workspace->fresh()),
     );
+}
+
+it('writes setup buttons on the greeting turn', function (): void {
+    suggestNextStepsFake();
+    answeredWith(OnboardingDataSource::Memory);
+    CrmAssistant::fake(['Hi, your workspace is ready.']);
+
+    runSetupTurn($this->user, $this->workspace->fresh(), MessageOrigin::Greeting);
+
+    $expected = expectedOptionArrays();
 
     expect(lastAssistantNextSteps($this->workspace->setupConversation->id))->toEqual($expected);
 
@@ -284,29 +314,62 @@ it('writes setup buttons instead of suggested next steps in the setup chat', fun
     );
 });
 
-it('writes the setup buttons on the greeting turn too', function (): void {
-    Queue::fake();
-    answeredWith(OnboardingDataSource::Assistant);
+it('writes setup buttons on the data arrived turn', function (): void {
+    suggestNextStepsFake();
+    answeredWith(OnboardingDataSource::Spreadsheet);
+    arrivedFrom(CreationSource::IMPORT);
+    CrmAssistant::fake(['Your companies arrived.']);
+
+    runSetupTurn($this->user, $this->workspace->fresh(), MessageOrigin::DataArrived);
+
+    expect(array_column(lastAssistantNextSteps($this->workspace->setupConversation->id), 'id'))->toBe(['pick_first', 'later']);
+    Queue::assertNotPushed(SuggestNextSteps::class);
+});
+
+it('keeps suggested next steps for a typed turn in the setup chat', function (): void {
+    suggestNextStepsFake();
+    answeredWith(OnboardingDataSource::Memory);
+    CrmAssistant::fake(['Tell me who you work with.']);
+
+    runSetupTurn($this->user, $this->workspace->fresh());
+
+    expect(lastAssistantNextSteps($this->workspace->setupConversation->id))->toBeNull();
+    Queue::assertPushed(SuggestNextSteps::class);
+});
+
+it('keeps suggested next steps for a workspace without a data source', function (MessageOrigin $origin): void {
+    suggestNextStepsFake();
+    answeredWith(null);
+    CrmAssistant::fake(['Hi, your workspace is ready.']);
+
+    runSetupTurn($this->user, $this->workspace->fresh(), $origin);
+
+    expect(lastAssistantNextSteps($this->workspace->setupConversation->id))->toBeNull();
+    Queue::assertPushed(SuggestNextSteps::class);
+})->with([MessageOrigin::Greeting, MessageOrigin::DataArrived]);
+
+it('writes no setup buttons when next steps are switched off', function (): void {
+    suggestNextStepsFake();
+    config()->set('chat.next_steps.enabled', false);
+    answeredWith(OnboardingDataSource::Memory);
     CrmAssistant::fake(['Hi, your workspace is ready.']);
 
     runSetupTurn($this->user, $this->workspace->fresh(), MessageOrigin::Greeting);
 
-    expect(array_column(lastAssistantNextSteps($this->workspace->setupConversation->id), 'id'))->toBe(['copy_prompt', 'connect_steps']);
-    Queue::assertNotPushed(SuggestNextSteps::class);
+    expect(lastAssistantNextSteps($this->workspace->setupConversation->id))->toBeNull();
 });
 
 it('writes nothing for an answer that has no button to offer', function (): void {
-    Queue::fake();
+    suggestNextStepsFake();
     $viewer = User::factory()->create();
     $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
     $viewer->switchWorkspace($this->workspace);
     answeredWith(OnboardingDataSource::Spreadsheet);
     CrmAssistant::fake(['Ask your workspace owner to upload the file.']);
 
-    runSetupTurn($viewer->fresh(), $this->workspace->fresh());
+    runSetupTurn($viewer->fresh(), $this->workspace->fresh(), MessageOrigin::Greeting);
 
     expect(lastAssistantNextSteps($this->workspace->setupConversation->id))->toBeNull();
-    Queue::assertNotPushed(SuggestNextSteps::class);
 });
 
 it('keeps suggesting next steps in an ordinary conversation', function (): void {

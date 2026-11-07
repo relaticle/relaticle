@@ -10,7 +10,6 @@ use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Queries\Onboarding\ArrivedRecordsQuery;
-use App\Services\WorkspaceActivationFacts;
 use Relaticle\Chat\Data\SetupOption;
 use Relaticle\Chat\Support\DestinationResolver;
 
@@ -19,7 +18,6 @@ final readonly class SetupOptions
     public function __construct(
         private ArrivedRecordsQuery $arrived,
         private DestinationResolver $destinations,
-        private WorkspaceActivationFacts $facts,
     ) {}
 
     /**
@@ -27,16 +25,16 @@ final readonly class SetupOptions
      */
     public function for(User $user, Workspace $workspace): array
     {
-        $answer = $workspace->onboarding_data_source ?? OnboardingDataSource::Memory;
+        $source = $workspace->effectiveDataSource();
 
-        if ($this->recordsArrivedToday($workspace, $answer)) {
+        if ($this->companiesArrivedToday($user, $workspace, $source)) {
             return [
                 $this->prompt('pick_first', 'heroicon-o-flag'),
                 $this->prompt('later', 'heroicon-o-clock'),
             ];
         }
 
-        $options = match ($this->effectiveSource($user, $workspace, $answer)) {
+        $options = match ($source) {
             OnboardingDataSource::Memory => [
                 $this->prompt('add_client', 'heroicon-o-building-office-2'),
                 $this->prompt('add_deal', 'heroicon-o-briefcase'),
@@ -57,22 +55,13 @@ final readonly class SetupOptions
         return array_values(array_filter($options));
     }
 
-    private function effectiveSource(User $user, Workspace $workspace, OnboardingDataSource $answer): OnboardingDataSource
+    private function companiesArrivedToday(User $user, Workspace $workspace, OnboardingDataSource $source): bool
     {
-        if ($answer === OnboardingDataSource::Inbox && ! $this->facts->hasConnectedMailbox($user, $workspace)) {
-            return OnboardingDataSource::Memory;
-        }
-
-        return $answer;
-    }
-
-    private function recordsArrivedToday(Workspace $workspace, OnboardingDataSource $answer): bool
-    {
-        $arrived = $this->arrived->today($workspace);
+        $arrived = $this->arrived->today($user, $workspace);
 
         return array_any(
-            $answer->arrivalSources(),
-            fn (CreationSource $source): bool => array_sum($arrived[$source->value] ?? []) > 0,
+            $source->arrivalSources(),
+            fn (CreationSource $creationSource): bool => ($arrived[$creationSource->value]['companies'] ?? 0) > 0,
         );
     }
 

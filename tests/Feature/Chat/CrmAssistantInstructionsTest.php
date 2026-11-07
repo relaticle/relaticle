@@ -49,6 +49,7 @@ use Relaticle\Chat\Tools\SearchDocsTool;
 use Relaticle\Chat\Tools\Task\DeleteTaskTool;
 use Relaticle\Chat\Tools\Task\UpdateTaskTool;
 use Relaticle\Cloud\Billing\StripeBilling;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 mutates(CrmAssistant::class, WebAccess::class, NoBilling::class, StripeBilling::class);
 
@@ -520,6 +521,7 @@ function setupAgent(Workspace $workspace, ?OnboardingDataSource $source = null):
 
     return resolve(CrmAssistant::class)
         ->withWorkspace($workspace->fresh())
+        ->forParticipant($workspace->owner)
         ->withSetupMode(true);
 }
 
@@ -632,7 +634,8 @@ it('gives rela the fixed prompt that has the users own assistant move their clie
         ->and(setupAgent($workspace, OnboardingDataSource::Memory)->dynamicInstructions())
         ->not->toContain('assistant_prompt:')
         ->and(resolve(CrmAssistant::class)->staticInstructions())
-        ->toContain('give the assistant_prompt line verbatim');
+        ->toContain('give the assistant_prompt line verbatim')
+        ->toContain('When they ask to see the prompt to paste into their assistant, give that same assistant_prompt line verbatim in a code block, with no rewording and no link.');
 });
 
 it('tells rela to list only the companies that arrived and let the user pick', function (): void {
@@ -658,10 +661,17 @@ it('points the company pick at the creation sources the data source arrives from
 })->with([
     'spreadsheet' => [OnboardingDataSource::Spreadsheet, 'import'],
     'other crm' => [OnboardingDataSource::OtherCrm, 'import'],
-    'inbox' => [OnboardingDataSource::Inbox, 'mailbox'],
+    'inbox without a mailbox' => [OnboardingDataSource::Inbox, 'import, mailbox'],
     'memory' => [OnboardingDataSource::Memory, 'import, mailbox'],
     'assistant' => [OnboardingDataSource::Assistant, 'import, mailbox'],
 ]);
+
+it('points the company pick at the mailbox for an inbox answer with a connected mailbox', function (): void {
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+    ConnectedAccount::factory()->create(['workspace_id' => $workspace->getKey(), 'user_id' => $workspace->owner->getKey()]);
+
+    expect(setupAgent($workspace, OnboardingDataSource::Inbox)->dynamicInstructions())->toContain("pick_sources: mailbox\n");
+});
 
 it('points the company pick at both sources when the user never answered', function (): void {
     $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;

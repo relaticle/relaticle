@@ -8,13 +8,18 @@ use App\Enums\CreationSource;
 use App\Models\Company;
 use App\Models\People;
 use App\Models\Scopes\WorkspaceScope;
+use App\Models\User;
 use App\Models\Workspace;
 
 final readonly class ArrivedRecordsQuery
 {
     /** @return array<string, array{people: int, companies: int}> */
-    public function today(Workspace $workspace): array
+    public function today(User $user, Workspace $workspace): array
     {
+        if (! $user->belongsToWorkspaceId((string) $workspace->getKey())) {
+            return [];
+        }
+
         $since = today($workspace->ownerTimezone())->utc();
         $sources = [CreationSource::IMPORT->value, CreationSource::MAILBOX->value];
         $arrived = [];
