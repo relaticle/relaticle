@@ -35,7 +35,7 @@
                             <button
                                 type="button"
                                 class="fi-record-overview-item"
-                                @if ($item['open']) x-on:click="{{ $item['open'] }}" @endif
+                                x-on:click="{{ $item['open'] }}"
                             >
                                 @if ($item['author'])
                                     <x-filament::avatar :src="$item['author']->getFilamentAvatarUrl()" :alt="$item['author']->name" size="xs" class="fi-record-overview-item-avatar" />

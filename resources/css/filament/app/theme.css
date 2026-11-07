@@ -326,11 +326,15 @@ html.fi-chat-docked .fi-app-main-wrapper {
 
 .fi-sidebar-nav {
     @apply gap-y-5 pt-2.5;
+}
+
+.fi-sidebar-nav,
+.ff-cards {
     scrollbar-width: thin;
     scrollbar-color: var(--color-gray-300) transparent;
 }
 
-.dark .fi-sidebar-nav {
+.dark :is(.fi-sidebar-nav, .ff-cards) {
     scrollbar-color: var(--color-gray-700) transparent;
 }
 
@@ -1026,28 +1030,25 @@ a.fi-linked-records-chip {
     @apply max-sm:max-w-full max-sm:min-w-0;
 }
 
+.fi-icon-btn:is(.fi-record-preview-trigger, .fi-board-card-preview-trigger) {
+    @apply m-0 size-6 shrink-0 rounded-md bg-white text-gray-500 opacity-0 ring-1 ring-gray-950/10 transition-opacity duration-75 pointer-coarse:opacity-100 hover:bg-gray-50 hover:text-gray-950 focus-visible:opacity-100 max-sm:hidden dark:text-gray-400 dark:ring-white/10 dark:hover:bg-white/10 dark:hover:text-white;
+
+    & .fi-icon {
+        @apply size-3.5;
+    }
+}
+
 .fi-icon-btn.fi-record-preview-trigger {
-    @apply m-0 size-6 shrink-0 rounded-md bg-white text-gray-500 opacity-0 ring-1 ring-gray-950/10 transition-opacity duration-75 hover:bg-gray-50 hover:text-gray-950 max-sm:hidden dark:bg-white/5 dark:text-gray-400 dark:ring-white/10 dark:hover:bg-white/10 dark:hover:text-white;
-
-    & .fi-icon {
-        @apply size-3.5;
-    }
+    @apply dark:bg-white/5;
 }
 
-.fi-ta-row:hover .fi-record-preview-trigger,
-.fi-record-preview-trigger:focus-visible {
-    @apply opacity-100;
-}
-
+/* Over the card's text, so it stays opaque. The offsets match Flowforge's card menu beside it. */
 .fi-icon-btn.fi-board-card-preview-trigger {
-    @apply absolute end-[calc(0.5rem+1.25rem+0.25rem)] top-[calc(0.5rem-0.125rem)] z-10 m-0 size-6 rounded-md bg-white text-gray-500 opacity-0 ring-1 ring-gray-950/10 hover:bg-gray-50 hover:text-gray-950 focus-visible:opacity-100 max-sm:hidden dark:bg-gray-900 dark:text-gray-400 dark:ring-white/10 dark:hover:bg-white/10 dark:hover:text-white;
-
-    & .fi-icon {
-        @apply size-3.5;
-    }
+    @apply absolute end-[calc(0.5rem+1.25rem+0.25rem)] top-[calc(0.5rem-0.125rem)] z-10 dark:bg-(--surface-block-bg);
 }
 
-.ff-card:hover .fi-board-card-preview-trigger {
+.fi-ta-row:is(:hover, :focus-within) .fi-record-preview-trigger,
+.ff-card:is(:hover, :focus-within) .fi-board-card-preview-trigger {
     @apply opacity-100;
 }
 
@@ -1256,11 +1257,11 @@ html.fi-record-stacked .fi-record-layout {
 
     .fi-record-overview-section .fi-section-header-heading,
     .fi-record-overview-related-title {
-        @apply text-sm font-medium text-gray-600 dark:text-gray-300;
+        @apply text-sm font-medium text-gray-600 dark:text-gray-400;
     }
 
     .fi-record-overview-card {
-        @apply overflow-hidden rounded-lg bg-white ring-1 ring-gray-950/10 dark:bg-white/[0.03] dark:ring-white/10;
+        @apply overflow-hidden rounded-xl bg-(--surface-block-bg) ring-1 ring-(--surface-block-border);
     }
 
     .fi-record-highlights .fi-grid {
@@ -1273,7 +1274,7 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-record-highlight {
-        @apply flex h-full min-h-26 flex-col justify-between gap-3 rounded-lg bg-white px-3.5 py-3 ring-1 ring-gray-950/10 dark:bg-white/[0.03] dark:ring-white/10;
+        @apply flex h-full min-h-26 flex-col justify-between gap-3 rounded-xl bg-(--surface-block-bg) px-3.5 py-3 ring-1 ring-(--surface-block-border);
 
         & .fi-in-entry-label-col,
         & .fi-in-entry-label-ctn {
@@ -1306,7 +1307,7 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-record-next-task {
-        @apply -mx-1.5 -my-1 flex w-[calc(100%+0.75rem)] min-w-0 flex-col items-start gap-0.5 rounded-md px-1.5 py-1 text-start hover:bg-gray-50 dark:hover:bg-white/5;
+        @apply -mx-1.5 -my-1 flex w-[calc(100%+0.75rem)] min-w-0 flex-col items-start gap-0.5 rounded-md px-1.5 py-1 text-start outline-none hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-white/5;
     }
 
     .fi-record-next-task-title {
@@ -1406,15 +1407,16 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-record-overview-view-all {
-        @apply rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-950 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white;
+        @apply rounded-md px-2 py-1 text-sm text-gray-500 outline-none hover:bg-gray-100 hover:text-gray-950 focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white;
     }
 
-    .fi-record-overview-count {
-        @apply min-w-5 rounded px-1 text-center text-xs font-medium text-gray-600 ring-1 ring-gray-950/10 dark:text-gray-300 dark:ring-white/15;
+    .fi-record-overview-count,
+    .fi-record-pane .fi-tabs-item .fi-badge {
+        @apply min-w-5 justify-center rounded bg-transparent px-1 py-0 text-center text-xs font-medium text-gray-600 ring-1 ring-gray-950/10 dark:text-gray-300 dark:ring-white/10;
     }
 
     .fi-icon-btn.fi-record-overview-add {
-        @apply m-0 size-7 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-950 dark:hover:bg-white/10 dark:hover:text-white;
+        @apply m-0 size-7 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-950 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white;
 
         & .fi-icon {
             @apply size-4;
@@ -1426,7 +1428,7 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-record-overview-item {
-        @apply flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-start text-sm hover:bg-gray-50 dark:hover:bg-white/5;
+        @apply flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-start text-sm outline-none hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-primary-500 max-sm:min-h-11 dark:hover:bg-white/5;
     }
 
     .fi-avatar.fi-record-overview-item-avatar {
@@ -1463,7 +1465,7 @@ html.fi-record-stacked .fi-record-layout {
 }
 
 .fi-modal-window.fi-record-preview {
-    @apply border-s border-gray-200 shadow-xl dark:border-white/10;
+    @apply border-s border-gray-200/60 shadow-xl dark:border-white/10;
 
     & > .fi-modal-header {
         @apply hidden;
@@ -1474,7 +1476,7 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-record-preview-header {
-        @apply sticky top-0 z-30 flex h-12 shrink-0 items-center gap-2 border-b border-gray-200/80 bg-white/95 px-3 backdrop-blur dark:border-white/10 dark:bg-gray-900/95;
+        @apply sticky top-0 z-30 flex h-(--topbar-height) shrink-0 items-center gap-2 border-b border-gray-200/60 bg-white/95 px-3 backdrop-blur dark:border-white/10 dark:bg-gray-900/95;
     }
 
     .fi-record-preview-header .fi-icon-btn {
@@ -1514,7 +1516,7 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-record-pane .fi-tabs:not(.fi-contained) {
-        @apply px-4 pt-0;
+        @apply pt-0;
     }
 }
 
@@ -1574,7 +1576,7 @@ html.fi-record-stacked .fi-record-layout {
 
 .fi-record-pane {
     .fi-tabs:not(.fi-contained) {
-        @apply mx-0 max-w-none gap-x-0.5 rounded-none border-b border-gray-200/80 bg-transparent px-4 py-0 shadow-none ring-0 record-split:pt-2 dark:border-white/10 dark:bg-transparent;
+        @apply mx-0 max-w-none gap-x-0.5 rounded-none border-b border-gray-200/60 bg-transparent px-4 py-0 shadow-none ring-0 record-split:pt-2 dark:border-white/10 dark:bg-transparent;
     }
 
     .fi-tabs-item {
@@ -1586,10 +1588,6 @@ html.fi-record-stacked .fi-record-layout {
 
         & > .fi-icon {
             @apply size-4 text-gray-400 dark:text-gray-500;
-        }
-
-        & .fi-badge {
-            @apply min-w-5 justify-center rounded bg-transparent px-1 py-0 text-xs font-medium text-gray-600 ring-1 ring-gray-950/10 dark:text-gray-300 dark:ring-white/15;
         }
 
         &.fi-active {
@@ -1618,9 +1616,7 @@ html.fi-record-stacked .fi-record-layout {
             @apply absolute -end-2 inset-y-1 w-px bg-current opacity-15 content-[''];
         }
     }
-}
 
-.fi-record-pane {
     /* Isolated so the lifted table header (z-index 21) stays under the rail resize handle.
        Never isolate the whole pane: its action modals would paint under the topbar and sidebar. */
     .fi-ta-ctn {
@@ -1662,7 +1658,7 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-ta-table :is(.fi-ta-header-cell, .fi-ta-cell) {
-        @apply border-x-0!;
+        @apply border-x-0;
     }
 
     /* Rows start and end on the same inset as the tab's heading and its header actions. */
@@ -1674,9 +1670,6 @@ html.fi-record-stacked .fi-record-layout {
         @apply pe-6 max-sm:pe-0;
     }
 
-}
-
-.fi-record-pane {
     /* A modal mounted in the pane keeps its sections as cards, as it has them everywhere else.
        The preview is itself a modal, so inside it only a second, nested modal keeps them. */
     .fi-section:not(.fi-section-not-contained):not(.fi-modal *),
@@ -2250,15 +2243,6 @@ html.fi-record-stacked .fi-record-layout {
     --ff-tray-bg: color-mix(in oklab, var(--gray-950) 50%, transparent);
 }
 
-.ff-cards {
-    scrollbar-width: thin;
-    scrollbar-color: var(--color-gray-300) transparent;
-}
-
-.dark .ff-cards {
-    scrollbar-color: var(--color-gray-700) transparent;
-}
-
 /* Chat Side Panel */
 [data-chat-side-panel] [data-chat-messages] {
     scrollbar-width: thin;
@@ -2761,7 +2745,10 @@ html.fi-record-stacked .fi-record-layout {
         @apply -my-2 min-h-11;
     }
 
-    :is(.fi-record-page, .fi-record-embedded-page) .fi-sc-actions :is(.fi-btn, .fi-icon-btn) {
+    :is(.fi-record-page, .fi-record-embedded-page) .fi-sc-actions :is(.fi-btn, .fi-icon-btn),
+    .fi-record-preview-header .fi-icon-btn,
+    .fi-icon-btn.fi-record-overview-add,
+    .fi-record-overview-view-all {
         @apply min-h-11 min-w-11;
     }
 
