@@ -24,6 +24,7 @@ use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Actions\Action;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Bus;
@@ -1250,6 +1251,26 @@ it('sends a retried email under the connection that retried it', function (): vo
     $client = connectedClient($this->viewer);
     Passport::actingAs($this->viewer, [Registrar::OAUTH_SCOPE, 'email:send'], client: $client);
     emailToolData($this->viewer, RetryEmailTool::class, ['id' => $email->id]);
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->once()->andThrow(new RuntimeException('provider reached'));
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    expect(fn () => runSendJob($email->fresh()))->toThrow(RuntimeException::class, 'provider reached');
+});
+
+it('sends an email its owner retries from the outbox after the connection that queued it was revoked', function (): void {
+    sendOverHttp($this->viewer, ['read', 'email:send'], 'Desk Agent', sendArguments($this->viewerAccount));
+    $email = Email::query()->where('creation_source', EmailCreationSource::MCP)->latest('id')->firstOrFail();
+    $this->viewer->tokens()->delete();
+    runSendJob($email);
+
+    $this->actingAs($this->viewer);
+    Filament::setTenant($this->workspace);
+    livewire(OutboxTable::class)
+        ->filterTable('status_tab', 'failed')
+        ->callAction(TestAction::make('retry')->table($email))
+        ->assertNotified();
 
     $factory = Mockery::mock(MailServiceFactoryInterface::class);
     $factory->shouldReceive('make')->once()->andThrow(new RuntimeException('provider reached'));

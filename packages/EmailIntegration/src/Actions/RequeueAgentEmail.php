@@ -26,12 +26,19 @@ final readonly class RequeueAgentEmail
         $scheduledFor = $this->pickSendTime->execute();
 
         $email = DB::transaction(function () use ($user, $email, $scheduledFor, $connection): Email {
-            if ($email->creation_source === EmailCreationSource::MCP) {
+            $isAgentEmail = $email->creation_source === EmailCreationSource::MCP;
+
+            if ($isAgentEmail) {
                 $this->reserveHold->execute($user);
-                $email->forceFill($connection->credential())->save();
             }
 
-            return $this->reschedule->execute($this->retry->execute($email), $scheduledFor);
+            $retried = $this->retry->execute($email);
+
+            if ($isAgentEmail) {
+                $retried->forceFill($connection->credential())->save();
+            }
+
+            return $this->reschedule->execute($retried, $scheduledFor);
         });
 
         $this->notifier->sendHeld($email, $user, $connection->name, (int) round(now()->diffInSeconds($scheduledFor)));
