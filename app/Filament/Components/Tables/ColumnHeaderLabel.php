@@ -12,13 +12,13 @@ use function Filament\Support\generate_icon_html;
 
 final readonly class ColumnHeaderLabel
 {
-    public static function make(string $label, string|BackedEnum $icon): HtmlString
+    public static function make(string $label, string|BackedEnum|null $icon): HtmlString
     {
         $icon = generate_icon_html($icon, size: IconSize::Small)?->toHtml();
         $label = e($label);
 
         return new HtmlString(
-            "<span class=\"fi-ta-header-cell-field inline-flex min-w-0 items-center gap-1.5 align-middle\">{$icon}<span class=\"truncate\">{$label}</span></span>"
+            "<span class=\"fi-ta-header-cell-field inline-flex min-w-0 max-w-full items-center gap-1.5 align-middle\">{$icon}<span class=\"truncate\">{$label}</span></span>"
         );
     }
 }

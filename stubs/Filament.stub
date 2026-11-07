@@ -1,0 +1,23 @@
+<?php
+
+namespace Filament\Support\Concerns;
+
+
+trait Macroable
+{
+    /**
+     * @param-closure-this static $macro
+     */
+    public static function macro(string $name, callable $macro): void
+    {
+    }
+}
+
+namespace Filament\Tables;
+
+/**
+ * @method $this resizableColumns()
+ */
+class Table
+{
+}

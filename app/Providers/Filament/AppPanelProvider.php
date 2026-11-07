@@ -24,9 +24,14 @@ use App\Filament\Pages\EditWorkspace;
 use App\Filament\Pages\Workspace\ActivityLog;
 use App\Filament\Pages\Workspace\CustomFields;
 use App\Filament\Pages\Workspace\Members;
+use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
+use App\Filament\Resources\NoteResource\Pages\ManageNotes;
 use App\Filament\Resources\OpportunityResource;
+use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
+use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\TaskResource;
+use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Http\Controllers\SyncUserTimezoneController;
 use App\Http\Middleware\ApplyTenantScopes;
@@ -46,7 +51,6 @@ use App\Support\BrandColors;
 use App\Support\Impersonation\Impersonator;
 use App\Support\OutlinedIcons;
 use App\Support\SupportForms;
-use Asmit\ResizedColumn\ResizedColumnPlugin;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\Contracts\HasActions;
@@ -162,16 +166,7 @@ final class AppPanelProvider extends PanelProvider
             ? $emptyState->compact()
             : $emptyState);
 
-        // Table and Schema configuration is global, so both callbacks have to check
-        // which panel is actually serving the request before they touch the format.
-        Table::configureUsing(fn (Table $table): Table => $this->isCurrentPanel()
-            ? $table
-                ->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
-                ->reorderableColumns()
-                ->columnManager(! $table->getLivewire() instanceof RelationManager)
-                ->defaultPaginationPageOption(self::DEFAULT_PAGINATION_PAGE_OPTION)
-                ->paginationPageOptions(fn (HasTable $livewire): array => $this->paginationPageOptions($livewire))
-            : $table);
+        $this->configureTables();
 
         $this->formatDateTimesInSchemas();
 
@@ -225,11 +220,26 @@ final class AppPanelProvider extends PanelProvider
             JS;
     }
 
+    private function configureTables(): void
+    {
+        // Table and Schema configuration is global, so both callbacks have to check
+        // which panel is actually serving the request before they touch the format.
+        Table::configureUsing(fn (Table $table): Table => $this->isCurrentPanel()
+            ? $table
+                ->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
+                ->reorderableColumns()
+                ->columnManager(! $table->getLivewire() instanceof RelationManager)
+                ->defaultPaginationPageOption(self::DEFAULT_PAGINATION_PAGE_OPTION)
+                ->paginationPageOptions(fn (HasTable $livewire): array => $this->paginationPageOptions($livewire))
+                ->persistColumnsInSession(false)
+            : $table);
+    }
+
     /** @return list<int> */
     private function paginationPageOptions(HasTable $livewire): array
     {
-        $onePage = (int) $livewire->getTable()->getDefaultPaginationPageOption();
-        $pageOptions = [$onePage, $onePage * 2, $onePage * 4];
+        $pageOptions = self::pageSizeOptions($livewire->getTable());
+        $onePage = $pageOptions[0];
 
         // Mount reads these before any query runs; afterwards the count comes from the
         // already-fetched paginator, and a single option is what hides the select.
@@ -242,6 +252,14 @@ final class AppPanelProvider extends PanelProvider
         }
 
         return [$onePage];
+    }
+
+    /** @return list<int> */
+    public static function pageSizeOptions(Table $table): array
+    {
+        $onePage = (int) $table->getDefaultPaginationPageOption();
+
+        return [$onePage, $onePage * 2, $onePage * 4];
     }
 
     /**
@@ -355,6 +373,26 @@ final class AppPanelProvider extends PanelProvider
                 position: DatabaseNotificationsPosition::Sidebar,
             )
             ->databaseNotificationsPolling('120s');
+    }
+
+    private function registerTableHooks(Panel $panel): void
+    {
+        $panel
+            ->renderHook(
+                TablesRenderHook::TOOLBAR_SEARCH_AFTER,
+                fn (): View|Factory => view('filament.app.tables.layouts'),
+                scopes: [ListCompanies::class, ListPeople::class, ListOpportunities::class, ManageTasks::class, ManageNotes::class],
+            )
+            ->renderHook(
+                TablesRenderHook::TOOLBAR_SEARCH_AFTER,
+                fn (): View|Factory => view('filament.app.tables.column-menu'),
+                scopes: [ListCompanies::class, ListPeople::class, ListOpportunities::class, ManageTasks::class, ManageNotes::class],
+            )
+            ->renderHook(
+                TablesRenderHook::FILTER_INDICATORS,
+                fn (): View|Factory => view('filament.app.board-filter-clear'),
+                scopes: [OpportunitiesBoard::class, TasksBoard::class],
+            );
     }
 
     private function registerInvitationHooks(Panel $panel): void
@@ -525,7 +563,6 @@ final class AppPanelProvider extends PanelProvider
                             && $user->hasWorkspaceCapability(Filament::getTenant()?->getKey(), WorkspaceCapability::FieldsManage);
                     })
                     ->managementPage(CustomFields::class),
-                ResizedColumnPlugin::make(),
                 ActivityLogPlugin::make()
                     ->renderers(array_fill_keys(
                         array_column(AppEventPalette::cases(), 'value'),
@@ -593,11 +630,6 @@ final class AppPanelProvider extends PanelProvider
                 ])
             )
             ->renderHook(
-                TablesRenderHook::FILTER_INDICATORS,
-                fn (): View|Factory => view('filament.app.board-filter-clear'),
-                scopes: [OpportunitiesBoard::class, TasksBoard::class],
-            )
-            ->renderHook(
                 PanelsRenderHook::HEAD_START,
                 fn (): View|Factory => view('filament.app.appearance-preference')
             )
@@ -644,6 +676,7 @@ final class AppPanelProvider extends PanelProvider
 
         $this->registerBanners($panel);
         $this->registerInvitationHooks($panel);
+        $this->registerTableHooks($panel);
         $this->registerNotifications($panel);
 
         // Hidden without a bound tenant: the old panel-root fallback sent these

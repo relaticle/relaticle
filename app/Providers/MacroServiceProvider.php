@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Filament\Tables\ResizableColumns;
+use Filament\Tables\Table;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
@@ -11,6 +13,8 @@ final class MacroServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
+        Table::macro('resizableColumns', fn (): Table => ResizableColumns::apply($this));
+
         URL::macro('getAppUrl', function (string $path = ''): string {
             $trimmedPath = ltrim($path, '/');
 
