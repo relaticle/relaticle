@@ -17,6 +17,8 @@ use Illuminate\Support\Str;
 
 mutates(RichEditorFieldType::class, SlashMenuPlugin::class, ChecklistPlugin::class, TaskItem::class);
 
+pest()->group('webkit');
+
 it('hides the heading toolbar when the caret has no text selection', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
