@@ -593,9 +593,10 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
     transition-delay: 0s, 0s, 0s, calc(var(--sidebar-motion-duration) / 4);
 }
 
-/* Expand fades in as the rail lands, over the top bar's widened start. */
+/* Expand fades in as the rail lands, over the top bar's widened start. Its glyph,
+   not its box, sits on the page's 24px content edge, as the page heading's icon does. */
 .fi-topbar-expand-sidebar-btn {
-    inset-inline-start: calc(var(--spacing) * 3);
+    inset-inline-start: calc(var(--spacing) * 4.5);
 
     &.fi-transition-enter {
         transition-property: opacity;
