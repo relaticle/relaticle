@@ -68,6 +68,8 @@ use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
  * @property int $attempts
  * @property CarbonInterface|null $linked_at
  * @property EmailPriority $priority
+ * @property string|null $oauth_client_id
+ * @property int|null $personal_access_token_id
  */
 #[UsePolicy(EmailPolicy::class)]
 #[ObservedBy(EmailObserver::class)]

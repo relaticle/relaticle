@@ -48,6 +48,7 @@ use Relaticle\EmailIntegration\Actions\QueueAgentEmailAction;
 use Relaticle\EmailIntegration\Actions\SaveAgentEmailDraft;
 use Relaticle\EmailIntegration\Actions\SaveAssistantEmailDraft;
 use Relaticle\EmailIntegration\Actions\SendAssistantEmail;
+use Relaticle\EmailIntegration\Data\AgentConnection;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
@@ -1006,7 +1007,7 @@ it('does not count email sent through rela toward the ten held assistant emails'
         $this->viewer,
         ['connected_account_id' => $this->viewerAccount->id, 'to' => ['lena@acme.test'], 'subject' => 'From Claude', 'body' => 'Hi'],
         EmailCreationSource::MCP,
-        'Claude',
+        new AgentConnection('Claude'),
     );
 
     expect($email->status)->toBe(EmailStatus::QUEUED)

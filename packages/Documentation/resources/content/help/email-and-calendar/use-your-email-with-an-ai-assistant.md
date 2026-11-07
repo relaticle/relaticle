@@ -112,11 +112,14 @@ After five minutes the email goes out and cannot be cancelled. It then shows
 in your synced email like any other.
 
 The Owner, Admin, and Member roles can send through an assistant. A Viewer
-cannot. See [Manage members and roles](/help/workspace/manage-members-and-roles).
+cannot. If your role changes to Viewer before a queued email goes out, it is
+not sent. See [Manage members and roles](/help/workspace/manage-members-and-roles).
 
 ## Turn it off
 
-For a connector, click **Revoke** under **AI Connectors**. A connector has
+For a connector, click **Revoke** under **AI Connectors**. Emails it queued
+that have not gone out are not sent. They wait on the **Failed** tab, where
+you can send one yourself with **Retry**. A connector has
 no setting for email alone, so an assistant that should keep your records
 without your email needs an access token with the email boxes empty. For an
 access token, click its **Permissions** icon and untick the email boxes.

@@ -12,7 +12,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-#[Description('Delete pending uploads and signed-put temp files nobody claimed within a day')]
+#[Description('Delete pending uploads nobody claimed within a day and signed-put temp files after an hour')]
 #[Signature('app:purge-pending-uploads {--hours=24 : Age after which an unclaimed upload is deleted}')]
 final class PurgePendingUploadsCommand extends Command
 {
@@ -52,9 +52,10 @@ final class PurgePendingUploadsCommand extends Command
 
         $disk = TemporaryUploads::disk();
         $temporary = 0;
+        $temporaryCutoff = now()->subMinutes(TemporaryUploads::RETENTION_MINUTES);
 
         foreach ($disk->files(TemporaryUploads::DIRECTORY) as $file) {
-            if ($disk->lastModified($file) >= $cutoff->getTimestamp()) {
+            if ($disk->lastModified($file) >= $temporaryCutoff->getTimestamp()) {
                 continue;
             }
 

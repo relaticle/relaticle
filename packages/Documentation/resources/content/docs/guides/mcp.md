@@ -53,17 +53,17 @@ The MCP endpoint advertises OAuth metadata at:
 - `https://mcp.relaticle.com/.well-known/oauth-authorization-server`
 - `https://mcp.relaticle.com/.well-known/oauth-protected-resource`
 
-Clients that support Dynamic Client Registration (RFC 7591), including Claude.ai, Claude Desktop, Claude Code, and ChatGPT custom connectors, register themselves automatically and walk you through a one-click consent flow. PKCE is required (`S256`).
+Clients that support Dynamic Client Registration (RFC 7591), including Claude.ai, Claude Desktop, Claude Code, and ChatGPT custom connectors, register themselves automatically and walk you through a one-click consent flow. PKCE is required (`S256`). A client may send a `resource` parameter (RFC 8707). It must name this MCP server, or the request is refused with `invalid_target`.
 
 At consent you pick **one workspace** for the connector. That choice is permanent for that connector: to point it at a different workspace, revoke it and connect again. Paused workspaces cannot be selected. Subscribe first, or the connector would have no data to read.
 
-The consent screen lists what the connector will be able to do, and the list follows your role in the workspace you pick. Where email is on, every role gets reading and drafting, and the Owner, Admin and Member roles get sending. The client cannot ask for more or less. Relaticle shows this screen every time a connector authorizes, so the connector always holds what its user saw.
+The consent screen lists what the connector will be able to do, and the list follows your role in the workspace you pick. Where email is on, every role gets reading and drafting, and the Owner, Admin and Member roles get sending. The client cannot ask for more or less. Relaticle shows this screen every time a connector authorizes, so the connector always holds what its user saw. Every tool call also checks your role at that moment, so a role change applies to connectors you added earlier.
 
 Access tokens last 30 days and refresh tokens 90 days; supported clients refresh silently in the background.
 
 ### Revoking a connector
 
-**Settings → Access Tokens → AI Connectors** lists every assistant you have connected, the workspace each is bound to, and a **Revoke** button. Revoking invalidates the connector's access and refresh tokens immediately.
+**Settings → Access Tokens → AI Connectors** lists every assistant you have connected, the workspace each is bound to, and a **Revoke** button. Revoking invalidates the connector's access and refresh tokens immediately. Emails it queued that have not gone out are not sent. They move to the **Failed** tab, where you can send them yourself with **Retry**.
 
 ### Personal access tokens (recommended for developer tools)
 
@@ -244,6 +244,8 @@ These tools appear only for a connection that was given email access. The readin
 
 The two reading tools need read access. The mailbox tool appears for a connection allowed to draft or send, and the three draft tools for one allowed to draft. The send, cancel, reschedule and retry tools need the send permission and a role that may send through an assistant. A scheduled send never goes out sooner than the hold. An email goes to at most 20 recipients in total across To, CC and BCC. A user can have up to 10 assistant emails waiting at once.
 
+A queued email stays tied to the connection that queued it. It is not sent if that connection is revoked, deleted or expired by its send time. The same happens if its user's role no longer allows sending through an assistant. It then waits on the **Failed** tab with the reason.
+
 | Tool | Description |
 |------|-------------|
 | `list-emails-tool` | List emails newest first, with optional search, linked record, direction, thread, status and date filters. A teammate's email appears once synced or sent, and the user's own drafts and outbox appear too. Subject and snippet appear only where the sharing level allows. |
@@ -255,15 +257,15 @@ The two reading tools need read access. The mailbox tool appears for a connectio
 | `send-email-tool` | Send an email from one of the user's mailboxes, now or at a chosen time. Each email waits a few minutes before it leaves, and its user can cancel it from notifications or the Outbox. |
 | `send-email-draft-tool` | Send a saved draft as it stands, including the user's own edits, and remove it from Drafts. It is held like any other send. |
 | `cancel-email-tool` | Cancel a queued email before it leaves. |
-| `reschedule-email-tool` | Change when a queued email leaves. |
-| `retry-email-tool` | Queue a failed email again, held like a new send. |
+| `reschedule-email-tool` | Change when a queued email leaves. The user gets a new notice they can cancel from. |
+| `retry-email-tool` | Queue a failed email again, held like a new send. It is then tied to the connection that retried it. |
 
 ### Files
 
 | Tool | Description |
 |------|-------------|
 | `upload-file` | Store a file in the workspace from a public https URL, a base64 body with `filename`, or an `upload_id`. Returns `suggested_markdown` to embed the file in a rich-editor field such as a note body, plus `file_id` for the stored file. Allowed types: pdf, doc, docx, xlsx, pptx, jpg, jpeg, png, gif, webp, up to 10 MB. 60 calls per hour per workspace. |
-| `create-upload-url` | Get a five-minute signed URL to `PUT` a file body to, then pass the returned `upload_id` to `upload-file`. |
+| `create-upload-url` | Get a five-minute signed URL to `PUT` a file body to, then pass the returned `upload_id` to `upload-file` within an hour. A body not stored by then is deleted. 60 calls per hour per workspace. |
 
 Uploads stay pending for 24 hours. Saving a record whose rich-editor body embeds the file claims it; unclaimed files are purged.
 

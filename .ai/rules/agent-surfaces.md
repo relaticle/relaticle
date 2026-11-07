@@ -41,3 +41,10 @@ A schema resource listing a relationship, a tool description naming a filter, a 
 promising a field: each needs the read or write path behind it in the same change. The
 MCP schema advertised `tasks` and `notes` as company relationships while the chat tools
 offered no include for them, so the model read a capability it could not call.
+
+## A tool gate checks the role the user holds now
+
+`ChecksTokenAbility::denyIfTokenCannot()` checks the token's ability and the holder's current
+role in the bound workspace. A connector, or a token issued before a demotion, holds only what
+the role grants today. A new MCP tool calls it, unless its action re-checks the capability.
+`tests/Feature/Mcp/UploadToolsTest.php` fails when the role check goes.

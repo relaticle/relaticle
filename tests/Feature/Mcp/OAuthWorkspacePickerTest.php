@@ -69,6 +69,41 @@ function authorizeUrl(Client $client, array $overrides = []): string
     ]);
 }
 
+it('refuses an authorization request meant for another server with an oauth invalid_target error', function (): void {
+    $this->actingAs($this->user);
+
+    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use', 'resource' => 'https://attacker.example/mcp']))
+        ->assertBadRequest()
+        ->assertExactJson([
+            'error' => 'invalid_target',
+            'error_description' => __('mcp.consent.invalid_resource'),
+        ]);
+});
+
+it('authorizes a request that names this MCP server as its resource', function (string $resource): void {
+    $this->actingAs($this->user);
+
+    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use', 'resource' => $resource]))
+        ->assertOk();
+})->with([
+    'as published' => fn (): string => url()->getMcpUrl(),
+    'with a trailing slash' => fn (): string => url()->getMcpUrl().'/',
+    'with the scheme and host in upper case' => fn (): string => strtoupper(url('/')).'/mcp',
+    'with the default port spelled out' => fn (): string => preg_replace(
+        '#^(https?)://([^/]+)#',
+        '$1://$2:'.(str_starts_with(url('/'), 'https') ? 443 : 80),
+        url()->getMcpUrl(),
+    ),
+]);
+
+it('authorizes the resource production MCP clients send', function (): void {
+    config(['app.url' => 'https://relaticle.com', 'app.mcp_domain' => 'mcp.relaticle.com']);
+    $this->actingAs($this->user);
+
+    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use', 'resource' => 'https://mcp.relaticle.com']))
+        ->assertOk();
+});
+
 it('lists the email access the role allows on the consent screen', function (): void {
     $this->actingAs($this->user);
 
