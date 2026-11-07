@@ -166,3 +166,36 @@ it('wraps a long rail label and gives the record buttons a 44px target on a phon
 
     expect($page->script($measure))->toBe(['labelsClipped' => false, 'smallButtons' => 0]);
 });
+
+it('previews a company from its list row, steps to the next one and closes on escape', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    [$oldest, $newest] = collect([2, 1])
+        ->map(fn (int $daysAgo): Company => Company::factory()->recycle([$user, $workspace])->create([
+            'name' => $daysAgo === 2 ? 'Harbor Logistics' : 'Atlas Freight',
+            'created_at' => now()->subDays($daysAgo),
+        ]))
+        ->all();
+
+    $previewTitle = '(() => document.querySelector(".fi-modal-window.fi-record-preview .fi-record-preview-title")?.innerText.trim())()';
+
+    loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/companies")
+        ->hover('.fi-ta-row:first-of-type [class~="fi-ta-cell-name"]')
+        ->click('.fi-ta-row:first-of-type .fi-record-preview-trigger')
+        ->assertScript($previewTitle, 'Atlas Freight')
+        ->assertSee('1 of 2 in Companies')
+        ->click('.fi-record-preview-header button[aria-label="'.__('filament/record-page.preview.next').'"]')
+        ->assertScript($previewTitle, 'Harbor Logistics')
+        ->assertSee('2 of 2 in Companies')
+        ->assertScript('document.querySelectorAll(".fi-modal-window.fi-record-preview").length', 1)
+        ->keys('.fi-modal-window.fi-record-preview', ['Escape'])
+        ->wait(0.5)
+        ->assertDontSee('2 of 2 in Companies')
+        ->assertScript('new URL(location.href).searchParams.has("relation")', false)
+        ->assertNoJavaScriptErrors();
+});

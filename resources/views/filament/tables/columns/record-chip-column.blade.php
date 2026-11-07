@@ -1,3 +1,4 @@
+@use(App\Filament\Actions\PreviewRecordAction)
 @php
     $chips = $getChips();
     $url = $getUrl();
@@ -31,7 +32,7 @@
             size="xs"
             :label="__('filament/record-page.actions.open_preview')"
             :tooltip="__('filament/record-page.actions.open_preview')"
-            x-on:click.prevent.stop="$wire[$wire.mountedActions.at(-1)?.name === {{ Js::from($previewAction) }} ? 'replaceMountedAction' : 'mountAction']({{ Js::from($previewAction) }}, {{ Js::from(['position' => null]) }}, {{ Js::from(['table' => true, 'recordKey' => $recordKey]) }})"
+            x-on:click.prevent.stop="{{ PreviewRecordAction::open(['position' => null], ['table' => true, 'recordKey' => $recordKey]) }}"
             class="fi-record-preview-trigger"
         />
     @endif

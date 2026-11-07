@@ -123,7 +123,7 @@ final class OpportunitiesBoard extends BoardResourcePage
             ->components([
                 View::make('filament.app.board-card-preview-trigger')
                     ->viewData(fn (Opportunity $record): array => [
-                        'open' => PreviewRecordAction::mountForRecord($record),
+                        'open' => PreviewRecordAction::openForRecord($record),
                     ]),
                 CardFlex::make([
                     RecordChipEntry::make('company.name')

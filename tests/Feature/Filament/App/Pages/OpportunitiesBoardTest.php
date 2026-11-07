@@ -427,7 +427,7 @@ it('opens the record preview from the button beside a card menu', function (): v
     $opportunity->saveCustomFieldValue($this->stageField, $prospecting->getKey());
 
     livewire(OpportunitiesBoard::class)
-        ->assertSeeHtml(['fi-board-card-preview-trigger', e(PreviewRecordAction::mountForRecord($opportunity))])
+        ->assertSeeHtml(['fi-board-card-preview-trigger', e(PreviewRecordAction::openForRecord($opportunity))])
         ->mountAction(PreviewRecordAction::getDefaultName(), ['record' => $opportunity->getKey()])
         ->assertActionMounted(PreviewRecordAction::getDefaultName())
         ->assertMountedActionModalSeeHtml(['fi-record-embedded-page', 'Rooftop pilot']);

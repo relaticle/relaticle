@@ -31,9 +31,20 @@ final class PreviewRecordAction extends ViewAction
         return 'preview';
     }
 
-    public static function mountForRecord(Model $record): string
+    public static function openForRecord(Model $record): string
     {
-        return '$wire.mountAction('.Js::from(self::getDefaultName()).', '.Js::from(['record' => (string) $record->getKey()]).')';
+        return self::open(['record' => (string) $record->getKey()]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $arguments
+     * @param  array<string, mixed>  $context
+     */
+    public static function open(array $arguments, array $context = []): string
+    {
+        $name = Js::from(self::getDefaultName());
+
+        return "\$wire[\$wire.mountedActions.at(-1)?.name === {$name} ? 'replaceMountedAction' : 'mountAction']({$name}, ".Js::from($arguments).', '.Js::from((object) $context).')';
     }
 
     /**
@@ -65,7 +76,6 @@ final class PreviewRecordAction extends ViewAction
                 'x-on:modal-closed.window' => $this->forgetTabOnClose($this->modalId($livewire)),
             ])
             ->modalContent(fn (Model $record, Component $livewire, array $arguments): View => view('filament.app.record-preview-header', [
-                'actionName' => $this->getName(),
                 'modalId' => $this->modalId($livewire),
                 'recordUrl' => Filament::getModelResource($record)::getUrl('view', ['record' => $record]),
                 'pluralLabel' => Filament::getModelResource($record)::getTitleCasePluralModelLabel(),

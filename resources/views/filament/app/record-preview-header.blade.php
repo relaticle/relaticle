@@ -1,5 +1,6 @@
+@use(App\Filament\Actions\PreviewRecordAction)
 @php
-    $step = fn (?string $key, int $position): string => '$wire.replaceMountedAction(' . Js::from($actionName) . ', ' . Js::from(['position' => $position]) . ', ' . Js::from(['table' => true, 'recordKey' => $key]) . ')';
+    $step = fn (?string $key, int $position): string => PreviewRecordAction::open(['position' => $position], ['table' => true, 'recordKey' => $key]);
 @endphp
 
 <div class="fi-record-preview-header">
