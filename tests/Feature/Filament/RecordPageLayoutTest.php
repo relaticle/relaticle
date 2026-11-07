@@ -561,6 +561,34 @@ it('names the open task due soonest as the next due task and skips a done one', 
         ]);
 });
 
+it('lists open tasks on the overview by due date with an undated one last', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $dueField = CustomField::query()->forEntity(Task::class)->where('code', TaskField::DUE_DATE->value)->firstOrFail();
+
+    $task = fn (string $title, ?CarbonImmutable $due): Task => tap(
+        Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => $title]),
+        function (Task $task) use ($company, $dueField, $due): void {
+            if ($due instanceof CarbonImmutable) {
+                $task->saveCustomFieldValue($dueField, $due);
+            }
+
+            $company->tasks()->attach($task);
+        },
+    );
+
+    $task('Write the proposal', null);
+    $task('Send the contract', now()->addDays(5));
+    $task('Book the demo', now()->addDay());
+
+    livewire(ViewCompany::class, ['record' => $company->getKey()])
+        ->assertSeeInOrder([
+            __('filament/record-page.overview.tasks'),
+            'Book the demo',
+            'Send the contract',
+            'Write the proposal',
+        ]);
+});
+
 it('points the :dataset overview view all link at the activity log tab', function (string $model, string $page): void {
     $record = $model::factory()->recycle([$this->user, $this->workspace])->create();
     $component = livewire($page, ['record' => $record->getKey()]);

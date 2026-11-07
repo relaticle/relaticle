@@ -11,6 +11,7 @@ use App\Enums\CustomFields\TaskField;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
+use App\Models\CustomFieldValue;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -29,6 +30,7 @@ use Filament\Schemas\Components\Livewire;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\View;
 use Filament\Support\Facades\FilamentTimezone;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Js;
 use Illuminate\Support\Str;
@@ -314,18 +316,26 @@ final readonly class RecordOverview
 
         return $record->tasks()
             ->with(['customFieldValues.customField', 'assignees'])
+            ->when($statusField instanceof CustomField && $doneOptionId !== null, fn (Builder $tasks): Builder => $tasks->whereDoesntHave(
+                'customFieldValues',
+                fn (Builder $value): Builder => $value->whereBelongsTo($statusField)->where('string_value', $doneOptionId),
+            ))
+            ->when($dueField instanceof CustomField, fn (Builder $tasks): Builder => $tasks->orderBy(
+                CustomFieldValue::query()
+                    ->select('datetime_value')
+                    ->whereBelongsTo($dueField)
+                    ->whereColumn('entity_id', 'tasks.id')
+                    ->where('entity_type', (new Task)->getMorphClass()),
+            ))
+            ->orderBy('tasks.id')
+            ->limit(self::LISTED_ITEMS)
             ->get()
-            ->reject(fn (Task $task): bool => $statusField instanceof CustomField
-                && $doneOptionId !== null
-                && (string) $task->getCustomFieldValue($statusField) === (string) $doneOptionId)
             ->map(fn (Task $task): array => [
                 'id' => (string) $task->getKey(),
                 'title' => (string) $task->title,
                 'due' => self::dueDate($task, $dueField),
                 'assignee' => $task->assignees->first(),
-            ])
-            ->sortBy(fn (array $task): int => $task['due']?->getTimestamp() ?? PHP_INT_MAX)
-            ->values();
+            ]);
     }
 
     private static function dueDate(Task $task, ?CustomField $dueField): ?CarbonInterface
