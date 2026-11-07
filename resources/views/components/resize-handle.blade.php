@@ -19,6 +19,17 @@
         get target() {
             return document.querySelector(@js($target))
         },
+        get collapseBelow() {
+            if (! this.bounds.collapsedProperty) return null
+
+            const probe = document.createElement('div')
+            probe.style.cssText = `position: absolute; visibility: hidden; width: var(${this.bounds.collapsedProperty})`
+            document.body.append(probe)
+            const collapsed = probe.offsetWidth
+            probe.remove()
+
+            return (collapsed + this.bounds.min) / 2
+        },
         get max() {
             const reserve = parseFloat(getComputedStyle(this.target).getPropertyValue('--resize-reserve')) || 0
 
@@ -41,6 +52,8 @@
             const edge = this.target.getBoundingClientRect()
             const growsTowardLeft = this.growsTowardLeft
             const max = this.max
+            const collapseBelow = this.collapseBelow
+            let collapsed = collapseBelow !== null && edge.width < this.bounds.min
             let moved = false
 
             handle.setPointerCapture(event.pointerId)
@@ -49,7 +62,14 @@
 
             const move = (moveEvent) => {
                 moved = true
-                this.apply(growsTowardLeft ? edge.right - moveEvent.clientX : moveEvent.clientX - edge.left, max)
+                const width = growsTowardLeft ? edge.right - moveEvent.clientX : moveEvent.clientX - edge.left
+
+                if (collapseBelow !== null && (width < collapseBelow) !== collapsed) {
+                    collapsed = ! collapsed
+                    this.$dispatch(collapsed ? 'resize-collapse' : 'resize-expand')
+                }
+
+                if (! collapsed) this.apply(width, max)
             }
 
             handle.addEventListener('pointermove', move)
@@ -58,7 +78,7 @@
                 this.isResizing = false
                 document.documentElement.classList.remove('fi-resizing')
 
-                if (moved) this.save()
+                if (moved && ! collapsed) this.save()
             }, { once: true })
         },
         nudge(delta) {

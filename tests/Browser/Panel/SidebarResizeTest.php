@@ -31,6 +31,30 @@ it('resizes the sidebar from its edge, keeps the width across pages, and resets 
         ->assertNoJavaScriptErrors();
 });
 
+it('collapses the sidebar when dragged past half its minimum and reopens it from the rail', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $width = '(() => Math.round(document.querySelector(".fi-sidebar").getBoundingClientRect().width))()';
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->drag('.fi-sidebar-resize-handle', '.fi-sidebar-nav .fi-sidebar-item-icon >> nth=0')
+        ->assertScript($width, 48)
+        ->assertScript('Alpine.store("sidebar").isOpen', false)
+        ->assertScript('localStorage.getItem("sidebar-width")', null);
+
+    $page->refresh()
+        ->assertScript($width, 48)
+        ->drag('.fi-sidebar-resize-handle', '.fi-topbar .fi-user-menu-trigger')
+        ->assertScript($width, 360)
+        ->assertScript('Alpine.store("sidebar").isOpen', true)
+        ->assertNoJavaScriptErrors();
+});
+
 it('fits every get started step on one line in the default sidebar', function (): void {
     $this->withVite();
 
