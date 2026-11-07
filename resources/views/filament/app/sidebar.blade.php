@@ -157,6 +157,12 @@
                             x-transition:leave-start="fi-transition-leave-start"
                             x-transition:leave-end="fi-transition-leave-end"
                         @endif
+                        x-on:mousedown="
+                            if ($event.target.closest('.fi-input-wrp-prefix, .fi-input-wrp-suffix')) {
+                                $event.preventDefault()
+                                $el.querySelector('.fi-input')?.focus()
+                            }
+                        "
                         class="fi-sidebar-search"
                     >
                         @livewire(Filament\Livewire\GlobalSearch::class)

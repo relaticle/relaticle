@@ -50,7 +50,7 @@
                     document.documentElement.classList.toggle('fi-record-stacked', entry.contentRect.width < railMin + paneMin)
                 })
 
-                this.observer.observe(this.$el.closest('.fi-main-ctn'))
+                this.observer.observe(this.$el.closest('.fi-modal-window, .fi-main-ctn'))
             },
 
             destroy() {

@@ -98,13 +98,12 @@ html.fi:has(body.fi-panel-app :is(.fi-app-layout, .fi-settings-layout)),
 }
 
 /* Search row (AppSidebar): the search field and the notifications trigger,
-   inset to exactly the gutter the navigation items sit in: the nav's `px-6`
-   less the groups' `-mx-2`. Padding rather than margin, so the rule separating
-   it from the workspace switcher runs the full width of the sidebar. */
+   inset to the header's edges: the workspace avatar and the toggle glyph.
+   Padding rather than margin, so the rule above it runs the full width. */
 .fi-sidebar-search-ctn {
     /* 12px above and below the rule; the field then gets a wider gap before the
        navigation starts (`.fi-sidebar-nav` already opens with 10px of its own). */
-    @apply mt-2 flex items-center justify-center gap-x-2 border-t border-gray-200/60 px-4 pt-3 pb-2.5 dark:border-white/10;
+    @apply mt-2 flex items-center justify-end-safe gap-x-2 border-t border-gray-200/60 px-6 pt-3 pb-2.5 dark:border-white/10;
 }
 
 .fi-sidebar-search {
@@ -118,11 +117,11 @@ html.fi:has(body.fi-panel-app :is(.fi-app-layout, .fi-settings-layout)),
 
     /* Compact field on the surface colour, so it lifts off the sidebar's canvas grey. */
     .fi-input-wrp {
-        @apply h-8 rounded-lg bg-white shadow-xs ring-gray-950/10 dark:bg-white/5 dark:ring-white/10;
+        @apply h-8 rounded-lg bg-white shadow-xs ring-gray-950/10 focus-within:ring-primary-600 dark:bg-white/5 dark:ring-white/10 dark:focus-within:ring-primary-500;
     }
 
     .fi-input-wrp-prefix {
-        @apply ps-2.5;
+        @apply cursor-text ps-2.5;
 
         .fi-icon {
             @apply h-4 w-4 text-gray-500 dark:text-gray-400;
@@ -145,7 +144,7 @@ html.fi:has(body.fi-panel-app :is(.fi-app-layout, .fi-settings-layout)),
 
     /* Keyboard hint reads as a key cap rather than trailing text */
     .fi-input-wrp-suffix {
-        @apply pe-1.5 max-sm:hidden;
+        @apply cursor-text pe-1.5 max-sm:hidden;
 
         .fi-input-wrp-label {
             @apply rounded-md bg-gray-50 px-1.5 py-px text-[0.6875rem]/[1.125rem] font-medium text-gray-500 ring-1 ring-gray-950/[0.06] dark:bg-white/10 dark:text-gray-400 dark:ring-white/10;
@@ -225,17 +224,33 @@ html.fi:has(body.fi-panel-app :is(.fi-app-layout, .fi-settings-layout)),
     }
 }
 
-/* Collapsed rail: only the trigger remains (the search field is hidden by the
-   sidebar store), so drop the gutter and let it centre. */
+/* Collapsed rail: only the trigger remains, held at the end of the row so it
+   does not jump when the search field leaves. It lands in the toggle's column. */
 .fi-sidebar:not(.fi-sidebar-open) .fi-sidebar-search-ctn {
     @apply mx-0 px-2;
 }
 
-/* The rail drops the groups' negative margin and the item's padding, so both are set here: 0.5rem of
-   nav padding each side, then 0.5rem inside the item, keeps the icon in the switcher's column. */
+/* The rail keeps the open layout and only narrows the padding, which glides with the width.
+   Filament centres a 40px group with `mx-auto`, which threw the icons to the middle of the still-wide
+   panel on the first frame of a collapse. */
 @media (width >= 64rem) {
+    /* Longhands: WebKit does not animate the `padding-inline` shorthand. */
+    .fi-sidebar-nav,
+    .fi-sidebar-search-ctn {
+        transition-property: padding-inline-start, padding-inline-end;
+        transition-duration: var(--sidebar-motion-duration);
+        transition-timing-function: var(--sidebar-motion-easing);
+    }
+
     .fi-sidebar:not(.fi-sidebar-open) {
-        .fi-sidebar-nav,
+        .fi-sidebar-nav {
+            @apply px-4;
+        }
+
+        .fi-sidebar-nav-groups {
+            @apply -mx-2 w-auto max-w-none;
+        }
+
         .fi-sidebar-item-btn {
             @apply px-2;
         }
@@ -322,8 +337,9 @@ html.fi-chat-docked .fi-app-main-wrapper {
 .fi-sidebar-item {
     @apply transition-colors duration-200 ease-in-out;
 
+    /* A fixed row height, so rows keep their pitch on the rail where the label leaves only the icon. */
     .fi-sidebar-item-btn {
-        @apply hover:bg-(--surface-sidebar-hover-bg) focus-visible:bg-(--surface-sidebar-hover-bg);
+        @apply min-h-8 hover:bg-(--surface-sidebar-hover-bg) focus-visible:bg-(--surface-sidebar-hover-bg);
         padding-block: calc(var(--spacing) * 1.5);
     }
 
@@ -509,11 +525,10 @@ html.fi-chat-docked .fi-app-main-wrapper {
     /* The lane the toggle sits in, beside the switcher when open. It has to
        clear everything the button occupies, which is its 4.5 inset plus its own
        8 of width: anything narrower and the trigger's box runs under the button
-       even though the workspace name still looks clear of it. It is not
-       transitioned: animating it let the trigger's edge overtake the button,
-       and the fading workspace name ran out from under it. Snapping it at the
-       start of the collapse is invisible, since the name is already clipped by
-       the panel edge well before it reaches the button. */
+       even though the workspace name still looks clear of it. It never animates:
+       animating it let the trigger's edge overtake the button. A collapse keeps
+       it until the rail is reached, since dropping it first slid the chevron
+       under the button. */
     #fi-main-sidebar.fi-sidebar-open:has(> [data-sidebar-workspace-toggle]) > .fi-tenant-menu {
         margin-inline-end: calc(var(--spacing) * 14);
     }
@@ -525,6 +540,16 @@ html.fi-chat-docked .fi-app-main-wrapper {
         margin-top: calc(var(--spacing) * 2);
         margin-inline: calc(var(--spacing) * 1);
         padding-bottom: calc(var(--spacing) * 10);
+        transition-delay: calc(var(--sidebar-motion-duration) / 2), 0s, var(--sidebar-motion-duration);
+    }
+
+    /* The navigation moves down to make room for the toggle on the same curve
+       and at the same moment as the toggle drops into it. The avatar glides to
+       the rail's centre with the width. */
+    #fi-main-sidebar:has(> [data-sidebar-workspace-toggle]) > .fi-tenant-menu {
+        transition-property: padding-bottom, margin-inline-start, margin-inline-end;
+        transition-duration: calc(var(--sidebar-motion-duration) / 2), var(--sidebar-motion-duration), 0s;
+        transition-timing-function: var(--sidebar-motion-easing);
     }
 
     .fi-tenant-menu-trigger .fi-avatar {
@@ -591,12 +616,23 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
 .fi-sidebar-item-label,
 .fi-sidebar-item-badge-ctn,
 .fi-sidebar-group-btn,
+.fi-sidebar-chats .fi-sidebar-item,
 .fi-sidebar-search,
 .fi-tenant-menu-trigger-text,
 .fi-tenant-menu-trigger .fi-icon {
     &.fi-transition-enter {
+        @apply lg:transition;
+
         transition-delay: calc(var(--sidebar-motion-duration) / 2.5);
         transition-duration: calc(var(--sidebar-motion-duration) / 2);
+    }
+
+    &.fi-transition-enter-start {
+        @apply opacity-0;
+    }
+
+    &.fi-transition-enter-end {
+        @apply opacity-100;
     }
 
     &.fi-transition-leave {
@@ -988,6 +1024,40 @@ a.fi-linked-records-chip {
     @apply max-sm:max-w-full max-sm:min-w-0;
 }
 
+.fi-icon-btn.fi-record-preview-trigger {
+    @apply m-0 size-6 shrink-0 rounded-md bg-white text-gray-500 opacity-0 ring-1 ring-gray-950/10 transition-opacity duration-75 hover:bg-gray-50 hover:text-gray-950 max-sm:hidden dark:bg-white/5 dark:text-gray-400 dark:ring-white/10 dark:hover:bg-white/10 dark:hover:text-white;
+
+    & .fi-icon {
+        @apply size-3.5;
+    }
+}
+
+.fi-ta-row:hover .fi-record-preview-trigger,
+.fi-record-preview-trigger:focus-visible {
+    @apply opacity-100;
+}
+
+.fi-icon-btn.fi-board-card-preview-trigger {
+    @apply absolute end-[calc(0.5rem+1.25rem+0.25rem)] top-[calc(0.5rem-0.125rem)] z-10 m-0 size-6 rounded-md bg-white text-gray-500 opacity-0 ring-1 ring-gray-950/10 hover:bg-gray-50 hover:text-gray-950 focus-visible:opacity-100 max-sm:hidden dark:bg-gray-900 dark:text-gray-400 dark:ring-white/10 dark:hover:bg-white/10 dark:hover:text-white;
+
+    & .fi-icon {
+        @apply size-3.5;
+    }
+}
+
+.ff-card:hover .fi-board-card-preview-trigger {
+    @apply opacity-100;
+}
+
+/* The trigger sits beside the card menu, so its schema slot takes no room in the card body. */
+.ff-card-body :is(.fi-grid-col:has(> .fi-sc-component > .fi-board-card-preview-trigger), .fi-sc-component:has(> .fi-board-card-preview-trigger)) {
+    @apply contents;
+}
+
+.fi-ta-row.fi-record-previewing {
+    @apply bg-gray-50 dark:bg-white/5;
+}
+
 /* On a phone the table search fills the toolbar row, beside the filter and column buttons. The actions after
    it are often only bulk actions waiting on a selection, so they take a margin once shown rather than a gap. */
 .fi-ta-header-toolbar {
@@ -1148,7 +1218,7 @@ html.fi-record-stacked .fi-record-layout {
     @apply record-split:px-0;
 }
 
-.fi-record-page .fi-page-header-main-ctn {
+:is(.fi-record-page, .fi-record-embedded-page) .fi-page-header-main-ctn {
     @apply record-split:py-0;
 }
 
@@ -1170,7 +1240,283 @@ html.fi-record-stacked .fi-record-layout {
 
 .fi-record-rail {
     @apply record-split:sticky record-split:top-0 record-split:max-h-[calc(100dvh-var(--topbar-height))] record-split:overflow-y-auto record-split:px-5 record-split:py-5;
+}
 
+.fi-record-pane {
+    .fi-record-overview {
+        @apply flex flex-col gap-8 px-6 pt-5 pb-8 max-sm:px-0;
+    }
+
+    .fi-record-overview-section > .fi-section-header,
+    .fi-record-overview-related-header {
+        @apply mb-3 min-h-7;
+    }
+
+    .fi-record-overview-section .fi-section-header-heading,
+    .fi-record-overview-related-title {
+        @apply text-sm font-medium text-gray-600 dark:text-gray-300;
+    }
+
+    .fi-record-overview-card {
+        @apply overflow-hidden rounded-lg bg-white ring-1 ring-gray-950/10 dark:bg-white/[0.03] dark:ring-white/10;
+    }
+
+    .fi-record-highlights .fi-grid {
+        @apply gap-2.5;
+
+        & > .fi-grid-col,
+        & > .fi-grid-col > * {
+            @apply h-full;
+        }
+    }
+
+    .fi-record-highlight {
+        @apply flex h-full min-h-26 flex-col justify-between gap-3 rounded-lg bg-white px-3.5 py-3 ring-1 ring-gray-950/10 dark:bg-white/[0.03] dark:ring-white/10;
+
+        & .fi-in-entry-label-col,
+        & .fi-in-entry-label-ctn {
+            @apply w-full;
+        }
+
+        & .fi-in-entry-label-ctn {
+            @apply flex-row-reverse justify-between;
+
+            & .fi-sc-icon {
+                @apply size-4 text-gray-400 dark:text-gray-500;
+            }
+        }
+
+        & .fi-in-entry-label {
+            @apply truncate text-sm font-normal text-gray-500 dark:text-gray-400;
+        }
+
+        & .fi-in-entry-content-col {
+            @apply min-w-0;
+        }
+
+        & .fi-in-entry-content {
+            @apply text-sm font-medium;
+        }
+    }
+
+    .fi-record-highlight-empty {
+        @apply text-sm text-gray-400 dark:text-gray-500;
+    }
+
+    .fi-record-next-task {
+        @apply -mx-1.5 -my-1 flex w-[calc(100%+0.75rem)] min-w-0 flex-col items-start gap-0.5 rounded-md px-1.5 py-1 text-start hover:bg-gray-50 dark:hover:bg-white/5;
+    }
+
+    .fi-record-next-task-title {
+        @apply w-full truncate text-sm font-medium text-gray-950 dark:text-white;
+    }
+
+    .fi-record-due {
+        @apply inline-flex shrink-0 items-center gap-1 text-sm text-gray-500 tabular-nums dark:text-gray-400;
+    }
+
+    .fi-record-due-today {
+        @apply text-warning-600 dark:text-warning-400;
+    }
+
+    .fi-record-due-overdue {
+        @apply text-danger-600 dark:text-danger-400;
+    }
+
+    .fi-record-stage {
+        @apply flex flex-col gap-2;
+    }
+
+    .fi-record-stage-name {
+        @apply text-sm font-medium text-gray-950 dark:text-white;
+    }
+
+    .fi-record-stage-track {
+        @apply -my-1 flex gap-1;
+    }
+
+    .fi-record-stage-step {
+        @apply relative h-3 flex-1 cursor-default before:absolute before:inset-x-0 before:top-1 before:h-1 before:rounded-full before:bg-(--stage-color) before:opacity-20 before:content-[''];
+
+        &.fi-passed {
+            @apply before:opacity-45;
+        }
+
+        &.fi-current {
+            @apply before:opacity-100;
+        }
+    }
+
+    .fi-record-overview-activity {
+        @apply px-2 py-1.5;
+
+        & ol > li > [data-type] {
+            @apply grid-cols-[20px_minmax(0,1fr)_auto] items-start gap-x-2.5 px-2 py-1.5;
+
+            & > div:first-child {
+                @apply pt-0;
+
+                & > span {
+                    @apply size-5;
+                }
+            }
+
+            & time {
+                @apply text-xs;
+            }
+        }
+
+        & ol > li > span[aria-hidden] {
+            @apply start-1 top-7 -bottom-1.5;
+        }
+
+        & div:has(> .fi-btn[wire\:click='loadMore']) {
+            @apply hidden;
+        }
+    }
+
+    .fi-record-overview-related {
+        @apply flex flex-col gap-6;
+    }
+
+    .fi-record-overview-related-header {
+        @apply flex items-center justify-between gap-3;
+    }
+
+    .fi-record-overview-related-title {
+        @apply inline-flex items-center gap-2;
+    }
+
+    .fi-record-overview-related-actions {
+        @apply flex items-center gap-1;
+    }
+
+    .fi-record-overview-section .fi-section-header-after-ctn .fi-link {
+        @apply rounded-md px-2 py-1 hover:bg-gray-100 dark:hover:bg-white/10;
+
+        & .fi-link-label {
+            @apply text-sm font-normal text-gray-500 dark:text-gray-400;
+        }
+
+        &:hover .fi-link-label {
+            @apply text-gray-950 no-underline dark:text-white;
+        }
+    }
+
+    .fi-record-overview-view-all {
+        @apply rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-950 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white;
+    }
+
+    .fi-record-overview-count {
+        @apply min-w-5 rounded px-1 text-center text-xs font-medium text-gray-600 ring-1 ring-gray-950/10 dark:text-gray-300 dark:ring-white/15;
+    }
+
+    .fi-icon-btn.fi-record-overview-add {
+        @apply m-0 size-7 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-950 dark:hover:bg-white/10 dark:hover:text-white;
+
+        & .fi-icon {
+            @apply size-4;
+        }
+    }
+
+    .fi-record-overview-list {
+        @apply px-2 py-1.5;
+    }
+
+    .fi-record-overview-item {
+        @apply flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-start text-sm hover:bg-gray-50 dark:hover:bg-white/5;
+    }
+
+    .fi-avatar.fi-record-overview-item-avatar {
+        @apply size-5 shrink-0;
+    }
+
+    .fi-record-overview-item-icon {
+        @apply size-4 shrink-0 text-gray-400 dark:text-gray-500;
+    }
+
+    .fi-record-overview-item-text {
+        @apply flex min-w-0 flex-1 items-baseline gap-2;
+    }
+
+    .fi-record-overview-item-title {
+        @apply shrink-0 truncate font-medium text-gray-950 max-sm:shrink dark:text-white;
+    }
+
+    .fi-record-overview-item-snippet {
+        @apply min-w-0 truncate text-gray-500 dark:text-gray-400;
+    }
+
+    .fi-record-overview-item-person {
+        @apply flex max-w-40 shrink-0 items-center gap-1.5 text-gray-600 max-sm:hidden dark:text-gray-300;
+
+        & .fi-avatar {
+            @apply size-5;
+        }
+    }
+
+    .fi-record-overview-item-meta {
+        @apply shrink-0 text-gray-500 tabular-nums dark:text-gray-400;
+    }
+}
+
+.fi-modal-window.fi-record-preview {
+    @apply border-s border-gray-200 shadow-xl dark:border-white/10;
+
+    & > .fi-modal-header {
+        @apply hidden;
+    }
+
+    & > .fi-modal-content {
+        @apply gap-0 p-0!;
+    }
+
+    .fi-record-preview-header {
+        @apply sticky top-0 z-30 flex h-12 shrink-0 items-center gap-2 border-b border-gray-200/80 bg-white/95 px-3 backdrop-blur dark:border-white/10 dark:bg-gray-900/95;
+    }
+
+    .fi-record-preview-header .fi-icon-btn {
+        @apply m-0 size-7 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-950 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white;
+
+        & .fi-icon {
+            @apply size-4;
+        }
+
+        &.fi-record-preview-header-btn {
+            @apply bg-white ring-1 ring-gray-950/10 hover:bg-gray-50 dark:bg-white/5 dark:ring-white/10 dark:hover:bg-white/10;
+        }
+
+        &.fi-disabled {
+            @apply opacity-40;
+        }
+    }
+
+    .fi-record-preview-close {
+        @apply me-0.5;
+    }
+
+    .fi-record-preview-position {
+        @apply ms-2 truncate text-sm text-gray-600 tabular-nums dark:text-gray-300;
+    }
+
+    .fi-record-embedded-page .fi-page-header-main-ctn {
+        @apply gap-0 p-0;
+    }
+
+    .fi-record-preview-title {
+        @apply px-6 pt-5 pb-3 text-xl font-semibold tracking-tight text-gray-950 dark:text-white;
+
+        & .fi-record-chip {
+            @apply gap-3;
+        }
+    }
+
+    .fi-record-pane .fi-tabs:not(.fi-contained) {
+        @apply px-4 pt-0;
+    }
+}
+
+.fi-record-rail {
     .fi-record-rail-section {
         @apply border-t border-gray-200/60 pt-4 dark:border-white/10;
     }
@@ -1226,17 +1572,53 @@ html.fi-record-stacked .fi-record-layout {
 
 .fi-record-pane {
     .fi-tabs:not(.fi-contained) {
-        @apply mx-0 rounded-none border-b border-gray-200/60 bg-transparent px-0 pt-0 pb-0 shadow-none ring-0 record-split:px-3.5 record-split:pt-5 dark:border-white/10 dark:bg-transparent;
+        @apply mx-0 max-w-none gap-x-0.5 rounded-none border-b border-gray-200/80 bg-transparent px-4 py-0 shadow-none ring-0 record-split:pt-2 dark:border-white/10 dark:bg-transparent;
     }
 
     .fi-tabs-item {
-        @apply -mb-px rounded-none border-b-2 border-transparent bg-transparent px-2.5 hover:bg-transparent dark:bg-transparent dark:hover:bg-transparent;
+        @apply relative my-1.5 gap-x-1.5 rounded-md border-0 bg-transparent px-2.5 py-1 text-gray-950 hover:bg-gray-100/80 dark:bg-transparent dark:text-white dark:hover:bg-white/5;
+
+        & .fi-tabs-item-label {
+            @apply text-sm font-medium text-gray-600 dark:text-gray-400;
+        }
+
+        & > .fi-icon {
+            @apply size-4 text-gray-400 dark:text-gray-500;
+        }
+
+        & .fi-badge {
+            @apply min-w-5 justify-center rounded bg-transparent px-1 py-0 text-xs font-medium text-gray-600 ring-1 ring-gray-950/10 dark:text-gray-300 dark:ring-white/15;
+        }
 
         &.fi-active {
-            @apply border-primary-600 dark:border-primary-400;
+            @apply bg-gray-100/80 dark:bg-white/10;
+
+            & .fi-tabs-item-label,
+            & > .fi-icon {
+                @apply text-gray-950 dark:text-white;
+            }
+
+            /* The underline takes the item's text colour, because dark: does not compile onto a pseudo-element here. */
+            &::after {
+                @apply absolute inset-x-0 -bottom-[calc(0.375rem+1px)] h-0.5 rounded-full bg-current content-[''];
+            }
         }
     }
 
+    .fi-sc-tabs-tab.fi-record-overview-tab {
+        @apply mt-0;
+    }
+
+    .fi-tabs-item.fi-record-overview-tab:first-child {
+        @apply me-3;
+
+        &::before {
+            @apply absolute -end-2 inset-y-1 w-px bg-current opacity-15 content-[''];
+        }
+    }
+}
+
+.fi-record-pane {
     /* Isolated so the lifted table header (z-index 21) stays under the rail resize handle.
        Never isolate the whole pane: its action modals would paint under the topbar and sidebar. */
     .fi-ta-ctn {
@@ -1265,8 +1647,38 @@ html.fi-record-stacked .fi-record-layout {
         @apply order-1 border-b-0 p-0 max-sm:order-2 max-sm:basis-full;
     }
 
-    /* A modal mounted in the pane keeps its sections as cards, as it has them everywhere else. */
-    .fi-section:not(.fi-section-not-contained):not(.fi-modal *) {
+    .fi-ta-header-heading {
+        @apply text-base font-semibold;
+    }
+
+    .fi-ta-header .fi-ta-actions .fi-btn {
+        @apply bg-white text-gray-950 shadow-none ring-1 ring-gray-950/10 hover:bg-gray-50 dark:bg-white/5 dark:text-white dark:ring-white/10 dark:hover:bg-white/10;
+
+        & .fi-icon {
+            @apply size-4 text-gray-500 dark:text-gray-400;
+        }
+    }
+
+    .fi-ta-table :is(.fi-ta-header-cell, .fi-ta-cell) {
+        @apply border-x-0!;
+    }
+
+    /* Rows start and end on the same inset as the tab's heading and its header actions. */
+    .fi-ta-table tr > :is(th, td):first-child {
+        @apply ps-6 max-sm:ps-0;
+    }
+
+    .fi-ta-table tr > :is(th, td):last-child {
+        @apply pe-6 max-sm:pe-0;
+    }
+
+}
+
+.fi-record-pane {
+    /* A modal mounted in the pane keeps its sections as cards, as it has them everywhere else.
+       The preview is itself a modal, so inside it only a second, nested modal keeps them. */
+    .fi-section:not(.fi-section-not-contained):not(.fi-modal *),
+    .fi-record-embedded-page & .fi-section:not(.fi-section-not-contained):not(.fi-modal .fi-modal *) {
         @apply rounded-none bg-transparent shadow-none ring-0 dark:bg-transparent;
 
         & > .fi-section-content-ctn > .fi-section-content {
@@ -1300,7 +1712,8 @@ html.fi-record-stacked .fi-record-layout {
 /* Toolbar fields are flat and 2rem tall, the height of a small button, so a row shares one height. */
 .fi-resource-list-records-page:not(.fi-page-has-sub-navigation),
 .fi-edge-to-edge-page,
-.fi-board-header {
+.fi-board-header,
+.fi-record-pane {
     .fi-ta-grouping-settings-fields .fi-input-wrp {
         @apply h-8 shadow-none ring-gray-950/10 dark:ring-white/10;
 
@@ -2090,7 +2503,7 @@ html.fi-record-stacked .fi-record-layout {
         /* WebKit does not focus a clicked button, so an open menu holds the actions itself. */
         &:hover .fi-ta-actions,
         &:focus-within .fi-ta-actions,
-        & .fi-ta-actions:has(.fi-dropdown-panel[style*='display: block']) {
+        & .fi-ta-actions:has(.fi-dropdown-trigger > [aria-expanded='true']) {
             @apply opacity-100;
         }
     }
@@ -2341,7 +2754,7 @@ html.fi-record-stacked .fi-record-layout {
         @apply -my-2 min-h-11;
     }
 
-    .fi-record-page .fi-sc-actions :is(.fi-btn, .fi-icon-btn) {
+    :is(.fi-record-page, .fi-record-embedded-page) .fi-sc-actions :is(.fi-btn, .fi-icon-btn) {
         @apply min-h-11 min-w-11;
     }
 

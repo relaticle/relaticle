@@ -52,6 +52,9 @@
         x-transition:enter="fi-transition-enter"
         x-transition:enter-start="fi-transition-enter-start"
         x-transition:enter-end="fi-transition-enter-end"
+        x-transition:leave="fi-transition-leave"
+        x-transition:leave-start="fi-transition-leave-start"
+        x-transition:leave-end="fi-transition-leave-end"
         class="fi-sidebar-group-btn"
     >
         <span class="fi-sidebar-group-label">{{ __('Chats') }}</span>
@@ -78,6 +81,12 @@
         @if($conversations->isEmpty())
             <li
                 x-show="$store.sidebar.isOpen"
+                x-transition:enter="fi-transition-enter"
+                x-transition:enter-start="fi-transition-enter-start"
+                x-transition:enter-end="fi-transition-enter-end"
+                x-transition:leave="fi-transition-leave"
+                x-transition:leave-start="fi-transition-leave-start"
+                x-transition:leave-end="fi-transition-leave-end"
                 class="px-3 py-2 text-xs text-gray-500 dark:text-gray-400"
                 role="status"
             >
@@ -161,6 +170,12 @@
                         }
                     }"
                     x-show="$store.sidebar.isOpen"
+                    x-transition:enter="fi-transition-enter"
+                    x-transition:enter-start="fi-transition-enter-start"
+                    x-transition:enter-end="fi-transition-enter-end"
+                    x-transition:leave="fi-transition-leave"
+                    x-transition:leave-start="fi-transition-leave-start"
+                    x-transition:leave-end="fi-transition-leave-end"
                     @class([
                         'fi-sidebar-item group/chat-item relative',
                         'fi-active' => $isActive,
@@ -179,6 +194,9 @@
                                 x-transition:enter="fi-transition-enter"
                                 x-transition:enter-start="fi-transition-enter-start"
                                 x-transition:enter-end="fi-transition-enter-end"
+                                x-transition:leave="fi-transition-leave"
+                                x-transition:leave-start="fi-transition-leave-start"
+                                x-transition:leave-end="fi-transition-leave-end"
                                 title="{{ $rawTitle }}"
                                 class="fi-sidebar-item-label truncate"
                             >
@@ -247,6 +265,12 @@
             @if($hasMore)
                 <li
                     x-show="$store.sidebar.isOpen"
+                    x-transition:enter="fi-transition-enter"
+                    x-transition:enter-start="fi-transition-enter-start"
+                    x-transition:enter-end="fi-transition-enter-end"
+                    x-transition:leave="fi-transition-leave"
+                    x-transition:leave-start="fi-transition-leave-start"
+                    x-transition:leave-end="fi-transition-leave-end"
                     class="fi-sidebar-item"
                 >
                     <button
@@ -261,6 +285,9 @@
                             x-transition:enter="fi-transition-enter"
                             x-transition:enter-start="fi-transition-enter-start"
                             x-transition:enter-end="fi-transition-enter-end"
+                            x-transition:leave="fi-transition-leave"
+                            x-transition:leave-start="fi-transition-leave-start"
+                            x-transition:leave-end="fi-transition-leave-end"
                             class="fi-sidebar-item-label"
                         >
                             {{ __('All chats') }}

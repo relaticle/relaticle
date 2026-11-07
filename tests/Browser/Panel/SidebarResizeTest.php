@@ -71,3 +71,44 @@ it('fits every get started step on one line in the default sidebar', function ()
         ->assertScript('[...document.querySelectorAll("[data-testid=activation-step] .text-sm")].filter((label) => label.getBoundingClientRect().height > parseFloat(getComputedStyle(label).lineHeight) + 1).map((label) => label.innerText.trim())', [])
         ->assertNoJavaScriptErrors();
 });
+
+it('focuses the sidebar search field from a click on its key cap or magnifier', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $searchIsFocused = 'document.activeElement.matches(".fi-sidebar-search .fi-input")';
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->click('.fi-sidebar-search .fi-input-wrp-label')
+        ->assertScript($searchIsFocused, true);
+
+    $page->script('document.activeElement.blur()');
+
+    $page->assertScript($searchIsFocused, false)
+        ->click('.fi-sidebar-search .fi-input-wrp-prefix')
+        ->assertScript($searchIsFocused, true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('keeps every navigation row 32px tall on the collapsed rail', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $rowHeights = '[...document.querySelectorAll(".fi-sidebar-nav .fi-sidebar-item-btn")].filter((row) => row.getClientRects().length > 0).every((row) => Math.round(row.getBoundingClientRect().height) === 32)';
+
+    loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->assertScript($rowHeights, true)
+        ->click('[data-sidebar-workspace-toggle]')
+        ->wait(0.5)
+        ->assertScript('Alpine.store("sidebar").isOpen', false)
+        ->assertScript($rowHeights, true)
+        ->assertNoJavaScriptErrors();
+});

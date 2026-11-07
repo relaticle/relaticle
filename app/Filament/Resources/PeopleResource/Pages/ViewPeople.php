@@ -6,6 +6,7 @@ namespace App\Filament\Resources\PeopleResource\Pages;
 
 use App\Enums\CrmEntity;
 use App\Filament\Components\Infolists\RecordChipEntry;
+use App\Filament\Components\Infolists\RecordOverview;
 use App\Filament\Concerns\HasRecordPageLayout;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\PeopleResource;
@@ -21,7 +22,19 @@ final class ViewPeople extends ViewRecord
 
     protected static string $resource = PeopleResource::class;
 
-    protected function nativeDetailEntries(): array
+    public static function highlightNames(): array
+    {
+        return [
+            'company.name',
+            'custom_fields.emails',
+            'custom_fields.phone_number',
+            'custom_fields.job_title',
+            RecordOverview::NEXT_TASK,
+            RecordOverview::LAST_INTERACTION,
+        ];
+    }
+
+    public static function nativeDetailEntries(): array
     {
         return [
             RecordChipEntry::make('company.name')

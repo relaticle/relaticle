@@ -7,6 +7,7 @@ use App\Enums\CrmEntity;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\WorkspaceRole;
 use App\Filament\Actions\MoveCardAction;
+use App\Filament\Actions\PreviewRecordAction;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
@@ -22,7 +23,7 @@ use Relaticle\Flowforge\Board;
 use Relaticle\Flowforge\Grouping;
 use Relaticle\Flowforge\Lane;
 
-mutates(OpportunitiesBoard::class, MoveCardAction::class);
+mutates(OpportunitiesBoard::class, MoveCardAction::class, PreviewRecordAction::class);
 
 beforeEach(function () {
     $this->user = User::factory()->withWorkspace()->create();
@@ -407,7 +408,6 @@ it('creates a card in a stage option the board owns', function (): void {
 
 it('opens the edit action when a card is clicked', function (): void {
     $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');
-
     $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
     $opportunity->saveCustomFieldValue($this->stageField, $prospecting->getKey());
 
@@ -418,6 +418,18 @@ it('opens the edit action when a card is clicked', function (): void {
     $component
         ->call('mountAction', 'edit', [], ['recordKey' => (string) $opportunity->id])
         ->assertSet('mountedActions.0.data.name', $opportunity->name);
+});
+
+it('opens the record preview from the button beside a card menu', function (): void {
+    $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Rooftop pilot']);
+    $opportunity->saveCustomFieldValue($this->stageField, $prospecting->getKey());
+
+    livewire(OpportunitiesBoard::class)
+        ->assertSeeHtml(['fi-board-card-preview-trigger', e(PreviewRecordAction::mountForRecord($opportunity))])
+        ->mountAction(PreviewRecordAction::getDefaultName(), ['record' => $opportunity->getKey()])
+        ->assertActionMounted(PreviewRecordAction::getDefaultName())
+        ->assertMountedActionModalSeeHtml(['fi-record-embedded-page', 'Rooftop pilot']);
 });
 
 it('labels the contact select point of contact when adding an opportunity to a column', function (): void {
