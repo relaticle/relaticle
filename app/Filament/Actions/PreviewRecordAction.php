@@ -103,26 +103,52 @@ final class PreviewRecordAction extends ViewAction
      */
     private function neighbours(Model $record, Component $livewire, mixed $position): array
     {
+        $unplaced = ['position' => null, 'total' => 0, 'previousKey' => null, 'nextKey' => null];
+
         if (! $livewire instanceof ListRecords) {
-            return ['position' => null, 'total' => 0, 'previousKey' => null, 'nextKey' => null];
+            return $unplaced;
         }
 
-        $position = is_numeric($position) ? (int) $position : $this->positionOnCurrentPage($record, $livewire);
         $query = $livewire->getFilteredSortedTableQuery();
 
-        if ($position === null || ! $query instanceof Builder) {
-            return ['position' => null, 'total' => 0, 'previousKey' => null, 'nextKey' => null];
+        if (! $query instanceof Builder) {
+            return $unplaced;
         }
 
-        $keyAt = fn (int $offset): ?string => $offset < 0
-            ? null
-            : (clone $query)->skip($offset)->value($record->getQualifiedKeyName());
+        $window = is_numeric($position) ? $this->windowAround($query, $record, (int) $position) : null;
+        $pagePosition = $window === null ? $this->positionOnCurrentPage($record, $livewire) : null;
+        $window ??= $pagePosition === null ? null : $this->windowAround($query, $record, $pagePosition);
+
+        if ($window === null) {
+            return $unplaced;
+        }
+
+        return [...$window, 'total' => $livewire->getAllTableRecordsCount()];
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     * @return array{position: int, previousKey: ?string, nextKey: ?string}|null
+     */
+    private function windowAround(Builder $query, Model $record, int $position): ?array
+    {
+        $start = max($position - 1, 0);
+        $keys = (clone $query)->toBase()
+            ->offset($start)
+            ->limit(3)
+            ->pluck($record->getQualifiedKeyName())
+            ->map(fn (mixed $key): string => (string) $key)
+            ->all();
+        $index = $position - $start;
+
+        if (($keys[$index] ?? null) !== (string) $record->getKey()) {
+            return null;
+        }
 
         return [
             'position' => $position,
-            'total' => $livewire->getAllTableRecordsCount(),
-            'previousKey' => $keyAt($position - 1),
-            'nextKey' => $keyAt($position + 1),
+            'previousKey' => $keys[$index - 1] ?? null,
+            'nextKey' => $keys[$index + 1] ?? null,
         ];
     }
 

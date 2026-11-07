@@ -118,6 +118,21 @@ it('keeps counting from the position a step passes when the record is on another
         ->toContain($middle->getKey());
 });
 
+it('places the company where the list now shows it when a stepped position has gone stale', function (): void {
+    [$oldest, $middle, $newest] = collect([3, 2, 1])
+        ->map(fn (int $daysAgo): Company => Company::factory()->recycle([$this->user, $this->workspace])->create(['created_at' => now()->subDays($daysAgo)]))
+        ->all();
+
+    $header = previewHeader(livewire(ListCompanies::class)
+        ->mountAction(TestAction::make('preview')->table($oldest)->arguments(['position' => 0]))
+        ->getMountedActionModalHtml());
+
+    expect($header)
+        ->toContain(__('filament/record-page.preview.position', ['position' => 3, 'total' => 3, 'label' => 'Companies']))
+        ->toContain($middle->getKey())
+        ->not->toContain($newest->getKey());
+});
+
 it('offers the preview in the row menu for keyboard and touch users', function (string $model, string $list): void {
     $record = $model::factory()->recycle([$this->user, $this->workspace])->create();
 
