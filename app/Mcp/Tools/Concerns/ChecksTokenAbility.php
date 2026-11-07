@@ -89,7 +89,7 @@ trait ChecksTokenAbility
         );
     }
 
-    protected function connectionName(): string
+    private function connectionName(): string
     {
         $token = $this->currentToken();
 
