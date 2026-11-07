@@ -126,6 +126,7 @@ it('keeps listing a dormant connector whose refresh token still works, and revok
 
     Livewire::test(ManageOAuthConnectors::class)
         ->assertCanSeeTableRecords([$connector])
+        ->assertTableColumnStateSet('active_tokens_count', 1, $connector)
         ->callAction(TestAction::make('revoke')->table($connector))
         ->assertNotified();
 

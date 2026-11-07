@@ -47,9 +47,7 @@ final class ManageOAuthConnectors extends BaseLivewireComponent implements HasTa
                 ])
                 ->withCount([
                     'tokens as active_tokens_count' => fn (Builder $query) => $query
-                        ->where('user_id', $userId)
-                        ->where('revoked', false)
-                        ->where('expires_at', '>', now()),
+                        ->whereIn('id', resolve(LiveAgentCredentialsQuery::class)->accessTokenIds((string) $userId)),
                 ]))
             ->columns([
                 TextColumn::make('name')->label(__('access-tokens.connectors.columns.name')),

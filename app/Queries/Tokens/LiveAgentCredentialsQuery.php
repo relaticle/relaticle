@@ -11,20 +11,14 @@ use Illuminate\Support\Facades\DB;
 
 final readonly class LiveAgentCredentialsQuery
 {
-    // A connector whose access token expired is still live while its refresh token can mint a new one.
     public function oauthClientIds(string $userId): Builder
     {
-        return DB::table('oauth_access_tokens')
-            ->select('client_id')
-            ->where('user_id', $userId)
-            ->where('revoked', false)
-            ->where(fn (Builder $live): Builder => $live
-                ->where('expires_at', '>', now())
-                ->orWhereExists(fn (Builder $refresh): Builder => $refresh
-                    ->from('oauth_refresh_tokens')
-                    ->whereColumn('oauth_refresh_tokens.access_token_id', 'oauth_access_tokens.id')
-                    ->where('oauth_refresh_tokens.revoked', false)
-                    ->where('oauth_refresh_tokens.expires_at', '>', now())));
+        return $this->liveAccessTokens($userId)->select('client_id');
+    }
+
+    public function accessTokenIds(string $userId): Builder
+    {
+        return $this->liveAccessTokens($userId)->select('id');
     }
 
     public function isLive(string $userId, ?string $oauthClientId, ?int $personalAccessTokenId): bool
@@ -38,6 +32,21 @@ final readonly class LiveAgentCredentialsQuery
         }
 
         return true;
+    }
+
+    // A connector whose access token expired is still live while its refresh token can mint a new one.
+    private function liveAccessTokens(string $userId): Builder
+    {
+        return DB::table('oauth_access_tokens')
+            ->where('user_id', $userId)
+            ->where('revoked', false)
+            ->where(fn (Builder $live): Builder => $live
+                ->where('expires_at', '>', now())
+                ->orWhereExists(fn (Builder $refresh): Builder => $refresh
+                    ->from('oauth_refresh_tokens')
+                    ->whereColumn('oauth_refresh_tokens.access_token_id', 'oauth_access_tokens.id')
+                    ->where('oauth_refresh_tokens.revoked', false)
+                    ->where('oauth_refresh_tokens.expires_at', '>', now())));
     }
 
     private function holdsAccessToken(string $userId, int $personalAccessTokenId): bool
