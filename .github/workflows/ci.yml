@@ -199,6 +199,7 @@ jobs:
         with:
           name: junit-tests-${{ matrix.shard }}
           path: junit.xml
+          retention-days: 1
 
   self-hosted-build:
     runs-on: ubuntu-latest
@@ -279,13 +280,14 @@ jobs:
         with:
           name: junit-self-hosted
           path: junit.xml
+          retention-days: 1
 
   browser-tests:
     runs-on: ${{ matrix.browser == 'webkit' && 'ubuntu-latest' || 'ubuntu-24.04-arm' }}
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5]
         browser: [chromium]
         # Tests tagged `pest()->group('webkit')` cover surfaces where WebKit has broken
         # while Chromium passed: the rich editor freeze, the model picker icons.
@@ -293,7 +295,7 @@ jobs:
           - shard: webkit
             browser: webkit
 
-    name: Browser Tests (${{ matrix.browser == 'webkit' && 'WebKit' || format('Shard {0}/4', matrix.shard) }})
+    name: Browser Tests (${{ matrix.browser == 'webkit' && 'WebKit' || format('Shard {0}/5', matrix.shard) }})
 
     # A browser test that waits on an element which never appears hangs rather
     # than fails, and without a ceiling the job runs until GitHub cancels it at
@@ -384,7 +386,7 @@ jobs:
         run: lscpu | grep -E 'Model name|^CPU\(s\)'
 
       - name: Browser Tests
-        run: vendor/bin/pest tests/Browser/ --configuration phpunit.ci.xml ${{ matrix.browser == 'webkit' && '--group=webkit --browser safari' || format('--shard={0}/4 --parallel --processes=3', matrix.shard) }} --log-junit junit.xml
+        run: vendor/bin/pest tests/Browser/ --configuration phpunit.ci.xml ${{ matrix.browser == 'webkit' && '--group=webkit --browser safari' || format('--shard={0}/5 --parallel --processes=3', matrix.shard) }} --log-junit junit.xml
 
       - name: Upload timings
         if: always()
@@ -392,6 +394,7 @@ jobs:
         with:
           name: junit-browser-${{ matrix.shard }}
           path: junit.xml
+          retention-days: 1
 
       - name: Upload browser failure artifacts
         if: failure()
@@ -402,6 +405,30 @@ jobs:
             tests/Browser/Screenshots
             storage/logs
           if-no-files-found: ignore
+
+  shard-timings:
+    runs-on: ubuntu-latest
+    name: Record Shard Timings
+    needs: [tests, browser-tests]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Download timings
+        uses: actions/download-artifact@v7
+        with:
+          pattern: junit-@(tests|browser)-[0-9]*
+          path: junit
+
+      - name: Write shards.json
+        run: php bin/shard-timings.php junit
+
+      - name: Save timings
+        uses: actions/cache/save@v6
+        with:
+          path: tests/.pest/shards.json
+          key: pest-shards-${{ github.run_id }}
 
   # The one check branch protection requires, so resharding or renaming a job above
   # never leaves auto-merge waiting on a check that no longer reports.
