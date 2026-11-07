@@ -15,6 +15,7 @@ return [
         ],
         'redirect' => 'After you authorize, you go back to :host. Continue only if you trust that site.',
         'signed_in_as' => 'Signed in as :email.',
+        'invalid_resource' => 'This connection asked for access to a different server. Relaticle only authorizes connections to its own MCP server.',
 
         'workspace' => [
             'heading' => 'Which workspace?',

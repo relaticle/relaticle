@@ -27,11 +27,13 @@ final readonly class RetryFailedEmailAction
             // would make EmailSendingService treat the next send as a first attempt and
             // skip the provider-side reconciliation lookup, re-delivering an email that
             // a prior attempt already handed to the provider before crashing.
-            $lockedEmail->update([
+            $lockedEmail->forceFill([
                 'status' => EmailStatus::QUEUED,
                 'last_error' => null,
                 'scheduled_for' => now(),
-            ]);
+                'oauth_client_id' => null,
+                'personal_access_token_id' => null,
+            ])->save();
 
             if ($lockedEmail->batch_id !== null) {
                 EmailBatch::query()->whereKey($lockedEmail->batch_id)->update(['status' => EmailBatchStatus::Sending]);

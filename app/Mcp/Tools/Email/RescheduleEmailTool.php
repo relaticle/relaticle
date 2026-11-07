@@ -6,6 +6,7 @@ namespace App\Mcp\Tools\Email;
 
 use App\Mcp\Tools\Concerns\FindsOwnOutboundEmail;
 use App\Mcp\Tools\Concerns\HasExplicitToolAnnotations;
+use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Facades\Date;
 use Laravel\Mcp\Request;
@@ -52,8 +53,11 @@ final class RescheduleEmailTool extends Tool
         /** @var array{scheduled_for: string} $validated */
         $validated = $request->validate(['scheduled_for' => ['required', 'date', 'after:now']]);
 
+        /** @var User $user */
+        $user = auth()->user();
+
         try {
-            return Response::structured($this->outboxState($reschedule->execute($email, Date::parse($validated['scheduled_for']))));
+            return Response::structured($this->outboxState($reschedule->execute($user, $email, Date::parse($validated['scheduled_for']), $this->agentConnection())));
         } catch (RuntimeException $exception) {
             return Response::error($exception->getMessage());
         }

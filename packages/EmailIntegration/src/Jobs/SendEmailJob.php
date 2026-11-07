@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Jobs;
 
+use App\Enums\WorkspaceCapability;
+use App\Queries\Tokens\LiveAgentCredentialsQuery;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Backoff;
@@ -129,6 +131,14 @@ final class SendEmailJob implements ShouldQueue
                 return null;
             }
 
+            $agentRefusal = $this->agentRefusal($lockedEmail);
+
+            if ($agentRefusal !== null) {
+                resolve(MarkEmailsSendFailedAction::class)->execute(collect([$lockedEmail]), $agentRefusal);
+
+                return null;
+            }
+
             $lockedEmail->update([
                 'status' => EmailStatus::SENDING,
                 'attempts' => $lockedEmail->attempts + 1,
@@ -136,6 +146,23 @@ final class SendEmailJob implements ShouldQueue
 
             return $lockedEmail;
         });
+    }
+
+    private function agentRefusal(Email $email): ?string
+    {
+        if ($email->oauth_client_id === null && $email->personal_access_token_id === null) {
+            return null;
+        }
+
+        if (! resolve(LiveAgentCredentialsQuery::class)->isLive((string) $email->user_id, $email->oauth_client_id, $email->personal_access_token_id)) {
+            return __('filament/notifications/email-send-failed.reasons.agent_connection_revoked');
+        }
+
+        if ($email->user?->hasWorkspaceCapability($email->workspace_id, WorkspaceCapability::EmailAgentSend) !== true) {
+            return __('filament/notifications/email-send-failed.reasons.agent_send_not_allowed');
+        }
+
+        return null;
     }
 
     public function failed(Throwable $exception): void

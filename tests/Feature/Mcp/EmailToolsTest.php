@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Mcp\RevokeOAuthConnector;
 use App\Enums\CustomFields\PeopleField;
 use App\Enums\WorkspaceRole;
 use App\Features\EmailIntegration;
@@ -23,6 +24,7 @@ use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Actions\Action;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Bus;
@@ -31,10 +33,12 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Illuminate\Testing\TestResponse;
+use Laravel\Mcp\Server\Registrar;
 use Laravel\Passport\Client;
 use Laravel\Passport\Passport;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Actions\HoldAgentEmail;
+use Relaticle\EmailIntegration\Actions\LinkEmailAction;
 use Relaticle\EmailIntegration\Actions\PickAgentSendTime;
 use Relaticle\EmailIntegration\Actions\PrepareAgentDraftSend;
 use Relaticle\EmailIntegration\Actions\PrepareAgentEmail;
@@ -43,6 +47,7 @@ use Relaticle\EmailIntegration\Actions\QueueAgentEmailAction;
 use Relaticle\EmailIntegration\Actions\SaveAgentEmailDraft;
 use Relaticle\EmailIntegration\Actions\SaveMailboxSharingTier;
 use Relaticle\EmailIntegration\Actions\SendAgentEmailDraft;
+use Relaticle\EmailIntegration\Data\AgentConnection;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -65,6 +70,8 @@ use Relaticle\EmailIntegration\Models\WorkspaceEmailBlocklist;
 use Relaticle\EmailIntegration\Notifications\EmailSendHeldNotification;
 use Relaticle\EmailIntegration\Policies\EmailPolicy;
 use Relaticle\EmailIntegration\Queries\VisibleEmailsQuery;
+use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
+use Relaticle\EmailIntegration\Services\EmailSendingService;
 use Relaticle\EmailIntegration\Support\AgentEmailBody;
 use Relaticle\EmailIntegration\Support\EmailForAgent;
 use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
@@ -1171,6 +1178,185 @@ function sendOverHttp(User $user, array $abilities, string $tokenName, array $ar
         ->and($response->json('result.isError'))->not->toBeTrue();
 }
 
+function runSendJob(Email $email): void
+{
+    new SendEmailJob($email->getKey())->handle(resolve(EmailSendingService::class), resolve(LinkEmailAction::class));
+}
+
+function connectedClient(User $user): Client
+{
+    $client = Client::query()->forceCreate([
+        'id' => (string) Str::uuid(),
+        'name' => 'Claude',
+        'redirect_uris' => ['https://claude.ai/api/mcp/auth_callback'],
+        'grant_types' => ['authorization_code', 'refresh_token'],
+        'revoked' => false,
+    ]);
+
+    DB::table('oauth_access_tokens')->insert([
+        'id' => Str::random(80),
+        'user_id' => $user->getKey(),
+        'client_id' => $client->getKey(),
+        'workspace_id' => $user->current_workspace_id,
+        'name' => 'Claude',
+        'scopes' => '["mcp:use","email:send"]',
+        'revoked' => false,
+        'created_at' => now(),
+        'updated_at' => now(),
+        'expires_at' => now()->addDays(30),
+    ]);
+
+    return $client;
+}
+
+it('does not send an email once the access token that queued it is deleted', function (): void {
+    sendOverHttp($this->viewer, ['read', 'email:send'], 'Desk Agent', sendArguments($this->viewerAccount));
+    $email = Email::query()->where('creation_source', EmailCreationSource::MCP)->latest('id')->firstOrFail();
+
+    $this->viewer->tokens()->delete();
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldNotReceive('make');
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    runSendJob($email);
+
+    expect($email->fresh())
+        ->status->toBe(EmailStatus::FAILED)
+        ->last_error->toBe(__('filament/notifications/email-send-failed.reasons.agent_connection_revoked'));
+});
+
+it('does not send an email once the access token that queued it has expired', function (): void {
+    sendOverHttp($this->viewer, ['read', 'email:send'], 'Desk Agent', sendArguments($this->viewerAccount));
+    $email = Email::query()->where('creation_source', EmailCreationSource::MCP)->latest('id')->firstOrFail();
+
+    $this->viewer->tokens()->update(['expires_at' => now()->subMinute()]);
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldNotReceive('make');
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    runSendJob($email);
+
+    expect($email->fresh()->status)->toBe(EmailStatus::FAILED);
+});
+
+it('does not send an email an agent queued once its sender is demoted to viewer', function (): void {
+    $member = memberWithRole($this->workspace, WorkspaceRole::Member);
+    sendOverHttp($member, ['read', 'email:send'], 'Desk Agent', sendArguments(mailboxOf($member, $this->workspace)));
+    $email = Email::query()->where('creation_source', EmailCreationSource::MCP)->latest('id')->firstOrFail();
+
+    $this->workspace->users()->updateExistingPivot($member->getKey(), ['role' => WorkspaceRole::Viewer->value]);
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldNotReceive('make');
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    runSendJob($email);
+
+    expect($email->fresh())
+        ->status->toBe(EmailStatus::FAILED)
+        ->last_error->toBe(__('filament/notifications/email-send-failed.reasons.agent_send_not_allowed'));
+});
+
+it('sends an email an agent queued once its demoted sender retries it from the outbox', function (): void {
+    $member = memberWithRole($this->workspace, WorkspaceRole::Member);
+    sendOverHttp($member, ['read', 'email:send'], 'Desk Agent', sendArguments(mailboxOf($member, $this->workspace)));
+    $email = Email::query()->where('creation_source', EmailCreationSource::MCP)->latest('id')->firstOrFail();
+    $this->workspace->users()->updateExistingPivot($member->getKey(), ['role' => WorkspaceRole::Viewer->value]);
+    runSendJob($email);
+
+    $this->actingAs($member->fresh());
+    Filament::setTenant($this->workspace);
+    livewire(OutboxTable::class)
+        ->filterTable('status_tab', 'failed')
+        ->callAction(TestAction::make('retry')->table($email))
+        ->assertNotified();
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->once()->andThrow(new RuntimeException('provider reached'));
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    expect(fn () => runSendJob($email->fresh()))->toThrow(RuntimeException::class, 'provider reached');
+});
+
+it('still sends an email an agent queued while its sender keeps the member role', function (): void {
+    $member = memberWithRole($this->workspace, WorkspaceRole::Member);
+    sendOverHttp($member, ['read', 'email:send'], 'Desk Agent', sendArguments(mailboxOf($member, $this->workspace)));
+    $email = Email::query()->where('creation_source', EmailCreationSource::MCP)->latest('id')->firstOrFail();
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->once()->andThrow(new RuntimeException('provider reached'));
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    expect(fn () => runSendJob($email))->toThrow(RuntimeException::class, 'provider reached');
+});
+
+it('does not send an email once the connector that queued it is revoked', function (): void {
+    $client = connectedClient($this->viewer);
+    Passport::actingAs($this->viewer, [Registrar::OAUTH_SCOPE, 'email:send'], client: $client);
+    $id = emailToolData($this->viewer, SendEmailTool::class, sendArguments($this->viewerAccount))['id'];
+
+    resolve(RevokeOAuthConnector::class)->execute($this->viewer, (string) $client->getKey());
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldNotReceive('make');
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    runSendJob(Email::query()->findOrFail($id));
+
+    expect(Email::query()->findOrFail($id)->status)->toBe(EmailStatus::FAILED);
+});
+
+it('sends a retried email under the connection that retried it', function (): void {
+    sendOverHttp($this->viewer, ['read', 'email:send'], 'Desk Agent', sendArguments($this->viewerAccount));
+    $email = Email::query()->where('creation_source', EmailCreationSource::MCP)->latest('id')->firstOrFail();
+    $this->viewer->tokens()->delete();
+    $email->forceFill(['status' => EmailStatus::FAILED, 'last_error' => 'boom'])->save();
+
+    $client = connectedClient($this->viewer);
+    Passport::actingAs($this->viewer, [Registrar::OAUTH_SCOPE, 'email:send'], client: $client);
+    emailToolData($this->viewer, RetryEmailTool::class, ['id' => $email->id]);
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->once()->andThrow(new RuntimeException('provider reached'));
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    expect(fn () => runSendJob($email->fresh()))->toThrow(RuntimeException::class, 'provider reached');
+});
+
+it('sends an email its owner retries from the outbox after the connection that queued it was revoked', function (): void {
+    sendOverHttp($this->viewer, ['read', 'email:send'], 'Desk Agent', sendArguments($this->viewerAccount));
+    $email = Email::query()->where('creation_source', EmailCreationSource::MCP)->latest('id')->firstOrFail();
+    $this->viewer->tokens()->delete();
+    runSendJob($email);
+
+    $this->actingAs($this->viewer);
+    Filament::setTenant($this->workspace);
+    livewire(OutboxTable::class)
+        ->filterTable('status_tab', 'failed')
+        ->callAction(TestAction::make('retry')->table($email))
+        ->assertNotified();
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->once()->andThrow(new RuntimeException('provider reached'));
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    expect(fn () => runSendJob($email->fresh()))->toThrow(RuntimeException::class, 'provider reached');
+});
+
+it('still sends an email while the connector that queued it is connected', function (): void {
+    $client = connectedClient($this->viewer);
+    Passport::actingAs($this->viewer, [Registrar::OAUTH_SCOPE, 'email:send'], client: $client);
+    $id = emailToolData($this->viewer, SendEmailTool::class, sendArguments($this->viewerAccount))['id'];
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->once()->andThrow(new RuntimeException('provider reached'));
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    expect(fn () => runSendJob(Email::query()->findOrFail($id)))->toThrow(RuntimeException::class, 'provider reached');
+});
+
 it('queues the email and holds it for the configured window', function (): void {
     $this->travelTo(now()->startOfSecond());
 
@@ -1591,7 +1777,7 @@ it('refuses the action itself to a user whose role may not send', function (): v
         'to' => ['client@acme.test'],
         'subject' => 'Next steps',
         'body' => 'Hello',
-    ], EmailCreationSource::MCP, 'Desk Agent'))->toThrow(HttpException::class);
+    ], EmailCreationSource::MCP, new AgentConnection('Desk Agent')))->toThrow(HttpException::class);
 
     expect(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(0);
 });
@@ -1604,7 +1790,7 @@ it('refuses the action itself to a user with no current workspace', function ():
         'to' => ['client@acme.test'],
         'subject' => 'Next steps',
         'body' => 'Hello',
-    ], EmailCreationSource::MCP, 'Desk Agent'))->toThrow(HttpException::class);
+    ], EmailCreationSource::MCP, new AgentConnection('Desk Agent')))->toThrow(HttpException::class);
 
     expect(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(0);
 });
@@ -2003,6 +2189,16 @@ it('reschedules a held email, never sooner than the hold', function (): void {
 
     expect($sooner['scheduled_for'])->toBe(now()->addSeconds(300)->toIso8601String())
         ->and(Email::query()->findOrFail($id)->scheduled_for->equalTo(now()->addSeconds(300)))->toBeTrue();
+});
+
+it('tells the user when it pulls forward an email they scheduled themselves', function (): void {
+    $this->travelTo(now()->startOfSecond());
+    $composed = ($this->emailFrom)($this->viewer, ['status' => EmailStatus::QUEUED, 'direction' => EmailDirection::OUTBOUND, 'sent_at' => null, 'creation_source' => EmailCreationSource::COMPOSE, 'scheduled_for' => now()->addDays(7)]);
+
+    $data = emailToolData($this->viewer, RescheduleEmailTool::class, ['id' => $composed->id, 'scheduled_for' => now()->addMinute()->toIso8601String()]);
+
+    expect($data['scheduled_for'])->toBe(now()->addSeconds(300)->toIso8601String())
+        ->and(EmailSendHeldNotification::present($this->viewer->notifications()->where('type', EmailSendHeldNotification::class)->sole())->getTitle())->toBe('An AI assistant rescheduled an email');
 });
 
 it('requeues a failed email behind the hold and tells the user', function (): void {
