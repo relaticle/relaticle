@@ -51,7 +51,7 @@
 
                 @if($this->continueUrl)
                     <x-filament::button tag="a" :href="$this->continueUrl" class="shrink-0">
-                        {{ __('import-wizard-new::preview.continue_with_rela') }}
+                        {{ __('import-wizard-new::preview.continue_with_assistant', ['name' => config('chat.assistant_name')]) }}
                     </x-filament::button>
                 @endif
             </div>

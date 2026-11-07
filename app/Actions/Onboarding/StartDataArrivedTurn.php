@@ -19,7 +19,7 @@ use Relaticle\Chat\Support\TurnPresence;
 
 final readonly class StartDataArrivedTurn
 {
-    private const int DEDUPE_DAYS = 7;
+    private const int CLAIM_DAYS = 7;
 
     public function __construct(
         private CreditService $credits,
@@ -41,13 +41,13 @@ final readonly class StartDataArrivedTurn
             return false;
         }
 
-        if (! $conversation->messages()->exists() || TurnPresence::current($conversation->id) !== null) {
+        if (! $conversation->messages()->exists()) {
             return false;
         }
 
-        $dedupeKey = "chat:data-arrived:{$conversation->id}:{$sourceKey}";
+        $claimKey = "chat:data-arrived:{$conversation->id}:{$sourceKey}";
 
-        if (! Cache::add($dedupeKey, true, now()->addDays(self::DEDUPE_DAYS))) {
+        if (! Cache::add($claimKey, true, now()->addDays(self::CLAIM_DAYS))) {
             return false;
         }
 
@@ -59,12 +59,16 @@ final readonly class StartDataArrivedTurn
             conversationId: $conversation->id,
             userId: (string) $owner->getKey(),
         )) {
-            Cache::forget($dedupeKey);
+            Cache::forget($claimKey);
 
             return false;
         }
 
-        TurnPresence::begin($conversation->id, turnId: $turnId, message: '', origin: MessageOrigin::DataArrived);
+        if (TurnPresence::current($conversation->id) === null) {
+            TurnPresence::begin($conversation->id, turnId: $turnId, message: '', origin: MessageOrigin::DataArrived);
+        }
+
+        $owner->setRelation('currentWorkspace', $workspace);
 
         dispatch(new ProcessChatMessage(
             user: $owner,
@@ -74,6 +78,7 @@ final readonly class StartDataArrivedTurn
             resolved: $this->models->resolve($owner),
             turnId: $turnId,
             origin: MessageOrigin::DataArrived,
+            claimKey: $claimKey,
         ));
 
         return true;

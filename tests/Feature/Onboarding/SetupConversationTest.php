@@ -2,15 +2,19 @@
 
 declare(strict_types=1);
 
+use App\Actions\Company\CreateCompany;
 use App\Actions\Onboarding\CreateSetupConversation;
 use App\Actions\Onboarding\StartDataArrivedTurn;
 use App\Actions\Onboarding\StartSetupGreeting;
+use App\Contracts\Entitlements;
 use App\Enums\CreationSource;
 use App\Enums\OnboardingDataSource;
 use App\Enums\OnboardingUseCase;
+use App\Enums\WorkspaceRole;
 use App\Features\Billing;
 use App\Features\SetupConversation;
 use App\Filament\Pages\CreateWorkspace;
+use App\Jobs\OpenDataArrivedTurn;
 use App\Listeners\CreateSetupConversationListener;
 use App\Listeners\StartDataArrivedTurnListener;
 use App\Models\Company;
@@ -26,12 +30,16 @@ use Laravel\Pennant\Feature;
 use Livewire\Features\SupportTesting\Testable;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\MessageOrigin;
+use Relaticle\Chat\Enums\PendingActionOperation;
+use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Support\ConversationTitleGate;
+use Relaticle\Chat\Support\ModelDescriptor;
 use Relaticle\Chat\Support\TurnPresence;
 use Relaticle\Cloud\Entitlements\PlanEntitlements;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -378,7 +386,7 @@ function assertDataArrivedPushed(int $times): void
 }
 
 it('opens a data arrived turn in the setup chat when an onboarding import finishes', function (): void {
-    Queue::fake();
+    Queue::fake([ProcessChatMessage::class]);
     $user = User::factory()->create();
     $workspace = setupWorkspaceWithGreeting($user);
 
@@ -391,7 +399,7 @@ it('opens a data arrived turn in the setup chat when an onboarding import finish
 });
 
 it('opens one data arrived turn per import', function (): void {
-    Queue::fake();
+    Queue::fake([ProcessChatMessage::class]);
     $user = User::factory()->create();
     $workspace = setupWorkspaceWithGreeting($user);
     $import = finishedImport($user, $workspace);
@@ -404,7 +412,7 @@ it('opens one data arrived turn per import', function (): void {
 });
 
 it('opens a turn for a second import after the first one', function (): void {
-    Queue::fake();
+    Queue::fake([ProcessChatMessage::class]);
     $user = User::factory()->create();
     $workspace = setupWorkspaceWithGreeting($user);
 
@@ -416,7 +424,7 @@ it('opens a turn for a second import after the first one', function (): void {
 });
 
 it('leaves the turn to the greeting when the setup chat was never opened', function (): void {
-    Queue::fake();
+    Queue::fake([ProcessChatMessage::class]);
     $user = User::factory()->create();
     $workspace = personalWorkspaceFor($user, ['onboarding_data_source' => OnboardingDataSource::Spreadsheet]);
 
@@ -426,7 +434,7 @@ it('leaves the turn to the greeting when the setup chat was never opened', funct
 });
 
 it('opens no data arrived turn for an import that created nothing or failed', function (): void {
-    Queue::fake();
+    Queue::fake([ProcessChatMessage::class]);
     $user = User::factory()->create();
     $workspace = setupWorkspaceWithGreeting($user);
 
@@ -437,7 +445,7 @@ it('opens no data arrived turn for an import that created nothing or failed', fu
 });
 
 it('opens no data arrived turn on the mail channel', function (): void {
-    Queue::fake();
+    Queue::fake([ProcessChatMessage::class]);
     $user = User::factory()->create();
     $workspace = setupWorkspaceWithGreeting($user);
 
@@ -447,23 +455,13 @@ it('opens no data arrived turn on the mail channel', function (): void {
     Queue::assertNotPushed(ProcessChatMessage::class);
 });
 
-it('opens no data arrived turn while another turn is running in the setup chat', function (): void {
-    Queue::fake();
-    $user = User::factory()->create();
-    $workspace = setupWorkspaceWithGreeting($user);
-    TurnPresence::begin($workspace->setupConversation->id, turnId: (string) Str::ulid(), message: 'Here is my list');
-
-    $user->notifyNow(new ImportFinishedNotification(finishedImport($user, $workspace), ImportOutcome::Completed), ['database']);
-
-    Queue::assertNotPushed(ProcessChatMessage::class);
-});
-
 it('opens no data arrived turn when the flag is off', function (): void {
-    Queue::fake();
+    Queue::fake([ProcessChatMessage::class]);
     $user = User::factory()->create();
     $workspace = setupWorkspaceWithGreeting($user);
 
-    Feature::deactivate(SetupConversation::class);
+    Feature::define(SetupConversation::class, false);
+    Feature::purge(SetupConversation::class);
     $user->notifyNow(new ImportFinishedNotification(finishedImport($user, $workspace), ImportOutcome::Completed), ['database']);
 
     Queue::assertNotPushed(ProcessChatMessage::class);
@@ -471,7 +469,7 @@ it('opens no data arrived turn when the flag is off', function (): void {
 
 it('opens no data arrived turn when the workspace is out of credits', function (): void {
     withHostedBilling();
-    Queue::fake();
+    Queue::fake([ProcessChatMessage::class]);
     $user = User::factory()->create();
     $workspace = setupWorkspaceWithGreeting($user);
     AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
@@ -487,7 +485,7 @@ it('opens no data arrived turn when the workspace is out of credits', function (
 });
 
 it('opens a data arrived turn when the mailbox history import completes', function (): void {
-    Queue::fake();
+    Queue::fake([ProcessChatMessage::class]);
     $user = User::factory()->create();
     $workspace = setupWorkspaceWithGreeting($user, ['onboarding_data_source' => OnboardingDataSource::Inbox]);
     $account = ConnectedAccount::factory()->create(['workspace_id' => $workspace->getKey(), 'user_id' => $user->getKey()]);
@@ -501,7 +499,7 @@ it('opens a data arrived turn when the mailbox history import completes', functi
 });
 
 it('opens no data arrived turn for a mailbox that imported nothing', function (): void {
-    Queue::fake();
+    Queue::fake([ProcessChatMessage::class]);
     $user = User::factory()->create();
     $workspace = setupWorkspaceWithGreeting($user, ['onboarding_data_source' => OnboardingDataSource::Inbox]);
     $account = ConnectedAccount::factory()->create(['workspace_id' => $workspace->getKey(), 'user_id' => $user->getKey()]);
@@ -509,4 +507,133 @@ it('opens no data arrived turn for a mailbox that imported nothing', function ()
     $user->notifyNow(new MailboxHistoryImportCompletedNotification($account, 'batch-1', importedEmailCount: 0, importedCalendarCount: 0, includesCalendar: false), ['database']);
 
     Queue::assertNotPushed(ProcessChatMessage::class);
+});
+
+it('opens the turn again after a pending proposal cancelled the first one', function (): void {
+    Queue::fake([ProcessChatMessage::class]);
+    $user = User::factory()->create();
+    $workspace = setupWorkspaceWithGreeting($user);
+    $import = finishedImport($user, $workspace);
+    $proposal = PendingAction::query()->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $user->getKey(),
+        'conversation_id' => $workspace->setupConversation->id,
+        'action_class' => CreateCompany::class,
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'company',
+        'action_data' => ['name' => 'Acme'],
+        'display_data' => ['title' => 'Create Company', 'summary' => 'Create company "Acme"', 'fields' => []],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    $user->notifyNow(new ImportFinishedNotification($import, ImportOutcome::Completed), ['database']);
+    Queue::pushed(ProcessChatMessage::class)->first()->handle(resolve(CreditService::class));
+
+    expect(TurnPresence::current($workspace->setupConversation->id))->toBeNull();
+
+    $proposal->update(['status' => PendingActionStatus::Rejected]);
+    $user->notifyNow(new ImportFinishedNotification($import, ImportOutcome::Completed), ['database']);
+
+    assertDataArrivedPushed(2);
+});
+
+it('opens the turn again after the first one failed', function (): void {
+    Queue::fake([ProcessChatMessage::class]);
+    $user = User::factory()->create();
+    $workspace = setupWorkspaceWithGreeting($user);
+    $import = finishedImport($user, $workspace);
+
+    $user->notifyNow(new ImportFinishedNotification($import, ImportOutcome::Completed), ['database']);
+    Queue::pushed(ProcessChatMessage::class)->first()->failed(new RuntimeException('provider down'));
+    $user->notifyNow(new ImportFinishedNotification($import, ImportOutcome::Completed), ['database']);
+
+    assertDataArrivedPushed(2);
+});
+
+it('still dispatches the data arrived turn while another turn is running in the setup chat', function (): void {
+    Queue::fake([ProcessChatMessage::class]);
+    $user = User::factory()->create();
+    $workspace = setupWorkspaceWithGreeting($user);
+    $runningTurnId = (string) Str::ulid();
+    TurnPresence::begin($workspace->setupConversation->id, turnId: $runningTurnId, message: 'Here is my list');
+
+    $user->notifyNow(new ImportFinishedNotification(finishedImport($user, $workspace), ImportOutcome::Completed), ['database']);
+
+    assertDataArrivedPushed(1);
+    expect(TurnPresence::current($workspace->setupConversation->id)['turn_id'])->toBe($runningTurnId);
+});
+
+it('sends the notification even when the data arrived turn cannot start', function (): void {
+    Queue::fake();
+    app()->bind(StartDataArrivedTurn::class, fn (): never => throw new RuntimeException('chat is down'));
+    $user = User::factory()->create();
+    $workspace = setupWorkspaceWithGreeting($user);
+
+    $user->notifyNow(new ImportFinishedNotification(finishedImport($user, $workspace), ImportOutcome::Completed), ['database']);
+
+    Queue::assertPushed(OpenDataArrivedTurn::class);
+    expect($user->notifications()->count())->toBe(1);
+});
+
+it('opens no data arrived turn for a teammate who is not the workspace owner', function (): void {
+    Queue::fake([ProcessChatMessage::class]);
+    $owner = User::factory()->create();
+    $workspace = setupWorkspaceWithGreeting($owner);
+    $teammate = User::factory()->create();
+    $workspace->users()->attach($teammate, ['role' => WorkspaceRole::Admin->value]);
+
+    $teammate->notifyNow(new ImportFinishedNotification(finishedImport($teammate, $workspace), ImportOutcome::Completed), ['database']);
+
+    Queue::assertNotPushed(ProcessChatMessage::class);
+});
+
+it('picks the model for the setup workspace, not the owner\'s current workspace', function (): void {
+    Queue::fake([ProcessChatMessage::class]);
+    $seen = new ArrayObject;
+    app()->instance(Entitlements::class, new class(new SelfHostedEntitlements, $seen) implements Entitlements
+    {
+        public function __construct(private readonly SelfHostedEntitlements $inner, private readonly ArrayObject $seen) {}
+
+        public function metersCredits(Workspace $workspace): bool
+        {
+            return $this->inner->metersCredits($workspace);
+        }
+
+        public function creditAllowance(Workspace $workspace): int
+        {
+            return $this->inner->creditAllowance($workspace);
+        }
+
+        public function allowsModel(?Workspace $workspace, ModelDescriptor $model): bool
+        {
+            $this->seen->append($workspace?->getKey());
+
+            return $this->inner->allowsModel($workspace, $model);
+        }
+
+        public function chatRateLimit(Workspace $workspace): int
+        {
+            return $this->inner->chatRateLimit($workspace);
+        }
+
+        public function allowsAccess(Workspace $workspace): bool
+        {
+            return $this->inner->allowsAccess($workspace);
+        }
+
+        public function mailboxLimit(Workspace $workspace): ?int
+        {
+            return $this->inner->mailboxLimit($workspace);
+        }
+    });
+    $user = User::factory()->create();
+    $workspace = setupWorkspaceWithGreeting($user);
+    $otherWorkspace = Workspace::factory()->create(['user_id' => $user->getKey()]);
+    $user->forceFill(['current_workspace_id' => $otherWorkspace->getKey()])->save();
+
+    $user->notifyNow(new ImportFinishedNotification(finishedImport($user, $workspace), ImportOutcome::Completed), ['database']);
+
+    expect($seen->getArrayCopy())->not->toBeEmpty()
+        ->and(array_unique($seen->getArrayCopy()))->toBe([$workspace->getKey()]);
 });

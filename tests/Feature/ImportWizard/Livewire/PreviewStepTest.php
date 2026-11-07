@@ -806,6 +806,16 @@ it('shows continue with rela after an onboarding import completes', function ():
         ->assertSeeHtml('href="'.ChatConversation::getUrl(['conversationId' => $conversationId, 'tenant' => $this->workspace]).'"');
 });
 
+it('names the configured assistant on the continue button', function (): void {
+    config()->set('chat.assistant_name', 'Aria');
+    onboardingWorkspaceWithSetupChat($this, OnboardingDataSource::Spreadsheet);
+    completePreviewImport($this);
+
+    mountPreviewStep($this)
+        ->assertSee('Continue with Aria')
+        ->assertDontSee('Continue with Rela');
+});
+
 it('shows no continue button to a workspace past onboarding', function (): void {
     onboardingWorkspaceWithSetupChat($this, null);
     completePreviewImport($this);

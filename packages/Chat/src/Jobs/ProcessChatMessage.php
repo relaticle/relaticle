@@ -102,6 +102,7 @@ final class ProcessChatMessage implements ShouldQueue
         public readonly MessageOrigin $origin = MessageOrigin::Typed,
         public readonly ?string $resumesTurnId = null,
         public readonly ?array $attachment = null,
+        public readonly ?string $claimKey = null,
     ) {
         $this->onConnection('redis-chat');
         $this->onQueue('chat');
@@ -163,7 +164,7 @@ final class ProcessChatMessage implements ShouldQueue
                 conversationId: $this->conversationId,
                 message: __('billing.access.paused_chat'),
             ));
-            TurnPresence::clear($this->conversationId, $this->turnId);
+            $this->abandonTurn();
 
             return;
         }
@@ -199,7 +200,7 @@ final class ProcessChatMessage implements ShouldQueue
                 conversationId: $this->conversationId,
             );
             $this->releaseAuth();
-            TurnPresence::clear($this->conversationId, $this->turnId);
+            $this->abandonTurn();
 
             return;
         }
@@ -264,7 +265,7 @@ final class ProcessChatMessage implements ShouldQueue
                 message: 'The assistant could not start. Please try again.',
             ));
             $this->releaseAuth();
-            TurnPresence::clear($this->conversationId, $this->turnId);
+            $this->abandonTurn();
 
             return;
         }
@@ -450,21 +451,7 @@ final class ProcessChatMessage implements ShouldQueue
                         maxAttempts: self::MAX_RATE_LIMIT_RETRIES,
                         delaySeconds: 0,
                     ));
-                    dispatch(new self(
-                        user: $this->user,
-                        workspace: $this->workspace,
-                        message: $this->message,
-                        conversationId: $this->conversationId,
-                        resolved: $next,
-                        mentions: $this->mentions,
-                        document: $this->document,
-                        pageContext: $this->pageContext,
-                        turnId: $this->turnId,
-                        failoverDepth: $this->failoverDepth + 1,
-                        origin: $this->origin,
-                        resumesTurnId: $this->resumesTurnId,
-                        attachment: $this->attachment,
-                    ));
+                    $this->dispatchFailover($next);
 
                     return;
                 }
@@ -588,6 +575,38 @@ final class ProcessChatMessage implements ShouldQueue
 
         // Last, after persistFailedTurn: a reload landing mid-failed() must
         // never find the marker gone AND the rows unpersisted at once.
+        $this->abandonTurn();
+    }
+
+    /**
+     * @param  array{provider: string|null, model: string|null, id: string|null, source: string}  $next
+     */
+    private function dispatchFailover(array $next): void
+    {
+        dispatch(new self(
+            user: $this->user,
+            workspace: $this->workspace,
+            message: $this->message,
+            conversationId: $this->conversationId,
+            resolved: $next,
+            mentions: $this->mentions,
+            document: $this->document,
+            pageContext: $this->pageContext,
+            turnId: $this->turnId,
+            failoverDepth: $this->failoverDepth + 1,
+            origin: $this->origin,
+            resumesTurnId: $this->resumesTurnId,
+            attachment: $this->attachment,
+            claimKey: $this->claimKey,
+        ));
+    }
+
+    private function abandonTurn(): void
+    {
+        if ($this->claimKey !== null) {
+            Cache::forget($this->claimKey);
+        }
+
         TurnPresence::clear($this->conversationId, $this->turnId);
     }
 
