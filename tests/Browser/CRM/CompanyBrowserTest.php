@@ -107,7 +107,7 @@ it('keeps app page headings in the topbar across navigation and viewport sizes',
         'topbarHeight' => 48,
         'titleCentered' => true,
         'actionsTopGap' => 12,
-        'tableTopGap' => 13,
+        'tableTopGap' => 12,
         'hasHorizontalOverflow' => false,
     ]);
 
@@ -136,4 +136,41 @@ it('keeps app page headings in the topbar across navigation and viewport sizes',
         ->click(".fi-view-switcher a[href$='/app/{$workspace->slug}/tasks/board']")
         ->assertPathIs("/app/{$workspace->slug}/tasks/board")
         ->assertNoJavaScriptErrors();
+});
+
+it('keeps the header row and its controls in place when switching between the list and the board', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $headerRow = <<<'JS'
+        (() => {
+            const row = document.querySelector('.fi-board-header') ?? document.querySelector('main .fi-header');
+            const controlTops = [...row.querySelectorAll('button, input')]
+                .filter((control) => control.getClientRects().length > 0)
+                .map((control) => control.getBoundingClientRect().top);
+
+            return { height: row.getBoundingClientRect().height, controlTops: [...new Set(controlTops)] };
+        })();
+    JS;
+
+    $page = loginViaBrowser($user)
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/opportunities")
+        ->assertVisible('main .fi-header .fi-view-switcher');
+
+    $list = $page->script($headerRow);
+
+    $page->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->click(".fi-view-switcher a[href$='/app/{$workspace->slug}/opportunities/board']")
+        ->assertPathIs("/app/{$workspace->slug}/opportunities/board")
+        ->assertVisible('.fi-board-header .fi-ta-search-field');
+
+    $board = $page->script($headerRow);
+
+    expect($list['height'])->toBe(56)
+        ->and($board['height'])->toBe(56)
+        ->and($list['controlTops'])->toHaveCount(1)
+        ->and($board['controlTops'])->toBe($list['controlTops']);
 });

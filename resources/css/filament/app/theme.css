@@ -1755,6 +1755,11 @@ html.fi-record-stacked .fi-record-layout {
 
     .fi-header:not(.fi-header-page-heading-only) {
         @apply flex-row items-center justify-between gap-3 border-b border-gray-200/60 min-h-14 px-4 py-2 lg:px-6 dark:border-white/10;
+
+        /* Filament bottom-aligns the actions; the board row centres its tools, so both views match. */
+        & > .fi-header-actions-ctn {
+            @apply self-center;
+        }
     }
 
     .fi-page-content .fi-ta-ctn:not(.fi-modal *) {
