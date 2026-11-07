@@ -1307,7 +1307,7 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-record-next-task {
-        @apply -mx-1.5 -my-1 flex w-[calc(100%+0.75rem)] min-w-0 flex-col items-start gap-0.5 rounded-md px-1.5 py-1 text-start outline-none hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-white/5;
+        @apply -mx-1.5 -my-1 flex w-[calc(100%+0.75rem)] min-w-0 flex-col items-start gap-0.5 rounded-md px-1.5 py-1 text-start outline-none hover:bg-(--surface-row-hover-bg) focus-visible:ring-2 focus-visible:ring-primary-500;
     }
 
     .fi-record-next-task-title {
@@ -1391,7 +1391,7 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-record-overview-section .fi-section-header-after-ctn .fi-link {
-        @apply rounded-md px-2 py-1 hover:bg-gray-100 dark:hover:bg-white/10;
+        @apply rounded-md px-2 py-1 hover:bg-(--surface-control-hover-bg);
 
         & .fi-link-label {
             @apply text-sm font-normal text-gray-500 dark:text-gray-400;
@@ -1403,7 +1403,7 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-record-overview-view-all {
-        @apply rounded-md px-2 py-1 text-sm text-gray-500 outline-none hover:bg-gray-100 hover:text-gray-950 focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white;
+        @apply rounded-md px-2 py-1 text-sm text-gray-500 outline-none hover:bg-(--surface-control-hover-bg) hover:text-gray-950 focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-gray-400 dark:hover:text-white;
     }
 
     .fi-record-overview-count,
@@ -1412,7 +1412,7 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-icon-btn.fi-record-overview-add {
-        @apply m-0 size-7 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-950 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white;
+        @apply m-0 size-7 rounded-lg text-gray-500 hover:bg-(--surface-control-hover-bg) hover:text-gray-950 dark:text-gray-400 dark:hover:text-white;
 
         & .fi-icon {
             @apply size-4;
@@ -1424,7 +1424,7 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-record-overview-item {
-        @apply flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-start text-sm outline-none hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-primary-500 max-sm:min-h-11 dark:hover:bg-white/5;
+        @apply flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-start text-sm outline-none hover:bg-(--surface-row-hover-bg) focus-visible:ring-2 focus-visible:ring-primary-500 max-sm:min-h-11;
     }
 
     .fi-avatar.fi-record-overview-item-avatar {
@@ -1476,7 +1476,7 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-record-preview-header .fi-icon-btn {
-        @apply m-0 size-7 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-950 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white;
+        @apply m-0 size-7 rounded-lg text-gray-500 hover:bg-(--surface-control-hover-bg) hover:text-gray-950 dark:text-gray-400 dark:hover:text-white;
 
         & .fi-icon {
             @apply size-4;
