@@ -23,8 +23,7 @@
     $voiceAvailable = app(\Relaticle\Chat\Services\ModelRegistry::class)->voiceInputAvailable();
     $streaming = $showStopButton ? 'isStreaming' : 'false';
     $composerEmpty = $voiceAvailable ? '(text.trim().length === 0 && !pendingAttachment)' : 'false';
-    $micShown = "({$composerEmpty} && !{$streaming}) || recording || transcribing";
-    $sendShown = "!{$composerEmpty} && !recording && !transcribing && !{$streaming}";
+    $micShown = "!{$streaming} || recording || transcribing";
 @endphp
 
 <div
@@ -114,7 +113,8 @@
                  500s. type="button" is load-bearing: this sits inside the
                  composer's <form>, and a typeless button would submit it.
                  The mic holds the primary slot while the composer is empty and
-                 hands it to send once there is something to send. --}}
+                 steps aside for send, as a secondary button, once there is
+                 something to send. --}}
             <div
                 @if ($voiceAvailable)
                     x-data="voiceRecorder({
@@ -147,11 +147,13 @@
                         :aria-pressed="recording"
                         :aria-label="recording ? @js(__('Stop recording')) : @js(__('Start voice input'))"
                         :title="recording ? @js(__('Stop recording')) : @js(__('Start voice input'))"
-                        class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full max-sm:size-10 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-progress"
+                        class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full max-sm:size-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-progress"
                         :aria-busy="transcribing"
                         :class="recording
                             ? 'bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-500/20 dark:text-red-400 dark:hover:bg-red-500/30'
-                            : 'bg-primary-600 text-white hover:bg-primary-700'"
+                            : ({{ $composerEmpty }}
+                                ? 'bg-primary-600 text-white hover:bg-primary-700'
+                                : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white')"
                     >
                         <span x-show="!transcribing" :class="recording ? 'motion-safe:animate-pulse' : ''">
                             <x-lucide-mic class="h-4 w-4" aria-hidden="true" />
@@ -180,16 +182,24 @@
                     </div>
                 @endif
 
-                <button
-                    x-show="{{ $sendShown }}"
+                {{-- The slot's width and the button's scale share one duration and
+                     easing, so the growing circle exactly fills the opening slot. --}}
+                <div
+                    x-show="!{{ $streaming }}"
                     @if ($voiceAvailable || $showStopButton) x-cloak @endif
-                    type="submit"
-                    class="flex h-7 w-7 items-center justify-center rounded-full max-sm:size-10 bg-primary-600 text-white transition hover:bg-primary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 dark:disabled:bg-gray-700 dark:disabled:text-gray-500"
-                    :disabled="{{ $sendDisabled }}"
-                    aria-label="{{ __('Send message') }}"
+                    class="flex shrink-0 justify-end transition-[width,margin] duration-200 ease-out motion-reduce:transition-none"
+                    :class="{{ $composerEmpty }} ? 'invisible -ms-1.5 w-0' : 'w-7 max-sm:w-10'"
                 >
-                    <x-lucide-arrow-up class="h-4 w-4" />
-                </button>
+                    <button
+                        type="submit"
+                        class="flex h-7 w-7 shrink-0 origin-right items-center justify-center rounded-full max-sm:size-10 bg-primary-600 text-white hover:bg-primary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 dark:disabled:bg-gray-700 dark:disabled:text-gray-500"
+                        :class="{{ $composerEmpty }} ? 'scale-0 opacity-0' : 'scale-100 opacity-100 transition duration-200 ease-out motion-reduce:transition-none'"
+                        :disabled="({{ $sendDisabled }}) || recording || transcribing"
+                        aria-label="{{ __('Send message') }}"
+                    >
+                        <x-lucide-arrow-up class="h-4 w-4" />
+                    </button>
+                </div>
             </div>
 
             @if ($showStopButton)

@@ -34,6 +34,7 @@ export function chatEditor({ placeholder, onSubmit, onChange, onArrowUp, autofoc
         // must read this, not call getText(), because the editor lives outside
         // Alpine's reactive proxy.
         text: '',
+        dictating: false,
 
         init() {
             this.editorEl = this.$refs.editor;
@@ -99,7 +100,7 @@ export function chatEditor({ placeholder, onSubmit, onChange, onArrowUp, autofoc
                                 }
                             }
                             event.preventDefault();
-                            onSubmit?.();
+                            if (! this.dictating) onSubmit?.();
                             return true;
                         }
                         // ArrowUp-to-edit: only when the doc is empty (a single empty
