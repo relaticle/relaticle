@@ -458,7 +458,7 @@ it('refunds a blank reply to a turn nobody typed without acknowledging it', func
 
     expect($resolution->type)->toBe(AiCreditType::Refund)
         ->and($assistant->content)->toBe('');
-})->with([MessageOrigin::Resume, MessageOrigin::Greeting]);
+})->with([MessageOrigin::Resume, MessageOrigin::Greeting, MessageOrigin::DataArrived]);
 
 it('refunds a turn that ends with no text and no tool call and stores an acknowledgement', function (): void {
     withHostedBilling();

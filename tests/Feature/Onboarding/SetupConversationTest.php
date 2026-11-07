@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 use App\Actions\Onboarding\CreateSetupConversation;
 use App\Actions\Onboarding\StartSetupGreeting;
+use App\Enums\CreationSource;
+use App\Enums\OnboardingDataSource;
 use App\Enums\OnboardingUseCase;
 use App\Features\Billing;
 use App\Features\SetupConversation;
 use App\Filament\Pages\CreateWorkspace;
 use App\Listeners\CreateSetupConversationListener;
+use App\Models\Company;
+use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\SelfHostedEntitlements;
@@ -270,4 +274,40 @@ it('does not greet when the workspace is out of credits', function (): void {
     openSetupConversation($user, $workspace)->assertSet('turnInFlight', false);
 
     Queue::assertNothingPushed();
+});
+
+it('greets an inbox workspace with what its mailbox brought in', function (): void {
+    $user = User::factory()->create();
+    $workspace = personalWorkspaceFor($user, [
+        'onboarding_use_case' => OnboardingUseCase::Sales,
+        'onboarding_data_source' => OnboardingDataSource::Inbox,
+    ]);
+
+    People::factory()->count(30)->create(['workspace_id' => $workspace->getKey(), 'creator_id' => null, 'creation_source' => CreationSource::MAILBOX]);
+    Company::factory()->count(12)->create(['workspace_id' => $workspace->getKey(), 'creator_id' => null, 'creation_source' => CreationSource::MAILBOX]);
+
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
+        'credits_remaining' => 100,
+        'credits_used' => 0,
+        'period_starts_at' => now()->startOfMonth(),
+        'period_ends_at' => now()->endOfMonth(),
+    ]);
+
+    CrmAssistant::fake(['Hi, your inbox brought people in.']);
+
+    $job = new ProcessChatMessage(
+        user: $user,
+        workspace: $workspace,
+        message: '',
+        conversationId: $workspace->setupConversation->id,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'id' => 'claude-sonnet-5', 'source' => 'auto'],
+        turnId: (string) Str::ulid(),
+        origin: MessageOrigin::Greeting,
+    );
+    $job->handle(resolve(CreditService::class));
+
+    CrmAssistant::assertPrompted(fn ($prompt): bool => $prompt->prompt === MessageOrigin::Greeting->opener()
+        && str_contains($prompt->agent->dynamicInstructions(), "data_source: inbox\n")
+        && str_contains($prompt->agent->dynamicInstructions(), "arrived: 30 people and 12 companies from mailbox today\n")
+        && str_contains($prompt->agent->dynamicInstructions(), "<turn>\n".MessageOrigin::Greeting->directive()."\n</turn>"));
 });
