@@ -16,7 +16,7 @@ const inner = (svg) => svg.replace(/^[\s\S]*?<svg\b[^>]*>/, '').replace(/<\/svg>
 const source = fs.readFileSync(path.join(destination, 'logomark.svg'), 'utf8');
 const wordmark = fs.readFileSync(path.join(destination, 'wordmark.svg'), 'utf8');
 const colorMark = inner(source);
-const whiteMark = colorMark.replace(/\sopacity="[^"]*"/g, '').replace(/(fill|stroke)="url\(#[^"]*\)"/g, '$1="#FFFFFF"');
+const whiteMark = colorMark.replace(/\sopacity="[^"]*"/g, '').replace(/(fill|stroke)="(?!none")[^"]*"/g, '$1="#FFFFFF"');
 const placed = (fraction) => {
     const scale = 1024 * fraction / 1158;
     const offset = (1024 - 1158 * scale) / 2;
