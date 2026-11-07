@@ -837,7 +837,8 @@ describe('connect email', function (): void {
     it('moves on to the use case when the install offers no provider', function (): void {
         config()->set('services.gmail.client_id');
         config()->set('services.azure.client_id');
-        $workspace = workspaceInSetup(User::factory()->create(), source: OnboardingDataSource::Inbox);
+        $workspace = workspaceAtSource(User::factory()->create());
+        $workspace->forceFill(['onboarding_step' => WorkspaceSetupStep::Email])->save();
 
         livewire(SetupWorkspace::class)
             ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'))
@@ -1536,20 +1537,23 @@ describe('data source', function (): void {
             ->onboarding_step->toBe(WorkspaceSetupStep::Email);
     });
 
-    it('skips the mailbox step for the inbox answer when no provider is configured', function (): void {
+    it('hides the inbox answer when no provider is configured', function (): void {
         Feature::define(EmailIntegration::class, true);
         config()->set('services.gmail.client_id');
         config()->set('services.azure.client_id');
         $workspace = workspaceAtSource(User::factory()->create());
 
-        livewire(SetupWorkspace::class)
+        $setup = livewire(SetupWorkspace::class)
+            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.source.options.inbox.label'))
             ->fillForm(['onboarding_data_source' => 'inbox'])
             ->call('saveSource')
-            ->assertHasNoFormErrors();
+            ->assertHasFormErrors(['onboarding_data_source']);
 
-        expect($workspace->fresh())
-            ->onboarding_data_source->toBe(OnboardingDataSource::Inbox)
-            ->onboarding_step->toBe(WorkspaceSetupStep::UseCase);
+        expect(array_keys($setup->instance()->form->getFlatFields()['onboarding_data_source']->getOptions()))
+            ->not->toContain('inbox')
+            ->and($workspace->fresh())
+            ->onboarding_data_source->toBeNull()
+            ->onboarding_step->toBe(WorkspaceSetupStep::Source);
     });
 
     it('hides the inbox answer when email integration is off', function (): void {

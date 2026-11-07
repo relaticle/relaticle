@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
-use App\Features\EmailIntegration;
+use App\Onboarding\MailboxStep;
 use Filament\Support\Contracts\HasLabel;
-use Laravel\Pennant\Feature;
 
 enum OnboardingDataSource: string implements HasLabel
 {
@@ -23,7 +22,7 @@ enum OnboardingDataSource: string implements HasLabel
     {
         return array_values(array_filter(
             self::cases(),
-            fn (self $source): bool => $source !== self::Inbox || Feature::active(EmailIntegration::class),
+            fn (self $source): bool => $source !== self::Inbox || MailboxStep::canRun(),
         ));
     }
 

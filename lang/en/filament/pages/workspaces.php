@@ -83,11 +83,11 @@ return [
             'options' => [
                 'spreadsheet' => [
                     'label' => 'A spreadsheet',
-                    'description' => 'Upload your file of people and companies in the next step.',
+                    'description' => 'Upload your file of people and companies once setup is done.',
                 ],
                 'other_crm' => [
                     'label' => 'Another CRM',
-                    'description' => 'Export people and companies as a CSV file from your current CRM, then upload it in the next step.',
+                    'description' => 'Export people and companies as a CSV file from your current CRM, then upload it once setup is done.',
                 ],
                 'inbox' => [
                     'label' => 'My inbox',
