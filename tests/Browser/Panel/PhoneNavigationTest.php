@@ -177,6 +177,7 @@ it('keeps a sheet opened on a record page above the tab bar', function (): void 
         ->assertPathIs("/app/{$workspace->slug}")
         ->resize(393, 852)
         ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}")
+        ->click('.fi-record-pane .fi-tabs-item:nth-child(3)')
         ->click('.fi-record-pane .fi-ta-row .fi-ta-actions .fi-dropdown-trigger')
         ->wait(0.5)
         ->assertScript(SHEET_HOLDS_BOTTOM_EDGE, true)

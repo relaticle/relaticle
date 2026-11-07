@@ -127,14 +127,14 @@ it('raises the notes tab count when a note is added from the tab', function (): 
     $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")
         ->navigate("/app/{$workspace->slug}/companies/{$company->getKey()}")
-        ->click('.fi-record-pane .fi-tabs-item:nth-child(3)')
+        ->click('.fi-record-pane .fi-tabs-item:nth-child(5)')
         ->press('New note')
         ->type('[id="mountedActionSchema0.title"]', 'Kickoff notes')
         ->press('Create')
         ->assertSee('Kickoff notes');
 
     $page->assertScript(
-        '(() => document.querySelector(".fi-record-pane .fi-tabs-item:nth-child(3)").innerText.replace(/\s+/g, " ").trim())()',
+        '(() => document.querySelector(".fi-record-pane .fi-tabs-item:nth-child(5)").innerText.replace(/\s+/g, " ").trim())()',
         'Notes 1',
     );
 });
