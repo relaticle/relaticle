@@ -271,13 +271,13 @@ final readonly class RecordOverview
     private static function due(CarbonInterface $due): array
     {
         $local = $due->clone()->setTimezone(FilamentTimezone::get());
-        $today = today(FilamentTimezone::get());
+        $date = $local->isoFormat($local->isCurrentYear() ? 'MMM D' : 'MMM D, YYYY');
 
         return match (true) {
-            $local->lt($today) => ['label' => $local->isoFormat($local->isSameYear($today) ? 'MMM D' : 'MMM D, YYYY'), 'tone' => 'overdue'],
-            $local->isSameDay($today) => ['label' => __('filament/record-page.overview.today'), 'tone' => 'today'],
-            $local->isSameDay($today->addDay()) => ['label' => __('filament/record-page.overview.tomorrow'), 'tone' => 'upcoming'],
-            default => ['label' => $local->isoFormat($local->isSameYear($today) ? 'MMM D' : 'MMM D, YYYY'), 'tone' => 'upcoming'],
+            $local->isPast() => ['label' => $date, 'tone' => 'overdue'],
+            $local->isToday() => ['label' => __('filament/record-page.overview.today'), 'tone' => 'today'],
+            $local->isTomorrow() => ['label' => __('filament/record-page.overview.tomorrow'), 'tone' => 'upcoming'],
+            default => ['label' => $date, 'tone' => 'upcoming'],
         };
     }
 

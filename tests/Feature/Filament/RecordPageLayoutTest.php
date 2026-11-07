@@ -613,6 +613,20 @@ it('offers no overview create button to a member who can only view records', fun
         ->assertDontSeeHtml('fi-record-overview-add');
 });
 
+it('marks a task due earlier today as overdue on the overview, as the tasks board does', function (): void {
+    $this->travelTo(now()->setTime(15, 0));
+
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $dueField = CustomField::query()->forEntity(Task::class)->where('code', TaskField::DUE_DATE->value)->firstOrFail();
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Morning call']);
+    $task->saveCustomFieldValue($dueField, now()->setTime(9, 0));
+    $company->tasks()->attach($task);
+
+    livewire(ViewCompany::class, ['record' => $company->getKey()])
+        ->assertSeeHtml('fi-record-due-overdue')
+        ->assertDontSeeHtml('fi-record-due-today');
+});
+
 it('points the :dataset overview view all link at the activity log tab', function (string $model, string $page): void {
     $record = $model::factory()->recycle([$this->user, $this->workspace])->create();
     $component = livewire($page, ['record' => $record->getKey()]);
