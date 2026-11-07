@@ -194,9 +194,16 @@ jobs:
           restore-keys: pest-shards-
 
       - name: Tests
-        run: composer test:pest:ci
+        run: composer test:pest:ci -- --log-junit junit.xml
         env:
           SHARD: ${{ matrix.shard }}/6
+
+      - name: Upload timings
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: junit-tests-${{ matrix.shard }}
+          path: junit.xml
 
   self-hosted-build:
     runs-on: ubuntu-latest
@@ -269,7 +276,14 @@ jobs:
           composer dump-autoload
 
       - name: Tests
-        run: vendor/bin/pest --compact --parallel --configuration phpunit.ci.xml --testsuite=Arch,Smoke,Feature --ci --no-tia
+        run: vendor/bin/pest --compact --parallel --configuration phpunit.ci.xml --testsuite=Arch,Smoke,Feature --ci --no-tia --log-junit junit.xml
+
+      - name: Upload timings
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: junit-self-hosted
+          path: junit.xml
 
   browser-tests:
     runs-on: ubuntu-latest
@@ -372,7 +386,14 @@ jobs:
       # tests/.pest/shards.json times the Default suite only, so Pest splits these
       # classes round-robin and warns that the file is out of date.
       - name: Browser Tests
-        run: vendor/bin/pest tests/Browser/ --configuration phpunit.ci.xml ${{ matrix.browser == 'webkit' && '--group=webkit --browser safari' || format('--shard={0}/6', matrix.shard) }}
+        run: vendor/bin/pest tests/Browser/ --configuration phpunit.ci.xml ${{ matrix.browser == 'webkit' && '--group=webkit --browser safari' || format('--shard={0}/6', matrix.shard) }} --log-junit junit.xml
+
+      - name: Upload timings
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: junit-browser-${{ matrix.shard }}
+          path: junit.xml
 
       - name: Upload browser failure artifacts
         if: failure()
