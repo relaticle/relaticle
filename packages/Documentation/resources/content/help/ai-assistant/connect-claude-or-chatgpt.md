@@ -49,8 +49,8 @@ Rela, the built-in assistant.
 Open **Settings → Access Tokens** from your avatar menu. The
 **AI Connectors** section lists every assistant connected to your
 workspaces, which workspace each is bound to, and how many active tokens it
-holds. **Revoke** cuts an assistant's access immediately, and you can always
-connect it again later.
+holds. **Revoke** cuts an assistant's access immediately and stops any email
+it queued that has not gone out. You can always connect it again later.
 
 ![The AI Connectors list showing Claude and ChatGPT bound to a workspace, with active token counts and a revoke button per row](/help-assets/ai-assistant/connect-claude-or-chatgpt-1.png)
 
