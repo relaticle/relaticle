@@ -107,7 +107,7 @@ it('keeps app page headings in the topbar across navigation and viewport sizes',
         'topbarHeight' => 48,
         'titleCentered' => true,
         'actionsTopGap' => 12,
-        'tableTopGap' => 12,
+        'tableTopGap' => 13,
         'hasHorizontalOverflow' => false,
     ]);
 
@@ -156,6 +156,7 @@ it('keeps the header row and its controls in place when switching between the li
     JS;
 
     $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$workspace->slug}/opportunities")
         ->assertVisible('main .fi-header .fi-view-switcher');
@@ -169,8 +170,8 @@ it('keeps the header row and its controls in place when switching between the li
 
     $board = $page->script($headerRow);
 
-    expect($list['height'])->toBe(56)
-        ->and($board['height'])->toBe(56)
+    expect($list['height'])->toBe(57)
+        ->and($board['height'])->toBe(57)
         ->and($list['controlTops'])->toHaveCount(1)
         ->and($board['controlTops'])->toBe($list['controlTops']);
 });

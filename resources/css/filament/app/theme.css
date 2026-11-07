@@ -1754,12 +1754,7 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-header:not(.fi-header-page-heading-only) {
-        @apply flex-row items-center justify-between gap-3 border-b border-gray-200/60 min-h-14 px-4 py-2 lg:px-6 dark:border-white/10;
-
-        /* Filament bottom-aligns the actions; the board row centres its tools, so both views match. */
-        & > .fi-header-actions-ctn {
-            @apply self-center;
-        }
+        @apply flex-row items-center justify-between gap-3 border-b border-gray-200/60 px-4 py-3 lg:px-6 dark:border-white/10;
     }
 
     .fi-page-content .fi-ta-ctn:not(.fi-modal *) {
@@ -1835,7 +1830,12 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-board-header {
-        @apply flex items-center gap-x-4 border-b border-gray-200/60 bg-white min-h-14 px-4 py-2 lg:px-6 dark:border-white/10 dark:bg-gray-900;
+        @apply flex items-center gap-x-4 border-b border-gray-200/60 bg-white px-4 py-3 lg:px-6 dark:border-white/10 dark:bg-gray-900;
+
+        /* Filament floors table toolbar items at 36px, which would make this row taller than the list's. */
+        & .fi-ta-header-toolbar > * {
+            @apply min-h-0;
+        }
 
         /* Contents puts the clear filters button on the toolbar line, right after the filter trigger. */
         & > .ff-header {
