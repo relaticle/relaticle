@@ -114,7 +114,7 @@ final readonly class CallbackController
         }
 
         if (! $workspace->hasMailboxCapacity() && ! $this->reconnectsMailbox($user, $workspace, $provider, $socialUser)) {
-            return $this->redirectWithError($request, $user, $workspace->plan->mailboxLimitMessage(), $workspace);
+            return $this->redirectWithError($request, $user, $workspace->mailboxLimitMessage(), $workspace);
         }
 
         $this->connect($user, $workspace, $provider, $socialUser);

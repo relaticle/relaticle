@@ -201,7 +201,7 @@ it('does not connect a new mailbox when the workspace has reached its limit', fu
 
     $this->get(route('email-accounts.callback', ['provider' => 'gmail']))
         ->assertRedirect(EmailAccountsPage::getUrl(['tenant' => $workspace->slug], panel: 'app'))
-        ->assertSessionHas('error', 'The Pro plan allows 10 connected mailboxes in a workspace. Upgrade to connect more.');
+        ->assertSessionHas('error', 'Mailbox limit reached. This workspace can connect 10 mailboxes. Upgrade to connect more.');
 
     $this->assertDatabaseMissing(ConnectedAccount::class, [
         'email_address' => 'connected@example.com',

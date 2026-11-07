@@ -56,7 +56,7 @@ it('quotes the mailbox limit of each plan when billing is on', function (): void
 
     $html = html_entity_decode($this->get('/email-and-calendar')->assertOk()->getContent());
 
-    expect($html)->toContain('Cloud Pro connects up to '.Plan::Pro->connectedMailboxes().' mailboxes, also during the free trial, and Cloud Scale up to '.Plan::Scale->connectedMailboxes().'.')
+    expect($html)->toContain('The free trial connects one mailbox. Cloud Pro connects up to '.Plan::Pro->connectedMailboxes().', and Cloud Scale up to '.Plan::Scale->connectedMailboxes().'.')
         ->and($html)->not->toContain('The Free plan');
 });
 
