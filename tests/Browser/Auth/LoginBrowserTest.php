@@ -27,6 +27,31 @@ it('reveals the password field only after continue', function (): void {
         ->assertVisible('[id="form.password"]');
 });
 
+it('keeps the sign in button reachable on a 320px phone', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $this->visit('/app/login')
+        ->resize(320, 568)
+        ->type('[id="form.email"]', $user->email)
+        ->click('button[type="submit"]')
+        ->assertVisible('[id="form.password"]')
+        ->assertScript(asyncAlpineComponentsLoaded())
+        ->type('[id="form.password"]', 'password')
+        ->assertScript('getComputedStyle(document.documentElement).overflowY !== "hidden"')
+        ->assertScript('(() => {
+            const button = document.querySelector(\'button[type="submit"]\')
+            button.scrollIntoView({ block: "end" })
+            const box = button.getBoundingClientRect()
+
+            return box.top >= 0 && box.bottom <= innerHeight
+                && button.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2))
+        })()')
+        ->click('button[type="submit"]')
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->assertNoJavaScriptErrors();
+});
+
 it('waits for explicit verification after entering all six digits', function (): void {
     $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $secret = Fortify::currentEncrypter()->decrypt($user->two_factor_secret);

@@ -47,7 +47,7 @@
         <div x-cloak x-show="opening" role="status" aria-label="{{ __('filament/emails/composer.opening') }}">
             <div class="ei-composer-opening-backdrop fixed inset-0 z-40 bg-gray-950/50"></div>
 
-            <div class="ei-composer-opening-panel fixed left-1/2 top-1/2 z-50 flex h-[85vh] w-[calc(100%-2rem)] max-w-5xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl bg-white shadow-2xl shadow-gray-950/20 ring-1 ring-gray-950/10 dark:bg-gray-900 dark:shadow-black/50 dark:ring-white/10">
+            <div class="ei-composer-opening-panel fixed left-1/2 top-1/2 z-50 flex h-[85vh] w-[calc(100%-2rem)] max-w-5xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl max-sm:inset-0 max-sm:h-dvh max-sm:w-full max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:pt-[env(safe-area-inset-top)] bg-white shadow-2xl shadow-gray-950/20 ring-1 ring-gray-950/10 dark:bg-gray-900 dark:shadow-black/50 dark:ring-white/10">
                 <div class="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 pl-4 pr-4 dark:border-white/10 dark:bg-white/5">
                     <span class="flex items-center gap-2">
                         <x-heroicon-m-envelope class="h-4 w-4 shrink-0 text-primary-500" />
@@ -157,6 +157,9 @@
                     'left-1/2 top-1/2 z-50 h-[85vh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2' => $isModal,
                     'max-w-5xl' => $isModal && ! $isMassSendLayout,
                     'max-w-6xl' => $isModal && $isMassSendLayout,
+                    // A phone has no room for a corner window, so an open composer takes the screen.
+                    'max-sm:inset-0 max-sm:h-dvh max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:pt-[env(safe-area-inset-top)] max-sm:pb-[env(safe-area-inset-bottom)] max-sm:ring-0' => $isFloating && ! $isMinimized,
+                    'max-sm:inset-x-2 max-sm:bottom-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom)+0.5rem)] max-sm:w-auto' => $isFloating && $isMinimized,
                 ])
             >
                 {{-- Title bar. The inline dock sits inside the message it answers, so it
@@ -198,7 +201,8 @@
                                     wire:click="toggleExpand"
                                     aria-label="{{ $expandLabel }}"
                                     x-tooltip="{ content: @js($expandLabel), theme: $store.theme }"
-                                    class="{{ $chromeButton }}"
+                                    {{-- A phone shows both sizes full screen, so shrinking would only drop mass sending. --}}
+                                    class="{{ $chromeButton }} max-sm:hidden"
                                 >
                                     <x-dynamic-component
                                         :component="$isExpanded ? 'heroicon-m-arrows-pointing-in' : 'heroicon-m-arrows-pointing-out'"
@@ -246,8 +250,8 @@
                         <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
                     @endif
                     @if ($isMassSendLayout)
-                        <div class="flex min-h-0 flex-1 overflow-hidden">
-                            <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                        <div class="flex min-h-0 flex-1 overflow-hidden max-md:flex-col max-md:overflow-y-auto">
+                            <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden max-md:flex-none max-md:overflow-visible">
                     @endif
 
                     {{-- Field rows --}}
@@ -292,13 +296,14 @@
                         'flex shrink-0 flex-col gap-2 border-t border-gray-200 px-3 dark:border-white/10 sm:px-5',
                         'sticky bottom-0 z-10 bg-white dark:bg-gray-900' => ! $isFloating,
                         'py-3' => $showMassSendToggle && $isMassSend,
-                        'h-14 justify-center' => ! ($showMassSendToggle && $isMassSend),
+                        'h-14 justify-center max-sm:h-auto max-sm:py-3' => ! ($showMassSendToggle && $isMassSend),
                     ])>
                         @if ($showMassSendToggle && $isMassSend)
                             <x-email-integration::composer-mass-send-outbox-hint />
                         @endif
 
-                        <div class="flex items-center justify-between gap-3">
+                        {{-- A phone has no room for one row, so Send takes a full-width row of its own under the tools. --}}
+                        <div class="flex items-center justify-between gap-3 max-sm:flex-wrap max-sm:gap-y-3">
                         <div class="flex items-center gap-1">
                             <x-email-integration::composer-icon-button icon="heroicon-o-paper-clip" :label="__('filament/emails/composer.actions.attach')" x-on:click="$refs.attachments.click()" />
                             <input type="file" x-ref="attachments" wire:model="attachments" multiple class="hidden" />
@@ -327,7 +332,7 @@
                             <span wire:loading wire:target="attachments" class="pl-1 text-xs text-gray-400">{{ __('filament/emails/composer.actions.uploading') }}</span>
                         </div>
 
-                        <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-3 max-sm:contents">
                             <x-email-integration::composer-mass-send-footer-actions
                                 :show-toggle="$showMassSendToggle"
                                 :is-mass-send="$isMassSend"
@@ -339,6 +344,7 @@
                             wire:loading.attr="disabled"
                             wire:target="send, attachments"
                             icon="heroicon-m-paper-airplane"
+                            class="max-sm:basis-full"
                         >
                             @if ($isMassSend)
                                 {{ __('filament/emails/composer.mass_send.send_button', ['count' => count($massRecipients)]) }}

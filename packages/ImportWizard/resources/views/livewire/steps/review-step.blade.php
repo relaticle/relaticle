@@ -6,7 +6,7 @@
     use Relaticle\ImportWizard\Enums\SortDirection;
 @endphp
 <div
-    class="flex flex-col h-full overflow-hidden"
+    class="flex flex-col h-full md:overflow-hidden"
     x-data="{
         timer: null,
         startPolling() {
@@ -37,10 +37,10 @@
     @endif
 
     {{-- Main Content --}}
-    <div class="flex-1 flex gap-4 overflow-hidden min-h-[12rem]">
+    <div class="flex-1 flex flex-col md:flex-row gap-4 md:overflow-hidden min-h-[12rem]">
         {{-- Column List (Left Panel) --}}
         <div
-            class="w-56 shrink-0 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 flex flex-col overflow-hidden">
+            class="md:w-56 md:shrink-0 max-md:max-h-48 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 flex flex-col overflow-hidden">
             <div
                 class="px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 rounded-t-xl shrink-0">
                 Mapped Columns
@@ -187,7 +187,7 @@
             @else
                 {{-- Filters --}}
                 <div class="px-3 py-2 border-b border-gray-200 dark:border-gray-700 shrink-0">
-                    <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center justify-between gap-3 max-md:flex-wrap">
                         <div class="flex gap-1 text-xs">
                             @foreach (ReviewFilter::cases() as $filterCase)
                                 <button

@@ -51,8 +51,8 @@ it('links the configured legal pages in the onboarding footer', function (): voi
 });
 
 it('shows no legal links in the onboarding footer when none are configured', function (): void {
-    config()->set('relaticle.legal.privacy_url', null);
-    config()->set('relaticle.legal.terms_url', null);
+    config()->set('relaticle.legal.privacy_url');
+    config()->set('relaticle.legal.terms_url');
 
     $this->actingAs(User::factory()->create());
 

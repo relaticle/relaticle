@@ -33,7 +33,7 @@
                     @endforeach
                 </select>
             @else
-                <span class="truncate text-sm text-gray-900 dark:text-gray-100">{{ $fromAccount?->label }}</span>
+                <span class="truncate text-sm text-gray-900 dark:text-gray-100" title="{{ $fromAccount?->label }}">{{ $fromAccount?->label }}</span>
             @endif
         </span>
     </div>
@@ -57,8 +57,8 @@
                 />
             </div>
             <span class="flex h-10 shrink-0 items-center space-x-2 text-xs font-medium text-gray-400">
-                <button type="button" wire:click="toggleCc" @class(['transition hover:text-gray-700 dark:hover:text-gray-200', 'text-primary-600 dark:text-primary-400' => $showCc])>{{ __('filament/emails/composer.fields.cc') }}</button>
-                <button type="button" wire:click="toggleBcc" @class(['transition hover:text-gray-700 dark:hover:text-gray-200', 'text-primary-600 dark:text-primary-400' => $showBcc])>{{ __('filament/emails/composer.fields.bcc') }}</button>
+                <button type="button" wire:click="toggleCc" @class(['max-sm:min-h-11 transition hover:text-gray-700 dark:hover:text-gray-200', 'text-primary-600 dark:text-primary-400' => $showCc])>{{ __('filament/emails/composer.fields.cc') }}</button>
+                <button type="button" wire:click="toggleBcc" @class(['max-sm:min-h-11 transition hover:text-gray-700 dark:hover:text-gray-200', 'text-primary-600 dark:text-primary-400' => $showBcc])>{{ __('filament/emails/composer.fields.bcc') }}</button>
             </span>
         @endif
     </div>

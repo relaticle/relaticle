@@ -8,6 +8,7 @@ use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
 use App\Filament\Components\Forms\WorkspaceMemberSelect;
 use App\Filament\Components\RecordChip;
+use App\Filament\Components\Tables\EmptyListDescription;
 use App\Filament\Components\Tables\RecordChipColumn;
 use App\Filament\Exports\CompanyExporter;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
@@ -32,6 +33,7 @@ use Filament\Actions\ViewAction;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
+use Filament\Tables\Columns\Column;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
@@ -73,44 +75,8 @@ final class CompanyResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->columns([
-                RecordChipColumn::make('name')
-                    ->label(__('filament/resources/company.fields.name.label'))
-                    ->searchable()
-                    ->sortable(),
-                RecordChipColumn::make('accountOwner.name')
-                    ->label(__('filament/resources/company.fields.account_owner.label'))
-                    ->searchable()
-                    ->sortable()
-                    ->toggleable(),
-                TextColumn::make('creator.name')
-                    ->label(__('filament/resources/company.fields.created_by.label'))
-                    ->searchable()
-                    ->sortable()
-                    ->toggleable()
-                    ->getStateUsing(fn (Company $record): string => $record->created_by),
-                TextColumn::make('deleted_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable()
-                    ->toggledHiddenByDefault(),
-                TextColumn::make('created_at')
-                    ->label(__('filament/resources/company.fields.created_at.label'))
-                    ->dateTime()
-                    ->searchable()
-                    ->sortable()
-                    ->toggleable(),
-                // "2 hours ago" is the friendlier read, but it was the one datetime in the
-                // panel a user could not check: no absolute value and no tooltip. Keep the
-                // relative label and put the exact time behind a hover.
-                TextColumn::make('updated_at')
-                    ->label(__('filament/resources/company.fields.updated_at.label'))
-                    ->since()
-                    ->dateTimeTooltip()
-                    ->searchable()
-                    ->sortable()
-                    ->toggleable(),
-            ])
+            ->emptyStateDescription(EmptyListDescription::unlessFiltered(__('filament/resources/company.empty_state.description')))
+            ->columns(self::columns())
             ->defaultSort('created_at', 'desc')
             ->filters([
                 SelectFilter::make('creation_source')
@@ -139,6 +105,53 @@ final class CompanyResource extends Resource
                     RestoreBulkAction::make(),
                 ]),
             ]);
+    }
+
+    /**
+     * @return array<int, Column>
+     */
+    private static function columns(): array
+    {
+        return [
+            RecordChipColumn::make('name')
+                ->label(__('filament/resources/company.fields.name.label'))
+                ->searchable()
+                ->sortable(),
+            RecordChipColumn::make('accountOwner.name')
+                ->label(__('filament/resources/company.fields.account_owner.label'))
+                ->searchable()
+                ->sortable()
+                ->toggleable(),
+            TextColumn::make('creator.name')
+                ->label(__('filament/resources/company.fields.created_by.label'))
+                ->searchable()
+                ->sortable()
+                ->toggleable()
+                ->visibleFrom('sm')
+                ->getStateUsing(fn (Company $record): string => $record->created_by),
+            TextColumn::make('deleted_at')
+                ->dateTime()
+                ->sortable()
+                ->toggleable()
+                ->toggledHiddenByDefault(),
+            TextColumn::make('created_at')
+                ->label(__('filament/resources/company.fields.created_at.label'))
+                ->dateTime()
+                ->searchable()
+                ->sortable()
+                ->visibleFrom('sm')
+                ->toggleable(),
+            // "2 hours ago" is the friendlier read, but it was the one datetime in the
+            // panel a user could not check: no absolute value and no tooltip. Keep the
+            // relative label and put the exact time behind a hover.
+            TextColumn::make('updated_at')
+                ->label(__('filament/resources/company.fields.updated_at.label'))
+                ->since()
+                ->dateTimeTooltip()
+                ->searchable()
+                ->sortable()
+                ->toggleable(),
+        ];
     }
 
     public static function getRelations(): array

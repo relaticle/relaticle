@@ -268,11 +268,61 @@
 }
 
 .ei-visibility-search .fi-ta-search-field {
-    @apply w-full max-w-xs;
+    @apply w-full max-w-xs max-sm:max-w-none;
+}
+
+/* Below sm a row is a card, as list tables stack: the heading cell heads it, then one label and value per line, the value under its label on the narrowest phones. */
+.ei-stacked-table {
+    @apply max-sm:block;
+
+    & > thead {
+        @apply max-sm:hidden;
+    }
+
+    & > tbody,
+    & > tbody > tr,
+    & > tbody > tr > td {
+        @apply max-sm:block;
+    }
+
+    & > tbody > tr {
+        @apply max-sm:relative max-sm:py-3;
+    }
+
+    & > tbody > tr > td {
+        @apply max-sm:py-1;
+    }
+
+    & > tbody > tr > td[data-label] {
+        @apply max-sm:grid max-sm:grid-cols-[8.5rem_minmax(0,1fr)] max-sm:items-center max-sm:gap-x-3 max-[360px]:grid-cols-1! max-[360px]:gap-y-0.5;
+
+        &::before {
+            @apply max-sm:truncate max-sm:text-gray-500 max-sm:content-[attr(data-label)] dark:max-sm:text-gray-400;
+        }
+    }
+
+    & .ei-stacked-table-heading {
+        @apply max-sm:pe-14 max-sm:pb-2;
+    }
+
+    & .ei-stacked-table-actions {
+        @apply max-sm:absolute max-sm:end-2 max-sm:top-2 max-sm:p-0;
+    }
 }
 
 .ei-enforcement-picker-option[aria-selected='true'] {
     @apply bg-gray-50 dark:bg-white/5;
+}
+
+/* iOS clips a sheet to the touch-scrolling box it opens from, so on a phone the email stops scrolling while a
+   menu from the reply composer is open. Hidden keeps the scroll offset. */
+[data-email-scroll-region]:has(.fi-dropdown-panel[x-ref='panel'][style*='display: block']) {
+    @apply max-sm:overflow-hidden!;
+}
+
+/* On a phone the picker is a bottom sheet, so its options sit as rounded rows like the panel's sheet menus. */
+.ei-enforcement-picker-option {
+    @apply max-sm:rounded-lg max-sm:border-b-0;
 }
 
 /* ── Email list: direction badge ───────────────────────────────────────────
@@ -331,4 +381,28 @@
 /* Empty picker copy is a caption. The same row style as a real choice reads as a signature or template named "No …". */
 .composer-picker-note {
     @apply px-2 py-1.5 text-start text-xs italic text-gray-400 dark:text-gray-500;
+}
+
+/* A mailbox's settings on a phone: its actions stay beside the address, and the tabs drop their own frame so the
+   blocklist and signatures are not boxed three deep. */
+.ei-account-settings {
+    & > .fi-section-header .fi-section-header-content {
+        @apply max-sm:flex-nowrap max-sm:items-start;
+
+        & > .fi-section-header-text-ctn {
+            @apply max-sm:min-w-0 max-sm:flex-1;
+        }
+    }
+
+    & > .fi-section-content-ctn > .fi-section-content {
+        @apply max-sm:p-4;
+    }
+
+    & .fi-sc-tabs.fi-contained {
+        @apply max-sm:rounded-none max-sm:bg-transparent max-sm:shadow-none max-sm:ring-0 dark:max-sm:bg-transparent;
+
+        & .fi-sc-tabs-tab.fi-active {
+            @apply max-sm:px-0 max-sm:pb-0;
+        }
+    }
 }

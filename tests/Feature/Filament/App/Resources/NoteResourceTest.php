@@ -35,6 +35,14 @@ it('can render the index page', function (): void {
         ->assertOk();
 });
 
+it('describes an empty list in one line', function (): void {
+    livewire(ManageNotes::class)
+        ->assertSee('Notes you add appear here.');
+
+    livewire(NotesCards::class)
+        ->assertSee('Notes you add appear here.');
+});
+
 // Column metadata is checked against a single mounted table rather than one
 // dataset case per column: mounting the page dominates the cost, and Filament's
 // assertion messages already name the offending column.

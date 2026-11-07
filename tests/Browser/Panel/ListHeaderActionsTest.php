@@ -10,7 +10,7 @@ it('keeps the list Import / Export menu inside the viewport', function (int $wid
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $panelFits = '(() => { const r = [...document.querySelectorAll(".fi-header .fi-dropdown-panel")].find((p) => p.offsetParent !== null).getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth; })()';
+    $panelFits = '(() => { const r = [...document.querySelectorAll(".fi-header .fi-dropdown-panel")].find((p) => p.getClientRects().length > 0).getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth; })()';
 
     loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")

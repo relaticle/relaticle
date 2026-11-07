@@ -6,6 +6,7 @@ namespace App\Filament\Resources;
 
 use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
+use App\Filament\Components\Tables\EmptyListDescription;
 use App\Filament\Concerns\RemembersViewMode;
 use App\Filament\Exports\OpportunityExporter;
 use App\Filament\Resources\OpportunityResource\Forms\OpportunityForm;
@@ -61,6 +62,7 @@ final class OpportunityResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->emptyStateDescription(EmptyListDescription::unlessFiltered(__('filament/resources/opportunity.empty_state.description')))
             ->columns([
                 TextColumn::make('name')
                     ->searchable(),
@@ -69,6 +71,7 @@ final class OpportunityResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->toggleable()
+                    ->visibleFrom('sm')
                     ->getStateUsing(fn (Opportunity $record): string => $record->created_by),
                 TextColumn::make('deleted_at')
                     ->dateTime()
@@ -77,6 +80,7 @@ final class OpportunityResource extends Resource
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
+                    ->visibleFrom('sm')
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('updated_at')
                     ->dateTime()

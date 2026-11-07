@@ -38,19 +38,17 @@
 
 /* App Panel Custom Layout
 
-   Profile (and any tall page) was scrolling the document. Overflow past
-   <body> paints on <html>. html.fi is only min-h-dvh; Filament also sets
-   .fi-main-ctn to min-h-[calc(100dvh-4rem)]. The app shell used h-screen
-   (100vh), which can be taller than 100dvh. Lock html/body and keep the
-   only scroller on .fi-layout. */
-html.fi:has(body.fi-panel-app) {
+   A shell with its own scroller (the app layout, the settings layout) locks html and body, so the only
+   scroller is that shell. Profile (and any tall page) was scrolling the document: overflow past <body>
+   paints on <html>, and h-screen (100vh) can be taller than 100dvh. Guest and onboarding pages have no
+   such scroller, so they keep document scrolling. */
+html.fi:has(body.fi-panel-app :is(.fi-app-layout, .fi-settings-layout)),
+.fi-body.fi-panel-app:has(:is(.fi-app-layout, .fi-settings-layout)) {
     height: 100dvh;
     overflow: hidden;
 }
 
 .fi-body.fi-panel-app {
-    height: 100dvh;
-    overflow: hidden;
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
         env(safe-area-inset-left);
 }
@@ -153,7 +151,7 @@ html.fi:has(body.fi-panel-app) {
 
     /* Keyboard hint reads as a key cap rather than trailing text */
     .fi-input-wrp-suffix {
-        @apply pe-1.5;
+        @apply pe-1.5 max-sm:hidden;
 
         .fi-input-wrp-label {
             @apply rounded-md bg-gray-50 px-1.5 py-px text-[0.6875rem]/[1.125rem] font-medium text-gray-500 ring-1 ring-gray-950/[0.06] dark:bg-white/10 dark:text-gray-400 dark:ring-white/10;
@@ -253,6 +251,11 @@ html.fi:has(body.fi-panel-app) {
     .fi-sidebar.fi-sidebar-open {
         width: min(90vw, 18rem);
     }
+}
+
+/* Against the scrimmed page the drawer's white/10 hairline vanishes in dark mode. */
+.fi-sidebar.fi-sidebar-open {
+    @apply max-sm:dark:border-white/20 max-sm:dark:ring-white/20;
 }
 
 /* Drag handle straddling a resizable edge (components/resize-handle). */
@@ -397,9 +400,12 @@ html.fi-chat-docked .fi-app-main-wrapper {
     }
 }
 
-/* Top Navigation Bar: 3rem, the height of the sidebar's workspace row. */
+/* Top Navigation Bar: 3rem, the height of the sidebar's workspace row. The phone tab bar sits below the content. */
 .fi-body {
     --topbar-height: 3rem;
+    --bottom-nav-height: 0rem;
+
+    @apply max-sm:[--bottom-nav-height:3.75rem];
 }
 
 .fi-topbar {
@@ -920,16 +926,40 @@ a.fi-linked-records-chip {
         @apply max-sm:border-0!;
     }
 
-    & > td.fi-ta-cell:not(.fi-ta-selection-cell, :has(.fi-ta-actions)) {
+    & > td.fi-ta-cell:not(.fi-ta-selection-cell, :has(.fi-ta-actions), [class*=':fi-visible']) {
         @apply max-sm:grid max-sm:grid-cols-[8.5rem_minmax(0,1fr)] max-sm:items-center max-sm:gap-x-3 max-sm:py-1;
 
         & > .fi-ta-cell-label {
             @apply max-sm:truncate max-sm:pt-0 max-sm:font-normal;
         }
+
+        & > .fi-ta-cell-content {
+            @apply max-sm:min-w-0;
+        }
+
+        & .fi-ta-text > .inline-flex {
+            @apply max-sm:max-w-full;
+        }
+
+        & .fi-ta-text > .inline-flex .group\/value {
+            @apply max-sm:min-w-0 max-sm:shrink;
+
+            & > a {
+                @apply max-sm:max-w-full;
+            }
+        }
+
+        &:is(
+                :has(.fi-ta-text:not(.fi-ta-text-item)):not(:has(.fi-ta-text:not(.fi-ta-text-item) > :not(.sr-only))),
+                :has(.fi-linked-records-cell-empty),
+                :has(.fi-ta-col > div > span:only-child:empty)
+            ) {
+            @apply max-sm:hidden;
+        }
     }
 
     & > td:is(.fi-ta-selection-cell + td, :first-child:not(.fi-ta-selection-cell)) {
-        @apply max-sm:block max-sm:pe-24 max-sm:pb-2;
+        @apply max-sm:block max-sm:min-w-0 max-sm:overflow-hidden max-sm:pe-24 max-sm:pb-2;
 
         & > .fi-ta-cell-label {
             @apply max-sm:hidden;
@@ -937,6 +967,10 @@ a.fi-linked-records-chip {
 
         & :is(.fi-ta-text-item, .fi-record-chip) {
             @apply max-sm:font-semibold;
+        }
+
+        & :is(.fi-ta-text-item, .fi-record-chip .truncate) {
+            @apply max-sm:line-clamp-2 max-sm:break-words max-sm:whitespace-normal;
         }
     }
 
@@ -950,7 +984,33 @@ a.fi-linked-records-chip {
 }
 
 .fi-ta-table-stacked-on-mobile .fi-ta-cell-content > .fi-ta-col > * {
-    @apply max-sm:p-0;
+    @apply max-sm:min-w-0 max-sm:p-0;
+}
+
+.fi-ta-table-stacked-on-mobile .fi-ta-cell-content > .fi-ta-col > * > * {
+    @apply max-sm:max-w-full max-sm:min-w-0;
+}
+
+/* On a phone the table search fills the toolbar row, beside the filter and column buttons. The actions after
+   it are often only bulk actions waiting on a selection, so they take a margin once shown rather than a gap. */
+.fi-ta-header-toolbar {
+    @apply max-sm:gap-x-0;
+
+    & > :has(> .fi-ta-search-field) {
+        @apply max-sm:ms-0 max-sm:flex-1;
+
+        & > .fi-ta-search-field {
+            @apply max-sm:w-full max-sm:max-w-none;
+        }
+    }
+
+    & > .fi-ta-actions {
+        @apply max-sm:order-last;
+
+        &:has(> :not([style*='display: none'])) {
+            @apply max-sm:ms-3;
+        }
+    }
 }
 
 /* The head cells already rule off an empty table. */
@@ -1019,7 +1079,7 @@ a.fi-linked-records-chip {
     }
 
     .fi-modal-close-btn {
-        @apply end-4.5 top-2.5 m-0 size-7 rounded-md text-gray-500 hover:bg-gray-950/5 hover:text-gray-950 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white;
+        @apply end-4.5 top-2.5 m-0 size-7 rounded-md max-sm:-m-2 max-sm:size-11 text-gray-500 hover:bg-gray-950/5 hover:text-gray-950 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white;
 
         .fi-icon {
             @apply size-4.5;
@@ -1139,7 +1199,7 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-in-entry-has-inline-label .fi-in-entry-label {
-        @apply truncate font-normal text-gray-500 dark:text-gray-400;
+        @apply truncate font-normal text-gray-500 max-sm:overflow-visible max-sm:text-clip max-sm:whitespace-normal dark:text-gray-400;
     }
 
     .fi-in-entry-label-ctn {
@@ -1149,6 +1209,18 @@ html.fi-record-stacked .fi-record-layout {
             @apply size-4 text-gray-500 dark:text-gray-400;
         }
     }
+}
+
+.fi-record-header {
+    @apply max-sm:flex-wrap max-sm:gap-y-2;
+
+    & > .fi-growable {
+        @apply max-sm:basis-full;
+    }
+}
+
+.fi-record-title .truncate {
+    @apply max-sm:break-words max-sm:whitespace-normal;
 }
 
 .fi-record-details-toggle {
@@ -1193,24 +1265,7 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-ta-header-toolbar {
-        @apply order-1 border-b-0 p-0 max-sm:order-2 max-sm:basis-full max-sm:gap-x-0;
-
-        & > :has(> .fi-ta-search-field) {
-            @apply max-sm:ms-0 max-sm:flex-1;
-
-            & > .fi-ta-search-field {
-                @apply max-sm:w-full max-sm:max-w-none;
-            }
-        }
-
-        /* Bulk actions show only with a selection, so they space themselves rather than through a gap. */
-        & > .fi-ta-actions {
-            @apply max-sm:order-last;
-
-            & > .fi-dropdown {
-                @apply max-sm:ms-3;
-            }
-        }
+        @apply order-1 border-b-0 p-0 max-sm:order-2 max-sm:basis-full;
     }
 
     /* A modal mounted in the pane keeps its sections as cards, as it has them everywhere else. */
@@ -1660,13 +1715,16 @@ html.fi-record-stacked .fi-record-layout {
     @apply rounded-xl;
 }
 
-/* Onboarding Wizard - split-screen layout overrides */
-html.fi:has(body.fi-onboarding-wizard),
-.fi-body.fi-onboarding-wizard {
-    height: auto;
-    overflow: visible;
+/* On a phone the guest card sits under the logo; centring it in the viewport left a gap of over 100px. */
+.fi-simple-main-ctn {
+    @apply max-sm:items-start;
 }
 
+.fi-simple-main {
+    @apply max-sm:my-4 max-sm:py-6;
+}
+
+/* Onboarding Wizard - split-screen layout overrides */
 .fi-body.fi-onboarding-wizard {
     @apply bg-white dark:bg-gray-950;
 }
@@ -1688,7 +1746,7 @@ html.fi:has(body.fi-onboarding-wizard),
     box-shadow: none;
     --tw-ring-shadow: none;
     --tw-ring-color: transparent;
-    padding: 0;
+    @apply p-0 max-sm:px-4;
     border-radius: 0;
     max-width: none;
     width: 100%;
@@ -1764,6 +1822,10 @@ html.fi:has(body.fi-onboarding-wizard),
     --ff-card-bg: var(--surface-block-bg);
     --ff-card-ring: var(--surface-block-border);
     --ff-gap: 0.75rem;
+
+    @media (width < 40rem) {
+        --ff-column-width: min(300px, calc(100vw - 3.5rem));
+    }
 }
 
 .dark .ff-board {
@@ -1970,16 +2032,16 @@ html.fi:has(body.fi-onboarding-wizard),
 /* The editor draws its own placeholder so the trigger can be a key cap, which
    Filament's `content: attr(data-placeholder)` cannot style. */
 .fi-slash-placeholder {
-    @apply pointer-events-none absolute inline-flex select-none items-center gap-1 text-gray-400 dark:text-gray-500;
+    @apply pointer-events-none absolute inline select-none text-gray-400 dark:text-gray-500;
 
     kbd {
-        @apply inline-flex h-5 min-w-5 items-center justify-center rounded border border-gray-200 bg-gray-50 px-1 font-sans text-xs text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-400;
+        @apply inline-flex h-5 min-w-5 items-center align-baseline justify-center rounded border border-gray-200 bg-gray-50 px-1 font-sans text-xs text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-400;
     }
 }
 
 /* Notes cards view: a grouped grid of note cards in place of the table rows. */
 .fi-ta-content-grid:has(.fi-note-card) {
-    @apply gap-5 px-6 pb-8;
+    @apply gap-5 px-6 pb-8 max-sm:px-4;
     grid-template-columns: repeat(auto-fill, minmax(min(22rem, 100%), 1fr)) !important;
 
     @variant xl {
@@ -2029,7 +2091,7 @@ html.fi:has(body.fi-onboarding-wizard),
 }
 
 .fi-note-card {
-    @apply flex h-56 w-full flex-col px-5 pt-5 text-start;
+    @apply flex h-56 w-full flex-col px-5 pt-5 text-start max-sm:px-0 max-sm:pt-4;
 }
 
 .fi-note-card-records {
@@ -2052,12 +2114,16 @@ html.fi:has(body.fi-onboarding-wizard),
 }
 
 .fi-note-card-title {
-    @apply truncate text-base font-medium text-gray-950 dark:text-white;
+    @apply truncate text-base font-medium text-gray-950 max-sm:line-clamp-2 max-sm:whitespace-normal dark:text-white;
 }
 
 .fi-note-card-excerpt {
     @apply mt-1 line-clamp-4 min-h-0 flex-1 text-sm/6 text-gray-600 dark:text-gray-300;
     mask-image: linear-gradient(to bottom, black calc(100% - 1.5rem), transparent);
+
+    @media (width < 40rem) {
+        mask-image: none;
+    }
 
     &.fi-note-card-excerpt-empty {
         @apply text-gray-400 dark:text-gray-500;
@@ -2075,4 +2141,209 @@ html.fi:has(body.fi-onboarding-wizard),
 
 .fi-note-card-date {
     @apply shrink-0 text-gray-500 dark:text-gray-400;
+}
+
+/* iOS zooms into a field set under 16px when it is tapped, and the page stays zoomed after, so on a touch
+   screen every text field and editor is 16px. Filament's own inputs only do this below sm. */
+@media (pointer: coarse) {
+    .fi-body.fi-panel-app :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file']), textarea, select, [contenteditable='true']) {
+        font-size: 16px;
+    }
+}
+
+/* A rich editor whose tools sit in one group ran its toolbar off a phone screen: the toolbar wraps groups, not tools. */
+.fi-fo-rich-editor-toolbar-group {
+    @apply max-sm:flex-wrap max-sm:gap-y-1;
+}
+
+/* A toast is capped at max-w-sm and pinned to the right, so on a phone it sat off-centre. It spans the screen
+   there instead, below the notch. */
+.fi-no {
+    @apply max-sm:top-[calc(env(safe-area-inset-top)+1rem)] max-sm:items-stretch;
+
+    & .fi-no-notification {
+        @apply max-sm:max-w-none;
+    }
+}
+
+/* Phones: a tab bar replaces the topbar's menu button, and menus and dialogs rise from the bottom edge. */
+
+/* Phones scroll the document rather than the content box. iOS clips a fixed sheet or dialog to a scrolling
+   box it sits in, and only the document gets tap-to-top and Safari's collapsing toolbar. */
+@media (width < 40rem) {
+    html.fi:has(body.fi-panel-app .fi-app-layout),
+    .fi-body.fi-panel-app:has(.fi-app-layout),
+    .fi-app-layout,
+    .fi-app-main-wrapper > .fi-layout {
+        height: auto;
+        overflow: visible;
+    }
+
+    html.fi:has(body.fi-panel-app .fi-app-layout) {
+        overflow-x: clip;
+    }
+
+    .fi-body.fi-panel-app:has(.fi-app-layout) {
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+
+    .fi-app-layout {
+        min-height: 100dvh;
+    }
+
+    .fi-app-main-wrapper > .fi-topbar-ctn {
+        padding-top: env(safe-area-inset-top);
+    }
+
+    /* The page holds still under an open sheet, as it does under a dialog, so a drag on the sheet never moves it. */
+    html.fi:has(body.fi-panel-app .fi-app-layout):has(.fi-dropdown-panel[x-ref='panel'][style*='display: block'], [data-sheet]:not([x-cloak], [style*='display: none'])) {
+        overflow: hidden;
+    }
+}
+
+/* Filament makes the topbar inert while the drawer is open, so a tap on it reached the overlay anyway. Under the
+   overlay (29) it is scrimmed like the page, and the drawer (30) covers the part its header would. */
+.fi-app-layout:has(.fi-main-sidebar.fi-sidebar-open) > .fi-app-main-wrapper > .fi-topbar-ctn {
+    @apply max-sm:z-28;
+}
+
+/* z-25: above the content's own layers (the table toolbar is 21), under the sidebar overlay (29). */
+.fi-bottom-nav {
+    @apply sticky bottom-0 z-25 box-content flex h-(--bottom-nav-height) shrink-0 border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)] sm:hidden dark:border-white/10 dark:bg-gray-900;
+}
+
+.fi-bottom-nav-item {
+    @apply flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[0.6875rem] font-medium text-gray-500 max-[22.5rem]:text-[0.625rem] max-[22.5rem]:tracking-tight dark:text-gray-400;
+
+    & > .fi-icon {
+        @apply size-6;
+    }
+
+    & > span {
+        @apply max-w-full truncate;
+    }
+
+    &.fi-active {
+        @apply text-primary-600 dark:text-primary-400;
+    }
+}
+
+.fi-sidebar-drawer-close-btn {
+    @apply size-11 lg:hidden;
+}
+
+.fi-topbar-open-sidebar-btn {
+    @apply max-sm:hidden!;
+}
+
+/* Floating UI writes position inline, hence !important; min-width outranks every fi-width-* cap. Menus inside
+   the sidebar or a dialog stay anchored to their trigger. A hand-placed menu opts in with data-sheet. */
+:is(.fi-dropdown-panel[x-ref='panel']:not(.fi-sidebar *, .fi-modal *), [data-sheet]) {
+    @apply max-sm:fixed! max-sm:inset-x-0! max-sm:top-auto! max-sm:bottom-0! max-sm:z-40 max-sm:max-h-[80dvh] max-sm:min-w-full max-sm:overflow-y-auto max-sm:overscroll-contain max-sm:rounded-b-none max-sm:rounded-t-2xl max-sm:border-x-0 max-sm:border-b-0 max-sm:px-2 max-sm:pt-3 max-sm:pb-[max(0.5rem,env(safe-area-inset-bottom))] max-sm:transition-[opacity,translate] max-sm:duration-200;
+    @apply max-sm:shadow-[0_0_0_100vmax_rgb(3_7_18/0.5)] max-sm:dark:ring-white/20;
+
+    &.fi-opacity-0 {
+        @apply max-sm:translate-y-full;
+    }
+
+    & .fi-dropdown-list-item {
+        @apply max-sm:gap-3 max-sm:px-3 max-sm:py-3 max-sm:text-base;
+    }
+}
+
+/* A select inside the filter sheet opens in the flow rather than beside it, where Floating UI placed it past the sheet's edge. */
+.fi-ta-filters .fi-dropdown-panel {
+    @apply max-sm:relative! max-sm:top-auto! max-sm:mt-1 max-sm:max-h-none! max-sm:w-full!;
+}
+
+.fi-ta-filters .fi-select-input-btn {
+    @apply max-sm:h-9;
+}
+
+/* The table and board still scroll their own boxes, so those stop while a sheet is open. Hidden keeps the offset. */
+:is(.fi-ta-content-ctn, .ff-columns, .ff-cards):has(.fi-dropdown-panel[x-ref='panel'][style*='display: block']) {
+    @apply max-sm:overflow-hidden!;
+}
+
+/* A sheet or dialog from the page must outrank the topbar and tab bar. The record pane isolates its content at
+   level 0, so both bars stop sticking and leave the stacking order, keeping their space so nothing shifts. */
+.fi-app-main-wrapper:has(> .fi-layout :is(.fi-dropdown-panel[x-ref='panel'][style*='display: block'], .fi-modal.fi-modal-open)) > :is(.fi-topbar-ctn, .fi-bottom-nav) {
+    @apply max-sm:static max-sm:z-auto;
+}
+
+/* With rows ticked, the toolbar holding the bulk actions trigger follows the scroll, as the rows are far from it. */
+.fi-ta-ctn:not(.fi-modal *):has(.fi-ta-record-checkbox:checked) .fi-ta-header-ctn {
+    @apply max-sm:sticky max-sm:top-[calc(var(--topbar-height)+env(safe-area-inset-top))] max-sm:border-b max-sm:border-gray-200/60 max-sm:bg-white dark:max-sm:border-white/10 dark:max-sm:bg-gray-900;
+}
+
+/* A stacked row's actions cell must outrank the table header. */
+.fi-ta-cell:has(.fi-dropdown-panel[x-ref='panel'][style*='display: block']) {
+    @apply max-sm:z-40;
+}
+
+/* Each table toolbar (z-21) is a stacking context, which traps its sheet at 21 beside the next table's toolbar,
+   and a record pane isolates its tables. The table holding an open sheet outranks its later siblings. */
+:is(.fi-ta-ctn, .fi-ta-header-ctn):not(.fi-modal *):has(.fi-dropdown-panel[x-ref='panel'][style*='display: block']) {
+    @apply max-sm:z-40;
+}
+
+/* The container clips rather than scrolls: mid-rise the window overflows it, and iOS scrolled it to the
+   focused button, so the dialog showed mid-screen and then slid down. The window scrolls itself. */
+.fi-modal:not(.fi-modal-slide-over, .fi-width-screen) > .fi-modal-window-ctn {
+    @apply max-sm:grid-rows-[1fr_auto] max-sm:overflow-clip! max-sm:p-0;
+
+    & > .fi-modal-window {
+        @apply max-sm:max-h-[90dvh] max-sm:overflow-y-auto max-sm:rounded-b-none max-sm:rounded-t-2xl max-sm:pb-[env(safe-area-inset-bottom)];
+
+        /* Rises on a keyframe: iOS skips a transition whose start state lands as the window is unhidden. */
+        &.fi-transition-enter {
+            @apply max-sm:animate-[fi-sheet-rise_300ms_ease-out];
+        }
+
+        &:is(.fi-transition-enter-start, .fi-transition-enter-end) {
+            @apply max-sm:scale-100 max-sm:opacity-100;
+        }
+
+        &.fi-transition-leave-end {
+            @apply max-sm:translate-y-full max-sm:scale-100 max-sm:opacity-100;
+        }
+    }
+}
+
+@keyframes fi-sheet-rise {
+    from {
+        translate: 0 100%;
+    }
+}
+
+/* A fingertip needs about 44px. The glyphs keep their size and a negative margin keeps each centre where it was. */
+@media (width < 40rem) {
+    .fi-sidebar-item-btn {
+        @apply min-h-11;
+    }
+
+    .fi-inbox-icon-btn {
+        @apply size-11;
+    }
+
+    .fi-inbox-tab {
+        @apply min-h-11 pb-0;
+    }
+
+    .fi-settings-back-link {
+        @apply -my-2 min-h-11;
+    }
+
+    .fi-record-page .fi-sc-actions :is(.fi-btn, .fi-icon-btn) {
+        @apply min-h-11 min-w-11;
+    }
+
+    .fi-modal:not(.fi-modal-slide-over) .fi-modal-close-btn {
+        @apply -m-3 size-11;
+    }
+
+    .fi-onboarding-link {
+        @apply inline-flex min-h-11 items-center;
+    }
 }

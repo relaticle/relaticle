@@ -655,26 +655,8 @@ final class AppPanelProvider extends PanelProvider
         $this->registerInvitationHooks($panel);
         $this->registerNotifications($panel);
 
-        // Hidden without a bound tenant: the old panel-root fallback sent these
-        // to the dashboard, silently abandoning the create-workspace wizard.
-        $accountMenuItems = [
-            Action::make('settings')
-                ->label(__('filament/panel.user_menu.settings'))
-                ->icon('heroicon-m-cog-6-tooth')
-                ->visible(fn (): bool => $this->shouldRegisterMenuItem())
-                ->url(fn (): string => url(Settings::getUrl())),
-        ];
-
-        if (Features::hasApiFeatures()) {
-            $accountMenuItems[] = Action::make('api_tokens')
-                ->label(__('access-tokens.user_menu'))
-                ->icon('heroicon-o-key')
-                ->visible(fn (): bool => $this->shouldRegisterMenuItem())
-                ->url(fn (): string => url(AccessTokens::getUrl()));
-        }
-
         $panel->userMenuItems([
-            $accountMenuItems,
+            $this->accountMenuItems(),
             $this->supportMenuItems(),
             [],
         ]);
@@ -696,6 +678,32 @@ final class AppPanelProvider extends PanelProvider
             ]);
 
         return $panel;
+    }
+
+    /**
+     * @return list<Action>
+     */
+    private function accountMenuItems(): array
+    {
+        // Hidden without a bound tenant: the old panel-root fallback sent these
+        // to the dashboard, silently abandoning the create-workspace wizard.
+        $items = [
+            Action::make('settings')
+                ->label(__('filament/panel.user_menu.settings'))
+                ->icon('heroicon-m-cog-6-tooth')
+                ->visible(fn (): bool => $this->shouldRegisterMenuItem())
+                ->url(fn (): string => url(Settings::getUrl())),
+        ];
+
+        if (Features::hasApiFeatures()) {
+            $items[] = Action::make('api_tokens')
+                ->label(__('access-tokens.user_menu'))
+                ->icon('heroicon-o-key')
+                ->visible(fn (): bool => $this->shouldRegisterMenuItem())
+                ->url(fn (): string => url(AccessTokens::getUrl()));
+        }
+
+        return $items;
     }
 
     /**

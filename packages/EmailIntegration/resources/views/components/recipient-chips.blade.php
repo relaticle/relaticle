@@ -254,13 +254,14 @@
     }"
     x-effect="if (isOpen) updatePopover()"
     x-on:resize.window="updatePopover()"
-    x-on:scroll.window="updatePopover()"
+    {{-- Capture: a reply or forward sits in the email's own scroll region, whose scroll never reaches the window. --}}
+    x-on:scroll.window.capture="updatePopover()"
     @if ($wireModel) wire:ignore @endif
     {{ $attributes->whereDoesntStartWith('wire:model')->merge(['class' => 'flex min-h-10 min-w-0 flex-wrap content-start items-center gap-2 py-2']) }}
 >
     <template x-for="chip in selectedChips" :key="chip.value">
         <span
-            class="inline-flex max-w-48 items-center gap-1 rounded-full bg-gray-100 py-0.5 pl-0.5 pr-0.5 text-[11px] font-medium leading-4 text-gray-800 ring-1 ring-gray-950/5 dark:bg-white/10 dark:text-gray-200 dark:ring-white/10"
+            class="inline-flex max-w-48 items-center gap-1 rounded-full max-sm:max-w-[calc(100%-4.5rem)] bg-gray-100 py-0.5 pl-0.5 pr-0.5 text-[11px] font-medium leading-4 text-gray-800 ring-1 ring-gray-950/5 dark:bg-white/10 dark:text-gray-200 dark:ring-white/10"
             x-tooltip="{ content: chipTooltip(chip), theme: $store.theme }"
         >
             <x-email-integration::recipient-avatar box="size-4" glyph="size-2.5" />
@@ -283,7 +284,7 @@
         x-bind:aria-controls="'{{ $listboxId }}'"
         role="combobox"
         autocomplete="off"
-        class="h-6 min-w-[8rem] flex-1 border-0 bg-transparent p-0 text-sm leading-6 focus:outline-none focus:ring-0"
+        class="h-6 min-w-16 flex-1 sm:min-w-[8rem] border-0 bg-transparent p-0 text-sm leading-6 focus:outline-none focus:ring-0"
     />
 
     <template x-teleport="body">

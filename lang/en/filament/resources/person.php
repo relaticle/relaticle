@@ -38,6 +38,10 @@ return [
         ],
     ],
 
+    'empty_state' => [
+        'description' => 'People you add or import appear here.',
+    ],
+
     'pages' => [
         'list' => [
             'actions' => [

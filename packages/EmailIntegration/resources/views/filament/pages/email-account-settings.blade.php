@@ -10,7 +10,7 @@
             wire:poll.10s.visible="refreshAccount"
         @endif
     >
-        <x-filament::section class="-mt-2">
+        <x-filament::section class="ei-account-settings -mt-2">
             <x-slot name="heading">
                 <div class="flex items-start gap-3">
                     <x-filament::icon :icon="$account->provider->getIcon()" class="mt-0.5 h-6 w-6 shrink-0 text-gray-400" />

@@ -62,7 +62,7 @@
                 @endif
 
                 {{-- Page content area --}}
-                <div class="fi-layout" style="flex: 1; overflow-y: auto;">
+                <div class="fi-layout">
                     {{ \Filament\Support\Facades\FilamentView::renderHook(\Filament\View\PanelsRenderHook::LAYOUT_START, scopes: $renderHookScopes) }}
 
                     <div
@@ -108,6 +108,10 @@
 
                     {{ \Filament\Support\Facades\FilamentView::renderHook(\Filament\View\PanelsRenderHook::LAYOUT_END, scopes: $renderHookScopes) }}
                 </div>
+
+                @if ($hasNavigation)
+                    @include('filament.app.bottom-navigation')
+                @endif
             </div>
         </div>
     @else

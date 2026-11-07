@@ -3,7 +3,7 @@
     $mailboxSyncing = $mailboxConnected && $this->isMailboxSyncing();
 @endphp
 
-<div class="mt-14" data-testid="meetings-home">
+<div class="mt-14 max-sm:mt-8" data-testid="meetings-home">
     <div class="mb-3 flex items-center justify-between gap-3">
         <h2 class="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
             <x-filament::icon :icon="\Filament\Support\Icons\Heroicon::OutlinedCalendar" class="size-4 shrink-0 text-gray-400 dark:text-gray-500" />
@@ -13,13 +13,13 @@
             @endif
         </h2>
         @if (! $mailboxSyncing)
-            <div class="flex shrink-0 items-center gap-1">
+            <div class="flex shrink-0 items-center gap-1 max-sm:gap-0">
                 {{-- The prefix is server-rendered and the date comes from the picker's
                      own state, so a click anywhere on "Today, Sep 10" opens the calendar. --}}
                 <div class="fi-meetings-date flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
                     <span
                         aria-hidden="true"
-                        class="cursor-pointer"
+                        class="cursor-pointer max-sm:text-base"
                         x-on:click="$el.parentElement.querySelector('.fi-meetings-date-trigger')?.click()"
                     >{{ $this->datePrefix() }}</span>
                     {{ $this->getSchema('datePickerSchema') }}
@@ -28,6 +28,7 @@
                 <x-filament::icon-button
                     color="gray"
                     size="xs"
+                    class="max-sm:size-8"
                     :icon="\Filament\Support\Icons\Heroicon::OutlinedChevronLeft"
                     :label="__('filament/pages/dashboard.meetings.previous_day')"
                     wire:click="previousDay"
@@ -35,6 +36,7 @@
                 <x-filament::icon-button
                     color="gray"
                     size="xs"
+                    class="max-sm:size-8"
                     :icon="\Filament\Support\Icons\Heroicon::OutlinedChevronRight"
                     :label="__('filament/pages/dashboard.meetings.next_day')"
                     wire:click="nextDay"
@@ -74,14 +76,14 @@
     @if ($mailboxSyncing)
         @include('email-integration::livewire.partials.mailbox-sync-status')
     @elseif (! $mailboxConnected)
-        <div class="rounded-xl border border-dashed border-[var(--surface-block-border)] px-6 py-10 text-center" data-testid="meetings-disconnected">
+        <div class="rounded-xl border border-dashed border-[var(--surface-block-border)] px-6 py-10 text-center max-sm:py-5" data-testid="meetings-disconnected">
             <p class="text-sm font-medium text-gray-900 dark:text-white">
                 {{ __('filament/pages/dashboard.meetings.disconnected.title') }}
             </p>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 {{ __('filament/pages/dashboard.meetings.disconnected.description') }}
             </p>
-            <div class="mt-4 flex flex-wrap justify-center gap-3">
+            <div class="mt-4 flex flex-wrap justify-center gap-3 max-sm:[&_.fi-btn]:w-full">
                 {{ $this->connectGmailAction }}
 
                 @if ($this->connectAzureAction->isVisible())
@@ -93,7 +95,7 @@
         @php
             $nextDayWithMeetings = $this->nextDayWithMeetings();
         @endphp
-        <div class="rounded-xl border border-dashed border-[var(--surface-block-border)] px-6 py-10 text-center">
+        <div class="rounded-xl border border-dashed border-[var(--surface-block-border)] px-6 py-10 text-center max-sm:py-5">
             <p class="text-sm font-medium text-gray-900 dark:text-white">
                 {{ __('filament/pages/dashboard.meetings.empty.title') }}
             </p>

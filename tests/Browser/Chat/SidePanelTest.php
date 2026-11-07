@@ -151,3 +151,29 @@ it('covers the page instead of docking below the xl breakpoint', function (): vo
         ->assertVisible('[data-chat-side-panel]')
         ->assertScript('getComputedStyle(document.querySelector(".fi-app-main-wrapper")).paddingRight', '0px');
 });
+
+it('keeps the history popover inside a phone viewport', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $assistantName = config('chat.assistant_name');
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/people")
+        ->resize(320, 640)
+        ->click("button[aria-label=\"Ask {$assistantName}\"]")
+        ->assertVisible('[data-chat-side-panel]')
+        ->click('[data-chat-side-panel] button[aria-label="View history"]')
+        ->assertVisible('[data-chat-side-panel] [role="dialog"][aria-label="Chat history"]');
+
+    $popover = json_decode((string) $page->script(<<<'JS'
+        (() => {
+            const box = document.querySelector('[data-chat-side-panel] [role="dialog"][aria-label="Chat history"]').getBoundingClientRect();
+
+            return JSON.stringify({ left: box.left, right: box.right, viewport: window.innerWidth });
+        })();
+    JS), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($popover['left'])->toBeGreaterThanOrEqual(8)
+        ->and($popover['right'])->toBeLessThanOrEqual($popover['viewport'] - 8);
+});
