@@ -237,11 +237,14 @@ html.fi:has(body.fi-panel-app :is(.fi-app-layout, .fi-settings-layout)),
     @apply mx-0 px-2;
 }
 
-/* The 3rem rail centres a 2rem item: 1rem of nav padding less the groups'
-   -0.5rem, then the item's own 0.5rem. */
+/* The rail drops the groups' negative margin and the item's padding, so both are set here: 0.5rem of
+   nav padding each side, then 0.5rem inside the item, keeps the icon in the switcher's column. */
 @media (width >= 64rem) {
-    .fi-sidebar:not(.fi-sidebar-open) .fi-sidebar-nav {
-        @apply ps-4;
+    .fi-sidebar:not(.fi-sidebar-open) {
+        .fi-sidebar-nav,
+        .fi-sidebar-item-btn {
+            @apply px-2;
+        }
     }
 }
 
@@ -470,10 +473,10 @@ html.fi-chat-docked .fi-app-main-wrapper {
     }
 
     /* Filament sizes the collapsed rail from its content, and `auto` cannot be
-       animated from a fixed width. `--collapsed-sidebar-width` comes from the
+       animated from a fixed width. `--sidebar-collapsed-width` comes from the
        panel's `collapsedSidebarWidth()`, so both ends are explicit. */
     .fi-sidebar:not(.fi-sidebar-open) {
-        width: var(--collapsed-sidebar-width);
+        width: var(--sidebar-collapsed-width);
     }
 
     /* Keeping the icons start-aligned means they hold their column while the
