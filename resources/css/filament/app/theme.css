@@ -2294,7 +2294,7 @@ html.fi-record-stacked .fi-record-layout {
     @apply max-sm:grid-rows-[1fr_auto] max-sm:overflow-clip! max-sm:p-0;
 
     & > .fi-modal-window {
-        @apply max-sm:max-h-[90dvh] max-sm:overflow-y-auto max-sm:rounded-b-none max-sm:rounded-t-2xl max-sm:pb-[env(safe-area-inset-bottom)];
+        @apply max-sm:max-w-none max-sm:max-h-[90dvh] max-sm:overflow-y-auto max-sm:rounded-b-none max-sm:rounded-t-2xl max-sm:pb-[env(safe-area-inset-bottom)];
 
         /* Rises on a keyframe: iOS skips a transition whose start state lands as the window is unhidden. */
         &.fi-transition-enter {

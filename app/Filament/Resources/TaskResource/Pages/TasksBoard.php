@@ -8,6 +8,7 @@ use App\Actions\Task\UpdateTask;
 use App\Enums\CustomFields\TaskField as TaskCustomField;
 use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Actions\EditTaskAction;
+use App\Filament\Actions\MoveCardAction;
 use App\Filament\Components\Forms\WorkspaceMemberSelect;
 use App\Filament\Components\Tables\Filters\RecordSelectFilter;
 use App\Filament\Concerns\HasViewSwitcher;
@@ -222,6 +223,7 @@ final class TasksBoard extends BoardResourcePage
                 ->modalWidth(Width::ThreeExtraLarge)
                 ->icon('heroicon-o-pencil-square')
                 ->schema(fn (Schema $schema): Schema => TaskForm::get($schema)),
+            MoveCardAction::make(),
             Action::make('delete')
                 ->authorize(fn (?Task $record): bool => $record instanceof Task && Gate::allows('delete', $record))
                 ->label(__('filament/pages/boards.tasks.actions.delete'))
