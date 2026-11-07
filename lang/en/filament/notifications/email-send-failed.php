@@ -24,5 +24,6 @@ return [
         'mailbox_needs_reconnect' => 'The mailbox needs reconnecting before this email can be sent.',
         'workspace_paused' => 'The workspace was paused when this email was due, so it was not sent.',
         'agent_connection_revoked' => 'The assistant connection that queued this email was removed before it was due, so it was not sent.',
+        'agent_send_not_allowed' => 'Your role in this workspace no longer allows an assistant to send email for you, so it was not sent.',
     ],
 ];

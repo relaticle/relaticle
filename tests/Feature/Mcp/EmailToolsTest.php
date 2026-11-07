@@ -1241,6 +1241,57 @@ it('does not send an email once the access token that queued it has expired', fu
     expect($email->fresh()->status)->toBe(EmailStatus::FAILED);
 });
 
+it('does not send an email an agent queued once its sender is demoted to viewer', function (): void {
+    $member = memberWithRole($this->workspace, WorkspaceRole::Member);
+    sendOverHttp($member, ['read', 'email:send'], 'Desk Agent', sendArguments(mailboxOf($member, $this->workspace)));
+    $email = Email::query()->where('creation_source', EmailCreationSource::MCP)->latest('id')->firstOrFail();
+
+    $this->workspace->users()->updateExistingPivot($member->getKey(), ['role' => WorkspaceRole::Viewer->value]);
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldNotReceive('make');
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    runSendJob($email);
+
+    expect($email->fresh())
+        ->status->toBe(EmailStatus::FAILED)
+        ->last_error->toBe(__('filament/notifications/email-send-failed.reasons.agent_send_not_allowed'));
+});
+
+it('sends an email an agent queued once its demoted sender retries it from the outbox', function (): void {
+    $member = memberWithRole($this->workspace, WorkspaceRole::Member);
+    sendOverHttp($member, ['read', 'email:send'], 'Desk Agent', sendArguments(mailboxOf($member, $this->workspace)));
+    $email = Email::query()->where('creation_source', EmailCreationSource::MCP)->latest('id')->firstOrFail();
+    $this->workspace->users()->updateExistingPivot($member->getKey(), ['role' => WorkspaceRole::Viewer->value]);
+    runSendJob($email);
+
+    $this->actingAs($member->fresh());
+    Filament::setTenant($this->workspace);
+    livewire(OutboxTable::class)
+        ->filterTable('status_tab', 'failed')
+        ->callAction(TestAction::make('retry')->table($email))
+        ->assertNotified();
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->once()->andThrow(new RuntimeException('provider reached'));
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    expect(fn () => runSendJob($email->fresh()))->toThrow(RuntimeException::class, 'provider reached');
+});
+
+it('still sends an email an agent queued while its sender keeps the member role', function (): void {
+    $member = memberWithRole($this->workspace, WorkspaceRole::Member);
+    sendOverHttp($member, ['read', 'email:send'], 'Desk Agent', sendArguments(mailboxOf($member, $this->workspace)));
+    $email = Email::query()->where('creation_source', EmailCreationSource::MCP)->latest('id')->firstOrFail();
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->once()->andThrow(new RuntimeException('provider reached'));
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    expect(fn () => runSendJob($email))->toThrow(RuntimeException::class, 'provider reached');
+});
+
 it('does not send an email once the connector that queued it is revoked', function (): void {
     $client = connectedClient($this->viewer);
     Passport::actingAs($this->viewer, [Registrar::OAUTH_SCOPE, 'email:send'], client: $client);
