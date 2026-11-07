@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Pages;
 
 use App\Enums\OnboardingUseCase;
+use App\Enums\WorkspaceCapability;
 use App\Enums\WorkspaceSetupStep;
 use App\Filament\Pages\Concerns\BuildsOnboardingPreview;
 use App\Filament\Pages\Concerns\RunsInviteStep;
@@ -20,6 +21,7 @@ use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentView;
 use Livewire\Attributes\Locked;
 use Override;
+use Relaticle\ImportWizard\Filament\Pages\ImportPeople;
 
 /**
  * @property-read Schema $form
@@ -171,6 +173,16 @@ final class SetupWorkspace extends Page
     }
 
     private function landingUrl(Workspace $workspace): string
+    {
+        $importsFile = $workspace->onboarding_data_source?->isFile() === true
+            && $this->authUser()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::DataImport);
+
+        return $importsFile
+            ? ImportPeople::getUrl(panel: 'app', tenant: $workspace)
+            : $this->setupChatUrl($workspace);
+    }
+
+    private function setupChatUrl(Workspace $workspace): string
     {
         $conversationId = $workspace->setupConversation()->value('id');
 

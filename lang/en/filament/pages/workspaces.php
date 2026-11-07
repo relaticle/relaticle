@@ -137,6 +137,8 @@ return [
             'copy_link' => 'Copy link',
             'create_link' => 'Create link',
             'send_and_start' => 'Send invites and get started',
+            'upload_file' => 'Upload my file',
+            'do_later' => 'Do this later',
             'not_sent' => [
                 'title' => 'Some invitations were not sent',
                 'body' => 'Your workspace is ready. Check Members in settings and invite anyone missing.',

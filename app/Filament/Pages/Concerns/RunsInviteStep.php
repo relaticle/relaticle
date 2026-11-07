@@ -7,6 +7,7 @@ namespace App\Filament\Pages\Concerns;
 use App\Actions\Jetstream\InviteWorkspaceMember;
 use App\Actions\Jetstream\UpdateInviteLinkSettings;
 use App\Actions\Onboarding\MoveWorkspaceSetup;
+use App\Actions\Onboarding\StartSetupLater;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceSetupStep;
 use App\Exceptions\WorkspaceInvitationRateLimitedException;
@@ -31,24 +32,12 @@ trait RunsInviteStep
 
     public function finish(): void
     {
-        $state = $this->inviteForm()->getState();
+        $this->completeSetup(startLater: false);
+    }
 
-        if (! resolve(MoveWorkspaceSetup::class)->execute($this->authUser(), $this->workspace, WorkspaceSetupStep::Invite, null)) {
-            $this->redirectTo(self::getUrl(['tenant' => $this->workspace]));
-
-            return;
-        }
-
-        $this->sendInvitationsOrWarn($state);
-
-        Notification::make()
-            ->title(__('filament/pages/workspaces.create_workspace.notifications.workspace_created.title'))
-            ->body(__('filament/pages/workspaces.create_workspace.notifications.workspace_created.body', ['name' => $this->workspace->name]))
-            ->success()
-            ->send();
-
-        // Full page load: the panel's sidebar store initialises only on a page's first load.
-        $this->redirect($this->landingUrl($this->workspace));
+    public function finishLater(): void
+    {
+        $this->completeSetup(startLater: $this->workspace->onboarding_data_source?->isFile() === true);
     }
 
     public function createInviteLink(): void
@@ -71,6 +60,32 @@ trait RunsInviteStep
         }
 
         return route('workspaces.join', ['token' => $this->workspace->invite_link_token]);
+    }
+
+    private function completeSetup(bool $startLater): void
+    {
+        $state = $this->inviteForm()->getState();
+
+        if (! resolve(MoveWorkspaceSetup::class)->execute($this->authUser(), $this->workspace, WorkspaceSetupStep::Invite, null)) {
+            $this->redirectTo(self::getUrl(['tenant' => $this->workspace]));
+
+            return;
+        }
+
+        if ($startLater) {
+            resolve(StartSetupLater::class)->execute($this->authUser(), $this->workspace);
+        }
+
+        $this->sendInvitationsOrWarn($state);
+
+        Notification::make()
+            ->title(__('filament/pages/workspaces.create_workspace.notifications.workspace_created.title'))
+            ->body(__('filament/pages/workspaces.create_workspace.notifications.workspace_created.body', ['name' => $this->workspace->name]))
+            ->success()
+            ->send();
+
+        // Full page load: the panel's sidebar store initialises only on a page's first load.
+        $this->redirect($startLater ? $this->setupChatUrl($this->workspace) : $this->landingUrl($this->workspace));
     }
 
     /**

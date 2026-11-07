@@ -87,6 +87,7 @@ final readonly class SaveOnboardingUseCase
     {
         return $workspace->isPersonalWorkspace()
             && Feature::active(OnboardSeed::class)
+            && ($workspace->onboarding_data_source?->seedsSamples() ?? true)
             && ! $this->facts->hasConnectedMailbox($user, $workspace);
     }
 

@@ -7,6 +7,7 @@ use App\Actions\Onboarding\MoveWorkspaceSetup;
 use App\Actions\Onboarding\SaveOnboardingDataSource;
 use App\Actions\Onboarding\SaveOnboardingSharing;
 use App\Actions\Onboarding\SaveOnboardingUseCase;
+use App\Actions\Onboarding\StartSetupLater;
 use App\Enums\CreationSource;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\OnboardingDataSource;
@@ -52,12 +53,13 @@ use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\ImportWizard\Filament\Pages\ImportPeople;
 use Relaticle\OnboardSeed\Contracts\ModelSeederInterface;
 use Relaticle\OnboardSeed\ModelSeeders\CompanySeeder;
 use Relaticle\OnboardSeed\ModelSeeders\PeopleSeeder;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(SetupWorkspace::class, RunsMailboxSteps::class, RunsSourceStep::class, RunsUseCaseStep::class, RunsInviteStep::class, SendsWorkspaceInvitations::class, SaveOnboardingDataSource::class, SaveOnboardingSharing::class, SaveOnboardingUseCase::class, ApplyStagePreset::class, MoveWorkspaceSetup::class);
+mutates(SetupWorkspace::class, RunsMailboxSteps::class, RunsSourceStep::class, RunsUseCaseStep::class, RunsInviteStep::class, SendsWorkspaceInvitations::class, SaveOnboardingDataSource::class, SaveOnboardingSharing::class, SaveOnboardingUseCase::class, StartSetupLater::class, ApplyStagePreset::class, MoveWorkspaceSetup::class);
 
 beforeEach(function (): void {
     Feature::define(EmailIntegration::class, false);
@@ -170,9 +172,9 @@ function bindSeederFailingOnAQuery(): void
     });
 }
 
-function workspaceAtInvite(User $user, string $name = 'Northwind Studio'): Workspace
+function workspaceAtInvite(User $user, string $name = 'Northwind Studio', OnboardingDataSource $source = OnboardingDataSource::Memory): Workspace
 {
-    $workspace = workspaceInSetup($user, $name);
+    $workspace = workspaceInSetup($user, $name, $source);
 
     livewire(SetupWorkspace::class)
         ->fillForm(['onboarding_use_case' => OnboardingUseCase::Other->value])
@@ -1658,6 +1660,273 @@ describe('data source', function (): void {
         expect($workspace->fresh())
             ->onboarding_data_source->toBeNull()
             ->onboarding_step->toBe(WorkspaceSetupStep::Source);
+    });
+});
+
+describe('where the data lives', function (): void {
+    function sampleCompaniesIn(Workspace $workspace): int
+    {
+        return Company::query()
+            ->withoutGlobalScopes()
+            ->where('workspace_id', $workspace->getKey())
+            ->where('creation_source', CreationSource::SAMPLE)
+            ->count();
+    }
+
+    function saveSalesUseCase(): void
+    {
+        livewire(SetupWorkspace::class)
+            ->fillForm(['onboarding_use_case' => OnboardingUseCase::Sales->value, 'onboarding_context' => ['outbound']])
+            ->call('saveUseCase')
+            ->assertHasNoFormErrors();
+    }
+
+    it('seeds samples only for the in my head answer', function (OnboardingDataSource $source, bool $seeded): void {
+        Feature::define(OnboardSeed::class, true);
+
+        $workspace = workspaceInSetup(User::factory()->create(), source: $source);
+
+        saveSalesUseCase();
+
+        expect(sampleCompaniesIn($workspace))->toBe($seeded ? 4 : 0);
+    })->with([
+        'in my head' => [OnboardingDataSource::Memory, true],
+        'a spreadsheet' => [OnboardingDataSource::Spreadsheet, false],
+        'another crm' => [OnboardingDataSource::OtherCrm, false],
+        'an assistant' => [OnboardingDataSource::Assistant, false],
+    ]);
+
+    it('seeds samples when the inbox answer skipped the mailbox step', function (): void {
+        Feature::define(OnboardSeed::class, true);
+        Feature::define(EmailIntegration::class, true);
+        config()->set('services.azure.client_id', 'azure-client');
+
+        $workspace = workspaceInSetup(User::factory()->create(), source: OnboardingDataSource::Inbox);
+
+        livewire(SetupWorkspace::class)->callAction('skipMailbox');
+
+        saveSalesUseCase();
+
+        expect(sampleCompaniesIn($workspace))->toBe(4);
+    });
+
+    it('seeds as before for a workspace that started setup before the data source step', function (): void {
+        Feature::define(OnboardSeed::class, true);
+
+        $workspace = workspaceInSetup(User::factory()->create(), source: OnboardingDataSource::Spreadsheet);
+        $workspace->update(['onboarding_data_source' => null]);
+
+        saveSalesUseCase();
+
+        expect(sampleCompaniesIn($workspace))->toBe(4);
+    });
+
+    it('finishes a workspace that was at the mailbox step before the data source step as it did before', function (): void {
+        Feature::define(OnboardSeed::class, true);
+        Feature::define(EmailIntegration::class, true);
+        Feature::define(SetupConversation::class, true);
+        config()->set('services.azure.client_id', 'azure-client');
+
+        $workspace = workspaceAtSource(User::factory()->create());
+        $workspace->update(['onboarding_step' => WorkspaceSetupStep::Email, 'onboarding_data_source' => null]);
+
+        livewire(SetupWorkspace::class)
+            ->callAction('skipMailbox')
+            ->assertSee(__('filament/pages/workspaces.create_workspace.actions.back'));
+
+        saveSalesUseCase();
+
+        livewire(SetupWorkspace::class)
+            ->call('finish')
+            ->assertRedirect(ChatConversation::getUrl([
+                'conversationId' => $workspace->fresh()->setupConversation->id,
+                'tenant' => $workspace,
+            ]));
+
+        expect(sampleCompaniesIn($workspace))->toBe(4);
+    });
+
+    it('sends a file answer to the people import when setup finishes', function (OnboardingDataSource $source): void {
+        Feature::define(SetupConversation::class, true);
+
+        $workspace = workspaceAtInvite(User::factory()->create(), source: $source);
+
+        livewire(SetupWorkspace::class)
+            ->call('finish')
+            ->assertRedirect(ImportPeople::getUrl(panel: 'app', tenant: $workspace));
+
+        expect($workspace->fresh()->onboarding_step)->toBeNull();
+    })->with([
+        'a spreadsheet' => OnboardingDataSource::Spreadsheet,
+        'another crm' => OnboardingDataSource::OtherCrm,
+    ]);
+
+    it('sends a file answer to the setup chat with samples when the owner chooses later', function (): void {
+        Feature::define(OnboardSeed::class, true);
+        Feature::define(SetupConversation::class, true);
+
+        $workspace = workspaceAtInvite(User::factory()->create(), source: OnboardingDataSource::Spreadsheet);
+
+        expect(sampleCompaniesIn($workspace))->toBe(0);
+
+        livewire(SetupWorkspace::class)
+            ->call('finishLater')
+            ->assertNotified(__('filament/pages/workspaces.create_workspace.notifications.workspace_created.title'))
+            ->assertRedirect(ChatConversation::getUrl([
+                'conversationId' => $workspace->setupConversation->id,
+                'tenant' => $workspace,
+            ]));
+
+        expect($workspace->fresh()->onboarding_step)->toBeNull()
+            ->and(sampleCompaniesIn($workspace))->toBe(4);
+    });
+
+    it('still sends the invitations typed when the owner chooses later', function (): void {
+        $workspace = workspaceAtInvite(User::factory()->create(), source: OnboardingDataSource::Spreadsheet);
+
+        livewire(SetupWorkspace::class)
+            ->fillForm(['emails' => 'maya@northwind.test'])
+            ->call('finishLater')
+            ->assertHasNoFormErrors();
+
+        expect($workspace->workspaceInvitations()->pluck('email')->all())->toBe(['maya@northwind.test']);
+    });
+
+    it('treats choosing later as finishing for an answer that has no file', function (): void {
+        Feature::define(OnboardSeed::class, true);
+        Feature::define(SetupConversation::class, true);
+
+        $workspace = workspaceAtInvite(User::factory()->create(), source: OnboardingDataSource::Assistant);
+
+        livewire(SetupWorkspace::class)
+            ->call('finishLater')
+            ->assertRedirect(ChatConversation::getUrl([
+                'conversationId' => $workspace->setupConversation->id,
+                'tenant' => $workspace,
+            ]));
+
+        expect(sampleCompaniesIn($workspace))->toBe(0);
+    });
+
+    it('sends every other answer to the setup chat when setup finishes', function (OnboardingDataSource $source): void {
+        Feature::define(SetupConversation::class, true);
+
+        $workspace = workspaceAtInvite(User::factory()->create(), source: $source);
+
+        livewire(SetupWorkspace::class)
+            ->call('finish')
+            ->assertRedirect(ChatConversation::getUrl([
+                'conversationId' => $workspace->setupConversation->id,
+                'tenant' => $workspace,
+            ]));
+    })->with([
+        'in my head' => OnboardingDataSource::Memory,
+        'an assistant' => OnboardingDataSource::Assistant,
+    ]);
+
+    it('offers the file buttons only for a file answer', function (OnboardingDataSource $source, bool $offered): void {
+        workspaceAtInvite(User::factory()->create(), source: $source);
+
+        $setup = livewire(SetupWorkspace::class);
+
+        $offered
+            ? $setup->assertSee(__('filament/pages/workspaces.setup_workspace.invite.upload_file'))->assertSee(__('filament/pages/workspaces.setup_workspace.invite.do_later'))
+            : $setup->assertDontSee(__('filament/pages/workspaces.setup_workspace.invite.upload_file'))->assertDontSee(__('filament/pages/workspaces.setup_workspace.invite.do_later'));
+    })->with([
+        'a spreadsheet' => [OnboardingDataSource::Spreadsheet, true],
+        'another crm' => [OnboardingDataSource::OtherCrm, true],
+        'in my head' => [OnboardingDataSource::Memory, false],
+        'an assistant' => [OnboardingDataSource::Assistant, false],
+    ]);
+
+    it('offers the way back to the mailbox step only for the inbox answer', function (OnboardingDataSource $source, bool $offered): void {
+        Feature::define(EmailIntegration::class, true);
+        config()->set('services.azure.client_id', 'azure-client');
+
+        $workspace = workspaceInSetup(User::factory()->create(), source: OnboardingDataSource::Inbox);
+        livewire(SetupWorkspace::class)->callAction('skipMailbox');
+
+        $workspace = $workspace->fresh();
+        $workspace->update(['onboarding_data_source' => $source]);
+        Filament::setTenant($workspace);
+
+        $setup = livewire(SetupWorkspace::class);
+
+        $offered
+            ? $setup->assertSee(__('filament/pages/workspaces.create_workspace.actions.back'))
+            : $setup->assertDontSee(__('filament/pages/workspaces.create_workspace.actions.back'));
+
+        $setup->call('backToMailbox');
+
+        expect($workspace->fresh()->onboarding_step)->toBe($offered ? WorkspaceSetupStep::Email : WorkspaceSetupStep::UseCase);
+    })->with([
+        'the inbox answer' => [OnboardingDataSource::Inbox, true],
+        'a spreadsheet' => [OnboardingDataSource::Spreadsheet, false],
+        'in my head' => [OnboardingDataSource::Memory, false],
+    ]);
+
+    it('seeds the fixture set of the workspace use case when setup is started later', function (): void {
+        Feature::define(OnboardSeed::class, true);
+
+        $user = User::factory()->create();
+        $workspace = workspaceAtInvite($user, source: OnboardingDataSource::Spreadsheet);
+        $workspace->update(['onboarding_use_case' => OnboardingUseCase::Recruiting]);
+
+        resolve(StartSetupLater::class)->execute($user, $workspace->fresh());
+
+        expect(Company::query()->withoutGlobalScopes()->where('workspace_id', $workspace->getKey())->pluck('name')->sort()->values()->all())
+            ->toBe(['Linear', 'Stripe', 'Supabase', 'Vercel']);
+    });
+
+    it('seeds the general fixture set when setup is started later without a use case', function (): void {
+        Feature::define(OnboardSeed::class, true);
+
+        $user = User::factory()->create();
+        $workspace = workspaceAtInvite($user, source: OnboardingDataSource::Spreadsheet);
+        $workspace->update(['onboarding_use_case' => null]);
+
+        resolve(StartSetupLater::class)->execute($user, $workspace->fresh());
+
+        expect(sampleCompaniesIn($workspace))->toBeGreaterThan(0);
+    });
+
+    it('seeds nothing when setup is started later in a workspace that already holds records', function (CreationSource $source): void {
+        Feature::define(OnboardSeed::class, true);
+
+        $user = User::factory()->create();
+        $workspace = workspaceAtInvite($user, source: OnboardingDataSource::Spreadsheet);
+
+        Company::factory()->create(['workspace_id' => $workspace->getKey(), 'creation_source' => $source]);
+
+        resolve(StartSetupLater::class)->execute($user, $workspace->fresh());
+
+        expect(Company::query()->withoutGlobalScopes()->where('workspace_id', $workspace->getKey())->count())->toBe(1);
+    })->with([
+        'its own record' => CreationSource::WEB,
+        'a sample' => CreationSource::SAMPLE,
+    ]);
+
+    it('seeds nothing when setup is started later in an additional workspace', function (): void {
+        Feature::define(OnboardSeed::class, true);
+
+        $user = User::factory()->withPersonalWorkspace()->create();
+        $workspace = workspaceAtInvite($user, 'Second Corp', OnboardingDataSource::Spreadsheet);
+
+        resolve(StartSetupLater::class)->execute($user, $workspace->fresh());
+
+        expect(sampleCompaniesIn($workspace))->toBe(0);
+    });
+
+    it('refuses to start setup later for someone who does not own the workspace', function (): void {
+        Feature::define(OnboardSeed::class, true);
+
+        $workspace = workspaceAtInvite(User::factory()->create(), source: OnboardingDataSource::Spreadsheet);
+        $member = joinAsMember($workspace);
+
+        expect(fn () => resolve(StartSetupLater::class)->execute($member, $workspace))
+            ->toThrow(HttpException::class);
+
+        expect(sampleCompaniesIn($workspace))->toBe(0);
     });
 });
 

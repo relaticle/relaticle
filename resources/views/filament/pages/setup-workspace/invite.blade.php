@@ -99,11 +99,30 @@
     </div>
 
     <div class="mt-auto pt-6">
-        <x-filament::button type="submit" size="lg" class="w-full" wire:target="finish">
-            <span
-                x-data
-                x-text="($wire.data?.emails ?? '').trim() === '' ? @js(__('filament/pages/workspaces.create_workspace.actions.get_started')) : @js(__('filament/pages/workspaces.setup_workspace.invite.send_and_start'))"
-            >{{ __('filament/pages/workspaces.create_workspace.actions.get_started') }}</span>
-        </x-filament::button>
+        @if ($this->workspace->onboarding_data_source?->isFile())
+            <div class="flex flex-col gap-3">
+                <x-filament::button type="submit" size="lg" class="w-full" wire:target="finish">
+                    {{ __('filament/pages/workspaces.setup_workspace.invite.upload_file') }}
+                </x-filament::button>
+                <x-filament::button
+                    type="button"
+                    size="lg"
+                    color="gray"
+                    outlined
+                    class="w-full"
+                    wire:click="finishLater"
+                    wire:target="finishLater"
+                >
+                    {{ __('filament/pages/workspaces.setup_workspace.invite.do_later') }}
+                </x-filament::button>
+            </div>
+        @else
+            <x-filament::button type="submit" size="lg" class="w-full" wire:target="finish">
+                <span
+                    x-data
+                    x-text="($wire.data?.emails ?? '').trim() === '' ? @js(__('filament/pages/workspaces.create_workspace.actions.get_started')) : @js(__('filament/pages/workspaces.setup_workspace.invite.send_and_start'))"
+                >{{ __('filament/pages/workspaces.create_workspace.actions.get_started') }}</span>
+            </x-filament::button>
+        @endif
     </div>
 </form>

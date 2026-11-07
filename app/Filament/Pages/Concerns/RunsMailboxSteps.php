@@ -7,6 +7,7 @@ namespace App\Filament\Pages\Concerns;
 use App\Actions\Onboarding\MoveWorkspaceSetup;
 use App\Actions\Onboarding\SaveOnboardingSharing;
 use App\Enums\CreationSource;
+use App\Enums\OnboardingDataSource;
 use App\Enums\WorkspaceSetupStep;
 use App\Features\EmailIntegration;
 use App\Models\People;
@@ -67,7 +68,10 @@ trait RunsMailboxSteps
 
     public function canGoBackToMailbox(): bool
     {
+        $source = $this->workspace->onboarding_data_source;
+
         return $this->step() === WorkspaceSetupStep::UseCase
+            && ($source === null || $source === OnboardingDataSource::Inbox)
             && MailboxStep::canRun()
             && ! resolve(WorkspaceActivationFacts::class)->hasConnectedMailbox($this->authUser(), $this->workspace);
     }
