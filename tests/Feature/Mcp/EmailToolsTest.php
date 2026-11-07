@@ -1226,6 +1226,21 @@ it('does not send an email once the access token that queued it is deleted', fun
         ->last_error->toBe(__('filament/notifications/email-send-failed.reasons.agent_connection_revoked'));
 });
 
+it('does not send an email once the access token that queued it has expired', function (): void {
+    sendOverHttp($this->viewer, ['read', 'email:send'], 'Desk Agent', sendArguments($this->viewerAccount));
+    $email = Email::query()->where('creation_source', EmailCreationSource::MCP)->latest('id')->firstOrFail();
+
+    $this->viewer->tokens()->update(['expires_at' => now()->subMinute()]);
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldNotReceive('make');
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    runSendJob($email);
+
+    expect($email->fresh()->status)->toBe(EmailStatus::FAILED);
+});
+
 it('does not send an email once the connector that queued it is revoked', function (): void {
     $client = connectedClient($this->viewer);
     Passport::actingAs($this->viewer, [Registrar::OAUTH_SCOPE, 'email:send'], client: $client);

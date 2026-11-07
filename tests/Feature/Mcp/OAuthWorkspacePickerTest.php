@@ -84,6 +84,12 @@ it('authorizes a request that names this MCP server as its resource', function (
 })->with([
     'as published' => fn (): string => url()->getMcpUrl(),
     'with a trailing slash' => fn (): string => url()->getMcpUrl().'/',
+    'with the scheme and host in upper case' => fn (): string => strtoupper(url('/')).'/mcp',
+    'with the default port spelled out' => fn (): string => preg_replace(
+        '#^(https?)://([^/]+)#',
+        '$1://$2:'.(str_starts_with(url('/'), 'https') ? 443 : 80),
+        url()->getMcpUrl(),
+    ),
 ]);
 
 it('authorizes the resource production MCP clients send', function (): void {
