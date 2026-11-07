@@ -238,3 +238,30 @@ it('rejects a malformed next step id', function (string $nextStep): void {
     'uppercase' => ['PICK_FIRST'],
     'too long' => [str_repeat('a', 41)],
 ]);
+
+it('runs a job serialized before the next step and claim key existed', function (): void {
+    Queue::fake();
+    $conversationId = seedSendableConversation();
+
+    $this->postJson(route('chat.send'), [
+        'conversation_id' => $conversationId,
+        'document' => ChatDocument::fromText('Queued before the deploy'),
+    ])->assertOk();
+
+    $payload = Queue::pushed(ProcessChatMessage::class)->sole()->__serialize();
+    unset($payload['nextStep'], $payload['claimKey']);
+
+    $legacy = (new ReflectionClass(ProcessChatMessage::class))->newInstanceWithoutConstructor();
+    $legacy->__unserialize($payload);
+
+    CrmAssistant::fake(['Done.']);
+    $legacy->handle(resolve(CreditService::class));
+
+    $userRow = DB::table('agent_conversation_messages')
+        ->where('conversation_id', $conversationId)
+        ->where('role', 'user')
+        ->sole();
+
+    expect((new ReflectionProperty($legacy, 'nextStep'))->isInitialized($legacy))->toBeFalse()
+        ->and(json_decode((string) $userRow->meta, true))->not->toHaveKey('next_step');
+});

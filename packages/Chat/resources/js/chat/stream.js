@@ -483,6 +483,7 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
         // only ever flips for a resumed one. Cleared by stream_end, stream
         // failure, and the watchdog, exactly as a sent turn is.
         this.isStreaming = true;
+        this.nextSteps = [];
         const bubble = this.targetBubbleFor(event.invocation_id ?? null);
 
         // A turn with no user row (a resume, the setup greeting) anchors on its own

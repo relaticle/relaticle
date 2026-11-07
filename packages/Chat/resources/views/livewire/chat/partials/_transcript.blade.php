@@ -608,20 +608,21 @@
              out-specifies a margin utility on one of its children; x-show only
              ever writes `display`, so it leaves this alone. --}}
         <div
-            x-show="!hasPendingProposal && nextSteps.length > 0"
+            x-show="!hasPendingProposal && !isStreaming && nextSteps.length > 0"
             {{-- The panel ships no `[x-cloak]` rule (see the jump-to-latest
                  button below), so the pre-Alpine hidden state is an inline
                  style; x-show clears it when it flips true. --}}
-            style="display: none; margin-top: auto"
+            style="display: none"
+            :style="showsSetupButtons() ? null : { marginTop: 'auto' }"
             x-transition:enter="motion-safe:transition motion-safe:duration-[var(--duration-base)] motion-safe:ease-[var(--ease-out-expo)]"
             x-transition:enter-start="motion-safe:translate-y-1 motion-safe:opacity-0"
             x-transition:enter-end="motion-safe:translate-y-0 motion-safe:opacity-100"
             class="flex"
-            :class="showsSetupButtons() ? 'flex-row flex-wrap items-center gap-2 pt-4' : 'flex-col items-start gap-0.5 pt-5'"
+            :class="showsSetupButtons() ? 'flex-row flex-wrap items-center gap-2 pt-0' : 'flex-col items-start gap-0.5 pt-5'"
             role="group"
             aria-label="{{ __('Suggested next steps') }}"
         >
-            <template x-for="(step, index) in nextSteps" :key="step.id ?? step.label ?? index">
+            <template x-for="step in nextSteps" :key="step.id ?? step.prompt ?? step.url">
                 <div class="contents">
                     <template x-if="!showsSetupButtons()">
                         <button
@@ -660,6 +661,10 @@
                             <span class="contents text-gray-400 dark:text-gray-500" aria-hidden="true" x-html="setupButtonIcons[step.icon] ?? ''"></span>
 
                             <span class="truncate" x-text="step.label"></span>
+
+                            <template x-if="nextStepLink(step).external">
+                                <span class="sr-only">{{ __('onboarding/setup.opens_in_new_tab') }}</span>
+                            </template>
                         </a>
                     </template>
                 </div>

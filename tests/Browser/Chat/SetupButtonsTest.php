@@ -74,7 +74,8 @@ it('renders the setup buttons bordered with their icons under the latest reply',
             const bubble = Array.from(document.querySelectorAll('[data-assistant-bubble]')).pop();
 
             return {
-                labels: steps.map((el) => el.textContent.trim()),
+                labels: steps.map((el) => el.querySelector('.truncate').textContent.trim()),
+                gap: Math.round(steps[0].getBoundingClientRect().top - bubble.getBoundingClientRect().bottom),
                 tags: steps.map((el) => el.tagName),
                 borders: steps.map((el) => parseFloat(getComputedStyle(el).borderTopWidth)),
                 iconWidths: steps.map((el) => Math.round(el.querySelector('svg')?.getBoundingClientRect().width ?? 0)),
@@ -87,7 +88,8 @@ it('renders the setup buttons bordered with their icons under the latest reply',
         ->and($layout['tags'])->toBe(['BUTTON', 'A', 'A'])
         ->and(min($layout['borders']))->toBeGreaterThan(0.0)
         ->and(min($layout['iconWidths']))->toBeGreaterThan(0)
-        ->and($layout['belowLastAnswer'])->toBeTrue();
+        ->and($layout['belowLastAnswer'])->toBeTrue()
+        ->and($layout['gap'])->toBeLessThan(32);
 });
 
 it('renders a link button as an anchor and opens an outside page in a new tab', function (): void {
@@ -106,12 +108,13 @@ it('renders a link button as an anchor and opens an outside page in a new tab', 
             href: el.getAttribute('href'),
             target: el.getAttribute('target'),
             rel: el.getAttribute('rel'),
+            newTabCue: el.querySelector('.sr-only')?.textContent.trim() ?? null,
         })))();
     JS);
 
     expect($links)->toBe([
-        ['href' => $appUrl, 'target' => null, 'rel' => null],
-        ['href' => 'https://relaticle.example/help/connect', 'target' => '_blank', 'rel' => 'noopener noreferrer'],
+        ['href' => $appUrl, 'target' => null, 'rel' => null, 'newTabCue' => null],
+        ['href' => 'https://relaticle.example/help/connect', 'target' => '_blank', 'rel' => 'noopener noreferrer', 'newTabCue' => '(opens in a new tab)'],
     ]);
 });
 
@@ -201,4 +204,75 @@ it('keeps the plain strip in a conversation that is not the setup chat', functio
     expect($layout['tags'])->toBe(['BUTTON', 'BUTTON'])
         ->and(array_sum($layout['borders']))->toEqual(0)
         ->and($layout['direction'])->toBe('column');
+});
+
+it('hides the setup buttons while a turn streams', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'setup', $conversationId);
+    seedButtonsTurn($conversationId, $user, 'Welcome to your workspace.', setupButtonRows("/app/{$workspace->slug}/companies"), setup: true);
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSourceHas('Welcome to your workspace.');
+
+    $resolve = ChatBrowser::resolveInterface();
+
+    $countVisible = <<<'JS'
+        (() => Array.from(document.querySelectorAll('[data-next-step]')).filter((el) => el.offsetParent !== null).length)();
+    JS;
+
+    $shownBefore = $page->script($countVisible);
+
+    $page->script(<<<JS
+        (async () => {
+            {$resolve}
+            data.isStreaming = true;
+            await data.\$nextTick();
+            await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+        })();
+    JS);
+
+    expect($shownBefore)->toBe(3)
+        ->and($page->script($countVisible))->toBe(0);
+});
+
+it('clears the strip when a turn this tab did not send starts streaming', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'setup', $conversationId);
+    seedButtonsTurn($conversationId, $user, 'Welcome to your workspace.', setupButtonRows("/app/{$workspace->slug}/companies"), setup: true);
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSourceHas('Welcome to your workspace.');
+
+    $resolve = ChatBrowser::resolveInterface();
+
+    $remaining = $page->script(<<<JS
+        (() => {
+            {$resolve}
+            data.handleStreamStart({ invocation_id: 'server-started' });
+
+            return data.nextSteps.length;
+        })();
+    JS);
+
+    expect($remaining)->toBe(0);
+});
+
+it('renders two plain chips that share a label', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'normal', $conversationId);
+    seedButtonsTurn($conversationId, $user, 'Your workspace is empty.', [
+        ['label' => 'Add a company', 'prompt' => 'Create a company called Acme'],
+        ['label' => 'Add a company', 'prompt' => 'Create a company called Globex'],
+    ], setup: false);
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSourceHas('Your workspace is empty.');
+
+    $page->assertCount('[data-next-step]', 2);
 });

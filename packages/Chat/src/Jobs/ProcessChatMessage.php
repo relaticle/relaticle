@@ -598,14 +598,14 @@ final class ProcessChatMessage implements ShouldQueue
             origin: $this->origin,
             resumesTurnId: $this->resumesTurnId,
             attachment: $this->attachment,
-            claimKey: $this->claimKey,
-            nextStep: $this->nextStep,
+            claimKey: $this->claimKey ?? null,
+            nextStep: $this->nextStep ?? null,
         ));
     }
 
     private function abandonTurn(): void
     {
-        if ($this->claimKey !== null) {
+        if (($this->claimKey ?? null) !== null) {
             Cache::forget($this->claimKey);
         }
 
@@ -694,7 +694,7 @@ final class ProcessChatMessage implements ShouldQueue
     {
         return array_filter([
             'attachment' => $this->attachment,
-            'next_step' => $this->nextStep,
+            'next_step' => $this->nextStep ?? null,
         ], static fn (mixed $value): bool => $value !== null);
     }
 
