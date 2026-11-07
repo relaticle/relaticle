@@ -180,7 +180,7 @@ trait HasRecordPageLayout
     public function editTaskAction(): EditTaskAction
     {
         return EditTaskAction::make(RecordOverview::EDIT_TASK_ACTION)
-            ->record(fn (array $arguments): ?Task => $this->crmRecord()->tasks()->whereKey($arguments['task'] ?? null)->first())
+            ->record(fn (array $arguments): ?Task => once(fn (): ?Task => $this->crmRecord()->tasks()->whereKey($arguments['task'] ?? null)->first()))
             ->recordTitleAttribute('title')
             ->authorize(fn (mixed $record): bool => $record instanceof Task && Gate::allows('update', $record))
             ->slideOver()
@@ -193,7 +193,7 @@ trait HasRecordPageLayout
     public function editNoteAction(): EditAction
     {
         return EditAction::make(RecordOverview::EDIT_NOTE_ACTION)
-            ->record(fn (array $arguments): ?Note => $this->crmRecord()->notes()->whereKey($arguments['note'] ?? null)->first())
+            ->record(fn (array $arguments): ?Note => once(fn (): ?Note => $this->crmRecord()->notes()->whereKey($arguments['note'] ?? null)->first()))
             ->recordTitleAttribute('title')
             ->authorize(fn (mixed $record): bool => $record instanceof Note && Gate::allows('update', $record))
             ->schema(fn (Schema $schema): Schema => NoteForm::get($schema, [$this->crmRecord()->getTable()]))

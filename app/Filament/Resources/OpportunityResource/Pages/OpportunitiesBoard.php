@@ -145,7 +145,7 @@ final class OpportunitiesBoard extends BoardResourcePage
     {
         return PreviewRecordAction::make()
             ->page(ViewOpportunity::class)
-            ->record(fn (array $arguments): ?Opportunity => Opportunity::query()->whereKey($arguments['record'] ?? null)->first());
+            ->record(fn (array $arguments): ?Opportunity => once(fn (): ?Opportunity => Opportunity::query()->whereKey($arguments['record'] ?? null)->first()));
     }
 
     /**
