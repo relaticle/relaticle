@@ -1865,40 +1865,30 @@ describe('where the data lives', function (): void {
         'in my head' => [OnboardingDataSource::Memory, false],
     ]);
 
-    it('seeds the fixture set of the workspace use case when setup is started later', function (): void {
+    it('seeds the fixture set of the workspace use case when the owner chooses later', function (): void {
         Feature::define(OnboardSeed::class, true);
 
-        $user = User::factory()->create();
-        $workspace = workspaceAtInvite($user, source: OnboardingDataSource::Spreadsheet);
-        $workspace->update(['onboarding_use_case' => OnboardingUseCase::Recruiting]);
+        $workspace = workspaceInSetup(User::factory()->create(), source: OnboardingDataSource::Spreadsheet);
 
-        resolve(StartSetupLater::class)->execute($user, $workspace->fresh());
+        livewire(SetupWorkspace::class)
+            ->fillForm(['onboarding_use_case' => OnboardingUseCase::Recruiting->value, 'onboarding_context' => ['applications']])
+            ->call('saveUseCase')
+            ->assertHasNoFormErrors();
+
+        livewire(SetupWorkspace::class)->call('finishLater');
 
         expect(Company::query()->withoutGlobalScopes()->where('workspace_id', $workspace->getKey())->pluck('name')->sort()->values()->all())
             ->toBe(['Linear', 'Stripe', 'Supabase', 'Vercel']);
     });
 
-    it('seeds the general fixture set when setup is started later without a use case', function (): void {
+    it('seeds nothing when the owner chooses later in a workspace that already holds records', function (CreationSource $source): void {
         Feature::define(OnboardSeed::class, true);
 
-        $user = User::factory()->create();
-        $workspace = workspaceAtInvite($user, source: OnboardingDataSource::Spreadsheet);
-        $workspace->update(['onboarding_use_case' => null]);
-
-        resolve(StartSetupLater::class)->execute($user, $workspace->fresh());
-
-        expect(sampleCompaniesIn($workspace))->toBeGreaterThan(0);
-    });
-
-    it('seeds nothing when setup is started later in a workspace that already holds records', function (CreationSource $source): void {
-        Feature::define(OnboardSeed::class, true);
-
-        $user = User::factory()->create();
-        $workspace = workspaceAtInvite($user, source: OnboardingDataSource::Spreadsheet);
+        $workspace = workspaceAtInvite(User::factory()->create(), source: OnboardingDataSource::Spreadsheet);
 
         Company::factory()->create(['workspace_id' => $workspace->getKey(), 'creation_source' => $source]);
 
-        resolve(StartSetupLater::class)->execute($user, $workspace->fresh());
+        livewire(SetupWorkspace::class)->call('finishLater');
 
         expect(Company::query()->withoutGlobalScopes()->where('workspace_id', $workspace->getKey())->count())->toBe(1);
     })->with([
@@ -1906,13 +1896,12 @@ describe('where the data lives', function (): void {
         'a sample' => CreationSource::SAMPLE,
     ]);
 
-    it('seeds nothing when setup is started later in an additional workspace', function (): void {
+    it('seeds nothing when the owner chooses later in an additional workspace', function (): void {
         Feature::define(OnboardSeed::class, true);
 
-        $user = User::factory()->withPersonalWorkspace()->create();
-        $workspace = workspaceAtInvite($user, 'Second Corp', OnboardingDataSource::Spreadsheet);
+        $workspace = workspaceAtInvite(User::factory()->withPersonalWorkspace()->create(), 'Second Corp', OnboardingDataSource::Spreadsheet);
 
-        resolve(StartSetupLater::class)->execute($user, $workspace->fresh());
+        livewire(SetupWorkspace::class)->call('finishLater');
 
         expect(sampleCompaniesIn($workspace))->toBe(0);
     });
