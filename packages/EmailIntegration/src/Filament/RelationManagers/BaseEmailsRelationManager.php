@@ -64,7 +64,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
             return null;
         }
 
-        return resolve(EmailVisibilityService::class)->visibleEmailCountBadge($ownerRecord, $user);
+        return once(fn (): ?string => resolve(EmailVisibilityService::class)->visibleEmailCountBadge($ownerRecord, $user));
     }
 
     public function table(Table $table): Table

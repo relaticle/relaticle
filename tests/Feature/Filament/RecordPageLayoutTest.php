@@ -380,6 +380,16 @@ it('links a note created from the rail to the :dataset record and reloads the op
     expect($record->notes()->sole()->title)->toBe('Discovery call recap');
 })->with('record pages');
 
+it('raises the overview notes count as soon as a note is created from the rail', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire(ViewCompany::class, ['record' => $company->getKey()])
+        ->assertSeeHtml('<span class="fi-record-overview-count">0</span>')
+        ->callAction(quickAction('createNote'), data: ['title' => 'Discovery call recap'])
+        ->dispatch('related-record-created')
+        ->assertSeeHtml('<span class="fi-record-overview-count">1</span>');
+});
+
 it('links a task created from the rail to the :dataset record and notifies its assignee', function (string $model, string $page): void {
     $this->withoutDefer();
 
