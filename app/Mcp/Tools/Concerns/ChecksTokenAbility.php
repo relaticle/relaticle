@@ -84,7 +84,7 @@ trait ChecksTokenAbility
 
         return new AgentConnection(
             $this->connectionName(),
-            $token instanceof PassportAccessToken && is_string($token->oauth_client_id) ? $token->oauth_client_id : null,
+            $token instanceof PassportAccessToken ? ($token->oauth_client_id ?: null) : null,
             $token instanceof PersonalAccessToken && $token->getKey() ? (int) $token->getKey() : null,
         );
     }
