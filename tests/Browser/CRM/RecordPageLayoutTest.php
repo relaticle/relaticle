@@ -7,6 +7,7 @@ use App\Filament\Concerns\HasRecordPageLayout;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Opportunity;
+use App\Models\Task;
 use App\Models\User;
 use Relaticle\CustomFields\Services\TenantContextService;
 
@@ -197,5 +198,32 @@ it('previews a company from its list row, steps to the next one and closes on es
         ->wait(0.5)
         ->assertDontSee('2 of 2 in Companies')
         ->assertScript('new URL(location.href).searchParams.has("relation")', false)
+        ->assertNoJavaScriptErrors();
+});
+
+it('keeps the preview open while a tab lists the rest of a task\'s assignees', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $company = Company::factory()->recycle([$user, $workspace])->create(['name' => 'Atlas Freight']);
+    $member = User::factory()->create(['name' => 'Priya Raman']);
+    $workspace->users()->attach($member, ['role' => 'member']);
+    $task = Task::factory()->recycle([$user, $workspace])->create();
+    $task->assignees()->attach([$user->getKey(), $member->getKey()]);
+    $company->tasks()->attach($task);
+
+    loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/companies")
+        ->hover('.fi-ta-row:first-of-type [class~="fi-ta-cell-name"]')
+        ->click('.fi-ta-row:first-of-type .fi-record-preview-trigger')
+        ->click('.fi-record-preview .fi-record-pane .fi-tabs-item:nth-child(4)')
+        ->click('.fi-record-preview .fi-linked-records-cell-more')
+        ->click('.fi-linked-records-cell-panel ul')
+        ->wait(0.5)
+        ->assertSee('Priya Raman')
+        ->assertVisible('.fi-modal-window.fi-record-preview .fi-record-preview-header')
         ->assertNoJavaScriptErrors();
 });
