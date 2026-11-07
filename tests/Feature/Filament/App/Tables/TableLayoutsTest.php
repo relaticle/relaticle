@@ -142,6 +142,19 @@ it('refuses a layout name the member already uses, ignoring case', function (): 
     expect(TableLayout::query()->withoutGlobalScopes()->count())->toBe(1);
 });
 
+it('names the owner when an admin renames their layout to a name the owner already uses', function (): void {
+    $owner = tableLayoutMember(WorkspaceRole::Member);
+    $shared = layoutFor($owner, ['name' => 'Team', 'is_shared' => true]);
+    layoutFor($owner, ['name' => 'Private plan']);
+    $this->actingAs(tableLayoutMember(WorkspaceRole::Admin));
+
+    livewire(ListCompanies::class)
+        ->callAction('renameTableLayout', ['name' => 'private PLAN'], ['layout' => $shared->getKey()])
+        ->assertHasActionErrors(['name' => "{$owner->name} already has a layout with this name."]);
+
+    expect($shared->refresh()->name)->toBe('Team');
+});
+
 it('lets two members use the same layout name', function (): void {
     layoutFor(tableLayoutMember(WorkspaceRole::Member), ['name' => 'Hot leads', 'is_shared' => true]);
 

@@ -84,6 +84,7 @@ return [
             'unshared' => '":name" is no longer shared',
             'name_required' => 'Give the layout a name.',
             'name_taken' => 'You already have a layout with this name.',
+            'name_taken_by_owner' => ':owner already has a layout with this name.',
             'unavailable' => 'That layout is no longer available.',
         ],
     ],
