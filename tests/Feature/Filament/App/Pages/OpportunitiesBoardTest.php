@@ -19,6 +19,7 @@ use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Str;
 use Relaticle\Flowforge\Board;
 use Relaticle\Flowforge\Grouping;
 use Relaticle\Flowforge\Lane;
@@ -431,6 +432,24 @@ it('opens the record preview from the button beside a card menu', function (): v
         ->assertActionMounted(PreviewRecordAction::getDefaultName())
         ->assertMountedActionModalSeeHtml(['fi-record-embedded-page', 'Rooftop pilot']);
 });
+
+it('opens no preview for a card that is gone or belongs to another workspace', function (string $state): void {
+    $outsider = User::factory()->withWorkspace()->create();
+    $foreign = Opportunity::factory()->recycle([$outsider, $outsider->currentWorkspace])->create();
+    $deleted = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
+    $deleted->delete();
+
+    $key = match ($state) {
+        'foreign' => $foreign->getKey(),
+        'deleted' => $deleted->getKey(),
+        'unknown' => (string) Str::ulid(),
+    };
+
+    livewire(OpportunitiesBoard::class)
+        ->mountAction(PreviewRecordAction::getDefaultName(), ['record' => $key])
+        ->assertOk()
+        ->assertSet('mountedActions', []);
+})->with(['foreign', 'deleted', 'unknown']);
 
 it('labels the contact select point of contact when adding an opportunity to a column', function (): void {
     $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');

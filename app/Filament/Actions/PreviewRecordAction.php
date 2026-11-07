@@ -71,10 +71,10 @@ final class PreviewRecordAction extends ViewAction
                 'pluralLabel' => Filament::getModelResource($record)::getTitleCasePluralModelLabel(),
                 ...$this->neighbours($record, $livewire, $arguments['position'] ?? null),
             ]))
-            ->schema(fn (Schema $schema, Model $record): Schema => $schema->components([
+            ->schema(fn (Schema $schema, ?Model $record): Schema => $record instanceof Model ? $schema->components([
                 Livewire::make($this->page, ['record' => $record->getKey(), 'isEmbedded' => true])
                     ->key("record-preview-{$record->getKey()}"),
-            ]));
+            ]) : $schema);
     }
 
     private function modalId(Component $livewire): string
