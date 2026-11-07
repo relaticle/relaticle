@@ -1,10 +1,11 @@
 @php
-    /** @var \App\Filament\Components\Forms\LinkedRecordsSelect $field */
+    /** @var \App\Filament\Components\Forms\LinkedRecordsSelect|\App\Filament\Components\Forms\WorkspaceMemberSelect $field */
     $id = $field->getId();
     $key = $field->getKey();
     $statePath = $field->getStatePath();
     $isDisabled = $field->isDisabled();
     $label = $field->getLabel();
+    $messages = $field->getPickerMessages();
 @endphp
 
 <div
@@ -15,17 +16,7 @@
         state: $wire.{{ $field->applyStateBindingModifiers("\$entangle('{$statePath}')") }},
         selected: @js($field->getSelectedRecordsForJs()),
         isDisabled: @js($isDisabled),
-        messages: @js([
-            'searching' => __('filament/components/linked-records.searching'),
-            'failed' => __('filament/components/linked-records.failed'),
-            'none' => __('filament/components/linked-records.none'),
-            'empty' => __('filament/components/linked-records.empty'),
-            'linked' => __('filament/components/linked-records.linked'),
-            'more' => __('filament/components/linked-records.more'),
-            'result' => __('filament/components/linked-records.result'),
-            'results' => __('filament/components/linked-records.results'),
-            'remove' => __('filament/components/linked-records.remove'),
-        ]),
+        messages: @js($messages),
         fetch: (search) => Livewire.fireAction(
             $wire.__instance,
             'callSchemaComponentMethod',
@@ -54,7 +45,7 @@
                     x-bind:title="option.name"
                     x-bind:class="{ 'fi-overflowed': index >= visibleCount, 'fi-shrinkable': visibleCount === 1 }"
                     x-html="option.html"
-                    x-on:click.stop
+                    x-on:click="option.url && $event.stopPropagation()"
                     target="_blank"
                     rel="noopener"
                     tabindex="-1"
@@ -117,8 +108,8 @@
                     aria-autocomplete="list"
                     aria-expanded="true"
                     aria-controls="{{ $id }}-listbox"
-                    aria-label="{{ __('filament/components/linked-records.search') }}"
-                    placeholder="{{ __('filament/components/linked-records.search') }}"
+                    aria-label="{{ $messages['search'] }}"
+                    placeholder="{{ $messages['search'] }}"
                     autocomplete="off"
                     autocapitalize="off"
                     spellcheck="false"

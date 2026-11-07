@@ -227,3 +227,20 @@ it('notifies a member newly assigned from a record tasks tab', function (string 
         },
     ],
 ]);
+
+it('shows one assignee on a record tasks tab and lists the rest behind a count', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $task = $company->tasks()->save(Task::factory()->recycle([$this->user, $this->workspace])->make());
+    $members = User::factory()->count(2)->sequence(['name' => 'Priya Raman'], ['name' => 'Tomas Berg'])->create();
+    $this->workspace->users()->attach($members, ['role' => 'member']);
+    $task->assignees()->attach([$this->user->getKey(), ...$members->modelKeys()]);
+
+    livewire(CompanyTasksRelationManager::class, [
+        'ownerRecord' => $company,
+        'pageClass' => ViewCompany::class,
+    ])
+        ->assertSeeHtml('fi-linked-records-cell-more')
+        ->assertSee('+2')
+        ->assertSeeHtml('aria-label="Show all 3 assignees"')
+        ->assertSee([$this->user->name, 'Priya Raman', 'Tomas Berg']);
+});

@@ -14,6 +14,13 @@ final class RecordChipColumn extends TextColumn
 
     protected string $view = 'filament.tables.columns.record-chip-column';
 
+    public function collapsed(): static
+    {
+        return $this
+            ->view('filament.tables.columns.record-chip-overflow-column')
+            ->disabledClick();
+    }
+
     /**
      * @return array<int, RecordChip>
      */

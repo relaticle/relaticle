@@ -33,6 +33,7 @@ final class TaskForm
                     ->schema([
                         WorkspaceMemberSelect::make('assignees')
                             ->label(__('filament/resources/task.fields.assignees.label'))
+                            ->placeholder(__('filament/resources/task.fields.assignees.placeholder'))
                             ->multiple()
                             ->relationship('assignees', 'name')
                             ->nullable(),

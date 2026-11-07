@@ -153,6 +153,7 @@ final class TaskResource extends Resource
                 ->toggleable(),
             RecordChipColumn::make('assignees.name')
                 ->label(__('filament/resources/task.fields.assignees.label'))
+                ->collapsed()
                 ->searchable()
                 ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('creator.name')
