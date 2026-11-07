@@ -24,6 +24,16 @@ final readonly class InternalWorkspace implements Scope
     {
         return DB::table('users')
             ->select('users.id')
-            ->whereIn(DB::raw('lower(users.email)'), DB::table('system_administrators')->selectRaw('lower(system_administrators.email)'));
+            ->where(fn (QueryBuilder $owners): QueryBuilder => $owners
+                ->whereIn(DB::raw('lower(users.email)'), DB::table('system_administrators')->selectRaw('lower(system_administrators.email)'))
+                ->orWhereIn(DB::raw("split_part(lower(users.email), '@', 2)"), self::emailDomains()));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function emailDomains(): array
+    {
+        return array_values(array_filter((array) config('system-admin.internal_email_domains', []), is_string(...)));
     }
 }

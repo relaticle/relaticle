@@ -10,7 +10,7 @@ use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
 use Relaticle\Cloud\Admin\Enums\LeadStage;
 use Relaticle\SystemAdmin\Metrics\ActivityDays;
-use Relaticle\SystemAdmin\Metrics\Scopes\ExternalWorkspace;
+use Relaticle\SystemAdmin\Metrics\Scopes\CustomerWorkspace;
 
 final readonly class SalesLeadsQuery
 {
@@ -22,7 +22,7 @@ final readonly class SalesLeadsQuery
         $since = now()->subDays(29)->toDateString();
 
         $query = Workspace::query()
-            ->withGlobalScope(ExternalWorkspace::class, new ExternalWorkspace)
+            ->withGlobalScope(CustomerWorkspace::class, new CustomerWorkspace)
             ->where(fn (Builder $use): Builder => $use
                 ->whereIn('workspaces.id', ActivityDays::workspacesWithOwnData())
                 ->orWhereIn('workspaces.id', self::workspacesChattingOnSeveralDays()))
