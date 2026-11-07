@@ -20,7 +20,7 @@ final readonly class RequireMcpResource
             return $next($request);
         }
 
-        $accepted = array_map($this->normalize(...), array_unique([URL::getMcpUrl(), url('/mcp')]));
+        $accepted = array_map($this->normalize(...), [URL::getMcpUrl(), url('/mcp')]);
 
         foreach ((array) $requested as $resource) {
             abort_unless(
