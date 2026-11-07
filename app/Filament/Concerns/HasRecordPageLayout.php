@@ -76,6 +76,10 @@ trait HasRecordPageLayout
 
     public function infolist(Schema $schema): Schema
     {
+        if ($this->isEmbedded) {
+            return $schema->components([$this->quickActions()]);
+        }
+
         return $schema->columns(1)->components([
             Flex::make([
                 RecordChipEntry::make('name')

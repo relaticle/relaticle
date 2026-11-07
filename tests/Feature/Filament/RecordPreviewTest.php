@@ -139,3 +139,13 @@ it('offers the preview in the row menu for keyboard and touch users', function (
     livewire($list)
         ->assertActionVisible(TestAction::make('preview')->table($record));
 })->with('record lists');
+
+it('creates a note from the overview of a company open in the preview', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire(ViewCompany::class, ['record' => $company->getKey(), 'isEmbedded' => true])
+        ->callAction(TestAction::make('createNote')->schemaComponent('quickActions', schema: 'infolist'), data: ['title' => 'Call recap'])
+        ->assertHasNoActionErrors();
+
+    expect($company->notes()->sole()->title)->toBe('Call recap');
+});
