@@ -22,6 +22,7 @@ use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Str;
+use Livewire\Livewire;
 use Relaticle\CustomFields\Services\TenantContextService;
 
 mutates(PreviewRecordAction::class, RecordChipColumn::class, RecordDetails::class, RecordOverview::class);
@@ -148,4 +149,12 @@ it('creates a note from the overview of a company open in the preview', function
         ->assertHasNoActionErrors();
 
     expect($company->notes()->sole()->title)->toBe('Call recap');
+});
+
+it('opens the preview on the overview even when the list url names a tab', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+    Livewire::withQueryParams(['relation' => '2'])
+        ->test(ViewCompany::class, ['record' => $company->getKey(), 'isEmbedded' => true])
+        ->assertSet('activeRelationManager', null);
 });

@@ -398,6 +398,16 @@ it('rejects an edit payload naming an assignee outside the workspace', function 
         ->and($outsider->notifications()->count())->toBe(0);
 });
 
+it('leaves a user from another workspace out of the assignee picker when the payload names one', function (): void {
+    $outsider = User::factory()->withWorkspace()->create(['name' => 'Otto Outsider']);
+    $record = Task::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire(ManageTasks::class)
+        ->mountAction(TestAction::make('edit')->table($record))
+        ->set('mountedActions.0.data.assignees', [$outsider->getKey()])
+        ->assertMountedActionModalDontSee('Otto Outsider');
+});
+
 it('can delete a task', function (): void {
     $record = Task::factory()->recycle([$this->user, $this->workspace])->create();
 

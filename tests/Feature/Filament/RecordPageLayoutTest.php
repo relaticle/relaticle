@@ -562,14 +562,17 @@ it('names the open task due soonest as the next due task and skips a done one', 
     $task('Kickoff call', now()->subDay())
         ->saveCustomFieldValue($statusField, $statusField->options->firstWhere('name', TaskField::DONE_STATUS)->getKey());
 
-    livewire(ViewOpportunity::class, ['record' => $opportunity->getKey()])
+    $html = livewire(ViewOpportunity::class, ['record' => $opportunity->getKey()])
         ->assertSeeInOrder([
             __('filament/record-page.overview.next_task'),
             'Book the demo',
             __('filament/record-page.overview.tasks'),
             'Book the demo',
             'Send the contract',
-        ]);
+        ])
+        ->html();
+
+    expect(Str::after($html, 'fi-record-overview-related'))->not->toContain('Kickoff call');
 });
 
 it('lists open tasks on the overview by due date with an undated one last', function (): void {
