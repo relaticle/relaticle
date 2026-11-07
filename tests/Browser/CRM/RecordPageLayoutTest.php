@@ -190,6 +190,8 @@ it('previews a company from its list row, steps to the next one and closes on es
         ->click('.fi-ta-row:first-of-type .fi-record-preview-trigger')
         ->assertScript($previewTitle, 'Atlas Freight')
         ->assertSee('1 of 2 in Companies')
+        ->assertScript('(() => { const header = document.querySelector(".fi-record-preview-header").getBoundingClientRect(); const open = document.querySelector(".fi-record-preview-open").getBoundingClientRect(); return header.right - open.right < 24; })()', true)
+        ->assertScript('[...new Set([...document.querySelectorAll(".fi-record-preview-header .fi-icon-btn")].map((button) => { const box = button.getBoundingClientRect(); return `${box.width}x${box.height}`; }))].length', 1)
         ->click('.fi-record-preview-header button[aria-label="'.__('filament/record-page.preview.next').'"]')
         ->assertScript($previewTitle, 'Harbor Logistics')
         ->assertSee('2 of 2 in Companies')

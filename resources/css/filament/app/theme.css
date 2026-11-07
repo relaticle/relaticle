@@ -1495,6 +1495,15 @@ html.fi-record-stacked .fi-record-layout {
         @apply me-0.5;
     }
 
+    .fi-record-preview-header .fi-icon-btn.fi-record-preview-open {
+        @apply ms-auto;
+
+        /* maximize-2 spans 18 of 24 units; at 12px it reads the size of the 12-unit close and chevron glyphs. */
+        & .fi-icon {
+            @apply size-3;
+        }
+    }
+
     .fi-record-preview-position {
         @apply ms-2 truncate text-sm text-gray-600 tabular-nums dark:text-gray-300;
     }

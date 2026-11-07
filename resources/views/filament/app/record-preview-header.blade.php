@@ -9,7 +9,8 @@
         color="gray"
         :label="__('filament::components/modal.actions.close.label')"
         :x-on:click="'$dispatch(\'close-modal\', { id: ' . Js::from($modalId) . ' })'"
-        class="fi-record-preview-close"
+        size="sm"
+        class="fi-record-preview-header-btn fi-record-preview-close"
     />
 
     @if ($position !== null)
@@ -46,6 +47,6 @@
         :href="$recordUrl"
         :label="__('filament/record-page.actions.open_record')"
         :tooltip="__('filament/record-page.actions.open_record')"
-        class="fi-record-preview-header-btn ms-auto"
+        class="fi-record-preview-header-btn fi-record-preview-open"
     />
 </div>
