@@ -9,6 +9,7 @@ use App\Data\AiSettings;
 use App\Enums\BillingStatus;
 use App\Enums\DeletionReason;
 use App\Enums\MediaCollection;
+use App\Enums\OnboardingDataSource;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\Plan;
@@ -73,6 +74,8 @@ use Spatie\Sluggable\SlugOptions;
  * @property ?OnboardingReferralSource $onboarding_referral_source
  * @property ?string $onboarding_referral_detail
  * @property ?string $onboarding_referral_prompt
+ * @property ?OnboardingDataSource $onboarding_data_source
+ * @property ?string $onboarding_data_source_detail
  * @property WorkspaceSetupStep|null $onboarding_step
  * @property CarbonImmutable|null $scheduled_deletion_at
  * @property DeletionReason|null $deletion_reason
@@ -105,6 +108,8 @@ use Spatie\Sluggable\SlugOptions;
     'onboarding_referral_source',
     'onboarding_referral_detail',
     'onboarding_referral_prompt',
+    'onboarding_data_source',
+    'onboarding_data_source_detail',
     'onboarding_step',
     'invite_link_default_role',
 ])]
@@ -246,6 +251,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
             'onboarding_use_case' => OnboardingUseCase::class,
             'onboarding_context' => 'array',
             'onboarding_referral_source' => OnboardingReferralSource::class,
+            'onboarding_data_source' => OnboardingDataSource::class,
             'onboarding_step' => WorkspaceSetupStep::class,
             'activation_checklist_dismissed_at' => 'datetime',
             'setup_nudge_sent_at' => 'datetime',

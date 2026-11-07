@@ -8,7 +8,6 @@ use App\Contracts\Billing;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\Plan;
 use App\Enums\WorkspaceSetupStep;
-use App\Features\EmailIntegration;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Rules\ValidWorkspaceSlug;
@@ -23,7 +22,6 @@ use Illuminate\Validation\Validator as ValidatorInstance;
 use Laravel\Jetstream\Contracts\CreatesTeams;
 use Laravel\Jetstream\Events\AddingTeam;
 use Laravel\Jetstream\Jetstream;
-use Laravel\Pennant\Feature;
 
 final readonly class CreateWorkspace implements CreatesTeams
 {
@@ -55,7 +53,7 @@ final readonly class CreateWorkspace implements CreatesTeams
                 'name' => $input['name'],
                 'slug' => $input['slug'] ?? null,
                 'personal_workspace' => ! $ownedWorkspace instanceof Workspace,
-                'onboarding_step' => Feature::active(EmailIntegration::class) ? WorkspaceSetupStep::Email : WorkspaceSetupStep::UseCase,
+                'onboarding_step' => WorkspaceSetupStep::Source,
                 ...$this->referralAttributes($input),
             ]);
             $workspace->plan = Plan::default();

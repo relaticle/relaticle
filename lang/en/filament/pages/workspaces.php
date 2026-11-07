@@ -74,6 +74,35 @@ return [
     ],
     'setup_workspace' => [
         'title' => 'Set up your workspace',
+        'source' => [
+            'heading' => 'Where do your clients live today?',
+            'description' => 'Pick the closest answer and we take you to the quickest way to bring them in.',
+            'label' => 'Where your clients live',
+            'validation_attribute' => 'answer',
+            'detail_label' => 'Which one? (optional)',
+            'options' => [
+                'spreadsheet' => [
+                    'label' => 'A spreadsheet',
+                    'description' => 'Upload your file of people and companies in the next step.',
+                ],
+                'other_crm' => [
+                    'label' => 'Another CRM',
+                    'description' => 'Export people and companies as a CSV file from your current CRM, then upload it in the next step.',
+                ],
+                'inbox' => [
+                    'label' => 'My inbox',
+                    'description' => 'Connect your mailbox and we add the people and companies you email.',
+                ],
+                'memory' => [
+                    'label' => 'In my head',
+                    'description' => 'Tell Rela, the built-in AI assistant, who you work with and approve what it adds.',
+                ],
+                'assistant' => [
+                    'label' => 'Claude or ChatGPT',
+                    'description' => 'Connect your assistant and have it move your clients in.',
+                ],
+            ],
+        ],
         'email' => [
             'heading' => 'Start with the people you already email',
             'description' => 'Connect your mailbox and Relaticle builds your CRM while you finish setup.',

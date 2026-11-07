@@ -13,6 +13,7 @@ use App\Models\People;
 use App\Models\Scopes\WorkspaceScope;
 use App\Models\Workspace;
 use App\Onboarding\MailboxProviderHint;
+use App\Onboarding\MailboxStep;
 use App\Services\WorkspaceActivationFacts;
 use Filament\Actions\Action;
 use Filament\Support\Enums\Alignment;
@@ -20,7 +21,6 @@ use Filament\Support\Enums\Width;
 use Illuminate\Validation\Rule;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
-use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
@@ -68,8 +68,7 @@ trait RunsMailboxSteps
     public function canGoBackToMailbox(): bool
     {
         return $this->step() === WorkspaceSetupStep::UseCase
-            && Feature::active(EmailIntegration::class)
-            && $this->configuredProviders() !== []
+            && MailboxStep::canRun()
             && ! resolve(WorkspaceActivationFacts::class)->hasConnectedMailbox($this->authUser(), $this->workspace);
     }
 
@@ -136,10 +135,7 @@ trait RunsMailboxSteps
      */
     private function configuredProviders(): array
     {
-        return array_values(array_map(
-            fn (EmailProvider $provider): string => $provider->value,
-            array_filter(EmailProvider::cases(), fn (EmailProvider $provider): bool => $provider->isConfigured()),
-        ));
+        return MailboxStep::configuredProviders();
     }
 
     private function leaveMailboxStepWhenSettled(Workspace $workspace): void
@@ -150,7 +146,7 @@ trait RunsMailboxSteps
 
         $move = resolve(MoveWorkspaceSetup::class);
 
-        if (! Feature::active(EmailIntegration::class) || $this->configuredProviders() === []) {
+        if (! MailboxStep::canRun()) {
             $move->execute($this->authUser(), $workspace, $workspace->onboarding_step, WorkspaceSetupStep::UseCase);
 
             return;

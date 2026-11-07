@@ -9,6 +9,7 @@ use App\Enums\WorkspaceSetupStep;
 use App\Filament\Pages\Concerns\BuildsOnboardingPreview;
 use App\Filament\Pages\Concerns\RunsInviteStep;
 use App\Filament\Pages\Concerns\RunsMailboxSteps;
+use App\Filament\Pages\Concerns\RunsSourceStep;
 use App\Filament\Pages\Concerns\RunsUseCaseStep;
 use App\Models\User;
 use App\Models\Workspace;
@@ -28,6 +29,7 @@ final class SetupWorkspace extends Page
     use BuildsOnboardingPreview;
     use RunsInviteStep;
     use RunsMailboxSteps;
+    use RunsSourceStep;
     use RunsUseCaseStep;
 
     protected static string $layout = 'filament-panels::components.layout.simple';
@@ -98,7 +100,11 @@ final class SetupWorkspace extends Page
     public function form(Schema $schema): Schema
     {
         return $schema
-            ->components($this->step() === WorkspaceSetupStep::Invite ? $this->inviteComponents() : $this->useCaseComponents())
+            ->components(match ($this->step()) {
+                WorkspaceSetupStep::Source => $this->sourceComponents(),
+                WorkspaceSetupStep::Invite => $this->inviteComponents(),
+                default => $this->useCaseComponents(),
+            })
             ->statePath('data');
     }
 
