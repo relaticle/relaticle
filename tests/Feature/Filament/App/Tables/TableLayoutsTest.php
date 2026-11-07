@@ -410,7 +410,8 @@ it('refuses a layout id from another workspace at every entry point', function (
         ->assertActionHidden('shareTableLayout', ['layout' => $foreign->getKey()])
         ->assertActionHidden('deleteTableLayout', ['layout' => $foreign->getKey()])
         ->call('toggleDefaultTableLayout', $foreign->getKey())
-        ->assertStatus(404);
+        ->assertNotified('That layout is no longer available.')
+        ->assertSet('defaultTableLayoutId', null);
 
     expect($foreign->refresh()->name)->toBe('Elsewhere')
         ->and(preferenceRow()?->default_layout_id)->toBeNull();
@@ -701,6 +702,20 @@ it('tells the member instead of failing when the layout they save over was delet
         ->assertSet('activeTableLayoutId', null);
 
     expect(TableLayout::query()->withoutGlobalScopes()->count())->toBe(0);
+});
+
+it('tells the member instead of failing when the layout they set as default was deleted elsewhere', function (): void {
+    $layout = layoutFor($this->user, ['state' => hotLeads()]);
+    $component = livewire(ListCompanies::class)->call('applySavedLayout', $layout->getKey());
+
+    $layout->delete();
+
+    $component->call('toggleDefaultTableLayout', $layout->getKey())
+        ->assertNotified('That layout is no longer available.')
+        ->assertSet('activeTableLayoutId', null)
+        ->assertSet('defaultTableLayoutId', null);
+
+    expect(preferenceRow()?->default_layout_id)->toBeNull();
 });
 
 it('shows the name error when a rename races another save to the same name', function (): void {

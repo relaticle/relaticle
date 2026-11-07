@@ -113,7 +113,14 @@ trait HasTableLayouts
 
     public function toggleDefaultTableLayout(string $layoutId): void
     {
-        $layout = $this->visibleTableLayout($layoutId) ?? abort(404);
+        $layout = $this->visibleTableLayout($layoutId);
+
+        if (! $layout instanceof TableLayout) {
+            $this->handleMissingTableLayout($layoutId);
+
+            return;
+        }
+
         $default = $this->defaultTableLayoutId === $layout->getKey() ? null : $layout;
 
         resolve(SetDefaultTableLayout::class)->execute($this->tableLayoutUser(), $this->tableLayoutWorkspace(), $this->tableEntity(), $default);
