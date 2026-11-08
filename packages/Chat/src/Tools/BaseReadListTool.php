@@ -27,6 +27,7 @@ use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\CustomFieldsFilterDescriber;
 use Relaticle\Chat\Services\Tools\DisplayFieldSelector;
+use Relaticle\Chat\Support\LongTextForModel;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Tools\Concerns\LocalisesDatetimes;
 use Spatie\QueryBuilder\Exceptions\InvalidQuery;
@@ -66,8 +67,10 @@ abstract class BaseReadListTool implements Tool
      */
     private const int MAX_PER_PAGE = 25;
 
+    private const array RESPONSE_FORMATS = ['concise', 'detailed'];
+
     /** @var list<string> */
-    private const array ARGUMENTS = ['filter', 'sort', 'per_page', 'page', 'lookup', 'include'];
+    private const array ARGUMENTS = ['filter', 'sort', 'per_page', 'page', 'lookup', 'include', 'response_format'];
 
     /** @return class-string<JsonResource> */
     abstract protected function resourceClass(): string;
@@ -114,6 +117,7 @@ abstract class BaseReadListTool implements Tool
             'per_page' => $schema->integer()->description('Results per page (default 10, max 25).')->default(10),
             'page' => $schema->integer()->description('Page number.')->default(1),
             'lookup' => $schema->boolean()->description('Set true when you call this only to find ids for another tool call (e.g. before an update or delete): the user then sees no table. Leave unset when the user asked to see the records.'),
+            'response_format' => $schema->string()->enum(self::RESPONSE_FORMATS)->description('concise (default) shortens long text fields to 300 characters and lists them in truncated_fields. detailed returns them whole as Markdown. Use the Get tool for one record\'s full text; use detailed only when the question turns on the text of many.'),
         ];
 
         $includes = $this->availableIncludes();
@@ -147,6 +151,12 @@ abstract class BaseReadListTool implements Tool
             return (string) json_encode([
                 'error' => 'Unknown include(s): '.implode(', ', $unknown).'. Valid values for this tool: '.($valid === '' ? '(none)' : $valid).'.',
             ], JSON_UNESCAPED_SLASHES);
+        }
+
+        $responseFormat = $request['response_format'] ?? 'concise';
+
+        if (! in_array($responseFormat, self::RESPONSE_FORMATS, true)) {
+            return (string) json_encode(['error' => 'response_format must be concise or detailed'], JSON_UNESCAPED_SLASHES);
         }
 
         try {
@@ -188,33 +198,16 @@ abstract class BaseReadListTool implements Tool
             return $collection->toJson(JSON_UNESCAPED_SLASHES);
         }
 
-        $citationType = $this->citationType();
+        $items = $this->shortenLongText($items, $responseFormat, $user);
+
         $resolver = resolve(RecordReferenceResolver::class);
-        $linkable = in_array($citationType, RecordReferenceResolver::CHIP_TYPES, true);
+        $linkable = in_array($this->citationType(), RecordReferenceResolver::CHIP_TYPES, true);
 
-        $items = array_map(function (mixed $item, int $index) use ($citationType, $resolver, $linkable, $models, $requestedIncludes): mixed {
-            if (! is_array($item)) {
-                return $item;
-            }
-
-            $id = isset($item['id']) && (is_string($item['id']) || is_int($item['id']))
-                ? (string) $item['id']
-                : null;
-
-            // resolve() was called here purely as a null check while referenceUrl()
-            // supplied the value, and resolve() issues a label query per call. At
-            // MAX_PER_PAGE that is 25 discarded SELECTs per list call. Whether a type
-            // is linkable is a constant, so it is decided once outside the loop.
-            $item['url'] = $id !== null && $linkable
-                ? $resolver->referenceUrl($citationType, $id)
-                : null;
-
-            if ($requestedIncludes !== [] && isset($models[$index]) && $models[$index] instanceof Model) {
-                $item['included'] = $this->includedFor($models[$index], $requestedIncludes, $resolver);
-            }
-
-            return $item;
-        }, $items, array_keys($items));
+        $items = array_map(
+            fn (mixed $item, int $index): mixed => $this->decorateRow($item, $models[$index] ?? null, $requestedIncludes, $resolver, $linkable),
+            $items,
+            array_keys($items),
+        );
 
         $payload = [
             'data' => $items,
@@ -231,6 +224,91 @@ abstract class BaseReadListTool implements Tool
         }
 
         return (string) json_encode($this->localiseDatetimes($payload, $user), JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * @param  list<string>  $requestedIncludes
+     */
+    private function decorateRow(mixed $item, mixed $model, array $requestedIncludes, RecordReferenceResolver $resolver, bool $linkable): mixed
+    {
+        if (! is_array($item)) {
+            return $item;
+        }
+
+        $id = isset($item['id']) && (is_string($item['id']) || is_int($item['id']))
+            ? (string) $item['id']
+            : null;
+
+        // resolve() was called here purely as a null check while referenceUrl()
+        // supplied the value, and resolve() issues a label query per call. At
+        // MAX_PER_PAGE that is 25 discarded SELECTs per list call. Whether a type
+        // is linkable is a constant, so it is decided once outside the loop.
+        $item['url'] = $id !== null && $linkable
+            ? $resolver->referenceUrl($this->citationType(), $id)
+            : null;
+
+        if ($requestedIncludes !== [] && $model instanceof Model) {
+            $item['included'] = $this->includedFor($model, $requestedIncludes, $resolver);
+        }
+
+        return $item;
+    }
+
+    /**
+     * @param  array<mixed>  $items
+     * @return list<mixed>
+     */
+    private function shortenLongText(array $items, string $mode, User $user): array
+    {
+        $longTextCodes = CustomField::query()
+            ->where('tenant_id', $user->currentWorkspace->getKey())
+            ->where('entity_type', $this->citationType())
+            ->active()
+            ->get()
+            ->filter(LongTextForModel::isLongText(...))
+            ->pluck('code')
+            ->all();
+
+        if ($longTextCodes === []) {
+            return array_values($items);
+        }
+
+        return array_map(function (mixed $item) use ($longTextCodes, $mode): mixed {
+            $fields = is_array($item) ? ($item['attributes']['custom_fields'] ?? null) : null;
+
+            if (! is_array($fields) || $fields === []) {
+                return $item;
+            }
+
+            $truncated = [];
+
+            foreach ($longTextCodes as $code) {
+                if (! isset($fields[$code]) || ! is_string($fields[$code])) {
+                    continue;
+                }
+
+                if ($mode === 'detailed') {
+                    $fields[$code] = LongTextForModel::markdown($fields[$code]);
+
+                    continue;
+                }
+
+                $concise = LongTextForModel::concise($fields[$code]);
+                $fields[$code] = $concise['text'];
+
+                if ($concise['truncated']) {
+                    $truncated[] = $code;
+                }
+            }
+
+            $item['attributes']['custom_fields'] = $fields;
+
+            if ($truncated !== []) {
+                $item['truncated_fields'] = $truncated;
+            }
+
+            return $item;
+        }, array_values($items));
     }
 
     private function perPageFor(Request $request): int
