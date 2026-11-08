@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "0d40065d746883ac7cb34db3c2092b22",
+    "content-hash": "23d829c9023a03cd7b053b97dc06bb62",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -20196,16 +20196,16 @@
         },
         {
             "name": "brianium/paratest",
-            "version": "v7.25.0",
+            "version": "v7.27.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/paratestphp/paratest.git",
-                "reference": "5aa46dcc0db88156b46114253ce596055f9be563"
+                "reference": "fe4a1fd811fd79ead7476fa109c5f4ed721cc18a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/paratestphp/paratest/zipball/5aa46dcc0db88156b46114253ce596055f9be563",
-                "reference": "5aa46dcc0db88156b46114253ce596055f9be563",
+                "url": "https://api.github.com/repos/paratestphp/paratest/zipball/fe4a1fd811fd79ead7476fa109c5f4ed721cc18a",
+                "reference": "fe4a1fd811fd79ead7476fa109c5f4ed721cc18a",
                 "shasum": ""
             },
             "require": {
@@ -20213,27 +20213,27 @@
                 "ext-pcre": "*",
                 "ext-reflection": "*",
                 "ext-simplexml": "*",
-                "fidry/cpu-core-counter": "^1.3.0",
+                "fidry/cpu-core-counter": "^1.4.1",
                 "jean85/pretty-package-versions": "^2.1.1",
                 "php": "~8.4.0 || ~8.5.0 || ~8.6.0",
-                "phpunit/php-code-coverage": "^14.3.3",
+                "phpunit/php-code-coverage": "^14.4.1",
                 "phpunit/php-file-iterator": "^7.0.2",
                 "phpunit/php-timer": "^9",
-                "phpunit/phpunit": "^13.3.4",
-                "sebastian/environment": "^9.3.2",
-                "symfony/console": "^7.4.8 || ^8.1.7",
-                "symfony/process": "^7.4.8 || ^8.1.7"
+                "phpunit/phpunit": "^13.4.3",
+                "sebastian/environment": "^9.3.3",
+                "symfony/console": "^7.4.20 || ^8.1.8",
+                "symfony/process": "^7.4.19 || ^8.1.7"
             },
             "require-dev": {
                 "doctrine/coding-standard": "^14.0.0",
                 "ext-pcntl": "*",
                 "ext-pcov": "*",
                 "ext-posix": "*",
-                "phpstan/phpstan": "^2.2.15",
+                "phpstan/phpstan": "^2.3.2",
                 "phpstan/phpstan-deprecation-rules": "^2.0.5",
-                "phpstan/phpstan-phpunit": "^2.0.18",
-                "phpstan/phpstan-strict-rules": "^2.0.12",
-                "symfony/filesystem": "^7.4.8 || ^8.1.6"
+                "phpstan/phpstan-phpunit": "^2.1.1",
+                "phpstan/phpstan-strict-rules": "^2.1.0",
+                "symfony/filesystem": "^7.4.18 || ^8.1.6"
             },
             "bin": [
                 "bin/paratest",
@@ -20273,7 +20273,7 @@
             ],
             "support": {
                 "issues": "https://github.com/paratestphp/paratest/issues",
-                "source": "https://github.com/paratestphp/paratest/tree/v7.25.0"
+                "source": "https://github.com/paratestphp/paratest/tree/v7.27.5"
             },
             "funding": [
                 {
@@ -20285,7 +20285,7 @@
                     "type": "paypal"
                 }
             ],
-            "time": "2026-09-24T08:47:36+00:00"
+            "time": "2026-10-29T13:58:46+00:00"
         },
         {
             "name": "daverandom/libdns",
@@ -21468,43 +21468,43 @@
         },
         {
             "name": "pestphp/pest",
-            "version": "dev-tia-warmup-worktrees",
+            "version": "dev-tia-warmup-worktrees-5x",
             "source": {
                 "type": "git",
                 "url": "https://github.com/ManukMinasyan/pest.git",
-                "reference": "49b6f7ce2e5aca6695b31a12f954004e7369c0f4"
+                "reference": "e679643c3863167ab4dae312de5d806b1d4577a3"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/ManukMinasyan/pest/zipball/49b6f7ce2e5aca6695b31a12f954004e7369c0f4",
-                "reference": "49b6f7ce2e5aca6695b31a12f954004e7369c0f4",
+                "url": "https://api.github.com/repos/ManukMinasyan/pest/zipball/e679643c3863167ab4dae312de5d806b1d4577a3",
+                "reference": "e679643c3863167ab4dae312de5d806b1d4577a3",
                 "shasum": ""
             },
             "require": {
-                "brianium/paratest": "^7.25.0",
+                "brianium/paratest": "^7.27.5",
                 "nunomaduro/collision": "^8.9.5",
                 "nunomaduro/termwind": "^2.4.0",
                 "pestphp/pest-plugin": "^5.0.0",
                 "pestphp/pest-plugin-arch": "^5.0.0",
                 "pestphp/pest-plugin-mutate": "^5.0.2",
-                "pestphp/pest-plugin-profanity": "^5.0.0",
+                "pestphp/pest-plugin-profanity": "^5.0.1",
                 "php": "^8.4",
-                "phpunit/phpunit": "^13.3.6",
-                "symfony/process": "^8.1.7"
+                "phpunit/phpunit": "^13.4.6",
+                "symfony/process": "^8.1.10"
             },
             "conflict": {
                 "filp/whoops": "<2.18.3",
                 "laravel/boost": "<2.6.0",
-                "phpunit/phpunit": ">13.3.6",
+                "phpunit/phpunit": ">13.4.6",
                 "sebastian/exporter": "<7.0.0",
                 "webmozart/assert": "<1.11.0"
             },
             "require-dev": {
                 "pestphp/pest-dev-tools": "^5.0.0",
-                "pestphp/pest-plugin-browser": "^5.1.0",
-                "pestphp/pest-plugin-phpstan": "^5.2.1",
-                "pestphp/pest-plugin-rector": "^5.0.4",
-                "pestphp/pest-plugin-type-coverage": "^5.0.2",
+                "pestphp/pest-plugin-browser": "^5.2.0",
+                "pestphp/pest-plugin-phpstan": "^5.3.1",
+                "pestphp/pest-plugin-rector": "^5.0.6",
+                "pestphp/pest-plugin-type-coverage": "^5.1.0",
                 "psy/psysh": "^0.12.24"
             },
             "bin": [
@@ -21630,7 +21630,7 @@
                 "unit"
             ],
             "support": {
-                "source": "https://github.com/ManukMinasyan/pest/tree/tia-warmup-worktrees"
+                "source": "https://github.com/ManukMinasyan/pest/tree/tia-warmup-worktrees-5x"
             },
             "funding": [
                 {
@@ -21642,7 +21642,7 @@
                     "url": "https://www.paypal.com/paypalme/enunomaduro"
                 }
             ],
-            "time": "2026-10-27T09:37:51+00:00"
+            "time": "2026-11-08T14:16:31+00:00"
         },
         {
             "name": "pestphp/pest-plugin",
@@ -22030,16 +22030,16 @@
         },
         {
             "name": "pestphp/pest-plugin-profanity",
-            "version": "v5.0.0",
+            "version": "v5.0.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/pestphp/pest-plugin-profanity.git",
-                "reference": "3dedf9ea6e2876b5b31f7733d3eacbd86f4653b9"
+                "reference": "2b5fc73ce561b835ba5bf9596c97a84333af2eb8"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/pestphp/pest-plugin-profanity/zipball/3dedf9ea6e2876b5b31f7733d3eacbd86f4653b9",
-                "reference": "3dedf9ea6e2876b5b31f7733d3eacbd86f4653b9",
+                "url": "https://api.github.com/repos/pestphp/pest-plugin-profanity/zipball/2b5fc73ce561b835ba5bf9596c97a84333af2eb8",
+                "reference": "2b5fc73ce561b835ba5bf9596c97a84333af2eb8",
                 "shasum": ""
             },
             "require": {
@@ -22047,7 +22047,8 @@
                 "php": "^8.4"
             },
             "conflict": {
-                "pestphp/pest": "<5.0.0"
+                "pestphp/pest": "<5.0.0",
+                "phpunit/phpunit": "<13.4.1"
             },
             "require-dev": {
                 "faissaloux/pest-plugin-inside": "^1.11",
@@ -22083,9 +22084,9 @@
                 "unit"
             ],
             "support": {
-                "source": "https://github.com/pestphp/pest-plugin-profanity/tree/v5.0.0"
+                "source": "https://github.com/pestphp/pest-plugin-profanity/tree/v5.0.1"
             },
-            "time": "2026-07-21T07:48:56+00:00"
+            "time": "2026-10-07T19:41:52+00:00"
         },
         {
             "name": "pestphp/pest-plugin-rector",
@@ -22172,31 +22173,32 @@
         },
         {
             "name": "pestphp/pest-plugin-type-coverage",
-            "version": "v5.0.2",
+            "version": "v5.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/pestphp/pest-plugin-type-coverage.git",
-                "reference": "6bcd630c6ee6bc06b0ae54a9d35fef0f4087efd7"
+                "reference": "3951c85494cede417987c6418005b96e68e30e5b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/pestphp/pest-plugin-type-coverage/zipball/6bcd630c6ee6bc06b0ae54a9d35fef0f4087efd7",
-                "reference": "6bcd630c6ee6bc06b0ae54a9d35fef0f4087efd7",
+                "url": "https://api.github.com/repos/pestphp/pest-plugin-type-coverage/zipball/3951c85494cede417987c6418005b96e68e30e5b",
+                "reference": "3951c85494cede417987c6418005b96e68e30e5b",
                 "shasum": ""
             },
             "require": {
                 "nunomaduro/pokio": "^1.0.1",
                 "pestphp/pest-plugin": "^5.0.0",
                 "php": "^8.4",
-                "phpstan/phpstan": "^2.2.7",
-                "tomasvotruba/type-coverage": "^2.3.0"
+                "phpstan/phpstan": "^2.3.4",
+                "tomasvotruba/type-coverage": "^2.5.1"
             },
             "conflict": {
                 "pestphp/pest": "<5.0.0",
-                "phpstan/phpstan": "<2.2.7"
+                "phpstan/phpstan": "<2.2.7",
+                "phpunit/phpunit": "<13.4.1"
             },
             "require-dev": {
-                "pestphp/pest": "^5.0.3",
+                "pestphp/pest": "^5.3.4",
                 "pestphp/pest-dev-tools": "^5.0.0"
             },
             "type": "library",
@@ -22229,7 +22231,7 @@
                 "unit"
             ],
             "support": {
-                "source": "https://github.com/pestphp/pest-plugin-type-coverage/tree/v5.0.2"
+                "source": "https://github.com/pestphp/pest-plugin-type-coverage/tree/v5.1.0"
             },
             "funding": [
                 {
@@ -22241,7 +22243,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-08-04T16:35:23+00:00"
+            "time": "2026-10-30T09:08:01+00:00"
         },
         {
             "name": "phar-io/manifest",
@@ -22809,16 +22811,16 @@
         },
         {
             "name": "phpunit/phpunit",
-            "version": "13.3.6",
+            "version": "13.4.6",
             "source": {
                 "type": "git",
                 "url": "https://github.com/sebastianbergmann/phpunit.git",
-                "reference": "b7d0ee4ea89121cb963302b8708b1c09d9ebc7d6"
+                "reference": "4821376960d0e1e5a7b7b700955ebcab33ecd71b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/b7d0ee4ea89121cb963302b8708b1c09d9ebc7d6",
-                "reference": "b7d0ee4ea89121cb963302b8708b1c09d9ebc7d6",
+                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/4821376960d0e1e5a7b7b700955ebcab33ecd71b",
+                "reference": "4821376960d0e1e5a7b7b700955ebcab33ecd71b",
                 "shasum": ""
             },
             "require": {
@@ -22832,23 +22834,23 @@
                 "phar-io/manifest": "^2.0.4",
                 "phar-io/version": "^3.2.1",
                 "php": ">=8.4.1",
-                "phpunit/php-code-coverage": "^14.3.5",
+                "phpunit/php-code-coverage": "^14.5.0",
                 "phpunit/php-file-iterator": "^7.0.2",
                 "phpunit/php-invoker": "^7.0.0",
-                "phpunit/php-text-template": "^6.0.0",
+                "phpunit/php-text-template": "^6.0.1",
                 "phpunit/php-timer": "^9.0.0",
                 "sebastian/cli-parser": "^5.0.1",
                 "sebastian/comparator": "^8.4",
                 "sebastian/diff": "^9.0.1",
-                "sebastian/environment": "^9.3.2",
+                "sebastian/environment": "^9.3.3",
                 "sebastian/exporter": "^8.2.1",
                 "sebastian/file-filter": "^1.0",
-                "sebastian/git-state": "^1.0",
+                "sebastian/git-state": "^1.1",
                 "sebastian/global-state": "^9.0.1",
                 "sebastian/object-enumerator": "^8.1.0",
                 "sebastian/recursion-context": "^8.0.1",
                 "sebastian/type": "^7.0.2",
-                "sebastian/version": "^7.0.0",
+                "sebastian/version": "^7.0.1",
                 "staabm/side-effects-detector": "^1.0.5"
             },
             "bin": [
@@ -22857,7 +22859,7 @@
             "type": "library",
             "extra": {
                 "branch-alias": {
-                    "dev-main": "13.3-dev"
+                    "dev-main": "13.4-dev"
                 }
             },
             "autoload": {
@@ -22889,7 +22891,7 @@
             "support": {
                 "issues": "https://github.com/sebastianbergmann/phpunit/issues",
                 "security": "https://github.com/sebastianbergmann/phpunit/security/policy",
-                "source": "https://github.com/sebastianbergmann/phpunit/tree/13.3.6"
+                "source": "https://github.com/sebastianbergmann/phpunit/tree/13.4.6"
             },
             "funding": [
                 {
@@ -22897,7 +22899,7 @@
                     "type": "other"
                 }
             ],
-            "time": "2026-09-29T12:12:05+00:00"
+            "time": "2026-11-02T07:12:28+00:00"
         },
         {
             "name": "rector/rector",
@@ -24505,9 +24507,9 @@
     "aliases": [
         {
             "package": "pestphp/pest",
-            "version": "dev-tia-warmup-worktrees",
-            "alias": "5.3.0",
-            "alias_normalized": "5.3.0.0"
+            "version": "dev-tia-warmup-worktrees-5x",
+            "alias": "5.3.5",
+            "alias_normalized": "5.3.5.0"
         }
     ],
     "minimum-stability": "beta",
