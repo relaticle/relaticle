@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Support;
 
 /**
- * The `display_block` key on a read-tool result, in one place.
+ * The model-replay view of a tool result: the `display_block` key and the write echo.
  *
  * A block is presentation, not reasoning. It travels to the UI two ways
  * (`ConversationMessagesQuery` on reload, `ChatInterface::latestAssistantMessage()`
@@ -16,6 +16,10 @@ namespace Relaticle\Chat\Support;
 final readonly class DisplayBlocks
 {
     private const string KEY = 'display_block';
+
+    private const string PENDING_ACTION = 'pending_action';
+
+    private const array WRITE_ECHO_KEYS = ['data', 'display'];
 
     /**
      * Every block carried by one message's tool results.
@@ -44,27 +48,40 @@ final readonly class DisplayBlocks
     }
 
     /**
-     * The same tool result with its block removed. Anything that is not a JSON
-     * object carrying a block is returned untouched, so a plain-string result
-     * never round-trips through json_encode.
+     * The same tool result as the model replays it: the block removed, and the
+     * `data` and `display` echo removed from a pending_action. Anything with
+     * nothing to remove is returned as the original string, never re-encoded.
      */
     public static function strip(mixed $result): mixed
     {
-        if (! is_string($result) || ! str_contains($result, self::KEY)) {
+        if (! is_string($result) || ! self::mayCarryStrippable($result)) {
             return $result;
         }
 
         $decoded = json_decode($result, true);
 
-        if (! is_array($decoded) || ! array_key_exists(self::KEY, $decoded)) {
+        if (! is_array($decoded)) {
             return $result;
         }
 
-        unset($decoded[self::KEY]);
+        $keys = array_key_exists(self::KEY, $decoded) ? [self::KEY] : [];
+
+        if (($decoded['type'] ?? null) === self::PENDING_ACTION) {
+            $keys = [...$keys, ...array_filter(self::WRITE_ECHO_KEYS, fn (string $key): bool => array_key_exists($key, $decoded))];
+        }
+
+        if ($keys === []) {
+            return $result;
+        }
 
         // Same flag the tools encode with: this re-encode is what the model
-        // actually replays for every block-carrying result, so dropping it
-        // would put escaped slashes back into the prefix the tools just cleaned.
-        return json_encode($decoded, JSON_UNESCAPED_SLASHES);
+        // actually replays for every stripped result, so dropping it would put
+        // escaped slashes back into the prefix the tools just cleaned.
+        return json_encode(array_diff_key($decoded, array_flip($keys)), JSON_UNESCAPED_SLASHES);
+    }
+
+    private static function mayCarryStrippable(string $result): bool
+    {
+        return str_contains($result, self::KEY) || str_contains($result, '"'.self::PENDING_ACTION.'"');
     }
 }
