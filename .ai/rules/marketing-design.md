@@ -52,7 +52,7 @@ product page takes a different composition, so no two read as copies:
 | --- | --- | --- |
 | `/ai` | `stage` | `inside` light on `tint` |
 | `/crm-for-*` | `stack`, centred, `glow` | `seam` light on `tint` |
-| `/self-hosted` | `stack`, `start` | `corners` light on `surface` |
+| `/self-hosted` | `stack`, `start` | `corners` light on `tint` |
 | `/email-and-calendar` | `split` | `around` light on `tint` |
 | `/ai-native-crm` | `stack`, centred | `dots` on `tint` |
 | homepage story | a `frame` section | `center` light on `tint`, dots inside |
@@ -150,8 +150,9 @@ reach it. Change the header height and the token together. `html` also carries `
 - The `/self-hosted` hero is that page's signature: an install configurator
   (`partials/self-hosted-install.blade.php`). A light terminal `window` holds the guide's quick start
   with an `APP_KEY` and `DB_PASSWORD` the browser generates through `crypto.getRandomValues`, and an
-  address field that rewrites `APP_URL` and the URL in the `mac-window` beside it, which shows the
-  board from a real screenshot. The server renders the `$(openssl ...)` form, so the markup stays
+  address field that rewrites `APP_URL` and the URL in the `mac-window` behind it, which shows the
+  board from a real screenshot. From `xl` the terminal overlaps the window and the board is cropped
+  to a legible scale; below `xl` the two stack. Long commands wrap rather than clip. The server renders the `$(openssl ...)` form, so the markup stays
   runnable shell without JavaScript, and Copy puts commands only on the clipboard. The terminal is
   never dark in light mode, so the band stays the page's one dark moment.
   `tests/Browser/Marketing/SelfHostedInstallTest.php` pins the secrets, the address and the clipboard.
