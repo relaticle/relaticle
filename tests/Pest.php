@@ -55,6 +55,7 @@ use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
 use Relaticle\EmailIntegration\Services\MailboxHistoryImportService;
 use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
+use Tests\Evals\EvalTestCase;
 use Tests\Helpers\ChatCatalog;
 use Tests\Helpers\PestTiaRuntime;
 use Tests\TestCase;
@@ -63,7 +64,11 @@ PestTiaRuntime::configure(dirname(__DIR__), array_slice($_SERVER['argv'], 1));
 
 pest()->extend(TestCase::class)
     ->use(LazilyRefreshDatabase::class)
-    ->in('Feature', 'Smoke', 'Browser', 'Evals', '../packages/Cloud/tests');
+    ->in('Feature', 'Smoke', 'Browser', '../packages/Cloud/tests');
+
+pest()->extend(EvalTestCase::class)
+    ->use(LazilyRefreshDatabase::class)
+    ->in('Evals');
 
 if (class_exists(Playwright::class)) {
     Playwright::setTimeout(30_000);
