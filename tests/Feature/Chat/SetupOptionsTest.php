@@ -240,7 +240,7 @@ it('keeps every label and prompt short, in the app words, with no dash', functio
             ->and(mb_strlen((string) $option->prompt))->toBeLessThanOrEqual(160)
             ->and($option->label.$option->prompt)->not->toContain('—')->not->toContain('contact')
             ->and($option->kind === 'prompt' ? $option->prompt : $option->url)->not->toBeEmpty()
-            ->and($option->icon)->toStartWith('heroicon-o-');
+            ->and($option->icon)->toStartWith('lucide-');
     }
 });
 
@@ -253,7 +253,7 @@ it('serialises an option to the shape the transcript reads', function (): void {
         'label' => 'Add a client',
         'prompt' => __('onboarding/setup.buttons.add_client.prompt'),
         'url' => null,
-        'icon' => 'heroicon-o-building-office-2',
+        'icon' => 'lucide-building-2',
     ]);
 });
 
@@ -407,13 +407,13 @@ it('reads next steps stored before buttons had a kind', function (): void {
 
 it('reads a stored link button and drops one without a url', function (): void {
     $steps = NextSteps::fromMeta(['next_steps' => [
-        ['id' => 'upload_file', 'kind' => 'link', 'label' => 'Upload my file', 'prompt' => null, 'url' => 'https://app.test/import', 'icon' => 'heroicon-o-arrow-up-tray'],
+        ['id' => 'upload_file', 'kind' => 'link', 'label' => 'Upload my file', 'prompt' => null, 'url' => 'https://app.test/import', 'icon' => 'lucide-upload'],
         ['id' => 'upload_file', 'kind' => 'link', 'label' => 'Broken', 'prompt' => null, 'url' => null, 'icon' => null],
         ['id' => 'x', 'kind' => 'prompt', 'label' => 'No prompt', 'prompt' => null, 'url' => null, 'icon' => null],
     ]]);
 
     expect($steps)->toBe([
-        ['id' => 'upload_file', 'kind' => 'link', 'label' => 'Upload my file', 'prompt' => null, 'url' => 'https://app.test/import', 'icon' => 'heroicon-o-arrow-up-tray'],
+        ['id' => 'upload_file', 'kind' => 'link', 'label' => 'Upload my file', 'prompt' => null, 'url' => 'https://app.test/import', 'icon' => 'lucide-upload'],
     ]);
 });
 

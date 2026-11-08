@@ -29,26 +29,26 @@ final readonly class SetupOptions
 
         if ($this->companiesArrivedToday($user, $workspace, $source)) {
             return [
-                $this->prompt('pick_first', 'heroicon-o-flag'),
-                $this->prompt('later', 'heroicon-o-clock'),
+                $this->prompt('pick_first', 'lucide-flag'),
+                $this->prompt('later', 'lucide-clock'),
             ];
         }
 
         $options = match ($source) {
             OnboardingDataSource::Memory => [
-                $this->prompt('add_client', 'heroicon-o-building-office-2'),
-                $this->prompt('add_deal', 'heroicon-o-briefcase'),
+                $this->prompt('add_client', 'lucide-building-2'),
+                $this->prompt('add_deal', 'lucide-briefcase'),
             ],
             OnboardingDataSource::Inbox => [
-                $this->prompt('show_synced', 'heroicon-o-envelope'),
-                $this->prompt('add_outside_email', 'heroicon-o-user-plus'),
+                $this->prompt('show_synced', 'lucide-mail'),
+                $this->prompt('add_outside_email', 'lucide-user-plus'),
             ],
             OnboardingDataSource::Assistant => [
-                $this->prompt('copy_prompt', 'heroicon-o-clipboard-document'),
-                $this->link($user, $workspace, 'connect_steps', 'connect_assistant', 'heroicon-o-arrow-top-right-on-square'),
+                $this->prompt('copy_prompt', 'lucide-clipboard'),
+                $this->link($user, $workspace, 'connect_steps', 'connect_assistant', 'lucide-external-link'),
             ],
             OnboardingDataSource::Spreadsheet, OnboardingDataSource::OtherCrm => [
-                $this->link($user, $workspace, 'upload_file', 'import_people', 'heroicon-o-arrow-up-tray'),
+                $this->link($user, $workspace, 'upload_file', 'import_people', 'lucide-upload'),
             ],
         };
 

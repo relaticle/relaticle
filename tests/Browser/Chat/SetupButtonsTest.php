@@ -50,9 +50,9 @@ function seedButtonsTurn(string $conversationId, User $user, string $reply, arra
 function setupButtonRows(string $appUrl): array
 {
     return [
-        (new SetupOption('pick_first', SetupOption::KIND_PROMPT, 'Pick who to work on first', 'heroicon-o-flag', prompt: 'Pick who to work on first'))->toArray(),
-        (new SetupOption('upload_file', SetupOption::KIND_LINK, 'Upload a file', 'heroicon-o-arrow-up-tray', url: $appUrl))->toArray(),
-        (new SetupOption('connect_steps', SetupOption::KIND_LINK, 'See the connection steps', 'heroicon-o-arrow-top-right-on-square', url: 'https://relaticle.example/help/connect'))->toArray(),
+        (new SetupOption('pick_first', SetupOption::KIND_PROMPT, 'Pick who to work on first', 'lucide-flag', prompt: 'Pick who to work on first'))->toArray(),
+        (new SetupOption('upload_file', SetupOption::KIND_LINK, 'Upload a file', 'lucide-upload', url: $appUrl))->toArray(),
+        (new SetupOption('connect_steps', SetupOption::KIND_LINK, 'See the connection steps', 'lucide-external-link', url: 'https://relaticle.example/help/connect'))->toArray(),
     ];
 }
 
