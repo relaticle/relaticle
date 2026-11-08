@@ -44,6 +44,8 @@ use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Pest\Browser\Api\AwaitableWebpage;
 use Pest\Browser\Playwright\Playwright;
+use Pest\Evals\Drivers\LaravelAiJudge;
+use Pest\Evals\Plugin as EvalsPlugin;
 use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\EmailIntegration\Controllers\RedirectController;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
@@ -69,6 +71,10 @@ pest()->extend(TestCase::class)
 pest()->extend(EvalTestCase::class)
     ->use(LazilyRefreshDatabase::class)
     ->in('Evals');
+
+if (EvalsPlugin::isEvalMode()) {
+    pest()->evals()->judgeUsing(new LaravelAiJudge(provider: 'anthropic', model: 'claude-opus-5-5'));
+}
 
 if (class_exists(Playwright::class)) {
     Playwright::setTimeout(30_000);
