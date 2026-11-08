@@ -2,12 +2,17 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
+use Laravel\Ai\Exceptions\RateLimitedException;
+use Laravel\Ai\Responses\Data\ToolCall;
+use Pest\Evals\Support\ToolCallParser;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AgentConversationMessage;
 use Tests\Evals\Support\EvalWorkspace;
 use Tests\Evals\Support\RelaTurn;
+use Tests\Evals\Support\TurnEnvelope;
 
 function assistantRowWithResults(EvalWorkspace $workspace, array $toolCalls, array $usage = [], array $meta = []): AgentConversationMessage
 {
@@ -112,4 +117,70 @@ it('lists the row ids of each tool call in the envelope', function (): void {
         ->and($envelope->inputTokens)->toBe(120)
         ->and($envelope->outputTokens)->toBe(30)
         ->and($envelope->durationMs)->toBe(450);
+});
+
+it('keeps the retry cause and retries a rate limited turn three times', function (): void {
+    Sleep::fake();
+    CrmAssistant::fake(fn () => throw RateLimitedException::forProvider('anthropic'));
+    $turn = new RelaTurn(EvalWorkspace::seed());
+
+    $envelope = json_decode($turn('anything'), true);
+
+    expect($envelope['error'])->toContain('rate limit')
+        ->and($envelope['error'])->toContain('asked for a retry')
+        ->and($envelope['text'])->toBe('');
+
+    Sleep::assertSleptTimes(RelaTurn::MAX_RETRIES);
+    Sleep::assertSequence([Sleep::for(2)->seconds(), Sleep::for(2)->seconds(), Sleep::for(2)->seconds()]);
+});
+
+it('does not retry or sleep when the turn succeeds', function (): void {
+    Sleep::fake();
+    CrmAssistant::fake(['Fine.']);
+    $turn = new RelaTurn(EvalWorkspace::seed());
+
+    $turn('anything');
+
+    Sleep::assertNeverSlept();
+});
+
+it('uses a new conversation from the closure on every invocation', function (): void {
+    CrmAssistant::fake(['one', 'two']);
+    $workspace = EvalWorkspace::seed();
+    $created = [];
+    $turn = new RelaTurn($workspace, conversation: function () use ($workspace, &$created): string {
+        return $created[] = (string) $workspace->conversation()->getKey();
+    });
+
+    $turn('a');
+    $turn('b');
+
+    $used = AgentConversationMessage::query()->whereIn('conversation_id', $created)->where('role', 'assistant')->pluck('conversation_id')->all();
+
+    expect($created)->toHaveCount(2)
+        ->and($created[0])->not->toBe($created[1])
+        ->and($used)->toEqualCanonicalizing($created);
+});
+
+it('writes unicode and newlines into the envelope without escaping', function (): void {
+    $json = new TurnEnvelope("سلام\nشما", [], [], 0, 0, 0, 0, null)->toJson();
+
+    expect($json)->toContain('سلام')
+        ->and($json)->toContain('\n')
+        ->and(json_decode($json, true)['text'])->toBe("سلام\nشما");
+});
+
+it('records a tool call end to end that the plugin parser reads', function (): void {
+    CrmAssistant::fake([new ToolCall('call_1', 'GetCrmSummaryTool', []), 'You have a few deals.']);
+    $turn = new RelaTurn(EvalWorkspace::seed());
+
+    $json = $turn('How many deals do we have');
+    $envelope = json_decode($json, true);
+    $calls = ToolCallParser::fromOutput($json);
+
+    expect($envelope['error'])->toBeNull()
+        ->and($envelope['tool_calls'][0]['name'])->toBe('GetCrmSummaryTool')
+        ->and($envelope['text'])->toBe('You have a few deals.')
+        ->and($calls)->toHaveCount(1)
+        ->and($calls[0]['name'])->toBe('GetCrmSummaryTool');
 });

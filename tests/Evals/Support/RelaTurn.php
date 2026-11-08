@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Evals\Support;
 
+use Closure;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use LogicException;
 use Relaticle\Chat\Enums\MessageOrigin;
+use Relaticle\Chat\Events\ChatStreamFailed;
+use Relaticle\Chat\Events\ChatStreamRetrying;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AgentConversationMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
@@ -19,6 +24,10 @@ use Throwable;
 
 final class RelaTurn
 {
+    public const int MAX_RETRIES = 3;
+
+    private const int RETRY_DELAY_SECONDS = 2;
+
     public static ?TurnEnvelope $last = null;
 
     private readonly string $modelId;
@@ -33,10 +42,16 @@ final class RelaTurn
         private readonly ?string $conversationId = null,
         private readonly MessageOrigin $origin = MessageOrigin::Typed,
         private readonly ?string $resumesTurnId = null,
+        private readonly ?Closure $conversation = null,
     ) {
         $this->modelId = $model ?? self::model();
-        $this->provider = resolve(ModelRegistry::class)->find($this->modelId)?->provider
-            ?? throw new RuntimeException("The model \"{$this->modelId}\" has no provider in the chat catalog.");
+        $descriptor = resolve(ModelRegistry::class)->find($this->modelId);
+
+        if ($descriptor === null || $descriptor->provider === null) {
+            throw new RuntimeException("The model \"{$this->modelId}\" has no provider in the chat catalog.");
+        }
+
+        $this->provider = $descriptor->provider;
 
         AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->workspace->getKey()], [
             'credits_remaining' => 100000,
@@ -48,22 +63,17 @@ final class RelaTurn
 
     public static function model(): string
     {
-        return (string) env('PEST_EVALS_RELA_MODEL', 'claude-sonnet-5');
+        return getenv('PEST_EVALS_RELA_MODEL') ?: 'claude-sonnet-5';
     }
 
     public function __invoke(string $prompt): string
     {
-        $conversationId = $this->conversationId ?? (string) $this->workspace->conversation()->getKey();
+        $conversationId = $this->nextConversationId();
         $previousId = $this->latestAssistantRow($conversationId)?->id;
+        $turnId = (string) Str::ulid();
 
         try {
-            $this->runJob($prompt, $conversationId);
-
-            $row = $this->latestAssistantRow($conversationId);
-
-            $envelope = $row === null || $row->id === $previousId
-                ? TurnEnvelope::failed('The turn stored no assistant message.')
-                : self::envelopeFromRow($row);
+            $envelope = $this->runWithRetries($prompt, $conversationId, $turnId, $previousId);
         } catch (Throwable $e) {
             $envelope = TurnEnvelope::failed($e->getMessage());
         }
@@ -110,7 +120,65 @@ final class RelaTurn
         ));
     }
 
-    private function runJob(string $prompt, string $conversationId): void
+    private function nextConversationId(): string
+    {
+        if ($this->conversation instanceof Closure) {
+            return (string) ($this->conversation)();
+        }
+
+        return $this->conversationId ?? (string) $this->workspace->conversation()->getKey();
+    }
+
+    private function runWithRetries(string $prompt, string $conversationId, string $turnId, ?string $previousId): TurnEnvelope
+    {
+        $retryable = false;
+        $envelope = $this->runOnce($prompt, $conversationId, $turnId, $previousId, $retryable);
+
+        for ($retry = 0; $retry < self::MAX_RETRIES && $retryable; $retry++) {
+            Sleep::for(self::RETRY_DELAY_SECONDS)->seconds();
+
+            $envelope = $this->runOnce($prompt, $conversationId, $turnId, $previousId, $retryable);
+        }
+
+        return $envelope;
+    }
+
+    private function runOnce(string $prompt, string $conversationId, string $turnId, ?string $previousId, bool &$retryable): TurnEnvelope
+    {
+        $retrying = null;
+        $failure = null;
+
+        Event::listen(ChatStreamRetrying::class, function (ChatStreamRetrying $event) use (&$retrying): void {
+            $retrying = "a transient provider error (rate limit, overload or dropped connection) asked for a retry, attempt {$event->attempt} of {$event->maxAttempts}";
+        });
+        Event::listen(ChatStreamFailed::class, function (ChatStreamFailed $event) use (&$failure): void {
+            $failure = $event->message;
+        });
+
+        try {
+            $this->runJob($prompt, $conversationId, $turnId);
+        } finally {
+            Event::forget(ChatStreamRetrying::class);
+            Event::forget(ChatStreamFailed::class);
+        }
+
+        $row = $this->latestAssistantRow($conversationId);
+
+        if ($row !== null && $row->id !== $previousId) {
+            $retryable = false;
+
+            return self::envelopeFromRow($row);
+        }
+
+        $retryable = $failure === null;
+
+        return TurnEnvelope::failed(implode('; ', array_filter([
+            $failure,
+            $retrying,
+        ])) ?: 'The turn stored no assistant message.');
+    }
+
+    private function runJob(string $prompt, string $conversationId, string $turnId): void
     {
         $job = new ProcessChatMessage(
             user: $this->workspace->owner,
@@ -118,7 +186,7 @@ final class RelaTurn
             message: $this->origin->isTyped() ? $prompt : '',
             conversationId: $conversationId,
             resolved: ['provider' => $this->provider, 'model' => $this->modelId, 'id' => $this->modelId, 'source' => 'explicit'],
-            turnId: (string) Str::ulid(),
+            turnId: $turnId,
             origin: $this->origin,
             resumesTurnId: $this->resumesTurnId,
         );

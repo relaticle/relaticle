@@ -39,6 +39,6 @@ final readonly class TurnEnvelope
             ],
             'duration_ms' => $this->durationMs,
             'error' => $this->error,
-        ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
     }
 }
