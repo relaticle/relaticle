@@ -57,6 +57,9 @@ use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
 use Relaticle\EmailIntegration\Services\MailboxHistoryImportService;
 use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 use Tests\Evals\EvalTestCase;
+use Tests\Evals\Support\EvalReport;
+use Tests\Evals\Support\RelaTurn;
+use Tests\Evals\Support\TurnEnvelope;
 use Tests\Helpers\ChatCatalog;
 use Tests\Helpers\PestTiaRuntime;
 use Tests\TestCase;
@@ -71,7 +74,26 @@ pest()->extend(EvalTestCase::class)
     ->use(LazilyRefreshDatabase::class)
     ->in('Evals');
 
-pest()->evals()->judgeUsing(new LaravelAiJudge(provider: 'anthropic', model: 'claude-opus-5-5'));
+pest()->evals()->judgeUsing(new LaravelAiJudge(provider: 'anthropic', model: EvalReport::JUDGE_MODEL));
+
+pest()->afterEach(function (): void {
+    if (! RelaTurn::$last instanceof TurnEnvelope) {
+        return;
+    }
+
+    $status = $this->status();
+    $failure = $status->isSuccess() ? null : $status->message();
+
+    EvalReport::record(
+        $this->getPrintableTestCaseMethodName(),
+        $status->isSuccess(),
+        RelaTurn::$last,
+        array_values(array_filter([$failure, RelaTurn::$last->error])),
+        count(RelaTurn::$turns),
+    );
+    EvalReport::flushOnShutdown(RelaTurn::model(), EvalReport::JUDGE_MODEL);
+    RelaTurn::forget();
+})->in('Evals');
 
 if (class_exists(Playwright::class)) {
     Playwright::setTimeout(30_000);

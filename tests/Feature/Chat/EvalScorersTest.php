@@ -92,6 +92,27 @@ it('fails the contact word unless the user used it', function (): void {
         ->and($scorer->score('import my list', scorerEnvelope('Map each contact to a person.'))->score)->toBe(0.0);
 });
 
+it('allows the contact verb and fails the contact noun', function (): void {
+    $scorer = new NoContactWord;
+    $pass = fn (string $reply): float => $scorer->score('', scorerEnvelope($reply))->score;
+
+    expect($pass('I will reach out to contact Sarah today.'))->toBe(1.0)
+        ->and($pass('Contact the owner before Friday.'))->toBe(1.0)
+        ->and($pass('She contacted the team and is contacting Ann.'))->toBe(1.0)
+        ->and($pass('Do you want me to contact them?'))->toBe(1.0)
+        ->and($pass('Here is the contact you added.'))->toBe(0.0)
+        ->and($pass('I will map every contact you import.'))->toBe(0.0)
+        ->and($pass('Created the contact Sarah Lee.'))->toBe(0.0);
+});
+
+it('counts a question mark that ends a sentence after a URL', function (): void {
+    $scorer = new OneClosingQuestionAtMost;
+
+    expect($scorer->score('', scorerEnvelope('Is it https://a.com? Or https://b.com?'))->score)->toBe(0.0)
+        ->and($scorer->score('', scorerEnvelope('Which one? See https://a.com/p?id=7&x=1'))->score)->toBe(1.0)
+        ->and($scorer->score('', scorerEnvelope('Is it https://a.com?'))->score)->toBe(1.0);
+});
+
 it('fails replayed bytes at or above the limit', function (): void {
     $scorer = new ReplayedBytesUnder(10000);
 

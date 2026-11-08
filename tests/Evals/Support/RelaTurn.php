@@ -32,6 +32,9 @@ final class RelaTurn
 
     public static ?TurnEnvelope $last = null;
 
+    /** @var list<TurnEnvelope> */
+    public static array $turns = [];
+
     private readonly string $modelId;
 
     private readonly string $provider;
@@ -81,8 +84,15 @@ final class RelaTurn
         }
 
         self::$last = $this->envelope = $envelope;
+        self::$turns[] = $envelope;
 
         return $envelope->toJson();
+    }
+
+    public static function forget(): void
+    {
+        self::$last = null;
+        self::$turns = [];
     }
 
     public function envelope(): TurnEnvelope

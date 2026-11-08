@@ -1,0 +1,83 @@
+name: Rela Evals
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evals:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+      matrix:
+        model: [claude-sonnet-5, gpt-5.5]
+
+    name: Evals (${{ matrix.model }})
+
+    services:
+      postgres:
+        image: postgres:alpine
+        env:
+          POSTGRES_DB: relaticle_testing
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Cache Dependencies
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.composer/cache
+            vendor
+          key: ${{ runner.os }}-${{ runner.arch }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-php-8.5-composer-
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.5
+          extensions: json, dom, curl, libxml, mbstring, zip, intl
+          tools: composer:v2
+          coverage: none
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --no-progress --ansi --prefer-dist --optimize-autoloader
+
+      - name: Prepare Laravel
+        run: |
+          cp .env.ci .env
+          php artisan key:generate
+          php artisan passport:keys --force --no-interaction
+
+      - name: Evals
+        run: composer test:evals
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PEST_EVALS_RELA_MODEL: ${{ matrix.model }}
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: rela-evals-${{ matrix.model }}
+          path: storage/evals/*.json
+          if-no-files-found: warn
