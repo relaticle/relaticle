@@ -15,7 +15,8 @@ final readonly class NoContactWord implements Scorer
     private const array ALLOWED_SPANS = [
         '/\bpoint of contact\b/i',
         '/\bcontact(?:ed|ing)\b/i',
-        '/(?:(?i:\b(?:to|will|would|can|could|should|may|might|must|shall|please|not|let\'s|i|we|you|they)\s+)|(?m:^)|[.!?:]\s+)(?i:contact)\s+(?:(?i:them|him|her|you|me|us|the\s+\w+)|[A-Z]\w+)/u',
+        '/\bcontact(?:ed|ing)?\s+(?:them|him|her|me|us)\b/i',
+        '/(?:(?i:\b(?:to|will|and|or|can|should)\s+|\'ll\s+|\'d\s+)|(?m:^)|[.!?:]\s+)(?i:contact(?:ed|ing)?)\s+(?:(?i:you|the\s+\w+)|[A-Z]\w+)/u',
     ];
 
     public function score(string $input, string $output, ?string $expected = null): ScorerResult

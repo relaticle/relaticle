@@ -31,6 +31,21 @@ it('seeds the eval workspace deterministically', function (): void {
         ->and($a->recordId('task', 'Task 07'))->toBe(evalRows(Task::class, $a)->where('title', 'Task 07')->value('id'));
 });
 
+it('gives every person one deterministic email address', function (): void {
+    $a = EvalWorkspace::seed();
+    $field = $a->field('people', 'emails');
+
+    expect(evalRows(People::class, $a)->count())->toBe(40);
+
+    $people = evalRows(People::class, $a)->with('customFieldValues.customField')->get();
+    $person = $people->firstWhere('name', 'Person 07');
+    $others = $people->map(fn (People $person): mixed => $person->getCustomFieldValue($field));
+
+    expect($person->getCustomFieldValue($field))->toBe(['person07@example.test'])
+        ->and($others->every(fn (mixed $value): bool => is_array($value) && count($value) === 1))->toBeTrue()
+        ->and($others->flatten()->unique()->count())->toBe(40);
+});
+
 it('gives every task a description between 300 and 2000 characters', function (): void {
     $a = EvalWorkspace::seed();
     $description = $a->field('task', 'description');

@@ -101,7 +101,11 @@ it('allows the contact verb and fails the contact noun', function (): void {
         ->and($pass('Contact the owner before Friday.'))->toBe(1.0)
         ->and($pass('She contacted the team and is contacting Ann.'))->toBe(1.0)
         ->and($pass('Do you want me to contact them?'))->toBe(1.0)
+        ->and($pass("I'll contact them tomorrow."))->toBe(1.0)
+        ->and($pass("We'll contact him after the call."))->toBe(1.0)
         ->and($pass('Here is the contact you added.'))->toBe(0.0)
+        ->and($pass('Your contacts are listed below.'))->toBe(0.0)
+        ->and($pass('Add a contact you know.'))->toBe(0.0)
         ->and($pass('I will map every contact you import.'))->toBe(0.0)
         ->and($pass('Created the contact Sarah Lee.'))->toBe(0.0);
 });

@@ -20,6 +20,21 @@ jobs:
 
     name: Evals (${{ matrix.model }})
 
+    env:
+      # The run uses phpunit.xml, whose APP_ENV=testing makes Laravel read the committed
+      # .env.testing (a local Postgres user with no password), so the service credentials
+      # of phpunit.ci.xml come from the environment instead.
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: relaticle_testing
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      BROADCAST_CONNECTION: log
+      PUSHER_APP_KEY: test-key
+      PUSHER_APP_SECRET: test-secret
+      PUSHER_APP_ID: test-id
+      PUSHER_APP_CLUSTER: mt1
+
     services:
       postgres:
         image: postgres:alpine
@@ -67,7 +82,10 @@ jobs:
           php artisan key:generate
           php artisan passport:keys --force --no-interaction
 
+      # A pass rate below 100% is expected today, so the step never fails the job and the
+      # artifact always uploads. The comparison against tests/Evals/baselines is manual.
       - name: Evals
+        continue-on-error: true
         run: composer test:evals
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

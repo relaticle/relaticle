@@ -10,9 +10,13 @@ final class EvalReport
 {
     public const string JUDGE_MODEL = 'claude-opus-5-5';
 
+    private const int REPLY_LIMIT = 2000;
+
     public static ?string $directory = null;
 
-    /** @var list<array{name: string, passed: bool, samples: int, tokens_in: int, tokens_out: int, replayed_bytes: int, tool_calls: int, duration_ms: int, reasons: list<string>}> */
+    public static ?string $summary = null;
+
+    /** @var list<array{name: string, passed: bool, samples: int, tokens_in: int, tokens_out: int, replayed_bytes: int, tool_calls: int, duration_ms: int, reply: string, steps_text: list<int>, reasons: list<string>}> */
     private static array $cases = [];
 
     private static ?CarbonImmutable $startedAt = null;
@@ -35,6 +39,8 @@ final class EvalReport
             'replayed_bytes' => $envelope instanceof TurnEnvelope ? $envelope->replayedBytes : 0,
             'tool_calls' => $envelope instanceof TurnEnvelope ? count($envelope->toolCalls) : 0,
             'duration_ms' => $envelope instanceof TurnEnvelope ? $envelope->durationMs : 0,
+            'reply' => $envelope instanceof TurnEnvelope ? mb_substr($envelope->text, 0, self::REPLY_LIMIT) : '',
+            'steps_text' => $envelope instanceof TurnEnvelope ? array_map(mb_strlen(...), $envelope->stepsText) : [],
             'reasons' => $reasons,
         ];
     }
@@ -53,14 +59,17 @@ final class EvalReport
             mkdir($directory, 0777, true);
         }
 
+        $totals = self::totals();
+
         file_put_contents($path, json_encode([
             'model' => $model,
             'judge' => $judge,
             'started_at' => $startedAt->toIso8601String(),
             'cases' => self::$cases,
-            'totals' => self::totals(),
+            'totals' => $totals,
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)."\n");
 
+        self::$summary = "{$totals['passed']}/{$totals['cases']} passed, tokens_in mean {$totals['tokens_in_mean']}, replayed bytes mean {$totals['replayed_bytes_mean']}, report: {$path}";
         self::reset();
 
         return $path;
@@ -75,10 +84,8 @@ final class EvalReport
         self::$shutdownRegistered = true;
 
         register_shutdown_function(static function () use ($model, $judge): void {
-            $path = self::flush($model, $judge);
-
-            if ($path !== null) {
-                echo PHP_EOL."Eval report written to {$path}".PHP_EOL;
+            if (self::flush($model, $judge) !== null) {
+                echo PHP_EOL.self::$summary.PHP_EOL;
             }
         });
     }

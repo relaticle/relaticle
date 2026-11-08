@@ -45,6 +45,7 @@ use Livewire\Livewire;
 use Pest\Browser\Api\AwaitableWebpage;
 use Pest\Browser\Playwright\Playwright;
 use Pest\Evals\Drivers\LaravelAiJudge;
+use Pest\Evals\Plugin;
 use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\EmailIntegration\Controllers\RedirectController;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
@@ -77,12 +78,24 @@ pest()->extend(EvalTestCase::class)
 pest()->evals()->judgeUsing(new LaravelAiJudge(provider: 'anthropic', model: EvalReport::JUDGE_MODEL));
 
 pest()->afterEach(function (): void {
-    if (! RelaTurn::$last instanceof TurnEnvelope) {
+    if (! Plugin::isEvalMode()) {
         return;
     }
 
     $status = $this->status();
+
+    if ($status->isSkipped()) {
+        return;
+    }
+
     $failure = $status->isSuccess() ? null : $status->message();
+
+    if (! RelaTurn::$last instanceof TurnEnvelope) {
+        EvalReport::record($this->getPrintableTestCaseMethodName(), false, null, ['no turn ran: '.($failure ?? 'the test finished without a turn')]);
+        EvalReport::flushOnShutdown(RelaTurn::model(), EvalReport::JUDGE_MODEL);
+
+        return;
+    }
 
     EvalReport::record(
         $this->getPrintableTestCaseMethodName(),

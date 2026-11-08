@@ -6,6 +6,7 @@ namespace Tests\Evals\Support;
 
 use App\Actions\CustomFields\CreateCustomField;
 use App\Actions\CustomFields\SetCustomFieldOptions;
+use App\Enums\CustomFields\PeopleField;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Note;
@@ -197,11 +198,15 @@ final readonly class EvalWorkspace
      */
     private function createPeople(array $companies): void
     {
+        $emails = $this->field('people', PeopleField::EMAILS->value);
+
         foreach (range(1, self::PEOPLE) as $index) {
-            People::factory()->for($this->workspace)->create([
+            $person = People::factory()->for($this->workspace)->create([
                 'name' => sprintf('Person %02d', $index),
                 'company_id' => $companies[($index - 1) % self::COMPANIES]->getKey(),
             ]);
+
+            $person->saveCustomFieldValue($emails, [sprintf('person%02d@example.test', $index)]);
         }
     }
 
