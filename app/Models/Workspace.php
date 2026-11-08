@@ -75,7 +75,6 @@ use Spatie\Sluggable\SlugOptions;
  * @property ?string $onboarding_referral_detail
  * @property ?string $onboarding_referral_prompt
  * @property ?OnboardingDataSource $onboarding_data_source
- * @property ?string $onboarding_data_source_detail
  * @property WorkspaceSetupStep|null $onboarding_step
  * @property CarbonImmutable|null $scheduled_deletion_at
  * @property DeletionReason|null $deletion_reason
@@ -109,7 +108,6 @@ use Spatie\Sluggable\SlugOptions;
     'onboarding_referral_detail',
     'onboarding_referral_prompt',
     'onboarding_data_source',
-    'onboarding_data_source_detail',
     'onboarding_step',
     'invite_link_default_role',
 ])]

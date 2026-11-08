@@ -12,7 +12,6 @@ return new class extends Migration
     {
         Schema::table('workspaces', function (Blueprint $table): void {
             $table->string('onboarding_data_source', 20)->nullable();
-            $table->string('onboarding_data_source_detail', 120)->nullable();
         });
     }
 };

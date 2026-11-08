@@ -53,7 +53,7 @@ final readonly class CreateWorkspace implements CreatesTeams
                 'name' => $input['name'],
                 'slug' => $input['slug'] ?? null,
                 'personal_workspace' => ! $ownedWorkspace instanceof Workspace,
-                'onboarding_step' => WorkspaceSetupStep::Source,
+                'onboarding_step' => WorkspaceSetupStep::UseCase,
                 ...$this->referralAttributes($input),
             ]);
             $workspace->plan = Plan::default();

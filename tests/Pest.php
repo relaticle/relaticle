@@ -15,7 +15,6 @@ declare(strict_types=1);
  */
 
 use App\Enums\Notifications\NotificationReason;
-use App\Enums\OnboardingDataSource;
 use App\Enums\WorkspaceSetupStep;
 use App\Features\Billing;
 use App\Filament\Pages\CreateWorkspace;
@@ -516,7 +515,7 @@ function actAsOAuthClient(User $user, array $scopes, ?Workspace $workspace): voi
  * @param  array<string, mixed>  $workspace
  * @param  array<string, mixed>  $useCase
  */
-function onboardWorkspace(User $user, array $workspace, array $useCase = ['onboarding_use_case' => 'other'], OnboardingDataSource $source = OnboardingDataSource::Memory): Workspace
+function onboardWorkspace(User $user, array $workspace, array $useCase = ['onboarding_use_case' => 'other']): Workspace
 {
     test()->actingAs($user);
 
@@ -530,8 +529,6 @@ function onboardWorkspace(User $user, array $workspace, array $useCase = ['onboa
     Filament::setTenant($created);
 
     $setup = livewire(SetupWorkspace::class);
-
-    $setup->fillForm(['onboarding_data_source' => $source->value])->call('saveSource')->assertHasNoFormErrors();
 
     $setup->fillForm($useCase)->call('saveUseCase')->assertHasNoFormErrors();
 

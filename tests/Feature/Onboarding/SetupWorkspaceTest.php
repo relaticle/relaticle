@@ -4,13 +4,9 @@ declare(strict_types=1);
 
 use App\Actions\Onboarding\ApplyStagePreset;
 use App\Actions\Onboarding\MoveWorkspaceSetup;
-use App\Actions\Onboarding\SaveOnboardingDataSource;
-use App\Actions\Onboarding\SaveOnboardingSharing;
 use App\Actions\Onboarding\SaveOnboardingUseCase;
-use App\Actions\Onboarding\StartSetupLater;
 use App\Enums\CreationSource;
 use App\Enums\CustomFields\OpportunityField;
-use App\Enums\OnboardingDataSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceSetupStep;
@@ -19,8 +15,6 @@ use App\Features\OnboardSeed;
 use App\Features\SetupConversation;
 use App\Filament\Pages\ChatConversation;
 use App\Filament\Pages\Concerns\RunsInviteStep;
-use App\Filament\Pages\Concerns\RunsMailboxSteps;
-use App\Filament\Pages\Concerns\RunsSourceStep;
 use App\Filament\Pages\Concerns\RunsUseCaseStep;
 use App\Filament\Pages\CreateWorkspace;
 use App\Filament\Pages\Dashboard;
@@ -30,9 +24,7 @@ use App\Livewire\App\Workspaces\Concerns\SendsWorkspaceInvitations;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Opportunity;
-use App\Models\People;
 use App\Models\User;
-use App\Models\UserSocialAccount;
 use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
 use Filament\Facades\Filament;
@@ -48,24 +40,15 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Js;
 use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
-use Livewire\Features\SupportTesting\Testable;
-use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
-use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
-use Relaticle\EmailIntegration\Models\Email;
-use Relaticle\ImportWizard\Filament\Pages\ImportPeople;
 use Relaticle\OnboardSeed\Contracts\ModelSeederInterface;
 use Relaticle\OnboardSeed\ModelSeeders\CompanySeeder;
 use Relaticle\OnboardSeed\ModelSeeders\PeopleSeeder;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(SetupWorkspace::class, RunsMailboxSteps::class, RunsSourceStep::class, RunsUseCaseStep::class, RunsInviteStep::class, SendsWorkspaceInvitations::class, SaveOnboardingDataSource::class, SaveOnboardingSharing::class, SaveOnboardingUseCase::class, StartSetupLater::class, ApplyStagePreset::class, MoveWorkspaceSetup::class);
+mutates(SetupWorkspace::class, RunsUseCaseStep::class, RunsInviteStep::class, SendsWorkspaceInvitations::class, SaveOnboardingUseCase::class, ApplyStagePreset::class, MoveWorkspaceSetup::class);
 
-beforeEach(function (): void {
-    Feature::define(EmailIntegration::class, false);
-});
-
-function workspaceAtSource(User $user, string $name = 'Northwind Studio'): Workspace
+function workspaceInSetup(User $user, string $name = 'Northwind Studio'): Workspace
 {
     test()->actingAs($user);
 
@@ -79,63 +62,6 @@ function workspaceAtSource(User $user, string $name = 'Northwind Studio'): Works
     Filament::setTenant($workspace);
 
     return $workspace;
-}
-
-function workspaceInSetup(User $user, string $name = 'Northwind Studio', OnboardingDataSource $source = OnboardingDataSource::Memory): Workspace
-{
-    $workspace = workspaceAtSource($user, $name);
-
-    livewire(SetupWorkspace::class)
-        ->fillForm(['onboarding_data_source' => $source->value])
-        ->call('saveSource')
-        ->assertHasNoFormErrors();
-
-    $workspace = $workspace->fresh();
-
-    Filament::setTenant($workspace);
-
-    return $workspace;
-}
-
-/**
- * @param  array<string, mixed>  $attributes
- */
-function connectedMailboxFor(User $user, Workspace $workspace, array $attributes = []): ConnectedAccount
-{
-    return ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
-        'user_id' => $user->getKey(),
-        'workspace_id' => $workspace->getKey(),
-        'email_address' => 'olivia@northwind.test',
-        ...$attributes,
-    ]));
-}
-
-/**
- * @param  array<string, mixed>  $attributes
- */
-function mailOf(User $user, Workspace $workspace, ConnectedAccount $account, EmailPrivacyTier $tier, array $attributes = []): Email
-{
-    return Email::factory()->create([
-        'workspace_id' => $workspace->getKey(),
-        'user_id' => $user->getKey(),
-        'connected_account_id' => $account->getKey(),
-        'privacy_tier' => $tier,
-        ...$attributes,
-    ]);
-}
-
-/**
- * @return list<string>
- */
-function emphasizedProviderButtons(Testable $setup): array
-{
-    preg_match_all('/<button\b[^>]*\bdata-provider="(?<provider>[a-z]+)"[^>]*>/s', $setup->html(), $buttons, PREG_SET_ORDER);
-
-    return collect($buttons)
-        ->filter(fn (array $button): bool => str_contains($button[0], 'data-emphasized="true"'))
-        ->map(fn (array $button): string => $button['provider'])
-        ->values()
-        ->all();
 }
 
 function bindSeederFailingOnAQuery(): void
@@ -172,9 +98,9 @@ function bindSeederFailingOnAQuery(): void
     });
 }
 
-function workspaceAtInvite(User $user, string $name = 'Northwind Studio', OnboardingDataSource $source = OnboardingDataSource::Memory): Workspace
+function workspaceAtInvite(User $user, string $name = 'Northwind Studio'): Workspace
 {
-    $workspace = workspaceInSetup($user, $name, $source);
+    $workspace = workspaceInSetup($user, $name);
 
     livewire(SetupWorkspace::class)
         ->fillForm(['onboarding_use_case' => OnboardingUseCase::Other->value])
@@ -205,7 +131,7 @@ function inviteLinkUrl(Workspace $workspace): string
     return route('workspaces.join', ['token' => $workspace->fresh()->invite_link_token]);
 }
 
-it('creates the workspace at the data source step and sends the owner to setup', function (): void {
+it('creates the workspace at the use case step and sends the owner to setup', function (): void {
     FilamentView::spa();
 
     $user = User::factory()->create();
@@ -219,7 +145,7 @@ it('creates the workspace at the data source step and sends the owner to setup',
 
     $workspace = $user->fresh()->currentWorkspace;
 
-    expect($workspace->onboarding_step)->toBe(WorkspaceSetupStep::Source)
+    expect($workspace->onboarding_step)->toBe(WorkspaceSetupStep::UseCase)
         ->and($workspace->onboarding_use_case)->toBeNull();
 
     $component->assertRedirect(SetupWorkspace::getUrl(['tenant' => $workspace]));
@@ -409,8 +335,9 @@ it('keeps the stages of a workspace that already holds an opportunity', function
         ->toBe(OpportunityField::STAGE->getOptions());
 });
 
-it('seeds sample data at the use case step when no mailbox is connected', function (): void {
+it('seeds sample data at the use case step when there is no setup chat to ask', function (): void {
     Feature::define(OnboardSeed::class, true);
+    Feature::define(SetupConversation::class, false);
 
     $user = User::factory()->create();
     $workspace = workspaceInSetup($user);
@@ -422,6 +349,21 @@ it('seeds sample data at the use case step when no mailbox is connected', functi
         ->call('saveUseCase');
 
     expect(Company::query()->where('workspace_id', $workspace->getKey())->where('creation_source', CreationSource::SAMPLE)->count())->toBe(4);
+});
+
+it('leaves the sample data to the setup chat when it will ask where the clients live', function (): void {
+    Feature::define(OnboardSeed::class, true);
+    Feature::define(SetupConversation::class, true);
+
+    $workspace = workspaceInSetup(User::factory()->create());
+
+    livewire(SetupWorkspace::class)
+        ->fillForm(['onboarding_use_case' => OnboardingUseCase::Sales->value, 'onboarding_context' => ['outbound']])
+        ->call('saveUseCase')
+        ->assertHasNoFormErrors();
+
+    expect(Company::query()->where('workspace_id', $workspace->getKey())->exists())->toBeFalse()
+        ->and($workspace->fresh()->onboarding_data_source)->toBeNull();
 });
 
 it('seeds no sample data for an owner who connected a mailbox', function (): void {
@@ -741,7 +683,7 @@ it('does not move the setup when the workspace is on another step', function ():
     $user = User::factory()->create();
     $workspace = workspaceInSetup($user);
 
-    $moved = resolve(MoveWorkspaceSetup::class)->execute($user, $workspace, WorkspaceSetupStep::Sharing, WorkspaceSetupStep::Invite);
+    $moved = resolve(MoveWorkspaceSetup::class)->execute($user, $workspace, WorkspaceSetupStep::Invite, null);
 
     expect($moved)->toBeFalse()
         ->and($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
@@ -762,12 +704,12 @@ it('reloads the passed workspace when another request already moved the step', f
     $workspace = workspaceInSetup($user);
     $stale = $workspace->fresh();
 
-    $workspace->update(['onboarding_step' => WorkspaceSetupStep::Sharing]);
+    $workspace->update(['onboarding_step' => WorkspaceSetupStep::Invite]);
 
     $moved = resolve(MoveWorkspaceSetup::class)->execute($user, $stale, WorkspaceSetupStep::UseCase, WorkspaceSetupStep::Invite);
 
     expect($moved)->toBeFalse()
-        ->and($stale->onboarding_step)->toBe(WorkspaceSetupStep::Sharing);
+        ->and($stale->onboarding_step)->toBe(WorkspaceSetupStep::Invite);
 });
 
 it('refuses to move the setup for someone who does not own the workspace', function (): void {
@@ -792,1108 +734,45 @@ it('leaves a workspace that already has a use case as it is', function (): void 
         ->onboarding_step->toBe(WorkspaceSetupStep::UseCase);
 });
 
-describe('connect email', function (): void {
-    beforeEach(function (): void {
+describe('the wizard order', function (): void {
+    it('starts a workspace at the use case step even when a mailbox could connect', function (): void {
         Feature::define(EmailIntegration::class, true);
         config()->set('services.azure.client_id', 'azure-client');
+
+        $workspace = workspaceInSetup(User::factory()->create());
+
+        expect($workspace->onboarding_step)->toBe(WorkspaceSetupStep::UseCase)
+            ->and($workspace->onboarding_data_source)->toBeNull();
     });
 
-    it('starts a new workspace on the connect step', function (): void {
-        $workspace = workspaceInSetup(User::factory()->create(), source: OnboardingDataSource::Inbox);
-
-        expect($workspace->onboarding_step)->toBe(WorkspaceSetupStep::Email);
-
-        livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.heading'))
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.google'))
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.microsoft'))
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.skip'))
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.preview.from_mailbox'));
-    });
-
-    it('offers only Google when no Microsoft client is configured', function (): void {
-        config()->set('services.azure.client_id');
-        workspaceInSetup(User::factory()->create(), source: OnboardingDataSource::Inbox);
-
-        $setup = livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.google'))
-            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.email.microsoft'))
-            ->assertSeeHtml('data-provider="gmail"')
-            ->assertDontSeeHtml('data-provider="azure"');
-
-        expect($setup->instance()->offeredProviders())->toBe(['gmail']);
-    });
-
-    it('offers only Microsoft when no Google client is configured', function (): void {
-        config()->set('services.gmail.client_id');
-        workspaceInSetup(User::factory()->create(), source: OnboardingDataSource::Inbox);
-
-        $setup = livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.microsoft'))
-            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.email.google'))
-            ->assertDontSeeHtml('data-provider="gmail"');
-
-        expect($setup->instance()->offeredProviders())->toBe(['azure']);
-    });
-
-    it('moves on to the use case when the install offers no provider', function (): void {
-        config()->set('services.gmail.client_id');
-        config()->set('services.azure.client_id');
-        $workspace = workspaceAtSource(User::factory()->create());
-        $workspace->forceFill(['onboarding_step' => WorkspaceSetupStep::Email])->save();
-
-        livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'))
-            ->assertDontSee(__('filament/pages/workspaces.create_workspace.actions.back'));
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
-    });
-
-    it('offers both providers once the Microsoft client is configured', function (): void {
-        workspaceInSetup(User::factory()->create(), source: OnboardingDataSource::Inbox);
-
-        $setup = livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.google'))
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.microsoft'))
-            ->assertSeeHtmlInOrder(['data-provider="gmail"', 'data-provider="azure"']);
-
-        expect($setup->instance()->offeredProviders())->toBe(['gmail', 'azure']);
-    });
-
-    it('emphasizes no provider the install does not offer', function (): void {
-        config()->set('services.azure.client_id');
-        $user = User::factory()->create();
-        UserSocialAccount::factory()->for($user)->create(['provider_name' => 'microsoft']);
-        workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-
-        $setup = livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.google'))
-            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.email.microsoft'));
-
-        expect($setup->instance()->emphasizedProvider())->toBeNull()
-            ->and($setup->instance()->offeredProviders())->toBe(['gmail']);
-    });
-
-    it('signs the connect link for the offered provider when it is clicked', function (string $provider): void {
-        $workspace = workspaceInSetup(User::factory()->create(), source: OnboardingDataSource::Inbox);
-
-        $setup = livewire(SetupWorkspace::class)->call('connectMailbox', $provider);
-
-        assertRedirectedToMailboxOAuth($setup, $provider, $workspace);
-
-        parse_str((string) parse_url($setup->effects['redirect'], PHP_URL_QUERY), $query);
-
-        expect($query['return'] ?? null)->toBe(SetupWorkspace::getUrl(['tenant' => $workspace]))
-            ->and($setup->effects)->not->toHaveKey('redirectUsingNavigate');
-    })->with(['gmail', 'azure']);
-
-    it('ignores a connect for a provider the install does not offer', function (string $provider): void {
-        config()->set('services.azure.client_id');
-        workspaceInSetup(User::factory()->create(), source: OnboardingDataSource::Inbox);
-
-        livewire(SetupWorkspace::class)
-            ->call('connectMailbox', $provider)
-            ->assertSuccessful()
-            ->assertNoRedirect();
-    })->with(['azure', 'yahoo', '']);
-
-    it('ignores a connect when the email feature was switched off while the step was open', function (): void {
-        workspaceInSetup(User::factory()->create(), source: OnboardingDataSource::Inbox);
-
-        $setup = livewire(SetupWorkspace::class);
-
-        Feature::define(EmailIntegration::class, false);
-        Feature::flushCache();
-
-        $setup->call('connectMailbox', 'gmail')
-            ->assertSuccessful()
-            ->assertNoRedirect();
-    });
-
-    it('ignores a connect once the workspace has moved on from the connect step', function (): void {
-        $workspace = workspaceInSetup(User::factory()->create(), source: OnboardingDataSource::Inbox);
-
-        $setup = livewire(SetupWorkspace::class);
-
-        $workspace->update(['onboarding_step' => WorkspaceSetupStep::UseCase]);
-
-        $setup->call('connectMailbox', 'gmail')
-            ->assertSuccessful()
-            ->assertNoRedirect();
-    });
-
-    it('renders the connect buttons as Livewire actions that stay inside the page', function (): void {
-        workspaceInSetup(User::factory()->create(), source: OnboardingDataSource::Inbox);
-
-        livewire(SetupWorkspace::class)
-            ->assertSeeHtml("wire:click=\"connectMailbox('gmail')\"")
-            ->assertSeeHtml("wire:click=\"connectMailbox('azure')\"")
-            ->assertDontSeeHtml('wire:navigate')
-            ->assertDontSeeHtml('/email-accounts/redirect/');
-    });
-
-    it('moves on to the use case when the owner skips', function (): void {
-        $workspace = workspaceInSetup(User::factory()->create(), source: OnboardingDataSource::Inbox);
-
-        livewire(SetupWorkspace::class)
-            ->callAction('skipMailbox')
-            ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
-    });
-
-    it('stays on the connect step until the owner confirms the skip', function (): void {
-        $workspace = workspaceInSetup(User::factory()->create(), source: OnboardingDataSource::Inbox);
-
-        livewire(SetupWorkspace::class)
-            ->mountAction('skipMailbox')
-            ->assertMountedActionModalSee([
-                __('filament/pages/workspaces.setup_workspace.email.skip_confirm.heading'),
-                __('filament/pages/workspaces.setup_workspace.email.benefit_records'),
-            ]);
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Email);
-    });
-
-    it('lets the owner go back to connect from the use case while no mailbox is connected', function (): void {
-        $workspace = workspaceInSetup(User::factory()->create(), source: OnboardingDataSource::Inbox);
-
-        livewire(SetupWorkspace::class)
-            ->callAction('skipMailbox')
-            ->assertSee(__('filament/pages/workspaces.create_workspace.actions.back'))
-            ->call('backToMailbox')
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.heading'));
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Email);
-    });
-
-    it('stays quiet when back is called twice', function (): void {
-        $workspace = workspaceInSetup(User::factory()->create(), source: OnboardingDataSource::Inbox);
-
-        livewire(SetupWorkspace::class)
-            ->callAction('skipMailbox')
-            ->call('backToMailbox')
-            ->assertSuccessful()
-            ->call('backToMailbox')
-            ->assertSuccessful();
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Email);
-    });
-
-    it('offers no way back to connect once a mailbox is connected', function (): void {
-        $user = User::factory()->create();
-        $workspace = workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-
-        livewire(SetupWorkspace::class)->callAction('skipMailbox');
-
-        ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
-            'user_id' => $user->getKey(),
-            'workspace_id' => $workspace->getKey(),
-        ]));
-
-        livewire(SetupWorkspace::class)
-            ->assertDontSee(__('filament/pages/workspaces.create_workspace.actions.back'))
-            ->call('backToMailbox')
-            ->assertSuccessful();
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
-    });
-
-    it('offers no way back to connect when the feature is off', function (): void {
-        $workspace = workspaceInSetup(User::factory()->create(), source: OnboardingDataSource::Inbox);
-
-        livewire(SetupWorkspace::class)->callAction('skipMailbox');
-
-        Feature::define(EmailIntegration::class, false);
-        Feature::flushCache();
-
-        livewire(SetupWorkspace::class)
-            ->assertDontSee(__('filament/pages/workspaces.create_workspace.actions.back'))
-            ->call('backToMailbox')
-            ->assertSuccessful();
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
-    });
-
-    it('moves on to the use case when the feature is switched off mid-setup', function (): void {
-        $workspace = workspaceInSetup(User::factory()->create(), source: OnboardingDataSource::Inbox);
-
-        Feature::define(EmailIntegration::class, false);
-        Feature::flushCache();
-
-        livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
-    });
-
-    it('moves on to the sharing step when a mailbox is already connected', function (): void {
-        $user = User::factory()->create();
-        $workspace = workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-        connectedMailboxFor($user, $workspace);
-
-        livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.heading'));
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing);
-    });
-
-    it('puts the provider the owner signed up with first', function (string $socialProvider, string $expected, string $other): void {
-        $user = User::factory()->create();
-        UserSocialAccount::factory()->for($user)->create(['provider_name' => $socialProvider]);
-        workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-
-        $setup = livewire(SetupWorkspace::class);
-
-        expect($setup->instance()->emphasizedProvider())->toBe($expected);
-
-        $setup->assertSeeHtmlInOrder([
-            'data-provider="'.$expected.'"',
-            'data-provider="'.$other.'"',
-        ]);
-    })->with([
-        ['google', 'gmail', 'azure'],
-        ['microsoft', 'azure', 'gmail'],
-    ]);
-
-    it('emphasizes only the button of the provider the owner signed up with', function (string $socialProvider, string $expected): void {
-        $user = User::factory()->create();
-        UserSocialAccount::factory()->for($user)->create(['provider_name' => $socialProvider]);
-        workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-
-        expect(emphasizedProviderButtons(livewire(SetupWorkspace::class)))->toBe([$expected]);
-    })->with([
-        ['google', 'gmail'],
-        ['microsoft', 'azure'],
-    ]);
-
-    it('emphasizes no button when nothing hints at a provider', function (): void {
-        workspaceInSetup(User::factory()->create(['email' => 'olivia@northwind.test']), source: OnboardingDataSource::Inbox);
-
-        expect(emphasizedProviderButtons(livewire(SetupWorkspace::class)))->toBe([]);
-    });
-
-    it('lets the most recently linked provider win when both are linked', function (string $first, string $second, string $expected): void {
-        $user = User::factory()->create();
-        UserSocialAccount::factory()->for($user)->create(['provider_name' => $first, 'created_at' => now()->subDays(2)]);
-        UserSocialAccount::factory()->for($user)->create(['provider_name' => $second, 'created_at' => now()->subDay()]);
-        workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-
-        expect(livewire(SetupWorkspace::class)->instance()->emphasizedProvider())->toBe($expected);
-    })->with([
-        ['google', 'microsoft', 'azure'],
-        ['microsoft', 'google', 'gmail'],
-    ]);
-
-    it('returns the owner to setup when the use case is submitted from another step', function (): void {
-        $workspace = workspaceInSetup(User::factory()->create(), source: OnboardingDataSource::Inbox);
-
-        livewire(SetupWorkspace::class)
-            ->fillForm(['onboarding_use_case' => OnboardingUseCase::Other->value])
-            ->call('saveUseCase')
-            ->assertRedirect(SetupWorkspace::getUrl(['tenant' => $workspace]));
-
-        expect($workspace->fresh())
-            ->onboarding_use_case->toBeNull()
-            ->onboarding_other_use_case->toBeNull()
-            ->onboarding_step->toBe(WorkspaceSetupStep::Email);
-    });
-
-    it('reads the provider from a consumer mail domain when there is no social sign-in', function (string $email, ?string $expected): void {
-        workspaceInSetup(User::factory()->create(['email' => $email]), source: OnboardingDataSource::Inbox);
-
-        expect(livewire(SetupWorkspace::class)->instance()->emphasizedProvider())->toBe($expected);
-    })->with([
-        ['olivia@gmail.com', 'gmail'],
-        ['olivia@outlook.com', 'azure'],
-        ['olivia@northwind.test', null],
-    ]);
-
-    it('lists Google first with no emphasis when nothing hints at a provider', function (): void {
-        workspaceInSetup(User::factory()->create(['email' => 'olivia@northwind.test']), source: OnboardingDataSource::Inbox);
-
-        livewire(SetupWorkspace::class)
-            ->assertSeeHtmlInOrder(['data-provider="gmail"', 'data-provider="azure"']);
-    });
-
-    it('ignores a social account that is not a mailbox provider', function (): void {
-        $user = User::factory()->create(['email' => 'olivia@northwind.test']);
-        UserSocialAccount::factory()->for($user)->create(['provider_name' => 'github']);
-        workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-
-        expect(livewire(SetupWorkspace::class)->instance()->emphasizedProvider())->toBeNull();
-    });
-
-    it('lands on sharing after a successful connect, with participants only chosen', function (): void {
-        $user = User::factory()->create();
-        $workspace = workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-        connectedMailboxFor($user, $workspace);
-
-        livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.heading'))
-            ->assertSee('olivia@northwind.test')
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.connected'))
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.syncing'))
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.description'))
-            ->assertDontSee(__('filament/pages/workspaces.create_workspace.actions.back'))
-            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.preview.from_mailbox'))
-            ->assertSeeHtml('wire:poll.5s')
-            ->assertSet('sharingTier', EmailPrivacyTier::METADATA_ONLY->value);
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing);
-    });
-
-    it('offers exactly participants only and subject line', function (): void {
-        $user = User::factory()->create();
-        $workspace = workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-        connectedMailboxFor($user, $workspace);
-
-        $setup = livewire(SetupWorkspace::class)
-            ->assertSee(EmailPrivacyTier::METADATA_ONLY->getLabel())
-            ->assertSee(EmailPrivacyTier::METADATA_ONLY->getDescription())
-            ->assertSee('Subject and message stay private.')
-            ->assertSee(EmailPrivacyTier::SUBJECT->getLabel())
-            ->assertSee(EmailPrivacyTier::SUBJECT->getDescription())
-            ->assertSee('The message stays private.')
-            ->assertDontSee(EmailPrivacyTier::FULL->getLabel())
-            ->assertDontSee(EmailPrivacyTier::PRIVATE->getLabel());
-
-        expect(array_keys($setup->instance()->sharingOptions()))
-            ->toBe([EmailPrivacyTier::METADATA_ONLY->value, EmailPrivacyTier::SUBJECT->value]);
-    });
-
-    it('preselects the level the owner would get, falling back to participants only', function (EmailPrivacyTier $workspaceDefault, EmailPrivacyTier $expected): void {
-        $user = User::factory()->create();
-        $workspace = workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-        $workspace->update(['default_email_sharing_tier' => $workspaceDefault]);
-        connectedMailboxFor($user, $workspace);
-
-        livewire(SetupWorkspace::class)->assertSet('sharingTier', $expected->value);
-    })->with([
-        [EmailPrivacyTier::METADATA_ONLY, EmailPrivacyTier::METADATA_ONLY],
-        [EmailPrivacyTier::SUBJECT, EmailPrivacyTier::SUBJECT],
-        [EmailPrivacyTier::FULL, EmailPrivacyTier::METADATA_ONLY],
-        [EmailPrivacyTier::PRIVATE, EmailPrivacyTier::METADATA_ONLY],
-    ]);
-
-    it('stores the chosen level on the mailbox and moves on', function (): void {
-        $user = User::factory()->create();
-        $workspace = workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-        $mailbox = connectedMailboxFor($user, $workspace);
-
-        livewire(SetupWorkspace::class)
-            ->set('sharingTier', EmailPrivacyTier::SUBJECT->value)
-            ->call('saveSharing')
-            ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
-
-        expect($mailbox->fresh()->sharing_tier)->toBe(EmailPrivacyTier::SUBJECT)
-            ->and($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
-    });
-
-    it('applies the chosen level to the owner\'s mail that synced before the choice and to no other mail', function (EmailPrivacyTier $chosen, EmailPrivacyTier $before): void {
-        $user = User::factory()->create();
-        $workspace = workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-        $account = connectedMailboxFor($user, $workspace);
-        $colleague = User::factory()->create();
-
-        $ownMail = mailOf($user, $workspace, $account, $before);
-        $customizedMail = mailOf($user, $workspace, $account, $before, ['privacy_tier_customized' => true]);
-        $colleagueMail = mailOf($colleague, $workspace, connectedMailboxFor($colleague, $workspace, ['email_address' => 'sam@northwind.test']), $before);
-
-        livewire(SetupWorkspace::class)
-            ->set('sharingTier', $chosen->value)
-            ->call('saveSharing');
-
-        expect($ownMail->fresh()->privacy_tier)->toBe($chosen)
-            ->and($customizedMail->fresh()->privacy_tier)->toBe($before)
-            ->and($colleagueMail->fresh()->privacy_tier)->toBe($before);
-    })->with([
-        'subject' => [EmailPrivacyTier::SUBJECT, EmailPrivacyTier::METADATA_ONLY],
-        'participants only' => [EmailPrivacyTier::METADATA_ONLY, EmailPrivacyTier::SUBJECT],
-    ]);
-
-    it('stores participants only on the mailbox when the default choice is submitted', function (): void {
-        $user = User::factory()->create();
-        $workspace = workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-        $mailbox = connectedMailboxFor($user, $workspace);
-
-        livewire(SetupWorkspace::class)->call('saveSharing');
-
-        expect($mailbox->fresh()->sharing_tier)->toBe(EmailPrivacyTier::METADATA_ONLY)
-            ->and($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
-    });
-
-    it('renders the sharing step without an address row once the mailbox is gone', function (): void {
-        $user = User::factory()->create();
-        $workspace = workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-        $account = connectedMailboxFor($user, $workspace);
-
-        livewire(SetupWorkspace::class);
-
-        $account->delete();
-
-        livewire(SetupWorkspace::class)
-            ->assertSuccessful()
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.heading'))
-            ->assertDontSee('olivia@northwind.test')
-            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.sharing.connected'))
-            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.sharing.syncing'));
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing);
-    });
-
-    it('refuses a level the step does not offer', function (string $tier): void {
-        $user = User::factory()->create();
-        $workspace = workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-        $mailbox = connectedMailboxFor($user, $workspace);
-
-        livewire(SetupWorkspace::class)
-            ->set('sharingTier', $tier)
-            ->call('saveSharing')
-            ->assertHasErrors('sharingTier');
-
-        expect($mailbox->fresh()->sharing_tier)->toBeNull()
-            ->and($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing);
-    })->with([EmailPrivacyTier::FULL->value, EmailPrivacyTier::PRIVATE->value, 'nonsense']);
-
-    it('leaves the mailbox level alone when a stale tab saves after the setup moved on', function (): void {
-        $user = User::factory()->create();
-        $workspace = workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-        $mailbox = connectedMailboxFor($user, $workspace);
-
-        $setup = livewire(SetupWorkspace::class);
-
-        resolve(MoveWorkspaceSetup::class)->execute($user, $workspace, WorkspaceSetupStep::Sharing, WorkspaceSetupStep::UseCase);
-
-        $setup->set('sharingTier', EmailPrivacyTier::SUBJECT->value)
-            ->call('saveSharing')
-            ->assertSuccessful();
-
-        expect($mailbox->fresh()->sharing_tier)->toBeNull()
-            ->and($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
-    });
-
-    it('moves on to the use case when the feature is switched off on the sharing step', function (): void {
-        $user = User::factory()->create();
-        $workspace = workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-        connectedMailboxFor($user, $workspace);
-
-        livewire(SetupWorkspace::class);
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing);
-
-        Feature::define(EmailIntegration::class, false);
-        Feature::flushCache();
-
-        livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
-    });
-
-    it('offers no way back to connect after the sharing step', function (): void {
-        $user = User::factory()->create();
-        $workspace = workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-        connectedMailboxFor($user, $workspace);
-
-        livewire(SetupWorkspace::class)
-            ->call('saveSharing')
-            ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'))
-            ->assertDontSee(__('filament/pages/workspaces.create_workspace.actions.back'));
-    });
-
-    it('shows how many people the mailbox has created so far', function (int $mailboxPeople, string $chip): void {
-        $user = User::factory()->create();
-        $workspace = workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-        connectedMailboxFor($user, $workspace);
-
-        People::factory()->for($workspace)->count($mailboxPeople)->create(['creation_source' => CreationSource::MAILBOX]);
-        People::factory()->for($workspace)->create(['creation_source' => CreationSource::SAMPLE]);
-        People::factory()->for($workspace)->create(['creation_source' => CreationSource::MAILBOX, 'deleted_at' => now()]);
-        People::factory()->create(['creation_source' => CreationSource::MAILBOX]);
-
-        $setup = livewire(SetupWorkspace::class);
-
-        expect($setup->instance()->getPreview()['mailboxProgress'])->toBe($chip);
-
-        $setup->assertSee($chip);
-    })->with([
-        'none yet' => [0, 'Reading your mailbox'],
-        'one person' => [1, '1 person found'],
-        'several people' => [3, '3 people found'],
-    ]);
-
-    it('asks about sharing for an owner with a mailbox in another workspace, and leaves that mail alone', function (): void {
-        $user = User::factory()->withPersonalWorkspace()->create();
-        $other = $user->currentWorkspace;
-        $otherMailbox = connectedMailboxFor($user, $other);
-        $otherMailbox->forceFill(['sharing_tier' => EmailPrivacyTier::FULL])->save();
-        $email = mailOf($user, $other, $otherMailbox, EmailPrivacyTier::FULL);
-
-        $workspace = workspaceInSetup($user, 'Second Corp', source: OnboardingDataSource::Inbox);
-        $mailbox = connectedMailboxFor($user, $workspace);
-
-        livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.heading'))
-            ->set('sharingTier', EmailPrivacyTier::SUBJECT->value)
-            ->call('saveSharing')
-            ->assertHasNoErrors();
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase)
-            ->and($mailbox->fresh()->sharing_tier)->toBe(EmailPrivacyTier::SUBJECT)
-            ->and($otherMailbox->fresh()->sharing_tier)->toBe(EmailPrivacyTier::FULL)
-            ->and($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
-    });
-
-    it('still asks about sharing when the only other mailbox was removed, and leaves its mail alone', function (): void {
-        $user = User::factory()->withPersonalWorkspace()->create();
-        $other = $user->currentWorkspace;
-        $removed = connectedMailboxFor($user, $other);
-        $email = mailOf($user, $other, $removed, EmailPrivacyTier::FULL);
-        $removed->delete();
-
-        $workspace = workspaceInSetup($user, 'Second Corp', source: OnboardingDataSource::Inbox);
-        $mailbox = connectedMailboxFor($user, $workspace);
-
-        livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.heading'))
-            ->call('saveSharing')
-            ->assertHasNoErrors();
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase)
-            ->and($mailbox->fresh()->sharing_tier)->toBe(EmailPrivacyTier::METADATA_ONLY)
-            ->and(Email::query()->withoutGlobalScopes()->whereKey($email->getKey())->value('privacy_tier'))->toBe(EmailPrivacyTier::FULL);
-    });
-
-    it('asks about sharing whatever status the owner other mailbox is in', function (EmailAccountStatus $status): void {
-        $user = User::factory()->withPersonalWorkspace()->create();
-        connectedMailboxFor($user, $user->currentWorkspace, ['status' => $status]);
-
-        $workspace = workspaceInSetup($user, 'Second Corp', source: OnboardingDataSource::Inbox);
-        connectedMailboxFor($user, $workspace);
-
-        livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.heading'));
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing);
-    })->with([EmailAccountStatus::ACTIVE, EmailAccountStatus::ERROR, EmailAccountStatus::REAUTH_REQUIRED]);
-
-    it('preselects the level the mailbox already has when setup offers it', function (): void {
-        $user = User::factory()->create();
-        $workspace = workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-        connectedMailboxFor($user, $workspace)->forceFill(['sharing_tier' => EmailPrivacyTier::SUBJECT])->save();
-
-        livewire(SetupWorkspace::class)
-            ->assertSet('sharingTier', EmailPrivacyTier::SUBJECT->value);
-    });
-
-    it('preselects participants only when the mailbox level is one setup does not offer', function (): void {
-        $user = User::factory()->create();
-        $workspace = workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-        connectedMailboxFor($user, $workspace)->forceFill(['sharing_tier' => EmailPrivacyTier::FULL])->save();
-
-        livewire(SetupWorkspace::class)
-            ->assertSet('sharingTier', EmailPrivacyTier::METADATA_ONLY->value);
-    });
-
-    it('moves on without saving when the mailbox was disconnected before the level was saved', function (): void {
-        $user = User::factory()->create();
-        $workspace = workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-        $mailbox = connectedMailboxFor($user, $workspace);
-
-        $setup = livewire(SetupWorkspace::class);
-        $mailbox->delete();
-
-        $setup->set('sharingTier', EmailPrivacyTier::SUBJECT->value)
-            ->call('saveSharing')
-            ->assertHasNoErrors();
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase)
-            ->and(ConnectedAccount::withTrashed()->find($mailbox->getKey())->sharing_tier)->toBeNull();
-    });
-
-    it('keeps the setup on sharing when saving the level fails', function (): void {
-        $user = User::factory()->create();
-        $workspace = workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-        $mailbox = connectedMailboxFor($user, $workspace);
-
-        $setup = livewire(SetupWorkspace::class)->set('sharingTier', EmailPrivacyTier::SUBJECT->value);
-
-        Event::listen('eloquent.updating: '.ConnectedAccount::class, fn (): never => throw new RuntimeException('lock timeout'));
-
-        expect(fn () => $setup->call('saveSharing'))->toThrow(RuntimeException::class);
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing)
-            ->and($mailbox->fresh()->sharing_tier)->toBeNull();
-    });
-
-    it('refuses to save a level the sharing step does not offer when the action runs directly', function (EmailPrivacyTier $tier): void {
-        $user = User::factory()->create();
-        $workspace = workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-        $mailbox = connectedMailboxFor($user, $workspace);
-        livewire(SetupWorkspace::class);
-
-        expect(fn () => resolve(SaveOnboardingSharing::class)->execute($user, $workspace, $tier))
-            ->toThrow(fn (HttpException $exception) => expect($exception->getStatusCode())->toBe(422));
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing)
-            ->and($mailbox->fresh()->sharing_tier)->toBeNull();
-    })->with([EmailPrivacyTier::FULL, EmailPrivacyTier::PRIVATE]);
-
-    it('refuses to save a sharing level for someone who does not own the workspace', function (): void {
-        $user = User::factory()->create();
-        $workspace = workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-        $mailbox = connectedMailboxFor($user, $workspace);
-        livewire(SetupWorkspace::class);
-        $member = User::factory()->create();
-
-        expect(fn () => resolve(SaveOnboardingSharing::class)->execute($member, $workspace, EmailPrivacyTier::SUBJECT))
-            ->toThrow(fn (HttpException $exception) => expect($exception->getStatusCode())->toBe(403));
-
-        expect($mailbox->fresh()->sharing_tier)->toBeNull()
-            ->and($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing);
-    });
-
-    it('groups the two sharing options so the arrow keys move between them', function (): void {
-        $user = User::factory()->create();
-        $workspace = workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-        connectedMailboxFor($user, $workspace);
-
-        $html = livewire(SetupWorkspace::class)->html();
-
-        expect(substr_count($html, 'type="radio"'))->toBe(2)
-            ->and(substr_count($html, 'name="sharingTier"'))->toBe(2);
-    });
-
-    it('claims no sync for a mailbox that is not active', function (EmailAccountStatus $status): void {
-        $user = User::factory()->create();
-        $workspace = workspaceInSetup($user, source: OnboardingDataSource::Inbox);
-        connectedMailboxFor($user, $workspace, ['status' => $status]);
-
-        $setup = livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.heading'))
-            ->assertSee('olivia@northwind.test')
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.description'))
-            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.sharing.connected'))
-            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.sharing.syncing'))
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.preview.from_mailbox'));
-
-        expect($setup->instance()->getPreview())->not->toHaveKey('mailboxProgress');
-    })->with([EmailAccountStatus::ERROR, EmailAccountStatus::REAUTH_REQUIRED]);
-
-    it('always promises a sharing choice on the connect step', function (): void {
-        $user = User::factory()->withPersonalWorkspace()->create();
-        connectedMailboxFor($user, $user->currentWorkspace);
-        workspaceInSetup($user, 'Second Corp', source: OnboardingDataSource::Inbox);
-
-        livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.privacy'));
-    });
-});
-
-describe('data source', function (): void {
-    it('starts a new workspace on the data source step', function (): void {
-        $workspace = workspaceAtSource(User::factory()->create());
-
-        expect($workspace->onboarding_step)->toBe(WorkspaceSetupStep::Source);
-
-        livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.source.heading'))
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.source.options.spreadsheet.label'))
-            ->assertFormFieldExists('onboarding_data_source');
-    });
-
-    it('requires an answer', function (): void {
-        workspaceAtSource(User::factory()->create());
-
-        livewire(SetupWorkspace::class)
-            ->call('saveSource')
-            ->assertHasFormErrors(['onboarding_data_source' => 'required']);
-    });
-
-    it('stores the data source and moves on to the use case step', function (): void {
-        $workspace = workspaceAtSource(User::factory()->create());
-
-        livewire(SetupWorkspace::class)
-            ->fillForm(['onboarding_data_source' => 'spreadsheet'])
-            ->call('saveSource')
-            ->assertHasNoFormErrors();
-
-        expect($workspace->fresh())
-            ->onboarding_data_source->toBe(OnboardingDataSource::Spreadsheet)
-            ->onboarding_step->toBe(WorkspaceSetupStep::UseCase);
-    });
-
-    it('sends the inbox answer to the mailbox step when email integration is on', function (): void {
+    it('walks the use case, then the invite step, then the setup chat', function (): void {
+        Feature::define(SetupConversation::class, true);
         Feature::define(EmailIntegration::class, true);
         config()->set('services.azure.client_id', 'azure-client');
-        $workspace = workspaceAtSource(User::factory()->create());
+
+        $workspace = workspaceInSetup(User::factory()->create());
 
         livewire(SetupWorkspace::class)
-            ->fillForm(['onboarding_data_source' => 'inbox'])
-            ->call('saveSource')
-            ->assertHasNoFormErrors();
-
-        expect($workspace->fresh())
-            ->onboarding_data_source->toBe(OnboardingDataSource::Inbox)
-            ->onboarding_step->toBe(WorkspaceSetupStep::Email);
-    });
-
-    it('hides the inbox answer when no provider is configured', function (): void {
-        Feature::define(EmailIntegration::class, true);
-        config()->set('services.gmail.client_id');
-        config()->set('services.azure.client_id');
-        $workspace = workspaceAtSource(User::factory()->create());
-
-        $setup = livewire(SetupWorkspace::class)
-            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.source.options.inbox.label'))
-            ->fillForm(['onboarding_data_source' => 'inbox'])
-            ->call('saveSource')
-            ->assertHasFormErrors(['onboarding_data_source']);
-
-        expect(array_keys($setup->instance()->form->getFlatFields()['onboarding_data_source']->getOptions()))
-            ->not->toContain('inbox')
-            ->and($workspace->fresh())
-            ->onboarding_data_source->toBeNull()
-            ->onboarding_step->toBe(WorkspaceSetupStep::Source);
-    });
-
-    it('hides the inbox answer when email integration is off', function (): void {
-        workspaceAtSource(User::factory()->create());
-
-        $setup = livewire(SetupWorkspace::class)
-            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.source.options.inbox.label'));
-
-        expect(array_keys($setup->instance()->form->getFlatFields()['onboarding_data_source']->getOptions()))
-            ->not->toContain('inbox')
-            ->toContain('spreadsheet', 'other_crm', 'memory', 'assistant');
-    });
-
-    it('refuses the inbox answer when email integration is off', function (): void {
-        $workspace = workspaceAtSource(User::factory()->create());
-
-        livewire(SetupWorkspace::class)
-            ->fillForm(['onboarding_data_source' => 'inbox'])
-            ->call('saveSource')
-            ->assertHasFormErrors(['onboarding_data_source']);
-
-        expect($workspace->fresh())
-            ->onboarding_data_source->toBeNull()
-            ->onboarding_step->toBe(WorkspaceSetupStep::Source);
-    });
-
-    it('shows the which crm field only for the other crm answer', function (): void {
-        workspaceAtSource(User::factory()->create());
-
-        livewire(SetupWorkspace::class)
-            ->assertFormFieldHidden('onboarding_data_source_detail')
-            ->fillForm(['onboarding_data_source' => 'other_crm'])
-            ->assertFormFieldVisible('onboarding_data_source_detail')
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.source.options.other_crm.description'))
-            ->fillForm(['onboarding_data_source' => 'memory'])
-            ->assertFormFieldHidden('onboarding_data_source_detail');
-    });
-
-    it('limits the which crm field to 120 characters', function (): void {
-        $workspace = workspaceAtSource(User::factory()->create());
-
-        livewire(SetupWorkspace::class)
-            ->fillForm(['onboarding_data_source' => 'other_crm', 'onboarding_data_source_detail' => str_repeat('a', 130)])
-            ->call('saveSource')
-            ->assertHasFormErrors(['onboarding_data_source_detail' => 'max']);
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Source);
-    });
-
-    it('stores nothing for an answer that is not offered when the action runs directly', function (): void {
-        $user = User::factory()->create();
-        $workspace = workspaceAtSource($user);
-
-        $saved = resolve(SaveOnboardingDataSource::class)->execute($user, $workspace, OnboardingDataSource::Inbox);
-
-        expect($saved)->toBeFalse()
-            ->and($workspace->fresh()->onboarding_data_source)->toBeNull();
-    });
-
-    it('stores the first answer only', function (): void {
-        $user = User::factory()->create();
-        $workspace = workspaceAtSource($user);
-        $action = resolve(SaveOnboardingDataSource::class);
-
-        $first = $action->execute($user, $workspace, OnboardingDataSource::Spreadsheet);
-        $second = $action->execute($user, $workspace, OnboardingDataSource::Memory);
-
-        expect($first)->toBeTrue()
-            ->and($second)->toBeFalse()
-            ->and($workspace->fresh()->onboarding_data_source)->toBe(OnboardingDataSource::Spreadsheet);
-    });
-
-    it('refuses a data source from a member who does not own the workspace', function (): void {
-        $workspace = workspaceAtSource(User::factory()->create());
-        $member = joinAsMember($workspace);
-
-        expect(fn () => resolve(SaveOnboardingDataSource::class)->execute($member, $workspace, OnboardingDataSource::Memory))
-            ->toThrow(HttpException::class);
-
-        expect($workspace->fresh())
-            ->onboarding_data_source->toBeNull()
-            ->onboarding_step->toBe(WorkspaceSetupStep::Source);
-    });
-});
-
-describe('where the data lives', function (): void {
-    function sampleCompaniesIn(Workspace $workspace): int
-    {
-        return Company::query()
-            ->withoutGlobalScopes()
-            ->where('workspace_id', $workspace->getKey())
-            ->where('creation_source', CreationSource::SAMPLE)
-            ->count();
-    }
-
-    function saveSalesUseCase(): void
-    {
-        livewire(SetupWorkspace::class)
+            ->assertFormFieldExists('onboarding_use_case')
             ->fillForm(['onboarding_use_case' => OnboardingUseCase::Sales->value, 'onboarding_context' => ['outbound']])
             ->call('saveUseCase')
             ->assertHasNoFormErrors();
-    }
 
-    it('seeds samples only for the in my head answer', function (OnboardingDataSource $source, bool $seeded): void {
-        Feature::define(OnboardSeed::class, true);
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Invite);
 
-        $workspace = workspaceInSetup(User::factory()->create(), source: $source);
-
-        saveSalesUseCase();
-
-        expect(sampleCompaniesIn($workspace))->toBe($seeded ? 4 : 0);
-    })->with([
-        'in my head' => [OnboardingDataSource::Memory, true],
-        'a spreadsheet' => [OnboardingDataSource::Spreadsheet, false],
-        'another crm' => [OnboardingDataSource::OtherCrm, false],
-        'an assistant' => [OnboardingDataSource::Assistant, false],
-    ]);
-
-    it('seeds no samples when the inbox answer skipped the mailbox step', function (): void {
-        Feature::define(OnboardSeed::class, true);
-        Feature::define(EmailIntegration::class, true);
-        config()->set('services.azure.client_id', 'azure-client');
-
-        $workspace = workspaceInSetup(User::factory()->create(), source: OnboardingDataSource::Inbox);
-
-        livewire(SetupWorkspace::class)->callAction('skipMailbox');
-
-        saveSalesUseCase();
-
-        expect(sampleCompaniesIn($workspace))->toBe(0);
-    });
-
-    it('seeds as before for a workspace that started setup before the data source step', function (): void {
-        Feature::define(OnboardSeed::class, true);
-
-        $workspace = workspaceInSetup(User::factory()->create(), source: OnboardingDataSource::Spreadsheet);
-        $workspace->update(['onboarding_data_source' => null]);
-
-        saveSalesUseCase();
-
-        expect(sampleCompaniesIn($workspace))->toBe(4);
-    });
-
-    it('finishes a workspace that was at the mailbox step before the data source step as it did before', function (): void {
-        Feature::define(OnboardSeed::class, true);
-        Feature::define(EmailIntegration::class, true);
-        Feature::define(SetupConversation::class, true);
-        config()->set('services.azure.client_id', 'azure-client');
-
-        $workspace = workspaceAtSource(User::factory()->create());
-        $workspace->update(['onboarding_step' => WorkspaceSetupStep::Email, 'onboarding_data_source' => null]);
+        Filament::setTenant($workspace->fresh());
 
         livewire(SetupWorkspace::class)
-            ->callAction('skipMailbox')
-            ->assertSee(__('filament/pages/workspaces.create_workspace.actions.back'));
-
-        saveSalesUseCase();
-
-        livewire(SetupWorkspace::class)
-            ->call('finish')
-            ->assertRedirect(ChatConversation::getUrl([
-                'conversationId' => $workspace->fresh()->setupConversation->id,
-                'tenant' => $workspace,
-            ]));
-
-        expect(sampleCompaniesIn($workspace))->toBe(4);
-    });
-
-    it('sends a file answer to the people import when setup finishes', function (OnboardingDataSource $source): void {
-        Feature::define(SetupConversation::class, true);
-
-        $workspace = workspaceAtInvite(User::factory()->create(), source: $source);
-
-        livewire(SetupWorkspace::class)
-            ->call('finish')
-            ->assertRedirect(ImportPeople::getUrl(panel: 'app', tenant: $workspace));
-
-        expect($workspace->fresh()->onboarding_step)->toBeNull();
-    })->with([
-        'a spreadsheet' => OnboardingDataSource::Spreadsheet,
-        'another crm' => OnboardingDataSource::OtherCrm,
-    ]);
-
-    it('sends a file answer to the setup chat with samples when the owner chooses later', function (): void {
-        Feature::define(OnboardSeed::class, true);
-        Feature::define(SetupConversation::class, true);
-
-        $workspace = workspaceAtInvite(User::factory()->create(), source: OnboardingDataSource::Spreadsheet);
-
-        expect(sampleCompaniesIn($workspace))->toBe(0);
-
-        livewire(SetupWorkspace::class)
-            ->call('finishLater')
-            ->assertNotified(__('filament/pages/workspaces.create_workspace.notifications.workspace_created.title'))
-            ->assertRedirect(ChatConversation::getUrl([
-                'conversationId' => $workspace->setupConversation->id,
-                'tenant' => $workspace,
-            ]));
-
-        expect($workspace->fresh()->onboarding_step)->toBeNull()
-            ->and(sampleCompaniesIn($workspace))->toBe(4);
-    });
-
-    it('still sends the invitations typed when the owner chooses later', function (): void {
-        $workspace = workspaceAtInvite(User::factory()->create(), source: OnboardingDataSource::Spreadsheet);
-
-        livewire(SetupWorkspace::class)
-            ->fillForm(['emails' => 'maya@northwind.test'])
-            ->call('finishLater')
-            ->assertHasNoFormErrors();
-
-        expect($workspace->workspaceInvitations()->pluck('email')->all())->toBe(['maya@northwind.test']);
-    });
-
-    it('treats choosing later as finishing for an answer that has no file', function (): void {
-        Feature::define(OnboardSeed::class, true);
-        Feature::define(SetupConversation::class, true);
-
-        $workspace = workspaceAtInvite(User::factory()->create(), source: OnboardingDataSource::Assistant);
-
-        livewire(SetupWorkspace::class)
-            ->call('finishLater')
-            ->assertRedirect(ChatConversation::getUrl([
-                'conversationId' => $workspace->setupConversation->id,
-                'tenant' => $workspace,
-            ]));
-
-        expect(sampleCompaniesIn($workspace))->toBe(0);
-    });
-
-    it('sends every other answer to the setup chat when setup finishes', function (OnboardingDataSource $source): void {
-        Feature::define(SetupConversation::class, true);
-
-        $workspace = workspaceAtInvite(User::factory()->create(), source: $source);
-
-        livewire(SetupWorkspace::class)
+            ->assertFormFieldExists('emails')
             ->call('finish')
             ->assertRedirect(ChatConversation::getUrl([
                 'conversationId' => $workspace->setupConversation->id,
                 'tenant' => $workspace,
             ]));
-    })->with([
-        'in my head' => OnboardingDataSource::Memory,
-        'an assistant' => OnboardingDataSource::Assistant,
-    ]);
 
-    it('offers the file buttons only for a file answer', function (OnboardingDataSource $source, bool $offered): void {
-        workspaceAtInvite(User::factory()->create(), source: $source);
-
-        $setup = livewire(SetupWorkspace::class);
-
-        $offered
-            ? $setup->assertSee(__('filament/pages/workspaces.setup_workspace.invite.upload_file'))->assertSee(__('filament/pages/workspaces.setup_workspace.invite.do_later'))
-            : $setup->assertDontSee(__('filament/pages/workspaces.setup_workspace.invite.upload_file'))->assertDontSee(__('filament/pages/workspaces.setup_workspace.invite.do_later'));
-    })->with([
-        'a spreadsheet' => [OnboardingDataSource::Spreadsheet, true],
-        'another crm' => [OnboardingDataSource::OtherCrm, true],
-        'in my head' => [OnboardingDataSource::Memory, false],
-        'an assistant' => [OnboardingDataSource::Assistant, false],
-    ]);
-
-    it('offers the way back to the mailbox step only for the inbox answer', function (OnboardingDataSource $source, bool $offered): void {
-        Feature::define(EmailIntegration::class, true);
-        config()->set('services.azure.client_id', 'azure-client');
-
-        $workspace = workspaceInSetup(User::factory()->create(), source: OnboardingDataSource::Inbox);
-        livewire(SetupWorkspace::class)->callAction('skipMailbox');
-
-        $workspace = $workspace->fresh();
-        $workspace->update(['onboarding_data_source' => $source]);
-        Filament::setTenant($workspace);
-
-        $setup = livewire(SetupWorkspace::class);
-
-        $offered
-            ? $setup->assertSee(__('filament/pages/workspaces.create_workspace.actions.back'))
-            : $setup->assertDontSee(__('filament/pages/workspaces.create_workspace.actions.back'));
-
-        $setup->call('backToMailbox');
-
-        expect($workspace->fresh()->onboarding_step)->toBe($offered ? WorkspaceSetupStep::Email : WorkspaceSetupStep::UseCase);
-    })->with([
-        'the inbox answer' => [OnboardingDataSource::Inbox, true],
-        'a spreadsheet' => [OnboardingDataSource::Spreadsheet, false],
-        'in my head' => [OnboardingDataSource::Memory, false],
-    ]);
-
-    it('seeds the fixture set of the workspace use case when the owner chooses later', function (): void {
-        Feature::define(OnboardSeed::class, true);
-
-        $workspace = workspaceInSetup(User::factory()->create(), source: OnboardingDataSource::Spreadsheet);
-
-        livewire(SetupWorkspace::class)
-            ->fillForm(['onboarding_use_case' => OnboardingUseCase::Recruiting->value, 'onboarding_context' => ['applications']])
-            ->call('saveUseCase')
-            ->assertHasNoFormErrors();
-
-        livewire(SetupWorkspace::class)->call('finishLater');
-
-        expect(Company::query()->withoutGlobalScopes()->where('workspace_id', $workspace->getKey())->pluck('name')->sort()->values()->all())
-            ->toBe(['Linear', 'Stripe', 'Supabase', 'Vercel']);
-    });
-
-    it('seeds nothing when the owner chooses later in a workspace that already holds records', function (CreationSource $source): void {
-        Feature::define(OnboardSeed::class, true);
-
-        $workspace = workspaceAtInvite(User::factory()->create(), source: OnboardingDataSource::Spreadsheet);
-
-        Company::factory()->create(['workspace_id' => $workspace->getKey(), 'creation_source' => $source]);
-
-        livewire(SetupWorkspace::class)->call('finishLater');
-
-        expect(Company::query()->withoutGlobalScopes()->where('workspace_id', $workspace->getKey())->count())->toBe(1);
-    })->with([
-        'its own record' => CreationSource::WEB,
-        'a sample' => CreationSource::SAMPLE,
-    ]);
-
-    it('seeds nothing when the owner chooses later in an additional workspace', function (): void {
-        Feature::define(OnboardSeed::class, true);
-
-        $workspace = workspaceAtInvite(User::factory()->withPersonalWorkspace()->create(), 'Second Corp', OnboardingDataSource::Spreadsheet);
-
-        livewire(SetupWorkspace::class)->call('finishLater');
-
-        expect(sampleCompaniesIn($workspace))->toBe(0);
-    });
-
-    it('refuses to start setup later for someone who does not own the workspace', function (): void {
-        Feature::define(OnboardSeed::class, true);
-
-        $workspace = workspaceAtInvite(User::factory()->create(), source: OnboardingDataSource::Spreadsheet);
-        $member = joinAsMember($workspace);
-
-        expect(fn () => resolve(StartSetupLater::class)->execute($member, $workspace))
-            ->toThrow(HttpException::class);
-
-        expect(sampleCompaniesIn($workspace))->toBe(0);
+        expect($workspace->fresh())
+            ->onboarding_step->toBeNull()
+            ->onboarding_data_source->toBeNull();
     });
 });
 

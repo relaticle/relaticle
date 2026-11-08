@@ -23,12 +23,12 @@ final readonly class SaveOnboardingDataSource
         $stored = Workspace::query()
             ->whereKey($workspace->getKey())
             ->whereNull('onboarding_data_source')
+            ->whereNull('onboarding_step')
             ->update(['onboarding_data_source' => $source, 'updated_at' => now()]) === 1;
 
         $workspace->refresh();
 
-        // Mid-wizard the use case is unset and SaveOnboardingUseCase seeds the samples itself.
-        if ($stored && $source->seedsSamples() && $workspace->onboarding_step === null) {
+        if ($stored && $source->seedsSamples()) {
             $this->seedSamples->execute($user, $workspace);
         }
 

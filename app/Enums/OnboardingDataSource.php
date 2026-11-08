@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
-use App\Onboarding\MailboxStep;
+use App\Features\EmailIntegration;
 use Filament\Support\Contracts\HasLabel;
+use Laravel\Pennant\Feature;
+use Relaticle\EmailIntegration\Enums\EmailProvider;
 
 enum OnboardingDataSource: string implements HasLabel
 {
@@ -22,8 +24,14 @@ enum OnboardingDataSource: string implements HasLabel
     {
         return array_values(array_filter(
             self::cases(),
-            fn (self $source): bool => $source !== self::Inbox || MailboxStep::canRun(),
+            fn (self $source): bool => $source !== self::Inbox || self::mailboxCanConnect(),
         ));
+    }
+
+    private static function mailboxCanConnect(): bool
+    {
+        return Feature::active(EmailIntegration::class)
+            && array_any(EmailProvider::cases(), fn (EmailProvider $provider): bool => $provider->isConfigured());
     }
 
     public static function fromButtonId(string $id): ?self
@@ -38,12 +46,7 @@ enum OnboardingDataSource: string implements HasLabel
 
     public function getLabel(): string
     {
-        return __("filament/pages/workspaces.setup_workspace.source.options.{$this->value}.label");
-    }
-
-    public function getDescription(): string
-    {
-        return __("filament/pages/workspaces.setup_workspace.source.options.{$this->value}.description");
+        return __("onboarding/setup.answers.{$this->value}");
     }
 
     public function isFile(): bool

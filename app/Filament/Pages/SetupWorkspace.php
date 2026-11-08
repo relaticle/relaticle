@@ -5,12 +5,9 @@ declare(strict_types=1);
 namespace App\Filament\Pages;
 
 use App\Enums\OnboardingUseCase;
-use App\Enums\WorkspaceCapability;
 use App\Enums\WorkspaceSetupStep;
 use App\Filament\Pages\Concerns\BuildsOnboardingPreview;
 use App\Filament\Pages\Concerns\RunsInviteStep;
-use App\Filament\Pages\Concerns\RunsMailboxSteps;
-use App\Filament\Pages\Concerns\RunsSourceStep;
 use App\Filament\Pages\Concerns\RunsUseCaseStep;
 use App\Models\User;
 use App\Models\Workspace;
@@ -21,7 +18,6 @@ use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentView;
 use Livewire\Attributes\Locked;
 use Override;
-use Relaticle\ImportWizard\Filament\Pages\ImportPeople;
 
 /**
  * @property-read Schema $form
@@ -30,8 +26,6 @@ final class SetupWorkspace extends Page
 {
     use BuildsOnboardingPreview;
     use RunsInviteStep;
-    use RunsMailboxSteps;
-    use RunsSourceStep;
     use RunsUseCaseStep;
 
     protected static string $layout = 'filament-panels::components.layout.simple';
@@ -65,13 +59,7 @@ final class SetupWorkspace extends Page
             return;
         }
 
-        $this->leaveMailboxStepWhenSettled($workspace);
-
         $this->form->fill();
-
-        if ($this->step() === WorkspaceSetupStep::Sharing) {
-            $this->sharingTier = $this->preselectedSharingTier();
-        }
     }
 
     public function authUser(): User
@@ -102,11 +90,7 @@ final class SetupWorkspace extends Page
     public function form(Schema $schema): Schema
     {
         return $schema
-            ->components(match ($this->step()) {
-                WorkspaceSetupStep::Source => $this->sourceComponents(),
-                WorkspaceSetupStep::Invite => $this->inviteComponents(),
-                default => $this->useCaseComponents(),
-            })
+            ->components($this->step() === WorkspaceSetupStep::Invite ? $this->inviteComponents() : $this->useCaseComponents())
             ->statePath('data');
     }
 
@@ -122,10 +106,6 @@ final class SetupWorkspace extends Page
 
     public function previewPanel(): string
     {
-        if (in_array($this->step(), [WorkspaceSetupStep::Email, WorkspaceSetupStep::Sharing], true)) {
-            return 'people';
-        }
-
         if ($this->step() === WorkspaceSetupStep::Invite) {
             return 'members';
         }
@@ -140,18 +120,12 @@ final class SetupWorkspace extends Page
     {
         $workspace = $this->workspace;
 
-        $preview = $this->onboardingPreview(
+        return $this->onboardingPreview(
             $workspace->name,
             $workspace->getFilamentAvatarUrl(),
             $this->authUser()->name,
             $this->selectedUseCase()?->pipelineStages() ?? [],
         );
-
-        if ($this->step() === WorkspaceSetupStep::Sharing && $this->connectedMailbox()?->isActive()) {
-            $preview['mailboxProgress'] = $this->mailboxProgress();
-        }
-
-        return $preview;
     }
 
     /**
@@ -173,16 +147,6 @@ final class SetupWorkspace extends Page
     }
 
     private function landingUrl(Workspace $workspace): string
-    {
-        $importsFile = $workspace->onboarding_data_source?->isFile() === true
-            && $this->authUser()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::DataImport);
-
-        return $importsFile
-            ? ImportPeople::getUrl(panel: 'app', tenant: $workspace)
-            : $this->setupChatUrl($workspace);
-    }
-
-    private function setupChatUrl(Workspace $workspace): string
     {
         $conversationId = $workspace->setupConversation()->value('id');
 

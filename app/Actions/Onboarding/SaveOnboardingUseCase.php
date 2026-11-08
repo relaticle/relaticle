@@ -7,6 +7,7 @@ namespace App\Actions\Onboarding;
 use App\Enums\OnboardingUseCase;
 use App\Enums\WorkspaceSetupStep;
 use App\Features\OnboardSeed;
+use App\Features\SetupConversation;
 use App\Jobs\Email\SyncSubscriberJob;
 use App\Models\User;
 use App\Models\Workspace;
@@ -87,7 +88,7 @@ final readonly class SaveOnboardingUseCase
     {
         return $workspace->isPersonalWorkspace()
             && Feature::active(OnboardSeed::class)
-            && ($workspace->onboarding_data_source?->seedsSamples() ?? true)
+            && ! Feature::active(SetupConversation::class)
             && ! $this->facts->hasConnectedMailbox($user, $workspace);
     }
 

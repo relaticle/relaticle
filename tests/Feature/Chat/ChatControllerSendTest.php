@@ -6,6 +6,7 @@ use App\Enums\CreationSource;
 use App\Enums\OnboardingDataSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\WorkspaceRole;
+use App\Enums\WorkspaceSetupStep;
 use App\Features\OnboardSeed;
 use App\Features\SetupConversation;
 use App\Filament\Pages\CreateWorkspace;
@@ -344,6 +345,44 @@ describe('answering where the clients live', function (): void {
             'another crm' => [OnboardingDataSource::OtherCrm, false],
             'an assistant' => [OnboardingDataSource::Assistant, false],
         ]);
+
+        it('seeds the sample set of the workspace use case', function (): void {
+            $this->workspace->forceFill(['onboarding_use_case' => OnboardingUseCase::Recruiting])->save();
+
+            sendSourceAnswer($this->conversationId, OnboardingDataSource::Memory)->assertOk();
+
+            expect(Company::query()->withoutGlobalScopes()->where('workspace_id', $this->workspace->getKey())->pluck('name')->sort()->values()->all())
+                ->toBe(['Linear', 'Stripe', 'Supabase', 'Vercel']);
+        });
+
+        it('seeds nothing on top of the records the workspace already holds', function (CreationSource $source): void {
+            Company::factory()->create(['workspace_id' => $this->workspace->getKey(), 'creation_source' => $source]);
+
+            sendSourceAnswer($this->conversationId, OnboardingDataSource::Memory)->assertOk();
+
+            expect($this->workspace->fresh()->onboarding_data_source)->toBe(OnboardingDataSource::Memory)
+                ->and(Company::query()->withoutGlobalScopes()->where('workspace_id', $this->workspace->getKey())->count())->toBe(1);
+        })->with([
+            'its own record' => CreationSource::WEB,
+            'a sample' => CreationSource::SAMPLE,
+        ]);
+
+        it('seeds nothing in an additional workspace', function (): void {
+            $this->workspace->forceFill(['personal_workspace' => false])->save();
+
+            sendSourceAnswer($this->conversationId, OnboardingDataSource::Memory)->assertOk();
+
+            expect(sampleCompanyCount($this->workspace))->toBe(0);
+        });
+
+        it('stores nothing and seeds nothing while the wizard is still open', function (): void {
+            $this->workspace->forceFill(['onboarding_step' => WorkspaceSetupStep::Invite])->save();
+
+            sendSourceAnswer($this->conversationId, OnboardingDataSource::Memory)->assertOk();
+
+            expect($this->workspace->fresh()->onboarding_data_source)->toBeNull()
+                ->and(sampleCompanyCount($this->workspace))->toBe(0);
+        });
 
         it('changes nothing on a second answer', function (): void {
             sendSourceAnswer($this->conversationId, OnboardingDataSource::Spreadsheet)->assertOk();

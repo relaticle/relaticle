@@ -6,6 +6,13 @@ return [
     'title' => 'Set up your workspace',
     'opens_in_new_tab' => '(opens in a new tab)',
     'assistant_prompt' => 'Move my current clients into Relaticle: add each company and the people I work with there, and an opportunity for every deal that is still open.',
+    'answers' => [
+        'spreadsheet' => 'A spreadsheet',
+        'other_crm' => 'Another CRM',
+        'inbox' => 'My inbox',
+        'memory' => 'In my head',
+        'assistant' => 'Claude or ChatGPT',
+    ],
     'buttons' => [
         'add_client' => [
             'label' => 'Add a client',
