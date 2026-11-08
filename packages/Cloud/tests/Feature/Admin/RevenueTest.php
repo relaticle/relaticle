@@ -57,6 +57,14 @@ function fakeStripeSubscriptions(array $bySubscription, bool $fails = false, arr
                 return [json_encode(['error' => ['message' => 'Too many requests', 'type' => 'invalid_request_error', 'code' => 'rate_limit']]), 429, []];
             }
 
+            if (str_starts_with($id, 'co_')) {
+                $coupon = $this->bySubscription['coupons'][$id] ?? null;
+
+                return $coupon === null
+                    ? [json_encode(['error' => ['message' => "No such coupon: '{$id}'", 'type' => 'invalid_request_error', 'code' => 'resource_missing']]), 404, []]
+                    : [json_encode(['id' => $id, 'object' => 'coupon', 'percent_off' => null, 'amount_off' => null, 'duration' => 'forever', ...$coupon]), 200, []];
+            }
+
             $data = $this->bySubscription[$id];
 
             if ($data === null) {
@@ -83,7 +91,7 @@ function stripeSubscription(string $id, array $data): array
         'id' => 'di_'.Str::random(6), 'object' => 'discount', 'end' => $entry['end'] ?? null,
         'source' => ['type' => 'coupon', 'coupon' => $coupon($entry['coupon'])],
     ];
-    $invoice = $data['invoice'] ?? ['status' => 'paid', 'created' => now()->subDays(20)->getTimestamp()];
+    $invoice = $data['invoice'] ?? ['status' => 'paid', 'total' => 2_400, 'created' => now()->subDays(20)->getTimestamp()];
 
     return [
         'id' => $id,
@@ -92,7 +100,9 @@ function stripeSubscription(string $id, array $data): array
             'id' => 'si_'.Str::random(6),
             'object' => 'subscription_item',
             'quantity' => $item['quantity'] ?? 1,
-            'discounts' => [],
+            'discounts' => array_map(fn (string $couponId): array => [
+                'id' => 'di_'.Str::random(6), 'object' => 'discount', 'end' => null, 'source' => ['type' => 'coupon', 'coupon' => $couponId],
+            ], $item['coupons'] ?? []),
             'price' => [
                 'id' => 'price_x', 'object' => 'price', 'type' => 'recurring', 'unit_amount' => $item['cents'],
                 'tax_behavior' => $item['tax_behavior'] ?? 'unspecified',
@@ -216,12 +226,58 @@ it('compares with the subscriptions that were paying a week ago', function (): v
         'sub_steady' => ['items' => [['cents' => 2_400]]],
         'sub_new' => ['items' => [['cents' => 5_900]]],
         'sub_churned' => ['items' => [['cents' => 1_000]]],
-        'sub_renewal_failed' => ['items' => [['cents' => 100]], 'invoice' => ['status' => 'open', 'created' => now()->subDays(2)->getTimestamp()]],
-        'sub_never_paid' => ['items' => [['cents' => 10_000]], 'invoice' => ['status' => 'open', 'created' => now()->subDays(2)->getTimestamp()]],
+        'sub_renewal_failed' => ['items' => [['cents' => 100]], 'invoice' => ['status' => 'open', 'total' => 100, 'created' => now()->subDays(2)->getTimestamp()]],
+        'sub_never_paid' => ['items' => [['cents' => 10_000]], 'invoice' => ['status' => 'open', 'total' => 10_000, 'created' => now()->subDays(2)->getTimestamp()]],
     ]);
 
     expect(resolve(Revenue::class)->monthlyMicros())->toBe(83_000_000)
         ->and(resolve(Revenue::class)->monthlyMicros($weekAgo))->toBe(35_000_000);
+});
+
+it('leaves out an Enterprise plan whose first invoice is not paid yet', function (): void {
+    $workspace = OverviewData::workspaceOf(OverviewData::owner());
+    $workspace->forceFill(['stripe_id' => 'cus_managed'])->save();
+    $workspace->subscriptions()->create([
+        'type' => 'managed_pending', 'stripe_id' => 'sub_managed', 'stripe_status' => 'active', 'stripe_price' => 'price_x', 'quantity' => 1,
+    ]);
+    fakeStripeSubscriptions(['sub_managed' => ['items' => [['cents' => 600_000, 'interval' => 'year']], 'invoice' => ['status' => 'open', 'total' => 600_000, 'created' => now()->subDay()->getTimestamp()]]]);
+
+    expect(resolve(Revenue::class)->monthlyMicros())->toBe(0)
+        ->and(resolve(Revenue::class)->monthlyMicros(now()->subWeek()))->toBe(0);
+});
+
+it('does not count a trial cancelled this week as paying last week', function (): void {
+    $cancelled = payingWorkspace(OverviewData::workspaceOf(OverviewData::owner()), 'sub_cancelled_trial', 'canceled');
+    $cancelled->forceFill(['created_at' => now()->subDays(16), 'trial_ends_at' => null, 'ends_at' => now()->subDays(2)])->save();
+    fakeStripeSubscriptions(['sub_cancelled_trial' => ['items' => [['cents' => 2_400]], 'invoice' => ['status' => 'paid', 'total' => 0, 'created' => now()->subDays(16)->getTimestamp()]]]);
+
+    expect(resolve(Revenue::class)->monthlyMicros(now()->subWeek()))->toBe(0);
+});
+
+it('keeps counting a renewal that is still inside its payment terms', function (): void {
+    $renewing = payingWorkspace(OverviewData::workspaceOf(OverviewData::owner()), 'sub_terms');
+    $renewing->forceFill(['created_at' => now()->subYear()])->save();
+    fakeStripeSubscriptions(['sub_terms' => ['items' => [['cents' => 22_800, 'interval' => 'year']], 'invoice' => ['status' => 'open', 'total' => 22_800, 'created' => now()->subDays(10)->getTimestamp()]]]);
+
+    expect(resolve(Revenue::class)->monthlyMicros())->toBe(19_000_000)
+        ->and(resolve(Revenue::class)->monthlyMicros(now()->subWeek()))->toBe(19_000_000);
+});
+
+it('nets a discount on a single subscription item', function (): void {
+    payingWorkspace(OverviewData::workspaceOf(OverviewData::owner()), 'sub_item_discount');
+    fakeStripeSubscriptions([
+        'sub_item_discount' => ['items' => [['cents' => 2_400, 'coupons' => ['co_quarter']]]],
+        'coupons' => ['co_quarter' => ['percent_off' => 25]],
+    ]);
+
+    expect(resolve(Revenue::class)->monthlyMicros())->toBe(18_000_000);
+});
+
+it('reports a subscription whose coupon cannot be read as unavailable, not as zero', function (): void {
+    payingWorkspace(OverviewData::workspaceOf(OverviewData::owner()), 'sub_deleted_coupon');
+    fakeStripeSubscriptions(['sub_deleted_coupon' => ['items' => [['cents' => 2_400, 'coupons' => ['co_deleted']]]], 'coupons' => []]);
+
+    expect(resolve(Revenue::class)->monthlyMicros())->toBeNull();
 });
 
 it('reports Stripe being unavailable instead of a wrong number', function (): void {
@@ -279,7 +335,7 @@ it('counts a subscription Stripe no longer knows as zero and keeps summing the r
 
     expect(resolve(Revenue::class)->monthlyMicros())->toBe(12_000_000);
 
-    $this->travelTo(now()->addHours(23));
+    $this->travelTo(now()->addMinutes(50));
 
     expect(resolve(Revenue::class)->monthlyMicros())->toBe(12_000_000)
         ->and($requests)->toHaveCount(2);

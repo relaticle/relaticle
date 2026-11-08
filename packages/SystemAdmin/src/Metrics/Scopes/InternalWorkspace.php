@@ -34,6 +34,6 @@ final readonly class InternalWorkspace implements Scope
      */
     private static function emailDomains(): array
     {
-        return array_values(array_filter((array) config('system-admin.internal_email_domains', []), is_string(...)));
+        return array_values(array_map(strtolower(...), array_filter((array) config('system-admin.internal_email_domains', []), is_string(...))));
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Cloud\Admin\Metrics\Scopes;
 
 use App\Enums\StripeSubscriptionStatus;
+use App\Enums\SubscriptionType;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -29,7 +30,9 @@ final readonly class CountsTowardMrr implements Scope
             ->withGlobalScope(ExternalWorkspace::class, new ExternalWorkspace)
             ->select('id');
 
-        $builder->whereIn($model->qualifyColumn('workspace_id'), $externalWorkspaces);
+        $builder
+            ->whereIn($model->qualifyColumn('workspace_id'), $externalWorkspaces)
+            ->where($model->qualifyColumn('type'), '!=', SubscriptionType::ManagedPending->value);
 
         $at = $this->asOf ?? now();
 

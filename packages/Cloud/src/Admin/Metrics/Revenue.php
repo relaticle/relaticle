@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Admin\Metrics;
 
+use App\Enums\StripeSubscriptionStatus;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Laravel\Cashier\Cashier;
 use Laravel\Cashier\Subscription;
 use Relaticle\Cloud\Admin\Metrics\Scopes\CountsTowardMrr;
+use RuntimeException;
 use Stripe\Coupon;
 use Stripe\Discount;
 use Stripe\Exception\InvalidRequestException;
@@ -37,7 +39,7 @@ final readonly class Revenue
                 return null;
             }
 
-            if ($asOf instanceof CarbonImmutable && ! $this->wasPayingAt($terms, $asOf)) {
+            if ($asOf instanceof CarbonImmutable && ! $this->wasPayingAt($subscription, $terms, $asOf)) {
                 continue;
             }
 
@@ -48,11 +50,14 @@ final readonly class Revenue
     }
 
     /**
+     * A subscription Stripe still calls active is inside its payment terms even with an open invoice.
+     *
      * @param  array{micros: int, invoice_paid: bool, invoice_created_at: ?int}  $terms
      */
-    private function wasPayingAt(array $terms, CarbonImmutable $asOf): bool
+    private function wasPayingAt(Subscription $subscription, array $terms, CarbonImmutable $asOf): bool
     {
         return $terms['invoice_paid']
+            || $subscription->stripe_status === StripeSubscriptionStatus::Active->value
             || ($terms['invoice_created_at'] !== null && $terms['invoice_created_at'] > $asOf->getTimestamp());
     }
 
@@ -78,7 +83,7 @@ final readonly class Revenue
             $terms = $this->isUnknownToStripe($exception) ? ['micros' => 0, 'invoice_paid' => false, 'invoice_created_at' => null] : null;
         }
 
-        Cache::put($key, ['terms' => $terms], $terms === null ? now()->addMinutes(10) : now()->addDay());
+        Cache::put($key, ['terms' => $terms], $terms === null ? now()->addMinutes(10) : now()->addHour());
 
         return $terms;
     }
@@ -131,7 +136,7 @@ final readonly class Revenue
 
         return [
             'micros' => max(0, (int) round($micros)),
-            'invoice_paid' => $invoice instanceof Invoice && $invoice->status === Invoice::STATUS_PAID,
+            'invoice_paid' => $invoice instanceof Invoice && $invoice->status === Invoice::STATUS_PAID && $invoice->total > 0,
             'invoice_created_at' => $invoice instanceof Invoice ? $invoice->created : null,
         ];
     }
@@ -199,7 +204,11 @@ final readonly class Revenue
         $coupon = $discount->source->coupon ?? null;
 
         if (is_string($coupon)) {
-            return Cashier::stripe()->coupons->retrieve($coupon);
+            try {
+                return Cashier::stripe()->coupons->retrieve($coupon);
+            } catch (InvalidRequestException $exception) {
+                throw new RuntimeException("Coupon {$coupon} could not be read.", $exception->getCode(), previous: $exception);
+            }
         }
 
         return $coupon instanceof Coupon ? $coupon : null;

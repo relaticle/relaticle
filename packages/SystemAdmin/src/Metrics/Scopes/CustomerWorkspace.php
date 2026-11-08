@@ -21,7 +21,11 @@ final readonly class CustomerWorkspace implements Scope
 
         $builder->whereNotIn($model->qualifyColumn('id'), Workspace::query()
             ->withGlobalScope(TrialFarmer::class, new TrialFarmer)
-            ->whereDoesntHave('subscriptions', fn (Builder $paying): Builder => $paying->where('stripe_status', StripeSubscriptionStatus::Active->value))
+            ->whereDoesntHave('subscriptions', fn (Builder $carded): Builder => $carded->whereIn('stripe_status', [
+                StripeSubscriptionStatus::Active->value,
+                StripeSubscriptionStatus::Trialing->value,
+                StripeSubscriptionStatus::PastDue->value,
+            ]))
             ->select('workspaces.id'));
     }
 }
