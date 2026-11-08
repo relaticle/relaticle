@@ -214,6 +214,23 @@ it('reports the challenge prompt in the active locale', function (): void {
         ->assertHasFormErrors(['cf_turnstile_response' => 'Veuillez compléter la vérification de sécurité.']);
 });
 
+it('points a visitor the challenge cannot verify at the sign-in providers', function (): void {
+    enableSignupChallenge();
+
+    startSignup('jane-blocked-'.uniqid().'@gmail.com')
+        ->assertSee(__('auth.turnstile.blocked_with_providers', ['providers' => 'Google or Microsoft']))
+        ->assertSee(__('auth.turnstile.retry'));
+});
+
+it('tells a visitor the challenge cannot verify to check their connection when no provider is configured', function (): void {
+    config(['services.google.client_id' => null, 'services.microsoft.client_id' => null]);
+    enableSignupChallenge();
+
+    startSignup('jane-blocked-'.uniqid().'@gmail.com')
+        ->assertSee(__('auth.turnstile.blocked'))
+        ->assertDontSee(__('auth.turnstile.blocked_with_providers', ['providers' => 'Google or Microsoft']));
+});
+
 it('never challenges an existing user signing in with a password', function (): void {
     enableSignupChallenge();
     fakeSiteverify(true);
