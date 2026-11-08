@@ -14,6 +14,10 @@ final readonly class NoDuplicateRowSet implements Scorer
 
     public function score(string $input, string $output, ?string $expected = null): ScorerResult
     {
+        if (($failed = $this->failedTurn($output)) instanceof ScorerResult) {
+            return $failed;
+        }
+
         $previous = array_map($this->key(...), $this->rowIdSets((string) $expected));
 
         foreach ($this->rowIdSets($output) as $ids) {

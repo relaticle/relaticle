@@ -14,7 +14,13 @@ final readonly class OneClosingQuestionAtMost implements Scorer
 
     public function score(string $input, string $output, ?string $expected = null): ScorerResult
     {
-        $questions = (int) preg_match_all('/[?\x{061F}\x{FF1F}]/u', $this->text($output));
+        if (($failed = $this->failedTurn($output)) instanceof ScorerResult) {
+            return $failed;
+        }
+
+        $text = $this->text($output);
+        $prose = preg_replace(['/\]\([^)]*\)/', '~https?://\S+~', '/"[^"\n]*"/', '/\x{201C}[^\x{201D}\n]*\x{201D}/u'], '', $text) ?? $text;
+        $questions = (int) preg_match_all('/[?\x{061F}\x{FF1F}]/u', $prose);
 
         if ($questions > 1) {
             return $this->fail("{$questions} question marks in the reply");

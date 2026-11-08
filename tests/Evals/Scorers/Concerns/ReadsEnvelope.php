@@ -42,6 +42,17 @@ trait ReadsEnvelope
         ], $calls));
     }
 
+    protected function failedTurn(string $output): ?ScorerResult
+    {
+        $error = $this->envelope($output)['error'] ?? null;
+
+        if ($error === null) {
+            return null;
+        }
+
+        return $this->fail('The turn failed: '.(is_string($error) ? $error : json_encode($error)));
+    }
+
     private function pass(string $reasoning): ScorerResult
     {
         return new ScorerResult(1.0, $reasoning, static::class);

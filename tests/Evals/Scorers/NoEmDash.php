@@ -14,6 +14,10 @@ final readonly class NoEmDash implements Scorer
 
     public function score(string $input, string $output, ?string $expected = null): ScorerResult
     {
+        if (($failed = $this->failedTurn($output)) instanceof ScorerResult) {
+            return $failed;
+        }
+
         if (preg_match('/\x{2014}/u', $this->text($output)) === 1) {
             return $this->fail('Em dash in the reply');
         }

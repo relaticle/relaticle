@@ -14,7 +14,11 @@ final readonly class NoHeadingLine implements Scorer
 
     public function score(string $input, string $output, ?string $expected = null): ScorerResult
     {
-        if (preg_match('/^\s*(#{1,4}\s+\S.*|\*\*[^*\n]{2,40}\*\*\s*:?\s*)$/m', $this->text($output), $match) === 1) {
+        if (($failed = $this->failedTurn($output)) instanceof ScorerResult) {
+            return $failed;
+        }
+
+        if (preg_match('/^\s*(#{1,6}\s+\S.*|\*\*[^*\n]{2,40}\*\*\s*:?\s*)$/m', $this->text($output), $match) === 1) {
             return $this->fail('Heading line in the reply: '.trim($match[0]));
         }
 

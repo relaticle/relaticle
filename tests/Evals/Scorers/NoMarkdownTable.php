@@ -14,7 +14,13 @@ final readonly class NoMarkdownTable implements Scorer
 
     public function score(string $input, string $output, ?string $expected = null): ScorerResult
     {
-        if (preg_match('/^\s*\|.*\|\s*$\n^\s*\|[\s:|-]+\|/m', $this->text($output), $match) === 1) {
+        if (($failed = $this->failedTurn($output)) instanceof ScorerResult) {
+            return $failed;
+        }
+
+        $text = $this->text($output);
+
+        if (preg_match('/^\s*\|.*\|\s*$\n^\s*\|[\s:|-]+\|/m', $text, $match) === 1 || preg_match('/^[^\n|]+\|[^\n]+\n[-:| ]+\|[-:| ]+$/m', $text, $match) === 1) {
             return $this->fail('Markdown table in the reply: '.trim($match[0]));
         }
 

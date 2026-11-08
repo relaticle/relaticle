@@ -16,6 +16,10 @@ final readonly class ReplayedBytesUnder implements Scorer
 
     public function score(string $input, string $output, ?string $expected = null): ScorerResult
     {
+        if (($failed = $this->failedTurn($output)) instanceof ScorerResult) {
+            return $failed;
+        }
+
         $bytes = (int) ($this->envelope($output)['replayed_bytes'] ?? 0);
 
         if ($bytes >= $this->max) {

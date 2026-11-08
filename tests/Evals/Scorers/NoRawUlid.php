@@ -14,6 +14,10 @@ final readonly class NoRawUlid implements Scorer
 
     public function score(string $input, string $output, ?string $expected = null): ScorerResult
     {
+        if (($failed = $this->failedTurn($output)) instanceof ScorerResult) {
+            return $failed;
+        }
+
         $text = $this->text($output);
         $prose = preg_replace(['/\]\([^)]*\)/', '~https?://\S+~'], '', $text) ?? $text;
 
