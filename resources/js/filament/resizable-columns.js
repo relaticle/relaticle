@@ -655,7 +655,7 @@ function startColumnDrag(event, th, wire) {
 
         // The cells move in the page at once, so the server's re-render arrives with nothing left to change.
         moveColumnCells(source, others[index] ?? null, others.at(-1))
-        wire.moveTableColumn(headerName(th), others[index] ? headerName(others[index].th) : null).catch(forgetColumnFocus)
+        Promise.resolve(wire.moveTableColumn(headerName(th), others[index] ? headerName(others[index].th) : null)).catch(forgetColumnFocus)
     }
 
     const onUp = (upEvent) => {
@@ -814,7 +814,7 @@ function registerResizableColumn() {
             if (isLeft ? !targets.canMoveLeft : !targets.canMoveRight) return
 
             rememberColumnFocus(columnName)
-            this.$wire.moveTableColumn(columnName, isLeft ? targets.before.left : targets.before.right).catch(forgetColumnFocus)
+            Promise.resolve(this.$wire.moveTableColumn(columnName, isLeft ? targets.before.left : targets.before.right)).catch(forgetColumnFocus)
         },
 
         wrapHeaderLabel() {
