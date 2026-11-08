@@ -1143,12 +1143,15 @@ final class ProcessChatMessage implements ShouldQueue
             return false;
         }
 
+        if (in_array($this->origin, [MessageOrigin::Greeting, MessageOrigin::DataArrived], true)) {
+            return true;
+        }
+
         if ($this->workspace->onboarding_data_source === null) {
             return ! resolve(WorkspaceActivationFacts::class)->hasOwnRecord($this->workspace);
         }
 
-        return $this->answeredTheSourceQuestion()
-            || in_array($this->origin, [MessageOrigin::Greeting, MessageOrigin::DataArrived], true);
+        return $this->answeredTheSourceQuestion();
     }
 
     private function answeredTheSourceQuestion(): bool

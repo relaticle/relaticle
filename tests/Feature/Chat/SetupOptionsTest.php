@@ -405,29 +405,41 @@ it('writes the answer buttons on any setup turn while the question is unanswered
     Queue::assertNotPushed(SuggestNextSteps::class);
 })->with([MessageOrigin::Greeting, MessageOrigin::DataArrived, MessageOrigin::Typed]);
 
-it('writes the company pick on a data arrived turn while the question is unanswered', function (): void {
+it('writes the company pick on a data arrived turn while the question is unanswered', function (CreationSource $arrivedFrom): void {
     suggestNextStepsFake();
     answeredWith(null);
-    arrivedFrom(CreationSource::MAILBOX);
+    arrivedFrom($arrivedFrom);
     CrmAssistant::fake(['Your companies arrived.']);
 
     runSetupTurn($this->user, $this->workspace->fresh(), MessageOrigin::DataArrived);
 
     expect(array_column(lastAssistantNextSteps($this->workspace->setupConversation->id), 'id'))->toBe(['pick_first', 'later']);
     Queue::assertNotPushed(SuggestNextSteps::class);
-});
+})->with([CreationSource::IMPORT, CreationSource::MAILBOX]);
 
-it('resumes suggested next steps once an unanswered workspace holds its own record', function (MessageOrigin $origin): void {
+it('resumes suggested next steps on a typed turn once an unanswered workspace holds its own record', function (): void {
     suggestNextStepsFake();
     answeredWith(null);
     Company::factory()->create(['workspace_id' => $this->workspace->getKey(), 'creation_source' => CreationSource::WEB]);
     CrmAssistant::fake(['Here is what you have.']);
 
-    runSetupTurn($this->user, $this->workspace->fresh(), $origin);
+    runSetupTurn($this->user, $this->workspace->fresh());
 
     expect(lastAssistantNextSteps($this->workspace->setupConversation->id))->toBeNull();
     Queue::assertPushed(SuggestNextSteps::class);
-})->with([MessageOrigin::Typed, MessageOrigin::Greeting, MessageOrigin::DataArrived]);
+});
+
+it('keeps the answer buttons on a greeting turn once an unanswered workspace holds its own record', function (): void {
+    suggestNextStepsFake();
+    answeredWith(null);
+    Company::factory()->create(['workspace_id' => $this->workspace->getKey(), 'creation_source' => CreationSource::WEB]);
+    CrmAssistant::fake(['Welcome.']);
+
+    runSetupTurn($this->user, $this->workspace->fresh(), MessageOrigin::Greeting);
+
+    expect(array_column(lastAssistantNextSteps($this->workspace->setupConversation->id), 'id'))
+        ->toBe(['source_spreadsheet', 'source_other_crm', 'source_inbox', 'source_memory', 'source_assistant']);
+});
 
 it('writes the path buttons on the turn that answered the question', function (): void {
     suggestNextStepsFake();
