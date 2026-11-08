@@ -21,6 +21,7 @@ it('can create a new workspace through the browser', function (): void {
         ->type('[id="form.slug"]', 'second-workspace')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Where do your clients live today?')
+        ->assertScript(FOCUSED_HEADING, 'Where do your clients live today?')
         ->click('[id$="onboarding_data_source-inbox"]')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Start with the people you already email')

@@ -397,6 +397,8 @@ function loginViaBrowser(User $user, ?string $theme = null, ?AwaitableWebpage $p
         ->click('button[type="submit"]');
 }
 
+const FOCUSED_HEADING = 'new Promise(resolve => { const end = Date.now() + 3000; const poll = () => { const focused = document.activeElement; focused?.tagName === "H1" || Date.now() > end ? resolve(focused?.tagName === "H1" ? focused.innerText.trim() : focused?.tagName) : setTimeout(poll, 50); }; poll(); })';
+
 function asyncAlpineComponentsLoaded(): string
 {
     return 'document.querySelector("[x-load][x-ignore]") === null';

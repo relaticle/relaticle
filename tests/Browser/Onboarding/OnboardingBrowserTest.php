@@ -18,8 +18,6 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 mutates(CreateWorkspace::class, SetupWorkspace::class);
 
-const FOCUSED_HEADING = 'new Promise(resolve => { const end = Date.now() + 3000; const poll = () => { const focused = document.activeElement; focused?.tagName === "H1" || Date.now() > end ? resolve(focused?.tagName === "H1" ? focused.innerText.trim() : focused?.tagName) : setTimeout(poll, 50); }; poll(); })';
-
 const ACTION_MODALS_READY = 'new Promise(resolve => { const ready = () => document.querySelector(\'[x-data^="filamentActionModals"]\')?._x_dataStack !== undefined; const poll = () => ready() ? resolve(true) : setTimeout(poll, 25); poll(); })';
 
 function walkToMailboxStep(User $user, string $name, string $slug): AwaitableWebpage
@@ -33,6 +31,7 @@ function walkToMailboxStep(User $user, string $name, string $slug): AwaitableWeb
         ->waitForText('How did you hear about us?')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Where do your clients live today?')
+        ->assertScript(FOCUSED_HEADING, 'Where do your clients live today?')
         ->click('[id$="onboarding_data_source-inbox"]')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Start with the people you already email')
@@ -111,6 +110,7 @@ it('walks a new owner through every setup screen to the setup conversation', fun
         ->waitForText('How did you hear about us?')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Where do your clients live today?')
+        ->assertScript(FOCUSED_HEADING, 'Where do your clients live today?')
         ->click('[id$="onboarding_data_source-inbox"]')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Start with the people you already email')
@@ -290,6 +290,7 @@ it('stores the use case and its sub-option chosen in the browser', function (): 
         ->waitForText('How did you hear about us?')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Where do your clients live today?')
+        ->assertScript(FOCUSED_HEADING, 'Where do your clients live today?')
         ->click('[id$="onboarding_data_source-inbox"]')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Start with the people you already email')
@@ -402,6 +403,7 @@ it('stores the assistant and the question behind an AI referral picked in the br
         ->type('[id$="onboarding_referral_prompt"]', 'A CRM my assistant can update')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Where do your clients live today?')
+        ->assertScript(FOCUSED_HEADING, 'Where do your clients live today?')
         ->click('[id$="onboarding_data_source-inbox"]')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Start with the people you already email')
