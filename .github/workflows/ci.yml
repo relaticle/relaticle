@@ -208,7 +208,7 @@ jobs:
           retention-days: 1
 
   self-hosted-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     name: Self-hosted Build
 
     services:
@@ -277,8 +277,10 @@ jobs:
           rm -rf packages/Cloud
           composer dump-autoload
 
+      # Feature repeats the shards' tests with Cloud removed and takes about ten minutes, so only
+      # pushes to main run it. Pull requests and releases run Arch and Smoke.
       - name: Tests
-        run: vendor/bin/pest --compact --parallel --configuration phpunit.ci.xml --testsuite=Arch,Smoke,Feature --ci --no-tia
+        run: vendor/bin/pest --compact --parallel --configuration phpunit.ci.xml --testsuite=${{ github.event_name == 'push' && 'Arch,Smoke,Feature' || 'Arch,Smoke' }} --ci --no-tia
 
   browser-tests:
     runs-on: ${{ matrix.browser == 'webkit' && 'ubuntu-latest' || 'ubuntu-24.04-arm' }}
