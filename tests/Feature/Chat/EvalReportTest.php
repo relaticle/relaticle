@@ -34,7 +34,7 @@ function reportEnvelope(int $in, int $out, int $bytes, int $ms, int $calls, stri
 
 it('writes nothing when no case was recorded', function (): void {
     expect(EvalReport::flush('claude-sonnet-5', 'claude-opus-5-5'))->toBeNull()
-        ->and(is_dir((string) EvalReport::$directory))->toBeFalse();
+        ->and((string) EvalReport::$directory)->not->toBeDirectory();
 });
 
 it('writes one file per run with per-case metrics and totals', function (): void {
