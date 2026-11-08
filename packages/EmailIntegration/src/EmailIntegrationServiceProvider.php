@@ -32,7 +32,6 @@ use Relaticle\EmailIntegration\Console\Commands\IncrementalCalendarSyncCommand;
 use Relaticle\EmailIntegration\Console\Commands\IncrementalEmailSyncCommand;
 use Relaticle\EmailIntegration\Console\Commands\RemoveOwnDomainRecordsCommand;
 use Relaticle\EmailIntegration\Console\Commands\RenewCalendarPushChannelsCommand;
-use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages\ManageEmailTemplates;
 use Relaticle\EmailIntegration\Inbox\EmailAccessRequestSource;
 use Relaticle\EmailIntegration\Listeners\CancelRemovedMemberAccessRequestsListener;
 use Relaticle\EmailIntegration\Listeners\DisconnectRemovedMemberMailboxesListener;
@@ -121,20 +120,11 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         // Incremental email + calendar sync are scheduled in bootstrap/app.php (all
         // scheduled work lives there); do not re-register them here.
 
-        // The templates resource has no page view of its own, so its tabs and header
-        // (see HasEmailSettingsHeader) are rendered into the content column from here.
         FilamentView::registerRenderHook(
             Dashboard::AFTER_COMPOSER_RENDER_HOOK,
             fn (): string => Feature::active(EmailIntegration::class)
                 ? Blade::render("@livewire('email-integration.meetings-home-widget')")
                 : '',
-        );
-
-        FilamentView::registerRenderHook(
-            PanelsRenderHook::PAGE_HEADER_WIDGETS_BEFORE,
-            fn (): string => view('email-integration::components.settings-tabs')->render()
-                .view('email-integration::components.settings-header')->render(),
-            scopes: ManageEmailTemplates::class,
         );
 
         $this->loadRoutesFrom(__DIR__.'/../routes/web.php');

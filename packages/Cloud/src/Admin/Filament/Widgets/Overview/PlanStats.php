@@ -94,7 +94,9 @@ final class PlanStats extends StatsOverviewWidget
         $pro = Plan::Pro->connectedMailboxes();
         $scale = Plan::Scale->connectedMailboxes();
 
-        return Stat::make(HelpLabel::make('At the mailbox cap', "Customer workspaces on Cloud Pro or Cloud Scale that have connected every mailbox their plan allows ({$pro} on Pro, {$scale} on Scale). They cannot connect another one without upgrading. A mailbox that needs sign-in still counts. A disconnected one does not."), number_format($capped))
+        $trial = Plan::trialConnectedMailboxes();
+
+        return Stat::make(HelpLabel::make('At the mailbox cap', "Customer workspaces on Cloud Pro, Cloud Scale or the trial that have connected every mailbox they may ({$pro} on Pro, {$scale} on Scale, {$trial} during the trial). They cannot connect another one without upgrading. A mailbox that needs sign-in still counts. A disconnected one does not."), number_format($capped))
             ->description($capped === 0 ? 'Nobody is blocked by the cap' : 'Blocked from connecting another mailbox')
             ->color($capped === 0 ? 'gray' : 'warning')
             ->url(WorkspaceResource::getUrl('index', ['filters' => [

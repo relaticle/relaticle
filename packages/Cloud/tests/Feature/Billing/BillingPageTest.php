@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
@@ -349,15 +350,14 @@ function actingAsMemberOf(Workspace $workspace): void
     Filament::setTenant($workspace->refresh());
 }
 
-it('offers the owner a seven-day extension on the paused screen', function (): void {
+it('offers the owner a trial extension under the help prompt on the paused screen', function (): void {
     withHostedBilling();
 
     [, $workspace] = pausedTrialWorkspace();
 
     $this->get(Billing::getUrl(panel: 'app', tenant: $workspace))
         ->assertOk()
-        ->assertSee(__('cloud::billing.paused.extend', ['days' => Workspace::TRIAL_EXTENSION_DAYS]))
-        ->assertSee(__('cloud::billing.paused.extend_once'));
+        ->assertSeeInOrder([__('cloud::billing.paused.help'), __('cloud::billing.paused.extend'), __('cloud::billing.paused.contact')]);
 });
 
 it('offers the extension during an inactivity countdown but not after an owner request', function (DeletionReason $reason, bool $offered): void {
@@ -369,8 +369,8 @@ it('offers the extension during an inactivity countdown but not after an owner r
     $page = $this->get(Billing::getUrl(panel: 'app', tenant: $workspace))->assertOk();
 
     $offered
-        ? $page->assertSee(__('cloud::billing.paused.extend', ['days' => Workspace::TRIAL_EXTENSION_DAYS]))
-        : $page->assertDontSee(__('cloud::billing.paused.extend', ['days' => Workspace::TRIAL_EXTENSION_DAYS]));
+        ? $page->assertSee(__('cloud::billing.paused.extend'))
+        : $page->assertDontSee(__('cloud::billing.paused.extend'));
 })->with([
     'inactivity' => [DeletionReason::Inactivity, true],
     'requested' => [DeletionReason::Requested, false],
@@ -395,14 +395,19 @@ it('extends the trial from the paused screen and reopens the workspace', functio
 
     livewire(Billing::class)
         ->call('extendTrial')
-        ->assertNotified(__('cloud::billing.paused.extended', ['days' => Workspace::TRIAL_EXTENSION_DAYS]))
+        ->assertNotified(
+            Notification::make()
+                ->title(__('cloud::billing.paused.extended.title'))
+                ->body(__('cloud::billing.paused.extended.body', ['days' => Workspace::TRIAL_EXTENSION_DAYS]))
+                ->success(),
+        )
         ->assertRedirect(Billing::getUrl());
 
     expect($workspace->refresh()->billingStatus())->toBe(BillingStatus::Trialing);
 
     $this->get(Billing::getUrl(panel: 'app', tenant: $workspace))
         ->assertOk()
-        ->assertDontSee(__('cloud::billing.paused.extend', ['days' => Workspace::TRIAL_EXTENSION_DAYS]))
+        ->assertDontSee(__('cloud::billing.paused.extend'))
         ->assertSee(__('cloud::billing.usage.title'));
 });
 
@@ -428,8 +433,7 @@ it('hides the extension once it was used', function (): void {
 
     livewire(Billing::class)
         ->assertSee(__('cloud::billing.paused.continue'))
-        ->assertDontSee(__('cloud::billing.paused.extend', ['days' => Workspace::TRIAL_EXTENSION_DAYS]))
-        ->assertDontSee(__('cloud::billing.paused.extend_once'));
+        ->assertDontSee(__('cloud::billing.paused.extend'));
 });
 
 it('tells the owner of a paused trial workspace it is deleted after 60 days with no sign-in', function (): void {
@@ -478,8 +482,7 @@ it('hides the extension from a member', function (): void {
 
     livewire(Billing::class)
         ->assertSee(__('cloud::billing.paused.member_body_trial', ['owner' => $workspace->owner->name, 'workspace' => $workspace->name]))
-        ->assertDontSee(__('cloud::billing.paused.extend', ['days' => Workspace::TRIAL_EXTENSION_DAYS]))
-        ->assertDontSee(__('cloud::billing.paused.extend_once'));
+        ->assertDontSee(__('cloud::billing.paused.extend'));
 });
 
 it('refuses a member who calls the extension directly', function (): void {

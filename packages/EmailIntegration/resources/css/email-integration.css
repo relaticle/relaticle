@@ -262,13 +262,8 @@
 
 /* ── Email visibility table (workspace privacy settings) ───────────────────
    Custom Blade table with a described enforcement picker per row. */
-.ei-visibility-search {
-    display: flex;
-    justify-content: end;
-}
-
 .ei-visibility-search .fi-ta-search-field {
-    @apply w-full max-w-xs max-sm:max-w-none;
+    @apply w-full;
 }
 
 /* Below sm a row is a card, as list tables stack: the heading cell heads it, then one label and value per line, the value under its label on the narrowest phones. */
@@ -383,26 +378,23 @@
     @apply px-2 py-1.5 text-start text-xs italic text-gray-400 dark:text-gray-500;
 }
 
-/* A mailbox's settings on a phone: its actions stay beside the address, and the tabs drop their own frame so the
-   blocklist and signatures are not boxed three deep. */
-.ei-account-settings {
-    & > .fi-section-header .fi-section-header-content {
-        @apply max-sm:flex-nowrap max-sm:items-start;
+/* Email settings panes: a mailbox's tabs sit beside the panel like the custom fields entity list, and above it on a phone. */
+.ei-email-settings {
+    & .fi-sc-tabs.fi-vertical {
+        @apply max-md:flex-col;
 
-        & > .fi-section-header-text-ctn {
-            @apply max-sm:min-w-0 max-sm:flex-1;
+        & > .fi-tabs {
+            @apply min-w-48 shrink-0 self-start max-md:mx-auto max-md:max-w-full max-md:flex-row max-md:overflow-x-auto;
+        }
+
+        & > .fi-sc-tabs-tab.fi-active {
+            @apply min-w-0 max-md:ms-0 max-md:mt-6;
         }
     }
 
-    & > .fi-section-content-ctn > .fi-section-content {
-        @apply max-sm:p-4;
-    }
-
-    & .fi-sc-tabs.fi-contained {
-        @apply max-sm:rounded-none max-sm:bg-transparent max-sm:shadow-none max-sm:ring-0 dark:max-sm:bg-transparent;
-
-        & .fi-sc-tabs-tab.fi-active {
-            @apply max-sm:px-0 max-sm:pb-0;
-        }
+    /* An uncontained section is a grid with an auto column, so the sharing cards would widen it past a phone screen. */
+    &.fi-section-not-contained,
+    & .fi-section-not-contained {
+        @apply grid-cols-1;
     }
 }

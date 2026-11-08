@@ -52,6 +52,12 @@ final readonly class PlanEntitlements implements Entitlements
 
     public function mailboxLimit(Workspace $workspace): ?int
     {
+        $workspace->loadMissing('subscriptions');
+
+        if ($workspace->billingStatus() === BillingStatus::Trialing) {
+            return Plan::trialConnectedMailboxes();
+        }
+
         return $workspace->plan->connectedMailboxes();
     }
 }

@@ -79,7 +79,7 @@ it('fails due queued mail on a mailbox that needs reconnecting and tells the sen
 
         return $notification->facts()['count'] === 2
             && $presented->getTitle() === '2 emails not sent'
-            && $presented->getBody() === 'Their mailbox needs reconnecting. Reconnect it, then retry them from the Failed tab.'
+            && $presented->getBody() === 'Their mailbox needs reconnecting. Reconnect it, then retry them from the outbox.'
             && $presented->getActions()[0]->getUrl() === EmailAccountsPage::getUrl(panel: 'app', tenant: $this->workspace);
     });
 });
@@ -180,7 +180,7 @@ it('fails due mail in a paused workspace and sends the sender to billing', funct
         $workspaceName = e($this->workspace->name);
 
         return $notification->facts()['remedy'] === SendFailureRemedy::Subscribe->value
-            && $presented->getBody() === "\"{$due->subject}\" was not sent because {$workspaceName} is paused. Once the workspace is reopened, retry the email from the Failed tab."
+            && $presented->getBody() === "\"{$due->subject}\" was not sent because {$workspaceName} is paused. Once the workspace is reopened, retry the email from the outbox."
             && $presented->getActions()[0]->getUrl() === route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]);
     });
 });

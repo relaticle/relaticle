@@ -25,6 +25,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Date;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Relaticle\EmailIntegration\Actions\CancelQueuedEmailAction;
 use Relaticle\EmailIntegration\Actions\RescheduleQueuedEmailAction;
@@ -44,24 +45,20 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
     use InteractsWithSchemas;
     use InteractsWithTable;
 
-    public ?EmailStatus $lockedStatus = null;
-
-    public bool $includeFailedFilter = true;
+    /**
+     * @var array<string, mixed>|null
+     */
+    #[Url]
+    public ?array $tableFilters = null;
 
     public function table(Table $table): Table
     {
         return $table
             ->query($this->buildQuery())
-            ->filters($this->lockedStatus instanceof EmailStatus ? [] : [$this->statusFilter()])
-            ->emptyStateHeading(fn (): string => $this->lockedStatus === EmailStatus::FAILED
-                ? __('filament/pages/email-inbox.failed.empty.heading')
-                : __('filament/pages/email-inbox.outbox.empty.heading'))
-            ->emptyStateDescription(fn (): string => $this->lockedStatus === EmailStatus::FAILED
-                ? __('filament/pages/email-inbox.failed.empty.description')
-                : __('filament/pages/email-inbox.outbox.empty.description'))
-            ->emptyStateIcon(fn (): string => $this->lockedStatus === EmailStatus::FAILED
-                ? 'lucide-circle-exclamation-point'
-                : 'lucide-clock')
+            ->filters([$this->statusFilter()])
+            ->emptyStateHeading(__('filament/pages/email-inbox.outbox.empty.heading'))
+            ->emptyStateDescription(__('filament/pages/email-inbox.outbox.empty.description'))
+            ->emptyStateIcon('lucide-clock')
             ->columns([
                 TextColumn::make('subject')->limit(50)->searchable(),
                 TextColumn::make('participants_to')
@@ -72,7 +69,7 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
                 TextColumn::make('scheduled_for')->dateTime()->label(__('filament/pages/email-outbox.columns.scheduled_for')),
                 TextColumn::make('priority')->label(__('filament/pages/email-outbox.columns.type'))->badge(),
                 TextColumn::make('last_error')
-                    ->toggleable(isToggledHiddenByDefault: $this->lockedStatus !== EmailStatus::FAILED)
+                    ->visible(fn (): bool => $this->isShowingFailed())
                     ->wrap(),
             ])
             ->recordActions([
@@ -170,11 +167,7 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
             ->with(['participants'])
             ->where('workspace_id', filament()->getTenant()?->getKey())
             ->where('user_id', auth()->id())
-            ->where('direction', EmailDirection::OUTBOUND)
-            ->when(
-                $this->lockedStatus instanceof EmailStatus,
-                fn (Builder $query): Builder => $query->where('status', $this->lockedStatus),
-            );
+            ->where('direction', EmailDirection::OUTBOUND);
     }
 
     private function statusFilter(): SelectFilter
@@ -197,13 +190,17 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
             ));
     }
 
+    private function isShowingFailed(): bool
+    {
+        return ($this->getTableFilterState('status_tab')['value'] ?? null) === OutboxTab::FAILED->value;
+    }
+
     /**
      * @return array<string, string>
      */
     private function statusFilterOptions(): array
     {
         return collect(OutboxTab::cases())
-            ->reject(fn (OutboxTab $tab): bool => ! $this->includeFailedFilter && $tab === OutboxTab::FAILED)
             ->mapWithKeys(fn (OutboxTab $tab): array => [$tab->value => $tab->getLabel()])
             ->all();
     }

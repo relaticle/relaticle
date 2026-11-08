@@ -2,7 +2,7 @@
 title: MCP Server
 description: Read the reference for Relaticle's MCP server, with OAuth and personal access token setup, custom field access and direct writes.
 order: 2
-updated: "2026-10-07"
+updated: "2026-11-08"
 ---
 
 MCP (Model Context Protocol) lets AI assistants like Claude work directly with your Relaticle CRM data. Instead of copy-pasting between tools, your AI assistant can list companies, create tasks, update people, and more -- all from a natural conversation.
@@ -63,7 +63,7 @@ Access tokens last 30 days and refresh tokens 90 days; supported clients refresh
 
 ### Revoking a connector
 
-**Settings → Access Tokens → AI Connectors** lists every assistant you have connected, the workspace each is bound to, and a **Revoke** button. Revoking invalidates the connector's access and refresh tokens immediately. Emails it queued that have not gone out are not sent. They move to the **Failed** tab, where you can send them yourself with **Retry**.
+**Settings → Access Tokens → AI Connectors** lists every assistant you have connected, the workspace each is bound to, and a **Revoke** button. Revoking invalidates the connector's access and refresh tokens immediately. Emails it queued that have not gone out are not sent. They move to the outbox under **Failed**, where you can send them yourself with **Retry**.
 
 ### Personal access tokens (recommended for developer tools)
 
@@ -244,7 +244,7 @@ These tools appear only for a connection that was given email access. The readin
 
 The two reading tools need read access. The mailbox tool appears for a connection allowed to draft or send, and the three draft tools for one allowed to draft. The send, cancel, reschedule and retry tools need the send permission and a role that may send through an assistant. A scheduled send never goes out sooner than the hold. An email goes to at most 20 recipients in total across To, CC and BCC. A user can have up to 10 assistant emails waiting at once.
 
-A queued email stays tied to the connection that queued it. It is not sent if that connection is revoked, deleted or expired by its send time. The same happens if its user's role no longer allows sending through an assistant. It then waits on the **Failed** tab with the reason.
+A queued email stays tied to the connection that queued it. It is not sent if that connection is revoked, deleted or expired by its send time. The same happens if its user's role no longer allows sending through an assistant. It then waits in the outbox under **Failed** with the reason.
 
 | Tool | Description |
 |------|-------------|

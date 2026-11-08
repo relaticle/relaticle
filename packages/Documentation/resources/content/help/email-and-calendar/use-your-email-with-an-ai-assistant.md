@@ -2,7 +2,7 @@
 title: Use your email with an AI assistant
 description: Let Rela, Claude, or ChatGPT read email you can see, save drafts, and send for you. You approve or can cancel every send.
 order: 9
-updated: "2026-11-06"
+updated: "2026-11-08"
 related: [help/email-and-calendar/choose-who-sees-your-email, help/ai-assistant/connect-claude-or-chatgpt, help/ai-assistant/approve-what-the-assistant-changes, help/workspace/manage-members-and-roles]
 ---
 
@@ -118,8 +118,8 @@ not sent. See [Manage members and roles](/help/workspace/manage-members-and-role
 ## Turn it off
 
 For a connector, click **Revoke** under **AI Connectors**. Emails it queued
-that have not gone out are not sent. They wait on the **Failed** tab, where
-you can send one yourself with **Retry**. A connector has
+that have not gone out are not sent. They wait in the **Outbox** under
+**Failed**, where you can send one yourself with **Retry**. A connector has
 no setting for email alone, so an assistant that should keep your records
 without your email needs an access token with the email boxes empty. For an
 access token, click its **Permissions** icon and untick the email boxes.

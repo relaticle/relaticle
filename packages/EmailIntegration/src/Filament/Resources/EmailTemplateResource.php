@@ -19,7 +19,6 @@ use Illuminate\Database\Eloquent\Collection;
 use Override;
 use Relaticle\EmailIntegration\Actions\DeleteEmailTemplatesAction;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
-use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages\ManageEmailTemplates;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Schemas\EmailTemplateForm;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 
@@ -31,14 +30,7 @@ final class EmailTemplateResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
-    protected static ?string $slug = 'workspace/email/templates';
-
     protected static bool $shouldRegisterNavigation = false;
-
-    public static function getNavigationLabel(): string
-    {
-        return __('filament/resources/email-template.navigation_label');
-    }
 
     public static function form(Schema $schema): Schema
     {
@@ -105,14 +97,6 @@ final class EmailTemplateResource extends Resource
                         }),
                 ]),
             ]);
-    }
-
-    #[Override]
-    public static function getPages(): array
-    {
-        return [
-            'index' => ManageEmailTemplates::route('/'),
-        ];
     }
 
     #[Override]

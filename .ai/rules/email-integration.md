@@ -128,12 +128,16 @@ as arbitrary disk paths.
 
 ## The sharing level lives on the mailbox
 
-`connected_accounts.sharing_tier` holds the level, and null follows the workspace
-default. Resolve it with `PrivacyService::tierForMailbox()` from the mailbox the
-email is sent or synced through, never from the user or `currentWorkspace`: the
-same person shares differently in each workspace. Write it only through
-`SaveMailboxSharingTier`, which re-stamps that one mailbox's mail. A
-workspace default is never Full access (`EmailPrivacyTier::canBeWorkspaceDefault()`).
+`connected_accounts.sharing_tier` holds the level. Resolve it with
+`PrivacyService::tierForMailbox()` from the mailbox the email is sent or synced
+through, never from the user or `currentWorkspace`: the same person shares
+differently in each workspace. A null level falls back to
+`workspaces.default_email_sharing_tier`, which no screen edits any more: it keeps
+the level admins chose before the workspace Sharing tab was removed. Write a level
+only through `SaveMailboxSharingTier`, which re-stamps that one mailbox's mail.
+The account page saves it only when the chosen level differs from the resolved
+one, so a null level is never stamped by an unrelated save.
+`tests/Feature/EmailIntegration/EmailAccountSettingsPageTest.php` fails when it is.
 `tests/Feature/EmailIntegration/PrivacyServiceTest.php` fails when a second
 workspace's mailbox changes the level, and
 `ApplyDefaultSharingTierToExistingEmailsActionTest.php` fails when a save

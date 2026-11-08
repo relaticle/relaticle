@@ -139,7 +139,11 @@ final class Billing extends Page
             return;
         }
 
-        Notification::make()->title(__('cloud::billing.paused.extended', ['days' => Workspace::TRIAL_EXTENSION_DAYS]))->success()->send();
+        Notification::make()
+            ->title(__('cloud::billing.paused.extended.title'))
+            ->body(__('cloud::billing.paused.extended.body', ['days' => Workspace::TRIAL_EXTENSION_DAYS]))
+            ->success()
+            ->send();
 
         $this->redirect(self::getUrl());
     }

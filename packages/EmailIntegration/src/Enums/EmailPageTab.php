@@ -15,7 +15,6 @@ enum EmailPageTab: string implements HasIcon, HasLabel
 {
     case DRAFTS = 'drafts';
     case OUTBOX = 'outbox';
-    case FAILED = 'failed';
     case TEMPLATES = 'templates';
 
     public function getLabel(): string
@@ -23,7 +22,6 @@ enum EmailPageTab: string implements HasIcon, HasLabel
         return match ($this) {
             self::DRAFTS => __('filament/pages/email-inbox.tabs.drafts'),
             self::OUTBOX => __('filament/pages/email-inbox.tabs.outbox'),
-            self::FAILED => __('filament/pages/email-inbox.tabs.failed'),
             self::TEMPLATES => __('filament/pages/email-inbox.tabs.templates'),
         };
     }
@@ -33,7 +31,6 @@ enum EmailPageTab: string implements HasIcon, HasLabel
         return match ($this) {
             self::DRAFTS => 'lucide-square-pen',
             self::OUTBOX => 'lucide-clock',
-            self::FAILED => 'lucide-circle-exclamation-point',
             self::TEMPLATES => 'lucide-copy',
         };
     }
@@ -45,20 +42,8 @@ enum EmailPageTab: string implements HasIcon, HasLabel
     {
         return match ($this) {
             self::DRAFTS => 'email-integration.drafts-table',
-            self::OUTBOX, self::FAILED => 'email-integration.outbox-table',
+            self::OUTBOX => 'email-integration.outbox-table',
             self::TEMPLATES => 'email-integration.templates-table',
-        };
-    }
-
-    /**
-     * @return array<string, bool|EmailStatus>
-     */
-    public function livewireParameters(): array
-    {
-        return match ($this) {
-            self::OUTBOX => ['includeFailedFilter' => false],
-            self::FAILED => ['lockedStatus' => EmailStatus::FAILED],
-            default => [],
         };
     }
 }

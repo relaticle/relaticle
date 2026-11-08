@@ -21,8 +21,7 @@ use Relaticle\EmailIntegration\Models\EmailTemplate;
 
 /**
  * The email templates table, rendered inside the Templates tab of the email page.
- * Columns and row actions come from {@see EmailTemplateResource::table()}, the same
- * definition the standalone templates page uses.
+ * Columns and row actions come from {@see EmailTemplateResource::table()}.
  */
 final class TemplatesTable extends Component implements HasActions, HasSchemas, HasTable
 {
