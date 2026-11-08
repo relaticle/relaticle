@@ -24,8 +24,8 @@
             : __('You, your agent and :name all work on the same record.', ['name' => $assistantName]) }}
     </x-cloud::marketing.frame-header>
 
-    <div class="bg-tint bg-dots border-rail -mt-px border-t">
-        <div class="border-rail mx-auto max-w-6xl px-6 py-12 sm:border-x md:px-10 md:py-20">
+    <x-cloud::marketing.band texture="wires" class="bg-tint -mt-px">
+        <div class="bg-dots px-6 py-12 md:px-10 md:py-20">
             <div class="mx-auto grid grid-cols-1 items-center gap-4 lg:grid-cols-[minmax(0,1fr)_4rem_minmax(0,27rem)_4rem_minmax(0,1fr)] lg:grid-rows-2 lg:gap-x-0 lg:gap-y-12">
                 <div class="order-first flex justify-center lg:order-none lg:col-start-3 lg:row-span-2 lg:row-start-1">
                     @include('cloud::marketing.home.partials.story-record', ['cardClass' => 'w-full max-w-md'])
@@ -57,5 +57,5 @@
                 @endforeach
             </div>
         </div>
-    </div>
+    </x-cloud::marketing.band>
 </section>

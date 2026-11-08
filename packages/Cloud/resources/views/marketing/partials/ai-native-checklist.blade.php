@@ -4,7 +4,7 @@
 @endphp
 
 <div
-    class="feat-card bg-hero-panel border-rail border-t px-3 py-6 sm:px-8 md:py-12"
+    class="feat-card px-3 py-6 sm:px-8 md:py-12"
     data-ai-native-checklist
     x-data="{
         marks: Array(@js($checkCount)).fill(false),

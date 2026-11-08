@@ -39,7 +39,7 @@
 @endphp
 
 <figure
-    class="feat-card bg-hero-panel border-rail border-t px-3 py-6 sm:px-8 md:py-12"
+    class="feat-card px-3 py-6 sm:px-8 md:py-12"
     data-assistant-playground
     x-data="{ ask: 'pipeline', asks: @js(array_keys($asks)) }"
     x-on:keydown.left.prevent="ask = asks[(asks.indexOf(ask) + asks.length - 1) % asks.length]; $nextTick(() => $refs[ask].focus())"

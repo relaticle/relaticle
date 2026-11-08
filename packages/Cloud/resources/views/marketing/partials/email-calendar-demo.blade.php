@@ -22,7 +22,7 @@
 @endphp
 
 <div
-    class="feat-card bg-hero-panel border-rail flex flex-col items-center gap-5 border-t px-3 py-8 sm:px-8 md:py-12"
+    class="feat-card flex flex-col items-center gap-5 px-3 py-8 sm:px-8 md:py-12"
     data-email-demo
     data-demo-state="idle"
     x-data="{

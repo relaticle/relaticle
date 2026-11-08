@@ -103,7 +103,12 @@
             <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">{{ __('No code and no API keys. The setup is a consent screen.') }}</p>
         </x-slot:aside>
 
-        @include('cloud::marketing.partials.assistant-playground')
+
+        <x-slot:visual>
+            <x-cloud::marketing.band texture="wires" class="bg-hero-panel">
+                @include('cloud::marketing.partials.assistant-playground')
+            </x-cloud::marketing.band>
+        </x-slot:visual>
     </x-cloud::marketing.hero>
 
     <x-cloud::marketing.frame id="connect">

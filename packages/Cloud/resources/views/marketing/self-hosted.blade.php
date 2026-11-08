@@ -133,7 +133,12 @@
             <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">{{ __('2 GB of RAM to start. Docker 20.10+ with Compose v2.') }}</p>
         </x-slot:aside>
 
-        @include('cloud::marketing.partials.self-hosted-install')
+
+        <x-slot:visual>
+            <x-cloud::marketing.band texture="rows" class="bg-hero-panel">
+                @include('cloud::marketing.partials.self-hosted-install')
+            </x-cloud::marketing.band>
+        </x-slot:visual>
     </x-cloud::marketing.hero>
 
     @if($stats !== [])

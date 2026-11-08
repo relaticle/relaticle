@@ -32,4 +32,8 @@
 
         {{ $slot }}
     </div>
+
+    @isset($visual)
+        {{ $visual }}
+    @endisset
 </section>

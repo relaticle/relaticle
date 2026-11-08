@@ -98,7 +98,6 @@
 
 <div
     id="demo"
-    class="border-rail border-t"
     data-ai-playground
     x-data="{
         scenario: 'batch',
@@ -188,7 +187,7 @@
         },
     }"
 >
-    <div class="bg-hero-panel flex justify-center px-4 py-8 sm:px-8 md:py-12">
+    <div class="flex justify-center px-4 py-8 sm:px-8 md:py-12">
         <x-cloud::marketing.mac-window class="w-full max-w-5xl">
             <div class="grid lg:grid-cols-[minmax(0,1fr)_26rem]">
 

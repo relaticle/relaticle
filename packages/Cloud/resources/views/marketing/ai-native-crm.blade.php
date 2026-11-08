@@ -158,7 +158,12 @@
             <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">{{ __(':days-day trial, no card, unlimited users.', ['days' => $trialDays]) }}</p>
         </x-slot:aside>
 
-        @include('cloud::marketing.partials.ai-native-checklist', ['checks' => $checks])
+
+        <x-slot:visual>
+            <x-cloud::marketing.band texture="crosses" class="bg-hero-panel">
+                @include('cloud::marketing.partials.ai-native-checklist', ['checks' => $checks])
+            </x-cloud::marketing.band>
+        </x-slot:visual>
     </x-cloud::marketing.hero>
 
     <x-cloud::marketing.frame id="definitions">

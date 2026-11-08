@@ -30,13 +30,26 @@ human moments (the homepage email visual), never behind body text.
 
 `bg-dots` is a 20px dot texture for the `tint` cells that hold product UI, so a mock has something to
 sit on. It never sits behind marketing copy. On `/ai` the showcase visuals and the Control cells use it.
-A `bg-dots` band that fills the whole column runs the full viewport width, and its rails keep drawing across it,
-so the grid stays whole. The homepage story is the worked example: hairlines above and below span
-the viewport, and the cards stay inside the rails.
 
 Cells inside a `gap-px` grid stay opaque. A translucent fill lets the rail color show through and
 turns the cell gray in dark mode. `canvas` is taken by the Scribe theme, which is why the third
 token is `tint`.
+
+## Bands
+
+A product visual that fills the whole column sits in a `band`: its fill runs the full viewport width,
+the rails keep drawing across it, and its content stays inside them. The story's `bg-tint` and the
+product heroes' `bg-hero-panel` are the two fills. A visual never stops at the column, because a
+1152px column is 80% of a 1440 screen and a band boxed inside it reads as cramped.
+
+`texture` puts one hairline mark in the gutters outside the rails: `wires` (the story's dashed
+wires), `crosses` (the header's crosses) or `rows` (a record list's row lines). The mark sits on the
+same 40px rhythm as the dots inside, is strongest at the rail, and fades toward the screen edge and
+the band's top and bottom. The story and `/crm-for-*` take `wires`, `/ai` and `/ai-native-crm` take
+`crosses`, `/email-and-calendar` and `/self-hosted` take `rows`. Every refined texture measured on
+2026-11-08 (Tailwind, Dub, Appwrite, Magic UI) keeps one primitive, about 5 to 12% contrast and a
+fade; tiles that drew several shapes or ended hard at the rail read as clip-art. No test reads this,
+so a reviewer reads for a second primitive in a tile or a gutter mark that ends on a hard edge.
 
 ## Type roles
 
@@ -79,7 +92,7 @@ reach it. Change the header height and the token together. `html` also carries `
 - `hero`: the stack every page opens on, centred on the product pages and left-aligned (`align="start"`)
   on the rest: the eyebrow, a two-tone `type-display` headline
   capped at `max-w-3xl`, the `aside` (one subline under 25 words, the buttons, a small-print line)
-  capped at `max-w-2xl`, then the page's visual below, on a `bg-hero-panel` cell inside the rails. The
+  capped at `max-w-2xl`, then the page's visual below, in the hero's `visual` slot on a full-width `bg-hero-panel` band. The
   headline runs two lines at 1440 and its gray continuation is one short clause. The subline says
   what the page is for; how to use the visual is said inside the visual, as the checklist's
   "Tick what your CRM does today" does. On a product page that visual cell is the page's signature,

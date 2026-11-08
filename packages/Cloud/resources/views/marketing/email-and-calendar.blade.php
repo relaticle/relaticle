@@ -134,7 +134,12 @@
             <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">{{ __('No credit card. Unlimited users. Open source.') }}</p>
         </x-slot:aside>
 
-        @include('cloud::marketing.partials.email-calendar-demo')
+
+        <x-slot:visual>
+            <x-cloud::marketing.band texture="rows" class="bg-hero-panel">
+                @include('cloud::marketing.partials.email-calendar-demo')
+            </x-cloud::marketing.band>
+        </x-slot:visual>
     </x-cloud::marketing.hero>
 
     <x-cloud::marketing.frame>

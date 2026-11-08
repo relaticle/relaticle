@@ -168,7 +168,12 @@
             </p>
         </x-slot:aside>
 
-        @include('cloud::marketing.partials.ai-playground')
+
+        <x-slot:visual>
+            <x-cloud::marketing.band texture="crosses" class="bg-hero-panel">
+                @include('cloud::marketing.partials.ai-playground')
+            </x-cloud::marketing.band>
+        </x-slot:visual>
     </x-cloud::marketing.hero>
 
     <x-cloud::marketing.frame>
