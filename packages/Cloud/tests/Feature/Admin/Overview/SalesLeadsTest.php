@@ -97,6 +97,18 @@ it('lists a workspace that typed to the assistant on two days without records of
         ->assertSee('0 records, 3 chat messages on 2 days, 2 active days');
 });
 
+it('leaves out a trial abuse bot that pings the assistant every day', function (): void {
+    config()->set('system-admin.abuse_timezones', ['Asia/Tehran']);
+
+    $bot = OverviewData::owner(CarbonImmutable::parse('2026-09-01'), ['timezone' => 'Asia/Tehran']);
+    $workspace = endedTrial(OverviewData::workspaceOf($bot), CarbonImmutable::parse('2026-09-01'));
+    OverviewData::typedMessage($workspace, $bot, now()->subDays(3));
+    OverviewData::typedMessage($workspace, $bot, now()->subDays(2));
+    OverviewData::typedMessage($workspace, $bot, now()->subDay());
+
+    leadsOn(LeadStage::TrialEnded)->assertCanNotSeeTableRecords([$workspace]);
+});
+
 it('leaves out a workspace that typed to the assistant on one day only', function (): void {
     $tryer = OverviewData::owner(CarbonImmutable::parse('2026-09-01'));
     $workspace = OverviewData::workspaceOf($tryer);

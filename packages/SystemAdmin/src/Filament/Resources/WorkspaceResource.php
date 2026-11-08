@@ -47,7 +47,7 @@ use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\
 use Relaticle\SystemAdmin\Filament\Support\QueuePurge;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 use Relaticle\SystemAdmin\Metrics\Scopes\AbuseSuspect;
-use Relaticle\SystemAdmin\Metrics\Scopes\ExternalWorkspace;
+use Relaticle\SystemAdmin\Metrics\Scopes\CustomerWorkspace;
 use Relaticle\SystemAdmin\Metrics\Scopes\FormedHabit;
 use Relaticle\SystemAdmin\Metrics\Scopes\InternalWorkspace;
 use Relaticle\SystemAdmin\Metrics\Scopes\StuckAfterSetup;
@@ -310,7 +310,7 @@ final class WorkspaceResource extends Resource
                 TernaryFilter::make('internal')
                     ->label('Internal')
                     ->placeholder('All workspaces')
-                    ->trueLabel('Owned by a system administrator')
+                    ->trueLabel('Ours: a system administrator or our own email domain')
                     ->falseLabel('Customers only')
                     ->queries(
                         true: function (Builder $query): Builder {
@@ -319,7 +319,7 @@ final class WorkspaceResource extends Resource
                             return $query;
                         },
                         false: function (Builder $query): Builder {
-                            (new ExternalWorkspace)->apply($query, $query->getModel());
+                            (new CustomerWorkspace)->apply($query, $query->getModel());
 
                             return $query;
                         },

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Cloud\Admin\Metrics\Scopes;
 
 use App\Enums\StripeSubscriptionStatus;
+use App\Enums\SubscriptionType;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -29,23 +30,31 @@ final readonly class CountsTowardMrr implements Scope
             ->withGlobalScope(ExternalWorkspace::class, new ExternalWorkspace)
             ->select('id');
 
-        $builder->whereIn($model->qualifyColumn('workspace_id'), $externalWorkspaces);
+        $builder
+            ->whereIn($model->qualifyColumn('workspace_id'), $externalWorkspaces)
+            ->where($model->qualifyColumn('type'), '!=', SubscriptionType::ManagedPending->value);
+
+        $at = $this->asOf ?? now();
+
+        $builder->where(fn (Builder $live): Builder => $live
+            ->whereNull($model->qualifyColumn('ends_at'))
+            ->orWhere($model->qualifyColumn('ends_at'), '>', $at));
 
         if (! $this->asOf instanceof CarbonImmutable) {
-            $builder->active();
+            $builder->where($model->qualifyColumn('stripe_status'), StripeSubscriptionStatus::Active->value);
 
             return;
         }
 
         $builder
             ->where($model->qualifyColumn('created_at'), '<=', $this->asOf)
-            ->where(fn (Builder $live): Builder => $live
-                ->whereNull($model->qualifyColumn('ends_at'))
-                ->orWhere($model->qualifyColumn('ends_at'), '>', $this->asOf))
-            ->whereNotIn($model->qualifyColumn('stripe_status'), [
-                StripeSubscriptionStatus::Incomplete->value,
-                StripeSubscriptionStatus::IncompleteExpired->value,
-                StripeSubscriptionStatus::Unpaid->value,
+            ->where(fn (Builder $trial): Builder => $trial
+                ->whereNull($model->qualifyColumn('trial_ends_at'))
+                ->orWhere($model->qualifyColumn('trial_ends_at'), '<=', $this->asOf))
+            ->whereIn($model->qualifyColumn('stripe_status'), [
+                StripeSubscriptionStatus::Active->value,
+                StripeSubscriptionStatus::PastDue->value,
+                StripeSubscriptionStatus::Canceled->value,
             ]);
     }
 }
