@@ -99,10 +99,10 @@ final readonly class CallbackController
             $email = $socialUser->getEmail();
             $canonicalEmail = $email !== null ? EmailAddress::canonicalize($email) : null;
             $matchedUser = $canonicalEmail !== null
-                ? User::query()->where('email', $canonicalEmail)->first()
+                ? User::query()->where('email', $canonicalEmail)->lockForUpdate()->first()
                 : null;
 
-            if ($matchedUser instanceof User && ! $this->releasedFor($provider, $socialUser, $matchedUser)) {
+            if ($matchedUser instanceof User && ! $this->deleteUnclaimedAccount->execute($matchedUser, $provider, $socialUser)) {
                 AuthenticationSession::suggestLink($provider->value, (string) $socialUser->getId(), $canonicalEmail);
 
                 return null;
@@ -114,27 +114,27 @@ final readonly class CallbackController
 
             $user = $this->createUser($socialUser, $creator);
 
+            if ($matchedUser instanceof User) {
+                $this->logReplacement($matchedUser, $user, $provider);
+            }
+
             return $this->linkSocialAccount($user, $provider->value, $socialUser->getId());
         });
     }
 
-    private function releasedFor(SocialiteProvider $provider, SocialiteUser $socialUser, User $holder): bool
+    private function logReplacement(User $replaced, User $replacement, SocialiteProvider $provider): void
     {
-        if (! $provider->vouchesForEmailOf($socialUser)) {
-            return false;
-        }
-
-        if (! $this->deleteUnclaimedAccount->execute($holder)) {
-            return false;
-        }
-
-        Log::info('A provider sign-up replaced an unclaimed account', [
-            'deleted_user_id' => $holder->getKey(),
+        $context = [
+            'deleted_user_id' => $replaced->getKey(),
+            'deleted_email' => $replaced->email,
+            'user_id' => $replacement->getKey(),
             'provider' => $provider->value,
             'ip' => request()->ip(),
-        ]);
+        ];
 
-        return true;
+        DB::afterCommit(function () use ($context): void {
+            Log::info('A provider sign-up replaced an unclaimed account', $context);
+        });
     }
 
     private function existingAccountMessage(SocialiteProvider $provider): string

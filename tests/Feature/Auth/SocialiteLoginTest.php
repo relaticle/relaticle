@@ -236,16 +236,56 @@ test('a google identity replaces an unverified password account nobody claimed',
     $this->assertAuthenticatedAs($owner);
 });
 
-test('replacing an unclaimed account leaves a log entry naming the deleted account', function (): void {
+test('replacing an unclaimed account logs both accounts once the replacement commits', function (): void {
     $squatter = User::factory()->unverified()->create(['email' => 'maya@example.com']);
     Socialite::fake('google', makeSocialiteUser('maya-google-id', 'Maya', 'maya@example.com'));
     Log::spy();
 
     $this->get(route('auth.socialite.callback', ['provider' => 'google', 'code' => 'accepted']));
 
+    $owner = User::query()->where('email', 'maya@example.com')->sole();
+
     Log::shouldHaveReceived('info')
-        ->with('A provider sign-up replaced an unclaimed account', Mockery::on(fn (array $context): bool => $context['deleted_user_id'] === $squatter->getKey() && $context['provider'] === 'google'))
+        ->with('A provider sign-up replaced an unclaimed account', Mockery::on(fn (array $context): bool => $context['deleted_user_id'] === $squatter->getKey()
+            && $context['deleted_email'] === 'maya@example.com'
+            && $context['user_id'] === $owner->getKey()
+            && $context['provider'] === 'google'))
         ->once();
+});
+
+test('an unclaimed account survives, unlogged, when the replacement sign-up is refused', function (): void {
+    Exceptions::fake();
+    $squatter = User::factory()->unverified()->create(['email' => 'burner@mailinator.com']);
+    Socialite::fake('google', makeSocialiteUser('burner-google-id', 'Burner', 'burner@mailinator.com'));
+    Log::spy();
+
+    $this->get(route('auth.socialite.callback', ['provider' => 'google', 'code' => 'accepted']))
+        ->assertSessionHasErrors(['login' => __('validation.indisposable')]);
+
+    expect($squatter->fresh())->not->toBeNull();
+    Log::shouldNotHaveReceived('info', ['A provider sign-up replaced an unclaimed account', Mockery::any()]);
+});
+
+test('an unverified account that is a member of another workspace is never replaced', function (): void {
+    $member = User::factory()->unverified()->create(['email' => 'maya@example.com']);
+    User::factory()->withWorkspace()->create()->ownedWorkspaces()->first()->users()->attach($member, ['role' => 'member']);
+    Socialite::fake('google', makeSocialiteUser('maya-google-id', 'Maya', 'maya@example.com'));
+
+    $this->get(route('auth.socialite.callback', ['provider' => 'google', 'code' => 'accepted']));
+
+    $this->assertGuest('web');
+    expect($member->fresh())->not->toBeNull();
+});
+
+test('an unverified account already linked to a provider is never replaced', function (): void {
+    $linked = User::factory()->unverified()->create(['email' => 'maya@example.com']);
+    $linked->socialAccounts()->create(['provider_name' => 'microsoft', 'provider_id' => 'maya-microsoft-id']);
+    Socialite::fake('google', makeSocialiteUser('maya-google-id', 'Maya', 'maya@example.com'));
+
+    $this->get(route('auth.socialite.callback', ['provider' => 'google', 'code' => 'accepted']));
+
+    $this->assertGuest('web');
+    expect($linked->fresh())->not->toBeNull();
 });
 
 test('a verified password account is left alone and the person is told to sign in with their password', function (): void {
