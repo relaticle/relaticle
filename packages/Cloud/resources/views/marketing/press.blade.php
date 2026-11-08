@@ -32,7 +32,7 @@
             </p>
 
             <div class="mt-7 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
-                <x-cloud::marketing.button href="{{ asset('brand/kit.zip') }}" download="relaticle-brand-kit.zip" icon="ri-download-2-line">
+                <x-cloud::marketing.button href="{{ asset('brand/kit.zip') }}" download="relaticle-brand-kit.zip" icon="lucide-download">
                     {{ __('Download brand kit') }}
                 </x-cloud::marketing.button>
                 <x-cloud::marketing.button variant="secondary" href="#facts">
@@ -64,7 +64,7 @@
                                             <span class="text-sm text-gray-600 dark:text-gray-400">{{ $logo['kind'] === 'lockup' ? __('Full logo') : __('Symbol') }}</span>
                                             <div class="flex gap-2">
                                                 @foreach (['svg' => __('SVG'), 'png' => __('PNG')] as $format => $formatLabel)
-                                                    <a href="{{ asset('brand/kit/'.$logo[$format]) }}" download class="{{ $downloadClass }}" aria-label="{{ __('Download :variant :kind as :format', ['variant' => $variant === 'color' ? __('color') : __('white'), 'kind' => $logo['kind'] === 'lockup' ? __('full logo') : __('symbol'), 'format' => $formatLabel]) }}">{{ $formatLabel }}<x-ri-download-2-line class="size-3.5" aria-hidden="true"/></a>
+                                                    <a href="{{ asset('brand/kit/'.$logo[$format]) }}" download class="{{ $downloadClass }}" aria-label="{{ __('Download :variant :kind as :format', ['variant' => $variant === 'color' ? __('color') : __('white'), 'kind' => $logo['kind'] === 'lockup' ? __('full logo') : __('symbol'), 'format' => $formatLabel]) }}">{{ $formatLabel }}<x-lucide-download class="size-3.5" aria-hidden="true"/></a>
                                                 @endforeach
                                             </div>
                                         </div>
@@ -105,7 +105,7 @@
                                 <img src="{{ asset('brand/kit/'.$avatar['svg']) }}" alt="" width="32" height="32" class="size-8 rounded-lg ring-1 ring-gray-200 dark:ring-gray-700" loading="lazy"/>
                                 <span class="text-xs text-gray-500 dark:text-gray-400">{{ __('Square or rounded') }}</span>
                             </div>
-                            <a href="{{ asset('brand/kit/'.$avatar['png']) }}" download class="{{ $downloadClass }} w-full justify-center" aria-label="{{ __('Download :color avatar PNG, 1024 pixels', ['color' => $avatarLabels[$avatar['id']]]) }}"><x-ri-download-2-line class="size-4" aria-hidden="true"/>{{ __('PNG · 1024 px') }}</a>
+                            <a href="{{ asset('brand/kit/'.$avatar['png']) }}" download class="{{ $downloadClass }} w-full justify-center" aria-label="{{ __('Download :color avatar PNG, 1024 pixels', ['color' => $avatarLabels[$avatar['id']]]) }}"><x-lucide-download class="size-4" aria-hidden="true"/>{{ __('PNG · 1024 px') }}</a>
                             <div class="mt-2 flex justify-center gap-5 text-xs">
                                 <a href="{{ asset('brand/kit/'.$avatar['largePng']) }}" download class="inline-flex min-h-11 items-center rounded-sm text-gray-600 underline decoration-gray-300 underline-offset-4 hover:text-primary focus-visible:outline-2 focus-visible:outline-primary dark:text-gray-400" aria-label="{{ __('Download :color avatar PNG, 2048 pixels', ['color' => $avatarLabels[$avatar['id']]]) }}">{{ __('PNG · 2048 px') }}</a>
                                 <a href="{{ asset('brand/kit/'.$avatar['svg']) }}" download class="inline-flex min-h-11 items-center rounded-sm text-gray-600 underline decoration-gray-300 underline-offset-4 hover:text-primary focus-visible:outline-2 focus-visible:outline-primary dark:text-gray-400" aria-label="{{ __('Download :color avatar SVG', ['color' => $avatarLabels[$avatar['id']]]) }}">{{ __('SVG') }}</a>
@@ -116,7 +116,7 @@
             <details class="group mt-5 rounded-2xl border border-gray-200 dark:border-gray-800" x-data="{ color: 'purple' }">
                     <summary class="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 rounded-2xl px-6 py-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary [&::-webkit-details-marker]:hidden">
                         <span class="text-sm font-semibold">{{ __('Choose a platform') }}<span class="ml-2 font-normal text-gray-500 dark:text-gray-400">{{ __(':count presets', ['count' => count($brand['platforms'])]) }}</span></span>
-                        <x-ri-add-line class="size-5 shrink-0 transition group-open:rotate-45" aria-hidden="true"/>
+                        <x-lucide-plus class="size-5 shrink-0 transition group-open:rotate-45" aria-hidden="true"/>
                     </summary>
                     <div class="border-t border-gray-200 p-6 dark:border-gray-800">
                         <div class="flex flex-wrap items-end justify-between gap-5">
@@ -132,7 +132,7 @@
                             @foreach ($brand['platforms'] as $platform)
                                 <a href="{{ asset('brand/kit/'.$platform['files']['purple']) }}" :href="{{ \Illuminate\Support\Js::from(collect($platform['files'])->map(fn (string $file): string => asset('brand/kit/'.$file))) }}[color]" download class="{{ $downloadClass }} justify-between py-3 text-left" data-platform="{{ $platform['id'] }}">
                                     <span>{{ $platform['name'] }}<span class="mt-0.5 block text-xs font-normal text-gray-500 dark:text-gray-400">{{ $platform['size'] }} × {{ $platform['size'] }}</span></span>
-                                    <x-ri-download-2-line class="size-4 shrink-0" aria-hidden="true"/>
+                                    <x-lucide-download class="size-4 shrink-0" aria-hidden="true"/>
                                 </a>
                             @endforeach
                         </div>
@@ -142,7 +142,7 @@
 <div><h3 class="text-sm font-semibold">{{ __('YouTube video watermark') }}</h3><p class="mt-2 text-sm text-gray-600 dark:text-gray-400">{{ __('Small PNGs for the corner of your videos. Choose white for dark footage or purple for a solid background.') }}</p></div>
                     <div class="flex flex-wrap gap-2">
                         @foreach ($brand['watermarks'] as $watermark)
-                            <a href="{{ asset('brand/kit/'.$watermark['png']) }}" download class="{{ $downloadClass }}" aria-label="{{ __('Download :color YouTube watermark PNG', ['color' => $watermark['id'] === 'white' ? __('white') : __('purple')]) }}">{{ $watermark['id'] === 'white' ? __('White PNG') : __('Purple PNG') }}<x-ri-download-2-line class="size-4" aria-hidden="true"/></a>
+                            <a href="{{ asset('brand/kit/'.$watermark['png']) }}" download class="{{ $downloadClass }}" aria-label="{{ __('Download :color YouTube watermark PNG', ['color' => $watermark['id'] === 'white' ? __('white') : __('purple')]) }}">{{ $watermark['id'] === 'white' ? __('White PNG') : __('Purple PNG') }}<x-lucide-download class="size-4" aria-hidden="true"/></a>
                         @endforeach
                     </div>
                 </div>
@@ -211,7 +211,7 @@
                 <p class="mt-6 text-sm text-gray-500 dark:text-gray-400">{{ __('Use these assets to identify or cover Relaticle. Do not imply a partnership or endorsement without our agreement.') }}</p>
             </div>
             <div class="bg-surface flex items-center p-6 md:p-10 lg:col-span-4">
-                <x-cloud::marketing.button variant="secondary" href="{{ route('contact') }}" iconTrailing="ri-arrow-right-line">{{ __('Contact the team') }}</x-cloud::marketing.button>
+                <x-cloud::marketing.button variant="secondary" href="{{ route('contact') }}" iconTrailing="lucide-arrow-right">{{ __('Contact the team') }}</x-cloud::marketing.button>
             </div>
         </div>
     </x-cloud::marketing.frame>

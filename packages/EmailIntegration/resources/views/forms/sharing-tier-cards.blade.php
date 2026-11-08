@@ -17,7 +17,7 @@
     $options = ($workspaceDefaultLabel ?? null) === null
         ? $tierOptions
         : [
-            ['value' => '', 'icon' => \Filament\Support\Icons\Heroicon::OutlinedBuildingOffice2, 'label' => $workspaceDefaultLabel, 'description' => $workspaceDefaultDescription],
+            ['value' => '', 'icon' => 'lucide-building-complex', 'label' => $workspaceDefaultLabel, 'description' => $workspaceDefaultDescription],
             ...$tierOptions,
         ];
 @endphp

@@ -1,6 +1,6 @@
 <div class="flex flex-col items-center text-center">
     <div class="flex size-12 items-center justify-center rounded-full bg-primary-50 dark:bg-primary-500/10">
-        <x-filament::icon icon="ri-mail-send-line" class="size-6 text-primary-600 dark:text-primary-400" />
+        <x-filament::icon icon="lucide-send" class="size-6 text-primary-600 dark:text-primary-400" />
     </div>
 
     <h1 class="mt-5 text-2xl font-bold tracking-tight text-gray-950 dark:text-white">

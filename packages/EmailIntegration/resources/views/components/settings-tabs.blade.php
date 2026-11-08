@@ -1,5 +1,4 @@
 @php
-    use Filament\Support\Icons\Heroicon;
     use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
     use Relaticle\EmailIntegration\Filament\Pages\EmailPrivacySettingsPage;
     use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource;
@@ -13,7 +12,7 @@
         :active="$this instanceof EmailAccountsPage"
         tag="a"
         :href="EmailAccountsPage::getUrl()"
-        :icon="Heroicon::OutlinedAtSymbol"
+        icon="lucide-at-sign"
     >
         {{ EmailAccountsPage::getNavigationLabel() }}
     </x-filament::tabs.item>
@@ -22,7 +21,7 @@
         :active="$this instanceof ManageEmailTemplates"
         tag="a"
         :href="EmailTemplateResource::getUrl()"
-        :icon="Heroicon::OutlinedDocumentDuplicate"
+        icon="lucide-copy"
     >
         {{ EmailTemplateResource::getNavigationLabel() }}
     </x-filament::tabs.item>

@@ -1,13 +1,15 @@
 ---
 title: See who changed a record
-description: The Activity log tab on a record shows every field change and who made it, and workspace admins get the same history across every record type.
+description: The Activity tab on a record shows every field change and who made it, and workspace admins get the same history across every record type.
 order: 6
-updated: "2026-10-05"
+updated: "2026-11-08"
 related: [help/records/company-records, help/records/restore-deleted-records]
 ---
 
-Companies, people, and opportunities each carry an **Activity log** tab, a
-read-only history of changes, grouped by date, newest first. When a value
+Companies, people, and opportunities each carry an **Activity** tab, a
+read-only history of changes, grouped by date, newest first. The record's
+**Overview** tab shows the latest three entries, and **View all** opens the
+full history. When a value
 looks wrong or a stage moved unexpectedly, this is where you find out who
 changed it and when.
 
@@ -29,6 +31,6 @@ every record type in one table, tasks and notes included. Each row is when,
 who, what action (created, updated, deleted, restored), which record, and
 what changed. Filter by any of those or by date range.
 
-This is also where deletions live on. A record's own Activity log tab
+This is also where deletions live on. A record's own Activity tab
 disappears with the record, but the workspace log keeps the entry and the
 name the record had when it went, so you can still see who deleted what.

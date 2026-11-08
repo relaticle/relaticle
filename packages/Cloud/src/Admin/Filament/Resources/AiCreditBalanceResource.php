@@ -47,7 +47,7 @@ final class AiCreditBalanceResource extends Resource
 {
     protected static ?string $model = AiCreditBalance::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-banknotes';
+    protected static string|\BackedEnum|null $navigationIcon = 'lucide-banknote';
 
     protected static ?int $navigationSort = 10;
 
@@ -244,7 +244,7 @@ final class AiCreditBalanceResource extends Resource
     {
         return Action::make('adjust')
             ->label(__('cloud::admin.credit_balances.adjust'))
-            ->icon('heroicon-o-adjustments-horizontal')
+            ->icon('lucide-sliders-horizontal')
             ->color('warning')
             ->authorize('update')
             ->modalHeading(__('cloud::admin.credit_balances.adjust_heading'))
@@ -281,7 +281,7 @@ final class AiCreditBalanceResource extends Resource
     {
         return Action::make('resetPeriod')
             ->label(__('cloud::admin.credit_balances.reset_period'))
-            ->icon('heroicon-o-arrow-path')
+            ->icon('lucide-refresh-cw')
             ->color('danger')
             ->authorize('update')
             ->requiresConfirmation()
@@ -315,7 +315,7 @@ final class AiCreditBalanceResource extends Resource
     {
         return BulkAction::make('resetPeriod')
             ->label(__('cloud::admin.credit_balances.reset_period'))
-            ->icon('heroicon-o-arrow-path')
+            ->icon('lucide-refresh-cw')
             ->color('danger')
             ->authorize('update')
             ->requiresConfirmation()

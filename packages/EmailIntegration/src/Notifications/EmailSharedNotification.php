@@ -12,7 +12,6 @@ use App\Models\Workspace;
 use App\Notifications\InboxNotification;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification as FilamentNotification;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Notifications\Messages\MailMessage;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Support\MarkdownText;
@@ -109,7 +108,7 @@ final class EmailSharedNotification extends InboxNotification
             ->title($sharerName === null
                 ? __(self::LANG.'.title_without_actor')
                 : __(self::LANG.'.title', ['name' => e($sharerName)]))
-            ->icon(Heroicon::OutlinedEnvelope)
+            ->icon('lucide-mail')
             ->iconColor('primary');
 
         if (! $email instanceof Email || ! $viewer instanceof User) {

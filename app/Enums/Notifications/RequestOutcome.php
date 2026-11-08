@@ -22,9 +22,9 @@ enum RequestOutcome: string
     public function icon(): string
     {
         return match ($this) {
-            self::Approved => 'ri-check-line',
-            self::Denied => 'ri-close-line',
-            self::AlreadyDecided => 'ri-information-line',
+            self::Approved => 'lucide-check',
+            self::Denied => 'lucide-x',
+            self::AlreadyDecided => 'lucide-info',
         };
     }
 

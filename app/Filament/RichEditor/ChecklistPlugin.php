@@ -7,7 +7,6 @@ namespace App\Filament\RichEditor;
 use Filament\Actions\Action;
 use Filament\Forms\Components\RichEditor\Plugins\Contracts\RichContentPlugin;
 use Filament\Forms\Components\RichEditor\RichEditorTool;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Vite;
 use Tiptap\Core\Extension;
 use Tiptap\Nodes\TaskList;
@@ -39,7 +38,7 @@ final class ChecklistPlugin implements RichContentPlugin
                 ->label(__('filament/rich-editor.slash_menu.items.taskList.label'))
                 ->jsHandler('$getEditor()?.chain().focus().toggleTaskList().run()')
                 ->toggle()
-                ->icon(Heroicon::OutlinedCheckCircle),
+                ->icon('lucide-circle-check'),
         ];
     }
 

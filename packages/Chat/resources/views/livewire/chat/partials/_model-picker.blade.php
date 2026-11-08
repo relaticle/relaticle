@@ -22,7 +22,7 @@
             aria-hidden="true"
         ></span>
         <span x-text="modelLabel(selectedModel)"></span>
-        <x-heroicon-o-chevron-up-down class="h-3 w-3" aria-hidden="true" />
+        <x-lucide-chevrons-up-down class="h-3 w-3" aria-hidden="true" />
     </button>
     <div
         x-show="menuOpen"
@@ -58,10 +58,10 @@
                         x-show="! allowedModels.includes(opt.value)"
                         class="ms-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[length:var(--text-micro)] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
                     >
-                        <x-heroicon-m-lock-closed class="h-2.5 w-2.5" aria-hidden="true" />
+                        <x-lucide-lock class="h-2.5 w-2.5" aria-hidden="true" />
                         <span x-text="trialLocked ? @js(__('Locked')) : @js(__('Pro'))"></span>
                     </span>
-                    <x-heroicon-s-check-circle
+                    <x-lucide-circle-check
                         x-show="selectedModel === opt.value && allowedModels.includes(opt.value)"
                         class="h-3.5 w-3.5 shrink-0 text-primary-600 dark:text-primary-400"
                         aria-hidden="true"

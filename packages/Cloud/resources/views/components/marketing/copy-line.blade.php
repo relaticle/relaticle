@@ -16,8 +16,8 @@
         x-on:click="navigator.clipboard.writeText(@js($value)).then(() => { copied = true; setTimeout(() => copied = false, 2000) })"
         class="inline-flex min-h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-xs font-medium text-gray-700 transition-colors hover:bg-surface hover:text-gray-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-gray-200 dark:hover:text-white"
     >
-        <x-ri-file-copy-line x-show="! copied" class="h-3.5 w-3.5" aria-hidden="true"/>
-        <x-ri-check-line x-show="copied" x-cloak class="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden="true"/>
+        <x-lucide-copy x-show="! copied" class="h-3.5 w-3.5" aria-hidden="true"/>
+        <x-lucide-check x-show="copied" x-cloak class="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden="true"/>
         <span aria-live="polite" x-text="copied ? @js(__('Copied')) : @js($label ?? __('Copy'))">{{ $label ?? __('Copy') }}</span>
     </button>
 

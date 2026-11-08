@@ -36,7 +36,7 @@ final class SubscriptionResource extends Resource
 {
     protected static ?string $model = Subscription::class;
 
-    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-credit-card';
+    protected static string|BackedEnum|null $navigationIcon = 'lucide-credit-card';
 
     protected static ?int $navigationSort = 10;
 
@@ -177,7 +177,7 @@ final class SubscriptionResource extends Resource
                 self::transferAction(),
                 Action::make('stripe')
                     ->label(__('cloud::admin.subscriptions.open_in_stripe'))
-                    ->icon('heroicon-o-arrow-top-right-on-square')
+                    ->icon('lucide-external-link')
                     ->url(fn (Subscription $record): string => "https://dashboard.stripe.com/subscriptions/{$record->stripe_id}")
                     ->openUrlInNewTab(),
             ])
@@ -208,7 +208,7 @@ final class SubscriptionResource extends Resource
     {
         return Action::make('transfer')
             ->label(__('cloud::admin.subscriptions.transfer'))
-            ->icon('heroicon-o-arrows-right-left')
+            ->icon('lucide-arrow-right-left')
             ->color('warning')
             ->authorize('transfer')
             ->visible(fn (Subscription $record): bool => $record->valid() && self::transferTargets($record) !== [])

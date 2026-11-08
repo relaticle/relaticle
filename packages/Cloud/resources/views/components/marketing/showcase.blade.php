@@ -41,7 +41,7 @@
         @if($linkHref)
             <a href="{{ $linkHref }}" class="group inline-flex w-fit items-center gap-1 text-sm font-medium text-gray-950 transition-colors hover:text-primary dark:text-white dark:hover:text-primary-400">
                 {{ $linkLabel }}
-                <x-ri-arrow-right-line class="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5"/>
+                <x-lucide-arrow-right class="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5"/>
             </a>
         @endif
     </div>

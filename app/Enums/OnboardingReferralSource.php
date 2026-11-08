@@ -68,11 +68,11 @@ enum OnboardingReferralSource: string implements HasLabel
             self::X => 'ri-twitter-x-fill',
             self::Reddit => 'ri-reddit-fill',
             self::YouTube => 'ri-youtube-fill',
-            self::FriendsCoworker => 'ri-group-line',
-            self::Newsletter => 'ri-mail-line',
-            self::AI => 'ri-robot-line',
-            self::Podcast => 'ri-mic-line',
-            self::Other => 'ri-more-line',
+            self::FriendsCoworker => 'lucide-users',
+            self::Newsletter => 'lucide-mail',
+            self::AI => 'lucide-bot',
+            self::Podcast => 'lucide-mic',
+            self::Other => 'lucide-ellipsis',
         };
     }
 }

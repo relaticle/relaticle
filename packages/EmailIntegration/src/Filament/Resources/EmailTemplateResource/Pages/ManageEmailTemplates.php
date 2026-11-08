@@ -44,7 +44,7 @@ final class ManageEmailTemplates extends ManageRecords
     public function createEmailTemplateAction(): CreateAction
     {
         return CreateAction::make('createEmailTemplate')
-            ->icon('heroicon-o-plus')
+            ->icon('lucide-plus')
             ->size(Size::Small)
             ->mutateFormDataUsing(function (array $data): array {
                 $data['workspace_id'] = filament()->getTenant()?->getKey();

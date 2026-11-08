@@ -3,7 +3,7 @@
     'description',
     'action',
     'secondaryAction' => null,
-    'icon' => 'heroicon-o-envelope',
+    'icon' => 'lucide-mail',
 ])
 
 <div class="flex flex-col items-center justify-center gap-3 px-8 py-16 text-center">

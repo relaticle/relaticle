@@ -160,3 +160,26 @@ it('labels the acting user with the "(You)" suffix via getOptionLabelFromRecordU
         ->and($select->getOptionLabelFromRecord($owner))
         ->toContain($owner->getFilamentAvatarUrl());
 });
+
+it('offers the workspace members to the assignee picker with the acting user first', function (): void {
+    workspaceMemberSelectWorkspace();
+    User::factory()->withWorkspace()->create(['name' => 'Otto Outsider']);
+
+    $groups = WorkspaceMemberSelect::make('assignees')->multiple()->getRecordGroupsForJs();
+
+    expect($groups)->toHaveCount(1)
+        ->and($groups[0]['label'])->toBe('Members')
+        ->and(array_column($groups[0]['options'], 'name'))->toBe(['Zoe Zimmer', 'Alice Anderson'])
+        ->and(memberOptionText($groups[0]['options'][0]['html']))->toBe(__('filament/panel.selects.member_self', ['name' => 'Zoe Zimmer']))
+        ->and(array_column($groups[0]['options'], 'url'))->toBe([null, null]);
+});
+
+it('narrows the assignee picker to members whose name matches the search', function (): void {
+    workspaceMemberSelectWorkspace();
+    User::factory()->withWorkspace()->create(['name' => 'Alice Outsider']);
+
+    $select = WorkspaceMemberSelect::make('assignees')->multiple();
+
+    expect(array_column($select->getRecordGroupsForJs('ali')[0]['options'], 'name'))->toBe(['Alice Anderson'])
+        ->and($select->getRecordGroupsForJs('%'))->toBe([]);
+});

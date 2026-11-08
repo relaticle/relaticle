@@ -17,7 +17,7 @@ trait CountsRelatedRecords
 {
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {
-        $count = $ownerRecord->{static::getRelationshipName()}()->count();
+        $count = once(fn (): int => $ownerRecord->{static::getRelationshipName()}()->count());
 
         return $count > 0 ? (string) $count : null;
     }

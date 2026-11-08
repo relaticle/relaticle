@@ -50,7 +50,7 @@
                     <ul class="{{ $featureList }}">
                         @foreach(__("cloud::billing.{$plan->value}_plan.features") as $feature)
                             <li class="flex items-start gap-3">
-                                <x-ri-check-line class="mt-0.5 size-4 shrink-0 text-gray-950 dark:text-white" />
+                                <x-lucide-check class="mt-0.5 size-4 shrink-0 text-gray-950 dark:text-white" />
                                 {{ $feature }}
                             </li>
                         @endforeach
@@ -86,7 +86,7 @@
                 <ul class="{{ $featureList }}">
                     @foreach(__('cloud::billing.enterprise.features') as $feature)
                         <li class="flex items-start gap-3">
-                            <x-ri-check-line class="mt-0.5 size-4 shrink-0 text-gray-950 dark:text-white" />
+                            <x-lucide-check class="mt-0.5 size-4 shrink-0 text-gray-950 dark:text-white" />
                             {{ $feature }}
                         </li>
                     @endforeach
@@ -102,7 +102,7 @@
         <h2 class="text-lg font-medium text-gray-950 dark:text-white">{{ __('Prefer to self-host? It’s free.') }}</h2>
         <p class="type-prose mt-1.5 text-gray-500 dark:text-gray-400">{{ __('AGPL-3.0 open source. Unlimited users and records on your own server, forever.') }}</p>
     </div>
-    <x-cloud::marketing.button variant="secondary" size="sm" :href="route('selfHosted')" iconTrailing="ri-arrow-right-line" class="shrink-0 self-start sm:self-center">
+    <x-cloud::marketing.button variant="secondary" size="sm" :href="route('selfHosted')" iconTrailing="lucide-arrow-right" class="shrink-0 self-start sm:self-center">
         {{ __('Explore self-hosting') }}
     </x-cloud::marketing.button>
 </div>

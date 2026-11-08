@@ -8,6 +8,7 @@
      is not a dependency of this project. --}}
 <header x-data="{
             mobileMenu: false,
+            scrolled: window.scrollY > 0,
             {{-- One accordion open at a time; reset on every open so the menu
                  always starts collapsed rather than remembering the last visit. --}}
             mobileExpanded: null,
@@ -35,13 +36,13 @@
         }"
         x-effect="bodyLock()"
         x-init="$watch('mobileMenu', (open) => { if (open) { mobileExpanded = null } else { $refs.hamburger.focus() } })"
+        @scroll.window.passive="scrolled = window.scrollY > 0"
         @resize.window="if (window.innerWidth >= 768) mobileMenu = false">
     <div
         id="main-header"
-        data-framed
-        class="pointer-events-none fixed w-full top-0 z-50">
-        <div class="mx-auto max-w-6xl px-2 pt-2 sm:px-3 md:px-6 md:pt-3">
-            <div class="pointer-events-auto rounded-2xl bg-white/95 px-2 shadow-navbar backdrop-blur-md sm:px-3 md:rounded-[1.25rem] md:px-4 dark:bg-gray-950/95">
+        class="bg-surface border-rail fixed top-0 z-50 w-full border-b">
+        <div class="mx-auto max-w-6xl">
+            <div class="border-rail relative px-6 sm:border-x md:px-10">
             <div class="flex h-16 items-center justify-between">
 
                 <div class="flex flex-1 items-center">
@@ -186,7 +187,7 @@
                                         class="px-4 py-1.5 rounded-full text-gray-600 dark:text-gray-400 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-white dark:hover:bg-white/[0.08] text-sm font-medium transition-colors duration-200 flex items-center gap-1 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                                         :class="openDropdown === '{{ $slug }}' && 'text-gray-900 bg-gray-100 dark:text-white dark:bg-white/[0.08]'">
                                     {{ $item->label }}
-                                    <x-ri-arrow-down-s-line class="w-3.5 h-3.5 transition-transform duration-200"
+                                    <x-lucide-chevron-down class="w-3.5 h-3.5 transition-transform duration-200"
                                                              ::class="openDropdown === '{{ $slug }}' && 'rotate-180'"/>
                                 </button>
                             </div>
@@ -300,15 +301,16 @@
                 <div class="flex flex-1 items-center justify-end gap-2 sm:gap-3">
                     <div class="hidden md:flex items-center gap-2">
                         @auth('web')
-                            <x-cloud::marketing.button size="sm" :href="app(\App\Support\Auth\LoginDestination::class)->resolve(auth('web')->user(), null)">
+                            <x-cloud::marketing.button size="sm" class="whitespace-nowrap" :href="app(\App\Support\Auth\LoginDestination::class)->resolve(auth('web')->user(), null)">
                                 {{ __('Open app') }}
                             </x-cloud::marketing.button>
                         @else
-                            <x-cloud::marketing.button variant="secondary" size="sm" href="{{ route('login') }}" data-analytics-intent="login" data-analytics-placement="header">
+                            <a href="{{ route('login') }}" referrerpolicy="no-referrer-when-downgrade" data-analytics-intent="login" data-analytics-placement="header"
+                               class="whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors duration-200 hover:text-gray-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-gray-300 dark:hover:text-white">
                                 Sign In
-                            </x-cloud::marketing.button>
+                            </a>
 
-                            <x-cloud::marketing.button size="sm" href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="header">
+                            <x-cloud::marketing.button size="sm" class="whitespace-nowrap" href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="header">
                                 Start for free
                             </x-cloud::marketing.button>
                         @endauth
@@ -339,14 +341,16 @@
                     </button>
                 </div>
             </div>
+            <x-cloud::marketing.cross class="-bottom-[12.5px] -left-[12.5px] [clip-path:inset(0_0_11.5px_0)] transition-opacity duration-200 motion-reduce:transition-none" ::class="{ 'opacity-0': scrolled }"/>
+            <x-cloud::marketing.cross class="-right-[12.5px] -bottom-[12.5px] [clip-path:inset(0_0_11.5px_0)] transition-opacity duration-200 motion-reduce:transition-none" ::class="{ 'opacity-0': scrolled }"/>
             </div>
         </div>
     </div>
 
-    <div class="bg-surface border-rail h-21 border-b md:h-23" aria-hidden="true">
-        <div class="border-rail relative mx-auto h-full max-w-6xl sm:border-x">
-            <x-cloud::marketing.cross class="-bottom-3 -left-3"/>
-            <x-cloud::marketing.cross class="-bottom-3 -right-3"/>
+    <div class="h-[calc(var(--header-height)+1px)]" aria-hidden="true">
+        <div class="relative mx-auto h-full max-w-6xl">
+            <x-cloud::marketing.cross class="-bottom-[11.5px] -left-[11.5px]"/>
+            <x-cloud::marketing.cross class="-right-[11.5px] -bottom-[11.5px]"/>
         </div>
     </div>
 

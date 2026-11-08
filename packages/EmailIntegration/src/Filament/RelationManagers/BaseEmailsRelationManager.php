@@ -40,7 +40,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
     protected static string $relationship = 'emails';
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-envelope';
+    protected static string|\BackedEnum|null $icon = 'lucide-mail';
 
     protected static ?string $badgeColor = 'gray';
 
@@ -64,7 +64,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
             return null;
         }
 
-        return resolve(EmailVisibilityService::class)->visibleEmailCountBadge($ownerRecord, $user);
+        return once(fn (): ?string => resolve(EmailVisibilityService::class)->visibleEmailCountBadge($ownerRecord, $user));
     }
 
     public function table(Table $table): Table

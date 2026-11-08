@@ -56,12 +56,12 @@
                         x-text="$wire.data?.name || @js($preview['companyPlaceholder'])"
                     @endif
                 >{{ $preview['workspaceName'] }}</span>
-                <x-filament::icon icon="ri-arrow-down-s-line" class="ms-auto size-4 shrink-0 text-gray-400" />
+                <x-filament::icon icon="lucide-chevron-down" class="ms-auto size-4 shrink-0 text-gray-400" />
             </div>
 
             <div class="flex flex-col gap-y-3 transition duration-300" x-bind:class="dim()">
                 <div class="flex items-center gap-2 rounded-md px-2 py-1.5 ring-1 ring-gray-950/5 dark:ring-white/10">
-                    <x-filament::icon icon="heroicon-o-magnifying-glass" class="size-3.5 shrink-0 text-gray-400" />
+                    <x-filament::icon icon="lucide-search" class="size-3.5 shrink-0 text-gray-400" />
                     <span class="h-1.5 w-14 rounded-full bg-gray-100 dark:bg-white/10"></span>
                     <span class="ms-auto h-3.5 w-6 rounded bg-gray-100 dark:bg-white/10"></span>
                 </div>
@@ -138,12 +138,12 @@
                         <span class="text-sm font-semibold text-gray-950 dark:text-white">{{ __('filament/pages/workspaces.setup_workspace.preview.people') }}</span>
                         @if (isset($preview['mailboxProgress']))
                             <span class="flex items-center gap-1.5 text-pico font-medium tabular-nums text-primary-600 dark:text-primary-400">
-                                <x-filament::icon icon="ri-loader-4-line" class="size-3 motion-safe:animate-spin" />
+                                <x-filament::icon icon="lucide-loader-circle" class="size-3 motion-safe:animate-spin" />
                                 {{ $preview['mailboxProgress'] }}
                             </span>
                         @else
                             <span class="flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-pico font-medium text-gray-500 ring-1 ring-gray-950/10 dark:bg-gray-900 dark:text-gray-400 dark:ring-white/10">
-                                <x-filament::icon icon="ri-mail-line" class="size-3" />
+                                <x-filament::icon icon="lucide-mail" class="size-3" />
                                 {{ __('filament/pages/workspaces.setup_workspace.preview.from_mailbox') }}
                             </span>
                         @endif

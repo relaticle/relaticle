@@ -20,12 +20,12 @@
         <div class="flex items-center gap-1">
             @if ($paginator->onFirstPage())
                 <span class="{{ $disabledClasses }}" aria-disabled="true" aria-label="{{ __('Previous page') }}">
-                    <x-ri-arrow-left-s-line class="w-4 h-4" aria-hidden="true" />
+                    <x-lucide-chevron-left class="w-4 h-4" aria-hidden="true" />
                 </span>
             @else
                 <a href="{{ $paginator->previousPageUrl() }}" rel="prev" class="{{ $linkClasses }}"
                    aria-label="{{ __('Previous page') }}">
-                    <x-ri-arrow-left-s-line class="w-4 h-4" aria-hidden="true" />
+                    <x-lucide-chevron-left class="w-4 h-4" aria-hidden="true" />
                 </a>
             @endif
 
@@ -49,11 +49,11 @@
             @if ($paginator->hasMorePages())
                 <a href="{{ $paginator->nextPageUrl() }}" rel="next" class="{{ $linkClasses }}"
                    aria-label="{{ __('Next page') }}">
-                    <x-ri-arrow-right-s-line class="w-4 h-4" aria-hidden="true" />
+                    <x-lucide-chevron-right class="w-4 h-4" aria-hidden="true" />
                 </a>
             @else
                 <span class="{{ $disabledClasses }}" aria-disabled="true" aria-label="{{ __('Next page') }}">
-                    <x-ri-arrow-right-s-line class="w-4 h-4" aria-hidden="true" />
+                    <x-lucide-chevron-right class="w-4 h-4" aria-hidden="true" />
                 </span>
             @endif
         </div>

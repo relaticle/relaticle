@@ -18,7 +18,7 @@ final class OwnedWorkspacesRelationManager extends RelationManager
 
     protected static ?string $title = 'Owned Workspaces';
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-building-office-2';
+    protected static string|\BackedEnum|null $icon = 'lucide-building-complex';
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {

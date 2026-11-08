@@ -30,7 +30,7 @@ final class PeopleRelationManager extends RelationManager
 
     protected static ?string $modelLabel = null;
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-user';
+    protected static string|\BackedEnum|null $icon = 'lucide-user';
 
     public static function getModelLabel(): string
     {
@@ -57,7 +57,7 @@ final class PeopleRelationManager extends RelationManager
             ->recordTitleAttribute('name')
             ->columns(RelatedRecordColumns::people())
             ->headerActions([
-                CreateAction::make()->icon('heroicon-o-plus')->size(Size::Small),
+                CreateAction::make()->icon('lucide-plus')->size(Size::Small),
             ])
             ->recordActions([
                 ActionGroup::make([

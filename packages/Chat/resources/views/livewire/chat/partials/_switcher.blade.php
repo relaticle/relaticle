@@ -25,7 +25,7 @@
 >
     <div class="w-full max-w-lg overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900">
         <div class="flex items-center gap-2 border-b border-gray-200 px-3 py-2.5 dark:border-gray-700">
-            <x-heroicon-o-magnifying-glass class="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
+            <x-lucide-search class="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
             <input
                 x-ref="switcherSearch"
                 x-model="switcherQuery"
@@ -74,7 +74,7 @@
                         class="flex w-full items-center gap-2 px-3 py-2 text-start text-sm text-gray-700 transition focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-200"
                         :class="idx === switcherActiveIndex ? 'bg-gray-50 dark:bg-white/5' : ''"
                     >
-                        <x-heroicon-o-chat-bubble-left class="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
+                        <x-lucide-message-square class="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
                         <span class="truncate" :title="item.title || @js(__('Untitled chat'))" x-text="item.title || @js(__('Untitled chat'))"></span>
                     </button>
                 </template>

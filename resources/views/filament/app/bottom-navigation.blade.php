@@ -40,7 +40,7 @@
         x-on:click="$store.sidebar.open($event.currentTarget)"
         @class(['fi-bottom-nav-item', 'fi-active' => $activeItems->isEmpty()])
     >
-        <x-filament::icon icon="heroicon-o-bars-3" />
+        <x-filament::icon icon="lucide-menu" />
         <span>{{ __('filament/panel.bottom_navigation.more') }}</span>
     </button>
 </nav>

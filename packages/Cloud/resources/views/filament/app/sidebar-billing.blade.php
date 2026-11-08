@@ -16,7 +16,7 @@
                 class="fi-sidebar-item-btn group w-full text-start"
                 x-on:click="$dispatch('open-modal', { id: @js(\Relaticle\Cloud\Billing\Livewire\UpgradeModal::MODAL_ID) })"
             >
-                <x-heroicon-o-arrow-up-circle class="fi-icon fi-size-lg fi-sidebar-item-icon" />
+                <x-lucide-circle-arrow-up class="fi-icon fi-size-lg fi-sidebar-item-icon" />
 
                 <span class="fi-sidebar-item-label">{{ $billing['label'] }}</span>
 
@@ -26,7 +26,7 @@
             </button>
         @else
             <a href="{{ resolve(\App\Contracts\Billing::class)->url($workspace) }}" class="fi-sidebar-item-btn group">
-                <x-heroicon-o-arrow-up-circle class="fi-icon fi-size-lg fi-sidebar-item-icon" />
+                <x-lucide-circle-arrow-up class="fi-icon fi-size-lg fi-sidebar-item-icon" />
 
                 <span class="fi-sidebar-item-label">{{ $billing['label'] }}</span>
 

@@ -32,7 +32,7 @@ final class TaskResource extends Resource
 
     protected static ?string $model = Task::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-clipboard-document-check';
+    protected static string|\BackedEnum|null $navigationIcon = 'lucide-clipboard-check';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Task Management';
 

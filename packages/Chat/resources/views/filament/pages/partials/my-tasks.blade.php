@@ -80,7 +80,7 @@
                                     class="transition duration-200 motion-reduce:transition-none"
                                     :class="checked ? 'scale-100 opacity-100' : 'scale-50 opacity-0'"
                                 >
-                                    <x-heroicon-m-check class="size-3 text-white" />
+                                    <x-lucide-check class="size-3 text-white" />
                                 </span>
                             </button>
                         @endif

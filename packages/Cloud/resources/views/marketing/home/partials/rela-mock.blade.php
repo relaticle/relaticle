@@ -64,7 +64,7 @@
         <p class="max-w-[85%] rounded-2xl rounded-br-md bg-gray-100 px-4 py-2.5 text-sm leading-relaxed text-gray-900 dark:bg-white/10 dark:text-gray-100">
             {{ __('Mark') }}
             <span class="chat-chip" data-record-type="opportunity">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="{{ $opportunityIcon }}"/>
                 </svg>
                 <span class="chat-chip-label">{{ __('Northwind renewal') }}</span>
@@ -88,7 +88,7 @@
             <x-cloud::marketing.window class="border-primary-200 ring-[3px] ring-primary-100 dark:border-primary-400/30 dark:ring-primary-400/10" data-approval-card>
                 <div class="flex items-start gap-2.5 px-4 pb-1.5 pt-3">
                     <span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="h-3.5 w-3.5" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="{{ $opportunityIcon }}"/>
                         </svg>
                     </span>
@@ -125,7 +125,7 @@
                             <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5 leading-8" @if($date) x-show="! editing" @endif x-bind:class="{ 'line-through opacity-60': ! {{ $included }} }">
                                 @if($date)
                                     <span class="text-gray-500 line-through decoration-gray-300 dark:text-gray-400 dark:decoration-gray-600">{{ $before }}</span>
-                                    <x-heroicon-m-arrow-right class="size-3 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true"/>
+                                    <x-lucide-arrow-right class="size-3 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true"/>
                                     <span class="text-gray-900 dark:text-white" x-text="formatted(closeDate)" data-approval-close-date>{{ $date->format('M j, Y') }}</span>
                                     <button
                                         type="button"
@@ -134,7 +134,7 @@
                                         aria-label="{{ __('Edit :field', ['field' => $field]) }}"
                                         class="inline-flex min-h-8 min-w-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 sm:opacity-0 sm:group-hover/field:opacity-100 dark:hover:bg-white/10 dark:hover:text-gray-300"
                                     >
-                                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5" aria-hidden="true"/>
+                                        <x-lucide-square-pen class="h-3.5 w-3.5" aria-hidden="true"/>
                                     </button>
                                 @else
                                     <span class="flex basis-full flex-col py-1.5 leading-5">
@@ -153,7 +153,7 @@
                                 class="inline-flex min-h-8 min-w-8 shrink-0 cursor-pointer items-center justify-center rounded-md transition focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
                                 x-bind:class="{{ $included }} ? 'text-gray-400 hover:bg-gray-100 hover:text-gray-700 sm:opacity-0 sm:group-hover/field:opacity-100 dark:hover:bg-white/10 dark:hover:text-gray-200' : 'px-1.5 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400'"
                             >
-                                <x-heroicon-o-x-mark class="h-3.5 w-3.5" x-show="{{ $included }}" aria-hidden="true"/>
+                                <x-lucide-x class="h-3.5 w-3.5" x-show="{{ $included }}" aria-hidden="true"/>
                                 <span x-show="! {{ $included }}" style="display: none">{{ __('Keep') }}</span>
                             </button>
                         </div>
@@ -177,10 +177,10 @@
         <div class="invisible col-start-1 row-start-1" x-bind:class="{ 'invisible': decision !== 'approved' }" data-approval-done>
             <p class="px-2 text-xs text-gray-500 dark:text-gray-400">{{ __('Applied 1 change · just now') }}</p>
             <div class="mt-1 flex min-w-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-gray-700 dark:text-gray-300">
-                <x-heroicon-o-check class="size-4 shrink-0 text-gray-500 dark:text-gray-400" aria-hidden="true"/>
+                <x-lucide-check class="size-4 shrink-0 text-gray-500 dark:text-gray-400" aria-hidden="true"/>
                 <span class="shrink-0 whitespace-nowrap">{{ __('Updated') }}</span>
                 <span class="chat-chip min-w-0" data-record-type="opportunity">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3 w-3" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="h-3 w-3" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="{{ $opportunityIcon }}"/>
                     </svg>
                     <span class="chat-chip-label">{{ __('Northwind renewal') }}</span>

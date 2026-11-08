@@ -6,7 +6,7 @@
     'border-gray-200 text-gray-500 group-hover:border-gray-300 dark:border-white/10 dark:text-gray-400' => ! $step->complete,
 ])>
     @if($step->complete)
-        <x-heroicon-s-check class="h-3.5 w-3.5" />
+        <x-lucide-check class="h-3.5 w-3.5" />
     @else
         {{ svg($step->icon, 'h-3.5 w-3.5') }}
     @endif

@@ -139,7 +139,7 @@
     :ogDescription="$description"
     :ogImage="url('/images/open-graph-ai.jpg').'?v=1'"
 >
-    <x-cloud::marketing.hero>
+    <x-cloud::marketing.hero layout="stage">
         <x-slot:eyebrow>
             <x-cloud::marketing.eyebrow>{{ __(':name, the built-in AI assistant', ['name' => $assistantName]) }}</x-cloud::marketing.eyebrow>
         </x-slot:eyebrow>
@@ -150,25 +150,27 @@
         </x-slot:title>
 
         <x-slot:aside>
-            <p class="text-base leading-relaxed text-gray-500 md:text-lg dark:text-gray-400">
-                {{ __('It opens beside every page in Relaticle and answers from your records. Nothing it proposes is saved until you approve it.') }}
-            </p>
+            <div class="flex w-full flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+                <p class="max-w-xl text-base leading-relaxed text-gray-600 md:text-lg dark:text-gray-400">
+                    {{ __('It opens beside every page in Relaticle and answers from your records. Nothing it proposes is saved until you approve it.') }}
+                </p>
 
-            <div class="mt-7 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
-                <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="hero">
-                    {{ __('Start for free') }}
-                </x-cloud::marketing.button>
-                <x-cloud::marketing.button variant="secondary" href="#demo" class="lg:hidden">
-                    {{ __('See it work') }}
-                </x-cloud::marketing.button>
+                <div class="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-3">
+                    <a href="{{ route('aiNativeCrm') }}" class="{{ $linkClass }} text-sm">{{ __('What makes a CRM AI-native?') }}</a>
+                    <x-cloud::marketing.button variant="secondary" href="#demo" class="lg:hidden">
+                        {{ __('See it work') }}
+                    </x-cloud::marketing.button>
+                    <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="hero">
+                        {{ __('Start for free') }}
+                    </x-cloud::marketing.button>
+                </div>
             </div>
-
-            <p class="mt-5 text-sm text-gray-500 dark:text-gray-400">
-                <a href="{{ route('aiNativeCrm') }}" class="{{ $linkClass }}">{{ __('What makes a CRM AI-native?') }}</a>
-            </p>
         </x-slot:aside>
 
-        @include('cloud::marketing.partials.ai-playground')
+
+        <x-slot:visual>
+            @include('cloud::marketing.partials.ai-playground')
+        </x-slot:visual>
     </x-cloud::marketing.hero>
 
     <x-cloud::marketing.frame>
@@ -317,7 +319,7 @@
                 </div>
                 <div class="mt-auto flex flex-wrap gap-3">
                     @foreach(\Relaticle\Cloud\Marketing\Enums\ConnectableAssistant::cases() as $assistant)
-                        <x-cloud::marketing.button variant="secondary" size="sm" :href="route($assistant->routeName())" iconTrailing="ri-arrow-right-line">
+                        <x-cloud::marketing.button variant="secondary" size="sm" :href="route($assistant->routeName())" iconTrailing="lucide-arrow-right">
                             {{ __('Relaticle for :assistant', ['assistant' => $assistant->label()]) }}
                         </x-cloud::marketing.button>
                     @endforeach
@@ -332,7 +334,7 @@
             <div class="bg-surface flex flex-col gap-6 p-6 md:p-10">
                 <div>
                     <div class="mb-6 flex flex-wrap gap-2" aria-hidden="true">
-                        @foreach([['ri-claude-fill', 'Claude'], ['ri-openai-fill', 'GPT'], ['ri-server-line', __('Ollama')]] as [$providerIcon, $providerLabel])
+                        @foreach([['ri-claude-fill', 'Claude'], ['ri-openai-fill', 'GPT'], ['lucide-server', __('Ollama')]] as [$providerIcon, $providerLabel])
                             <span class="border-rail inline-flex items-center gap-1.5 rounded-full border py-0.5 pl-1 pr-2.5 text-xs font-medium text-gray-700 dark:text-gray-300">
                                 <span class="flex h-5 w-5 items-center justify-center"><x-dynamic-component :component="$providerIcon" class="h-3.5 w-3.5"/></span>
                                 {{ $providerLabel }}
@@ -344,7 +346,7 @@
                     <p class="type-prose mt-2 text-gray-500 dark:text-gray-400">{{ __('Self-hosting Relaticle does not mean giving up the assistant. On your own server, bring your own API key for Claude or GPT, or point it at a local model with Ollama and keep every request on your own infrastructure.') }}</p>
                 </div>
                 <div class="mt-auto">
-                    <x-cloud::marketing.button variant="secondary" size="sm" href="{{ route('selfHosted') }}" iconTrailing="ri-arrow-right-line">
+                    <x-cloud::marketing.button variant="secondary" size="sm" href="{{ route('selfHosted') }}" iconTrailing="lucide-arrow-right">
                         {{ __('See self-hosting options') }}
                     </x-cloud::marketing.button>
                 </div>

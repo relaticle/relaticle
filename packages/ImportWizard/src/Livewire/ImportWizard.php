@@ -9,7 +9,6 @@ use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
@@ -154,7 +153,7 @@ final class ImportWizard extends Component implements HasActions, HasForms
         return Action::make('startOver')
             ->label('Start over')
             ->color('gray')
-            ->icon(Heroicon::OutlinedArrowPath)
+            ->icon('lucide-refresh-cw')
             ->requiresConfirmation()
             ->modalHeading('Start a new import?')
             ->modalDescription('Are you sure you want to start a new import? Your current progress will be lost.')

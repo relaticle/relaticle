@@ -41,7 +41,7 @@
         outlined
         color="gray"
         size="sm"
-        icon="heroicon-o-chat-bubble-left-right"
+        icon="lucide-messages-square"
         x-on:click="window.Livewire.dispatch('chat:toggle-panel')"
         :aria-label="$askLabel"
         :title="$askLabel"

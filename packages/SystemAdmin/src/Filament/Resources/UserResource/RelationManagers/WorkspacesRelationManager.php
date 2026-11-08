@@ -19,7 +19,7 @@ final class WorkspacesRelationManager extends RelationManager
 
     protected static ?string $title = 'Member Of';
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-user-group';
+    protected static string|\BackedEnum|null $icon = 'lucide-users';
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {

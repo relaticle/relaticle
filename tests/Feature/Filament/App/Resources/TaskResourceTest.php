@@ -23,7 +23,6 @@ use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\RichEditor;
 use Filament\Schemas\Components\Component;
 use Filament\Support\Enums\IconSize;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
@@ -75,7 +74,7 @@ it('heads every column but the task title with an icon', function (): void {
 });
 
 it('heads the relations column with the link icon', function (): void {
-    $linkIcon = generate_icon_html(Heroicon::OutlinedLink, size: IconSize::Small)->toHtml();
+    $linkIcon = generate_icon_html('lucide-link', size: IconSize::Small)->toHtml();
 
     livewire(ManageTasks::class)
         ->assertTableColumnExists('relations', fn (Column $column): bool => str_contains((string) $column->getLabel(), $linkIcon));
@@ -365,6 +364,48 @@ it('notifies only the member newly assigned through the edit action', function (
     expect($record->refresh()->assignees->modelKeys())->toEqualCanonicalizing([$kept->id, $added->id])
         ->and($added->notifications()->count())->toBe(1)
         ->and($kept->notifications()->count())->toBe(0);
+});
+
+it('removes one assignee, then clears every assignee, through the edit action', function (): void {
+    [$kept, $removed] = User::factory()->count(2)->create()->all();
+    $this->workspace->users()->attach([$kept->id, $removed->id], ['role' => 'member']);
+
+    $record = Task::factory()->recycle([$this->user, $this->workspace])->create();
+    $record->assignees()->attach([$kept->id, $removed->id]);
+
+    livewire(ManageTasks::class)
+        ->callAction(TestAction::make('edit')->table($record), data: ['assignees' => [$kept->id]])
+        ->assertHasNoActionErrors();
+
+    expect($record->refresh()->assignees->modelKeys())->toBe([$kept->id]);
+
+    livewire(ManageTasks::class)
+        ->callAction(TestAction::make('edit')->table($record), data: ['assignees' => []])
+        ->assertHasNoActionErrors();
+
+    expect($record->refresh()->assignees)->toBeEmpty();
+});
+
+it('rejects an edit payload naming an assignee outside the workspace', function (): void {
+    $outsider = User::factory()->withWorkspace()->create();
+    $record = Task::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire(ManageTasks::class)
+        ->callAction(TestAction::make('edit')->table($record), data: ['assignees' => [$outsider->id]])
+        ->assertHasActionErrors(['assignees.0']);
+
+    expect($record->refresh()->assignees)->toBeEmpty()
+        ->and($outsider->notifications()->count())->toBe(0);
+});
+
+it('leaves a user from another workspace out of the assignee picker when the payload names one', function (): void {
+    $outsider = User::factory()->withWorkspace()->create(['name' => 'Otto Outsider']);
+    $record = Task::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire(ManageTasks::class)
+        ->mountAction(TestAction::make('edit')->table($record))
+        ->set('mountedActions.0.data.assignees', [$outsider->getKey()])
+        ->assertMountedActionModalDontSee('Otto Outsider');
 });
 
 it('can delete a task', function (): void {

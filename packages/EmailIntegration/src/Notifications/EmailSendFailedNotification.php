@@ -10,7 +10,6 @@ use App\Models\Workspace;
 use App\Notifications\InboxNotification;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification as FilamentNotification;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Model;
 use Relaticle\EmailIntegration\Enums\SendFailureRemedy;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -87,7 +86,7 @@ final class EmailSendFailedNotification extends InboxNotification
         $url = $workspace instanceof Workspace ? $remedy->url($workspace) : null;
 
         $notification = FilamentNotification::make((string) $row->getKey())
-            ->icon(Heroicon::OutlinedExclamationTriangle)
+            ->icon('lucide-triangle-exclamation-point')
             ->title($sent > 0
                 ? __('filament/notifications/email-send-failed.partial_title', ['sent' => $sent, 'failed' => $count])
                 : trans_choice('filament/notifications/email-send-failed.title', $count, ['count' => $count]))

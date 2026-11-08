@@ -52,6 +52,7 @@ use App\Support\Mail\ParksInactiveRecipientsTransport;
 use App\Support\Markdown\TableAwareLeagueDriver;
 use App\Support\Media\MediaLookup;
 use App\Support\Migrations\TenantMigration;
+use App\Support\PanelIcons;
 use App\Support\Passport\ClientRepository;
 use App\Support\Passport\WorkspaceBearerTokenResponse;
 use Carbon\CarbonImmutable;
@@ -71,6 +72,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
 use Filament\Support\Facades\FilamentColor;
+use Filament\Support\Facades\FilamentIcon;
 use Filament\Support\Facades\FilamentTimezone;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Cache\RateLimiting\Unlimited;
@@ -260,6 +262,7 @@ final class AppServiceProvider extends ServiceProvider
         // scheduled-deletion interstitials, which would otherwise render
         // Filament's default amber instead of the brand color.
         FilamentColor::register(['primary' => BrandColors::primary()]);
+        FilamentIcon::register(PanelIcons::aliases());
 
         Event::listen(SocialiteWasCalled::class, MicrosoftExtendSocialite::class);
 

@@ -14,6 +14,6 @@
         x-tooltip="{ content: @js(__('filament/emails/composer.actions.discard')), theme: $store.theme }"
         class="rounded-lg p-1.5 text-gray-400 transition hover:bg-danger-50 hover:text-danger-600 dark:hover:bg-danger-400/10 dark:hover:text-danger-400"
     >
-        <x-heroicon-m-x-mark class="h-4 w-4" />
+        <x-lucide-x class="h-4 w-4" />
     </button>
 </div>

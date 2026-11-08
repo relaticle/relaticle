@@ -19,7 +19,7 @@ final class MessagesRelationManager extends RelationManager
 {
     protected static string $relationship = 'messages';
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-chat-bubble-left-right';
+    protected static string|\BackedEnum|null $icon = 'lucide-messages-square';
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {

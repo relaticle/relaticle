@@ -52,12 +52,12 @@
                     @if($canManageBilling)
                         <div class="mt-8 flex flex-col gap-3">
                             @if($lapsedPlan)
-                                <x-filament::button size="lg" tag="a" icon="ri-customer-service-2-line" class="w-full justify-center"
+                                <x-filament::button size="lg" tag="a" icon="lucide-headset" class="w-full justify-center"
                                     :href="url()->getPublicUrl(route('contact', ['plan' => $lapsedPlan->value], absolute: false))">
                                     {{ __('cloud::billing.paused.restart_managed', ['plan' => $lapsedPlan->marketingLabel()]) }}
                                 </x-filament::button>
                             @endif
-                            <x-filament::button size="lg" :color="$lapsedPlan ? 'gray' : 'primary'" icon="ri-arrow-up-circle-line" class="w-full justify-center" x-on:click="$dispatch('open-modal', { id: {{ \Illuminate\Support\Js::from(\Relaticle\Cloud\Billing\Livewire\UpgradeModal::MODAL_ID) }} })">
+                            <x-filament::button size="lg" :color="$lapsedPlan ? 'gray' : 'primary'" icon="lucide-circle-arrow-up" class="w-full justify-center" x-on:click="$dispatch('open-modal', { id: {{ \Illuminate\Support\Js::from(\Relaticle\Cloud\Billing\Livewire\UpgradeModal::MODAL_ID) }} })">
                                 {{ __('cloud::billing.paused.continue') }}
                             </x-filament::button>
                             @if($trialExtensionAvailable)
@@ -75,7 +75,7 @@
                                 <x-slot name="trigger">
                                     <button type="button" class="inline-flex items-center gap-1 text-sm font-medium text-gray-600 transition hover:text-gray-950 dark:text-gray-400 dark:hover:text-white">
                                         {{ __('cloud::billing.paused.switch') }}
-                                        <x-ri-arrow-down-s-line class="h-4 w-4" />
+                                        <x-lucide-chevron-down class="h-4 w-4" />
                                     </button>
                                 </x-slot>
 
@@ -92,7 +92,7 @@
 
                     <div @class(['mt-14 flex flex-col items-center gap-3', 'hidden' => $lapsedPlan && $canManageBilling])>
                         <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('cloud::billing.paused.help') }}</p>
-                        <x-filament::button tag="a" color="gray" icon="ri-customer-service-2-line" class="w-full justify-center"
+                        <x-filament::button tag="a" color="gray" icon="lucide-headset" class="w-full justify-center"
                             :href="url()->getPublicUrl(route('contact', absolute: false))">
                             {{ __('cloud::billing.paused.contact') }}
                         </x-filament::button>

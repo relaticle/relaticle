@@ -57,7 +57,7 @@ final class SalesLeads extends TableWidget
                 Impersonate::workspaceOwner()->label(__('cloud::admin.sales_leads.open_as_user')),
                 Action::make('emailOwner')
                     ->label(__('cloud::admin.sales_leads.email_owner'))
-                    ->icon('heroicon-o-envelope')
+                    ->icon('lucide-mail')
                     ->color('gray')
                     ->visible(fn (Workspace $record): bool => $record->owner !== null)
                     ->url(fn (Workspace $record): string => "mailto:{$record->owner?->email}"),

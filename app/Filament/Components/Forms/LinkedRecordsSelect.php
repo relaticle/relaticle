@@ -8,6 +8,7 @@ use App\Actions\Note\UpdateNote;
 use App\Actions\Task\UpdateTask;
 use App\Enums\CrmEntity;
 use App\Filament\Concerns\HasRecordChips;
+use App\Filament\Concerns\RendersRecordPicker;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Task;
@@ -31,6 +32,7 @@ use Override;
 final class LinkedRecordsSelect extends Select
 {
     use HasRecordChips;
+    use RendersRecordPicker;
 
     private const int RECENT_LIMIT = 5;
 
@@ -96,11 +98,12 @@ final class LinkedRecordsSelect extends Select
     #[Override]
     public function toEmbeddedHtml(): string
     {
-        return $this->wrapEmbeddedHtml(
-            $this->wrapInputHtml(
-                view('filament.forms.components.linked-records-select', ['field' => $this])->render(),
-            ),
-        );
+        return $this->recordPickerHtml();
+    }
+
+    protected function pickerMessagesFile(): string
+    {
+        return 'filament/components/linked-records';
     }
 
     #[Override]

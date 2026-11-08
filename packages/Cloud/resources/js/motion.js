@@ -177,6 +177,7 @@ function playBoard() {
     const card = board.querySelector("[data-board-card]")
     const slot = board.querySelector("[data-board-slot]")
     const counts = [...board.querySelectorAll("[data-board-count]")]
+    const sourceAdd = card.parentElement.querySelector("[data-board-add]")
     const lifted = ["relative", "z-20", "shadow-lg"]
 
     const showCounts = (moved) => {
@@ -198,7 +199,7 @@ function playBoard() {
     playOnEntry(board, 0.5, {
         target: board.closest(".feat-card"),
         reset: () => {
-            settle([card])
+            settle([card, sourceAdd])
             slot.style.height = `${card.offsetHeight}px`
             card.classList.remove(...lifted)
             hide([slot])
@@ -223,6 +224,7 @@ function playBoard() {
             await Promise.all([
                 step(animate(card, { transform: [`translate(${x}px, ${y}px) ${held}`, `translate(${x}px, ${y}px)`] }, { duration: FAST })),
                 step(animate(slot, { opacity: [1, 0] }, { duration: BASE })),
+                step(animate(sourceAdd, { transform: ["none", `translateY(${card.offsetTop - sourceAdd.offsetTop}px)`] }, { duration: BASE, ease: EASE })),
             ])
         },
     })

@@ -63,8 +63,8 @@
                     <button type="button"
                             x-on:click="copyMarkdown()"
                             class="flex cursor-pointer items-center gap-1.5 rounded-l-lg px-2.5 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white">
-                        <x-ri-file-copy-line x-show="!copied" class="h-3.5 w-3.5" />
-                        <x-ri-check-line x-cloak x-show="copied" class="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <x-lucide-copy x-show="!copied" class="h-3.5 w-3.5" />
+                        <x-lucide-check x-cloak x-show="copied" class="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                         <span x-text="copied ? '{{ __('Copied') }}' : '{{ __('Copy page') }}'"></span>
                     </button>
                     <button type="button"
@@ -72,7 +72,7 @@
                             x-bind:aria-expanded="open"
                             class="cursor-pointer rounded-r-lg border-l border-gray-200 px-1.5 py-1.5 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900 dark:border-white/10 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white"
                             aria-label="{{ __('More page actions') }}">
-                        <x-ri-arrow-down-s-line class="h-3.5 w-3.5" />
+                        <x-lucide-chevron-down class="h-3.5 w-3.5" />
                     </button>
                 </div>
 
@@ -85,12 +85,12 @@
                     <button type="button"
                             x-on:click="copyMarkdown()"
                             class="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/5">
-                        <x-ri-file-copy-line class="h-3.5 w-3.5" />
+                        <x-lucide-copy class="h-3.5 w-3.5" />
                         {{ __('Copy as Markdown') }}
                     </button>
                     <a href="{{ $markdownUrl }}"
                        class="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/5">
-                        <x-ri-markdown-line class="h-3.5 w-3.5" />
+                        <x-lucide-file-code class="h-3.5 w-3.5" />
                         {{ __('View as Markdown') }}
                     </a>
                 </div>
@@ -151,7 +151,7 @@
                     <a href="{{ \Relaticle\Documentation\Support\DocUrl::page($previous) }}"
                        class="group rounded-xl border border-gray-200/80 p-4 transition-colors hover:border-gray-300 dark:border-white/[0.06] dark:hover:border-white/15">
                         <span class="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500">
-                            <x-ri-arrow-left-line class="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
+                            <x-lucide-arrow-left class="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
                             {{ __('Previous') }}
                         </span>
                         <span class="font-display mt-1 block text-[13px] font-semibold tracking-tight text-gray-900 dark:text-white">{{ $previous->title }}</span>
@@ -165,7 +165,7 @@
                        class="group rounded-xl border border-gray-200/80 p-4 text-right transition-colors hover:border-gray-300 sm:col-start-2 dark:border-white/[0.06] dark:hover:border-white/15">
                         <span class="flex items-center justify-end gap-1.5 text-xs text-gray-400 dark:text-gray-500">
                             {{ __('Next') }}
-                            <x-ri-arrow-right-line class="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                            <x-lucide-arrow-right class="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                         </span>
                         <span class="font-display mt-1 block text-[13px] font-semibold tracking-tight text-gray-900 dark:text-white">{{ $next->title }}</span>
                     </a>
@@ -190,7 +190,7 @@
             </a>
             <a href="{{ route('contact') }}"
                class="inline-flex items-center gap-2 text-gray-500 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
-                <x-ri-mail-line class="h-4 w-4" />
+                <x-lucide-mail class="h-4 w-4" />
                 {{ __('Contact support') }}
             </a>
         </div>

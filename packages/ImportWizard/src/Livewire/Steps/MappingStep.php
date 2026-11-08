@@ -321,7 +321,7 @@ final class MappingStep extends Component implements HasActions, HasForms
             $action
                 ->requiresConfirmation()
                 ->modalWidth(Width::Large)
-                ->modalIcon('heroicon-o-exclamation-triangle')
+                ->modalIcon('lucide-triangle-exclamation-point')
                 ->modalIconColor('warning')
                 ->modalHeading('Avoid creating duplicate records')
                 ->modalDescription($this->buildMatchWarningDescription())

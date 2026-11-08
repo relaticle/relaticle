@@ -17,7 +17,7 @@ final class ImportsRelationManager extends RelationManager
 {
     protected static string $relationship = 'imports';
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-arrow-up-tray';
+    protected static string|\BackedEnum|null $icon = 'lucide-upload';
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {

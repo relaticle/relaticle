@@ -24,7 +24,7 @@
                 x-on:mouseenter="warm()"
                 x-on:focus="warm()"
                 class="mt-8 flex w-full max-w-3xl cursor-pointer items-center gap-3 rounded-xl border border-[var(--surface-input-border)] bg-[var(--surface-input-bg)] px-4 py-3.5 text-left text-gray-500 transition-colors hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-white/15 dark:hover:text-gray-200">
-            <x-ri-search-line class="h-5 w-5 shrink-0 text-gray-400" />
+            <x-lucide-search class="h-5 w-5 shrink-0 text-gray-400" />
             <span class="flex-1 text-sm sm:text-base">{{ __('Search help articles and guides') }}</span>
             <kbd class="hidden rounded border border-gray-200 bg-white px-2 py-1 font-sans text-xs font-medium text-gray-500 sm:block dark:border-white/10 dark:bg-white/5 dark:text-gray-400">⌘K</kbd>
         </button>
@@ -60,7 +60,7 @@
                                         {{ $link['description'] }}
                                     </span>
                                 </span>
-                                <x-ri-arrow-right-line class="mt-0.5 h-4 w-4 shrink-0 text-gray-300 transition-all group-hover:translate-x-0.5 group-hover:text-primary-500 dark:text-gray-600" />
+                                <x-lucide-arrow-right class="mt-0.5 h-4 w-4 shrink-0 text-gray-300 transition-all group-hover:translate-x-0.5 group-hover:text-primary-500 dark:text-gray-600" />
                             </a>
                         </li>
                     @endforeach
@@ -81,7 +81,7 @@
                 </p>
             </div>
             <div class="mt-4 flex shrink-0 flex-wrap gap-2 sm:mt-0">
-                <x-cloud::marketing.button variant="secondary" size="sm" href="{{ route('contact') }}" icon="ri-mail-line">
+                <x-cloud::marketing.button variant="secondary" size="sm" href="{{ route('contact') }}" icon="lucide-mail">
                     {{ __('Contact us') }}
                 </x-cloud::marketing.button>
                 <x-cloud::marketing.button variant="secondary" size="sm" href="{{ route('discord') }}" icon="ri-discord-fill" :external="true">

@@ -24,8 +24,8 @@ outside the roles.
 
 Three treatments sit on top of the tokens. A page has at most one dark moment: the `closing-band` on
 the homepage, `/ai` and `/email-and-calendar`. `bg-hero-panel` is the
-gradient in the logo's colours (`#4038CD` to `#5D54E8`) under a hero's product window; it never
-carries copy. `bg-cta-band` is the closing band's surface. `bg-warm` is a static radial wash for the
+gradient in the logo's colours (`#4038CD` to `#5D54E8`) under the homepage hero's product window
+only; it never carries copy. `bg-cta-band` is the closing band's surface. `bg-warm` is a static radial wash for the
 human moments (the homepage email visual), never behind body text.
 
 `bg-dots` is a 20px dot texture for the `tint` cells that hold product UI, so a mock has something to
@@ -34,6 +34,33 @@ sit on. It never sits behind marketing copy. On `/ai` the showcase visuals and t
 Cells inside a `gap-px` grid stay opaque. A translucent fill lets the rail color show through and
 turns the cell gray in dark mode. `canvas` is taken by the Scribe theme, which is why the third
 token is `tint`.
+
+## Hero system and stages
+
+A product visual sits on a `stage` inside the rails: a rounded frame with a 1px ring, lit by soft
+light in the logo's colours (`glow-indigo`, `glow-violet`, `glow-sky`), never by a pattern laid over
+it. `stage` takes `light` (`seam`, `corners`, `inside`, `around`, `center`), `dots` for a radially
+faded dot field, and `:frame="false"` for light with no frame. Full-width bands and gutter textures
+were tried on 2026-11-08 and removed: a slab under the rails cut the gradient into three strips.
+
+The `hero` component composes the copy and the visual three ways: `layout="stack"` (copy above,
+centred or `align="start"`, `glow` adds a light rising behind the buttons), `layout="stage"` (copy
+and visual on one stage) and `layout="split"` (copy left, visual right in the first screen from `xl`, stacked below it). Each
+product page takes a different composition, so no two read as copies:
+
+| Page | Composition | Stage |
+| --- | --- | --- |
+| `/ai` | `stage` | `inside` light on `tint` |
+| `/crm-for-*` | `stack`, centred, `glow` | `seam` light on `tint` |
+| `/self-hosted` | `stack`, `start` | `corners` light on `tint` |
+| `/email-and-calendar` | `split` | `around` light on `tint` |
+| `/ai-native-crm` | `stack`, centred | `dots` on `tint` |
+| homepage story | a `frame` section | `center` light on `tint`, dots inside |
+
+The homepage hero keeps its own rounded `bg-hero-panel` outside the rails, and no other page copies
+it. 19 product pages measured on 2026-11-08 (Linear, Stripe, Raycast, Resend, Attio, Intercom)
+put the product in the first screen on a frame or soft light; that is the bar. No test reads this,
+so a reviewer reads for a product page that repeats another's composition or a visual with no stage.
 
 ## Type roles
 
@@ -82,7 +109,7 @@ reach it. Change the header height and the token together. `html` also carries `
 - `hero`: the stack every page opens on, centred on the product pages and left-aligned (`align="start"`)
   on the rest: the eyebrow, a two-tone `type-display` headline
   capped at `max-w-3xl`, the `aside` (one subline under 25 words, the buttons, a small-print line)
-  capped at `max-w-2xl`, then the page's visual below, on a `bg-hero-panel` cell inside the rails. The
+  capped at `max-w-2xl`, then the page's visual in the hero's `visual` slot, composed as the Hero system section says. The
   headline runs two lines at 1440 and its gray continuation is one short clause. The subline says
   what the page is for; how to use the visual is said inside the visual, as the checklist's
   "Tick what your CRM does today" does. On a product page that visual cell is the page's signature,
@@ -123,8 +150,9 @@ reach it. Change the header height and the token together. `html` also carries `
 - The `/self-hosted` hero is that page's signature: an install configurator
   (`partials/self-hosted-install.blade.php`). A light terminal `window` holds the guide's quick start
   with an `APP_KEY` and `DB_PASSWORD` the browser generates through `crypto.getRandomValues`, and an
-  address field that rewrites `APP_URL` and the URL in the `mac-window` beside it, which shows the
-  board from a real screenshot. The server renders the `$(openssl ...)` form, so the markup stays
+  address field that rewrites `APP_URL` and the URL in the `mac-window` behind it, which shows the
+  board from a real screenshot. From `xl` the terminal overlaps the window and the board is cropped
+  to a legible scale; below `xl` the two stack. Long commands wrap rather than clip. The server renders the `$(openssl ...)` form, so the markup stays
   runnable shell without JavaScript, and Copy puts commands only on the clipboard. The terminal is
   never dark in light mode, so the band stays the page's one dark moment.
   `tests/Browser/Marketing/SelfHostedInstallTest.php` pins the secrets, the address and the clipboard.
@@ -185,18 +213,24 @@ reach it. Change the header height and the token together. `html` also carries `
 The header and footer sit on the same `max-w-6xl` rails as every section, so the logo, the `h1` and
 every section edge line up. `x-cloud::guest-layout` has no other layout.
 
-The framed header is a floating card: 64px tall (the height of the app's top bar) with a 12px gap
-above it at `md`, a 1px `gray-200` ring and one soft shadow (`shadow-navbar`). A 92px band on the
-rails sits under it with a `cross` mark at each bottom corner from `xl`. `--header-height` is the
-card's bottom edge (4.75rem at `md`), and `scroll-padding-top` follows it. On phones the menu opens
-as a card under the header instead of a full screen.
+The header is the frame's first row: a fixed 64px bar (the height of the app's top bar) on the rails,
+`bg-surface` with a `rail` hairline under it and no shadow. At the top of the page a `cross` marks
+each point where a rail meets that hairline, from `xl`. Each cross is two halves: the bar's half is
+clipped at the hairline and fades out once the page scrolls, and the spacer's half below it scrolls
+away. A cross over scrolled content painted a `surface` square or a gray stub onto the hero panel
+and the dark band, so the crosses only ever sit on the page's own surface. The bar holds the nav, the
+GitHub and Discord counts from
+`lg`, Sign In as a text link and Start for free as its one button, each on one line down to `md`.
+On phones the menu opens as a full-width sheet over the bar.
 
 The framed footer is quiet: the logo and blurb with four small social icons, four link columns,
 then the copyright row with the theme switcher. No cells, no wordmark. The copyright names
 Relaticle, Inc., as `.github/TRADEMARK.md` does, and the row carries the legal links and llms.txt.
 `MarketingNavigation::legal()` holds them, and `closestTo()` reads it with the columns.
 
-The old full-width header and footer are gone; the `framed` flag went with them on 2026-11-06.
+The old full-width header and footer are gone; the `framed` flag went with them on 2026-11-06. The
+floating header card gave way to the bar on 2026-11-08: its shadow was the only one in the system,
+and it sat 24px inside the rails, so two vertical edges ran side by side.
 
 ## Motion (`packages/Cloud/resources/js/motion.js`)
 

@@ -50,7 +50,7 @@
 
                             {{-- Arrow --}}
                             <div class="hidden md:flex w-6 items-center justify-center">
-                                <x-filament::icon icon="heroicon-m-arrow-long-right"
+                                <x-filament::icon icon="lucide-move-right"
                                                   class="w-4 h-4 text-gray-300 dark:text-gray-600"/>
                             </div>
 
@@ -76,7 +76,7 @@
                 <div class="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
                     <div class="flex items-center justify-between gap-2">
                         <span class="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Preview</span>
-                        <x-filament::icon icon="heroicon-o-eye" class="w-3.5 h-3.5 text-gray-400"/>
+                        <x-filament::icon icon="lucide-eye" class="w-3.5 h-3.5 text-gray-400"/>
                     </div>
                 </div>
                 <div
@@ -109,7 +109,7 @@
             @endphp
             <div
                 class="flex items-center gap-2 px-3 py-2 rounded-xl bg-warning-50 dark:bg-warning-950/50 border border-warning-200 dark:border-warning-800">
-                <x-filament::icon icon="heroicon-o-exclamation-triangle" class="w-4 h-4 text-warning-500 shrink-0"/>
+                <x-filament::icon icon="lucide-triangle-exclamation-point" class="w-4 h-4 text-warning-500 shrink-0"/>
                 <p class="text-xs text-warning-700 dark:text-warning-300">
                     <span class="font-medium text-warning-800 dark:text-warning-200">Required:</span>
                     {{ $unmappedLabels->join(', ') }}

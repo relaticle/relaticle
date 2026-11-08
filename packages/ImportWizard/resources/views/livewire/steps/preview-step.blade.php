@@ -25,7 +25,7 @@
     <div class="flex-1 flex flex-col overflow-hidden min-h-[20rem]">
         @if($this->isCompleted)
             <div class="flex items-center gap-3 px-4 py-3 mb-3 shrink-0 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl">
-                <x-heroicon-o-check-circle class="h-5 w-5 text-success-600 dark:text-success-400 shrink-0" />
+                <x-lucide-circle-check class="h-5 w-5 text-success-600 dark:text-success-400 shrink-0" />
                 <p class="text-sm font-medium text-gray-900 dark:text-white">Import Complete</p>
 
                 @if($this->results)
@@ -51,7 +51,7 @@
             </div>
         @elseif($this->isImporting)
             <div class="flex items-center gap-3 px-4 py-3 mb-3 shrink-0 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl">
-                <x-heroicon-o-arrow-path class="h-5 w-5 text-primary-600 dark:text-primary-400 animate-spin shrink-0" />
+                <x-lucide-refresh-cw class="h-5 w-5 text-primary-600 dark:text-primary-400 animate-spin shrink-0" />
 
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center justify-between mb-1.5">
@@ -111,12 +111,12 @@
                 <div class="px-3 py-2 border-b border-gray-200 dark:border-gray-700 shrink-0">
                     <div class="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                         <span class="flex items-center gap-1">
-                            <x-filament::icon icon="heroicon-m-plus" class="w-3.5 h-3.5 text-success-500"/>
+                            <x-filament::icon icon="lucide-plus" class="w-3.5 h-3.5 text-success-500"/>
                             <span class="font-medium text-gray-700 dark:text-gray-300">{{ number_format($this->createCount) }}</span>
                             will be created
                         </span>
                         <span class="flex items-center gap-1">
-                            <x-filament::icon icon="heroicon-m-arrow-path" class="w-3.5 h-3.5 text-primary-500"/>
+                            <x-filament::icon icon="lucide-refresh-cw" class="w-3.5 h-3.5 text-primary-500"/>
                             <span class="font-medium text-gray-700 dark:text-gray-300">{{ number_format($this->updateCount) }}</span>
                             will be updated
                         </span>
@@ -158,9 +158,9 @@
                                             @if($relMatch && filled($value))
                                                 <span class="inline-flex items-center gap-1 text-xs truncate" title="{{ $value }}">
                                                     @if($relMatch->isExisting())
-                                                        <x-filament::icon icon="heroicon-m-link" class="w-3.5 h-3.5 text-primary-500 shrink-0"/>
+                                                        <x-filament::icon icon="lucide-link" class="w-3.5 h-3.5 text-primary-500 shrink-0"/>
                                                     @else
-                                                        <x-filament::icon icon="heroicon-m-plus" class="w-3.5 h-3.5 text-success-500 shrink-0"/>
+                                                        <x-filament::icon icon="lucide-plus" class="w-3.5 h-3.5 text-success-500 shrink-0"/>
                                                     @endif
                                                     <span class="text-gray-900 dark:text-white truncate">{{ Str::limit((string) $value, 28) }}</span>
                                                 </span>
@@ -207,12 +207,12 @@
                 <div class="px-3 py-2 border-b border-gray-200 dark:border-gray-700 shrink-0">
                     <div class="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                         <span class="flex items-center gap-1">
-                            <x-filament::icon icon="heroicon-m-link" class="w-3.5 h-3.5 text-primary-500"/>
+                            <x-filament::icon icon="lucide-link" class="w-3.5 h-3.5 text-primary-500"/>
                             <span class="font-medium text-gray-700 dark:text-gray-300">{{ number_format($this->relationshipStats['link']) }}</span>
                             will be linked
                         </span>
                         <span class="flex items-center gap-1">
-                            <x-filament::icon icon="heroicon-m-plus" class="w-3.5 h-3.5 text-success-500"/>
+                            <x-filament::icon icon="lucide-plus" class="w-3.5 h-3.5 text-success-500"/>
                             <span class="font-medium text-gray-700 dark:text-gray-300">{{ number_format($this->relationshipStats['create']) }}</span>
                             will be created
                         </span>
@@ -222,15 +222,15 @@
                 <div class="flex items-stretch text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-gray-800/30 border-b border-gray-200 dark:border-gray-700">
                     <div class="w-8 shrink-0 border-r border-gray-200 dark:border-gray-700 py-1.5"></div>
                     <div class="w-2/5 px-2 py-1.5 border-r border-gray-200 dark:border-gray-700 flex items-center gap-1">
-                        <x-filament::icon icon="heroicon-m-tag" class="w-3 h-3 shrink-0"/>
+                        <x-filament::icon icon="lucide-tag" class="w-3 h-3 shrink-0"/>
                         Value
                     </div>
                     <div class="w-2/5 px-2 py-1.5 border-r border-gray-200 dark:border-gray-700 flex items-center gap-1">
-                        <x-filament::icon icon="heroicon-m-arrow-path-rounded-square" class="w-3 h-3 shrink-0"/>
+                        <x-filament::icon icon="lucide-repeat" class="w-3 h-3 shrink-0"/>
                         Resolution
                     </div>
                     <div class="flex-1 px-2 py-1.5 flex items-center justify-end gap-1">
-                        <x-filament::icon icon="heroicon-m-queue-list" class="w-3 h-3 shrink-0"/>
+                        <x-filament::icon icon="lucide-list-ordered" class="w-3 h-3 shrink-0"/>
                         Rows
                     </div>
                 </div>
@@ -240,9 +240,9 @@
                         <div class="flex items-stretch border-b border-gray-100 dark:border-gray-800 text-sm">
                             <div class="w-8 shrink-0 flex items-center justify-center border-r border-gray-200 dark:border-gray-700 py-2">
                                 @if($entry['action'] === 'link')
-                                    <x-filament::icon icon="heroicon-m-link" class="w-4 h-4 text-primary-500"/>
+                                    <x-filament::icon icon="lucide-link" class="w-4 h-4 text-primary-500"/>
                                 @else
-                                    <x-filament::icon icon="heroicon-m-plus" class="w-4 h-4 text-success-500"/>
+                                    <x-filament::icon icon="lucide-plus" class="w-4 h-4 text-success-500"/>
                                 @endif
                             </div>
                             <div class="w-2/5 min-w-0 px-2 py-2 flex items-center border-r border-gray-200 dark:border-gray-700">
@@ -251,12 +251,12 @@
                             <div class="w-2/5 px-2 py-2 flex items-center border-r border-gray-200 dark:border-gray-700">
                                 @if($entry['action'] === 'link')
                                     <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300">
-                                        <x-filament::icon icon="heroicon-m-link" class="w-3 h-3"/>
+                                        <x-filament::icon icon="lucide-link" class="w-3 h-3"/>
                                         Link existing
                                     </span>
                                 @else
                                     <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium bg-success-50 dark:bg-success-900/30 text-success-700 dark:text-success-300">
-                                        <x-filament::icon icon="heroicon-m-plus" class="w-3 h-3"/>
+                                        <x-filament::icon icon="lucide-plus" class="w-3 h-3"/>
                                         Create new
                                     </span>
                                 @endif

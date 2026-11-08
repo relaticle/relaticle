@@ -2,7 +2,7 @@
 title: People records
 description: People with unique emails, phone, job title, and a company link, created standalone or from a company.
 order: 2
-updated: "2026-10-05"
+updated: "2026-11-08"
 related: [help/records/company-records, help/getting-started/add-your-first-person]
 ---
 
@@ -24,12 +24,15 @@ in bulk [by import](/help/import/what-each-record-type-needs).
 ## The record page
 
 A person's page shows their details with the company as a link. Click
-through to the company any time. Two working tabs, **Tasks** and **Notes**,
-create records pre-linked to this person, and **Activity log** shows the
-change history.
+through to the company any time. The page opens on **Overview**: their key
+fields, the next due task, and the latest activity, notes, and open tasks.
+Two working tabs, **Tasks** and **Notes**, create records pre-linked to this
+person, and **Activity** shows the change history.
 
 With email and calendar sync on, **Emails** and **Meetings** tabs appear
 here too.
 
 In the **People** list the company column links to the company too, so you
-can move between a person and their company from anywhere.
+can move between a person and their company from anywhere. To open a person
+in a side panel without leaving the list, hover their row and click the
+preview button beside the name. **Open preview** in the row menu does the same.

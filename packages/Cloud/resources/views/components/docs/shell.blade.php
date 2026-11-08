@@ -108,7 +108,7 @@
                     x-on:click="sidebarOpen = true"
                     class="-ml-1.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 lg:hidden dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white"
                     aria-label="{{ __('Open navigation') }}">
-                <x-ri-menu-line class="h-5 w-5" />
+                <x-lucide-menu class="h-5 w-5" />
             </button>
 
             <a href="{{ url('/') }}" class="flex shrink-0 items-center gap-2.5" aria-label="{{ __('Relaticle home') }}">
@@ -131,7 +131,7 @@
                         x-on:mouseenter="warm()"
                         x-on:focus="warm()"
                         class="hidden w-60 cursor-pointer items-center gap-2.5 rounded-lg border border-[var(--surface-input-border)] bg-[var(--surface-input-bg)] px-3 py-1.5 text-left text-[13px] text-gray-500 transition-colors hover:border-gray-300 hover:text-gray-700 md:flex dark:text-gray-400 dark:hover:border-white/15 dark:hover:text-gray-200">
-                    <x-ri-search-line class="h-4 w-4 shrink-0" />
+                    <x-lucide-search class="h-4 w-4 shrink-0" />
                     <span class="flex-1">{{ __('Search the docs') }}</span>
                     <kbd class="rounded border border-gray-200 bg-white px-1.5 font-sans text-pico font-medium text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-400">⌘K</kbd>
                 </button>
@@ -139,7 +139,7 @@
                         x-on:click="openSearch()"
                         class="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 md:hidden dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white"
                         aria-label="{{ __('Search the docs') }}">
-                    <x-ri-search-line class="h-5 w-5" />
+                    <x-lucide-search class="h-5 w-5" />
                 </button>
 
                 <span aria-hidden="true" class="mx-1 hidden h-5 w-px bg-gray-200 sm:block dark:bg-white/10"></span>
@@ -173,7 +173,7 @@
                         x-on:click="sidebarOpen = false"
                         class="-mr-1.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white"
                         aria-label="{{ __('Close navigation') }}">
-                    <x-ri-close-line class="h-5 w-5" />
+                    <x-lucide-x class="h-5 w-5" />
                 </button>
             </div>
             <x-cloud::docs.sidebar-nav :nav="$nav" :current-path="$currentPath" />

@@ -15,7 +15,6 @@ use Filament\Actions\Contracts\HasActions;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
 use Filament\Schemas\Contracts\HasSchemas;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -69,9 +68,9 @@ final class DraftsTable extends Component implements HasActions, HasSchemas, Has
             ->emptyStateDescription(fn (): string => $this->hasMailbox()
                 ? __('filament/pages/email-inbox.drafts.empty.description')
                 : __('filament/pages/email-accounts.not_connected.inbox.description'))
-            ->emptyStateIcon(fn (): Heroicon => $this->hasMailbox()
-                ? Heroicon::OutlinedPencilSquare
-                : Heroicon::OutlinedEnvelope)
+            ->emptyStateIcon(fn (): string => $this->hasMailbox()
+                ? 'lucide-square-pen'
+                : 'lucide-mail')
             ->emptyStateActions([
                 $composeEmail,
                 ...$this->connectMailboxActions(),
@@ -97,7 +96,7 @@ final class DraftsTable extends Component implements HasActions, HasSchemas, Has
                 ActionGroup::make([
                     Action::make('openDraft')
                         ->label(__('filament/pages/email-inbox.drafts.actions.open'))
-                        ->icon(Heroicon::OutlinedPencilSquare)
+                        ->icon('lucide-square-pen')
                         ->dispatch('composer:open', fn (Email $record): array => ['draftId' => (string) $record->getKey()])
                         // A row click mounts the action on the server, where the browser dispatch above never runs.
                         ->action(function (Email $record): void {
@@ -105,7 +104,7 @@ final class DraftsTable extends Component implements HasActions, HasSchemas, Has
                         }),
                     Action::make('deleteDraft')
                         ->label(__('filament/pages/email-inbox.drafts.actions.delete'))
-                        ->icon(Heroicon::OutlinedTrash)
+                        ->icon('lucide-trash')
                         ->color('danger')
                         ->requiresConfirmation()
                         ->action(function (Email $record): void {
@@ -124,7 +123,7 @@ final class DraftsTable extends Component implements HasActions, HasSchemas, Has
                 BulkActionGroup::make([
                     BulkAction::make('deleteDrafts')
                         ->label(__('filament/pages/email-inbox.drafts.actions.delete_selected'))
-                        ->icon(Heroicon::OutlinedTrash)
+                        ->icon('lucide-trash')
                         ->color('danger')
                         ->requiresConfirmation()
                         ->deselectRecordsAfterCompletion()
@@ -168,7 +167,7 @@ final class DraftsTable extends Component implements HasActions, HasSchemas, Has
     {
         return Action::make('composeEmail')
             ->label(__('filament/concerns/email-compose.actions.compose.label'))
-            ->icon(Heroicon::OutlinedPencilSquare)
+            ->icon('lucide-square-pen')
             ->tooltip(__('filament/concerns/email-compose.actions.compose.tooltip'))
             ->visible(fn (): bool => $this->hasMailbox())
             ->dispatch('composer:open');

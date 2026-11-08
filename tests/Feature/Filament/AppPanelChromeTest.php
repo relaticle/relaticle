@@ -64,12 +64,21 @@ it('renders exactly one sidebar collapse toggle, in the sidebar above the naviga
         ->toBeLessThan(strpos($this->html, 'fi-sidebar-nav'));
 });
 
+it('renders exactly one sidebar expand toggle, at the start of the top bar', function (): void {
+    expect(substr_count($this->html, 'data-sidebar-expand-toggle'))->toBe(1);
+
+    expect(strpos($this->html, 'class="fi-topbar"'))
+        ->toBeLessThan(strpos($this->html, 'data-sidebar-expand-toggle'))
+        ->and(strpos($this->html, 'data-sidebar-expand-toggle'))
+        ->toBeLessThan(strpos($this->html, 'fi-topbar-start'));
+});
+
 it('sizes the collapsed rail to the width that centres the navigation icons', function (): void {
     expect(Filament::getPanel('app')->getCollapsedSidebarWidth())->toBe('3rem');
 });
 
 it('sizes the open sidebar with a css length rather than a bare number', function (): void {
-    expect(Filament::getPanel('app')->getSidebarWidth())->toBe('16rem');
+    expect(Filament::getPanel('app')->getSidebarWidth())->toBe('18rem');
 });
 
 it('renders a keyboard reachable resize handle inside the sidebar', function (): void {

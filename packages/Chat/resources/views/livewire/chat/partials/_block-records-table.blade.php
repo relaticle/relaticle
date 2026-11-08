@@ -41,7 +41,7 @@
                  record type reads as one thing wherever chat draws it. --}}
             <template x-if="window.ChatModules.recordChipIcon(block.type)">
                 <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400" aria-hidden="true">
-                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
                         <path stroke-linecap="round" stroke-linejoin="round" :d="window.ChatModules.recordChipIcon(block.type)"></path>
                     </svg>
                 </span>
@@ -104,7 +104,7 @@
                                     {{-- No wire:navigate: `/r/` is a server redirect, not a
                                          Livewire page, and the chip family is plain navigation. --}}
                                     <a class="chat-chip" :data-record-type="blockRowType(block, row)" :href="row.url">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                                             <path stroke-linecap="round" stroke-linejoin="round" :d="window.ChatModules.recordChipIcon(blockRowType(block, row))"></path>
                                         </svg>
                                         <span class="chat-chip-label" x-text="blockCell(row, column)"></span>
@@ -118,7 +118,7 @@
                                     <span class="flex flex-wrap gap-1">
                                         <template x-for="chip in blockCell(row, column)" :key="chip.url || chip.label">
                                             <a class="chat-chip" :data-record-type="chip.type" :href="chip.url">
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
                                                     <path stroke-linecap="round" stroke-linejoin="round" :d="window.ChatModules.recordChipIcon(chip.type)"></path>
                                                 </svg>
                                                 <span class="chat-chip-label" x-text="chip.label"></span>

@@ -13,7 +13,7 @@ final class ImportExportActionGroup extends ActionGroup
     {
         parent::setUp();
 
-        $this->icon('heroicon-o-arrows-up-down');
+        $this->icon('lucide-arrow-up-down');
 
         $this->color('gray');
 

@@ -29,7 +29,7 @@ final class EmailInboxPage extends Page
 
     protected static ?string $slug = 'email';
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-envelope';
+    protected static string|\BackedEnum|null $navigationIcon = 'lucide-mail';
 
     protected static ?int $navigationSort = 6;
 

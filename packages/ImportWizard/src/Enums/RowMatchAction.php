@@ -13,9 +13,9 @@ enum RowMatchAction: string
     public function icon(): string
     {
         return match ($this) {
-            self::Create => 'heroicon-m-plus',
-            self::Update => 'heroicon-m-arrow-path',
-            self::Skip => 'heroicon-m-minus',
+            self::Create => 'lucide-plus',
+            self::Update => 'lucide-refresh-cw',
+            self::Skip => 'lucide-minus',
         };
     }
 

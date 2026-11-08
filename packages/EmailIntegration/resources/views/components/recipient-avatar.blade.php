@@ -19,7 +19,7 @@
     ])
     x-bind:class="chip.circular ? 'rounded-full' : 'rounded'"
 >
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" @class([$glyph]) aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" @class([$glyph]) aria-hidden="true">
         <path stroke-linecap="round" stroke-linejoin="round" x-bind:d="chip.iconPath" />
     </svg>
 </span>

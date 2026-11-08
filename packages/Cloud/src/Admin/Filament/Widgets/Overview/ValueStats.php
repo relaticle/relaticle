@@ -52,9 +52,9 @@ final class ValueStats extends StatsOverviewWidget
             Stat::make(HelpLabel::make('Real signups', 'New accounts from the latest full week that has had 7 days to act. Only verified people who signed up on their own count: invited teammates, suspected trial abuse and your own accounts are left out. The arrow compares with the week before.'), number_format($signups))
                 ->description('Week of '.$week->format('M j').', '.($change >= 0 ? '+' : '').$change.' vs the week before')
                 ->descriptionIcon(match (true) {
-                    $change > 0 => 'heroicon-m-arrow-trending-up',
-                    $change < 0 => 'heroicon-m-arrow-trending-down',
-                    default => 'heroicon-m-minus',
+                    $change > 0 => 'lucide-trending-up',
+                    $change < 0 => 'lucide-trending-down',
+                    default => 'lucide-minus',
                 })
                 ->color('gray')
                 ->url(UserResource::getUrl('index', ['filters' => $filters])),

@@ -7,6 +7,6 @@
     role="status"
     data-proposal-overwrite-notice
 >
-    <x-heroicon-o-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+    <x-lucide-triangle-exclamation-point class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
     <span>{{ $notice }}</span>
 </p>

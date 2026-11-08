@@ -91,7 +91,7 @@ it('skips the upload and says so when the mic is tapped by accident', function (
     expect($page->script('window.__transcribeCalls'))->toBe(0);
 });
 
-it('swaps the mic for send only while the dashboard composer has something to send', function (): void {
+it('keeps the mic beside send once the dashboard composer has something to send', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
@@ -113,22 +113,71 @@ it('swaps the mic for send only while the dashboard composer has something to se
         $expected,
     )))->toBe($expected);
 
+    $sendDisabled = fn (): mixed => $page->script(<<<'JS'
+        (async () => {
+            await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+            return document.querySelector('[data-chat-context="dashboard"][x-data*="chatEditor"] button[aria-label="Send message"]').disabled;
+        })()
+        JS);
+
     $expectControls(['mic' => true, 'send' => false]);
 
-    $setState("editor.setText('How is the pipeline?');");
-    $expectControls(['mic' => false, 'send' => true]);
+    $micFillOnNextFrame = $page->script(<<<'JS'
+        (async () => {
+            const composer = document.querySelector('[data-chat-context="dashboard"][x-data*="chatEditor"]');
+            Alpine.$data(composer).setText('How is the pipeline?');
+            await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+            return getComputedStyle(composer.querySelector('[x-data^="voiceRecorder"] > button')).backgroundColor;
+        })()
+        JS);
+    expect($micFillOnNextFrame)->toBe('rgba(0, 0, 0, 0)');
+
+    $expectControls(['mic' => true, 'send' => true]);
+    expect($sendDisabled())->toBeFalse();
 
     $setState('recorder.recording = true;');
-    $expectControls(['mic' => true, 'send' => false]);
+    $expectControls(['mic' => true, 'send' => true]);
+    expect($sendDisabled())->toBeTrue();
 
     $setState('recorder.recording = false; recorder.transcribing = true;');
-    $expectControls(['mic' => true, 'send' => false]);
+    $expectControls(['mic' => true, 'send' => true]);
+    expect($sendDisabled())->toBeTrue();
 
     $setState("recorder.transcribing = false; editor.setText('');");
     $expectControls(['mic' => true, 'send' => false]);
 
     $setState("editor.pendingAttachment = { id: 'a', name: 'leads.csv', kind: 'csv', row_count: 3 };");
-    $expectControls(['mic' => false, 'send' => true]);
+    $expectControls(['mic' => true, 'send' => true]);
+});
+
+it('keeps Enter from sending while a dictation is in progress', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $page = ChatBrowser::logIn($user, $workspace->slug)
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $pressEnter = fn (string $recorderState): mixed => $page->script(<<<JS
+        (async () => {
+            const composer = document.querySelector('[data-chat-context="dashboard"][x-data*="chatEditor"]');
+            const recorder = Alpine.\$data(composer.querySelector('[x-data^="voiceRecorder"]'));
+            Alpine.\$data(composer).setText('How is the pipeline?');
+            {$recorderState}
+            await new Promise((resolve) => requestAnimationFrame(resolve));
+            composer.querySelector('.ProseMirror').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+
+            return {
+                sent: sessionStorage.getItem('chat:bootstrap') !== null,
+                text: Alpine.\$data(composer).text,
+            };
+        })()
+        JS);
+
+    expect($pressEnter('recorder.recording = true;'))->toBe(['sent' => false, 'text' => 'How is the pipeline?']);
+    expect($pressEnter('recorder.recording = false; recorder.transcribing = true;'))->toBe(['sent' => false, 'text' => 'How is the pipeline?']);
+    expect($pressEnter('recorder.transcribing = false;')['sent'])->toBeTrue();
 });
 
 it('hides both the mic and send while a reply streams', function (): void {
@@ -170,7 +219,7 @@ it('keeps the send button on an empty composer when voice input is off', functio
             const send = composer.querySelector('button[aria-label="Send message"]');
             return {
                 mic: composer.querySelector('[x-data^="voiceRecorder"]') !== null,
-                send: send.checkVisibility(),
+                send: send.checkVisibility({ visibilityProperty: true }),
                 sendDisabled: send.disabled,
             };
         })()
@@ -189,7 +238,7 @@ function composerControlsSettledTo(string $composer, array $expected): string
     return <<<JS
         (async () => {
             const composer = document.querySelector('{$composer}');
-            const shown = (selector) => composer.querySelector(selector)?.checkVisibility() ?? false;
+            const shown = (selector) => composer.querySelector(selector)?.checkVisibility({ visibilityProperty: true }) ?? false;
             const read = () => Object.fromEntries(Object.keys({$expectedJson}).map((key) => [key, shown({
                 mic: '[x-data^="voiceRecorder"] > button',
                 send: 'button[aria-label="Send message"]',

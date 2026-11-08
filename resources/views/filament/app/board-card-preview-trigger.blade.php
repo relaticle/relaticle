@@ -1,0 +1,9 @@
+<x-filament::icon-button
+    icon="lucide-panel-right"
+    color="gray"
+    size="xs"
+    :label="__('filament/record-page.actions.open_preview')"
+    :tooltip="__('filament/record-page.actions.open_preview')"
+    :x-on:click.stop="$open"
+    class="fi-board-card-preview-trigger"
+/>

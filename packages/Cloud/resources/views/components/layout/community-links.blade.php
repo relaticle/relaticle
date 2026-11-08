@@ -37,7 +37,7 @@
                 @if($link['count'] !== null)
                     <span class="tabular-nums text-gray-900 dark:text-white">{{ $link['count'] }}</span>
                 @endif
-                <x-ri-arrow-right-up-line class="h-3 w-3 shrink-0 text-gray-400 transition-[translate,color] duration-200 group-hover:translate-x-px group-hover:-translate-y-px group-hover:text-gray-600 motion-reduce:transition-none dark:text-gray-500 dark:group-hover:text-gray-300" aria-hidden="true"/>
+                <x-lucide-arrow-up-right class="h-3 w-3 shrink-0 text-gray-400 transition-[translate,color] duration-200 group-hover:translate-x-px group-hover:-translate-y-px group-hover:text-gray-600 motion-reduce:transition-none dark:text-gray-500 dark:group-hover:text-gray-300" aria-hidden="true"/>
             </a>
         @endforeach
     </div>
@@ -51,7 +51,7 @@
                 @if($link['count'] !== null)
                     <span class="tabular-nums">{{ $link['count'] }}</span>
                 @endif
-                <x-ri-arrow-right-up-line class="h-3 w-3 shrink-0 text-gray-400 transition-[translate,color] duration-200 group-hover:translate-x-px group-hover:-translate-y-px group-hover:text-gray-600 motion-reduce:transition-none dark:text-gray-500 dark:group-hover:text-gray-300" aria-hidden="true"/>
+                <x-lucide-arrow-up-right class="h-3 w-3 shrink-0 text-gray-400 transition-[translate,color] duration-200 group-hover:translate-x-px group-hover:-translate-y-px group-hover:text-gray-600 motion-reduce:transition-none dark:text-gray-500 dark:group-hover:text-gray-300" aria-hidden="true"/>
             </a>
         @endforeach
     </div>

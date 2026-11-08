@@ -137,7 +137,7 @@
                     :class="open ? 'text-gray-600 dark:text-gray-300' : 'text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300'"
                     aria-hidden="true"
                 >
-                    <x-heroicon-o-chevron-down class="h-3.5 w-3.5 transition-transform duration-200" ::class="open ? 'rotate-180' : ''" />
+                    <x-lucide-chevron-down class="h-3.5 w-3.5 transition-transform duration-200" ::class="open ? 'rotate-180' : ''" />
                 </span>
             </template>
         </div>

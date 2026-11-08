@@ -15,7 +15,7 @@
                 <span class="text-base font-semibold text-gray-900 dark:text-white">
                     {{ $question }}
                 </span>
-                <x-ri-arrow-down-s-line class="h-5 w-5 shrink-0 text-gray-400 transition-transform duration-200" ::class="open === {{ $index }} ? 'rotate-180' : ''"/>
+                <x-lucide-chevron-down class="h-5 w-5 shrink-0 text-gray-400 transition-transform duration-200" ::class="open === {{ $index }} ? 'rotate-180' : ''"/>
             </button>
             <div id="{{ $idPrefix }}-answer-{{ $index }}" role="region" aria-labelledby="{{ $idPrefix }}-question-{{ $index }}" x-show="open === {{ $index }}" x-collapse x-cloak>
                 <div class="type-prose pt-3 text-gray-600 dark:text-gray-400">

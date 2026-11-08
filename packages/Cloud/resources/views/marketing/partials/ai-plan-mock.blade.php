@@ -29,7 +29,7 @@
                             <li class="pb-2.5" data-ai-plan-step>
                                 <div class="flex items-start gap-2.5 px-4 pt-3">
                                     <span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400" aria-hidden="true">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icon($type) }}"/></svg>
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icon($type) }}"/></svg>
                                     </span>
                                     <p class="min-w-0 flex-1 truncate text-sm leading-6">
                                         <span class="text-gray-500 dark:text-gray-400">{{ $verb }}</span>

@@ -62,7 +62,7 @@
     <label class="sr-only">{{ __('filament/emails/composer.mass_send.add_recipients') }}</label>
 
     <div class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 transition focus-within:border-primary-500 focus-within:ring-1 focus-within:ring-primary-500 dark:border-white/10 dark:bg-gray-900 dark:focus-within:border-primary-500">
-        <x-heroicon-o-plus class="h-4 w-4 shrink-0 text-gray-400" />
+        <x-lucide-plus class="h-4 w-4 shrink-0 text-gray-400" />
         <input
             type="text"
             x-model="query"

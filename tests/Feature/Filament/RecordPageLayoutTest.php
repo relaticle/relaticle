@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Enums\CreationSource;
+use App\Enums\CustomFields\TaskField;
+use App\Enums\WorkspaceRole;
 use App\Features\EmailIntegration;
 use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Concerns\CountsRelatedRecords;
@@ -29,14 +31,18 @@ use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\Task;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
+use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\EmailIntegration\Filament\Actions\ComposeEmailAction;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
@@ -122,7 +128,7 @@ it('marks custom field labels with the same outline icon set as the native detai
     $iconPath = fn (string $icon): string => Str::match('/ d="([^"]+)"/', svg($icon)->contents());
 
     livewire(ViewOpportunity::class, ['record' => $opportunity->getKey()])
-        ->assertSeeHtml($iconPath('heroicon-o-chevron-up-down'))
+        ->assertSeeHtml($iconPath('lucide-chevrons-up-down'))
         ->assertDontSeeHtml($iconPath('mdi-form-select'))
         ->assertDontSeeHtml($iconPath('mdi-calendar'));
 });
@@ -202,7 +208,7 @@ it('keeps details past the first eight behind a view all toggle', function (): v
     $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
     livewire(ViewCompany::class, ['record' => $company->getKey()])
-        ->assertSee('View all')
+        ->assertSeeHtml('fi-record-details-toggle')
         ->assertSeeHtml('x-show="showAllDetails"')
         ->assertSee('Extra detail 8');
 });
@@ -211,10 +217,10 @@ it('shows no view all toggle when every detail fits', function (): void {
     $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
     livewire(ViewCompany::class, ['record' => $company->getKey()])
-        ->assertDontSee('View all');
+        ->assertDontSeeHtml('fi-record-details-toggle');
 });
 
-it('orders the :dataset page tabs as tasks, notes, emails, meetings, then the activity log', function (string $model, string $page): void {
+it('orders the :dataset page tabs as activity, tasks, notes, emails, then meetings', function (string $model, string $page): void {
     $record = $model::factory()->recycle([$this->user, $this->workspace])->create();
 
     $tabs = collect(livewire($page, ['record' => $record->getKey()])->instance()->getRelationManagers())
@@ -224,20 +230,26 @@ it('orders the :dataset page tabs as tasks, notes, emails, meetings, then the ac
         ->all();
 
     expect($tabs)->toBe([
+        'ActivityLogRelationManager',
         'TasksRelationManager',
         'NotesRelationManager',
         'EmailsRelationManager',
         'MeetingsRelationManager',
-        'ActivityLogRelationManager',
     ]);
 })->with('record pages');
 
-it('puts the people tab first on the company page', function (): void {
+it('puts the people tab right after activity on the company page', function (): void {
     $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
-    $tabs = livewire(ViewCompany::class, ['record' => $company->getKey()])->instance()->getRelationManagers();
+    $tabs = array_map(class_basename(...), array_values(livewire(ViewCompany::class, ['record' => $company->getKey()])->instance()->getRelationManagers()));
 
-    expect(class_basename(reset($tabs)))->toBe('PeopleRelationManager');
+    expect(array_slice($tabs, 0, 2))->toBe(['ActivityLogRelationManager', 'PeopleRelationManager']);
+});
+
+it('names the activity log tab activity', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+    expect(ActivityLogRelationManager::getTitle($company, ViewCompany::class))->toBe('Activity');
 });
 
 it('puts a keyboard reachable resize handle between the details rail and the work pane on the :dataset page', function (string $model, string $page): void {
@@ -369,6 +381,16 @@ it('links a note created from the rail to the :dataset record and reloads the op
     expect($record->notes()->sole()->title)->toBe('Discovery call recap');
 })->with('record pages');
 
+it('raises the overview notes count as soon as a note is created from the rail', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire(ViewCompany::class, ['record' => $company->getKey()])
+        ->assertSeeHtml('<span class="fi-record-overview-count">0</span>')
+        ->callAction(quickAction('createNote'), data: ['title' => 'Discovery call recap'])
+        ->dispatch('related-record-created')
+        ->assertSeeHtml('<span class="fi-record-overview-count">1</span>');
+});
+
 it('links a task created from the rail to the :dataset record and notifies its assignee', function (string $model, string $page): void {
     $this->withoutDefer();
 
@@ -484,4 +506,182 @@ it('hides compose email on the rail for a person whose mailbox is blocked', func
 
     livewire(ViewPeople::class, ['record' => $person->getKey()])
         ->assertActionDoesNotExist(quickAction('composeEmail'));
+});
+
+it('opens the :dataset page on an overview of highlights, activity, notes and tasks', function (string $model, string $page): void {
+    $record = $model::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire($page, ['record' => $record->getKey()])
+        ->assertSeeHtml('fi-record-overview-tab')
+        ->assertSeeInOrder([
+            __('filament/record-page.overview.highlights'),
+            __('filament/record-page.overview.activity'),
+            __('filament/record-page.overview.notes'),
+            __('filament/record-page.overview.tasks'),
+        ]);
+})->with('record pages');
+
+it('highlights an opportunity by stage, amount, close date, company, contact and next due task', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Northwind Traders']);
+    $contact = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Dana Whitfield']);
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create([
+        'company_id' => $company->getKey(),
+        'contact_id' => $contact->getKey(),
+    ]);
+
+    livewire(ViewOpportunity::class, ['record' => $opportunity->getKey()])
+        ->assertSeeInOrder([
+            __('filament/record-page.overview.highlights'),
+            'Stage',
+            'Amount',
+            'Close Date',
+            'Company',
+            'Northwind Traders',
+            'Point of Contact',
+            'Dana Whitfield',
+            __('filament/record-page.overview.next_task'),
+            __('filament/record-page.overview.no_next_task'),
+        ]);
+});
+
+it('names the open task due soonest as the next due task and skips a done one', function (): void {
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
+    $dueField = CustomField::query()->forEntity(Task::class)->where('code', TaskField::DUE_DATE->value)->firstOrFail();
+    $statusField = CustomField::query()->forEntity(Task::class)->where('code', TaskField::STATUS->value)->with('options')->firstOrFail();
+
+    $task = fn (string $title, CarbonImmutable $due): Task => tap(
+        Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => $title]),
+        function (Task $task) use ($opportunity, $dueField, $due): void {
+            $task->saveCustomFieldValue($dueField, $due);
+            $opportunity->tasks()->attach($task);
+        },
+    );
+
+    $task('Send the contract', now()->addDays(5));
+    $task('Book the demo', now()->addDay());
+    $task('Kickoff call', now()->subDay())
+        ->saveCustomFieldValue($statusField, $statusField->options->firstWhere('name', TaskField::DONE_STATUS)->getKey());
+
+    $html = livewire(ViewOpportunity::class, ['record' => $opportunity->getKey()])
+        ->assertSeeInOrder([
+            __('filament/record-page.overview.next_task'),
+            'Book the demo',
+            __('filament/record-page.overview.tasks'),
+            'Book the demo',
+            'Send the contract',
+        ])
+        ->html();
+
+    expect(Str::after($html, 'fi-record-overview-related'))->not->toContain('Kickoff call');
+});
+
+it('lists open tasks on the overview by due date with an undated one last', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $dueField = CustomField::query()->forEntity(Task::class)->where('code', TaskField::DUE_DATE->value)->firstOrFail();
+
+    $task = fn (string $title, ?CarbonImmutable $due): Task => tap(
+        Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => $title]),
+        function (Task $task) use ($company, $dueField, $due): void {
+            if ($due instanceof CarbonImmutable) {
+                $task->saveCustomFieldValue($dueField, $due);
+            }
+
+            $company->tasks()->attach($task);
+        },
+    );
+
+    $task('Write the proposal', null);
+    $task('Send the contract', now()->addDays(5));
+    $task('Book the demo', now()->addDay());
+
+    livewire(ViewCompany::class, ['record' => $company->getKey()])
+        ->assertSeeInOrder([
+            __('filament/record-page.overview.tasks'),
+            'Book the demo',
+            'Send the contract',
+            'Write the proposal',
+        ]);
+});
+
+it('offers no overview create button to a member who can only view records', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $viewer = User::factory()->create();
+    $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
+    $viewer->switchWorkspace($this->workspace);
+
+    $this->actingAs($viewer);
+
+    livewire(ViewCompany::class, ['record' => $company->getKey()])
+        ->assertSeeHtml('fi-record-overview-related')
+        ->assertDontSeeHtml('fi-record-overview-add');
+});
+
+it('marks a task due earlier today as overdue on the overview, as the tasks board does', function (): void {
+    $this->travelTo(now()->setTime(15, 0));
+
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $dueField = CustomField::query()->forEntity(Task::class)->where('code', TaskField::DUE_DATE->value)->firstOrFail();
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Morning call']);
+    $task->saveCustomFieldValue($dueField, now()->setTime(9, 0));
+    $company->tasks()->attach($task);
+
+    livewire(ViewCompany::class, ['record' => $company->getKey()])
+        ->assertSeeHtml('fi-record-due-overdue')
+        ->assertDontSeeHtml('fi-record-due-today');
+});
+
+it('lists the three latest activity entries on the overview', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+    foreach (['Call one', 'Call two', 'Call three', 'Call four'] as $index => $title) {
+        $this->travelTo(now()->addMinutes($index + 1));
+        $company->tasks()->attach(Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => $title]));
+    }
+
+    $html = livewire(ViewCompany::class, ['record' => $company->getKey()])->html();
+    $activity = Str::before(Str::after($html, 'fi-record-overview-activity'), __('filament/record-page.overview.notes'));
+
+    expect(substr_count($activity, 'timeline-entry-'))->toBe(3)
+        ->and($activity)->toContain('Call four')
+        ->and($activity)->not->toContain('Call one');
+});
+
+it('points the :dataset overview view all link at the activity log tab', function (string $model, string $page): void {
+    $record = $model::factory()->recycle([$this->user, $this->workspace])->create();
+    $component = livewire($page, ['record' => $record->getKey()]);
+    $activityTab = array_search(ActivityLogRelationManager::class, $component->instance()->getRelationManagers(), true);
+
+    $component->assertSeeHtml("\$wire.set('activeRelationManager', '{$activityTab}')");
+})->with('record pages');
+
+it('opens a task linked to the opportunity from its overview and refuses one from another record', function (): void {
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
+    $linked = Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Book the demo']);
+    $opportunity->tasks()->attach($linked);
+    $elsewhere = Task::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire(ViewOpportunity::class, ['record' => $opportunity->getKey()])
+        ->assertSeeHtml([e("\$wire.mountAction('editTask'"), (string) $linked->getKey()])
+        ->mountAction('editTask', ['task' => $linked->getKey()])
+        ->assertActionMounted('editTask')
+        ->assertSchemaStateSet(['title' => 'Book the demo'])
+        ->call('unmountAction')
+        ->mountAction('editTask', ['task' => $elsewhere->getKey()])
+        ->assertActionNotMounted('editTask');
+});
+
+it('opens a note linked to the company from its overview and refuses one from another record', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $linked = Note::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Kickoff notes']);
+    $company->notes()->attach($linked);
+    $elsewhere = Note::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire(ViewCompany::class, ['record' => $company->getKey()])
+        ->assertSeeHtml([e("\$wire.mountAction('editNote'"), (string) $linked->getKey()])
+        ->mountAction('editNote', ['note' => $linked->getKey()])
+        ->assertActionMounted('editNote')
+        ->assertSchemaStateSet(['title' => 'Kickoff notes'])
+        ->call('unmountAction')
+        ->mountAction('editNote', ['note' => $elsewhere->getKey()])
+        ->assertActionNotMounted('editNote');
 });
