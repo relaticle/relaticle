@@ -6,8 +6,13 @@ namespace Relaticle\Chat\Support;
 
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
+use App\Models\Workspace;
 use App\Support\PlainText;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use League\HTMLToMarkdown\Converter\TableConverter;
+use League\HTMLToMarkdown\HtmlConverter;
+use Relaticle\Chat\Support\Markdown\TaskListConverter;
 
 final readonly class LongTextForModel
 {
@@ -31,6 +36,24 @@ final readonly class LongTextForModel
 
     public static function markdown(string $html): string
     {
-        return trim(resolve('markdown-response.driver.league')->convert($html));
+        $converter = new HtmlConverter([
+            ...(array) config('markdown-response.driver_options.league.options', []),
+            'header_style' => 'atx',
+        ]);
+        $converter->getEnvironment()->addConverter(new TableConverter);
+        $converter->getEnvironment()->addConverter(new TaskListConverter);
+
+        return trim($converter->convert($html));
+    }
+
+    /** @return Collection<int, CustomField> */
+    public static function richTextFields(Workspace $workspace, string $entityType): Collection
+    {
+        return CustomField::query()
+            ->where('tenant_id', $workspace->getKey())
+            ->where('entity_type', $entityType)
+            ->where('type', CustomFieldType::RICH_EDITOR->value)
+            ->active()
+            ->get();
     }
 }

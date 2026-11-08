@@ -17,6 +17,7 @@ use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\DisplayFieldSelector;
+use Relaticle\Chat\Support\LongTextForModel;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Tools\Concerns\LocalisesDatetimes;
 use Relaticle\CustomFields\Models\CustomFieldValue;
@@ -162,7 +163,7 @@ abstract class BaseReadShowTool implements Tool
         /** @var class-string<JsonResource> $resourceClass */
         $resourceClass = $this->resourceClass();
 
-        $payload = $this->flattenResource(new $resourceClass($model));
+        $payload = $this->richTextAsMarkdown($this->flattenResource(new $resourceClass($model)), $user);
 
         $id = (string) $model->getKey();
         $resolver = resolve(RecordReferenceResolver::class);
@@ -280,6 +281,30 @@ abstract class BaseReadShowTool implements Tool
 
         /** @var array<string, mixed> $data */
         return $data;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function richTextAsMarkdown(array $payload, User $user): array
+    {
+        $attributes = $payload['attributes'] ?? null;
+        $customFields = $attributes instanceof stdClass ? ($attributes->custom_fields ?? null) : null;
+
+        if (! $customFields instanceof stdClass) {
+            return $payload;
+        }
+
+        $richTextFields = LongTextForModel::richTextFields($user->currentWorkspace, $this->citationType());
+
+        foreach ($richTextFields->pluck('code') as $code) {
+            if (isset($customFields->{$code}) && is_string($customFields->{$code})) {
+                $customFields->{$code} = LongTextForModel::markdown($customFields->{$code});
+            }
+        }
+
+        return $payload;
     }
 
     /**

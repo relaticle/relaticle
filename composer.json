@@ -40,6 +40,7 @@
         "laravel/socialite": "^5.16",
         "laravel/tinker": "^3.0",
         "league/flysystem-aws-s3-v3": "^3.0",
+        "league/html-to-markdown": "^5.2",
         "livewire/livewire": "^4.0",
         "mallardduck/blade-lucide-icons": "^2.0",
         "manukminasyan/blade-mdi": "^1.0",
