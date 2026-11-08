@@ -57,8 +57,8 @@ enum OnboardingDataSource: string implements HasLabel
     public function seedsSamples(): bool
     {
         return match ($this) {
-            self::Memory, self::Inbox => true,
-            self::Spreadsheet, self::OtherCrm, self::Assistant => false,
+            self::Memory => true,
+            self::Spreadsheet, self::OtherCrm, self::Inbox, self::Assistant => false,
         };
     }
 

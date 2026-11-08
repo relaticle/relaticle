@@ -15,7 +15,10 @@ final readonly class SaveOnboardingDataSource
     public function execute(User $user, Workspace $workspace, OnboardingDataSource $source): bool
     {
         abort_unless($workspace->user_id === $user->getKey(), 403);
-        abort_unless(in_array($source, OnboardingDataSource::offered(), true), 422);
+
+        if (! in_array($source, OnboardingDataSource::offered(), true)) {
+            return false;
+        }
 
         $stored = Workspace::query()
             ->whereKey($workspace->getKey())

@@ -9,6 +9,7 @@ use App\Enums\OnboardingDataSource;
 use App\Features\SetupConversation;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\WorkspaceActivationFacts;
 use App\Support\CurrentWorkspace;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -1142,8 +1143,11 @@ final class ProcessChatMessage implements ShouldQueue
             return false;
         }
 
-        return $this->workspace->onboarding_data_source === null
-            || $this->answeredTheSourceQuestion()
+        if ($this->workspace->onboarding_data_source === null) {
+            return ! resolve(WorkspaceActivationFacts::class)->hasOwnRecord($this->workspace);
+        }
+
+        return $this->answeredTheSourceQuestion()
             || in_array($this->origin, [MessageOrigin::Greeting, MessageOrigin::DataArrived], true);
     }
 

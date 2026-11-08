@@ -26,11 +26,6 @@ final readonly class SetupOptions
     public function for(User $user, Workspace $workspace): array
     {
         $answer = $workspace->onboarding_data_source;
-
-        if (! $answer instanceof OnboardingDataSource) {
-            return $this->answers();
-        }
-
         $source = $workspace->effectiveDataSource();
 
         if ($this->companiesArrivedToday($user, $workspace, $source)) {
@@ -38,6 +33,10 @@ final readonly class SetupOptions
                 $this->prompt('pick_first', 'lucide-flag'),
                 $this->prompt('later', 'lucide-clock'),
             ];
+        }
+
+        if (! $answer instanceof OnboardingDataSource) {
+            return $this->answers();
         }
 
         $options = match ($source) {

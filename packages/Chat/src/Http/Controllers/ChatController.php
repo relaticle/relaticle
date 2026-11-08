@@ -163,13 +163,13 @@ final readonly class ChatController
             ]);
         }
 
-        $this->saveSetupAnswer($user, $workspace, $conversation, $validated['next_step'] ?? null);
-
         $turnId = (string) Str::ulid();
 
         if (! $this->creditService->reserveCredit($workspace, reservationKey: "reserve-{$turnId}", conversationId: $conversation, userId: (string) $user->getKey())) {
             return $this->creditsExhaustedResponse($workspace);
         }
+
+        $this->saveSetupAnswer($user, $workspace, $conversation, $validated['next_step'] ?? null);
 
         DB::transaction(function () use ($conversation, $user, $workspace): void {
             $row = DB::table('agent_conversations')

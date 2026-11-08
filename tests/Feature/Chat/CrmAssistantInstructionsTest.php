@@ -550,11 +550,11 @@ it('has the greeting ask where the clients live when the user has not answered',
     $greeting = MessageOrigin::Greeting->directive();
 
     expect($greeting)
-        ->toContain('When the data_source line is none, ask where their clients live today, in one or two short sentences')
-        ->toContain('they can pick an answer below or just tell you')
+        ->toContain('When the data_source line is none, ask where their clients live today, in one or two short sentences, and point them to the answers below')
         ->toContain('call no tools in this turn')
+        ->not->toContain('just tell you')
         ->not->toContain('none means')
-        ->not->toContain('—');
+        ->not->toContain(chr(0x2014));
 
     $agent = setupAgent(User::factory()->withPersonalWorkspace()->create()->currentWorkspace)->withTurnOrigin(MessageOrigin::Greeting);
 
@@ -563,15 +563,25 @@ it('has the greeting ask where the clients live when the user has not answered',
         ->toContain("<turn>\n{$greeting}\n</turn>");
 });
 
-it('gives the next step of the path a clicked answer names', function (): void {
+it('keys the setup rules on the data source line and never on an answer label', function (): void {
     $instructions = resolve(CrmAssistant::class)->staticInstructions();
 
     expect($instructions)
-        ->toContain("When the user's whole message is the name of one answer (A spreadsheet, Another CRM, My inbox, In my head, Claude or ChatGPT)")
-        ->toContain('the data_source line already holds it')
+        ->toContain("When the data_source line names a source and the user's message answers where their clients live, give that source's next step")
         ->toContain('other_crm: ask which CRM they use, and say an exported CSV of people and companies comes in through the import')
-        ->toContain('With data_source none, the user has not answered yet')
+        ->toContain('A stored answer does not change')
+        ->toContain('When the data_source line is none, nothing is stored from what the user types')
+        ->toContain('never say it was saved')
         ->not->toContain('crm_named');
+
+    $start = (int) strpos($instructions, '## Setup mode');
+    $setupMode = substr($instructions, $start, (int) strpos($instructions, "\n## ", $start + 1) - $start);
+
+    expect($setupMode)->toContain('When the data_source line is none')->toContain('RemoveSampleDataTool');
+
+    foreach (OnboardingDataSource::cases() as $source) {
+        expect($setupMode)->not->toContain($source->getLabel());
+    }
 });
 
 it('leaves the data source lines out of an ordinary conversation', function (): void {

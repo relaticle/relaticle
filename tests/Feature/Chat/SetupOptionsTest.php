@@ -113,6 +113,13 @@ it('leaves out the inbox answer when no mailbox can connect', function (): void 
     expect(optionIds())->toBe(['source_spreadsheet', 'source_other_crm', 'source_memory', 'source_assistant']);
 });
 
+it('offers the company pick to a workspace that never answered once companies arrived', function (CreationSource $arrivedFrom): void {
+    answeredWith(null);
+    arrivedFrom($arrivedFrom);
+
+    expect(optionIds())->toBe(['pick_first', 'later']);
+})->with([CreationSource::IMPORT, CreationSource::MAILBOX]);
+
 it('offers no answers once the question was answered', function (OnboardingDataSource $source): void {
     answeredWith($source);
 
@@ -397,6 +404,30 @@ it('writes the answer buttons on any setup turn while the question is unanswered
         ->toBe(['source_spreadsheet', 'source_other_crm', 'source_inbox', 'source_memory', 'source_assistant']);
     Queue::assertNotPushed(SuggestNextSteps::class);
 })->with([MessageOrigin::Greeting, MessageOrigin::DataArrived, MessageOrigin::Typed]);
+
+it('writes the company pick on a data arrived turn while the question is unanswered', function (): void {
+    suggestNextStepsFake();
+    answeredWith(null);
+    arrivedFrom(CreationSource::MAILBOX);
+    CrmAssistant::fake(['Your companies arrived.']);
+
+    runSetupTurn($this->user, $this->workspace->fresh(), MessageOrigin::DataArrived);
+
+    expect(array_column(lastAssistantNextSteps($this->workspace->setupConversation->id), 'id'))->toBe(['pick_first', 'later']);
+    Queue::assertNotPushed(SuggestNextSteps::class);
+});
+
+it('resumes suggested next steps once an unanswered workspace holds its own record', function (MessageOrigin $origin): void {
+    suggestNextStepsFake();
+    answeredWith(null);
+    Company::factory()->create(['workspace_id' => $this->workspace->getKey(), 'creation_source' => CreationSource::WEB]);
+    CrmAssistant::fake(['Here is what you have.']);
+
+    runSetupTurn($this->user, $this->workspace->fresh(), $origin);
+
+    expect(lastAssistantNextSteps($this->workspace->setupConversation->id))->toBeNull();
+    Queue::assertPushed(SuggestNextSteps::class);
+})->with([MessageOrigin::Typed, MessageOrigin::Greeting, MessageOrigin::DataArrived]);
 
 it('writes the path buttons on the turn that answered the question', function (): void {
     suggestNextStepsFake();

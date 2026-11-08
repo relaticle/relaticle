@@ -1605,14 +1605,14 @@ describe('data source', function (): void {
         expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Source);
     });
 
-    it('refuses an answer that is not offered when the action runs directly', function (): void {
+    it('stores nothing for an answer that is not offered when the action runs directly', function (): void {
         $user = User::factory()->create();
         $workspace = workspaceAtSource($user);
 
-        expect(fn () => resolve(SaveOnboardingDataSource::class)->execute($user, $workspace, OnboardingDataSource::Inbox))
-            ->toThrow(HttpException::class);
+        $saved = resolve(SaveOnboardingDataSource::class)->execute($user, $workspace, OnboardingDataSource::Inbox);
 
-        expect($workspace->fresh()->onboarding_data_source)->toBeNull();
+        expect($saved)->toBeFalse()
+            ->and($workspace->fresh()->onboarding_data_source)->toBeNull();
     });
 
     it('stores the first answer only', function (): void {
@@ -1674,7 +1674,7 @@ describe('where the data lives', function (): void {
         'an assistant' => [OnboardingDataSource::Assistant, false],
     ]);
 
-    it('seeds samples when the inbox answer skipped the mailbox step', function (): void {
+    it('seeds no samples when the inbox answer skipped the mailbox step', function (): void {
         Feature::define(OnboardSeed::class, true);
         Feature::define(EmailIntegration::class, true);
         config()->set('services.azure.client_id', 'azure-client');
@@ -1685,7 +1685,7 @@ describe('where the data lives', function (): void {
 
         saveSalesUseCase();
 
-        expect(sampleCompaniesIn($workspace))->toBe(4);
+        expect(sampleCompaniesIn($workspace))->toBe(0);
     });
 
     it('seeds as before for a workspace that started setup before the data source step', function (): void {
