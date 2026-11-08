@@ -1,6 +1,6 @@
 {
     "private": true,
-    "packageManager": "pnpm@11.24.0",
+    "packageManager": "pnpm@11.28.11",
     "type": "module",
     "engines": {
         "node": ">=22.22.0"

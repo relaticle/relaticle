@@ -7,6 +7,7 @@ namespace App\Filament\Components\Tables;
 use App\Filament\Actions\PreviewRecordAction;
 use App\Filament\Components\RecordChip;
 use App\Filament\Concerns\HasRecordChips;
+use Filament\Actions\ActionGroup;
 use Filament\Tables\Columns\TextColumn;
 
 final class RecordChipColumn extends TextColumn
@@ -51,7 +52,11 @@ final class RecordChipColumn extends TextColumn
             return null;
         }
 
-        $action->record($this->getRecord());
+        $group = $action->getRootGroup();
+
+        $action = $group instanceof ActionGroup
+            ? $group->getClone()->record($this->getRecord())->getFlatActions()[$action->getName()]
+            : (clone $action)->record($this->getRecord());
 
         if ($action->isHidden()) {
             return null;
