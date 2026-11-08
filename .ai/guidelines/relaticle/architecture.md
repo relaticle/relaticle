@@ -66,8 +66,9 @@ repository without it.
   the directory, and the unset switch keeps the provider out of `bootstrap/providers.php` and the
   package's entries out of `vite.config.js`. `packages/Cloud/tests/Feature/CloudProviderTest.php`
   pins the provider half. The `Self-hosted Build` job in `.github/workflows/ci.yml` boots once with
-  the switch unset, then deletes the directory, rebuilds the autoload and runs Arch, Smoke and
-  Feature. A core class, view or route that needs Cloud fails that job
+  the switch unset, then deletes the directory, rebuilds the autoload and runs Arch and Smoke. A
+  push to main runs Feature there too. A core class, view or route that needs Cloud fails that job,
+  on the pull request when Arch or Smoke reaches it, and otherwise on main after the merge
 - Core asks Cloud through two contracts and keeps a self-hosted default for each:
   `App\Contracts\Entitlements` (`SelfHostedEntitlements`) and `App\Contracts\Billing` (`NoBilling`).
   `CloudServiceProvider` binds Cloud's implementation only while the billing flag is on.
