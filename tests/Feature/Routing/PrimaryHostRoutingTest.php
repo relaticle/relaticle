@@ -79,6 +79,12 @@ describe('app plumbing on secondary hosts', function () {
         expect(urldecode($location))->toContain('redirect_uri=http://app.relaticle.test/auth/callback/google');
     });
 
+    it('serves the guest passkey sign-in options on the app host so the ceremony stays same-origin', function (): void {
+        $this->get('http://app.relaticle.test/passkeys/login/options')
+            ->assertOk()
+            ->assertJsonStructure(['options' => ['challenge']]);
+    });
+
     it('leaves filament export downloads untouched', function (): void {
         $user = User::factory()->withPersonalWorkspace()->create();
 
