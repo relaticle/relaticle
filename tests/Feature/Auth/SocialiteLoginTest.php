@@ -25,6 +25,7 @@ use Illuminate\Foundation\Testing\CachedState;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\InvalidStateException;
@@ -233,6 +234,18 @@ test('a google identity replaces an unverified password account nobody claimed',
         ->and($owner->socialAccounts()->where('provider_id', 'maya-google-id')->exists())->toBeTrue();
 
     $this->assertAuthenticatedAs($owner);
+});
+
+test('replacing an unclaimed account leaves a log entry naming the deleted account', function (): void {
+    $squatter = User::factory()->unverified()->create(['email' => 'maya@example.com']);
+    Socialite::fake('google', makeSocialiteUser('maya-google-id', 'Maya', 'maya@example.com'));
+    Log::spy();
+
+    $this->get(route('auth.socialite.callback', ['provider' => 'google', 'code' => 'accepted']));
+
+    Log::shouldHaveReceived('info')
+        ->with('A provider sign-up replaced an unclaimed account', Mockery::on(fn (array $context): bool => $context['deleted_user_id'] === $squatter->getKey() && $context['provider'] === 'google'))
+        ->once();
 });
 
 test('a verified password account is left alone and the person is told to sign in with their password', function (): void {

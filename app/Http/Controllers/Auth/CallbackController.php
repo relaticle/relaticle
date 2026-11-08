@@ -18,6 +18,7 @@ use Filament\Notifications\Notification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Laravel\Socialite\Contracts\User as SocialiteUser;
 use Laravel\Socialite\Two\InvalidStateException;
@@ -119,7 +120,21 @@ final readonly class CallbackController
 
     private function releasedFor(SocialiteProvider $provider, SocialiteUser $socialUser, User $holder): bool
     {
-        return $provider->vouchesForEmailOf($socialUser) && $this->deleteUnclaimedAccount->execute($holder);
+        if (! $provider->vouchesForEmailOf($socialUser)) {
+            return false;
+        }
+
+        if (! $this->deleteUnclaimedAccount->execute($holder)) {
+            return false;
+        }
+
+        Log::info('A provider sign-up replaced an unclaimed account', [
+            'deleted_user_id' => $holder->getKey(),
+            'provider' => $provider->value,
+            'ip' => request()->ip(),
+        ]);
+
+        return true;
     }
 
     private function existingAccountMessage(SocialiteProvider $provider): string
