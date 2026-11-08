@@ -7,7 +7,7 @@
     $copy = [
         'twenty' => [
             'badge' => __('Comparison'),
-            'opening' => __('Relaticle and Twenty CRM are both AGPL-3.0, self-hostable CRMs with AI and a first-party MCP server. The choice comes down to what you\'re optimizing for. Pick Relaticle if you want flat pricing that doesn\'t grow with headcount, or one server to run. Pick Twenty if you want the larger open-source community or prefer a Node/NestJS stack over Laravel and PHP.'),
+            'opening' => __('Relaticle and Twenty CRM are both AGPL-3.0, self-hostable CRMs with AI and a first-party MCP server. The choice comes down to what you\'re optimizing for. Pick Relaticle if you want flat pricing that doesn\'t grow with headcount, or one server to run. Pick Twenty if you want custom objects built as apps, or an open-source project with more GitHub stars and contributors.'),
             'sections' => [
                 [
                     'heading' => __('How do Relaticle and Twenty pricing compare?'),
