@@ -24,7 +24,7 @@ final readonly class UpdateTableLayout
         abort_unless($user->can('update', $layout), 403);
 
         if (array_key_exists('name', $attributes)) {
-            $attributes['name'] = $this->ensureNameIsFree->execute($user, $layout->workspace_id, $layout->entity, $attributes['name'], $layout);
+            $attributes['name'] = $this->ensureNameIsFree->execute($user, $layout, $attributes['name']);
         }
 
         if (array_key_exists('state', $attributes)) {
