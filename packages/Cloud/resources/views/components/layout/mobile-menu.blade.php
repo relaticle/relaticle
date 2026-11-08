@@ -1,6 +1,5 @@
 <div x-show="mobileMenu" x-transition.opacity.duration.150ms @click="mobileMenu = false" class="fixed inset-0 z-[59] md:hidden" x-cloak aria-hidden="true"></div>
 
-{{-- A card under the floating header --}}
 <nav x-show="mobileMenu"
      x-ref="overlay"
      x-transition.opacity.duration.150ms
@@ -10,12 +9,12 @@
           sees Shift+Tab and focus escapes backwards out of the overlay. --}}
      @keydown.tab="trapTab($event)"
      @keydown.shift.tab="trapTab($event)"
-     class="md:hidden fixed z-[60] bg-white dark:bg-gray-950 flex flex-col inset-x-2 top-2 max-h-[calc(100dvh-1rem)] overflow-hidden rounded-2xl shadow-navbar"
+     class="md:hidden fixed z-[60] bg-surface border-rail flex flex-col inset-x-0 top-0 max-h-dvh overflow-hidden border-b"
      x-cloak
      aria-label="{{ __('Mobile menu') }}">
 
     {{-- Header --}}
-    <div class="flex items-center justify-between h-16 shrink-0 px-2">
+    <div class="flex items-center justify-between h-16 shrink-0 px-6 sm:px-[25px]">
         <a href="{{ url('/') }}" aria-label="Relaticle Home">
             <x-brand.logo-lockup size="md" class="text-black dark:text-white"/>
         </a>
@@ -92,17 +91,17 @@
     {{-- Bottom CTA. With both accordions open the list scrolls under this block,
          so it carries a fade: without one the last link stops dead against the
          buttons and reads as clipped rather than scrollable. --}}
-    <div class="relative shrink-0 border-t border-gray-100 p-4 dark:border-white/[0.06]">
-        <x-cloud::layout.community-links class="mobile-nav-enter mb-4 flex w-fit" style="--stagger: {{ count($mobileNavItems) }}"/>
+    <div class="mobile-nav-enter relative shrink-0 border-t border-gray-100 p-4 dark:border-white/[0.06]" style="--stagger: {{ count($mobileNavItems) }}">
+        <x-cloud::layout.community-links class="mb-4 flex w-fit"/>
 
         @auth('web')
-            <div class="grid mobile-nav-enter" style="--stagger: {{ count($mobileNavItems) }}">
+            <div class="grid">
                 <x-cloud::marketing.button :href="app(\App\Support\Auth\LoginDestination::class)->resolve(auth('web')->user(), null)" class="active:scale-[0.98]">
                     {{ __('Open app') }}
                 </x-cloud::marketing.button>
             </div>
         @else
-            <div class="grid grid-cols-2 gap-3 mobile-nav-enter" style="--stagger: {{ count($mobileNavItems) }}">
+            <div class="grid grid-cols-2 gap-3">
                 <x-cloud::marketing.button variant="secondary" href="{{ route('login') }}" class="active:scale-[0.98]" data-analytics-intent="login" data-analytics-placement="mobile">
                     Sign In
                 </x-cloud::marketing.button>

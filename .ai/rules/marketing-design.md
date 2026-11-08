@@ -30,6 +30,9 @@ human moments (the homepage email visual), never behind body text.
 
 `bg-dots` is a 20px dot texture for the `tint` cells that hold product UI, so a mock has something to
 sit on. It never sits behind marketing copy. On `/ai` the showcase visuals and the Control cells use it.
+A `bg-dots` band that fills the whole column runs the full viewport width, and its rails keep drawing across it,
+so the grid stays whole. The homepage story is the worked example: hairlines above and below span
+the viewport, and the cards stay inside the rails.
 
 Cells inside a `gap-px` grid stay opaque. A translucent fill lets the rail color show through and
 turns the cell gray in dark mode. `canvas` is taken by the Scribe theme, which is why the third
@@ -179,18 +182,24 @@ reach it. Change the header height and the token together. `html` also carries `
 The header and footer sit on the same `max-w-6xl` rails as every section, so the logo, the `h1` and
 every section edge line up. `x-cloud::guest-layout` has no other layout.
 
-The framed header is a floating card: 64px tall (the height of the app's top bar) with a 12px gap
-above it at `md`, a 1px `gray-200` ring and one soft shadow (`shadow-navbar`). A 92px band on the
-rails sits under it with a `cross` mark at each bottom corner from `xl`. `--header-height` is the
-card's bottom edge (4.75rem at `md`), and `scroll-padding-top` follows it. On phones the menu opens
-as a card under the header instead of a full screen.
+The header is the frame's first row: a fixed 64px bar (the height of the app's top bar) on the rails,
+`bg-surface` with a `rail` hairline under it and no shadow. At the top of the page a `cross` marks
+each point where a rail meets that hairline, from `xl`. Each cross is two halves: the bar's half is
+clipped at the hairline and fades out once the page scrolls, and the spacer's half below it scrolls
+away. A cross over scrolled content painted a `surface` square or a gray stub onto the hero panel
+and the dark band, so the crosses only ever sit on the page's own surface. The bar holds the nav, the
+GitHub and Discord counts from
+`lg`, Sign In as a text link and Start for free as its one button, each on one line down to `md`.
+On phones the menu opens as a full-width sheet over the bar.
 
 The framed footer is quiet: the logo and blurb with four small social icons, four link columns,
 then the copyright row with the theme switcher. No cells, no wordmark. The copyright names
 Relaticle, Inc., as `.github/TRADEMARK.md` does, and the row carries the legal links and llms.txt.
 `MarketingNavigation::legal()` holds them, and `closestTo()` reads it with the columns.
 
-The old full-width header and footer are gone; the `framed` flag went with them on 2026-11-06.
+The old full-width header and footer are gone; the `framed` flag went with them on 2026-11-06. The
+floating header card gave way to the bar on 2026-11-08: its shadow was the only one in the system,
+and it sat 24px inside the rails, so two vertical edges ran side by side.
 
 ## Motion (`packages/Cloud/resources/js/motion.js`)
 
