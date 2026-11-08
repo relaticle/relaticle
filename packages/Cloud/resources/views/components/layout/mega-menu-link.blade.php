@@ -13,7 +13,7 @@
 <a href="{{ $item->url }}"
    @if($item->external) target="_blank" rel="noopener noreferrer" @endif
    @if(url()->current() === $item->url) aria-current="page" @endif
-   @click="openDropdown = null"
+   @click="closeAll()"
    class="group flex items-start gap-3 rounded-lg px-3 py-2 hover:bg-gray-50 dark:hover:bg-white/[0.04] transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary">
 
     @if($item->icon)
