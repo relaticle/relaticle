@@ -202,8 +202,12 @@ jobs:
           retention-days: 1
 
   self-hosted-build:
-    runs-on: ubuntu-latest
-    name: Self-hosted Build
+    runs-on: ubuntu-24.04-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: ['arch-smoke', '1/4', '2/4', '3/4', '4/4']
+    name: Self-hosted Build (${{ matrix.variant }})
 
     services:
       postgres:
@@ -231,9 +235,9 @@ jobs:
           path: |
             ~/.composer/cache
             vendor
-          key: ${{ runner.os }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
           restore-keys: |
-            ${{ runner.os }}-php-8.5-composer-
+            ${{ runner.os }}-${{ runner.arch }}-php-8.5-composer-
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -272,13 +276,13 @@ jobs:
           composer dump-autoload
 
       - name: Tests
-        run: vendor/bin/pest --compact --parallel --configuration phpunit.ci.xml --testsuite=Arch,Smoke,Feature --ci --no-tia --log-junit junit.xml
+        run: vendor/bin/pest --compact --parallel --configuration phpunit.ci.xml ${{ matrix.variant == 'arch-smoke' && '--testsuite=Arch,Smoke' || format('--testsuite=Arch,Smoke,Feature --shard={0}', matrix.variant) }} --ci --no-tia --log-junit junit.xml
 
       - name: Upload timings
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: junit-self-hosted
+          name: junit-self-hosted-${{ strategy.job-index }}
           path: junit.xml
           retention-days: 1
 
