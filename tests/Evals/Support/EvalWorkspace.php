@@ -77,13 +77,11 @@ final readonly class EvalWorkspace
 
     public function conversation(?string $purpose = null): AgentConversation
     {
-        $conversation = resolve(CreateConversation::class)->execute($this->owner, $this->workspace, 'Eval conversation');
-
         if ($purpose === AgentConversation::PURPOSE_SETUP) {
-            $conversation->forceFill(['purpose' => $purpose])->save();
+            return $this->setupConversation();
         }
 
-        return $conversation;
+        return resolve(CreateConversation::class)->execute($this->owner, $this->workspace, 'Eval conversation');
     }
 
     public function recordId(string $entity, string $name): string
@@ -114,6 +112,23 @@ final readonly class EvalWorkspace
             ->where('entity_type', $entity)
             ->where('code', $code)
             ->sole();
+    }
+
+    private function setupConversation(): AgentConversation
+    {
+        $existing = AgentConversation::query()
+            ->where('workspace_id', $this->workspace->getKey())
+            ->where('purpose', AgentConversation::PURPOSE_SETUP)
+            ->first();
+
+        if ($existing instanceof AgentConversation) {
+            return $existing;
+        }
+
+        $conversation = resolve(CreateConversation::class)->execute($this->owner, $this->workspace, 'Eval conversation');
+        $conversation->forceFill(['purpose' => AgentConversation::PURPOSE_SETUP])->save();
+
+        return $conversation;
     }
 
     private function createCompanyFields(): void

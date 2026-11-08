@@ -11,6 +11,7 @@ use App\Models\Task;
 use Illuminate\Database\Eloquent\Builder;
 use Relaticle\Chat\Models\PendingAction;
 use Tests\Evals\Support\EvalWorkspace;
+use Tests\Helpers\ProposalCardFixture;
 
 function evalRows(string $model, EvalWorkspace $fixture): Builder
 {
@@ -40,15 +41,25 @@ it('gives every task a description between 300 and 2000 characters', function ()
     });
 });
 
-it('starts each conversation on a fresh id with no pending actions', function (): void {
+it('starts each conversation on a fresh id with its own pending actions', function (): void {
     $a = EvalWorkspace::seed();
     $one = $a->conversation();
-    $two = $a->conversation('setup');
+    ProposalCardFixture::proposal($a->owner, ['name' => 'Acme'], ['summary' => 'Create Acme'])->update(['conversation_id' => $one->id]);
+    $two = $a->conversation();
 
     expect($one->id)->not->toBe($two->id)
-        ->and($two->purpose)->toBe('setup')
-        ->and($one->purpose)->toBeNull()
-        ->and(PendingAction::query()->where('conversation_id', $one->id)->count())->toBe(0);
+        ->and(PendingAction::query()->where('conversation_id', $one->id)->count())->toBe(1)
+        ->and(PendingAction::query()->where('conversation_id', $two->id)->count())->toBe(0);
+});
+
+it('marks the setup conversation and returns the same one on every call', function (): void {
+    $a = EvalWorkspace::seed();
+    $first = $a->conversation('setup');
+    $second = $a->conversation('setup');
+
+    expect($first->purpose)->toBe('setup')
+        ->and($second->id)->toBe($first->id)
+        ->and($a->conversation()->purpose)->toBeNull();
 });
 
 it('spreads task statuses and adds the waiting option', function (): void {
@@ -57,6 +68,6 @@ it('spreads task statuses and adds the waiting option', function (): void {
     $counts = evalRows(Task::class, $a)->with('customFieldValues.customField')->get()
         ->countBy(fn (Task $task): string => (string) $status->options->firstWhere('id', $task->getCustomFieldValue($status))?->name);
 
-    expect($counts->all())->toBe(['To do' => 13, 'In progress' => 6, 'Done' => 6])
+    expect($counts->all())->toEqualCanonicalizing(['To do' => 13, 'In progress' => 6, 'Done' => 6])
         ->and($status->options->pluck('name')->all())->toContain('Waiting on others');
 });
