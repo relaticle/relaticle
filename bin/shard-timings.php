@@ -22,8 +22,9 @@ foreach ($reports as $report) {
         exit(1);
     }
 
-    foreach ($xml->xpath('//testsuite[@file][testcase]') ?: [] as $suite) {
-        $timings[(string) $suite->testcase[0]['class']] = round((float) $suite['time'], 4);
+    foreach ($xml->xpath('//testsuite[@file][.//testcase]') ?: [] as $suite) {
+        $class = (string) $suite->xpath('(.//testcase)[1]')[0]['class'];
+        $timings[$class] = round((float) $suite['time'], 4);
     }
 }
 
