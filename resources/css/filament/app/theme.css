@@ -1530,8 +1530,10 @@ html.fi-record-stacked .fi-record-layout {
 
 /* Dropdowns */
 
+/* The table toolbar sits at z-index 21 (resizable-columns.css), above Filament's default panel at 20,
+   so a page-header or row menu would open behind it. 22 clears the toolbar and stays under the topbar (30). */
 .fi-dropdown-panel {
-    @apply rounded-xl p-1;
+    @apply z-[22] rounded-xl p-1;
 }
 
 .fi-dropdown-list {
