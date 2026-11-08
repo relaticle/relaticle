@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Tools;
 
 use App\Data\ListQuery;
 use App\Enums\CrmEntity;
+use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\User;
 use App\Models\Workspace;
@@ -260,20 +261,20 @@ abstract class BaseReadListTool implements Tool
      */
     private function shortenLongText(array $items, string $mode, User $user): array
     {
-        $longTextCodes = CustomField::query()
+        $isRichByCode = CustomField::query()
             ->where('tenant_id', $user->currentWorkspace->getKey())
             ->where('entity_type', $this->citationType())
             ->active()
             ->get()
             ->filter(LongTextForModel::isLongText(...))
-            ->pluck('code')
+            ->mapWithKeys(static fn (CustomField $field): array => [$field->code => $field->type === CustomFieldType::RICH_EDITOR->value])
             ->all();
 
-        if ($longTextCodes === []) {
+        if ($isRichByCode === []) {
             return array_values($items);
         }
 
-        return array_map(function (mixed $item) use ($longTextCodes, $mode): mixed {
+        return array_map(function (mixed $item) use ($isRichByCode, $mode): mixed {
             $fields = is_array($item) ? ($item['attributes']['custom_fields'] ?? null) : null;
 
             if (! is_array($fields) || $fields === []) {
@@ -282,22 +283,16 @@ abstract class BaseReadListTool implements Tool
 
             $truncated = [];
 
-            foreach ($longTextCodes as $code) {
+            foreach ($isRichByCode as $code => $isRich) {
                 if (! isset($fields[$code]) || ! is_string($fields[$code])) {
                     continue;
                 }
 
-                if ($mode === 'detailed') {
-                    $fields[$code] = LongTextForModel::markdown($fields[$code]);
+                $shortened = $this->shortenValue($fields[$code], $mode, $isRich);
+                $fields[$code] = $shortened['text'];
 
-                    continue;
-                }
-
-                $concise = LongTextForModel::concise($fields[$code]);
-                $fields[$code] = $concise['text'];
-
-                if ($concise['truncated']) {
-                    $truncated[] = $code;
+                if ($shortened['truncated']) {
+                    $truncated[] = (string) $code;
                 }
             }
 
@@ -309,6 +304,16 @@ abstract class BaseReadListTool implements Tool
 
             return $item;
         }, array_values($items));
+    }
+
+    /** @return array{text: string, truncated: bool} */
+    private function shortenValue(string $value, string $mode, bool $isRich): array
+    {
+        if ($mode === 'detailed') {
+            return ['text' => $isRich ? LongTextForModel::markdown($value) : $value, 'truncated' => false];
+        }
+
+        return $isRich ? LongTextForModel::concise($value) : LongTextForModel::conciseText($value);
     }
 
     private function perPageFor(Request $request): int

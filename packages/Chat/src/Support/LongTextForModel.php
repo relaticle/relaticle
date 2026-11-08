@@ -7,9 +7,9 @@ namespace Relaticle\Chat\Support;
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\Workspace;
+use App\Support\Markdown\DecodeHtmlEntitiesPostprocessor;
 use App\Support\PlainText;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 use League\HTMLToMarkdown\Converter\TableConverter;
 use League\HTMLToMarkdown\HtmlConverter;
 use Relaticle\Chat\Support\Markdown\TaskListConverter;
@@ -26,11 +26,15 @@ final readonly class LongTextForModel
     /** @return array{text: string, truncated: bool} */
     public static function concise(string $html): array
     {
-        $plain = PlainText::fromHtml($html);
+        return self::conciseText(PlainText::fromHtml($html));
+    }
 
+    /** @return array{text: string, truncated: bool} */
+    public static function conciseText(string $text): array
+    {
         return [
-            'text' => Str::limit($plain, self::CONCISE_LIMIT, ''),
-            'truncated' => mb_strlen($plain) > self::CONCISE_LIMIT,
+            'text' => mb_substr($text, 0, self::CONCISE_LIMIT),
+            'truncated' => mb_strlen($text) > self::CONCISE_LIMIT,
         ];
     }
 
@@ -43,7 +47,7 @@ final readonly class LongTextForModel
         $converter->getEnvironment()->addConverter(new TableConverter);
         $converter->getEnvironment()->addConverter(new TaskListConverter);
 
-        return trim($converter->convert($html));
+        return trim(resolve(DecodeHtmlEntitiesPostprocessor::class)($converter->convert($html)));
     }
 
     /** @return Collection<int, CustomField> */
