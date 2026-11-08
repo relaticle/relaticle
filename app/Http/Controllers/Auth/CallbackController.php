@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Auth;
 
 use App\Actions\Auth\BeginAuthentication;
+use App\Actions\Auth\DeleteUnclaimedAccount;
 use App\Contracts\User\CreatesNewSocialUsers;
 use App\Enums\AuthMethod;
 use App\Enums\SocialiteProvider;
@@ -26,7 +27,10 @@ final readonly class CallbackController
 {
     use ResolvesSocialiteUsers;
 
-    public function __construct(private BeginAuthentication $beginAuthentication) {}
+    public function __construct(
+        private BeginAuthentication $beginAuthentication,
+        private DeleteUnclaimedAccount $deleteUnclaimedAccount,
+    ) {}
 
     public function __invoke(
         Request $request,
@@ -42,7 +46,7 @@ final readonly class CallbackController
             $account = $this->resolveUser($provider, $socialUser, $creator);
 
             if (! $account instanceof UserSocialAccount) {
-                return $this->handleError(__('auth.link.account_exists'));
+                return $this->handleError($this->existingAccountMessage($provider));
             }
 
             $user = $account->user;
@@ -70,9 +74,10 @@ final readonly class CallbackController
     /**
      * A matching email is never proof of ownership on its own, so a guest
      * callback with no existing (provider, provider_id) association must
-     * never create or update one. It returns null and leaves a short-lived
-     * link suggestion for the caller to surface instead, requiring the person
-     * to authenticate normally before an explicit link flow can run.
+     * never link to the account holding it. When that account never verified
+     * its address it is deleted and the provider's identity signs up in its
+     * place; otherwise this returns null and leaves a short-lived link
+     * suggestion, so the person authenticates normally before linking.
      */
     private function resolveUser(
         SocialiteProvider $provider,
@@ -96,7 +101,7 @@ final readonly class CallbackController
                 ? User::query()->where('email', $canonicalEmail)->first()
                 : null;
 
-            if ($matchedUser instanceof User) {
+            if ($matchedUser instanceof User && ! $this->releasedFor($provider, $socialUser, $matchedUser)) {
                 AuthenticationSession::suggestLink($provider->value, (string) $socialUser->getId(), $canonicalEmail);
 
                 return null;
@@ -110,6 +115,40 @@ final readonly class CallbackController
 
             return $this->linkSocialAccount($user, $provider->value, $socialUser->getId());
         });
+    }
+
+    private function releasedFor(SocialiteProvider $provider, SocialiteUser $socialUser, User $holder): bool
+    {
+        return $provider->vouchesForEmailOf($socialUser) && $this->deleteUnclaimedAccount->execute($holder);
+    }
+
+    private function existingAccountMessage(SocialiteProvider $provider): string
+    {
+        $email = AuthenticationSession::linkSuggestion()['email'] ?? null;
+        $holder = $email === null ? null : User::query()->where('email', $email)->first();
+
+        if (! $holder instanceof User) {
+            return __('auth.link.account_exists');
+        }
+
+        if ($holder->hasPasskey()) {
+            return __('auth.link.account_exists_passkey', ['provider' => $provider->label()]);
+        }
+
+        if ($holder->hasPassword()) {
+            return __('auth.link.account_exists_password', ['provider' => $provider->label()]);
+        }
+
+        $existingProvider = $holder->availableSocialAccount()?->provider_name;
+
+        if ($existingProvider === null) {
+            return __('auth.link.account_exists_reset');
+        }
+
+        return __('auth.link.account_exists_provider', [
+            'existing' => SocialiteProvider::from($existingProvider)->label(),
+            'provider' => $provider->label(),
+        ]);
     }
 
     private function createUser(SocialiteUser $socialUser, CreatesNewSocialUsers $creator): User

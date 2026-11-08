@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Models\WorkspaceInvitation;
 use App\Rules\RegistrableEmail;
 use App\Rules\TurnstileChallenge;
+use App\Support\Auth\AuthenticationSession;
 use App\Support\EmailAddress;
 use App\Support\Http\TorExitNodes;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
@@ -466,7 +467,7 @@ final class Login extends \Filament\Auth\Pages\Login
             ->autocomplete('username webauthn')
             ->autofocus()
             ->dehydrateStateUsing(fn (?string $state): string => EmailAddress::canonicalize((string) $state))
-            ->default(fn (): ?string => $this->getWorkspaceInvitationFromSession()?->email)
+            ->default(fn (): ?string => $this->getWorkspaceInvitationFromSession()->email ?? AuthenticationSession::linkSuggestion()['email'] ?? null)
             ->rules(RegistrableEmail::rules(), condition: fn (): bool => $this->authMethod === 'signup')
             ->unique(table: fn (): ?string => $this->authMethod === 'signup' ? 'users' : null)
             ->live(onBlur: true)
