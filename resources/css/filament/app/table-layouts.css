@@ -145,6 +145,17 @@
     @apply block max-w-56 truncate;
 }
 
+/* On a phone the trigger is icon only, like the filter and column buttons beside it, and keeps its name for screen readers. */
+.fi-ta-layouts-trigger {
+    & :is(.fi-ta-layouts-trigger-label, .fi-ta-layouts-trigger-modified) {
+        @apply max-sm:sr-only;
+    }
+
+    & .fi-view-switcher-chevron {
+        @apply max-sm:hidden;
+    }
+}
+
 .fi-ta-layouts-save .fi-icon {
     @apply text-primary-600 dark:text-primary-400;
 }

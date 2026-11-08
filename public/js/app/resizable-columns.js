@@ -240,8 +240,8 @@ function markScrolledSideways(table) {
     table?.toggleAttribute('data-scrolled-x', (table.closest('.fi-ta-content-ctn')?.scrollLeft ?? 0) > 0)
 }
 
-// Matches ResizableColumns::MIN_WIDTH, the narrowest a column gets.
-const MIN_COLUMN_WIDTH = 120
+// Matches ResizableColumns::DEFAULT_COLUMN_WIDTH, the width a column takes until someone resizes it.
+const FULL_COLUMN_WIDTH = 180
 
 // Each pinned cell sticks at the selection column's width plus the pinned widths before it.
 function applyPinnedOffsets(table) {
@@ -253,9 +253,11 @@ function applyPinnedOffsets(table) {
         left += parseInt(th.dataset.resizableWidth, 10) || th.offsetWidth
         return offset
     })
-    // Pins that leave no room for one more column would hide the rest, so they scroll with the table instead.
+    // Pins stick only while the widest other column and the actions column still fit beside them, so none is cut off.
     const room = table.closest('.fi-ta-content-ctn')?.clientWidth || Infinity
-    const active = pinned.length > 0 && left + MIN_COLUMN_WIDTH <= room && !showsCards(table)
+    const actions = table.querySelector('thead .fi-ta-actions-header-cell')?.offsetWidth ?? 0
+    const widest = Math.min(FULL_COLUMN_WIDTH, Math.max(0, ...headersOf(table).filter((th) => !pinned.includes(th)).map((th) => parseInt(th.dataset.resizableWidth, 10) || th.offsetWidth)))
+    const active = pinned.length > 0 && left + actions + widest <= room && !showsCards(table)
 
     table.classList.toggle('fi-ta-has-pinned', active)
     table.querySelectorAll('[data-column-pinned-last]').forEach((cell) => cell.removeAttribute('data-column-pinned-last'))

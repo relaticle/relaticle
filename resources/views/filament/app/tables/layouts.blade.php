@@ -18,7 +18,7 @@
                 <span class="fi-ta-layouts-trigger-label" @if ($active) title="{{ $active->name }}" @endif>{{ $active?->name ?? __('filament/panel.tables.layouts.label') }}</span>
 
                 @if ($isModified)
-                    <span class="font-normal text-gray-500 dark:text-gray-400">{{ __('filament/panel.tables.layouts.modified') }}</span>
+                    <span class="fi-ta-layouts-trigger-modified font-normal text-gray-500 dark:text-gray-400">{{ __('filament/panel.tables.layouts.modified') }}</span>
                 @endif
 
                 <x-filament::icon :icon="Heroicon::ChevronDown" class="fi-view-switcher-chevron" />
