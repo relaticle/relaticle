@@ -7,15 +7,15 @@
     $copy = [
         'twenty' => [
             'badge' => __('Comparison'),
-            'opening' => __('Relaticle and Twenty CRM are both AGPL-3.0, self-hostable CRMs, so the choice comes down to what you\'re optimizing for. Pick Relaticle if you want AI tooling (chat and MCP) that runs fully self-hosted, plus flat pricing that doesn\'t grow with headcount. Pick Twenty if you want the larger open-source community or prefer a Node/NestJS stack over Laravel and PHP.'),
+            'opening' => __('Relaticle and Twenty CRM are both AGPL-3.0, self-hostable CRMs with AI and a first-party MCP server. The choice comes down to what you\'re optimizing for. Pick Relaticle if you want flat pricing that doesn\'t grow with headcount, or one server to run. Pick Twenty if you want the larger open-source community or prefer a Node/NestJS stack over Laravel and PHP.'),
             'sections' => [
                 [
                     'heading' => __('How do Relaticle and Twenty pricing compare?'),
                     'body' => __('Relaticle charges :relaticlePricing. The bill is the same whether two people use the workspace or two hundred. Twenty prices per user (:twentyPricing), so its bill scales with every seat you add, and the gap between the two models widens as your team grows. On licensing, both projects publish under AGPL-3.0; Twenty adds a Twenty Application Exception that license-tags its enterprise files in-repo, which means some functionality stays legally reserved even in a self-hosted deploy. Relaticle reserves no product feature. Everything a self-hosted install runs is AGPL-3.0. Only the code that runs relaticle.com\'s billing and website is licensed separately.', ['relaticlePricing' => $relaticle['pricing'], 'twentyPricing' => $competitor['pricing']]),
                 ],
                 [
-                    'heading' => __('Which one runs AI and MCP self-hosted?'),
-                    'body' => __('Relaticle ships :relaticleAi. Every write the built-in assistant proposes renders as an approval card showing old value to new value, per field. It executes only when a human accepts it, so the AI layer is safe to point at real customer data. Twenty\'s offering is :twentyAi. Self-hosters get the core CRM, but the AI tooling itself is Cloud-oriented, and its public self-hosting documentation does not describe an equivalent out-of-the-box MCP setup. If self-hosted AI is the requirement, this is the sharpest difference between the two products.', ['relaticleAi' => $relaticle['ai'], 'twentyAi' => $competitor['ai']]),
+                    'heading' => __('How do their AI and MCP setups compare?'),
+                    'body' => __('Relaticle ships :relaticleAi. Every write the built-in assistant proposes renders as an approval card showing old value to new value, per field. It executes only when a human accepts it. Twenty\'s offering is :twentyAi. Both run their AI and MCP server on a self-hosted install, so try the write flow you need on each before you choose.', ['relaticleAi' => $relaticle['ai'], 'twentyAi' => $competitor['ai']]),
                 ],
                 [
                     'heading' => __('What does self-hosting each one take?'),
@@ -36,7 +36,7 @@
         ],
         'espocrm' => [
             'badge' => __('Comparison'),
-            'opening' => __('Relaticle and EspoCRM are both open-source, AGPL-3.0, self-hosted-first CRMs built to run on a single PHP server. Pick Relaticle if built-in AI, including a built-in assistant and an MCP server, matters to you. EspoCRM ships neither today. Pick EspoCRM if you want a more established codebase and its paid extension ecosystem for specific integrations.'),
+            'opening' => __('Relaticle and EspoCRM are both open-source, AGPL-3.0, self-hosted-first CRMs built to run on a single PHP server. Pick Relaticle if you want a built-in AI assistant with every Cloud plan and every self-hosted install. EspoCRM sells its AI as a paid add-on and offers MCP as a free extension. Pick EspoCRM if you want a more established codebase and its paid extension ecosystem for specific integrations.'),
             'sections' => [
                 [
                     'heading' => __('How do Relaticle and EspoCRM pricing compare?'),
@@ -44,7 +44,7 @@
                 ],
                 [
                     'heading' => __('Which one has built-in AI and MCP support?'),
-                    'body' => __('Relaticle ships :relaticleAi. Every write the built-in assistant proposes is a human-approved card, so the AI can work real customer data without acting unilaterally. EspoCRM\'s AI: :espocrmAi. If AI tooling matters to your evaluation, this is the deciding dimension. EspoCRM simply does not compete on it today.', ['relaticleAi' => $relaticle['ai'], 'espocrmAi' => $competitor['ai']]),
+                    'body' => __('Relaticle ships :relaticleAi. Every write the built-in assistant proposes is a human-approved card, so the assistant never changes customer data on its own. EspoCRM\'s AI: :espocrmAi. Both give AI agents access to CRM data over MCP. The difference is the assistant: Relaticle includes one, and EspoCRM sells its AI as an add-on.', ['relaticleAi' => $relaticle['ai'], 'espocrmAi' => $competitor['ai']]),
                 ],
                 [
                     'heading' => __('What does self-hosting each one take?'),
