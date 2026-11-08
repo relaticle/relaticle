@@ -3,14 +3,17 @@
 declare(strict_types=1);
 
 use Pest\Evals\Scorers\Scorer;
+use Tests\Evals\Scorers\CalledAnyOf;
 use Tests\Evals\Scorers\NoContactWord;
 use Tests\Evals\Scorers\NoDuplicateRowSet;
 use Tests\Evals\Scorers\NoEmDash;
 use Tests\Evals\Scorers\NoHeadingLine;
 use Tests\Evals\Scorers\NoMarkdownTable;
+use Tests\Evals\Scorers\NoNarration;
 use Tests\Evals\Scorers\NoRawUlid;
 use Tests\Evals\Scorers\OneClosingQuestionAtMost;
 use Tests\Evals\Scorers\ReplayedBytesUnder;
+use Tests\Evals\Scorers\TextMatches;
 use Tests\Evals\Scorers\UsesLookupBeforeWrite;
 use Tests\Evals\Support\Scripts;
 
@@ -18,10 +21,11 @@ use Tests\Evals\Support\Scripts;
  * @param  list<array{name: string, arguments: array<string, mixed>}>  $toolCalls
  * @param  list<list<string>>  $rowIds
  */
-function scorerEnvelope(string $text, array $toolCalls = [], int $bytes = 0, array $rowIds = [], ?string $error = null): string
+function scorerEnvelope(string $text, array $toolCalls = [], int $bytes = 0, array $rowIds = [], ?string $error = null, array $stepsText = []): string
 {
     return json_encode([
         'text' => $text,
+        'steps_text' => $stepsText,
         'tool_calls' => $toolCalls,
         'tool_result_row_ids' => $rowIds,
         'replayed_bytes' => $bytes,
@@ -126,6 +130,42 @@ it('detects Latin and non-Latin scripts', function (): void {
         ->and(Scripts::isLatin('Hello world, caf'."\u{00E9}"))->toBeTrue();
 });
 
+it('reads the text before a tool call as well as the final reply', function (): void {
+    $heading = scorerEnvelope('Here you go.', stepsText: ["## Reading data\nChecking.", 'Here you go.']);
+    $dash = scorerEnvelope('Here you go.', stepsText: ["One moment \u{2014} checking.", 'Here you go.']);
+    $plain = scorerEnvelope('Which one?', stepsText: ['Which one?']);
+
+    expect((new NoHeadingLine)->score('', $heading)->score)->toBe(0.0)
+        ->and((new NoEmDash)->score('', $dash)->score)->toBe(0.0)
+        ->and((new OneClosingQuestionAtMost)->score('', $plain)->score)->toBe(1.0);
+});
+
+it('fails narration of the next step in any step', function (): void {
+    $scorer = new NoNarration;
+
+    expect($scorer->score('', scorerEnvelope('Done.', stepsText: ['Let me check that for you.', 'Done.']))->score)->toBe(0.0)
+        ->and($scorer->score('', scorerEnvelope("I\u{2019}ll now pull your tasks.\nDone."))->score)->toBe(0.0)
+        ->and($scorer->score('', scorerEnvelope('Allow me to look.'))->score)->toBe(0.0)
+        ->and($scorer->score('', scorerEnvelope('You have 3 tasks. Let me know if you want more.'))->score)->toBe(1.0);
+});
+
+it('matches a pattern against the reply text only', function (): void {
+    $envelope = scorerEnvelope('Created Acme.', [['name' => 'CreateCompanyTool', 'arguments' => ['name' => 'pending']]], stepsText: ['pending']);
+
+    expect((new TextMatches('/created/i'))->score('', $envelope)->score)->toBe(1.0)
+        ->and((new TextMatches('/pending/i', negate: true))->score('', $envelope)->score)->toBe(1.0)
+        ->and((new TextMatches('/pending/i'))->score('', $envelope)->score)->toBe(0.0)
+        ->and((new TextMatches('/created/i', negate: true))->score('', $envelope)->score)->toBe(0.0);
+});
+
+it('passes when any of the named tools was called', function (): void {
+    $scorer = new CalledAnyOf(['ListPeopleTool', 'GetCompanyTool']);
+
+    expect($scorer->score('', scorerEnvelope('x', [['name' => 'GetCompanyTool', 'arguments' => []]]))->score)->toBe(1.0)
+        ->and($scorer->score('', scorerEnvelope('x', [['name' => 'ListTasksTool', 'arguments' => []]]))->score)->toBe(0.0)
+        ->and($scorer->score('', scorerEnvelope('x'))->score)->toBe(0.0);
+});
+
 it('fails every scorer on a failed turn', function (Scorer $scorer): void {
     $failed = scorerEnvelope('', error: 'provider down');
     $result = $scorer->score('prompt', $failed, $failed);
@@ -142,4 +182,7 @@ it('fails every scorer on a failed turn', function (Scorer $scorer): void {
     'ReplayedBytesUnder' => fn (): Scorer => new ReplayedBytesUnder(10000),
     'UsesLookupBeforeWrite' => fn (): Scorer => new UsesLookupBeforeWrite,
     'NoDuplicateRowSet' => fn (): Scorer => new NoDuplicateRowSet,
+    'NoNarration' => fn (): Scorer => new NoNarration,
+    'TextMatches' => fn (): Scorer => new TextMatches('/x/'),
+    'CalledAnyOf' => fn (): Scorer => new CalledAnyOf(['ListTasksTool']),
 ]);

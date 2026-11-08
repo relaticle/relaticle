@@ -68,7 +68,7 @@ final readonly class Prior
 
     public static function viewer(EvalWorkspace $w): EvalWorkspace
     {
-        $viewer = User::factory()->create();
+        $viewer = User::factory()->create(['name' => 'Vik Viewer']);
         $w->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
         $viewer->switchWorkspace($w->workspace);
 
@@ -213,11 +213,11 @@ final readonly class Prior
             'content' => $content,
             'reasoning' => '',
             'tool_calls' => array_map(fn (array $call): array => [
-                'id' => (string) Str::ulid(),
+                'id' => $callId = 'call_'.Str::ulid(),
                 'name' => $call['name'],
                 'arguments' => $call['arguments'],
                 'result' => $call['result'],
-                'result_id' => null,
+                'result_id' => $callId,
             ], $calls),
             'replay_blocks' => [],
             'provider_tool_calls' => [],

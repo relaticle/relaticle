@@ -9,6 +9,7 @@ final readonly class TurnEnvelope
     /**
      * @param  list<array{name: string, arguments: array<string, mixed>}>  $toolCalls
      * @param  list<list<string>>  $toolResultRowIds
+     * @param  list<string>  $stepsText
      */
     public function __construct(
         public string $text,
@@ -19,6 +20,7 @@ final readonly class TurnEnvelope
         public int $outputTokens,
         public int $durationMs,
         public ?string $error,
+        public array $stepsText = [],
     ) {}
 
     public static function failed(string $error): self
@@ -30,6 +32,7 @@ final readonly class TurnEnvelope
     {
         return json_encode([
             'text' => $this->text,
+            'steps_text' => $this->stepsText,
             'tool_calls' => $this->toolCalls,
             'tool_result_row_ids' => $this->toolResultRowIds,
             'replayed_bytes' => $this->replayedBytes,

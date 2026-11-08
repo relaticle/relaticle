@@ -25,7 +25,7 @@ it('points at mass send instead of sending one email per person', function (): v
         ->repeat(3)
         ->not->toMatch('/"name":"SendEmailTool"/')
         ->toPassScorer(new OneClosingQuestionAtMost)
-        ->toPassJudge('The reply points the user at mass send and does not draft an email for each person.');
+        ->toPassJudge('The reply points the user at the composer\'s mass send rather than sending from chat, and sends nothing.');
 });
 
 it('offers to create a note when the list comes back empty', function (): void {
@@ -41,6 +41,7 @@ it('offers nothing to create when the email list comes back empty', function ():
 
     expect((new RelaTurn($w))(...))
         ->prompt('Show me emails from Company 05')
+        ->toHaveToolCalls(['ListEmailsTool' => []])
         ->toPassJudge('The reply says no emails were found. It never offers to create, log or draft an email record.');
 });
 

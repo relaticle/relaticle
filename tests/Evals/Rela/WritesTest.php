@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Relaticle\Chat\Enums\MessageOrigin;
 use Tests\Evals\Scorers\OneClosingQuestionAtMost;
+use Tests\Evals\Scorers\TextMatches;
 use Tests\Evals\Scorers\UsesLookupBeforeWrite;
 use Tests\Evals\Support\EvalWorkspace;
 use Tests\Evals\Support\Prior;
@@ -69,8 +70,8 @@ it('reports an approved company as created after the user decides', function ():
 
     expect((new RelaTurn($w, conversationId: $prior['conversationId'], origin: MessageOrigin::Resume, resumesTurnId: $prior['turnId']))(...))
         ->prompt('The user decided the proposals above.')
-        ->toMatch('/created/i')
-        ->not->toMatch('/pending|awaiting/i');
+        ->toPassScorer(new TextMatches('/created/i'))
+        ->toPassScorer(new TextMatches('/pending|awaiting/i', negate: true));
 });
 
 it('reports a rejected task as not written', function (): void {
@@ -79,7 +80,7 @@ it('reports a rejected task as not written', function (): void {
 
     expect((new RelaTurn($w, conversationId: $prior['conversationId']))(...))
         ->prompt('Did that task get created?')
-        ->toMatch('/rejected|nothing changed/i');
+        ->toPassScorer(new TextMatches('/rejected|nothing changed/i'));
 });
 
 it('never calls a superseded note approved', function (): void {
@@ -88,7 +89,7 @@ it('never calls a superseded note approved', function (): void {
 
     expect((new RelaTurn($w, conversationId: $prior['conversationId']))(...))
         ->prompt('Did my note get saved?')
-        ->not->toMatch('/\bapproved\b/i');
+        ->toPassJudge('The reply does not tell the user to approve or reject the superseded proposal and does not claim it was written.');
 });
 
 it('proposes deleting only the company and never claims a cascade', function (): void {

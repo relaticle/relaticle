@@ -8,9 +8,11 @@ use Laravel\Ai\Exceptions\RateLimitedException;
 use Laravel\Ai\Responses\Data\ToolCall;
 use Pest\Evals\Support\ToolCallParser;
 use Relaticle\Chat\Agents\CrmAssistant;
+use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AgentConversationMessage;
 use Tests\Evals\Support\EvalWorkspace;
+use Tests\Evals\Support\Prior;
 use Tests\Evals\Support\RelaTurn;
 use Tests\Evals\Support\TurnEnvelope;
 
@@ -183,4 +185,33 @@ it('records a tool call end to end that the plugin parser reads', function (): v
         ->and($envelope['text'])->toBe('You have a few deals.')
         ->and($calls)->toHaveCount(1)
         ->and($calls[0]['name'])->toBe('GetCrmSummaryTool');
+});
+
+it('lists the text of every step in the envelope', function (): void {
+    $workspace = EvalWorkspace::seed();
+    $row = assistantRowWithResults($workspace, []);
+    $row->update(['steps' => json_encode([
+        ['content' => 'Checking your tasks.', 'tool_calls' => [], 'reasoning' => '', 'replay_blocks' => [], 'provider_tool_calls' => []],
+        ['content' => 'Done.', 'tool_calls' => [], 'reasoning' => '', 'replay_blocks' => [], 'provider_tool_calls' => []],
+    ], JSON_THROW_ON_ERROR)]);
+
+    $envelope = RelaTurn::envelopeFromRow($row->refresh());
+
+    expect($envelope->stepsText)->toBe(['Checking your tasks.', 'Done.'])
+        ->and(json_decode($envelope->toJson(), true)['steps_text'])->toBe(['Checking your tasks.', 'Done.']);
+});
+
+it('resumes the turn the conversation closure names', function (): void {
+    CrmAssistant::fake(['Created Acme Robotics.']);
+    $workspace = EvalWorkspace::seed();
+    $turn = new RelaTurn($workspace, origin: MessageOrigin::Resume, conversation: function () use ($workspace): array {
+        return Prior::approvedCompany($workspace);
+    });
+
+    $turn('The user decided the proposals above.');
+
+    CrmAssistant::assertPrompted(fn ($prompt): bool => $prompt->agent->resolvedActions !== []
+        && $prompt->agent->resolvedActions[0]['just_decided'] === true
+        && str_contains($prompt->prompt, 'The user decided the proposals above:')
+        && str_contains($prompt->prompt, 'Acme Robotics'));
 });

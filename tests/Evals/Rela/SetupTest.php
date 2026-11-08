@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Enums\OnboardingUseCase;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Tests\Evals\Scorers\NoContactWord;
+use Tests\Evals\Scorers\TextMatches;
 use Tests\Evals\Support\EvalWorkspace;
 use Tests\Evals\Support\Prior;
 use Tests\Evals\Support\RelaTurn;
@@ -11,6 +13,7 @@ use Tests\Evals\Support\RelaTurn;
 it('greets a new sales workspace with people and companies, briefly, without tools', function (): void {
     $greet = function (string $prompt): string {
         $w = EvalWorkspace::seed();
+        $w->workspace->forceFill(['onboarding_use_case' => OnboardingUseCase::Sales])->save();
 
         $reply = (new RelaTurn($w, conversationId: (string) $w->conversation('setup')->getKey(), origin: MessageOrigin::Greeting))($prompt);
 
@@ -23,9 +26,9 @@ it('greets a new sales workspace with people and companies, briefly, without too
         ->prompt('')
         ->repeat(3)
         ->toMatch('/"tool_calls":\[\]/')
-        ->toMatch('/people/i')
-        ->toMatch('/compan/i')
-        ->toPassScorer(new NoContactWord, expected: '');
+        ->toPassScorer(new TextMatches('/people/i'))
+        ->toPassScorer(new TextMatches('/compan/i'))
+        ->toPassScorer(new NoContactWord);
 });
 
 it('says plainly that a sample only workspace holds sample data', function (): void {
@@ -34,5 +37,5 @@ it('says plainly that a sample only workspace holds sample data', function (): v
 
     expect((new RelaTurn($w))(...))
         ->prompt('Give me an overview of my workspace')
-        ->toMatch('/sample/i');
+        ->toPassScorer(new TextMatches('/sample/i'));
 });

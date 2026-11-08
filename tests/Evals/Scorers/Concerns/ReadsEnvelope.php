@@ -22,6 +22,17 @@ trait ReadsEnvelope
     {
         $text = $this->envelope($output)['text'] ?? '';
 
+        $text = is_string($text) ? $text : '';
+        $steps = $this->envelope($output)['steps_text'] ?? [];
+        $earlier = is_array($steps) ? array_filter($steps, fn (mixed $step): bool => is_string($step) && trim($step) !== '' && trim($step) !== trim($text)) : [];
+
+        return implode("\n", [...$earlier, $text]);
+    }
+
+    private function replyText(string $output): string
+    {
+        $text = $this->envelope($output)['text'] ?? '';
+
         return is_string($text) ? $text : '';
     }
 

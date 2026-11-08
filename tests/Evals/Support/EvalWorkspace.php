@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Model;
 use InvalidArgumentException;
 use Relaticle\Chat\Actions\CreateConversation;
 use Relaticle\Chat\Models\AgentConversation;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 final readonly class EvalWorkspace
 {
@@ -54,13 +55,18 @@ final readonly class EvalWorkspace
 
     public static function seed(): self
     {
-        $owner = User::factory()->withPersonalWorkspace()->create();
+        $owner = User::factory()->withPersonalWorkspace()->create(['name' => 'Olive Owner']);
         $workspace = $owner->currentWorkspace;
-        $member = User::factory()->create();
+        $member = User::factory()->create(['name' => 'Mira Member']);
         $workspace->users()->attach($member, ['role' => 'member']);
         $member->switchWorkspace($workspace);
 
         $fixture = new self($owner, $member, $workspace);
+
+        ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->default()->create([
+            'workspace_id' => $workspace->id,
+            'user_id' => $owner->id,
+        ]));
 
         resolve(CurrentWorkspace::class)->within($workspace, function () use ($fixture): void {
             $fixture->createCompanyFields();
@@ -205,6 +211,7 @@ final readonly class EvalWorkspace
     private function createOpportunities(array $companies): void
     {
         $stage = $this->field('opportunity', 'stage')->load('options');
+        $amount = $this->field('opportunity', 'amount');
 
         foreach (range(1, self::OPPORTUNITIES) as $index) {
             $opportunity = Opportunity::factory()->for($this->workspace)->create([
@@ -213,6 +220,7 @@ final readonly class EvalWorkspace
             ]);
 
             $opportunity->saveCustomFieldValue($stage, $stage->options[($index - 1) % $stage->options->count()]->getKey());
+            $opportunity->saveCustomFieldValue($amount, 1000 * $index);
         }
     }
 

@@ -11,8 +11,7 @@ it('answers a request for a new table with custom fields from the docs', functio
     expect((new RelaTurn($w))(...))
         ->prompt('Can I add a new table for properties')
         ->toHaveToolCalls(['SearchDocsTool' => []])
-        ->toMatch('/custom field/i')
-        ->not->toMatch('/new table/i');
+        ->toPassJudge('The reply explains that record types are fixed and offers custom fields on an existing record type. It never presents those fields as a new table.');
 });
 
 it('searches the docs first for a product question', function (): void {
@@ -20,7 +19,7 @@ it('searches the docs first for a product question', function (): void {
 
     expect((new RelaTurn($w))(...))
         ->prompt('How do I import people from a CSV file?')
-        ->toFollowTrajectory(['SearchDocsTool'], strictOrder: false);
+        ->toFollowTrajectory(['SearchDocsTool'], strictOrder: true);
 });
 
 it('declines an out of scope request in one sentence and offers one CRM action', function (): void {

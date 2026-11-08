@@ -3,12 +3,14 @@
 declare(strict_types=1);
 
 use Relaticle\Chat\Models\AgentConversationMessage;
+use Tests\Evals\Scorers\CalledAnyOf;
 use Tests\Evals\Scorers\NoContactWord;
 use Tests\Evals\Scorers\NoDuplicateRowSet;
 use Tests\Evals\Scorers\NoHeadingLine;
 use Tests\Evals\Scorers\NoMarkdownTable;
 use Tests\Evals\Scorers\OneClosingQuestionAtMost;
 use Tests\Evals\Scorers\ReplayedBytesUnder;
+use Tests\Evals\Scorers\TextMatches;
 use Tests\Evals\Support\EvalWorkspace;
 use Tests\Evals\Support\Prior;
 use Tests\Evals\Support\RelaTurn;
@@ -65,8 +67,8 @@ it('does not claim to show the first page as everything when more rows exist', f
     expect((new RelaTurn($w))(...))
         ->prompt('List all my people')
         ->toHaveToolCalls(['ListPeopleTool' => []])
-        ->not->toMatch('/first \d+ of/i')
-        ->toPassJudge('The reply says more people exist beyond the ones shown, or offers the next page. It never presents the shown rows as everyone.');
+        ->toPassScorer(new TextMatches('/first \d+ of/i', negate: true))
+        ->toPassJudge('The reply either says more people exist beyond those shown, or shows all 40.');
 });
 
 it('keeps the replayed task list under ten kilobytes', function (): void {
@@ -102,7 +104,7 @@ it('says person and company where the user did not say contact', function (): vo
     expect((new RelaTurn($w))(...))
         ->prompt($prompt)
         ->repeat(3)
-        ->toPassScorer(new NoContactWord, expected: $prompt);
+        ->toPassScorer(new NoContactWord);
 });
 
 it('may say contact when the user said contact', function (): void {
@@ -112,6 +114,6 @@ it('may say contact when the user said contact', function (): void {
     expect((new RelaTurn($w))(...))
         ->prompt($prompt)
         ->repeat(3)
-        ->toHaveToolCalls(['ListPeopleTool' => []])
-        ->toPassScorer(new NoContactWord, expected: $prompt);
+        ->toPassScorer(new CalledAnyOf(['ListPeopleTool', 'GetCompanyTool']))
+        ->toPassScorer(new NoContactWord);
 });

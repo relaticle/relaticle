@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Tests\Evals\Scorers\NoEmDash;
 use Tests\Evals\Scorers\NoHeadingLine;
 use Tests\Evals\Scorers\NoMarkdownTable;
+use Tests\Evals\Scorers\NoNarration;
 use Tests\Evals\Scorers\NoRawUlid;
 use Tests\Evals\Support\EvalWorkspace;
 use Tests\Evals\Support\Prior;
@@ -49,7 +50,7 @@ it('never narrates what it is about to do', function (): void {
 
     expect((new RelaTurn($w))(...))
         ->prompt('Show me my opportunities')
-        ->not->toMatch('/^\{"text":"(let me|i(.|\\\\u2019)ll (now|first))/i');
+        ->toPassScorer(new NoNarration);
 });
 
 it('counts with the summary tool when asked how many', function (): void {

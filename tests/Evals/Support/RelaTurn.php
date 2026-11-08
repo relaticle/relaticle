@@ -17,7 +17,9 @@ use Relaticle\Chat\Models\AgentConversationMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\ModelRegistry;
+use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Support\DisplayBlocks;
+use Relaticle\Chat\Support\ResolvedActionText;
 use Relaticle\Chat\Support\StoredSteps;
 use RuntimeException;
 use Throwable;
@@ -68,12 +70,12 @@ final class RelaTurn
 
     public function __invoke(string $prompt): string
     {
-        $conversationId = $this->nextConversationId();
+        [$conversationId, $resumesTurnId] = $this->nextConversation();
         $previousId = $this->latestAssistantRow($conversationId)?->id;
         $turnId = (string) Str::ulid();
 
         try {
-            $envelope = $this->runWithRetries($prompt, $conversationId, $turnId, $previousId);
+            $envelope = $this->runWithRetries($prompt, $conversationId, $turnId, $previousId, $resumesTurnId);
         } catch (Throwable $e) {
             $envelope = TurnEnvelope::failed($e->getMessage());
         }
@@ -106,7 +108,21 @@ final class RelaTurn
             outputTokens: (int) ($usage['output_tokens'] ?? 0),
             durationMs: (int) ($meta['duration_ms'] ?? 0),
             error: null,
+            stepsText: self::stepsTextOf($row->steps),
         );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function stepsTextOf(mixed $steps): array
+    {
+        $decoded = is_array($steps) ? $steps : json_decode((string) ($steps ?: '[]'), true);
+
+        return array_values(array_map(
+            fn (mixed $step): string => is_array($step) ? (string) ($step['content'] ?? '') : '',
+            is_array($decoded) ? $decoded : [],
+        ));
     }
 
     /**
@@ -120,30 +136,37 @@ final class RelaTurn
         ));
     }
 
-    private function nextConversationId(): string
+    /**
+     * @return array{0: string, 1: ?string}
+     */
+    private function nextConversation(): array
     {
         if ($this->conversation instanceof Closure) {
-            return (string) ($this->conversation)();
+            $made = ($this->conversation)();
+
+            return is_array($made) ?
+                [(string) $made['conversationId'], isset($made['turnId']) ? (string) $made['turnId'] : $this->resumesTurnId] :
+                [(string) $made, $this->resumesTurnId];
         }
 
-        return $this->conversationId ?? (string) $this->workspace->conversation()->getKey();
+        return [$this->conversationId ?? (string) $this->workspace->conversation()->getKey(), $this->resumesTurnId];
     }
 
-    private function runWithRetries(string $prompt, string $conversationId, string $turnId, ?string $previousId): TurnEnvelope
+    private function runWithRetries(string $prompt, string $conversationId, string $turnId, ?string $previousId, ?string $resumesTurnId): TurnEnvelope
     {
         $retryable = false;
-        $envelope = $this->runOnce($prompt, $conversationId, $turnId, $previousId, $retryable);
+        $envelope = $this->runOnce($prompt, $conversationId, $turnId, $previousId, $resumesTurnId, $retryable);
 
         for ($retry = 0; $retry < self::MAX_RETRIES && $retryable; $retry++) {
             Sleep::for(self::RETRY_DELAY_SECONDS)->seconds();
 
-            $envelope = $this->runOnce($prompt, $conversationId, $turnId, $previousId, $retryable);
+            $envelope = $this->runOnce($prompt, $conversationId, $turnId, $previousId, $resumesTurnId, $retryable);
         }
 
         return $envelope;
     }
 
-    private function runOnce(string $prompt, string $conversationId, string $turnId, ?string $previousId, bool &$retryable): TurnEnvelope
+    private function runOnce(string $prompt, string $conversationId, string $turnId, ?string $previousId, ?string $resumesTurnId, bool &$retryable): TurnEnvelope
     {
         $retrying = null;
         $failure = null;
@@ -156,7 +179,7 @@ final class RelaTurn
         });
 
         try {
-            $this->runJob($prompt, $conversationId, $turnId);
+            $this->runJob($prompt, $conversationId, $turnId, $resumesTurnId);
         } finally {
             Event::forget(ChatStreamRetrying::class);
             Event::forget(ChatStreamFailed::class);
@@ -178,20 +201,38 @@ final class RelaTurn
         ])) ?: 'The turn stored no assistant message.');
     }
 
-    private function runJob(string $prompt, string $conversationId, string $turnId): void
+    private function runJob(string $prompt, string $conversationId, string $turnId, ?string $resumesTurnId): void
     {
         $job = new ProcessChatMessage(
             user: $this->workspace->owner,
             workspace: $this->workspace->workspace,
-            message: $this->origin->isTyped() ? $prompt : '',
+            message: $this->messageFor($prompt, $conversationId, $resumesTurnId),
             conversationId: $conversationId,
             resolved: ['provider' => $this->provider, 'model' => $this->modelId, 'id' => $this->modelId, 'source' => 'explicit'],
             turnId: $turnId,
             origin: $this->origin,
-            resumesTurnId: $this->resumesTurnId,
+            resumesTurnId: $resumesTurnId,
         );
 
         $job->handle(resolve(CreditService::class));
+    }
+
+    private function messageFor(string $prompt, string $conversationId, ?string $resumesTurnId): string
+    {
+        if ($this->origin->isTyped()) {
+            return $prompt;
+        }
+
+        if ($this->origin !== MessageOrigin::Resume || $resumesTurnId === null) {
+            return '';
+        }
+
+        $decided = array_filter(
+            resolve(PendingActionService::class)->resolvedForConversation($conversationId, $resumesTurnId),
+            fn (array $action): bool => $action['just_decided'],
+        );
+
+        return ResolvedActionText::resumeOpener(array_values($decided));
     }
 
     private function latestAssistantRow(string $conversationId): ?AgentConversationMessage

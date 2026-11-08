@@ -9,6 +9,7 @@ use App\Models\People;
 use App\Models\Scopes\WorkspaceScope;
 use App\Models\Task;
 use Illuminate\Database\Eloquent\Builder;
+use Relaticle\Chat\Enums\EmailReach;
 use Relaticle\Chat\Models\PendingAction;
 use Tests\Evals\Support\EvalWorkspace;
 use Tests\Helpers\ProposalCardFixture;
@@ -70,4 +71,27 @@ it('spreads task statuses and adds the waiting option', function (): void {
 
     expect($counts->all())->toEqualCanonicalizing(['To do' => 13, 'In progress' => 6, 'Done' => 6])
         ->and($status->options->pluck('name')->all())->toContain('Waiting on others');
+});
+
+it('gives every opportunity an amount of a thousand times its number', function (): void {
+    $a = EvalWorkspace::seed();
+    $amount = $a->field('opportunity', 'amount');
+    $amounts = evalRows(Opportunity::class, $a)->with('customFieldValues.customField')->orderBy('name')->get()
+        ->map(fn (Opportunity $opportunity): int => (int) $opportunity->getCustomFieldValue($amount))
+        ->all();
+
+    expect($amounts)->toBe(array_map(fn (int $index): int => 1000 * $index, range(1, 15)));
+});
+
+it('connects a sendable mailbox for the owner', function (): void {
+    $a = EvalWorkspace::seed();
+
+    expect(EmailReach::for($a->owner, $a->workspace))->toBe(EmailReach::Ready);
+});
+
+it('names the users so no name collides with a prompt', function (): void {
+    $a = EvalWorkspace::seed();
+
+    expect($a->owner->name)->toBe('Olive Owner')
+        ->and($a->member->name)->toBe('Mira Member');
 });

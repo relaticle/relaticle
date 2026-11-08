@@ -29,6 +29,11 @@ it('stores the listed tasks as one assistant step the replay reads back', functi
         ->and($envelope->toolCalls[0]['name'])->toBe('ListTasksTool')
         ->and($envelope->toolResultRowIds[0])->toHaveCount(19)
         ->and($envelope->replayedBytes)->toBeGreaterThan(1000);
+
+    $storedCalls = collect(json_decode($rows->last()->steps, true))->flatMap(fn (array $step): array => $step['tool_calls']);
+
+    expect($storedCalls)->not->toBeEmpty()
+        ->and($storedCalls->pluck('result_id')->every(fn (?string $id): bool => is_string($id) && str_starts_with($id, 'call_')))->toBeTrue();
 });
 
 it('seeds each decided proposal on its own conversation with the matching status', function (): void {
