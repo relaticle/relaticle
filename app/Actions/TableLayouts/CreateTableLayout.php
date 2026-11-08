@@ -22,7 +22,7 @@ final readonly class CreateTableLayout
             'workspace_id' => $workspace->getKey(),
             'user_id' => $user->getKey(),
             'entity' => $entity,
-            'name' => $this->ensureNameIsFree->execute($user, $user, $workspace->getKey(), $entity, $name),
+            'name' => $this->ensureNameIsFree->execute($user, $workspace->getKey(), $entity, $name),
             'state' => $state->withoutWidths(),
         ]);
     }

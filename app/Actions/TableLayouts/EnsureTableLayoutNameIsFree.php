@@ -12,13 +12,14 @@ use Illuminate\Validation\ValidationException;
 
 final readonly class EnsureTableLayoutNameIsFree
 {
-    public function execute(User $actor, User $owner, string $workspaceId, CrmEntity $entity, string $name, ?TableLayout $ignore = null): string
+    public function execute(User $actor, string $workspaceId, CrmEntity $entity, string $name, ?TableLayout $renaming = null): string
     {
         $name = trim($name);
+        $owner = $renaming instanceof TableLayout ? $renaming->user : $actor;
 
         $taken = TableLayout::query()
             ->named($owner, $workspaceId, $entity, $name)
-            ->when($ignore, fn (Builder $query): Builder => $query->whereKeyNot($ignore->getKey()))
+            ->when($renaming, fn (Builder $query): Builder => $query->whereKeyNot($renaming->getKey()))
             ->exists();
 
         if ($name === '' || $taken) {
