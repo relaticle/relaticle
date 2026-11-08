@@ -29,11 +29,12 @@ final class ResizableColumns
 
         $widths = $livewire->getResizableColumnWidths();
         $pinned = method_exists($livewire, 'getPinnedTableColumns') ? $livewire->getPinnedTableColumns() : [];
+        $title = method_exists($livewire, 'getTableTitleColumn') ? $livewire->getTableTitleColumn() : null;
 
         foreach ($table->getColumns() as $name => $column) {
             $width = $widths[$name] ?? self::pixels($column->getWidth()) ?? self::DEFAULT_COLUMN_WIDTH;
 
-            self::stamp($column, $name, max(self::MIN_WIDTH, min(self::MAX_WIDTH, $width)), in_array($name, $pinned, true));
+            self::stamp($column, $name, max(self::MIN_WIDTH, min(self::MAX_WIDTH, $width)), in_array($name, $pinned, true), $name === $title);
         }
 
         return $table;
@@ -44,7 +45,7 @@ final class ResizableColumns
         return preg_match('/^(\d+)(px)?$/', (string) $width, $match) === 1 ? (int) $match[1] : null;
     }
 
-    private static function stamp(Column $column, string $name, int $width, bool $isPinned): void
+    private static function stamp(Column $column, string $name, int $width, bool $isPinned, bool $isTitle): void
     {
         $min = self::MIN_WIDTH;
         $max = self::MAX_WIDTH;
@@ -54,6 +55,8 @@ final class ResizableColumns
             'data-resizable-width' => (string) $width,
             'data-resizable-column-id' => $columnId,
             'data-column-pinned' => $isPinned ? '1' : '0',
+            // A phone card is headed by the title column, wherever the member moved or pinned it.
+            ...($isTitle ? ['data-column-title' => '1'] : []),
         ];
 
         $column->extraHeaderAttributes([

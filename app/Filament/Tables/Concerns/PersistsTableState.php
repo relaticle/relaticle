@@ -183,6 +183,11 @@ trait PersistsTableState
         return in_array($perPage, AppPanelProvider::pageSizeOptions($this->getTable()));
     }
 
+    public function getTableTitleColumn(): string
+    {
+        return $this->tableEntity()->titleColumn();
+    }
+
     private function tableEntity(): CrmEntity
     {
         $model = $this->getModel();

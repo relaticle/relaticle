@@ -617,10 +617,10 @@ it('lets pins that leave no room for another column scroll with the table on a n
         ->assertNoJavaScriptErrors();
 });
 
-it('shows each row as a card on a phone, without the pins and widths the member saved', function (): void {
+it('shows each row as a card on a phone, headed by its name, without the pins and widths the member saved', function (): void {
     TablePreference::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
         'entity' => CrmEntity::Company,
-        'state' => new TableStateData(widths: ['updated_at' => 400], pinned: ['name']),
+        'state' => new TableStateData(widths: ['updated_at' => 400], pinned: ['accountOwner.name']),
     ]);
 
     $page = companiesTable($this->user, $this->workspace->slug)->resize(390, 844)->wait(0.5);
@@ -629,6 +629,15 @@ it('shows each row as a card on a phone, without the pins and widths the member 
         ->assertScript('document.querySelector("table.fi-ta-table").classList.contains("fi-ta-has-pinned")', false)
         ->assertScript(sprintf('Math.round(%s.getBoundingClientRect().width) > 300', firstCell('updated_at')), true)
         ->assertScript(sprintf('%s.getBoundingClientRect().right <= window.innerWidth', firstCell('updated_at')), true)
+        ->assertScript(<<<'JS'
+            (() => {
+                const cells = [...document.querySelector('tbody tr.fi-ta-row').children]
+                    .filter((td) => td.matches('td.fi-ta-cell:not(.fi-ta-selection-cell)') && !td.querySelector('.fi-ta-actions') && getComputedStyle(td).display !== 'none')
+                    .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
+
+                return cells[0].classList.contains('fi-ta-cell-name');
+            })()
+        JS, true)
         ->assertNoJavaScriptErrors();
 });
 

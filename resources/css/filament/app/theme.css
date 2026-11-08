@@ -961,8 +961,14 @@ a.fi-linked-records-chip {
         }
     }
 
-    & > td:is(.fi-ta-selection-cell + td, :first-child:not(.fi-ta-selection-cell)) {
-        @apply max-sm:block max-sm:min-w-0 max-sm:overflow-hidden max-sm:pe-24 max-sm:pb-2;
+    /* A list that marks its title column heads each card with it, so a moved or pinned column cannot take its place. */
+    &:has(> td[data-column-title]) {
+        @apply max-sm:flex max-sm:flex-col;
+    }
+
+    & > td.fi-ta-cell[data-column-title],
+    &:not(:has(> td[data-column-title])) > td:is(.fi-ta-selection-cell + td, :first-child:not(.fi-ta-selection-cell)) {
+        @apply max-sm:order-first max-sm:block max-sm:min-w-0 max-sm:overflow-hidden max-sm:pe-24 max-sm:pb-2;
 
         & > .fi-ta-cell-label {
             @apply max-sm:hidden;
