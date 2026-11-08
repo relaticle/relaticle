@@ -80,6 +80,12 @@ under a button stays `text-sm`.
 A heading is two-tone: the claim in `gray-950`, the continuation in `text-gray-500 dark:text-gray-400`.
 Keep the continuation to one short clause.
 
+Headings step down one level at a time: the hero's `h1`, then an `h2` before any `h3` (WCAG 1.3.1).
+A card grid inside the hero has no section heading, so a label that already names it becomes the
+`h2` (the `/ai-native-crm` checklist), or the grid gets an `sr-only` one (`/alternatives/attio`).
+The `PublicPagesTest` case "steps the headings of :path down one level at a time" fails a skipped
+level. A new marketing page joins its dataset.
+
 ## Colour and contrast
 
 Text meets 4.5:1, large text (24px, or 18.7px bold) 3:1, and control edges and states 3:1 (WCAG 1.4.3,

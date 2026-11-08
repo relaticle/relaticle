@@ -69,8 +69,9 @@ repository without it.
   the directory, and the unset switch keeps the provider out of `bootstrap/providers.php` and the
   package's entries out of `vite.config.js`. `packages/Cloud/tests/Feature/CloudProviderTest.php`
   pins the provider half. The `Self-hosted Build` job in `.github/workflows/ci.yml` boots once with
-  the switch unset, then deletes the directory, rebuilds the autoload and runs Arch, Smoke and
-  Feature. A core class, view or route that needs Cloud fails that job
+  the switch unset, then deletes the directory, rebuilds the autoload and runs Arch and Smoke. A
+  push to main runs Feature there too. A core class, view or route that needs Cloud fails that job,
+  on the pull request when Arch or Smoke reaches it, and otherwise on main after the merge
 - Core asks Cloud through two contracts and keeps a self-hosted default for each:
   `App\Contracts\Entitlements` (`SelfHostedEntitlements`) and `App\Contracts\Billing` (`NoBilling`).
   `CloudServiceProvider` binds Cloud's implementation only while the billing flag is on.
@@ -499,9 +500,10 @@ months two copies of the same field vocabulary drifted apart.
 ## Quality Checks
 
 The local loop is scoped to the change. GitHub CI (`.github/workflows/ci.yml`) is the
-only full run: it executes lint, rector, PHPStan, type coverage, six test shards and
-six Browser shards on every push to a pull request. A run takes about 4 minutes when
-runners are free, and longer when several runs queue for them.
+only full run: it executes lint, rector, PHPStan, type coverage, eight test shards and
+five Browser shards on every push to a pull request. The test and Browser shards run on arm
+runners, and each of those jobs takes under 3 minutes when runners are free. Runs queue when
+the organization's 20 concurrent jobs are taken.
 
 After each change, while iterating:
 
@@ -724,12 +726,12 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
   a scoped run cannot, and for recording a TIA graph. TIA replays a cached pass whenever
   a test's edges are unchanged, so it cannot see time-dependent failures (`travelTo`,
   expiring tokens), `.env` edits, or dynamic dispatch it did not trace while recording.
-- The `Shard Timings` workflow records each test class's duration on main every night, and
-  each `Tests` shard restores that recording before Pest splits the suite. A class with no
-  recording yet is dealt round-robin. Browser shards are not timed and split round-robin too.
+- Every main run's `Record Shard Timings` job rebuilds `tests/.pest/shards.json` from the
+  JUnit reports of its test and Browser shards, and the next run's shards restore that
+  recording before Pest splits the suite. A class with no recording yet is dealt round-robin.
   `tests/.pest/shards.json` is only the fallback for a run that finds no recording, so do not
   refresh it with a local `composer test:update-shards`: a laptop's timings skew the split.
-  Refresh it from the workflow's `pest-shards` artifact.
+  Refresh it with `php bin/shard-timings.php <dir>` over a main run's `junit-*` artifacts.
 
 === .ai/relaticle/ui rules ===
 

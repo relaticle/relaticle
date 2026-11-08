@@ -15,7 +15,7 @@
     <x-cloud::marketing.window class="mx-auto w-full max-w-5xl">
         <div class="border-rail flex flex-wrap items-center justify-between gap-x-8 gap-y-3 border-b px-5 py-4 md:px-6">
             <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                <span class="type-label text-gray-500 dark:text-gray-400">{{ __('AI-native checklist') }}</span>
+                <h2 class="type-label text-gray-500 dark:text-gray-400">{{ __('AI-native checklist') }}</h2>
                 <span class="text-sm text-gray-700 dark:text-gray-300">{{ __('Tick what your CRM does today.') }}</span>
             </div>
 

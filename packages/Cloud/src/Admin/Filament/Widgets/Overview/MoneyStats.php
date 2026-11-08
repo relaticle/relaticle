@@ -44,7 +44,7 @@ final class MoneyStats extends StatsOverviewWidget
         };
 
         return [
-            Stat::make(HelpLabel::make('MRR', 'What paying customers pay per month, before tax. Each subscription counts its latest invoice, split into months, so a yearly plan adds a twelfth of its price. Your own workspaces are left out. The change compares with the subscriptions that were active a week ago.'), Money::format($mrr))
+            Stat::make(HelpLabel::make('MRR', 'What paying customers pay per month for their plan, before tax: the plan price less any recurring discount, with a yearly plan counted as a twelfth. Only paid-up subscriptions count, so trials, failed payments, one-off purchases such as credit packs and your own workspaces are left out. The change compares with the subscriptions that were paying a week ago.'), Money::format($mrr))
                 ->description($description)
                 ->color($mrr === null ? 'gray' : 'primary')
                 ->url(SubscriptionResource::getUrl('index', ['filters' => ['counts_toward_mrr' => ['isActive' => true]]])),
