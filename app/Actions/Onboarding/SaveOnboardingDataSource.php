@@ -10,7 +10,7 @@ use App\Models\Workspace;
 
 final readonly class SaveOnboardingDataSource
 {
-    public function __construct(private StartSetupLater $seedSamples) {}
+    public function __construct(private SeedSampleData $seedSamples) {}
 
     public function execute(User $user, Workspace $workspace, OnboardingDataSource $source): bool
     {

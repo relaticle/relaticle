@@ -12,7 +12,7 @@ use App\Services\WorkspaceActivationFacts;
 use Laravel\Pennant\Feature;
 use Relaticle\OnboardSeed\OnboardSeeder;
 
-final readonly class StartSetupLater
+final readonly class SeedSampleData
 {
     public function __construct(
         private OnboardSeeder $onboardSeeder,

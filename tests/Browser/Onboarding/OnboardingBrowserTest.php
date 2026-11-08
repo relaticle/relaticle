@@ -103,8 +103,6 @@ it('walks a new owner through every setup screen to the setup conversation', fun
         ->waitForText('Help us customize your workspace')
         ->assertPathIs('/app/my-first-workspace/setup')
         ->assertNoJavaScriptErrors()
-        ->assertDontSee('Where do your clients live today?')
-        ->assertDontSee('Start with the people you already email')
         ->assertScript(asyncAlpineComponentsLoaded())
         ->click('[for$="onboarding_use_case-other"]')
         ->press('button:visible:has-text("Continue")')

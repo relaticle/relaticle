@@ -113,6 +113,14 @@ it('leaves out the inbox answer when no mailbox can connect', function (): void 
     expect(optionIds())->toBe(['source_spreadsheet', 'source_other_crm', 'source_memory', 'source_assistant']);
 });
 
+it('leaves out the inbox answer when email integration is on but no provider is configured', function (): void {
+    config()->set('services.gmail.client_id', null);
+    config()->set('services.azure.client_id', null);
+    answeredWith(null);
+
+    expect(optionIds())->toBe(['source_spreadsheet', 'source_other_crm', 'source_memory', 'source_assistant']);
+});
+
 it('offers the company pick to a workspace that never answered once companies arrived', function (CreationSource $arrivedFrom): void {
     answeredWith(null);
     arrivedFrom($arrivedFrom);

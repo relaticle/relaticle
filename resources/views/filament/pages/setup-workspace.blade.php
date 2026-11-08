@@ -10,6 +10,4 @@
             </div>
         </div>
     </div>
-
-    <x-filament-actions::modals />
 </x-onboarding.shell>

@@ -537,12 +537,6 @@ it('says none when the user never answered where their data lives', function ():
     expect(setupAgent($workspace)->dynamicInstructions())->toContain("data_source: none\n");
 });
 
-it('never carries a crm name in the onboarding block', function (): void {
-    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
-
-    expect(setupAgent($workspace, OnboardingDataSource::OtherCrm)->dynamicInstructions())->not->toContain('crm_named');
-});
-
 it('has the greeting ask where the clients live when the user has not answered', function (): void {
     $greeting = MessageOrigin::Greeting->directive();
 

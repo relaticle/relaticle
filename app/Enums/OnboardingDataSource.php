@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
-use App\Features\EmailIntegration;
+use App\Onboarding\MailboxAvailability;
 use Filament\Support\Contracts\HasLabel;
-use Laravel\Pennant\Feature;
-use Relaticle\EmailIntegration\Enums\EmailProvider;
 
 enum OnboardingDataSource: string implements HasLabel
 {
@@ -24,14 +22,8 @@ enum OnboardingDataSource: string implements HasLabel
     {
         return array_values(array_filter(
             self::cases(),
-            fn (self $source): bool => $source !== self::Inbox || self::mailboxCanConnect(),
+            fn (self $source): bool => $source !== self::Inbox || MailboxAvailability::canConnect(),
         ));
-    }
-
-    private static function mailboxCanConnect(): bool
-    {
-        return Feature::active(EmailIntegration::class)
-            && array_any(EmailProvider::cases(), fn (EmailProvider $provider): bool => $provider->isConfigured());
     }
 
     public static function fromButtonId(string $id): ?self
