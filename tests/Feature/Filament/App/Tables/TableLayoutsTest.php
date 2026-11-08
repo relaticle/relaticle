@@ -745,6 +745,29 @@ it('tells the member instead of failing when the layout they set as default was 
     expect(preferenceRow()?->default_layout_id)->toBeNull();
 });
 
+it('closes the modal and tells the member when the layout it acts on was deleted elsewhere', function (string $action): void {
+    $layout = layoutFor($this->user, ['name' => 'Renewals']);
+    $component = livewire(ListCompanies::class)->mountAction($action, ['layout' => $layout->getKey()]);
+
+    $layout->delete();
+
+    $component->callMountedAction()
+        ->assertNotified('That layout is no longer available.')
+        ->assertActionNotMounted($action);
+})->with(['renameTableLayout', 'shareTableLayout', 'deleteTableLayout']);
+
+it('closes the stop sharing modal and tells the admin when the layout was deleted elsewhere', function (): void {
+    $layout = layoutFor(tableLayoutMember(WorkspaceRole::Member), ['name' => 'Renewals', 'is_shared' => true]);
+    $this->actingAs(tableLayoutMember(WorkspaceRole::Admin));
+    $component = livewire(ListCompanies::class)->mountAction('stopSharingTableLayout', ['layout' => $layout->getKey()]);
+
+    $layout->delete();
+
+    $component->callMountedAction()
+        ->assertNotified('That layout is no longer available.')
+        ->assertActionNotMounted('stopSharingTableLayout');
+});
+
 it('shows the name error when a rename races another save to the same name', function (): void {
     $layout = layoutFor($this->user, ['name' => 'Old pipeline']);
 

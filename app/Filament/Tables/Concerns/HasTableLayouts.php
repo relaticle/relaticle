@@ -18,14 +18,36 @@ use Filament\Facades\Filament;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Schema;
+use Filament\Support\Components\Attributes\Exposed;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Validation\ValidationException;
 
 trait HasTableLayouts
 {
+    private const array TABLE_LAYOUT_ROW_ACTIONS = ['renameTableLayout', 'shareTableLayout', 'stopSharingTableLayout', 'deleteTableLayout'];
+
     /** @var Collection<int, TableLayout>|null */
     private ?Collection $visibleTableLayouts = null;
+
+    /**
+     * @param  array<string, mixed>  $arguments
+     */
+    #[Exposed]
+    public function callMountedAction(array $arguments = []): mixed
+    {
+        $layoutId = $this->vanishedMountedTableLayoutId();
+
+        if ($layoutId === null) {
+            return parent::callMountedAction($arguments);
+        }
+
+        // Filament drops the submit of an action that turned hidden, which left the modal open on a blank name.
+        $this->unmountAction();
+        $this->handleMissingTableLayout($layoutId);
+
+        return null;
+    }
 
     /**
      * @return Collection<int, TableLayout>
@@ -286,6 +308,18 @@ trait HasTableLayouts
     private function isSomeoneElsesTableLayout(?TableLayout $layout): bool
     {
         return $layout instanceof TableLayout && $layout->user_id !== $this->tableLayoutUser()->getKey();
+    }
+
+    private function vanishedMountedTableLayoutId(): ?string
+    {
+        $action = $this->getMountedAction();
+        $layoutId = $action?->getArguments()['layout'] ?? null;
+
+        if (! in_array($action?->getName(), self::TABLE_LAYOUT_ROW_ACTIONS, true) || ! is_string($layoutId)) {
+            return null;
+        }
+
+        return $this->visibleTableLayout($layoutId) instanceof TableLayout ? null : $layoutId;
     }
 
     private function handleMissingTableLayout(?string $layoutId): void
