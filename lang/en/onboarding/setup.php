@@ -23,6 +23,9 @@ return [
             'label' => 'Add someone not in my email',
             'prompt' => 'I want to add a person or company that is not in my email. Ask me for the details.',
         ],
+        'connect_mailbox' => [
+            'label' => 'Connect your mailbox',
+        ],
         'copy_prompt' => [
             'label' => 'Copy the prompt',
             'prompt' => 'Show me the prompt to paste into my AI assistant.',

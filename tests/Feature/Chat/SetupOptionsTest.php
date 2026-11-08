@@ -87,10 +87,46 @@ it('offers the memory buttons to an in my head workspace', function (): void {
         ->and($options[0]->url)->toBeNull();
 });
 
-it('offers the memory buttons to a workspace that never answered', function (): void {
+function withoutEmailIntegration(): void
+{
+    config()->set('relaticle.features.email_integration', false);
+    Feature::flushCache();
+}
+
+it('offers one answer button per source to a workspace that never answered', function (): void {
     answeredWith(null);
 
-    expect(optionIds())->toBe(['add_client', 'add_deal']);
+    $options = resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh());
+
+    expect(array_map(fn (SetupOption $option): string => $option->id, $options))
+        ->toBe(['source_spreadsheet', 'source_other_crm', 'source_inbox', 'source_memory', 'source_assistant'])
+        ->and(array_map(fn (SetupOption $option): string => $option->kind, $options))->each->toBe('prompt')
+        ->and(array_map(fn (SetupOption $option): string => (string) $option->prompt, $options))
+        ->toBe(array_map(fn (SetupOption $option): string => $option->label, $options))
+        ->and($options[3]->label)->toBe('In my head');
+});
+
+it('leaves out the inbox answer when no mailbox can connect', function (): void {
+    withoutEmailIntegration();
+    answeredWith(null);
+
+    expect(optionIds())->toBe(['source_spreadsheet', 'source_other_crm', 'source_memory', 'source_assistant']);
+});
+
+it('offers no answers once the question was answered', function (OnboardingDataSource $source): void {
+    answeredWith($source);
+
+    expect(array_filter(optionIds(), fn (string $id): bool => str_starts_with($id, 'source_')))->toBe([]);
+})->with(OnboardingDataSource::cases());
+
+it('derives an answer id from the source and reads it back', function (): void {
+    foreach (OnboardingDataSource::cases() as $source) {
+        expect(OnboardingDataSource::fromButtonId($source->buttonId()))->toBe($source)
+            ->and($source->buttonId())->toMatch('/^[a-z_]+$/');
+    }
+
+    expect(OnboardingDataSource::fromButtonId('pick_first'))->toBeNull()
+        ->and(OnboardingDataSource::fromButtonId('source_nothing'))->toBeNull();
 });
 
 it('offers the inbox buttons once a mailbox is connected', function (): void {
@@ -100,10 +136,21 @@ it('offers the inbox buttons once a mailbox is connected', function (): void {
     expect(optionIds())->toBe(['show_synced', 'add_outside_email']);
 });
 
-it('offers the memory buttons to an inbox workspace whose mailbox step was skipped', function (): void {
+it('offers the mailbox link and the add button to an inbox answer with no mailbox', function (): void {
     answeredWith(OnboardingDataSource::Inbox);
 
-    expect(optionIds())->toBe(['add_client', 'add_deal']);
+    $options = resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh());
+
+    expect(array_map(fn (SetupOption $option): string => $option->id, $options))->toBe(['connect_mailbox', 'add_client'])
+        ->and($options[0]->kind)->toBe('link')
+        ->and($options[0]->url)->toBe(resolve(DestinationResolver::class)->resolve('email_accounts', $this->workspace));
+});
+
+it('offers only the add button to an inbox answer with no mailbox when the email page is unavailable', function (): void {
+    withoutEmailIntegration();
+    answeredWith(OnboardingDataSource::Inbox);
+
+    expect(optionIds())->toBe(['add_client']);
 });
 
 it('offers the assistant buttons with a prompt and a link to the connection steps', function (): void {
@@ -200,35 +247,36 @@ it('drops a link whose page is unavailable', function (): void {
         ->and(optionIds())->toBe(['copy_prompt']);
 });
 
-it('never links to the email accounts page', function (bool $emailIntegration): void {
-    config()->set('relaticle.features.email_integration', $emailIntegration);
-    Feature::flushCache();
-
+it('links to the email accounts page only for an inbox answer that has no mailbox', function (): void {
     $emailAccounts = resolve(DestinationResolver::class)->resolve('email_accounts', $this->workspace);
-    ConnectedAccount::factory()->create(['workspace_id' => $this->workspace->getKey(), 'user_id' => $this->user->getKey()]);
 
-    foreach (OnboardingDataSource::cases() as $source) {
+    foreach ([null, ...OnboardingDataSource::cases()] as $source) {
         answeredWith($source);
 
-        foreach ([false, true] as $arrived) {
-            $arrived && arrivedFrom(CreationSource::IMPORT);
+        $urls = array_map(fn (SetupOption $option): ?string => $option->url, resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh()));
 
-            foreach (resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh()) as $option) {
-                expect($option->url === null || $option->url !== $emailAccounts)->toBeTrue();
-            }
-        }
+        expect(in_array($emailAccounts, $urls, true))->toBe($source === OnboardingDataSource::Inbox);
     }
-})->with([false, true]);
+
+    ConnectedAccount::factory()->create(['workspace_id' => $this->workspace->getKey(), 'user_id' => $this->user->getKey()]);
+    answeredWith(OnboardingDataSource::Inbox);
+
+    expect(array_column(array_map(fn (SetupOption $option): array => $option->toArray(), resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh())), 'url'))
+        ->not->toContain($emailAccounts);
+});
 
 it('keeps every label and prompt short, in the app words, with no dash', function (): void {
     $this->travelTo('2026-11-08 12:00:00');
-    ConnectedAccount::factory()->create(['workspace_id' => $this->workspace->getKey(), 'user_id' => $this->user->getKey()]);
     $options = [];
 
-    foreach (OnboardingDataSource::cases() as $source) {
+    foreach ([null, ...OnboardingDataSource::cases()] as $source) {
         answeredWith($source);
         $options = [...$options, ...resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh())];
     }
+
+    ConnectedAccount::factory()->create(['workspace_id' => $this->workspace->getKey(), 'user_id' => $this->user->getKey()]);
+    answeredWith(OnboardingDataSource::Inbox);
+    $options = [...$options, ...resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh())];
 
     arrivedFrom(CreationSource::IMPORT);
     $options = [...$options, ...resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh())];
@@ -257,7 +305,7 @@ it('serialises an option to the shape the transcript reads', function (): void {
     ]);
 });
 
-function runSetupTurn(User $user, Workspace $workspace, MessageOrigin $origin = MessageOrigin::Typed): void
+function runSetupTurn(User $user, Workspace $workspace, MessageOrigin $origin = MessageOrigin::Typed, ?string $nextStep = null): void
 {
     (new ProcessChatMessage(
         user: $user,
@@ -267,6 +315,7 @@ function runSetupTurn(User $user, Workspace $workspace, MessageOrigin $origin = 
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'id' => 'claude-sonnet-5', 'source' => 'auto'],
         turnId: (string) Str::ulid(),
         origin: $origin,
+        nextStep: $nextStep,
     ))->handle(resolve(CreditService::class));
 }
 
@@ -337,16 +386,39 @@ it('keeps suggested next steps for a typed turn in the setup chat', function ():
     Queue::assertPushed(SuggestNextSteps::class);
 });
 
-it('keeps suggested next steps for a workspace without a data source', function (MessageOrigin $origin): void {
+it('writes the answer buttons on any setup turn while the question is unanswered', function (MessageOrigin $origin): void {
     suggestNextStepsFake();
     answeredWith(null);
-    CrmAssistant::fake(['Hi, your workspace is ready.']);
+    CrmAssistant::fake(['Where do your clients live today?']);
 
     runSetupTurn($this->user, $this->workspace->fresh(), $origin);
 
+    expect(array_column(lastAssistantNextSteps($this->workspace->setupConversation->id), 'id'))
+        ->toBe(['source_spreadsheet', 'source_other_crm', 'source_inbox', 'source_memory', 'source_assistant']);
+    Queue::assertNotPushed(SuggestNextSteps::class);
+})->with([MessageOrigin::Greeting, MessageOrigin::DataArrived, MessageOrigin::Typed]);
+
+it('writes the path buttons on the turn that answered the question', function (): void {
+    suggestNextStepsFake();
+    answeredWith(OnboardingDataSource::Memory);
+    CrmAssistant::fake(['Which people are you working with right now?']);
+
+    runSetupTurn($this->user, $this->workspace->fresh(), MessageOrigin::Typed, 'source_memory');
+
+    expect(array_column(lastAssistantNextSteps($this->workspace->setupConversation->id), 'id'))->toBe(['add_client', 'add_deal']);
+    Queue::assertNotPushed(SuggestNextSteps::class);
+});
+
+it('keeps suggested next steps for a typed turn that no answer button sent', function (): void {
+    suggestNextStepsFake();
+    answeredWith(OnboardingDataSource::Memory);
+    CrmAssistant::fake(['Tell me who you work with.']);
+
+    runSetupTurn($this->user, $this->workspace->fresh(), MessageOrigin::Typed, 'add_client');
+
     expect(lastAssistantNextSteps($this->workspace->setupConversation->id))->toBeNull();
     Queue::assertPushed(SuggestNextSteps::class);
-})->with([MessageOrigin::Greeting, MessageOrigin::DataArrived]);
+});
 
 it('writes no setup buttons when next steps are switched off', function (): void {
     suggestNextStepsFake();
@@ -418,16 +490,22 @@ it('reads a stored link button and drops one without a url', function (): void {
 });
 
 it('draws every option with an icon the chat ships', function (): void {
-    ConnectedAccount::factory()->create(['workspace_id' => $this->workspace->getKey(), 'user_id' => $this->user->getKey()]);
 
     $icons = [];
 
-    foreach (OnboardingDataSource::cases() as $source) {
+    foreach ([null, ...OnboardingDataSource::cases()] as $source) {
         answeredWith($source);
 
         foreach (resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh()) as $option) {
             $icons[] = $option->icon;
         }
+    }
+
+    ConnectedAccount::factory()->create(['workspace_id' => $this->workspace->getKey(), 'user_id' => $this->user->getKey()]);
+    answeredWith(OnboardingDataSource::Inbox);
+
+    foreach (resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh()) as $option) {
+        $icons[] = $option->icon;
     }
 
     arrivedFrom(CreationSource::IMPORT);

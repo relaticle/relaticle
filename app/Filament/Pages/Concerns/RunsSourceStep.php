@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages\Concerns;
 
+use App\Actions\Onboarding\MoveWorkspaceSetup;
 use App\Actions\Onboarding\SaveOnboardingDataSource;
 use App\Enums\OnboardingDataSource;
+use App\Enums\WorkspaceSetupStep;
+use App\Onboarding\MailboxStep;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
@@ -15,9 +18,22 @@ trait RunsSourceStep
 {
     public function saveSource(): void
     {
-        resolve(SaveOnboardingDataSource::class)->execute($this->authUser(), $this->workspace, $this->form->getState());
+        $source = OnboardingDataSource::from($this->form->getState()['onboarding_data_source']);
+
+        $moved = resolve(MoveWorkspaceSetup::class)->execute($this->authUser(), $this->workspace, WorkspaceSetupStep::Source, $this->stepAfter($source));
+
+        if ($moved) {
+            resolve(SaveOnboardingDataSource::class)->execute($this->authUser(), $this->workspace, $source);
+        }
 
         $this->redirectTo(self::getUrl(['tenant' => $this->workspace]));
+    }
+
+    private function stepAfter(OnboardingDataSource $source): WorkspaceSetupStep
+    {
+        return $source === OnboardingDataSource::Inbox && MailboxStep::canRun()
+            ? WorkspaceSetupStep::Email
+            : WorkspaceSetupStep::UseCase;
     }
 
     /**

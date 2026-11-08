@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Jobs;
 
 use App\Contracts\Entitlements;
+use App\Enums\OnboardingDataSource;
 use App\Features\SetupConversation;
 use App\Models\User;
 use App\Models\Workspace;
@@ -1137,10 +1138,20 @@ final class ProcessChatMessage implements ShouldQueue
 
     private function offersSetupOptions(): bool
     {
-        return (bool) config('chat.next_steps.enabled', true)
-            && in_array($this->origin, [MessageOrigin::Greeting, MessageOrigin::DataArrived], true)
-            && $this->workspace->onboarding_data_source !== null
-            && $this->isSetupConversation();
+        if (! config('chat.next_steps.enabled', true) || ! $this->isSetupConversation()) {
+            return false;
+        }
+
+        return $this->workspace->onboarding_data_source === null
+            || $this->answeredTheSourceQuestion()
+            || in_array($this->origin, [MessageOrigin::Greeting, MessageOrigin::DataArrived], true);
+    }
+
+    private function answeredTheSourceQuestion(): bool
+    {
+        $nextStep = $this->nextStep ?? null;
+
+        return $nextStep !== null && OnboardingDataSource::fromButtonId($nextStep) instanceof OnboardingDataSource;
     }
 
     private function offerSetupOptions(string $messageId): void

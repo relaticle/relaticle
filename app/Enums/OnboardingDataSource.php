@@ -26,6 +26,16 @@ enum OnboardingDataSource: string implements HasLabel
         ));
     }
 
+    public static function fromButtonId(string $id): ?self
+    {
+        return array_find(self::cases(), fn (self $source): bool => $source->buttonId() === $id);
+    }
+
+    public function buttonId(): string
+    {
+        return "source_{$this->value}";
+    }
+
     public function getLabel(): string
     {
         return __("filament/pages/workspaces.setup_workspace.source.options.{$this->value}.label");

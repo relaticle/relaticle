@@ -1594,7 +1594,7 @@ describe('data source', function (): void {
             ->assertFormFieldHidden('onboarding_data_source_detail');
     });
 
-    it('stores which crm the user names, trimmed to 120 characters', function (): void {
+    it('limits the which crm field to 120 characters', function (): void {
         $workspace = workspaceAtSource(User::factory()->create());
 
         livewire(SetupWorkspace::class)
@@ -1603,50 +1603,28 @@ describe('data source', function (): void {
             ->assertHasFormErrors(['onboarding_data_source_detail' => 'max']);
 
         expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Source);
-
-        livewire(SetupWorkspace::class)
-            ->fillForm(['onboarding_data_source' => 'other_crm', 'onboarding_data_source_detail' => '  '.str_repeat('a', 40).'  '])
-            ->call('saveSource')
-            ->assertHasNoFormErrors();
-
-        expect($workspace->fresh())
-            ->onboarding_data_source_detail->toBe(str_repeat('a', 40))
-            ->onboarding_step->toBe(WorkspaceSetupStep::UseCase);
     });
 
-    it('rejects a crm name over 120 characters when the action runs directly', function (): void {
+    it('refuses an answer that is not offered when the action runs directly', function (): void {
         $user = User::factory()->create();
         $workspace = workspaceAtSource($user);
 
-        expect(fn () => resolve(SaveOnboardingDataSource::class)->execute($user, $workspace, [
-            'onboarding_data_source' => 'other_crm',
-            'onboarding_data_source_detail' => str_repeat('a', 121),
-        ]))->toThrow(ValidationException::class);
+        expect(fn () => resolve(SaveOnboardingDataSource::class)->execute($user, $workspace, OnboardingDataSource::Inbox))
+            ->toThrow(HttpException::class);
 
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Source);
+        expect($workspace->fresh()->onboarding_data_source)->toBeNull();
     });
 
-    it('drops the crm name for any other answer', function (): void {
-        $user = User::factory()->create();
-        $workspace = workspaceAtSource($user);
-
-        resolve(SaveOnboardingDataSource::class)->execute($user, $workspace, [
-            'onboarding_data_source' => 'spreadsheet',
-            'onboarding_data_source_detail' => 'Leftover',
-        ]);
-
-        expect($workspace->fresh()->onboarding_data_source_detail)->toBeNull();
-    });
-
-    it('ignores a second answer once the step has moved on', function (): void {
+    it('stores the first answer only', function (): void {
         $user = User::factory()->create();
         $workspace = workspaceAtSource($user);
         $action = resolve(SaveOnboardingDataSource::class);
 
-        $action->execute($user, $workspace, ['onboarding_data_source' => 'spreadsheet']);
-        $saved = $action->execute($user, $workspace, ['onboarding_data_source' => 'memory']);
+        $first = $action->execute($user, $workspace, OnboardingDataSource::Spreadsheet);
+        $second = $action->execute($user, $workspace, OnboardingDataSource::Memory);
 
-        expect($saved)->toBeFalse()
+        expect($first)->toBeTrue()
+            ->and($second)->toBeFalse()
             ->and($workspace->fresh()->onboarding_data_source)->toBe(OnboardingDataSource::Spreadsheet);
     });
 
@@ -1654,7 +1632,7 @@ describe('data source', function (): void {
         $workspace = workspaceAtSource(User::factory()->create());
         $member = joinAsMember($workspace);
 
-        expect(fn () => resolve(SaveOnboardingDataSource::class)->execute($member, $workspace, ['onboarding_data_source' => 'memory']))
+        expect(fn () => resolve(SaveOnboardingDataSource::class)->execute($member, $workspace, OnboardingDataSource::Memory))
             ->toThrow(HttpException::class);
 
         expect($workspace->fresh())

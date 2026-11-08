@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Http\Controllers;
 
+use App\Actions\Onboarding\SaveOnboardingDataSource;
 use App\Contracts\Billing;
 use App\Contracts\Entitlements;
+use App\Enums\OnboardingDataSource;
 use App\Enums\Plan;
+use App\Features\SetupConversation;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -24,6 +27,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Actions\CreateConversation;
 use Relaticle\Chat\Actions\DeleteConversation;
 use Relaticle\Chat\Actions\MarkAttachmentSent;
@@ -67,6 +71,7 @@ final readonly class ChatController
         private ModelAccess $modelAccess,
         private Entitlements $entitlements,
         private Billing $billing,
+        private SaveOnboardingDataSource $saveDataSource,
     ) {}
 
     /** @return list<string> */
@@ -128,32 +133,10 @@ final readonly class ChatController
             403
         );
 
-        if (filled($validated['model'] ?? null) && $validated['model'] !== 'auto') {
-            $descriptor = $this->registry->find($validated['model']);
+        $modelDenied = $this->modelDeniedResponse($workspace, $validated['model'] ?? null);
 
-            if ($descriptor instanceof ModelDescriptor && ! $this->entitlements->allowsModel($workspace, $descriptor)) {
-                if ($this->modelAccess->isTrialLocked($workspace) && $descriptor->allowedForPlan($workspace->plan)) {
-                    return response()->json([
-                        'error' => 'model_not_allowed',
-                        'message' => __('Add your own records to unlock premium models during your trial.'),
-                        'plan' => $workspace->plan->value,
-                        'requested_model' => $descriptor->id,
-                        'upgrade_available' => false,
-                        'upgrade_url' => null,
-                    ], 403);
-                }
-
-                $isFree = $workspace->plan === Plan::Free;
-
-                return response()->json([
-                    'error' => 'model_not_allowed',
-                    'message' => __(':model is not available on the :plan plan.', ['model' => $descriptor->label, 'plan' => $workspace->plan->getLabel()]),
-                    'plan' => $workspace->plan->value,
-                    'requested_model' => $descriptor->id,
-                    'upgrade_available' => $isFree,
-                    'upgrade_url' => $isFree ? $this->billing->url($workspace) : null,
-                ], 403);
-            }
+        if ($modelDenied instanceof JsonResponse) {
+            return $modelDenied;
         }
 
         if ($attachment instanceof ChatAttachment && $attachment->isText() && ! $attachment->fitsConversationTextBudget()) {
@@ -179,6 +162,8 @@ final readonly class ChatController
                 ...$stored,
             ]);
         }
+
+        $this->saveSetupAnswer($user, $workspace, $conversation, $validated['next_step'] ?? null);
 
         $turnId = (string) Str::ulid();
 
@@ -252,6 +237,56 @@ final readonly class ChatController
             'status' => 'processing',
             'conversation_id' => $conversation,
         ]);
+    }
+
+    private function modelDeniedResponse(Workspace $workspace, ?string $model): ?JsonResponse
+    {
+        if (blank($model) || $model === 'auto') {
+            return null;
+        }
+
+        $descriptor = $this->registry->find($model);
+
+        if (! $descriptor instanceof ModelDescriptor || $this->entitlements->allowsModel($workspace, $descriptor)) {
+            return null;
+        }
+
+        if ($this->modelAccess->isTrialLocked($workspace) && $descriptor->allowedForPlan($workspace->plan)) {
+            return response()->json([
+                'error' => 'model_not_allowed',
+                'message' => __('Add your own records to unlock premium models during your trial.'),
+                'plan' => $workspace->plan->value,
+                'requested_model' => $descriptor->id,
+                'upgrade_available' => false,
+                'upgrade_url' => null,
+            ], 403);
+        }
+
+        $isFree = $workspace->plan === Plan::Free;
+
+        return response()->json([
+            'error' => 'model_not_allowed',
+            'message' => __(':model is not available on the :plan plan.', ['model' => $descriptor->label, 'plan' => $workspace->plan->getLabel()]),
+            'plan' => $workspace->plan->value,
+            'requested_model' => $descriptor->id,
+            'upgrade_available' => $isFree,
+            'upgrade_url' => $isFree ? $this->billing->url($workspace) : null,
+        ], 403);
+    }
+
+    private function saveSetupAnswer(User $user, Workspace $workspace, string $conversation, ?string $nextStep): void
+    {
+        $source = $nextStep === null ? null : OnboardingDataSource::fromButtonId($nextStep);
+
+        if (! $source instanceof OnboardingDataSource || ! Feature::active(SetupConversation::class)) {
+            return;
+        }
+
+        if (! $workspace->setupConversation()->whereKey($conversation)->exists()) {
+            return;
+        }
+
+        $this->saveDataSource->execute($user, $workspace, $source);
     }
 
     private function creditsExhaustedResponse(Workspace $workspace): JsonResponse

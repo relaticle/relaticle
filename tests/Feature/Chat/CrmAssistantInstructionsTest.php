@@ -537,12 +537,41 @@ it('says none when the user never answered where their data lives', function ():
     expect(setupAgent($workspace)->dynamicInstructions())->toContain("data_source: none\n");
 });
 
-it('names the tool the user said they are leaving as quoted data', function (): void {
+it('never carries a crm name in the onboarding block', function (): void {
     $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
-    $workspace->forceFill(['onboarding_data_source_detail' => 'Our old <tracker> "v2"'])->save();
+    $workspace->forceFill(['onboarding_data_source_detail' => 'Our old tracker'])->save();
 
     expect(setupAgent($workspace, OnboardingDataSource::OtherCrm)->dynamicInstructions())
-        ->toContain('crm_named: "Our old tracker v2"');
+        ->not->toContain('crm_named')
+        ->not->toContain('Our old tracker');
+});
+
+it('has the greeting ask where the clients live when the user has not answered', function (): void {
+    $greeting = MessageOrigin::Greeting->directive();
+
+    expect($greeting)
+        ->toContain('When the data_source line is none, ask where their clients live today, in one or two short sentences')
+        ->toContain('they can pick an answer below or just tell you')
+        ->toContain('call no tools in this turn')
+        ->not->toContain('none means')
+        ->not->toContain('—');
+
+    $agent = setupAgent(User::factory()->withPersonalWorkspace()->create()->currentWorkspace)->withTurnOrigin(MessageOrigin::Greeting);
+
+    expect($agent->dynamicInstructions())
+        ->toContain("data_source: none\n")
+        ->toContain("<turn>\n{$greeting}\n</turn>");
+});
+
+it('gives the next step of the path a clicked answer names', function (): void {
+    $instructions = resolve(CrmAssistant::class)->staticInstructions();
+
+    expect($instructions)
+        ->toContain("When the user's whole message is the name of one answer (A spreadsheet, Another CRM, My inbox, In my head, Claude or ChatGPT)")
+        ->toContain('the data_source line already holds it')
+        ->toContain('other_crm: ask which CRM they use, and say an exported CSV of people and companies comes in through the import')
+        ->toContain('With data_source none, the user has not answered yet')
+        ->not->toContain('crm_named');
 });
 
 it('leaves the data source lines out of an ordinary conversation', function (): void {

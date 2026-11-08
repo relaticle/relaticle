@@ -2,12 +2,22 @@
 
 declare(strict_types=1);
 
+use App\Enums\CreationSource;
+use App\Enums\OnboardingDataSource;
+use App\Enums\OnboardingUseCase;
+use App\Enums\WorkspaceRole;
+use App\Features\OnboardSeed;
+use App\Features\SetupConversation;
+use App\Filament\Pages\CreateWorkspace;
 use App\Models\Company;
 use App\Models\User;
 use App\Models\Workspace;
+use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Http\Controllers\ChatController;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
@@ -264,4 +274,113 @@ it('runs a job serialized before the next step and claim key existed', function 
 
     expect((new ReflectionProperty($legacy, 'nextStep'))->isInitialized($legacy))->toBeFalse()
         ->and(json_decode((string) $userRow->meta, true))->not->toHaveKey('next_step');
+});
+
+function sendSourceAnswer(string $conversationId, OnboardingDataSource $source): TestResponse
+{
+    return test()->postJson(route('chat.send'), [
+        'conversation_id' => $conversationId,
+        'document' => ChatDocument::fromText($source->getLabel()),
+        'next_step' => $source->buttonId(),
+    ]);
+}
+
+function sampleCompanyCount(Workspace $workspace): int
+{
+    return Company::query()
+        ->withoutGlobalScopes()
+        ->where('workspace_id', $workspace->getKey())
+        ->where('creation_source', CreationSource::SAMPLE)
+        ->count();
+}
+
+describe('answering where the clients live', function (): void {
+    beforeEach(function (): void {
+        Feature::define(SetupConversation::class, true);
+        Feature::define(OnboardSeed::class, true);
+        Queue::fake();
+
+        $this->user = User::factory()->create();
+        $this->actingAs($this->user);
+
+        livewire(CreateWorkspace::class)->fillForm(['name' => 'Northwind Studio'])->call('register');
+
+        $this->workspace = $this->user->fresh()->currentWorkspace;
+        $this->workspace->forceFill(['onboarding_step' => null, 'onboarding_use_case' => OnboardingUseCase::Sales])->save();
+        Filament::setTenant($this->workspace);
+        $this->conversationId = $this->workspace->setupConversation->id;
+    });
+
+    it('stores the answer before the turn is dispatched', function (): void {
+        sendSourceAnswer($this->conversationId, OnboardingDataSource::Spreadsheet)->assertOk();
+
+        expect($this->workspace->fresh()->onboarding_data_source)->toBe(OnboardingDataSource::Spreadsheet);
+        Queue::assertPushed(ProcessChatMessage::class, fn (ProcessChatMessage $job): bool => $job->nextStep === 'source_spreadsheet');
+    });
+
+    it('seeds the sample records for the in my head answer only', function (OnboardingDataSource $source, bool $seeded): void {
+        sendSourceAnswer($this->conversationId, $source)->assertOk();
+
+        expect(sampleCompanyCount($this->workspace))->toBe($seeded ? 4 : 0);
+    })->with([
+        'in my head' => [OnboardingDataSource::Memory, true],
+        'a spreadsheet' => [OnboardingDataSource::Spreadsheet, false],
+        'another crm' => [OnboardingDataSource::OtherCrm, false],
+        'an assistant' => [OnboardingDataSource::Assistant, false],
+    ]);
+
+    it('changes nothing on a second answer', function (): void {
+        sendSourceAnswer($this->conversationId, OnboardingDataSource::Spreadsheet)->assertOk();
+        sendSourceAnswer($this->conversationId, OnboardingDataSource::Memory)->assertOk();
+
+        expect($this->workspace->fresh()->onboarding_data_source)->toBe(OnboardingDataSource::Spreadsheet)
+            ->and(sampleCompanyCount($this->workspace))->toBe(0);
+    });
+
+    it('refuses an answer from a member who does not own the workspace', function (): void {
+        $member = User::factory()->create();
+        $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+        $member->switchWorkspace($this->workspace);
+        $this->actingAs($member);
+
+        sendSourceAnswer($this->conversationId, OnboardingDataSource::Memory)->assertForbidden();
+
+        expect($this->workspace->fresh()->onboarding_data_source)->toBeNull()
+            ->and(sampleCompanyCount($this->workspace))->toBe(0);
+    });
+
+    it('ignores an answer id outside the setup conversation', function (): void {
+        sendSourceAnswer(seedSendableConversation(), OnboardingDataSource::Memory)->assertOk();
+
+        expect($this->workspace->fresh()->onboarding_data_source)->toBeNull()
+            ->and(sampleCompanyCount($this->workspace))->toBe(0);
+    });
+
+    it('ignores an answer id when the setup conversation is off', function (): void {
+        Feature::deactivate(SetupConversation::class);
+
+        sendSourceAnswer($this->conversationId, OnboardingDataSource::Memory)->assertOk();
+
+        expect($this->workspace->fresh()->onboarding_data_source)->toBeNull();
+    });
+
+    it('ignores a next step that is not an answer', function (): void {
+        $this->postJson(route('chat.send'), [
+            'conversation_id' => $this->conversationId,
+            'document' => ChatDocument::fromText('Pick who to work on first'),
+            'next_step' => 'pick_first',
+        ])->assertOk();
+
+        expect($this->workspace->fresh()->onboarding_data_source)->toBeNull();
+    });
+
+    it('refuses an inbox answer when no mailbox can connect', function (): void {
+        config()->set('relaticle.features.email_integration', false);
+        Feature::flushCache();
+
+        sendSourceAnswer($this->conversationId, OnboardingDataSource::Inbox)->assertStatus(422);
+
+        expect($this->workspace->fresh()->onboarding_data_source)->toBeNull();
+        Queue::assertNothingPushed();
+    });
 });

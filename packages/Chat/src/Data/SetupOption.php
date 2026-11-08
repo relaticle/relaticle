@@ -21,6 +21,10 @@ final readonly class SetupOption
         'lucide-clipboard',
         'lucide-external-link',
         'lucide-upload',
+        'lucide-file-spreadsheet',
+        'lucide-database',
+        'lucide-brain',
+        'lucide-sparkles',
     ];
 
     public function __construct(

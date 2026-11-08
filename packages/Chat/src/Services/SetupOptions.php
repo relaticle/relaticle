@@ -25,6 +25,12 @@ final readonly class SetupOptions
      */
     public function for(User $user, Workspace $workspace): array
     {
+        $answer = $workspace->onboarding_data_source;
+
+        if (! $answer instanceof OnboardingDataSource) {
+            return $this->answers();
+        }
+
         $source = $workspace->effectiveDataSource();
 
         if ($this->companiesArrivedToday($user, $workspace, $source)) {
@@ -35,7 +41,10 @@ final readonly class SetupOptions
         }
 
         $options = match ($source) {
-            OnboardingDataSource::Memory => [
+            OnboardingDataSource::Memory => $answer === OnboardingDataSource::Inbox ? [
+                $this->link($user, $workspace, 'connect_mailbox', 'email_accounts', 'lucide-mail'),
+                $this->prompt('add_client', 'lucide-building-2'),
+            ] : [
                 $this->prompt('add_client', 'lucide-building-2'),
                 $this->prompt('add_deal', 'lucide-briefcase'),
             ],
@@ -53,6 +62,34 @@ final readonly class SetupOptions
         };
 
         return array_values(array_filter($options));
+    }
+
+    /**
+     * @return list<SetupOption>
+     */
+    private function answers(): array
+    {
+        return array_map(
+            fn (OnboardingDataSource $source): SetupOption => new SetupOption(
+                id: $source->buttonId(),
+                kind: SetupOption::KIND_PROMPT,
+                label: $source->getLabel(),
+                icon: $this->answerIcon($source),
+                prompt: $source->getLabel(),
+            ),
+            OnboardingDataSource::offered(),
+        );
+    }
+
+    private function answerIcon(OnboardingDataSource $source): string
+    {
+        return match ($source) {
+            OnboardingDataSource::Spreadsheet => 'lucide-file-spreadsheet',
+            OnboardingDataSource::OtherCrm => 'lucide-database',
+            OnboardingDataSource::Inbox => 'lucide-mail',
+            OnboardingDataSource::Memory => 'lucide-brain',
+            OnboardingDataSource::Assistant => 'lucide-sparkles',
+        };
     }
 
     private function companiesArrivedToday(User $user, Workspace $workspace, OnboardingDataSource $source): bool

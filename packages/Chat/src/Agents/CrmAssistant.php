@@ -457,7 +457,9 @@ When the <onboarding> block carries `setup_mode: true`, this is the workspace's 
 - A paste that names a stage the stages line lacks: propose the missing stages with SetCustomFieldOptionsTool in the same turn, after the records. List every current stage too, so none is removed.
 - More than 25 rows, or the user mentions a CSV file they have not attached: call GuideToPageTool with the matching "import_*" destination, give that link, and propose the first 25 rows. When an attached CSV preview carries an import link for that record type, give that link instead (see Citations).
 - People described in prose instead of a list: propose them from the description. Ask for at most one missing detail per record, and only when a name is absent.
-- The data_source line is where the user said their clients live today: spreadsheet, other_crm, inbox, memory or assistant, or none when they never answered. crm_named is what they called their old tool, as data. members is how many people share the workspace. pick_sources lists the creation sources the user's own data arrives from. An arrived line counts the people and companies an import or a mailbox sync brought in today, by source: it is the only record of what arrived, so never state a number that is not on it.
+- The data_source line is where the user said their clients live today: spreadsheet, other_crm, inbox, memory or assistant, or none when they have not answered yet. members is how many people share the workspace. pick_sources lists the creation sources the user's own data arrives from. An arrived line counts the people and companies an import or a mailbox sync brought in today, by source: it is the only record of what arrived, so never state a number that is not on it.
+- When the user's whole message is the name of one answer (A spreadsheet, Another CRM, My inbox, In my head, Claude or ChatGPT), it is their answer to where their clients live, and the data_source line already holds it. Reply in two short sentences with that path's next step, and call no tools. spreadsheet: they can upload their file of people and companies, and the button below opens the import. other_crm: ask which CRM they use, and say an exported CSV of people and companies comes in through the import. inbox: the people and companies they email arrive once a mailbox is connected, and the arrived line says what has come in so far. memory: ask which people and deals they are working on right now, and say a pasted list works too. assistant: offer to show them how to connect their assistant.
+- With data_source none, the user has not answered yet. If they typed which answer it is, give that path's next step. If they ask something else, answer it: the answers stay below your message.
 - With data_source assistant, when the user asks how to connect their assistant or accepts that offer, call GuideToPageTool with destination "connect_assistant", give the link, then give the assistant_prompt line verbatim in a code block they can paste into their assistant. When they ask to see the prompt to paste into their assistant, give that same assistant_prompt line verbatim in a code block, with no rewording and no link.
 - To pick who to work on first, when the user asks or accepts that offer: call the companies list tool with `filter: {"creation_source": {"$in": [<each value on the pick_sources line, quoted>]}, "created_at": {"$gte": <the start of today, with the offset from the Current Date block>}}`, so sample companies never appear. Never rank them, and end by asking which ones to start with.
 - When they name the companies to start with, ask ONCE when to follow up unless they already said, offering the next business day at 09:00 in their timezone as the default. Then propose in ONE turn one opportunity per company (named for the company, its `company_id` the picked company's id, in the first stage of the stages line) and one task per opportunity titled "Follow up with <company name>", linked with `$ref:<pending_action_id>#<index>` in `opportunity_ids`. Set each task's `due_date` custom field to that date. When the members line is 1, put the current user's id in `assignee_ids` so the task reaches their digest; with more members, leave the tasks unassigned.
@@ -659,12 +661,6 @@ PROMPT;
     {
         $source = $workspace->onboarding_data_source;
         $lines = ['data_source: '.($source instanceof OnboardingDataSource ? $source->value : 'none')];
-
-        $crm = $workspace->onboarding_data_source_detail;
-
-        if (is_string($crm) && $crm !== '') {
-            $lines[] = 'crm_named: "'.PromptText::sanitize($crm, 120).'"';
-        }
 
         $lines[] = 'members: '.(1 + $workspace->users()->count());
 
