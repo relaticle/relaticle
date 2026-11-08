@@ -33,6 +33,16 @@ final class RichEditorFieldType extends BaseFieldType
         };
         JS;
 
+    // The floating UI plugin keeps the open panel's positioning loop in a closure that re-attaching the
+    // toolbar orphans, and the loop then throws on every scroll. Closing the panel on teardown stops it.
+    private const string CLOSE_PANEL_ON_DESTROY = <<<'JS'
+        const destroy = $data.destroy;
+        $data.destroy = function () {
+            this.$refs.panel?.close();
+            return destroy.call(this);
+        };
+        JS;
+
     public function configure(): FieldSchema
     {
         return (new PackageRichEditorFieldType)->configure()
@@ -96,7 +106,7 @@ final class RichEditorFieldType extends BaseFieldType
                 ['paragraph', 'h1', 'h2', 'h3'],
             )
                 ->textualButtons()
-                ->extraAttributes(['x-init' => self::KEEP_TRIGGER_WHILE_DETACHED]),
+                ->extraAttributes(['x-init' => self::KEEP_TRIGGER_WHILE_DETACHED.self::CLOSE_PANEL_ON_DESTROY]),
             ...self::FLOATING_TOOLBAR,
         ];
     }
