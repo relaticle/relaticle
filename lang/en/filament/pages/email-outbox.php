@@ -19,6 +19,10 @@ return [
         'completed' => 'Completed',
         'partial_failure' => 'Partial failure',
     ],
+    'filters' => [
+        'status' => 'Status',
+        'status_indicator' => 'Status: :status',
+    ],
     'tabs' => [
         'queued' => 'Queued',
         'scheduled' => 'Scheduled',

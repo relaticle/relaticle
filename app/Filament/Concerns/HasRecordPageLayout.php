@@ -66,10 +66,12 @@ trait HasRecordPageLayout
                     ->hiddenLabel()
                     ->chipSize('lg')
                     ->size(TextSize::Large)
-                    ->weight(FontWeight::SemiBold),
+                    ->weight(FontWeight::SemiBold)
+                    ->extraAttributes(['class' => 'fi-record-title']),
                 $this->recordActions()->grow(false),
             ])
-                ->verticallyAlignCenter(),
+                ->verticallyAlignCenter()
+                ->extraAttributes(['class' => 'fi-record-header']),
             $this->quickActions(),
             $this->detailsSection($schema),
             CommunicationIntelligenceInfolist::section()
@@ -237,6 +239,8 @@ trait HasRecordPageLayout
         return Section::make(__('filament/record-page.sections.details'))
             ->contained(false)
             ->collapsible()
+            ->persistCollapsed()
+            ->id('record-details')
             ->schema([
                 Group::make([
                     ...$visible,

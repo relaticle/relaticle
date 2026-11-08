@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\CompanyResource\Pages;
 
+use App\Filament\Actions\ImportExportActionGroup;
 use App\Filament\Concerns\HasCustomFieldColumns;
 use App\Filament\Exports\CompanyExporter;
 use App\Filament\Resources\CompanyResource;
 use App\Models\Company;
 use Filament\Actions\Action;
-use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\ExportAction;
 use Filament\Resources\Pages\ListRecords;
@@ -32,19 +32,14 @@ final class ListCompanies extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            ActionGroup::make([
+            ImportExportActionGroup::make([
                 Action::make('import')
                     ->label(__('filament/resources/company.pages.list.actions.import.label'))
                     ->icon('heroicon-o-arrow-up-tray')
                     ->url(ImportCompanies::getUrl())
                     ->visible(ImportCompanies::canAccess(...)),
                 ExportAction::make()->exporter(CompanyExporter::class)->authorize('exportAny', Company::class),
-            ])
-                ->icon('heroicon-o-arrows-up-down')
-                ->color('gray')
-                ->button()
-                ->label(__('filament/resources/company.pages.list.actions.import_export.label'))
-                ->size(Size::Small),
+            ])->label(__('filament/resources/company.pages.list.actions.import_export.label')),
             CreateAction::make()->icon('heroicon-o-plus')->size(Size::Small),
         ];
     }

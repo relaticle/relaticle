@@ -66,14 +66,14 @@
             <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('Chats') }}</h3>
 
-                <div class="flex items-center gap-1">
+                <div class="flex items-center gap-1 max-sm:gap-2">
                     <a
                         href="{{ $newChatUrl }}"
                         wire:navigate
                         @click="$wire.close()"
                         aria-label="{{ __('New chat') }}"
                         title="{{ __('New chat') }}"
-                        class="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-white/5 dark:hover:text-primary-400"
+                        class="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition max-sm:size-11 hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-white/5 dark:hover:text-primary-400"
                     >
                         <x-heroicon-o-plus class="h-4 w-4" />
                     </a>
@@ -82,7 +82,7 @@
                         type="button"
                         @click="$wire.close()"
                         aria-label="{{ __('Close all chats panel') }}"
-                        class="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/5 dark:hover:text-gray-200"
+                        class="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition max-sm:size-11 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/5 dark:hover:text-gray-200"
                     >
                         <x-heroicon-o-x-mark class="h-4 w-4" />
                     </button>

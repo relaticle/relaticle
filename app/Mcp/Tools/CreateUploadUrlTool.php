@@ -12,6 +12,7 @@ use App\Models\Workspace;
 use App\Support\Media\TemporaryUploads;
 use App\Support\Media\UploadAllowlist;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -30,6 +31,8 @@ final class CreateUploadUrlTool extends Tool
     use HasExplicitToolAnnotations;
 
     private const int EXPIRY_MINUTES = 5;
+
+    private const int URLS_PER_HOUR = 60;
 
     protected function destructiveHint(): bool
     {
@@ -66,6 +69,10 @@ final class CreateUploadUrlTool extends Tool
 
         /** @var Workspace $workspace */
         $workspace = $user->currentWorkspace;
+
+        if (RateLimiter::increment("mcp-upload-urls:{$workspace->getKey()}", 3600) > self::URLS_PER_HOUR) {
+            return Response::error(__('uploads.errors.rate_limited'));
+        }
 
         try {
             $uploadId = TemporaryUploads::newName((string) $validated['filename'], (string) $workspace->getKey());

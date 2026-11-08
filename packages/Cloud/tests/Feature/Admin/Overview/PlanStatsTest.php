@@ -140,3 +140,23 @@ it('counts self-serve workspaces at their mailbox cap exactly as the workspace l
         ->assertCanSeeTableRecords([$capped])
         ->assertCanNotSeeTableRecords([$nearlyCapped, $scale, $free, $internal]);
 });
+
+it('leaves trial abuse bots and workspaces owned on our own email domains out of the customer counts', function (): void {
+    config()->set('system-admin.abuse_timezones', ['Asia/Tehran']);
+    config()->set('system-admin.internal_email_domains', ['relaticle.com']);
+
+    $customer = OverviewData::trial(OverviewData::workspaceOf(OverviewData::owner()));
+    $bot = OverviewData::trial(OverviewData::workspaceOf(OverviewData::owner(attributes: ['timezone' => 'Asia/Tehran'])));
+    $payingInTehran = OverviewData::trial(OverviewData::workspaceOf(OverviewData::owner(attributes: ['timezone' => 'Asia/Tehran'])));
+    $payingInTehran->subscriptions()->create([
+        'type' => 'default', 'stripe_id' => 'sub_tehran', 'stripe_status' => 'active', 'stripe_price' => 'price_x', 'quantity' => 1,
+    ]);
+    $demo = OverviewData::trial(OverviewData::workspaceOf(OverviewData::owner(attributes: ['email' => 'Reviewer@Relaticle.com'])));
+
+    livewire(PlanStats::class)->assertSeeInOrder(['Cloud Pro', '2', '100% of 2 customer workspaces']);
+
+    livewire(ListWorkspaces::class)
+        ->filterTable('internal', false)
+        ->assertCanSeeTableRecords([$customer, $payingInTehran])
+        ->assertCanNotSeeTableRecords([$bot, $demo]);
+});

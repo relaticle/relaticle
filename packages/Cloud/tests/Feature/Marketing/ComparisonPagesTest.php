@@ -40,7 +40,7 @@ it('renders question-shaped headings and primary source links on comparison page
     $html = $this->get('/compare/relaticle-vs-twenty')->assertOk()->getContent();
 
     expect($html)->toContain('How do Relaticle and Twenty pricing compare?')
-        ->and($html)->toContain('Which one runs AI and MCP self-hosted?')
+        ->and($html)->toContain('How do their AI and MCP setups compare?')
         ->and($html)->toContain('Twenty CRM')
         ->and($html)->toContain(__('Primary sources:'))
         ->and($html)->toContain('https://twenty.com/pricing')

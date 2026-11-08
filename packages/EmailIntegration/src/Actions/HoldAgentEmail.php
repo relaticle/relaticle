@@ -7,6 +7,7 @@ namespace Relaticle\EmailIntegration\Actions;
 use App\Models\User;
 use DateTimeInterface;
 use Illuminate\Support\Facades\DB;
+use Relaticle\EmailIntegration\Data\AgentConnection;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
 use Relaticle\EmailIntegration\Models\Email;
@@ -39,16 +40,17 @@ final readonly class HoldAgentEmail
      *     attachment_attributes?: array<string, array{is_inline: bool, content_id: ?string}>,
      * }  $payload
      */
-    public function execute(User $user, array $payload, string $via): Email
+    public function execute(User $user, array $payload, AgentConnection $connection): Email
     {
-        return DB::transaction(function () use ($user, $payload, $via): Email {
+        return DB::transaction(function () use ($user, $payload, $connection): Email {
             $this->reserveHold->execute($user);
 
             $scheduledFor = $this->pickSendTime->execute($payload['scheduled_for'] ?? null);
 
             $email = $this->sendEmail->execute($user, [...$payload, 'scheduled_for' => $scheduledFor]);
+            $email->forceFill($connection->credential())->save();
 
-            $this->notifier->sendHeld($email, $user, $via, (int) round(now()->diffInSeconds($scheduledFor)));
+            $this->notifier->sendHeld($email, $user, $connection->name, (int) round(now()->diffInSeconds($scheduledFor)));
 
             return $email;
         });

@@ -64,6 +64,8 @@
             <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">{{ __('No credit card required to start. Self-host without a license fee.') }}</p>
         </x-slot:aside>
 
+        <h2 class="sr-only">{{ __('What you get with Relaticle') }}</h2>
+
         <div class="bg-rail border-rail grid grid-cols-1 gap-px border-t md:grid-cols-3">
             @foreach ([
                 [__('Choose where it runs'), __('Our cloud or your infrastructure. You decide who operates your CRM.')],

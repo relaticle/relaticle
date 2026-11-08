@@ -152,15 +152,26 @@ final class MappingStep extends Component implements HasActions, HasForms
         return ['linkKey' => $mapping->entityLink, 'link' => $link, 'matcherKey' => $mapping->target];
     }
 
+    /** @return array<string, array<int, string>> */
+    #[Computed]
+    public function previews(): array
+    {
+        $rows = $this->store()->query()
+            ->limit(50)
+            ->get()
+            ->pluck('raw_data');
+
+        return collect($this->headers())
+            ->mapWithKeys(fn (string $header): array => [
+                $header => $rows->map(fn (Collection $data): string => (string) ($data[$header] ?? ''))->all(),
+            ])
+            ->all();
+    }
+
     /** @return array<string> */
     public function previewValues(string $column, int $limit = 5): array
     {
-        return $this->store()->query()
-            ->limit($limit)
-            ->get()
-            ->pluck('raw_data')
-            ->map(fn (Collection $data): string => (string) ($data[$column] ?? ''))
-            ->all();
+        return array_slice($this->previews[$column] ?? [], 0, $limit);
     }
 
     public function canProceed(): bool

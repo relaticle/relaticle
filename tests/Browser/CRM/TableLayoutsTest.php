@@ -61,3 +61,24 @@ it('keeps the layout list in step with the search box after Escape', function ()
         ->assertScript("{$visibleRows} === (document.querySelector('.fi-ta-layouts-search input').value === '' ? 7 : 1)", true)
         ->assertNoJavaScriptErrors();
 });
+
+it('closes a layout confirmation from its close button on a phone, where the layouts menu is a sheet', function (): void {
+    $layout = TableLayout::factory()->for($this->user)->for($this->workspace)->create(['name' => 'Hot leads']);
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(390, 844)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-ta-layouts-trigger');
+
+    $page->script(<<<'JS'
+        document.querySelector(`.fi-ta-layouts-row [wire\\:click^="mountAction('deleteTableLayout'"]`).click()
+    JS);
+
+    $page->assertSee('Delete "Hot leads"?')
+        ->click('.fi-modal.fi-modal-open .fi-modal-close-btn')
+        ->assertScript('document.querySelector(".fi-modal.fi-modal-open") === null', true)
+        ->assertNoJavaScriptErrors();
+
+    expect(TableLayout::query()->whereKey($layout->getKey())->exists())->toBeTrue();
+});

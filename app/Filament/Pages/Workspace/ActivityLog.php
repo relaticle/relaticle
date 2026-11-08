@@ -25,6 +25,7 @@ use Filament\Pages\Page;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Facades\FilamentTimezone;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\Column;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -180,46 +181,7 @@ final class ActivityLog extends Page implements HasTable
                         $this->removeTableFilters();
                     }),
             ])
-            ->columns([
-                TextColumn::make('created_at')
-                    ->label(__('workspaces.activity.columns.created_at'))
-                    ->since()
-                    ->dateTimeTooltip()
-                    ->sortable(),
-                TextColumn::make('causer.name')
-                    ->label(__('workspaces.activity.columns.causer'))
-                    ->weight(FontWeight::Medium)
-                    ->placeholder(fn (Activity $record): string => $record->causerLabel()),
-                TextColumn::make('source')
-                    ->label(__('workspaces.activity.columns.source'))
-                    ->badge()
-                    ->placeholder(ActivityValue::EMPTY),
-                TextColumn::make('event')
-                    ->label(__('workspaces.activity.columns.event'))
-                    ->badge()
-                    ->icon($this->eventIcon(...))
-                    ->color(fn (?string $state): string => match ($state) {
-                        'created', ExecuteImportJob::IMPORTED_EVENT => 'success',
-                        'deleted', ExecuteImportJob::FAILED_EVENT => 'danger',
-                        'restored' => 'warning',
-                        default => 'gray',
-                    })
-                    ->formatStateUsing($this->eventLabel(...)),
-                TextColumn::make('subject_type')
-                    ->label(__('workspaces.activity.columns.subject_type'))
-                    ->color('gray')
-                    ->icon($this->typeIcon(...))
-                    ->formatStateUsing($this->typeLabel(...)),
-                TextColumn::make('subject_id')
-                    ->label(__('workspaces.activity.columns.record'))
-                    ->state($this->recordName(...))
-                    ->weight(FontWeight::Medium)
-                    ->color(fn (Activity $record): ?string => $this->liveSubject($record) instanceof Model ? null : 'gray')
-                    ->tooltip($this->destroyedNotice(...))
-                    ->searchable(query: $this->searchByRecordName(...))
-                    ->wrap(),
-                $this->changesColumn(),
-            ])
+            ->columns($this->columns())
             ->filters([
                 SelectFilter::make('event')
                     ->label(__('workspaces.activity.filters.event'))
@@ -251,6 +213,55 @@ final class ActivityLog extends Page implements HasTable
                         ->when(filled($data['until'] ?? null), fn (Builder $q): Builder => $q->whereDate('activity_log.created_at', '<=', $data['until'])))
                     ->indicateUsing($this->dateIndicators(...)),
             ]);
+    }
+
+    /**
+     * @return array<int, Column>
+     */
+    private function columns(): array
+    {
+        return [
+            TextColumn::make('created_at')
+                ->label(__('workspaces.activity.columns.created_at'))
+                ->since()
+                ->dateTimeTooltip()
+                ->sortable(),
+            TextColumn::make('causer.name')
+                ->label(__('workspaces.activity.columns.causer'))
+                ->weight(FontWeight::Medium)
+                ->placeholder(fn (Activity $record): string => $record->causerLabel()),
+            TextColumn::make('source')
+                ->label(__('workspaces.activity.columns.source'))
+                ->badge()
+                ->visibleFrom('sm')
+                ->placeholder(ActivityValue::EMPTY),
+            TextColumn::make('event')
+                ->label(__('workspaces.activity.columns.event'))
+                ->badge()
+                ->icon($this->eventIcon(...))
+                ->color(fn (?string $state): string => match ($state) {
+                    'created', ExecuteImportJob::IMPORTED_EVENT => 'success',
+                    'deleted', ExecuteImportJob::FAILED_EVENT => 'danger',
+                    'restored' => 'warning',
+                    default => 'gray',
+                })
+                ->formatStateUsing($this->eventLabel(...)),
+            TextColumn::make('subject_type')
+                ->label(__('workspaces.activity.columns.subject_type'))
+                ->visibleFrom('sm')
+                ->color('gray')
+                ->icon($this->typeIcon(...))
+                ->formatStateUsing($this->typeLabel(...)),
+            TextColumn::make('subject_id')
+                ->label(__('workspaces.activity.columns.record'))
+                ->state($this->recordName(...))
+                ->weight(FontWeight::Medium)
+                ->color(fn (Activity $record): ?string => $this->liveSubject($record) instanceof Model ? null : 'gray')
+                ->tooltip($this->destroyedNotice(...))
+                ->searchable(query: $this->searchByRecordName(...))
+                ->wrap(),
+            $this->changesColumn(),
+        ];
     }
 
     /**

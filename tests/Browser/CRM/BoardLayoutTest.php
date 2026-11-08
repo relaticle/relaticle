@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\CustomFields\TaskField;
+use App\Filament\Actions\MoveCardAction;
 use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Models\Company;
@@ -13,7 +14,7 @@ use App\Models\Task;
 use App\Models\User;
 use Relaticle\CustomFields\Services\TenantContextService;
 
-mutates(TasksBoard::class, OpportunitiesBoard::class);
+mutates(TasksBoard::class, OpportunitiesBoard::class, MoveCardAction::class);
 
 it('scrolls a long column inside the board without scrolling the page', function (string $model, string $columnFieldCode, string $dateFieldCode, string $path): void {
     $this->withVite();
@@ -226,4 +227,61 @@ it('joins the active filter trigger and its clear button into one pill', functio
 })->with([
     'phone' => [390, true],
     'desktop' => [1440, false],
+]);
+
+it('lets the next board column peek past the first on a 320px phone', function (string $path): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(320, 568)
+        ->navigate("/app/{$workspace->slug}/{$path}")
+        ->assertVisible('.ff-column >> nth=0')
+        ->assertNoJavaScriptErrors();
+
+    expect($page->script('Math.round(document.querySelectorAll(".ff-column")[1].getBoundingClientRect().left)'))->toBeLessThanOrEqual(304);
+})->with(['tasks/board', 'opportunities/board']);
+
+it('moves a card on a phone by tapping a column in its move to sheet', function (string $model, string $columnFieldCode, string $path): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    TenantContextService::setTenantId($workspace->getKey());
+
+    $columnField = CustomField::query()->forEntity($model)->where('code', $columnFieldCode)->firstOrFail();
+    [$from, $to] = [$columnField->options->get(0), $columnField->options->get(1)];
+
+    $record = $model::factory()->recycle([$user, $workspace])->create();
+    $record->saveCustomFieldValue($columnField, $from->getKey());
+
+    TenantContextService::setTenantId(null);
+
+    $card = "[data-card-id=\"{$record->getKey()}\"]";
+
+    loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(430, 932)
+        ->navigate("/app/{$workspace->slug}/{$path}")
+        ->click("{$card} .fi-dropdown-trigger")
+        ->click(".fi-dropdown-panel[style*='display: block'] .fi-dropdown-list-item:has-text('".__('filament/pages/boards.move_to.label')."')")
+        ->assertVisible('.fi-modal-open .fi-modal-window')
+        ->wait(0.5)
+        ->assertScript("(() => { const r = document.querySelector('.fi-modal-open .fi-modal-window').getBoundingClientRect(); return r.left === 0 && Math.round(r.right) === innerWidth; })()", true)
+        ->assertScript("document.querySelector('.fi-modal-open [role=radio][aria-checked=true]').textContent.trim()", $from->name)
+        ->click(".fi-modal-open [role=radio]:has-text('{$to->name}')")
+        ->assertSee(__('filament/pages/boards.move_to.moved', ['column' => $to->name]))
+        ->assertScript("document.querySelector('{$card}').closest('[data-column-root]').dataset.columnRoot", (string) $to->getKey())
+        ->assertScript("document.querySelector('.fi-modal-open') === null", true)
+        ->assertNoJavaScriptErrors();
+
+    expect($record->fresh()->customFieldValues()->where('custom_field_id', $columnField->getKey())->value($columnField->getValueColumn()))
+        ->toBe($to->getKey());
+})->with([
+    'tasks' => [Task::class, TaskField::STATUS->value, 'tasks/board'],
+    'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board'],
 ]);

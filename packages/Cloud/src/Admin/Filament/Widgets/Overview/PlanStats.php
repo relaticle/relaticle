@@ -18,7 +18,7 @@ use Relaticle\EmailIntegration\EmailIntegrationServiceProvider;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource;
 use Relaticle\SystemAdmin\Filament\Support\HelpLabel;
 use Relaticle\SystemAdmin\Filament\Support\ViewerTime;
-use Relaticle\SystemAdmin\Metrics\Scopes\ExternalWorkspace;
+use Relaticle\SystemAdmin\Metrics\Scopes\CustomerWorkspace;
 
 final class PlanStats extends StatsOverviewWidget
 {
@@ -108,6 +108,6 @@ final class PlanStats extends StatsOverviewWidget
      */
     private function customers(): Builder
     {
-        return Workspace::query()->withGlobalScope(ExternalWorkspace::class, new ExternalWorkspace);
+        return Workspace::query()->withGlobalScope(CustomerWorkspace::class, new CustomerWorkspace);
     }
 }

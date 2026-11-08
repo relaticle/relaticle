@@ -242,22 +242,22 @@
             :class="{ 'shadow-xl': !docked }"
         >
             {{-- Panel Header --}}
-            <div class="flex items-center justify-between gap-2 border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+            <div class="flex items-center justify-between gap-2 border-b border-gray-200 px-4 py-3 max-sm:py-1.5 dark:border-gray-700">
                 <div class="flex min-w-0 items-center gap-2">
                     <x-heroicon-o-chat-bubble-left-right class="h-5 w-5 shrink-0 text-primary-600 dark:text-primary-400" />
                     <h3 class="truncate text-sm font-semibold text-gray-900 dark:text-white">{{ config('chat.assistant_name') }}</h3>
                 </div>
 
-                <div class="flex shrink-0 items-center gap-0.5">
+                <div class="flex shrink-0 items-center gap-0.5 max-sm:gap-1">
                     {{-- Chat history --}}
-                    <div class="relative" @click.outside="historyOpen = false">
+                    <div class="relative max-sm:static" @click.outside="historyOpen = false">
                         <button
                             type="button"
                             @click="toggleHistory()"
                             aria-label="{{ __('View history') }}"
                             title="{{ __('View history') }}"
                             :aria-expanded="historyOpen"
-                            class="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                            class="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition max-sm:size-11 hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
                             :class="{ 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300': historyOpen }"
                         >
                             <x-ri-history-line class="h-4 w-4" aria-hidden="true" />
@@ -271,7 +271,7 @@
                             x-transition:enter-end="motion-safe:opacity-100 motion-safe:scale-100"
                             role="dialog"
                             aria-label="{{ __('Chat history') }}"
-                            class="absolute end-0 z-20 mt-1.5 w-80 max-w-[calc(100vw-2rem)] origin-top-right overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
+                            class="absolute end-0 z-20 mt-1.5 w-80 max-w-[calc(100vw-2rem)] max-sm:inset-x-2 max-sm:w-auto origin-top-right overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
                         >
                             <div class="flex items-center gap-2 border-b border-gray-200 px-3 py-2 dark:border-gray-700">
                                 <x-heroicon-o-magnifying-glass class="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
@@ -336,7 +336,7 @@
                             aria-label="{{ __('Chat actions') }}"
                             title="{{ __('Chat actions') }}"
                             :aria-expanded="menuOpen"
-                            class="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                            class="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition max-sm:size-11 hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
                             :class="{ 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300': menuOpen }"
                         >
                             <x-heroicon-o-ellipsis-vertical class="h-4 w-4" aria-hidden="true" />
@@ -393,7 +393,7 @@
                         @click="open = false"
                         type="button"
                         aria-label="{{ __('Close chat panel') }}"
-                        class="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                        class="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition max-sm:size-11 hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
                     >
                         <x-heroicon-o-x-mark class="h-5 w-5" aria-hidden="true" />
                     </button>

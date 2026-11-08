@@ -127,14 +127,14 @@ it('writes nothing when the visitor discards the proposal', function (): void {
     $page->assertNoJavaScriptErrors();
 });
 
-it('saves an edited close date and leaves an unticked field out', function (): void {
+it('saves an edited close date and leaves a field out', function (): void {
     $page = $this->visit('/');
 
     scrollShowcaseIntoView($page, '[data-approval]');
     $page->click('[aria-label="Edit Close date"]');
     $page->fill('[data-approval] input[type="date"]', '2026-11-20');
     $page->click('[data-approval-field="closeIncluded"] button:text-is("Save")');
-    $page->click('[aria-label="Include Stage"]');
+    $page->click('[aria-label="Leave out Stage"]');
     $page->click('[data-approval-button]');
 
     expect($page->script("document.querySelector('[data-approval-close-date]').textContent"))->toBe('Nov 20, 2026')

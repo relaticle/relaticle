@@ -82,3 +82,41 @@ it('scrolls a table wider than its card so the row actions stay reachable', func
 
     expect($rowActionReachable)->toBeTrue();
 });
+
+it('keeps a table sheet above the sections that follow it on a phone', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(390, 664)
+        ->navigate("/app/{$workspace->slug}/settings/access-tokens")
+        ->assertVisible('.fi-ta-col-manager-dropdown button >> nth=0')
+        ->click('.fi-ta-col-manager-dropdown button >> nth=0')
+        ->assertVisible('.fi-ta-col-manager-dropdown .fi-dropdown-panel >> nth=0')
+        ->wait(0.5);
+
+    $page->script("document.querySelectorAll('.fi-ta-header-ctn')[1].scrollIntoView({ block: 'center' })");
+
+    $coveredBySheet = <<<'JS'
+        (() => {
+            const sheet = document.querySelector('.fi-ta-col-manager-dropdown .fi-dropdown-panel');
+            const box = sheet.getBoundingClientRect();
+            const points = [];
+
+            for (let y = box.top + 6; y < Math.min(box.bottom, innerHeight) - 2; y += 18) {
+                points.push(y);
+            }
+
+            return {
+                points: points.length > 0,
+                fullWidth: Math.round(box.width) === innerWidth,
+                covered: points.every((y) => sheet.contains(document.elementFromPoint(innerWidth / 2, y))),
+            };
+        })();
+    JS;
+
+    expect($page->script($coveredBySheet))->toBe(['points' => true, 'fullWidth' => true, 'covered' => true]);
+});

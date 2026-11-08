@@ -17,6 +17,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Filters\Indicator;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\View\View;
@@ -180,9 +181,17 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
     private function statusFilter(): SelectFilter
     {
         return SelectFilter::make('status_tab')
+            ->label(__('filament/pages/email-outbox.filters.status'))
             ->options($this->statusFilterOptions())
             ->default(OutboxTab::QUEUED->value)
             ->selectablePlaceholder(false)
+            ->resetState(['value' => OutboxTab::QUEUED->value])
+            ->indicateUsing(function (array $state): Indicator {
+                $tab = OutboxTab::tryFrom((string) ($state['value'] ?? '')) ?? OutboxTab::QUEUED;
+
+                return Indicator::make(__('filament/pages/email-outbox.filters.status_indicator', ['status' => $tab->getLabel()]))
+                    ->removable($tab !== OutboxTab::QUEUED);
+            })
             ->query(fn (Builder $query, array $data): Builder => $this->applyStatusTab(
                 $query,
                 OutboxTab::tryFrom((string) ($data['value'] ?? '')) ?? OutboxTab::QUEUED,

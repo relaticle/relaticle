@@ -9,6 +9,7 @@ use App\Enums\CrmEntity;
 use App\Filament\Components\Forms\RecordSelect;
 use App\Filament\Components\Forms\WorkspaceMemberSelect;
 use App\Filament\Components\RecordChip;
+use App\Filament\Components\Tables\EmptyListDescription;
 use App\Filament\Components\Tables\RecordChipColumn;
 use App\Filament\Exports\PeopleExporter;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
@@ -37,6 +38,7 @@ use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
+use Filament\Tables\Columns\Column;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
@@ -107,36 +109,8 @@ final class PeopleResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->columns([
-                RecordChipColumn::make('name')
-                    ->label(__('filament/resources/person.fields.name.label'))
-                    ->searchable()
-                    ->sortable(),
-                RecordChipColumn::make('company.name')
-                    ->label(__('filament/resources/person.fields.company.label'))
-                    ->url(fn (People $record): ?string => $record->company_id ? CompanyResource::getUrl('view', [$record->company_id]) : null)
-                    ->searchable()
-                    ->sortable(),
-                TextColumn::make('creator.name')
-                    ->label(__('filament/resources/person.fields.creator.label'))
-                    ->searchable()
-                    ->sortable()
-                    ->toggleable()
-                    ->getStateUsing(fn (People $record): string => $record->created_by),
-                TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('deleted_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable()
-                    ->toggledHiddenByDefault(),
-            ])
+            ->emptyStateDescription(EmptyListDescription::unlessFiltered(__('filament/resources/person.empty_state.description')))
+            ->columns(self::columns())
             ->defaultSort('created_at', 'desc')
             ->filters([
                 SelectFilter::make('creation_source')
@@ -165,6 +139,45 @@ final class PeopleResource extends Resource
                     RestoreBulkAction::make(),
                 ]),
             ]);
+    }
+
+    /**
+     * @return array<int, Column>
+     */
+    private static function columns(): array
+    {
+        return [
+            RecordChipColumn::make('name')
+                ->label(__('filament/resources/person.fields.name.label'))
+                ->searchable()
+                ->sortable(),
+            RecordChipColumn::make('company.name')
+                ->label(__('filament/resources/person.fields.company.label'))
+                ->url(fn (People $record): ?string => $record->company_id ? CompanyResource::getUrl('view', [$record->company_id]) : null)
+                ->searchable()
+                ->sortable(),
+            TextColumn::make('creator.name')
+                ->label(__('filament/resources/person.fields.creator.label'))
+                ->searchable()
+                ->sortable()
+                ->toggleable()
+                ->visibleFrom('sm')
+                ->getStateUsing(fn (People $record): string => $record->created_by),
+            TextColumn::make('created_at')
+                ->dateTime()
+                ->sortable()
+                ->visibleFrom('sm')
+                ->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('updated_at')
+                ->dateTime()
+                ->sortable()
+                ->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('deleted_at')
+                ->dateTime()
+                ->sortable()
+                ->toggleable()
+                ->toggledHiddenByDefault(),
+        ];
     }
 
     public static function getRelations(): array

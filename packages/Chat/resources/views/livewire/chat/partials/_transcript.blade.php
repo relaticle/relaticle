@@ -569,32 +569,17 @@
                     </div>
                 </template>
 
-                {{-- Action cards: resolved cards stay inline as the audit trail.
+                {{-- Receipts: a decided proposal stays inline as its receipt lines.
                      A still-pending batch that already has some resolved items
-                     ALSO renders inline as a compact progress card (the editor
+                     ALSO renders inline as a compact progress line (the editor
                      for the unresolved items lives docked at the composer; see
                      input area). A fully-unresolved proposal is dock-only. --}}
                 <template x-if="msg.pending_actions && msg.pending_actions.length > 0">
                     <div class="mt-3 space-y-3">
                         <template x-for="group in proposalGroups(msg)" :key="group.key">
-                            <div class="space-y-2">
-                                {{-- A plan: one card for the whole decision, its steps in order. --}}
-                                <template x-if="isPlanGroup(group)">
-                                    <div class="space-y-2">
-                                        <template x-if="group.actions.some((a) => a.status !== 'pending')">
-                                            @include('chat::livewire.chat.partials._proposal-plan-card')
-                                        </template>
-                                    </div>
-                                </template>
-
-                                <template x-if="!isPlanGroup(group)">
-                                    <template x-for="action in group.actions" :key="action.pending_action_id">
-                                        <div class="space-y-2">
-                                            <template x-if="action.status !== 'pending' || hasItemResults(action)">
-                                                @include('chat::livewire.chat.partials._proposal-card')
-                                            </template>
-                                        </div>
-                                    </template>
+                            <div>
+                                <template x-if="group.actions.some((a) => a.status !== 'pending' || hasItemResults(a))">
+                                    @include('chat::livewire.chat.partials._proposal-receipt')
                                 </template>
                             </div>
                         </template>

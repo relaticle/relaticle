@@ -28,15 +28,6 @@ enum PendingActionOperation: string
         };
     }
 
-    public function count(): string
-    {
-        return match ($this) {
-            self::Create => __(':count created'),
-            self::Update => __(':count updated'),
-            self::Delete => __(':count deleted'),
-        };
-    }
-
     public function verb(): string
     {
         return $this->value;

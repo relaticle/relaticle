@@ -52,7 +52,7 @@ final class RetryEmailTool extends Tool
         $user = auth()->user();
 
         try {
-            return Response::structured($this->outboxState($requeue->execute($user, $email, $this->connectionName())));
+            return Response::structured($this->outboxState($requeue->execute($user, $email, $this->agentConnection())));
         } catch (RuntimeException $exception) {
             return Response::error($exception->getMessage());
         }

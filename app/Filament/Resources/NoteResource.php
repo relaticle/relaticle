@@ -6,6 +6,7 @@ namespace App\Filament\Resources;
 
 use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
+use App\Filament\Components\Tables\EmptyListDescription;
 use App\Filament\Components\Tables\LinkedRecordsColumn;
 use App\Filament\Concerns\RemembersViewMode;
 use App\Filament\Exports\NoteExporter;
@@ -25,6 +26,7 @@ use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
+use Filament\Tables\Columns\Column;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
@@ -73,34 +75,8 @@ final class NoteResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->columns([
-                TextColumn::make('title')
-                    ->searchable(),
-                LinkedRecordsColumn::make('relations')
-                    ->toggleable(),
-                TextColumn::make('creator.name')
-                    ->label(__('filament/resources/note.fields.creator.label'))
-                    ->searchable()
-                    ->sortable()
-                    ->toggleable()
-                    ->getStateUsing(fn (Note $record): string => $record->created_by),
-                TextColumn::make('deleted_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable()
-                    ->toggledHiddenByDefault(),
-                TextColumn::make('created_at')
-                    ->label(__('filament/resources/note.fields.created_at.label'))
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(),
-                TextColumn::make('updated_at')
-                    ->label(__('filament/resources/note.fields.updated_at.label'))
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable()
-                    ->toggledHiddenByDefault(),
-            ])
+            ->emptyStateDescription(EmptyListDescription::unlessFiltered(__('filament/resources/note.empty_state.description')))
+            ->columns(self::columns())
             ->defaultSort('created_at', 'desc')
             ->filters([
                 SelectFilter::make('creation_source')
@@ -127,6 +103,43 @@ final class NoteResource extends Resource
                     RestoreBulkAction::make(),
                 ]),
             ]);
+    }
+
+    /**
+     * @return array<int, Column>
+     */
+    private static function columns(): array
+    {
+        return [
+            TextColumn::make('title')
+                ->searchable(),
+            LinkedRecordsColumn::make('relations')
+                ->toggleable(),
+            TextColumn::make('creator.name')
+                ->label(__('filament/resources/note.fields.creator.label'))
+                ->searchable()
+                ->sortable()
+                ->toggleable()
+                ->visibleFrom('sm')
+                ->getStateUsing(fn (Note $record): string => $record->created_by),
+            TextColumn::make('deleted_at')
+                ->dateTime()
+                ->sortable()
+                ->toggleable()
+                ->toggledHiddenByDefault(),
+            TextColumn::make('created_at')
+                ->label(__('filament/resources/note.fields.created_at.label'))
+                ->dateTime()
+                ->sortable()
+                ->visibleFrom('sm')
+                ->toggleable(),
+            TextColumn::make('updated_at')
+                ->label(__('filament/resources/note.fields.updated_at.label'))
+                ->dateTime()
+                ->sortable()
+                ->toggleable()
+                ->toggledHiddenByDefault(),
+        ];
     }
 
     #[Override]

@@ -7,6 +7,7 @@ namespace App\Livewire\App\AccessTokens;
 use App\Actions\Mcp\RevokeOAuthConnector;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\Workspace;
+use App\Queries\Tokens\LiveAgentCredentialsQuery;
 use Filament\Actions\Action;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -14,7 +15,6 @@ use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Laravel\Passport\Client;
@@ -36,12 +36,7 @@ final class ManageOAuthConnectors extends BaseLivewireComponent implements HasTa
             ->heading(__('access-tokens.connectors.title'))
             ->description(__('access-tokens.connectors.description'))
             ->query(fn (): Builder => Passport::client()->newQuery()
-                ->whereIn('id', fn (QueryBuilder $query) => $query
-                    ->select('client_id')
-                    ->from('oauth_access_tokens')
-                    ->where('user_id', $userId)
-                    ->where('revoked', false)
-                    ->where('expires_at', '>', now()))
+                ->whereIn('id', resolve(LiveAgentCredentialsQuery::class)->oauthClientIds((string) $userId))
                 ->addSelect(['bound_workspace_id' => DB::table('oauth_access_tokens')
                     ->select('workspace_id')
                     ->whereColumn('client_id', 'oauth_clients.id')
@@ -52,9 +47,7 @@ final class ManageOAuthConnectors extends BaseLivewireComponent implements HasTa
                 ])
                 ->withCount([
                     'tokens as active_tokens_count' => fn (Builder $query) => $query
-                        ->where('user_id', $userId)
-                        ->where('revoked', false)
-                        ->where('expires_at', '>', now()),
+                        ->whereIn('id', resolve(LiveAgentCredentialsQuery::class)->accessTokenIds((string) $userId)),
                 ]))
             ->columns([
                 TextColumn::make('name')->label(__('access-tokens.connectors.columns.name')),

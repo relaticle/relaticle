@@ -72,12 +72,12 @@
     $controls = [
         [
             __(':name never writes without your approval', ['name' => $assistantName]),
-            __('Every proposed create, update, or delete renders as a card showing the old value and the new one. You approve or reject it; nothing saves until you do. An unanswered proposal expires after :duration.', ['duration' => $pendingActionExpiry]),
+            __('Every proposed create, update, or delete docks as a card showing the old value and the new one. You approve or discard it; nothing saves until you do. An unanswered proposal expires after :duration.', ['duration' => $pendingActionExpiry]),
             'approval',
         ],
         [
-            __('Batches are reviewed record by record'),
-            __('A batch of up to :max records is stepped through one at a time. Keep the ones you want, reject the rest, and nothing you skipped is written.', ['max' => $maxBatchSize]),
+            __('Leave out any record before you approve'),
+            __('A batch of up to :max records lists every record on one card. Leave out the ones you do not want, approve the rest, and nothing you left out is written.', ['max' => $maxBatchSize]),
             'batch',
         ],
         [
@@ -222,7 +222,7 @@
                     :lead="__('It writes the email.')"
                     :facts="[
                         __('Shows the mailbox, recipients, message and signature'),
-                        __('Approve all never sends an email'),
+                        __('Approving a plan never sends an email'),
                         trans_choice('An Undo button stays up for :count second after Send|An Undo button stays up for :count seconds after Send', $undoSeconds, ['count' => $undoSeconds]),
                     ]"
                     :link-label="__('Use your email with an AI assistant')"

@@ -30,6 +30,6 @@ final readonly class FormedHabit implements Scope
                 ->groupBy('activity.workspace_id')
                 ->havingRaw("count(distinct date_trunc('week', activity.day)) >= 3"));
 
-        (new ExternalWorkspace)->apply($builder, $model);
+        (new CustomerWorkspace)->apply($builder, $model);
     }
 }

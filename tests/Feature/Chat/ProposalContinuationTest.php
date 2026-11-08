@@ -309,12 +309,13 @@ it('does not resume while another step of the plan is still pending', function (
 
     $turnId = (string) Str::ulid();
     $first = continuationProposal($this->user, $this->convId, $turnId, 'Step One Co');
-    continuationProposal($this->user, $this->convId, $turnId, 'Step Two Co');
+    continuationProposal($this->user, $this->convId, $turnId, 'Step Two Co')->update(['entity_type' => 'workspace_invitations']);
 
     Livewire::test(ProposalCard::class)
         ->dispatch('proposal:set-active', id: (string) $first->getKey(), context: 'conversation')
-        ->call('approveStep', (string) $first->getKey(), resolve(ProposalPlanService::class));
+        ->call('approveAll', resolve(ProposalPlanService::class));
 
+    expect($first->refresh()->status)->toBe(PendingActionStatus::Approved);
     Queue::assertNotPushed(ProcessChatMessage::class);
 });
 

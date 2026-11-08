@@ -68,7 +68,7 @@ final class SendEmailDraftTool extends Tool
         ]);
 
         try {
-            $email = $sendDraft->execute($user, $validated['draft_id'], $validated['scheduled_for'] ?? null, $this->connectionName());
+            $email = $sendDraft->execute($user, $validated['draft_id'], $validated['scheduled_for'] ?? null, $this->agentConnection());
         } catch (OutboxFull|AgentOutboxFull $exception) {
             return Response::error($exception->getMessage());
         }

@@ -49,6 +49,10 @@ return [
         ],
     ],
 
+    'empty_state' => [
+        'description' => 'Tasks you add appear here.',
+    ],
+
     'pages' => [
         'list' => [
             'actions' => [

@@ -146,6 +146,66 @@ it('rejects a signup from a disposable email domain', function (): void {
     expect(User::where('email', $email)->exists())->toBeFalse();
 });
 
+it('reports a refused email to analytics', function (): void {
+    livewire(Login::class)
+        ->fillForm(['email' => 'burner-event-'.uniqid().'@mailinator.com'])
+        ->call('authenticate')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasFormErrors(['email'])
+        ->assertDispatched('analytics-event', name: 'signup_refused_email')
+        ->assertNotDispatched('analytics-event', name: 'signup_refused_password');
+});
+
+it('reports a refused password to analytics', function (): void {
+    livewire(Login::class)
+        ->fillForm(['email' => 'weak-event-'.uniqid().'@gmail.com'])
+        ->call('authenticate')
+        ->fillForm(['password' => 'short'])
+        ->call('authenticate')
+        ->assertHasFormErrors(['password'])
+        ->assertDispatched('analytics-event', name: 'signup_refused_password')
+        ->assertNotDispatched('analytics-event', name: 'signup_refused_email');
+});
+
+it('reports a throttled signup to analytics', function (): void {
+    $component = livewire(Login::class)
+        ->fillForm(['email' => 'throttle-event-'.uniqid().'@gmail.com'])
+        ->call('authenticate');
+
+    foreach (range(1, 5) as $attempt) {
+        $component->fillForm(['password' => 'short'])->call('authenticate');
+    }
+
+    $component->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertDispatched('analytics-event', name: 'signup_refused_throttled');
+});
+
+it('reports a signup for an existing account to analytics', function (): void {
+    $email = 'exists-event-'.uniqid().'@gmail.com';
+
+    $component = livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate');
+
+    User::factory()->create(['email' => $email]);
+
+    $component->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertDispatched('analytics-event', name: 'signup_refused_existing_account');
+});
+
+it('reports no refusal for a signup that succeeds', function (): void {
+    livewire(Login::class)
+        ->fillForm(['email' => 'accepted-event-'.uniqid().'@gmail.com'])
+        ->call('authenticate')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasNoFormErrors()
+        ->assertNotDispatched('analytics-event', fn (string $event, array $params): bool => str_starts_with((string) $params['name'], 'signup_refused_'));
+});
+
 it('rejects a disposable email in the active locale', function (): void {
     app()->setLocale('fr');
 

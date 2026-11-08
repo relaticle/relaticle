@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Models\User;
 
+pest()->group('webkit');
+
 it('closes the model picker when the user presses Escape', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();

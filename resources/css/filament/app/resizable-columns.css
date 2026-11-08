@@ -19,6 +19,22 @@
     @apply w-auto min-w-16 overflow-hidden;
 }
 
+/* Below sm the list stacks into cards, so the columns give up the widths and dividers the server stamped on them,
+   and Filament's card rules place the cells again. */
+.fi-ta-table-stacked-on-mobile :is(th, td)[data-resizable-width] {
+    @apply max-sm:w-auto! max-sm:max-w-none! max-sm:min-w-0! max-sm:overflow-visible! max-sm:border-r-0!;
+}
+
+@media (width < 40rem) {
+    .fi-ta-table-stacked-on-mobile.fi-ta-resizable-table :is(td, .fi-ta-selection-cell) {
+        position: revert-layer;
+        width: revert-layer;
+        min-width: revert-layer;
+        max-width: revert-layer;
+        overflow: revert-layer;
+    }
+}
+
 /* Each cell owns its borders, so a divider travels with a column that slides. Rows cannot draw
    borders in this model, so Filament's row lines move onto the cells. */
 .fi-ta-resizable-table {
@@ -38,6 +54,16 @@
 .fi-ta-resizable-table th:not(:last-child):not(.fi-ta-selection-cell),
 .fi-ta-resizable-table td:not(:last-child):not(.fi-ta-selection-cell) {
     @apply border-r border-r-gray-200 dark:border-r-gray-700;
+}
+
+/* The toolbar stacks above the sticky head and the rows, so its dropdowns and the phone's sticky bulk bar stay on top.
+   21 stays under the topbar (30), and an open toolbar modal lifts it above. */
+.fi-ta-ctn .fi-ta-header-ctn {
+    @apply relative z-21;
+
+    &:has(.fi-modal.fi-modal-open) {
+        @apply z-50;
+    }
 }
 
 /* The script pins the head with a scroll-driven animation. Keyed off the server-rendered

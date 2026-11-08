@@ -328,7 +328,7 @@ it('drags the title column and drops another column before it', function (): voi
     $page = companiesTable($this->user, $this->workspace->slug);
     $order = $page->script(headerOrder());
 
-    $page->script(dragHeader('name', $order[2], side: 'right'));
+    $page->script(dragHeader('name', $order[1], side: 'right'));
     waitUntil($page, headerOrder().'.indexOf("name") > 0');
 
     $page->script(dragHeader('created_at', 'name'));
@@ -592,8 +592,8 @@ it('keeps every pin stuck however much of the table the pins cover', function ()
         ->assertNoJavaScriptErrors();
 });
 
-it('keeps pins stuck on a phone-sized screen', function (): void {
-    $page = pinFromMenu(companiesTable($this->user, $this->workspace->slug)->resize(390, 844)->wait(0.5), 'name');
+it('keeps a pin stuck on a tablet-sized screen', function (): void {
+    $page = pinFromMenu(companiesTable($this->user, $this->workspace->slug)->resize(768, 1024)->wait(0.5), 'name');
 
     $page->script('(() => { const wrapper = document.querySelector(".fi-ta-content-ctn"); wrapper.scrollLeft = wrapper.scrollWidth; return true })()');
 
@@ -603,8 +603,9 @@ it('keeps pins stuck on a phone-sized screen', function (): void {
         ->assertNoJavaScriptErrors();
 });
 
-it('lets pins that leave no room for another column scroll with the table on a phone', function (): void {
-    $page = pinFromMenu(companiesTable($this->user, $this->workspace->slug)->resize(390, 844)->wait(0.5), 'name');
+it('lets pins that leave no room for another column scroll with the table on a narrow tablet', function (): void {
+    $page = pinFromMenu(companiesTable($this->user, $this->workspace->slug)->resize(640, 900)->wait(0.5), 'name');
+    $page = pinFromMenu($page, 'accountOwner.name');
     $page = pinFromMenu($page, 'created_at');
 
     $page->script('(() => { const wrapper = document.querySelector(".fi-ta-content-ctn"); wrapper.scrollLeft = wrapper.scrollWidth; return true })()');
@@ -613,6 +614,21 @@ it('lets pins that leave no room for another column scroll with the table on a p
         ->assertScript('document.querySelector("table.fi-ta-table").classList.contains("fi-ta-has-pinned")', false)
         ->assertScript(sprintf('document.querySelector(`%s`).dataset.columnPinned', columnHeader('created_at')), '1')
         ->assertScript('[...document.querySelectorAll(`th[x-data^="resizableColumn"][data-column-pinned="0"]`)].some((th) => { const box = th.getBoundingClientRect(); return box.left >= 0 && box.right <= window.innerWidth })', true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('shows each row as a card on a phone, without the pins and widths the member saved', function (): void {
+    TablePreference::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+        'entity' => CrmEntity::Company,
+        'state' => new TableStateData(widths: ['updated_at' => 400], pinned: ['name']),
+    ]);
+
+    $page = companiesTable($this->user, $this->workspace->slug)->resize(390, 844)->wait(0.5);
+
+    waitUntil($page, 'document.querySelector("table.fi-ta-table").style.tableLayout === ""')
+        ->assertScript('document.querySelector("table.fi-ta-table").classList.contains("fi-ta-has-pinned")', false)
+        ->assertScript(sprintf('Math.round(%s.getBoundingClientRect().width) > 300', firstCell('updated_at')), true)
+        ->assertScript(sprintf('%s.getBoundingClientRect().right <= window.innerWidth', firstCell('updated_at')), true)
         ->assertNoJavaScriptErrors();
 });
 

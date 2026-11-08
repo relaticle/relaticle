@@ -88,7 +88,7 @@ it('resizes a column by dragging its edge and keeps the width after a reload', f
 });
 
 it('resizes a column with a finger and shows its edge on a touch screen', function (): void {
-    $page = loginViaBrowser($this->user, page: $this->visit('/app/login')->on()->mobile()->assertPathIs('/app/login'))
+    $page = loginViaBrowser($this->user, page: $this->visit('/app/login')->on()->iPadMini()->assertPathIs('/app/login'))
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->navigate("/app/{$this->workspace->slug}/companies")
         ->assertPresent(headerSelector('name').' .column-resize-handle-bar');

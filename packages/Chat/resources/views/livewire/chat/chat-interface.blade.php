@@ -81,15 +81,11 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             ['value' => 'other', 'label' => __('Other')],
         ]),
         proposalTexts: @js([
-            'createdVerb' => \Relaticle\Chat\Enums\PendingActionOperation::Create->done(),
-            'updatedVerb' => \Relaticle\Chat\Enums\PendingActionOperation::Update->done(),
-            'deletedVerb' => \Relaticle\Chat\Enums\PendingActionOperation::Delete->done(),
-            'countCreated' => \Relaticle\Chat\Enums\PendingActionOperation::Create->count(),
-            'countUpdated' => \Relaticle\Chat\Enums\PendingActionOperation::Update->count(),
-            'countDeleted' => \Relaticle\Chat\Enums\PendingActionOperation::Delete->count(),
-            'entityVerbs' => \Relaticle\Chat\Enums\ProposalEntity::receipts(),
-            'countSkipped' => __(':count skipped'),
-            'countKept' => __(':count kept'),
+            ...\Relaticle\Chat\Enums\ProposalOutcome::forClient(),
+            'receipts' => \Relaticle\Chat\Enums\ProposalEntity::receipts(),
+            'proposeAgain' => __('Propose again'),
+            'proposeAgainPrompt' => __('Propose again: :summary'),
+            'leftOut' => __('(:fields left out)'),
         ]),
     }),
     ...window.ChatModules.sendModule({
@@ -392,8 +388,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.approvalKeyHandler = (e) => {
             if (!((e.metaKey || e.ctrlKey) && e.key === 'Enter')) return;
 
-            const pending = this.visiblePendingActions();
-            if (pending.length !== 1 || this.isStreaming) return;
+            if (this.isStreaming || !this.hasPendingProposal || !this.$root.querySelector('[data-proposal-shortcut]:not([disabled])')) return;
             if (this.input.trim().length > 0) return; // composer draft wins
 
             e.preventDefault();
@@ -462,7 +457,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             window.Livewire.on('proposal:lapsed', (payload) => {
                 if ((payload?.context ?? 'conversation') !== this.context) return;
                 const action = this.findPendingAction(payload?.pendingActionId);
-                if (action?.status === 'pending') action.status = 'expired';
+                if (action?.status === 'pending') this.settleLocally(action, 'expired');
             }),
             // The dock queued a resumed turn (TurnContinuationService). Nothing
             // streams for a second or two while the job picks it up, and without

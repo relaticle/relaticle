@@ -9,7 +9,7 @@
             tag="a"
             color="gray"
             class="w-full justify-center"
-            x-on:click="localStorage.setItem('relaticle:last-login', 'google')"
+            x-on:click="localStorage.setItem('relaticle:last-login', 'google'); $dispatch('analytics-event', { name: 'google_auth_started', id: crypto.randomUUID() })"
         >
             <span class="flex items-center">
                 <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24">
@@ -35,7 +35,7 @@
             tag="a"
             color="gray"
             class="w-full justify-center"
-            x-on:click="localStorage.setItem('relaticle:last-login', 'microsoft')"
+            x-on:click="localStorage.setItem('relaticle:last-login', 'microsoft'); $dispatch('analytics-event', { name: 'microsoft_auth_started', id: crypto.randomUUID() })"
         >
             <span class="flex items-center">
                 <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24">

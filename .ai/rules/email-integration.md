@@ -158,3 +158,16 @@ and a migration queues that command. A new path that ends a membership fires
 `TeamMemberRemoved` or calls the action itself.
 `tests/Feature/Workspaces/RemoveWorkspaceMemberTest.php` fails when a removal
 leaves a token, a syncing mailbox or a queued email behind.
+
+## An agent's queued email answers to the connection that queued it
+
+`HoldAgentEmail` stamps an MCP email with `oauth_client_id` or
+`personal_access_token_id`. `SendEmailJob::agentRefusal()` checks it when the
+email is due: the credential must still be live (`LiveAgentCredentialsQuery`),
+and its user must still hold `EmailAgentSend`. Check at send time, never on a
+revoke path, because one check covers revocation, token deletion, expiry and
+demotion. The user's own Retry (`RetryFailedEmailAction`) clears the binding,
+and an MCP retry (`RequeueAgentEmail`) rebinds it. A reschedule keeps it, so
+revoking the assistant that wrote an email always stops it. Rela emails carry
+no binding, because the person approves each one.
+`tests/Feature/Mcp/EmailToolsTest.php` fails when any of this changes.

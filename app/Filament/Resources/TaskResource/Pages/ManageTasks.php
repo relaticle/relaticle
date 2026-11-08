@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources\TaskResource\Pages;
 
 use App\Filament\Actions\CreateTaskAction;
+use App\Filament\Actions\ImportExportActionGroup;
 use App\Filament\Concerns\HasCustomFieldColumns;
 use App\Filament\Concerns\HasViewSwitcher;
 use App\Filament\Concerns\KeepsOpenTaskInUrl;
@@ -12,7 +13,6 @@ use App\Filament\Exports\TaskExporter;
 use App\Filament\Resources\TaskResource;
 use App\Models\Task;
 use Filament\Actions\Action;
-use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
 use Filament\Actions\ExportAction;
 use Filament\Actions\ViewAction;
@@ -56,19 +56,14 @@ final class ManageTasks extends ManageRecords
     protected function getHeaderActions(): array
     {
         return [
-            ActionGroup::make([
+            ImportExportActionGroup::make([
                 Action::make('import')
                     ->label(__('filament/resources/task.pages.list.actions.import.label'))
                     ->icon('heroicon-o-arrow-up-tray')
                     ->url(ImportTasks::getUrl())
                     ->visible(ImportTasks::canAccess(...)),
                 ExportAction::make()->exporter(TaskExporter::class)->authorize('exportAny', Task::class),
-            ])
-                ->icon('heroicon-o-arrows-up-down')
-                ->color('gray')
-                ->button()
-                ->label(__('filament/resources/task.pages.list.actions.import_export.label'))
-                ->size(Size::Small),
+            ])->label(__('filament/resources/task.pages.list.actions.import_export.label')),
             CreateTaskAction::make()->icon('heroicon-o-plus')->size(Size::Small)->slideOver(),
         ];
     }

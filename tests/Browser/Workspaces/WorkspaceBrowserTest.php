@@ -38,3 +38,20 @@ it('can create a new workspace through the browser', function (): void {
 
     expect(Workspace::where('name', 'Second Workspace')->where('user_id', $user->id)->exists())->toBeTrue();
 });
+
+it('fits every role column of the compare roles table on a phone', function (int $width): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize($width, 700)
+        ->navigate("/app/{$workspace->slug}/workspace/members")
+        ->press('Invite workspace members')
+        ->press('Compare roles')
+        ->assertPresent('[data-role-matrix]')
+        ->assertScript("(() => { const scroller = document.querySelector('[data-role-matrix]').parentElement; return scroller.scrollWidth <= scroller.clientWidth; })()", true)
+        ->assertNoJavaScriptErrors();
+})->with([390, 320]);

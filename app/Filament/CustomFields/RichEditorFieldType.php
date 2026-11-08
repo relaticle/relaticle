@@ -24,6 +24,15 @@ final class RichEditorFieldType extends BaseFieldType
     /** @var list<string> */
     private const array FLOATING_TOOLBAR = ['bold', 'italic', 'underline', 'strike', 'code', 'highlight', 'link'];
 
+    // TipTap detaches a hidden floating toolbar, and Filament's dropdown then rewrites its trigger's ARIA
+    // on every mutation it sees. That loops forever in WebKit, so a detached dropdown keeps its trigger.
+    private const string KEEP_TRIGGER_WHILE_DETACHED = <<<'JS'
+        const getTrigger = $data.getTrigger;
+        $data.getTrigger = function () {
+            return this.$el.isConnected || ! this.activeTrigger ? getTrigger.call(this) : this.activeTrigger;
+        };
+        JS;
+
     public function configure(): FieldSchema
     {
         return (new PackageRichEditorFieldType)->configure()
@@ -85,7 +94,9 @@ final class RichEditorFieldType extends BaseFieldType
             ToolbarButtonGroup::make(
                 __('filament/rich-editor.selection_toolbar.text_style'),
                 ['paragraph', 'h1', 'h2', 'h3'],
-            )->textualButtons(),
+            )
+                ->textualButtons()
+                ->extraAttributes(['x-init' => self::KEEP_TRIGGER_WHILE_DETACHED]),
             ...self::FLOATING_TOOLBAR,
         ];
     }

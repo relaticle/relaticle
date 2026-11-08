@@ -16,7 +16,7 @@ use Relaticle\SystemAdmin\Filament\Resources\UserResource;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource;
 use Relaticle\SystemAdmin\Filament\Support\HelpLabel;
 use Relaticle\SystemAdmin\Filament\Support\ViewerTime;
-use Relaticle\SystemAdmin\Metrics\Scopes\ExternalWorkspace;
+use Relaticle\SystemAdmin\Metrics\Scopes\CustomerWorkspace;
 use Relaticle\SystemAdmin\Metrics\Scopes\FormedHabit;
 use Relaticle\SystemAdmin\Metrics\Scopes\GenuineSignup;
 use Relaticle\SystemAdmin\Metrics\Scopes\ReachedFirstValue;
@@ -58,7 +58,7 @@ final class ValueStats extends StatsOverviewWidget
                 })
                 ->color('gray')
                 ->url(UserResource::getUrl('index', ['filters' => $filters])),
-            Stat::make(HelpLabel::make('Reached first value', 'Share of that week\'s real signups who added their own record (a company, person, deal, task or note) within 7 days. Sample data does not count. Red under 20%, amber under 30%, green from 30%.'), $share === null ? "\u{2014}" : "{$share}%")
+            Stat::make(HelpLabel::make('Reached first value', 'Share of that week\'s real signups who added their own record (a company, person, opportunity, task or note) within 7 days. Sample data does not count. Red under 20%, amber under 30%, green from 30%.'), $share === null ? "\u{2014}" : "{$share}%")
                 ->description($signups === 0 ? 'No real signups that week' : "{$firstValue} of {$signups} added their own data within 7 days")
                 ->color(match (true) {
                     $share === null => 'gray',
@@ -82,10 +82,10 @@ final class ValueStats extends StatsOverviewWidget
     private function mailboxes(OverviewCache $cache): Stat
     {
         $customers = (int) $cache->remember('value.mailboxes.customers', fn (): int => Workspace::query()
-            ->withGlobalScope(ExternalWorkspace::class, new ExternalWorkspace)
+            ->withGlobalScope(CustomerWorkspace::class, new CustomerWorkspace)
             ->count());
         $connected = (int) $cache->remember('value.mailboxes.connected', fn (): int => Workspace::query()
-            ->withGlobalScope(ExternalWorkspace::class, new ExternalWorkspace)
+            ->withGlobalScope(CustomerWorkspace::class, new CustomerWorkspace)
             ->withConnectedMailbox()
             ->count());
         $share = $customers === 0 ? 0 : (int) round($connected / $customers * 100);

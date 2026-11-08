@@ -1,19 +1,19 @@
 <div
-    class="flex flex-col h-full overflow-hidden"
+    class="flex flex-col h-full md:overflow-hidden"
     x-data="{ hoveredColumn: {{ Js::from($headers[0] ?? '') }} }"
     @field-selected.window="$wire.mapToField($event.detail.column, $event.detail.fieldKey)"
     @entity-link-selected.window="$wire.mapToEntityLink($event.detail.column, $event.detail.matcherKey, $event.detail.entityLinkKey)"
     @field-cleared.window="$wire.unmapColumn($event.detail.column)"
     wire:ignore.self
 >
-    <div class="flex-1 flex flex-col space-y-4 overflow-hidden min-h-[12rem]">
-        <div class="flex-1 flex gap-4 min-h-0 overflow-hidden">
+    <div class="flex-1 flex flex-col space-y-4 md:overflow-hidden min-h-[12rem]">
+        <div class="flex-1 flex gap-4 min-h-0 md:overflow-hidden">
             {{-- Column Mapping List --}}
             <div
                 class="flex-1 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 flex flex-col overflow-hidden">
                 {{-- Header --}}
                 <div
-                    class="flex items-center px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 rounded-t-xl shrink-0">
+                    class="hidden md:flex items-center px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 rounded-t-xl shrink-0">
                     <div class="flex-1">File column</div>
                     <div class="w-6"></div>
                     <div class="flex-1 flex justify-end">
@@ -22,7 +22,7 @@
                 </div>
 
                 {{-- Mapping Rows --}}
-                <div class="flex-1 overflow-y-auto">
+                <div class="flex-1 md:overflow-y-auto">
                     @foreach ($headers as $index => $header)
                         @php
                             $mapping = $this->getMapping($header);
@@ -38,23 +38,24 @@
 
                         <div
                             wire:key="row-{{ md5($header) }}"
-                            class="flex items-center py-2 border-b border-gray-100 dark:border-gray-800 last:border-b-0 px-3 transition-colors"
+                            class="flex flex-col gap-1.5 py-2.5 md:flex-row md:items-center md:gap-0 md:py-2 border-b border-gray-100 dark:border-gray-800 last:border-b-0 px-3 transition-colors"
                             :class="hoveredColumn === {{ Js::from($header) }} ? 'bg-primary-50/50 dark:bg-primary-950/20' : ''"
                             @mouseenter="hoveredColumn = {{ Js::from($header) }}"
                         >
                             {{-- File Column Name --}}
                             <div class="flex-1 min-w-0">
-                                <span class="text-sm text-gray-900 dark:text-white truncate">{{ $header }}</span>
+                                <span class="text-sm text-gray-900 dark:text-white break-words md:truncate">{{ $header }}</span>
+                                <span class="md:hidden block text-xs text-gray-500 dark:text-gray-400 truncate">{{ $this->previews[$header][0] ?? '' }}</span>
                             </div>
 
                             {{-- Arrow --}}
-                            <div class="w-6 flex items-center justify-center">
+                            <div class="hidden md:flex w-6 items-center justify-center">
                                 <x-filament::icon icon="heroicon-m-arrow-long-right"
                                                   class="w-4 h-4 text-gray-300 dark:text-gray-600"/>
                             </div>
 
                             {{-- Attribute Selector --}}
-                            <div class="flex-1 flex justify-end">
+                            <div class="md:flex-1 flex justify-end max-md:[&>div]:w-full">
                                 <x-import-wizard-new::field-select
                                     :fields="$this->allFields"
                                     :entity-links="$this->entityLinks"
@@ -71,7 +72,7 @@
 
             {{-- Preview Panel --}}
             <div
-                class="w-56 shrink-0 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden flex flex-col bg-white dark:bg-gray-900">
+                class="hidden md:flex w-56 shrink-0 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden flex-col bg-white dark:bg-gray-900">
                 <div class="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
                     <div class="flex items-center justify-between gap-2">
                         <span class="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Preview</span>
@@ -86,7 +87,7 @@
                 <div class="flex-1 overflow-y-auto">
                     @foreach ($headers as $header)
                         <div x-show="hoveredColumn === {{ Js::from($header) }}" x-cloak>
-                            @foreach ($this->previewValues($header, 50) as $value)
+                            @foreach ($this->previews[$header] as $value)
                                 <div
                                     class="px-3 py-1.5 border-b border-gray-100 dark:border-gray-800 last:border-b-0 text-xs text-gray-600 dark:text-gray-300 truncate">
                                     {{ $value ?: '—' }}

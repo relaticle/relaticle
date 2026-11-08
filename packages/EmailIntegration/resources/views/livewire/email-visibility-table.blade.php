@@ -7,7 +7,7 @@
     </div>
 
     <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
-        <table class="w-full table-auto divide-y divide-gray-200 text-sm dark:divide-white/10">
+        <table class="ei-stacked-table w-full table-auto divide-y divide-gray-200 text-sm dark:divide-white/10">
             <thead class="bg-gray-50 dark:bg-white/5">
                 <tr>
                     <th class="px-4 py-3 text-start font-medium text-gray-950 dark:text-white">
@@ -38,10 +38,13 @@
                             'bg-gray-50/70 dark:bg-white/[0.02]' => $row['is_system'],
                         ])
                     >
-                        <td class="px-4 py-3 font-medium text-gray-950 dark:text-white">
+                        <td class="ei-stacked-table-heading px-4 py-3 font-medium text-gray-950 dark:text-white">
                             {{ $row['address'] }}
                         </td>
-                        <td class="px-4 py-3 text-gray-600 dark:text-gray-300">
+                        <td
+                            data-label="{{ __('filament/pages/email-privacy-settings.visibility.table.subdomains') }}"
+                            class="px-4 py-3 text-gray-600 dark:text-gray-300"
+                        >
                             @if (! $row['is_system'] && ($row['type'] ?? '') === 'domain')
                                 <label class="inline-flex items-center gap-2">
                                     <input
@@ -58,20 +61,29 @@
                                 <span class="text-gray-400 dark:text-gray-500">{{ '—' }}</span>
                             @endif
                         </td>
-                        <td class="relative px-4 py-3">
+                        <td
+                            data-label="{{ __('filament/pages/email-privacy-settings.visibility.table.enforcement') }}"
+                            class="relative px-4 py-3"
+                        >
                             <x-email-integration::enforcement-level-picker
                                 :value="$row['enforcement_value']"
                                 :entry-id="$row['entry_id'] ?? null"
                                 :disabled="$row['is_system']"
                             />
                         </td>
-                        <td class="px-4 py-3 text-gray-600 dark:text-gray-300">
+                        <td
+                            data-label="{{ __('filament/pages/email-privacy-settings.visibility.table.updated') }}"
+                            class="px-4 py-3 text-gray-600 dark:text-gray-300"
+                        >
                             {{ $row['updated_at'] ?? '—' }}
                         </td>
-                        <td class="px-4 py-3 text-gray-600 dark:text-gray-300">
+                        <td
+                            data-label="{{ __('filament/pages/email-privacy-settings.visibility.table.added_by') }}"
+                            class="px-4 py-3 text-gray-600 dark:text-gray-300"
+                        >
                             {{ $row['source'] }}
                         </td>
-                        <td class="px-4 py-3 text-end">
+                        <td class="ei-stacked-table-actions px-4 py-3 text-end">
                             @if (! $row['is_system'])
                                 {{ ($this->deleteVisibilityEntryAction)(['entry_id' => $row['entry_id']]) }}
                             @endif

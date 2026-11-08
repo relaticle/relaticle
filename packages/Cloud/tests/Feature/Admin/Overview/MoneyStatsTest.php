@@ -102,5 +102,5 @@ it('explains how MRR is counted in a tooltip', function (): void {
 
     livewire(MoneyStats::class)
         ->assertSeeHtml('x-tooltip')
-        ->assertSee('Each subscription counts its latest invoice, split into months');
+        ->assertSee('Only paid-up subscriptions count, so trials, failed payments, one-off purchases such as credit packs and your own workspaces are left out.');
 });

@@ -166,8 +166,9 @@ final class AppPanelProvider extends PanelProvider
             ? $emptyState->compact()
             : $emptyState);
 
+        // Table and Schema configuration is global, so both callbacks have to check
+        // which panel is actually serving the request before they touch the format.
         $this->configureTables();
-
         $this->formatDateTimesInSchemas();
 
         /**
@@ -188,6 +189,20 @@ final class AppPanelProvider extends PanelProvider
         DateTimePicker::configureUsing(fn (DateTimePicker $picker): DateTimePicker => $this->isCurrentPanel()
             ? $picker->extraAlpineAttributes(['x-init' => $this->todayInViewerZoneExpression()], merge: true)
             : $picker);
+    }
+
+    private function configureTables(): void
+    {
+        Table::configureUsing(fn (Table $table): Table => $this->isCurrentPanel()
+            ? $table
+                ->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
+                ->reorderableColumns()
+                ->stackedOnMobile()
+                ->columnManager(! $table->getLivewire() instanceof RelationManager)
+                ->defaultPaginationPageOption(self::DEFAULT_PAGINATION_PAGE_OPTION)
+                ->paginationPageOptions(fn (HasTable $livewire): array => $this->paginationPageOptions($livewire))
+                ->persistColumnsInSession(false)
+            : $table);
     }
 
     private function formatDateTimesInSchemas(): void
@@ -218,21 +233,6 @@ final class AppPanelProvider extends PanelProvider
                 return day === date && focusedMonth === month - 1 && focusedYear === year;
             }
             JS;
-    }
-
-    private function configureTables(): void
-    {
-        // Table and Schema configuration is global, so both callbacks have to check
-        // which panel is actually serving the request before they touch the format.
-        Table::configureUsing(fn (Table $table): Table => $this->isCurrentPanel()
-            ? $table
-                ->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
-                ->reorderableColumns()
-                ->columnManager(! $table->getLivewire() instanceof RelationManager)
-                ->defaultPaginationPageOption(self::DEFAULT_PAGINATION_PAGE_OPTION)
-                ->paginationPageOptions(fn (HasTable $livewire): array => $this->paginationPageOptions($livewire))
-                ->persistColumnsInSession(false)
-            : $table);
     }
 
     /** @return list<int> */
@@ -316,6 +316,10 @@ final class AppPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 fn (): View|Factory => view('filament.app.analytics')
+            )
+            ->renderHook(
+                PanelsRenderHook::HEAD_END,
+                fn (): View|Factory => view('filament.app.web-app-meta')
             )
             // Filament loads the reveal script on demand, and the password field binds only then,
             // overwriting anything typed or autofilled before it arrived.
@@ -679,26 +683,8 @@ final class AppPanelProvider extends PanelProvider
         $this->registerTableHooks($panel);
         $this->registerNotifications($panel);
 
-        // Hidden without a bound tenant: the old panel-root fallback sent these
-        // to the dashboard, silently abandoning the create-workspace wizard.
-        $accountMenuItems = [
-            Action::make('settings')
-                ->label(__('filament/panel.user_menu.settings'))
-                ->icon('heroicon-m-cog-6-tooth')
-                ->visible(fn (): bool => $this->shouldRegisterMenuItem())
-                ->url(fn (): string => url(Settings::getUrl())),
-        ];
-
-        if (Features::hasApiFeatures()) {
-            $accountMenuItems[] = Action::make('api_tokens')
-                ->label(__('access-tokens.user_menu'))
-                ->icon('heroicon-o-key')
-                ->visible(fn (): bool => $this->shouldRegisterMenuItem())
-                ->url(fn (): string => url(AccessTokens::getUrl()));
-        }
-
         $panel->userMenuItems([
-            $accountMenuItems,
+            $this->accountMenuItems(),
             $this->supportMenuItems(),
             [],
         ]);
@@ -720,6 +706,32 @@ final class AppPanelProvider extends PanelProvider
             ]);
 
         return $panel;
+    }
+
+    /**
+     * @return list<Action>
+     */
+    private function accountMenuItems(): array
+    {
+        // Hidden without a bound tenant: the old panel-root fallback sent these
+        // to the dashboard, silently abandoning the create-workspace wizard.
+        $items = [
+            Action::make('settings')
+                ->label(__('filament/panel.user_menu.settings'))
+                ->icon('heroicon-m-cog-6-tooth')
+                ->visible(fn (): bool => $this->shouldRegisterMenuItem())
+                ->url(fn (): string => url(Settings::getUrl())),
+        ];
+
+        if (Features::hasApiFeatures()) {
+            $items[] = Action::make('api_tokens')
+                ->label(__('access-tokens.user_menu'))
+                ->icon('heroicon-o-key')
+                ->visible(fn (): bool => $this->shouldRegisterMenuItem())
+                ->url(fn (): string => url(AccessTokens::getUrl()));
+        }
+
+        return $items;
     }
 
     /**

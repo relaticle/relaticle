@@ -34,6 +34,28 @@ it('can render the index page', function (): void {
         ->assertOk();
 });
 
+it('describes an empty list in one line', function (): void {
+    livewire(ListCompanies::class)
+        ->assertSee('Companies you add or import appear here.');
+});
+
+it('leaves the empty list description off a search or filter that finds nothing', function (): void {
+    Company::factory()->recycle([$this->user, $this->workspace])->create([
+        'name' => 'Acme',
+        'creation_source' => CreationSource::WEB,
+    ]);
+
+    livewire(ListCompanies::class)
+        ->searchTable('zzqx-no-match')
+        ->assertCountTableRecords(0)
+        ->assertDontSee('Companies you add or import appear here.');
+
+    livewire(ListCompanies::class)
+        ->filterTable('creation_source', [CreationSource::IMPORT->value])
+        ->assertCountTableRecords(0)
+        ->assertDontSee('Companies you add or import appear here.');
+});
+
 it('can render the view page', function (): void {
     $record = Company::factory()->recycle([$this->user, $this->workspace])->create();
 

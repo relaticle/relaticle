@@ -99,6 +99,18 @@ it('removes every sample record when approved from the card, even with no record
         ->and($pending->fresh()->status)->toBe(PendingActionStatus::Approved);
 });
 
+it('labels the removal button for what it removes', function (): void {
+    seedChatSampleRecords($this->workspace, $this->owner);
+    proposeSampleRemoval();
+
+    $pending = PendingAction::query()->where('workspace_id', $this->workspace->getKey())->sole();
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $pending->getKey(), context: 'conversation')
+        ->assertSeeText('Remove sample data')
+        ->assertDontSeeText('1 sample data');
+});
+
 it('keeps the user\'s own records when the sample data is removed', function (): void {
     seedChatSampleRecords($this->workspace, $this->owner);
     $own = Company::factory()->create([

@@ -8,6 +8,7 @@ use App\Features\EmailIntegration;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Cloud\CloudServiceProvider;
+use Symfony\Component\DomCrawler\Crawler;
 
 mutates(CloudServiceProvider::class);
 
@@ -60,12 +61,26 @@ it('offers every model without a plan gate when billing is off', function (): vo
         ->not->toContain('A paid plan additionally unlocks');
 });
 
-it('describes batch approval as per record, matching how the service resolves batches', function (): void {
+it('describes batch approval as leaving out records, matching how the service resolves batches', function (): void {
     $html = $this->get('/ai')->assertOk()->getContent();
 
-    expect($html)->toContain(__('Batches are reviewed record by record'))
+    expect($html)->toContain(__('Leave out any record before you approve'))
         ->and($html)->not->toContain('all-or-nothing')
         ->and($html)->not->toContain('no partial approval');
+});
+
+it('shows an expired proposal as its own settled line, never under an applied receipt', function (): void {
+    $page = new Crawler((string) $this->get('/ai')->assertOk()->getContent());
+    $settled = $page->filter('[data-mock-settled]')->reduce(fn (Crawler $line): bool => str_contains($line->text(), 'Kovra renewal'));
+    $appliedRows = $page->filter('p')
+        ->reduce(fn (Crawler $head): bool => trim($head->text()) === __('Applied 1 change · just now'))
+        ->each(fn (Crawler $head): string => implode(' ', $head->nextAll()->reduce(fn (Crawler $row): bool => $row->attr('data-mock-settled') === null)->each(fn (Crawler $row): string => $row->text())));
+
+    expect($settled)->toHaveCount(1)
+        ->and($settled->text())->toContain('Update opportunity "Kovra renewal"')
+        ->and($settled->text())->toContain(__('expired'))
+        ->and($settled->text())->toContain(__('Propose again'))
+        ->and(implode(' ', $appliedRows))->not->toContain(__('expired'));
 });
 
 it('names the assistant from config rather than a hardcoded literal', function (): void {
@@ -82,9 +97,10 @@ it('renders the ask playground at the #demo anchor the hero points to', function
         ->and($html)->toContain(__('Add a person'))
         ->and($html)->toContain(__('Find overdue tasks'));
 
-    expect($html)->toContain(__('Update Opportunity'))
-        ->and($html)->toContain(__('Create Person'))
-        ->and($html)->toContain(__('Save changes'))
+    expect($html)->toContain('>'.__('Move').'</span>')
+        ->and($html)->toContain(__('Create person'))
+        ->and($html)->toContain(__('Approve :count changes', ['count' => 3]))
+        ->and($html)->not->toContain('Approve or discard the proposal to keep chatting')
         ->and($html)->toContain(__('Discard'))
         ->and($html)->not->toContain('bg-amber-500 text-white');
 });
@@ -101,13 +117,13 @@ it('shows a plan, a docs answer and an email proposal as product fragments', fun
 
     $html = $this->get('/ai')->assertOk()->getContent();
 
-    expect($html)->toContain(__('Approved together, in order'))
-        ->and($html)->toContain(__('Runs after step :step', ['step' => 1]))
-        ->and($html)->toContain(__('Kovra Systems (step 1)'))
+    expect($html)->toContain(__('Hover a line to leave it out'))
+        ->and($html)->not->toContain(__('Approved together, in order'))
+        ->and($html)->toContain(__('Approve :count changes', ['count' => 3]))
         ->and($html)->toContain(__('Up to :steps linked steps in one plan', ['steps' => config('chat.max_plan_steps')]))
         ->and($html)->toContain(route('help.show', ['category' => 'ai-assistant', 'slug' => 'connect-claude-or-chatgpt']))
-        ->and($html)->toContain(__('Send Email'))
-        ->and($html)->toContain(__('Approve all never sends an email'));
+        ->and($html)->toContain(__('Own approval'))
+        ->and($html)->toContain(__('Approving a plan never sends an email'));
 });
 
 it('leaves the email showcase out when email integration is off', function (): void {

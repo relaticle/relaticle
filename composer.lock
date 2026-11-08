@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "fec82aad26b463cc78f5701c9d8ae8ee",
+    "content-hash": "baf3c963cfaf15fac39fae8a84b44650",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -10474,16 +10474,16 @@
         },
         {
             "name": "relaticle/custom-fields",
-            "version": "v3.17.0",
+            "version": "v3.18.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/relaticle/custom-fields.git",
-                "reference": "e6c3da9de1bd54172a28c475a6d07eb0743d8ce8"
+                "reference": "22c1663351d7f37739d8cfa9ebc6cf479bf6a261"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/relaticle/custom-fields/zipball/e6c3da9de1bd54172a28c475a6d07eb0743d8ce8",
-                "reference": "e6c3da9de1bd54172a28c475a6d07eb0743d8ce8",
+                "url": "https://api.github.com/repos/relaticle/custom-fields/zipball/22c1663351d7f37739d8cfa9ebc6cf479bf6a261",
+                "reference": "22c1663351d7f37739d8cfa9ebc6cf479bf6a261",
                 "shasum": ""
             },
             "require": {
@@ -10569,20 +10569,20 @@
                 "issues": "https://github.com/relaticle/custom-fields/issues",
                 "source": "https://github.com/relaticle/custom-fields"
             },
-            "time": "2026-11-06T13:00:23+00:00"
+            "time": "2026-11-06T23:39:59+00:00"
         },
         {
             "name": "relaticle/flowforge",
-            "version": "v4.3.2",
+            "version": "v4.3.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/relaticle/flowforge.git",
-                "reference": "d7a3cb2bf87ba2c29d8d4c7abb94e37d28e77406"
+                "reference": "ea62a1d4c3a274d71ce71b4f8165e797ffeff360"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/relaticle/flowforge/zipball/d7a3cb2bf87ba2c29d8d4c7abb94e37d28e77406",
-                "reference": "d7a3cb2bf87ba2c29d8d4c7abb94e37d28e77406",
+                "url": "https://api.github.com/repos/relaticle/flowforge/zipball/ea62a1d4c3a274d71ce71b4f8165e797ffeff360",
+                "reference": "ea62a1d4c3a274d71ce71b4f8165e797ffeff360",
                 "shasum": ""
             },
             "require": {
@@ -10658,7 +10658,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-10-31T19:12:41+00:00"
+            "time": "2026-11-06T23:39:56+00:00"
         },
         {
             "name": "relaticle/ink",

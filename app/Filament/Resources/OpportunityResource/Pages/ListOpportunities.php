@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\OpportunityResource\Pages;
 
+use App\Filament\Actions\ImportExportActionGroup;
 use App\Filament\Concerns\HasCustomFieldColumns;
 use App\Filament\Concerns\HasViewSwitcher;
 use App\Filament\Exports\OpportunityExporter;
 use App\Filament\Resources\OpportunityResource;
 use App\Models\Opportunity;
 use Filament\Actions\Action;
-use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\ExportAction;
 use Filament\Resources\Pages\ListRecords;
@@ -30,19 +30,14 @@ final class ListOpportunities extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            ActionGroup::make([
+            ImportExportActionGroup::make([
                 Action::make('import')
                     ->label(__('filament/resources/opportunity.pages.list.actions.import.label'))
                     ->icon('heroicon-o-arrow-up-tray')
                     ->url(ImportOpportunities::getUrl())
                     ->visible(ImportOpportunities::canAccess(...)),
                 ExportAction::make()->exporter(OpportunityExporter::class)->authorize('exportAny', Opportunity::class),
-            ])
-                ->icon('heroicon-o-arrows-up-down')
-                ->color('gray')
-                ->button()
-                ->label(__('filament/resources/opportunity.pages.list.actions.import_export.label'))
-                ->size(Size::Small),
+            ])->label(__('filament/resources/opportunity.pages.list.actions.import_export.label')),
             CreateAction::make()->icon('heroicon-o-plus')->size(Size::Small),
         ];
     }

@@ -460,7 +460,7 @@ export default Extension.create({
             new Plugin({
                 props: {
                     decorations({ doc }) {
-                        if (doc.childCount !== 1 || doc.firstChild.content.size > 0) {
+                        if (doc.childCount !== 1 || ! doc.firstChild.isTextblock || doc.firstChild.content.size > 0) {
                             return null
                         }
 

@@ -37,7 +37,7 @@ return [
     | so the assistant splits a longer request instead of being cut off.
     */
 
-    'max_plan_steps' => (int) env('CHAT_MAX_PLAN_STEPS', 6),
+    'max_plan_steps' => (int) env('CHAT_MAX_PLAN_STEPS', 5),
 
     /*
     |--------------------------------------------------------------------------

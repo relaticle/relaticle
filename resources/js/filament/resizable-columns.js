@@ -97,6 +97,13 @@ function stickyHeaderStyleElement() {
     return stickyHeadersStyleElement
 }
 
+// Matches Tailwind's `max-sm`, where a stacked table turns each row into a card.
+const stackedCardsQuery = window.matchMedia('(width < 40rem)')
+
+function showsCards(table) {
+    return stackedCardsQuery.matches && table.classList.contains('fi-ta-table-stacked-on-mobile')
+}
+
 // Keyframes cannot interpolate CSS variables, so each table's pixel range is written out.
 function measureStickyHeaders() {
     if (!stickyHeadersSupported) return
@@ -107,7 +114,7 @@ function measureStickyHeaders() {
         const table = thead.parentElement
         const maxShift = Math.max(0, table.offsetHeight - thead.offsetHeight)
 
-        if (maxShift === 0) {
+        if (maxShift === 0 || showsCards(table)) {
             thead.removeAttribute('data-sticky-header')
 
             return
@@ -174,6 +181,12 @@ function computeMinTableWidth(table) {
 }
 
 function applyTableSizing(table) {
+    if (showsCards(table)) {
+        table.style.tableLayout = ''
+        table.style.width = ''
+        return
+    }
+
     table.style.tableLayout = 'fixed'
 
     const wrapper = table.closest('.fi-ta-content-ctn')
@@ -242,7 +255,7 @@ function applyPinnedOffsets(table) {
     })
     // Pins that leave no room for one more column would hide the rest, so they scroll with the table instead.
     const room = table.closest('.fi-ta-content-ctn')?.clientWidth || Infinity
-    const active = pinned.length > 0 && left + MIN_COLUMN_WIDTH <= room
+    const active = pinned.length > 0 && left + MIN_COLUMN_WIDTH <= room && !showsCards(table)
 
     table.classList.toggle('fi-ta-has-pinned', active)
     table.querySelectorAll('[data-column-pinned-last]').forEach((cell) => cell.removeAttribute('data-column-pinned-last'))
@@ -914,11 +927,12 @@ function registerResizableColumn() {
 
         measureContentWidth() {
             const label = this.column.querySelector(':scope > .fi-ta-resizable-label')
+            // A stacked table puts the card's hidden label first in each cell, so the value sits in its own wrapper.
             const contents = [...this.table.querySelectorAll(this.cellSelector)]
-                .map((cell) => cell.firstElementChild)
+                .map((cell) => cell.querySelector(':scope > .fi-ta-cell-content')?.firstElementChild ?? cell.firstElementChild)
                 .filter(Boolean)
 
-            const insets = [this.column, ...contents.map((content) => content.parentElement)].map(horizontalInset)
+            const insets = [this.column, ...contents.map((content) => content.closest('td'))].map(horizontalInset)
             const widths = naturalWidths([label, ...contents])
             const widest = Math.max(...widths.map((width, index) => width + insets[index]))
 

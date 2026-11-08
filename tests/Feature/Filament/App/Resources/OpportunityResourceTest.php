@@ -28,6 +28,11 @@ it('can render the index page', function (): void {
         ->assertOk();
 });
 
+it('describes an empty list in one line', function (): void {
+    livewire(ListOpportunities::class)
+        ->assertSee('Opportunities you add or import appear here.');
+});
+
 it('can render the view page', function (): void {
     $record = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
 

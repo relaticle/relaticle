@@ -17,6 +17,7 @@ use Filament\Forms\Components\Toggle;
 use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -2047,7 +2048,8 @@ it('saves a template from the composer with the templates page message editor', 
                 'panel' => $editor->getActivePanel(),
             ];
 
-            return $fromTemplates['panel'] === 'mergeTags';
+            return $fromTemplates['panel'] === null
+                && in_array('mergeTags', Arr::flatten($fromTemplates['toolbar']), true);
         });
 
     Livewire::test(EmailComposer::class)

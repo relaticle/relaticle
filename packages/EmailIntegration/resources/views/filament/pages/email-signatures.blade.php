@@ -5,8 +5,8 @@
         <x-filament::section :heading="__('filament/pages/email-signatures.heading')">
 
             @forelse($this->signatures as $signature)
-                <div class="flex items-start justify-between gap-4 rounded-lg border border-gray-200 p-4 dark:border-gray-700">
-                    <div class="min-w-0 flex-1 space-y-1">
+                <div class="flex items-start justify-between gap-4 rounded-lg max-sm:flex-col border border-gray-200 p-4 dark:border-gray-700">
+                    <div class="min-w-0 flex-1 space-y-1 max-sm:w-full">
                         <div class="flex items-center gap-2">
                             <p class="text-sm font-medium text-gray-900 dark:text-white">{{ $signature->name }}</p>
                             @if ($signature->is_default)

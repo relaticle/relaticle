@@ -21,10 +21,7 @@
 
         <template x-if="field.type === 'boolean'">
             <span
-                class="inline-flex items-center rounded-full px-2 py-0.5 text-[length:var(--text-micro)] font-medium"
-                :class="(field.new ?? field.value) === 'Yes'
-                    ? 'bg-green-50 text-green-700 dark:bg-green-400/10 dark:text-green-400'
-                    : 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-400'"
+                class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[length:var(--text-micro)] font-medium text-gray-600 dark:bg-white/10 dark:text-gray-400"
                 x-text="field.new ?? field.value"
             ></span>
         </template>

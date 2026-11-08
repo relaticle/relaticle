@@ -8,12 +8,16 @@
 - Any change to a Blade view, Livewire component, or Filament page must be
   clicked through with agent-browser (including empty-state data) before being
   reported done. Tests passing is not sufficient for UI work.
-- agent-browser and the Browser suite both drive Chromium, and CI installs
-  Chromium only (`.github/workflows/ci.yml`). A defect that only WebKit shows
-  passes every gate. After the Chromium pass, run the browser tests for the
-  surfaces you changed in WebKit:
-  `php artisan test --compact <files> --browser safari`. Install the engine once
-  per machine with `pnpm exec playwright install webkit`.
+- agent-browser and the Browser suite both drive Chromium. CI runs WebKit only
+  for test files tagged `pest()->group('webkit')`, in the `Browser Tests (WebKit)`
+  job of `.github/workflows/ci.yml`. A defect that only WebKit shows passes every
+  other gate. After the Chromium pass, run the browser tests for the surfaces you
+  changed in WebKit: `php artisan test --compact <files> --browser safari`.
+  Install the engine once per machine with `pnpm exec playwright install webkit`.
+- When WebKit breaks a surface Chromium passes, tag the test file that covers it
+  with `pest()->group('webkit')`, so CI keeps checking it in WebKit.
+  `tests/Browser/CRM/RichEditorBrowserTest.php` is the example: a rich editor
+  selection froze Safari while every Chromium test passed.
 - An SVG that reaches the page as a string (`svg()->toHtml()` inside `@js`, a
   JavaScript template) carries its own size class:
   `svg('ri-claude-fill', 'size-full')`. With only a `viewBox`, Chromium stretches
