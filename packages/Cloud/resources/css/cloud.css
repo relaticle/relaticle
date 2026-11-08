@@ -39,7 +39,6 @@ html:has(#main-header) {
 
 /* The hero's product panel takes the logo's own colours, #4038CD to #5D54E8. */
 @utility bg-hero-panel {
-    --texture-ink: color-mix(in oklab, var(--color-indigo-950) 14%, transparent);
     background-color: var(--color-indigo-50);
     background-image:
         radial-gradient(55% 90% at 80% 5%, color-mix(in oklab, var(--color-indigo-400) 45%, transparent), transparent 70%),
@@ -91,46 +90,29 @@ html:has(#main-header) {
     }
 }
 
-/* A band's gutter texture is strongest at the rail and fades out toward the screen edge
-   and at the band's top and bottom, so it never ends on a hard line. */
-@utility mask-gutter {
-    mask-image: linear-gradient(to right, #000, transparent 18rem), linear-gradient(to bottom, transparent, #000 25%, #000 75%, transparent);
-    mask-composite: intersect;
-}
-
-/* Gutter textures, one hairline mark each: the story's dashed wires, the header's crosses,
-   and a record list's row lines. Tiles are 40px, centred like `bg-dots`, so the marks
-   continue the dot rows inside the rails. */
-@utility texture-wires {
-    background-color: var(--texture-ink, color-mix(in oklab, var(--color-gray-950) 12%, transparent));
-    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M0 20h40' stroke='black' stroke-dasharray='4 4' shape-rendering='crispEdges'/%3E%3C/svg%3E");
-    mask-size: 40px 40px;
-    mask-position: left center;
+/* Soft light for a stage, in the logo's colours. Each is a blurred radial spot; a
+   stage places two or three of them, so no hard edge ever shows. */
+@utility glow-indigo {
+    background-image: radial-gradient(closest-side, color-mix(in oklab, var(--color-indigo-400) 50%, transparent), transparent);
 
     &:where(.dark, .dark *) {
-        background-color: rgb(255 255 255 / 0.12);
+        background-image: radial-gradient(closest-side, color-mix(in oklab, var(--color-indigo-500) 38%, transparent), transparent);
     }
 }
 
-@utility texture-crosses {
-    background-color: var(--texture-ink, color-mix(in oklab, var(--color-gray-950) 12%, transparent));
-    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M20 16v9M15.5 20.5h9' stroke='black' shape-rendering='crispEdges'/%3E%3C/svg%3E");
-    mask-size: 40px 40px;
-    mask-position: left center;
+@utility glow-violet {
+    background-image: radial-gradient(closest-side, color-mix(in oklab, var(--color-primary-300) 55%, transparent), transparent);
 
     &:where(.dark, .dark *) {
-        background-color: rgb(255 255 255 / 0.12);
+        background-image: radial-gradient(closest-side, color-mix(in oklab, var(--color-primary-500) 24%, transparent), transparent);
     }
 }
 
-@utility texture-rows {
-    background-color: var(--texture-ink, color-mix(in oklab, var(--color-gray-950) 12%, transparent));
-    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M0 20h40' stroke='black' stroke-opacity='0.55' shape-rendering='crispEdges'/%3E%3C/svg%3E");
-    mask-size: 40px 40px;
-    mask-position: left center;
+@utility glow-sky {
+    background-image: radial-gradient(closest-side, color-mix(in oklab, var(--color-sky-200) 60%, transparent), transparent);
 
     &:where(.dark, .dark *) {
-        background-color: rgb(255 255 255 / 0.12);
+        background-image: radial-gradient(closest-side, color-mix(in oklab, var(--color-sky-500) 14%, transparent), transparent);
     }
 }
 

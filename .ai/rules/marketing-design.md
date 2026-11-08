@@ -24,8 +24,8 @@ outside the roles.
 
 Three treatments sit on top of the tokens. A page has at most one dark moment: the `closing-band` on
 the homepage, `/ai` and `/email-and-calendar`. `bg-hero-panel` is the
-gradient in the logo's colours (`#4038CD` to `#5D54E8`) under a hero's product window; it never
-carries copy. `bg-cta-band` is the closing band's surface. `bg-warm` is a static radial wash for the
+gradient in the logo's colours (`#4038CD` to `#5D54E8`) under the homepage hero's product window
+only; it never carries copy. `bg-cta-band` is the closing band's surface. `bg-warm` is a static radial wash for the
 human moments (the homepage email visual), never behind body text.
 
 `bg-dots` is a 20px dot texture for the `tint` cells that hold product UI, so a mock has something to
@@ -35,21 +35,32 @@ Cells inside a `gap-px` grid stay opaque. A translucent fill lets the rail color
 turns the cell gray in dark mode. `canvas` is taken by the Scribe theme, which is why the third
 token is `tint`.
 
-## Bands
+## Hero system and stages
 
-A product visual that fills the whole column sits in a `band`: its fill runs the full viewport width,
-the rails keep drawing across it, and its content stays inside them. The story's `bg-tint` and the
-product heroes' `bg-hero-panel` are the two fills. A visual never stops at the column, because a
-1152px column is 80% of a 1440 screen and a band boxed inside it reads as cramped.
+A product visual sits on a `stage` inside the rails: a rounded frame with a 1px ring, lit by soft
+light in the logo's colours (`glow-indigo`, `glow-violet`, `glow-sky`), never by a pattern laid over
+it. `stage` takes `light` (`seam`, `corners`, `inside`, `around`, `center`), `dots` for a radially
+faded dot field, and `:frame="false"` for light with no frame. Full-width bands and gutter textures
+were tried on 2026-11-08 and removed: a slab under the rails cut the gradient into three strips.
 
-`texture` puts one hairline mark in the gutters outside the rails: `wires` (the story's dashed
-wires), `crosses` (the header's crosses) or `rows` (a record list's row lines). The mark sits on the
-same 40px rhythm as the dots inside, is strongest at the rail, and fades toward the screen edge and
-the band's top and bottom. The story and `/crm-for-*` take `wires`, `/ai` and `/ai-native-crm` take
-`crosses`, `/email-and-calendar` and `/self-hosted` take `rows`. Every refined texture measured on
-2026-11-08 (Tailwind, Dub, Appwrite, Magic UI) keeps one primitive, about 5 to 12% contrast and a
-fade; tiles that drew several shapes or ended hard at the rail read as clip-art. No test reads this,
-so a reviewer reads for a second primitive in a tile or a gutter mark that ends on a hard edge.
+The `hero` component composes the copy and the visual three ways: `layout="stack"` (copy above,
+centred or `align="start"`, `glow` adds a light rising behind the buttons), `layout="stage"` (copy
+and visual on one stage) and `layout="split"` (copy left, visual right in the first screen). Each
+product page takes a different composition, so no two read as copies:
+
+| Page | Composition | Stage |
+| --- | --- | --- |
+| `/ai` | `stage` | `inside` light on `tint` |
+| `/crm-for-*` | `stack`, centred, `glow` | `seam` light on `tint` |
+| `/self-hosted` | `stack`, `start` | `corners` light on `surface` |
+| `/email-and-calendar` | `split` | `around` light, no frame |
+| `/ai-native-crm` | `stack`, centred | `dots` on `tint` |
+| homepage story | a `frame` section | `center` light on `tint`, dots inside |
+
+The homepage hero keeps its own rounded `bg-hero-panel` outside the rails, and no other page copies
+it. 19 product pages measured on 2026-11-08 (Linear, Stripe, Raycast, Resend, Attio, Intercom)
+put the product in the first screen on a frame or soft light; that is the bar. No test reads this,
+so a reviewer reads for a product page that repeats another's composition or a visual with no stage.
 
 ## Type roles
 
@@ -92,7 +103,7 @@ reach it. Change the header height and the token together. `html` also carries `
 - `hero`: the stack every page opens on, centred on the product pages and left-aligned (`align="start"`)
   on the rest: the eyebrow, a two-tone `type-display` headline
   capped at `max-w-3xl`, the `aside` (one subline under 25 words, the buttons, a small-print line)
-  capped at `max-w-2xl`, then the page's visual below, in the hero's `visual` slot on a full-width `bg-hero-panel` band. The
+  capped at `max-w-2xl`, then the page's visual in the hero's `visual` slot, composed as the Hero system section says. The
   headline runs two lines at 1440 and its gray continuation is one short clause. The subline says
   what the page is for; how to use the visual is said inside the visual, as the checklist's
   "Tick what your CRM does today" does. On a product page that visual cell is the page's signature,

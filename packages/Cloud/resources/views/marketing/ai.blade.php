@@ -139,7 +139,7 @@
     :ogDescription="$description"
     :ogImage="url('/images/open-graph-ai.jpg').'?v=1'"
 >
-    <x-cloud::marketing.hero>
+    <x-cloud::marketing.hero layout="stage">
         <x-slot:eyebrow>
             <x-cloud::marketing.eyebrow>{{ __(':name, the built-in AI assistant', ['name' => $assistantName]) }}</x-cloud::marketing.eyebrow>
         </x-slot:eyebrow>
@@ -150,29 +150,26 @@
         </x-slot:title>
 
         <x-slot:aside>
-            <p class="text-base leading-relaxed text-gray-500 md:text-lg dark:text-gray-400">
-                {{ __('It opens beside every page in Relaticle and answers from your records. Nothing it proposes is saved until you approve it.') }}
-            </p>
+            <div class="flex w-full flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+                <p class="max-w-xl text-base leading-relaxed text-gray-600 md:text-lg dark:text-gray-400">
+                    {{ __('It opens beside every page in Relaticle and answers from your records. Nothing it proposes is saved until you approve it.') }}
+                </p>
 
-            <div class="mt-7 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
-                <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="hero">
-                    {{ __('Start for free') }}
-                </x-cloud::marketing.button>
-                <x-cloud::marketing.button variant="secondary" href="#demo" class="lg:hidden">
-                    {{ __('See it work') }}
-                </x-cloud::marketing.button>
+                <div class="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-3">
+                    <a href="{{ route('aiNativeCrm') }}" class="{{ $linkClass }} text-sm">{{ __('What makes a CRM AI-native?') }}</a>
+                    <x-cloud::marketing.button variant="secondary" href="#demo" class="lg:hidden">
+                        {{ __('See it work') }}
+                    </x-cloud::marketing.button>
+                    <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="hero">
+                        {{ __('Start for free') }}
+                    </x-cloud::marketing.button>
+                </div>
             </div>
-
-            <p class="mt-5 text-sm text-gray-500 dark:text-gray-400">
-                <a href="{{ route('aiNativeCrm') }}" class="{{ $linkClass }}">{{ __('What makes a CRM AI-native?') }}</a>
-            </p>
         </x-slot:aside>
 
 
         <x-slot:visual>
-            <x-cloud::marketing.band texture="crosses" class="bg-hero-panel">
-                @include('cloud::marketing.partials.ai-playground')
-            </x-cloud::marketing.band>
+            @include('cloud::marketing.partials.ai-playground')
         </x-slot:visual>
     </x-cloud::marketing.hero>
 

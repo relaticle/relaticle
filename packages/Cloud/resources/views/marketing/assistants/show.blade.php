@@ -76,7 +76,7 @@
     :ogDescription="$description"
     :ogImage="url('/images/open-graph-ai.jpg').'?v=1'"
 >
-    <x-cloud::marketing.hero>
+    <x-cloud::marketing.hero glow>
         <x-slot:eyebrow>
             <x-cloud::marketing.eyebrow>{{ __('Relaticle for :name', ['name' => $name]) }}</x-cloud::marketing.eyebrow>
         </x-slot:eyebrow>
@@ -103,11 +103,10 @@
             <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">{{ __('No code and no API keys. The setup is a consent screen.') }}</p>
         </x-slot:aside>
 
-
         <x-slot:visual>
-            <x-cloud::marketing.band texture="wires" class="bg-hero-panel">
+            <x-cloud::marketing.stage light="seam" class="bg-tint rounded-2xl">
                 @include('cloud::marketing.partials.assistant-playground')
-            </x-cloud::marketing.band>
+            </x-cloud::marketing.stage>
         </x-slot:visual>
     </x-cloud::marketing.hero>
 

@@ -100,7 +100,7 @@
     :ogDescription="$description"
     :ogImage="url('/images/open-graph-self-hosted.jpg').'?v=1'"
 >
-    <x-cloud::marketing.hero>
+    <x-cloud::marketing.hero align="start">
         <x-slot:eyebrow>
             <x-cloud::marketing.eyebrow>{{ __('Self-hosted') }}</x-cloud::marketing.eyebrow>
         </x-slot:eyebrow>
@@ -133,11 +133,10 @@
             <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">{{ __('2 GB of RAM to start. Docker 20.10+ with Compose v2.') }}</p>
         </x-slot:aside>
 
-
         <x-slot:visual>
-            <x-cloud::marketing.band texture="rows" class="bg-hero-panel">
+            <x-cloud::marketing.stage light="corners" class="bg-surface rounded-2xl">
                 @include('cloud::marketing.partials.self-hosted-install')
-            </x-cloud::marketing.band>
+            </x-cloud::marketing.stage>
         </x-slot:visual>
     </x-cloud::marketing.hero>
 

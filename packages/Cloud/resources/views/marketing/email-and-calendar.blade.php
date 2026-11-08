@@ -107,7 +107,7 @@
         @vite('packages/Cloud/resources/js/motion.js')
     @endpush
 
-    <x-cloud::marketing.hero>
+    <x-cloud::marketing.hero layout="split">
         <x-slot:eyebrow>
             <x-cloud::marketing.eyebrow>{{ __('Email and calendar') }}</x-cloud::marketing.eyebrow>
         </x-slot:eyebrow>
@@ -134,11 +134,10 @@
             <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">{{ __('No credit card. Unlimited users. Open source.') }}</p>
         </x-slot:aside>
 
-
         <x-slot:visual>
-            <x-cloud::marketing.band texture="rows" class="bg-hero-panel">
+            <x-cloud::marketing.stage light="around" :frame="false">
                 @include('cloud::marketing.partials.email-calendar-demo')
-            </x-cloud::marketing.band>
+            </x-cloud::marketing.stage>
         </x-slot:visual>
     </x-cloud::marketing.hero>
 
