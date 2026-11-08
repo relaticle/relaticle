@@ -15,7 +15,7 @@
                 </x-cloud::marketing.stage>
             </div>
         @elseif($layout === 'split')
-            <div class="grid items-center gap-x-12 px-6 pb-10 pt-9 md:px-10 md:pb-12 md:pt-12 lg:grid-cols-[minmax(0,1fr)_34rem]">
+            <div class="grid grid-cols-1 items-center gap-x-12 gap-y-10 px-6 pb-10 pt-9 md:px-10 md:pb-12 md:pt-12 xl:grid-cols-[minmax(0,1fr)_36rem]">
                 <x-cloud::marketing.hero-copy align="start" :eyebrow="$eyebrow ?? null" :title="$title" :aside="$aside ?? null"/>
 
                 <div>{{ $visual ?? '' }}</div>

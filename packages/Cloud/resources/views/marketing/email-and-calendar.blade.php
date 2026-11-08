@@ -135,7 +135,7 @@
         </x-slot:aside>
 
         <x-slot:visual>
-            <x-cloud::marketing.stage light="around" :frame="false">
+            <x-cloud::marketing.stage light="around" class="bg-tint rounded-3xl p-3 sm:p-5">
                 @include('cloud::marketing.partials.email-calendar-demo')
             </x-cloud::marketing.stage>
         </x-slot:visual>

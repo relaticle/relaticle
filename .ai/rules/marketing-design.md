@@ -45,7 +45,7 @@ were tried on 2026-11-08 and removed: a slab under the rails cut the gradient in
 
 The `hero` component composes the copy and the visual three ways: `layout="stack"` (copy above,
 centred or `align="start"`, `glow` adds a light rising behind the buttons), `layout="stage"` (copy
-and visual on one stage) and `layout="split"` (copy left, visual right in the first screen). Each
+and visual on one stage) and `layout="split"` (copy left, visual right in the first screen from `xl`, stacked below it). Each
 product page takes a different composition, so no two read as copies:
 
 | Page | Composition | Stage |
@@ -53,7 +53,7 @@ product page takes a different composition, so no two read as copies:
 | `/ai` | `stage` | `inside` light on `tint` |
 | `/crm-for-*` | `stack`, centred, `glow` | `seam` light on `tint` |
 | `/self-hosted` | `stack`, `start` | `corners` light on `surface` |
-| `/email-and-calendar` | `split` | `around` light, no frame |
+| `/email-and-calendar` | `split` | `around` light on `tint` |
 | `/ai-native-crm` | `stack`, centred | `dots` on `tint` |
 | homepage story | a `frame` section | `center` light on `tint`, dots inside |
 
