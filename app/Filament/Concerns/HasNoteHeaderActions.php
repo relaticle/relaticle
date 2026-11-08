@@ -25,12 +25,12 @@ trait HasNoteHeaderActions
             ImportExportActionGroup::make([
                 Action::make('import')
                     ->label(__('filament/resources/note.pages.list.actions.import.label'))
-                    ->icon('heroicon-o-arrow-up-tray')
+                    ->icon('lucide-upload')
                     ->url(ImportNotes::getUrl())
                     ->visible(ImportNotes::canAccess(...)),
                 ExportAction::make()->exporter(NoteExporter::class)->authorize('exportAny', Note::class),
             ])->label(__('filament/resources/note.pages.list.actions.import_export.label')),
-            CreateAction::make()->icon('heroicon-o-plus')->size(Size::Small),
+            CreateAction::make()->icon('lucide-plus')->size(Size::Small),
         ];
     }
 }

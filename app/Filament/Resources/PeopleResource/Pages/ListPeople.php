@@ -31,12 +31,12 @@ final class ListPeople extends ListRecords
             ImportExportActionGroup::make([
                 Action::make('import')
                     ->label(__('filament/resources/person.pages.list.actions.import.label'))
-                    ->icon('heroicon-o-arrow-up-tray')
+                    ->icon('lucide-upload')
                     ->url(ImportPeople::getUrl())
                     ->visible(ImportPeople::canAccess(...)),
                 ExportAction::make()->exporter(PeopleExporter::class)->authorize('exportAny', People::class),
             ])->label(__('filament/resources/person.pages.list.actions.import_export.label')),
-            CreateAction::make()->icon('heroicon-o-plus')->size(Size::Small),
+            CreateAction::make()->icon('lucide-plus')->size(Size::Small),
         ];
     }
 

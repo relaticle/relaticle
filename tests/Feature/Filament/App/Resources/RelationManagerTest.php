@@ -227,3 +227,45 @@ it('notifies a member newly assigned from a record tasks tab', function (string 
         },
     ],
 ]);
+
+it('shows one assignee on a record tasks tab and lists the rest behind a count', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $task = $company->tasks()->save(Task::factory()->recycle([$this->user, $this->workspace])->make());
+    $members = User::factory()->count(2)->sequence(['name' => 'Priya Raman'], ['name' => 'Tomas Berg'])->create();
+    $this->workspace->users()->attach($members, ['role' => 'member']);
+    $task->assignees()->attach([$this->user->getKey(), ...$members->modelKeys()]);
+
+    livewire(CompanyTasksRelationManager::class, [
+        'ownerRecord' => $company,
+        'pageClass' => ViewCompany::class,
+    ])
+        ->assertSeeHtml('fi-linked-records-cell-more')
+        ->assertSee('+2')
+        ->assertSeeHtml('aria-label="Show all 3 assignees"')
+        ->assertSee([$this->user->name, 'Priya Raman', 'Tomas Berg']);
+});
+
+it('shows a lone assignee without a count and an unassigned task as empty', function (int $assignees, bool $showsCount, bool $showsEmpty): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $task = $company->tasks()->save(Task::factory()->recycle([$this->user, $this->workspace])->make());
+    $members = User::factory()->count($assignees)->create();
+    $this->workspace->users()->attach($members, ['role' => 'member']);
+    $task->assignees()->attach($members->modelKeys());
+
+    $component = livewire(CompanyTasksRelationManager::class, [
+        'ownerRecord' => $company,
+        'pageClass' => ViewCompany::class,
+    ]);
+
+    $showsCount
+        ? $component->assertSeeHtml('fi-linked-records-cell-more')->assertSee('+1')
+        : $component->assertDontSeeHtml('fi-linked-records-cell-more');
+
+    $showsEmpty
+        ? $component->assertSeeHtml('fi-linked-records-cell-empty')
+        : $component->assertDontSeeHtml('fi-linked-records-cell-empty');
+})->with([
+    'none' => [0, false, true],
+    'one' => [1, false, false],
+    'two' => [2, true, false],
+]);

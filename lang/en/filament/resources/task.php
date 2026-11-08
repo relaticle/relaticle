@@ -11,6 +11,7 @@ return [
     'fields' => [
         'assignees' => [
             'label' => 'Assignees',
+            'placeholder' => 'Assign a member',
         ],
         'companies' => [
             'label' => 'Companies',

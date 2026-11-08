@@ -3,7 +3,7 @@
         <div class="space-y-1">
             <div class="flex items-center gap-2 font-medium text-gray-900 dark:text-white">
                 <x-filament::icon
-                    :icon="$this->enabled ? 'ri-shield-check-fill' : 'ri-shield-line'"
+                    :icon="$this->enabled ? 'lucide-shield-check' : 'lucide-shield'"
                     @class([
                         'size-5',
                         'text-success-600 dark:text-success-400' => $this->enabled,

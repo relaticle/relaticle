@@ -105,13 +105,13 @@ final class TasksBoard extends BoardResourcePage
                     ->grow(false)
                     ->badge()
                     ->hiddenLabel()
-                    ->icon('heroicon-o-flag');
+                    ->icon('lucide-flag');
 
                 $dueDateField = $customFields->get('custom_fields.due_date')
                     ?->visible(fn (?string $state): bool => filled($state))
                     ->badge()
                     ->color('gray')
-                    ->icon('heroicon-o-calendar')
+                    ->icon('lucide-calendar')
                     ->grow(false)
                     ->hiddenLabel()
                     ->formatStateUsing(fn (?string $state): string => $this->formatDueDateBadge($state));
@@ -186,7 +186,7 @@ final class TasksBoard extends BoardResourcePage
             ->hiddenLabel()
             ->badge()
             ->color(fn (Task $record): string => $this->checklistIsDone($record) ? 'success' : 'gray')
-            ->icon('heroicon-o-check-circle')
+            ->icon('lucide-circle-check')
             ->grow(false)
             ->extraAttributes(['data-checklist-progress' => ''])
             ->state(function (Task $record): ?string {
@@ -221,13 +221,13 @@ final class TasksBoard extends BoardResourcePage
                 ->label(__('filament/pages/boards.tasks.actions.edit'))
                 ->slideOver()
                 ->modalWidth(Width::ThreeExtraLarge)
-                ->icon('heroicon-o-pencil-square')
+                ->icon('lucide-square-pen')
                 ->schema(fn (Schema $schema): Schema => TaskForm::get($schema)),
             MoveCardAction::make(),
             Action::make('delete')
                 ->authorize(fn (?Task $record): bool => $record instanceof Task && Gate::allows('delete', $record))
                 ->label(__('filament/pages/boards.tasks.actions.delete'))
-                ->icon('heroicon-o-trash')
+                ->icon('lucide-trash')
                 ->color('danger')
                 ->requiresConfirmation()
                 ->action(function (Task $record): void {
@@ -314,7 +314,7 @@ final class TasksBoard extends BoardResourcePage
         return CreateTaskAction::make()
             ->authorize(fn (): bool => Gate::allows('create', Task::class))
             ->label(__('filament/pages/boards.tasks.actions.add'))
-            ->icon('heroicon-o-plus')
+            ->icon('lucide-plus')
             ->iconButton()
             ->modalWidth(Width::TwoExtraLarge)
             ->slideOver(false)

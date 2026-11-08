@@ -15,7 +15,7 @@
          x-transition:enter-end="scale-100 opacity-100"
          class="relative mx-auto mt-[12vh] w-[calc(100%-2rem)] max-w-xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl shadow-gray-950/10 dark:border-white/[0.08] dark:bg-gray-900 dark:shadow-black/40">
         <div class="flex items-center gap-3 border-b border-gray-200/70 px-4 dark:border-white/[0.06]">
-            <x-ri-search-line class="h-4 w-4 shrink-0 text-gray-400" />
+            <x-lucide-search class="h-4 w-4 shrink-0 text-gray-400" />
             <input x-ref="searchInput"
                    x-model="query"
                    x-on:input="active = 0"

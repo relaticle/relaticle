@@ -6,7 +6,7 @@
 <div @class(['shrink-0', 'border-b border-gray-200 dark:border-gray-700 p-3' => $framed])>
     <div class="relative">
         <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-            <x-heroicon-o-magnifying-glass class="h-4 w-4 text-gray-400 dark:text-gray-500" wire:loading.remove wire:target="search" />
+            <x-lucide-search class="h-4 w-4 text-gray-400 dark:text-gray-500" wire:loading.remove wire:target="search" />
             <x-filament::loading-indicator class="h-4 w-4 text-primary-500" wire:loading wire:target="search" />
         </div>
         <input
@@ -23,7 +23,7 @@
                 x-tooltip="{ content: @js(__('filament/pages/email-inbox.search.clear')), theme: $store.theme }"
                 class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
             >
-                <x-heroicon-o-x-mark class="h-4 w-4" />
+                <x-lucide-x class="h-4 w-4" />
             </button>
         @endif
     </div>

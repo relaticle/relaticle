@@ -240,6 +240,57 @@ it('stops a detached text style dropdown from rewriting its trigger', function (
     expect($ariaWrites)->toBe(0);
 });
 
+it('stops positioning an open text style menu once the floating toolbar re-renders', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/notes")
+        ->press('New note')
+        ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
+        ->assertNoJavaScriptErrors();
+
+    $selectBodyText = <<<'JS'
+        (() => {
+            const root = document.querySelector('.fi-fo-rich-editor-seamless');
+            const editorRoot = root.querySelector('[x-data^="richEditorFormComponent"]');
+            const editor = Alpine.$data(editorRoot).getEditor();
+
+            editor.commands.setContent('<p>Introduction</p><p>Quarterly review</p>');
+            editor.chain().focus().setTextSelection({ from: 15, to: 31 }).run();
+        })();
+    JS;
+
+    $page->script($selectBodyText);
+
+    $page->assertVisible('[x-ref="floatingToolbar::paragraph"] button[aria-label="Text style"]')
+        ->click('[x-ref="floatingToolbar::paragraph"] button[aria-label="Text style"]')
+        ->assertVisible('[x-ref="floatingToolbar::paragraph"] button[aria-label="Heading 1"]');
+
+    $page->script($selectBodyText);
+
+    $page->script(<<<'JS'
+        (async () => {
+            const toolbar = () => document.querySelector('[x-ref="floatingToolbar::paragraph"]');
+            const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+            for (let tries = 0; tries < 40 && ! toolbar()?.isConnected; tries++) {
+                await wait(50);
+            }
+
+            await wait(500);
+            window.dispatchEvent(new Event('resize'));
+            await wait(300);
+        })()
+    JS);
+
+    $page->assertNoJavaScriptErrors()
+        ->click('[x-ref="floatingToolbar::paragraph"] button[aria-label="Text style"]')
+        ->assertVisible('[x-ref="floatingToolbar::paragraph"] button[aria-label="Heading 1"]')
+        ->assertNoJavaScriptErrors();
+});
+
 it('fits the selection toolbar inside a mobile viewport in both themes', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();

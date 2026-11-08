@@ -17,7 +17,6 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Size;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\Rule;
@@ -86,7 +85,7 @@ final class EditProfile extends BaseEditProfile
             ->modalHeading(__('Add a passkey'))
             ->modalDescription(__('Your browser will ask you to confirm with the device unlock you already use.'))
             ->modalSubmitActionLabel(__('Continue'))
-            ->icon(Heroicon::FingerPrint)
+            ->icon('lucide-fingerprint-pattern')
             ->link()
             ->visible(fn (): bool => SystemAdministratorPasskey::hasDedicatedRelyingParty())
             ->schema([

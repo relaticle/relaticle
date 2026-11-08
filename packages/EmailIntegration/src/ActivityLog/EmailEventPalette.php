@@ -14,7 +14,7 @@ enum EmailEventPalette: string implements HasIcon, HasLabel
 
     public function getIcon(): string
     {
-        return 'ri-mail-line';
+        return 'lucide-mail';
     }
 
     public function getLabel(): string

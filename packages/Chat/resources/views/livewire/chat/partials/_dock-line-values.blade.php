@@ -69,7 +69,7 @@
                         class="inline-flex h-5 w-5 shrink-0 items-center justify-center self-center rounded text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 sm:-ms-1.5 sm:w-0 sm:overflow-hidden sm:opacity-0 sm:group-hover/pair:ms-0 sm:group-hover/pair:w-5 sm:group-hover/pair:opacity-100 sm:focus-visible:ms-0 sm:focus-visible:w-5 sm:focus-visible:opacity-100 dark:hover:bg-white/10 dark:hover:text-gray-300"
                         aria-label="{{ __('Edit :field', ['field' => $row['label'] ?? '']) }}"
                     >
-                        <x-heroicon-o-pencil-square class="h-3 w-3 shrink-0" aria-hidden="true" />
+                        <x-lucide-square-pen class="h-3 w-3 shrink-0" aria-hidden="true" />
                     </button>
                 @endif
             </span>
@@ -90,7 +90,7 @@
                 class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 sm:opacity-0 sm:group-hover/pair:opacity-100 dark:hover:bg-white/10 dark:hover:text-gray-300"
                 aria-label="{{ __('Edit :field', ['field' => $row['label'] ?? '']) }}"
             >
-                <x-heroicon-o-pencil-square class="h-3 w-3" aria-hidden="true" />
+                <x-lucide-square-pen class="h-3 w-3" aria-hidden="true" />
             </button>
         @endif
     </div>

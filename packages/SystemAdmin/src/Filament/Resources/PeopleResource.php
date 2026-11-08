@@ -32,7 +32,7 @@ final class PeopleResource extends Resource
 
     protected static ?string $model = People::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-user';
+    protected static string|\BackedEnum|null $navigationIcon = 'lucide-user';
 
     protected static string|\UnitEnum|null $navigationGroup = 'CRM';
 

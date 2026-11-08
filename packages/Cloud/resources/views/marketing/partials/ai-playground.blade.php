@@ -98,7 +98,6 @@
 
 <div
     id="demo"
-    class="border-rail border-t"
     data-ai-playground
     x-data="{
         scenario: 'batch',
@@ -188,7 +187,7 @@
         },
     }"
 >
-    <div class="bg-hero-panel flex justify-center px-4 py-8 sm:px-8 md:py-12">
+    <div class="flex justify-center px-4 py-8 sm:px-8 md:py-12">
         <x-cloud::marketing.mac-window class="w-full max-w-5xl">
             <div class="grid lg:grid-cols-[minmax(0,1fr)_26rem]">
 
@@ -197,22 +196,22 @@
                         <div class="{{ $page }} {{ $key === 'batch' ? $fadeOpacity : 'invisible opacity-0' }}" x-bind:class="{ 'invisible opacity-0': scenario !== '{{ $key }}', '{{ $fadeOpacity }}': scenario === '{{ $key }}' }" data-ai-page="{{ $key }}">
                             <div class="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-white/[0.06]">
                                 <span class="flex min-w-0 items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-4 w-4 shrink-0 text-gray-400"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons[$pageIcon] }}"/></svg>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="h-4 w-4 shrink-0 text-gray-400"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons[$pageIcon] }}"/></svg>
                                     <span class="truncate">{{ $pageTitle }}</span>
                                 </span>
                                 <span class="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200 dark:text-gray-200 dark:ring-white/10">
-                                    <x-heroicon-o-chat-bubble-left-right class="h-3.5 w-3.5"/>
+                                    <x-lucide-messages-square class="h-3.5 w-3.5"/>
                                     {{ __('Ask :name', ['name' => config('chat.assistant_name')]) }}
                                 </span>
                             </div>
 
                             <div class="flex items-center justify-between gap-3 px-4 py-2.5">
                                 <span class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200 dark:text-gray-200 dark:ring-white/10">
-                                    <x-heroicon-m-bars-3 class="h-3.5 w-3.5 text-gray-400"/>
+                                    <x-lucide-menu class="h-3.5 w-3.5 text-gray-400"/>
                                     {{ __('List') }}
                                 </span>
                                 <span class="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-2.5 py-1 text-xs font-medium text-white">
-                                    <x-heroicon-m-plus class="h-3.5 w-3.5"/>
+                                    <x-lucide-plus class="h-3.5 w-3.5"/>
                                     {{ $newLabel }}
                                 </span>
                             </div>
@@ -286,12 +285,12 @@
                 <div class="flex min-w-0 flex-col">
                     <div class="flex items-center justify-between gap-2 border-b border-gray-100 px-4 py-3 dark:border-white/[0.06]">
                         <span class="flex min-w-0 items-center gap-2">
-                            <x-heroicon-o-chat-bubble-left-right class="h-5 w-5 shrink-0 text-primary-600 dark:text-primary-400" aria-hidden="true"/>
+                            <x-lucide-messages-square class="h-5 w-5 shrink-0 text-primary-600 dark:text-primary-400" aria-hidden="true"/>
                             <span class="truncate text-sm font-semibold text-gray-900 dark:text-white">{{ config('chat.assistant_name') }}</span>
                         </span>
                         <span class="flex shrink-0 items-center gap-2.5 text-gray-400" aria-hidden="true">
-                            <x-ri-history-line class="h-4 w-4"/>
-                            <x-heroicon-o-x-mark class="h-4 w-4"/>
+                            <x-lucide-rotate-ccw-clock class="h-4 w-4"/>
+                            <x-lucide-x class="h-4 w-4"/>
                         </span>
                     </div>
 
@@ -317,7 +316,7 @@
                                     <div class="{{ $card }}">
                                         <div class="flex items-start gap-2.5 px-4 pb-1.5 pt-3">
                                             <span class="{{ $tile }} mt-px" aria-hidden="true">
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons['opportunity'] }}"/></svg>
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons['opportunity'] }}"/></svg>
                                             </span>
                                             <span class="min-w-0 flex-1">
                                                 <span class="block truncate text-sm leading-6">
@@ -342,7 +341,7 @@
                                                         x-bind:aria-label="deals[{{ $index }}].out ? @js(__('Keep :name', ['name' => $deal['name']])) : @js(__('Leave out :name', ['name' => $deal['name']]))"
                                                         aria-label="{{ __('Leave out :name', ['name' => $deal['name']]) }}"
                                                     >
-                                                        <x-heroicon-o-x-mark class="h-3.5 w-3.5" x-show="! deals[{{ $index }}].out" aria-hidden="true"/>
+                                                        <x-lucide-x class="h-3.5 w-3.5" x-show="! deals[{{ $index }}].out" aria-hidden="true"/>
                                                         <span x-show="deals[{{ $index }}].out" style="display: none">{{ __('Keep') }}</span>
                                                     </button>
                                                 </li>
@@ -366,12 +365,12 @@
                                             <p class="px-2 text-xs text-gray-500 dark:text-gray-400" x-text="kept(@js(__('Applied :count change · just now')), @js(__('Applied :count changes · just now')))"></p>
                                             <ul class="mt-1">
                                                 <li class="flex min-w-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-gray-700 dark:text-gray-300">
-                                                    <x-heroicon-o-check class="size-4 shrink-0 text-gray-500 dark:text-gray-400" aria-hidden="true"/>
+                                                    <x-lucide-check class="size-4 shrink-0 text-gray-500 dark:text-gray-400" aria-hidden="true"/>
                                                     <span class="min-w-0 truncate" x-text="kept(@js(__('Moved :count opportunity to :stage')), @js(__('Moved :count opportunities to :stage'))).replace(':stage', @js(__('Negotiation/Review')))"></span>
                                                 </li>
                                                 @foreach($deals as $index => $deal)
                                                     <li class="flex min-w-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm" x-show="deals[{{ $index }}].decision === 'skipped'">
-                                                        <x-heroicon-o-no-symbol class="size-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true"/>
+                                                        <x-lucide-ban class="size-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true"/>
                                                         <span class="min-w-0 truncate text-gray-500 line-through decoration-gray-300 dark:text-gray-400 dark:decoration-gray-600">{{ $deal['name'] }}</span>
                                                         <span class="shrink-0 text-gray-500 dark:text-gray-400">&middot; {{ __('left out') }}</span>
                                                     </li>
@@ -406,7 +405,7 @@
                                     <div class="{{ $card }}">
                                         <div class="flex items-start gap-2.5 px-4 pb-1.5 pt-3">
                                             <span class="{{ $tile }} mt-px" aria-hidden="true">
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons['people'] }}"/></svg>
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons['people'] }}"/></svg>
                                             </span>
                                             <p class="min-w-0 truncate text-sm leading-6">
                                                 <span class="text-gray-500 dark:text-gray-400">{{ __('Create person') }}</span>
@@ -433,7 +432,7 @@
                                                         x-bind:aria-label="person.{{ $key }} ? @js(__('Leave out :field', ['field' => $field])) : @js(__('Keep :field', ['field' => $field]))"
                                                         aria-label="{{ __('Leave out :field', ['field' => $field]) }}"
                                                     >
-                                                        <x-heroicon-o-x-mark class="h-3.5 w-3.5" x-show="person.{{ $key }}" aria-hidden="true"/>
+                                                        <x-lucide-x class="h-3.5 w-3.5" x-show="person.{{ $key }}" aria-hidden="true"/>
                                                         <span x-show="! person.{{ $key }}" style="display: none">{{ __('Keep') }}</span>
                                                     </button>
                                                 </div>
@@ -450,10 +449,10 @@
                                 <div tabindex="-1" x-ref="personcreated" class="invisible col-start-1 row-start-1 self-start focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500" x-bind:class="{ 'invisible': person.decision !== 'created' }" data-ai-create-done>
                                     <p class="px-2 text-xs text-gray-500 dark:text-gray-400">{{ __('Applied 1 change · just now') }}</p>
                                     <div class="mt-1 flex min-w-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-gray-700 dark:text-gray-300">
-                                        <x-heroicon-o-check class="size-4 shrink-0 text-gray-500 dark:text-gray-400" aria-hidden="true"/>
+                                        <x-lucide-check class="size-4 shrink-0 text-gray-500 dark:text-gray-400" aria-hidden="true"/>
                                         <span class="shrink-0 whitespace-nowrap">{{ __('Created') }}</span>
                                         <span class="chat-chip min-w-0" data-record-type="people">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3 w-3" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons['people'] }}"/></svg>
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="h-3 w-3" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons['people'] }}"/></svg>
                                             <span class="chat-chip-label">Sarah Chen</span>
                                         </span>
                                         <span class="min-w-0 truncate text-gray-500 dark:text-gray-400" x-show="! person.title || ! person.company" x-text="'· ' + @js(__('(:fields left out)')).replace(':fields', [person.title ? null : @js(__('Job Title')), person.company ? null : @js(__('Company'))].filter(Boolean).join(', '))"></span>
@@ -481,7 +480,7 @@
                             <div class="overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)]" x-bind:class="{ 'translate-y-2 opacity-0': thinking, '{{ $fade }}': ! thinking }">
                                 <div class="flex items-center gap-2 border-b border-gray-100 px-4 py-2.5 dark:border-white/5">
                                     <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400" aria-hidden="true">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons['task'] }}"/></svg>
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons['task'] }}"/></svg>
                                     </span>
                                     <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('Tasks') }}</span>
                                 </div>
@@ -489,7 +488,7 @@
                                     @foreach(array_filter($tasks, fn (array $task): bool => $task[1]->isPast()) as [$taskTitle, $due])
                                         <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-sm">
                                             <span class="chat-chip min-w-0" data-record-type="task">
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons['task'] }}"/></svg>
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons['task'] }}"/></svg>
                                                 <span class="chat-chip-label">{{ $taskTitle }}</span>
                                             </span>
                                             <span class="ms-auto text-xs tabular-nums text-red-600 dark:text-red-400">{{ $due->isoFormat('MMM D') }}</span>
@@ -524,9 +523,9 @@
                         <div class="rounded-xl border border-gray-200 px-3.5 pb-2.5 pt-3 dark:border-white/10" aria-hidden="true">
                             <p class="text-sm text-gray-400 dark:text-gray-500">{{ __('Ask anything...') }}</p>
                             <div class="mt-3 flex items-center justify-between">
-                                <x-heroicon-o-paper-clip class="h-4 w-4 text-gray-400"/>
+                                <x-lucide-paperclip class="h-4 w-4 text-gray-400"/>
                                 <span class="flex h-7 w-7 items-center justify-center rounded-full bg-primary-600/40 text-white">
-                                    <x-heroicon-m-arrow-up class="h-4 w-4"/>
+                                    <x-lucide-arrow-up class="h-4 w-4"/>
                                 </span>
                             </div>
                         </div>
@@ -549,7 +548,7 @@
         </div>
         <a href="https://github.com/relaticle/relaticle/blob/main/packages/Chat/src/Agents/CrmAssistant.php" target="_blank" rel="noopener" class="{{ $textLink }} inline-flex shrink-0 items-center gap-1 text-sm">
             {{ __('Read the instructions') }}
-            <x-ri-arrow-right-up-line class="h-3 w-3 text-gray-400 dark:text-gray-500" aria-hidden="true"/>
+            <x-lucide-arrow-up-right class="h-3 w-3 text-gray-400 dark:text-gray-500" aria-hidden="true"/>
         </a>
     </figure>
 </div>

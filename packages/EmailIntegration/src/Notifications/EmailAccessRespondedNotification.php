@@ -11,7 +11,6 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Notifications\InboxNotification;
 use Filament\Notifications\Notification as FilamentNotification;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Notifications\Messages\MailMessage;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
@@ -88,9 +87,9 @@ final class EmailAccessRespondedNotification extends InboxNotification
                 : __(self::LANG.".{$outcome->value}.body", ['owner' => e($ownerName)]));
 
         return match ($outcome) {
-            EmailAccessRequestStatus::APPROVED => $notification->success()->icon(Heroicon::OutlinedCheckCircle),
-            EmailAccessRequestStatus::EXPIRED => $notification->color('gray')->icon(Heroicon::OutlinedClock),
-            default => $notification->danger()->icon(Heroicon::OutlinedXCircle),
+            EmailAccessRequestStatus::APPROVED => $notification->success()->icon('lucide-circle-check'),
+            EmailAccessRequestStatus::EXPIRED => $notification->color('gray')->icon('lucide-clock'),
+            default => $notification->danger()->icon('lucide-circle-x'),
         };
     }
 

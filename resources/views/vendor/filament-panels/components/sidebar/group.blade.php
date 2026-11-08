@@ -65,7 +65,7 @@
             @if ($collapsible)
                 <x-filament::icon-button
                     color="gray"
-                    :icon="\Filament\Support\Icons\Heroicon::ChevronUp"
+                    icon="lucide-chevron-up"
                     :icon-alias="\Filament\View\PanelsIconAlias::SIDEBAR_GROUP_COLLAPSE_BUTTON"
                     :label="$labelText"
                     :aria-label="$labelText"

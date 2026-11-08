@@ -5,12 +5,18 @@ declare(strict_types=1);
 namespace App\Filament\Components\Forms;
 
 use App\Filament\Concerns\HasRecordChips;
+use App\Filament\Concerns\RendersRecordPicker;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\LikePattern;
 use Closure;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
+use Filament\Support\Components\Attributes\ExposedLivewireMethod;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Livewire\Attributes\Renderless;
+use Override;
 
 /**
  * The single way a workspace member is picked via a Filament relationship select.
@@ -24,10 +30,14 @@ use Illuminate\Database\Eloquent\Builder;
  * the top of the list and falls back to alphabetical. Filament only applies its own
  * alphabetical order when the query carries none (Select.php:1151), so the injected
  * order wins without fighting it.
+ *
+ * @phpstan-import-type RecordOption from LinkedRecordsSelect
+ * @phpstan-import-type RecordGroup from LinkedRecordsSelect
  */
 final class WorkspaceMemberSelect extends Select
 {
     use HasRecordChips;
+    use RendersRecordPicker;
 
     /**
      * Namespaced defensively so it cannot collide with a real `users` column
@@ -146,6 +156,93 @@ final class WorkspaceMemberSelect extends Select
         );
     }
 
+    /**
+     * @return list<RecordGroup>
+     */
+    #[ExposedLivewireMethod]
+    #[Renderless]
+    public function getRecordGroupsForJs(?string $search = null): array
+    {
+        $search = trim((string) $search);
+
+        $members = User::query()
+            ->tap(self::currentWorkspaceMembers())
+            ->when($search !== '', fn (Builder $query): Builder => $query->whereLike('users.name', '%'.LikePattern::escape($search).'%'))
+            ->limit($this->getOptionsLimit())
+            ->get();
+
+        if ($members->isEmpty()) {
+            return [];
+        }
+
+        return [[
+            'label' => __('filament/components/member-picker.group'),
+            'options' => $this->memberOptions($members),
+        ]];
+    }
+
+    /**
+     * @return list<RecordOption>
+     */
+    public function getSelectedRecordsForJs(): array
+    {
+        $state = array_values(array_filter((array) $this->getRawState(), is_string(...)));
+
+        if ($state === []) {
+            return [];
+        }
+
+        $members = User::query()
+            ->tap(self::currentWorkspaceMembers())
+            ->whereKey($state)
+            ->get()
+            ->sortBy(fn (User $member): int|false => array_search((string) $member->getKey(), $state, true));
+
+        return $this->memberOptions($members);
+    }
+
+    #[Override]
+    public function toEmbeddedHtml(): string
+    {
+        if (! $this->isMultiple()) {
+            return parent::toEmbeddedHtml();
+        }
+
+        return $this->recordPickerHtml();
+    }
+
+    protected function pickerMessagesFile(): string
+    {
+        return 'filament/components/member-picker';
+    }
+
+    /**
+     * @param  Collection<int, User>  $members
+     * @return list<RecordOption>
+     */
+    private function memberOptions(Collection $members): array
+    {
+        return array_values($members
+            ->map(fn (User $member): array => [
+                'value' => (string) $member->getKey(),
+                'name' => (string) $member->name,
+                'html' => $this->memberLabel($member),
+                'hint' => null,
+                'url' => null,
+            ])
+            ->all());
+    }
+
+    private function memberLabel(User $member): string
+    {
+        return $this->recordChipLabel(
+            $member,
+            $member->getKey() === auth()->id()
+                ? __('filament/panel.selects.member_self', ['name' => $member->name])
+                : (string) $member->name,
+        );
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -153,13 +250,6 @@ final class WorkspaceMemberSelect extends Select
         $this->searchable();
         $this->preload();
         $this->allowHtml();
-        $this->getOptionLabelFromRecordUsing(
-            fn (User $record): string => $this->recordChipLabel(
-                $record,
-                $record->getKey() === auth()->id()
-                    ? __('filament/panel.selects.member_self', ['name' => $record->name])
-                    : (string) $record->name,
-            ),
-        );
+        $this->getOptionLabelFromRecordUsing(fn (User $record): string => $this->memberLabel($record));
     }
 }

@@ -51,7 +51,7 @@
                 @if ((! $hasTopbar) && $isSidebarCollapsibleOnDesktop)
                     <x-filament::icon-button
                         color="gray"
-                        :icon="$isRtl ? \Filament\Support\Icons\Heroicon::OutlinedChevronLeft : \Filament\Support\Icons\Heroicon::OutlinedChevronRight"
+                        :icon="$isRtl ? 'lucide-chevron-left' : 'lucide-chevron-right'"
                         :icon-alias="
                             $isRtl
                             ? [
@@ -75,7 +75,7 @@
                 @if ((! $hasTopbar) && $isCollapsible)
                     <x-filament::icon-button
                         color="gray"
-                        :icon="$isRtl ? \Filament\Support\Icons\Heroicon::OutlinedChevronRight : \Filament\Support\Icons\Heroicon::OutlinedChevronLeft"
+                        :icon="$isRtl ? 'lucide-chevron-right' : 'lucide-chevron-left'"
                         :icon-alias="
                             $isRtl
                             ? [
@@ -117,7 +117,7 @@
 
                 <x-filament::icon-button
                     color="gray"
-                    :icon="\Filament\Support\Icons\Heroicon::OutlinedXMark"
+                    icon="lucide-x"
                     icon-size="lg"
                     :label="__('filament-panels::layout.actions.sidebar.collapse.label')"
                     x-data="{}"
@@ -157,6 +157,12 @@
                             x-transition:leave-start="fi-transition-leave-start"
                             x-transition:leave-end="fi-transition-leave-end"
                         @endif
+                        x-on:mousedown="
+                            if ($event.target.closest('.fi-input-wrp-prefix, .fi-input-wrp-suffix')) {
+                                $event.preventDefault()
+                                $el.querySelector('.fi-input')?.focus()
+                            }
+                        "
                         class="fi-sidebar-search"
                     >
                         @livewire(Filament\Livewire\GlobalSearch::class)

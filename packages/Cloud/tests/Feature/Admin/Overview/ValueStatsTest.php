@@ -41,7 +41,7 @@ it('renders on an empty database', function (): void {
         ->assertSee('Formed a habit')
         ->assertSee('No real signups that week')
         ->assertDontSee('0 of 0')
-        ->assertSeeHtml(iconMarkup('heroicon-m-minus'));
+        ->assertSeeHtml(iconMarkup('lucide-minus'));
 
     livewire(CohortTable::class)->assertOk();
 });
@@ -74,21 +74,21 @@ it('points the signup arrow by the change against the week before', function ():
 
     livewire(ValueStats::class)
         ->assertSee('Week of Sep 14, -1 vs the week before')
-        ->assertSeeHtml(iconMarkup('heroicon-m-arrow-trending-down'));
+        ->assertSeeHtml(iconMarkup('lucide-trending-down'));
 
     Cache::flush();
     OverviewData::owner(CarbonImmutable::parse('2026-09-16 10:00:00'));
 
     livewire(ValueStats::class)
         ->assertSee('Week of Sep 14, +0 vs the week before')
-        ->assertSeeHtml(iconMarkup('heroicon-m-minus'));
+        ->assertSeeHtml(iconMarkup('lucide-minus'));
 
     Cache::flush();
     OverviewData::owner(CarbonImmutable::parse('2026-09-17 10:00:00'));
 
     livewire(ValueStats::class)
         ->assertSee('Week of Sep 14, +1 vs the week before')
-        ->assertSeeHtml(iconMarkup('heroicon-m-arrow-trending-up'));
+        ->assertSeeHtml(iconMarkup('lucide-trending-up'));
 });
 
 it('measures a week only once every timezone has seen its last signup for 7 days', function (): void {

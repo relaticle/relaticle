@@ -50,7 +50,7 @@
             <div class="ei-composer-opening-panel fixed left-1/2 top-1/2 z-50 flex h-[85vh] w-[calc(100%-2rem)] max-w-5xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl max-sm:inset-0 max-sm:h-dvh max-sm:w-full max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:pt-[env(safe-area-inset-top)] bg-white shadow-2xl shadow-gray-950/20 ring-1 ring-gray-950/10 dark:bg-gray-900 dark:shadow-black/50 dark:ring-white/10">
                 <div class="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 pl-4 pr-4 dark:border-white/10 dark:bg-white/5">
                     <span class="flex items-center gap-2">
-                        <x-heroicon-m-envelope class="h-4 w-4 shrink-0 text-primary-500" />
+                        <x-lucide-mail class="h-4 w-4 shrink-0 text-primary-500" />
                         <span class="h-3 w-24 rounded-full bg-gray-200 motion-safe:animate-pulse dark:bg-white/10"></span>
                     </span>
 
@@ -176,7 +176,7 @@
                             wire:click="{{ $isMinimized ? 'restore' : 'minimize' }}"
                             class="flex min-w-0 flex-1 items-center gap-2 text-left text-sm font-medium text-gray-900 dark:text-gray-100"
                         >
-                            <x-heroicon-m-envelope class="h-4 w-4 shrink-0 text-primary-500" />
+                            <x-lucide-mail class="h-4 w-4 shrink-0 text-primary-500" />
                             <span class="truncate">{{ filled($subject) ? $subject : ($isMassSend ? __('filament/emails/composer.title_mass_send') : __('filament/emails/composer.title')) }}</span>
                         </button>
 
@@ -188,7 +188,7 @@
                                 x-tooltip="{ content: @js($minimizeLabel), theme: $store.theme }"
                                 class="{{ $chromeButton }}"
                             >
-                                <x-dynamic-component :component="$isMinimized ? 'heroicon-m-chevron-up' : 'heroicon-m-minus'" class="h-4 w-4" />
+                                <x-dynamic-component :component="$isMinimized ? 'lucide-chevron-up' : 'lucide-minus'" class="h-4 w-4" />
                             </button>
 
                             {{-- No fit-to-screen toggle while the message being answered is
@@ -205,7 +205,7 @@
                                     class="{{ $chromeButton }} max-sm:hidden"
                                 >
                                     <x-dynamic-component
-                                        :component="$isExpanded ? 'heroicon-m-arrows-pointing-in' : 'heroicon-m-arrows-pointing-out'"
+                                        :component="$isExpanded ? 'lucide-minimize-2' : 'lucide-maximize-2'"
                                         class="h-4 w-4"
                                     />
                                 </button>
@@ -221,7 +221,7 @@
                                 x-tooltip="{ content: @js($closeLabel), theme: $store.theme }"
                                 class="{{ $chromeButton }}"
                             >
-                                <x-heroicon-m-x-mark class="h-4 w-4" />
+                                <x-lucide-x class="h-4 w-4" />
                             </button>
                         </div>
                     </div>
@@ -305,11 +305,11 @@
                         {{-- A phone has no room for one row, so Send takes a full-width row of its own under the tools. --}}
                         <div class="flex items-center justify-between gap-3 max-sm:flex-wrap max-sm:gap-y-3">
                         <div class="flex items-center gap-1">
-                            <x-email-integration::composer-icon-button icon="heroicon-o-paper-clip" :label="__('filament/emails/composer.actions.attach')" x-on:click="$refs.attachments.click()" />
+                            <x-email-integration::composer-icon-button icon="lucide-paperclip" :label="__('filament/emails/composer.actions.attach')" x-on:click="$refs.attachments.click()" />
                             <input type="file" x-ref="attachments" wire:model="attachments" multiple class="hidden" />
 
                             <x-email-integration::composer-picker-menu
-                                icon="heroicon-o-pencil-square"
+                                icon="lucide-square-pen"
                                 :label="__('filament/emails/composer.actions.signature')"
                                 :options="$this->signatureOptions"
                                 :selected="$signatureId"
@@ -320,7 +320,7 @@
                             />
 
                             <x-email-integration::composer-picker-menu
-                                icon="heroicon-o-document-text"
+                                icon="lucide-file-text"
                                 :label="__('filament/emails/composer.actions.template')"
                                 :options="$this->templateOptions"
                                 :empty-label="__('filament/emails/composer.fields.template_none')"
@@ -343,7 +343,7 @@
                             wire:click="send"
                             wire:loading.attr="disabled"
                             wire:target="send, attachments"
-                            icon="heroicon-m-paper-airplane"
+                            icon="lucide-send"
                             class="max-sm:basis-full"
                         >
                             @if ($isMassSend)

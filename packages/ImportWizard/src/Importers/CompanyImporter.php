@@ -42,7 +42,7 @@ final class CompanyImporter extends BaseImporter
                     'firm', 'client', 'customer', 'customer_name', 'vendor', 'vendor_name',
                 ])
                 ->example('Acme Corporation')
-                ->icon('heroicon-o-building-office'),
+                ->icon('lucide-building'),
         ]);
     }
 

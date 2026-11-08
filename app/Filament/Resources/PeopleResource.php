@@ -6,6 +6,7 @@ namespace App\Filament\Resources;
 
 use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
+use App\Filament\Actions\PreviewRecordAction;
 use App\Filament\Components\Forms\RecordSelect;
 use App\Filament\Components\Forms\WorkspaceMemberSelect;
 use App\Filament\Components\RecordChip;
@@ -91,7 +92,7 @@ final class PeopleResource extends Resource
                                     ]))
                                     ->modalWidth(Width::Large)
                                     ->slideOver()
-                                    ->icon('heroicon-o-plus')
+                                    ->icon('lucide-plus')
                                     ->action(function (array $data, Set $set): void {
                                         $company = Company::query()->create($data);
                                         $set('company_id', $company->id);
@@ -121,6 +122,7 @@ final class PeopleResource extends Resource
             ])
             ->recordActions([
                 ActionGroup::make([
+                    PreviewRecordAction::make()->page(ViewPeople::class),
                     ViewAction::make(),
                     EditAction::make(),
                     RestoreAction::make(),
@@ -148,6 +150,7 @@ final class PeopleResource extends Resource
     {
         return [
             RecordChipColumn::make('name')
+                ->previewable()
                 ->label(__('filament/resources/person.fields.name.label'))
                 ->searchable()
                 ->sortable(),
@@ -183,11 +186,11 @@ final class PeopleResource extends Resource
     public static function getRelations(): array
     {
         return [
+            ActivityLogRelationManager::class,
             TasksRelationManager::class,
             NotesRelationManager::class,
             EmailsRelationManager::class,
             MeetingsRelationManager::class,
-            ActivityLogRelationManager::class,
         ];
     }
 

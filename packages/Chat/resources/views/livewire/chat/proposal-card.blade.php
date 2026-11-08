@@ -140,7 +140,7 @@
                         'opacity-50' => $primaryBlocked,
                     ])
                 >
-                    <x-heroicon-o-arrow-path class="h-3 w-3 motion-safe:animate-spin" wire:loading wire:target="{{ $primaryAction }}" aria-hidden="true" />
+                    <x-lucide-refresh-cw class="h-3 w-3 motion-safe:animate-spin" wire:loading wire:target="{{ $primaryAction }}" aria-hidden="true" />
                     <span>{{ $primaryLabel }}</span>
                     @if ($showsShortcut)
                     <kbd

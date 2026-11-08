@@ -16,10 +16,10 @@
             x-tooltip="{ content: @js($validationError ?? __('import-wizard-new::validation.invalid_number', ['format' => $numberFormat->getLabel()])), theme: $store.theme }"
             class="ml-2 cursor-help"
         >
-            <x-filament::icon icon="heroicon-o-exclamation-triangle" class="w-4 h-4 text-warning-500 shrink-0"/>
+            <x-filament::icon icon="lucide-triangle-exclamation-point" class="w-4 h-4 text-warning-500 shrink-0"/>
         </span>
     @else
-        <x-filament::icon icon="heroicon-o-hashtag" class="w-4 h-4 text-gray-400 shrink-0 ml-2"/>
+        <x-filament::icon icon="lucide-hash" class="w-4 h-4 text-gray-400 shrink-0 ml-2"/>
     @endunless
     <input
         type="text"

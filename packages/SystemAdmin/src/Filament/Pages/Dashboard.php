@@ -12,7 +12,7 @@ final class Dashboard extends BaseDashboard
 {
     protected static string $routePath = '/instance';
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-server-stack';
+    protected static string|\BackedEnum|null $navigationIcon = 'lucide-server';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Dashboards';
 

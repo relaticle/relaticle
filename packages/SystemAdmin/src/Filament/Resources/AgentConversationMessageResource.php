@@ -27,7 +27,7 @@ final class AgentConversationMessageResource extends Resource
 {
     protected static ?string $model = AgentConversationMessage::class;
 
-    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-chat-bubble-bottom-center-text';
+    protected static string|BackedEnum|null $navigationIcon = 'lucide-message-square-text';
 
     protected static string|UnitEnum|null $navigationGroup = 'AI';
 

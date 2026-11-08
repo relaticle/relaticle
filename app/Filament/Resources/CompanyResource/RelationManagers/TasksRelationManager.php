@@ -27,7 +27,7 @@ final class TasksRelationManager extends RelationManager
 
     protected static string $relationship = 'tasks';
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-clipboard-document-check';
+    protected static string|\BackedEnum|null $icon = 'lucide-clipboard-check';
 
     public function form(Schema $schema): Schema
     {
@@ -40,7 +40,7 @@ final class TasksRelationManager extends RelationManager
             ->recordTitleAttribute('title')
             ->columns(RelatedRecordColumns::tasks())
             ->headerActions([
-                CreateTaskAction::make()->icon('heroicon-o-plus')->size(Size::Small),
+                CreateTaskAction::make()->icon('lucide-plus')->size(Size::Small),
                 AttachAction::make(),
             ])
             ->recordActions([

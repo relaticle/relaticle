@@ -33,14 +33,14 @@
 
             <div class="mt-8 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
                 @if($suggestion)
-                    <x-cloud::marketing.button :href="$suggestion->url" icon-trailing="ri-arrow-right-line">
+                    <x-cloud::marketing.button :href="$suggestion->url" icon-trailing="lucide-arrow-right">
                         {{ __('Go to :page', ['page' => $suggestion->label]) }}
                     </x-cloud::marketing.button>
                     <x-cloud::marketing.button variant="secondary" :href="$home['url']">
                         {{ $home['label'] }}
                     </x-cloud::marketing.button>
                 @else
-                    <x-cloud::marketing.button :href="$home['url']" icon-trailing="ri-arrow-right-line">
+                    <x-cloud::marketing.button :href="$home['url']" icon-trailing="lucide-arrow-right">
                         {{ $home['label'] }}
                     </x-cloud::marketing.button>
                 @endif
@@ -60,7 +60,7 @@
                     <li class="bg-surface">
                         <a href="{{ $url }}" class="hover:bg-tint group flex h-full items-center justify-between gap-3 p-6 text-base font-medium text-gray-950 transition-colors md:p-8 dark:text-white">
                             {{ $label }}
-                            <x-ri-arrow-right-line class="size-4 shrink-0 text-gray-400 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true"/>
+                            <x-lucide-arrow-right class="size-4 shrink-0 text-gray-400 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true"/>
                         </a>
                     </li>
                 @endforeach

@@ -6,6 +6,7 @@ namespace App\Filament\Resources;
 
 use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
+use App\Filament\Actions\PreviewRecordAction;
 use App\Filament\Components\Forms\WorkspaceMemberSelect;
 use App\Filament\Components\RecordChip;
 use App\Filament\Components\Tables\EmptyListDescription;
@@ -87,6 +88,7 @@ final class CompanyResource extends Resource
             ])
             ->recordActions([
                 ActionGroup::make([
+                    PreviewRecordAction::make()->page(ViewCompany::class),
                     ViewAction::make(),
                     EditAction::make(),
                     RestoreAction::make(),
@@ -114,6 +116,7 @@ final class CompanyResource extends Resource
     {
         return [
             RecordChipColumn::make('name')
+                ->previewable()
                 ->label(__('filament/resources/company.fields.name.label'))
                 ->searchable()
                 ->sortable(),
@@ -157,12 +160,12 @@ final class CompanyResource extends Resource
     public static function getRelations(): array
     {
         return [
+            ActivityLogRelationManager::class,
             PeopleRelationManager::class,
             TasksRelationManager::class,
             NotesRelationManager::class,
             EmailsRelationManager::class,
             MeetingsRelationManager::class,
-            ActivityLogRelationManager::class,
         ];
     }
 

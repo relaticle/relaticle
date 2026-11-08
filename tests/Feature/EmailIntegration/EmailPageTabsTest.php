@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -59,12 +58,12 @@ function makeDraft(User $user, ConnectedAccount $account, array $overrides = [])
 }
 
 it('uses an outlined icon for the failed tab', function (): void {
-    expect(EmailPageTab::FAILED->getIcon())->toBe(Heroicon::OutlinedExclamationCircle);
+    expect(EmailPageTab::FAILED->getIcon())->toBe('lucide-circle-exclamation-point');
 });
 
 it('uses an outlined key for the requests empty state', function (): void {
     expect(Livewire::test(AccessRequestsTable::class)->instance()->getTable()->getEmptyStateIcon())
-        ->toBe(Heroicon::OutlinedKey);
+        ->toBe('lucide-key');
 });
 
 it('shows the emails icon beside the page title', function (): void {

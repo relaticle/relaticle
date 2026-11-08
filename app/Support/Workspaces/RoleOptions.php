@@ -73,7 +73,7 @@ final readonly class RoleOptions
     {
         return Action::make('compareRoles')
             ->label(__('workspaces.actions.compare_roles'))
-            ->icon('heroicon-m-table-cells')
+            ->icon('lucide-table')
             ->link()
             ->modalHeading(__('workspaces.actions.compare_roles'))
             ->modalWidth('2xl')
@@ -87,7 +87,7 @@ final readonly class RoleOptions
             ->extraModalFooterActions([
                 Action::make('readRolesHelp')
                     ->label(__('workspaces.actions.compare_roles_help_link'))
-                    ->icon('heroicon-m-arrow-top-right-on-square')
+                    ->icon('lucide-external-link')
                     ->iconPosition('after')
                     ->link()
                     ->url(DocUrl::helpPage('workspace', 'manage-members-and-roles'))

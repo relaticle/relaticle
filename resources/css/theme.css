@@ -70,6 +70,8 @@
     --surface-sidebar-bg: rgb(251 251 251);               /* a step lighter than zinc-50 */
     --surface-sidebar-hover-bg: rgb(9 9 11 / 0.025);      /* zinc-950/2.5 */
     --surface-sidebar-active-bg: rgb(9 9 11 / 0.04);      /* zinc-950/4 */
+    --surface-row-hover-bg: rgb(249 250 251);             /* gray-50: a list row or a clickable item */
+    --surface-control-hover-bg: rgb(243 244 246);         /* gray-100: an icon button or a text link */
 }
 
 .dark {
@@ -85,6 +87,8 @@
     --surface-sidebar-bg: rgb(9 9 11);                     /* zinc-950 */
     --surface-sidebar-hover-bg: rgb(255 255 255 / 0.05);
     --surface-sidebar-active-bg: rgb(255 255 255 / 0.1);
+    --surface-row-hover-bg: rgb(255 255 255 / 0.05);
+    --surface-control-hover-bg: rgb(255 255 255 / 0.1);
 }
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -95,6 +99,12 @@
    dresses the streamed reply and the reloaded one alike. Same surface tokens
    as the follow-up chips in _transcript.blade.php, at the density of an
    @mention chip: the transcript carries two chip families, not three. */
+/* Lucide draws a 2px stroke on a 24 grid; 1.75 keeps 16px icons crisp without
+   reading heavier than the label beside them. */
+.lucide {
+    stroke-width: 1.75;
+}
+
 .chat-chip {
     @apply inline-flex max-w-full items-center gap-1 rounded-full border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] px-2 py-0.5 text-[length:var(--text-micro)] font-medium text-gray-700 no-underline transition;
 

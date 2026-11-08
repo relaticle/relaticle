@@ -13,7 +13,6 @@ use Filament\Forms\Components\DateTimePicker;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
 use Filament\Schemas\Contracts\HasSchemas;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -60,9 +59,9 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
             ->emptyStateDescription(fn (): string => $this->lockedStatus === EmailStatus::FAILED
                 ? __('filament/pages/email-inbox.failed.empty.description')
                 : __('filament/pages/email-inbox.outbox.empty.description'))
-            ->emptyStateIcon(fn (): Heroicon => $this->lockedStatus === EmailStatus::FAILED
-                ? Heroicon::OutlinedExclamationCircle
-                : Heroicon::OutlinedClock)
+            ->emptyStateIcon(fn (): string => $this->lockedStatus === EmailStatus::FAILED
+                ? 'lucide-circle-exclamation-point'
+                : 'lucide-clock')
             ->columns([
                 TextColumn::make('subject')->limit(50)->searchable(),
                 TextColumn::make('participants_to')
@@ -78,7 +77,7 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
             ])
             ->recordActions([
                 Action::make('cancel')
-                    ->icon(Heroicon::OutlinedXMark)
+                    ->icon('lucide-x')
                     ->color('danger')
                     ->requiresConfirmation()
                     ->visible(fn (Email $record): bool => $record->status === EmailStatus::QUEUED)
@@ -88,7 +87,7 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
                         Notification::make()->title(__('filament/pages/email-outbox.notifications.cancelled'))->success()->send();
                     }),
                 Action::make('reschedule')
-                    ->icon(Heroicon::OutlinedClock)
+                    ->icon('lucide-clock')
                     ->visible(fn (Email $record): bool => $record->status === EmailStatus::QUEUED)
                     ->schema([
                         DateTimePicker::make('scheduled_for')
@@ -104,7 +103,7 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
                         Notification::make()->title(__('filament/pages/email-outbox.notifications.rescheduled'))->success()->send();
                     }),
                 Action::make('retry')
-                    ->icon(Heroicon::OutlinedArrowPath)
+                    ->icon('lucide-refresh-cw')
                     ->color('warning')
                     ->visible(fn (Email $record): bool => $record->status === EmailStatus::FAILED)
                     ->action(function (Email $record): void {
@@ -117,7 +116,7 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
                 BulkAction::make('bulkCancel')
                     ->label(__('filament/pages/email-outbox.actions.bulk_cancel'))
                     ->color('danger')
-                    ->icon(Heroicon::OutlinedXMark)
+                    ->icon('lucide-x')
                     ->requiresConfirmation()
                     ->action(function (Collection $records): void {
                         $cancelled = 0;

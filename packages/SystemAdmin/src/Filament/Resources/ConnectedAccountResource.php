@@ -28,7 +28,7 @@ final class ConnectedAccountResource extends Resource
 {
     protected static ?string $model = ConnectedAccount::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-envelope';
+    protected static string|\BackedEnum|null $navigationIcon = 'lucide-mail';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Email';
 

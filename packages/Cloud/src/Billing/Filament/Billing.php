@@ -38,7 +38,7 @@ final class Billing extends Page
 {
     use HasWorkspaceSettingsNavigation;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-credit-card';
+    protected static string|\BackedEnum|null $navigationIcon = 'lucide-credit-card';
 
     protected static ?string $slug = self::BILLING_SLUG;
 

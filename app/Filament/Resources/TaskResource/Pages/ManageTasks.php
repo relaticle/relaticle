@@ -59,12 +59,12 @@ final class ManageTasks extends ManageRecords
             ImportExportActionGroup::make([
                 Action::make('import')
                     ->label(__('filament/resources/task.pages.list.actions.import.label'))
-                    ->icon('heroicon-o-arrow-up-tray')
+                    ->icon('lucide-upload')
                     ->url(ImportTasks::getUrl())
                     ->visible(ImportTasks::canAccess(...)),
                 ExportAction::make()->exporter(TaskExporter::class)->authorize('exportAny', Task::class),
             ])->label(__('filament/resources/task.pages.list.actions.import_export.label')),
-            CreateTaskAction::make()->icon('heroicon-o-plus')->size(Size::Small)->slideOver(),
+            CreateTaskAction::make()->icon('lucide-plus')->size(Size::Small)->slideOver(),
         ];
     }
 

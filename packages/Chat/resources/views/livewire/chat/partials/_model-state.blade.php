@@ -24,10 +24,10 @@ modelOptions: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->pickerOpti
     persistSelection: @js($persistSelection ?? false),
     {{-- Each icon carries its own size: WebKit collapses an SVG that has only a viewBox inside the picker's flex slot. --}}
     providerIcons: @js([
-        'auto' => svg('ri-sparkling-2-line', 'size-full')->toHtml(),
+        'auto' => svg('lucide-sparkles', 'size-full')->toHtml(),
         'anthropic' => svg('ri-claude-fill', 'size-full')->toHtml(),
         'openai' => svg('ri-openai-fill', 'size-full')->toHtml(),
-        'ollama' => svg('ri-server-line', 'size-full')->toHtml(),
-        'selfhosted' => svg('ri-server-line', 'size-full')->toHtml(),
+        'ollama' => svg('lucide-server', 'size-full')->toHtml(),
+        'selfhosted' => svg('lucide-server', 'size-full')->toHtml(),
     ]),
 }),

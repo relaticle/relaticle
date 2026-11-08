@@ -285,3 +285,35 @@ it('moves a card on a phone by tapping a column in its move to sheet', function 
     'tasks' => [Task::class, TaskField::STATUS->value, 'tasks/board'],
     'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board'],
 ]);
+
+it('swaps the open preview for the next card instead of stacking a second one', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    TenantContextService::setTenantId($workspace->getKey());
+
+    $stageField = CustomField::query()->forEntity(Opportunity::class)->where('code', OpportunityField::STAGE->value)->firstOrFail();
+    [$first, $second] = Opportunity::factory()->recycle([$user, $workspace])->count(2)->sequence(['name' => 'Rooftop pilot'], ['name' => 'Fleet renewal'])->create()->all();
+    $first->saveCustomFieldValue($stageField, $stageField->options->first()->getKey());
+    $second->saveCustomFieldValue($stageField, $stageField->options->get(1)->getKey());
+
+    TenantContextService::setTenantId(null);
+
+    $openPreviews = 'document.querySelectorAll(".fi-modal-window.fi-record-preview").length';
+
+    loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/opportunities/board")
+        ->hover("[data-card-id=\"{$first->getKey()}\"]")
+        ->click("[data-card-id=\"{$first->getKey()}\"] .fi-board-card-preview-trigger")
+        ->assertSee('Rooftop pilot')
+        ->hover("[data-card-id=\"{$second->getKey()}\"]")
+        ->click("[data-card-id=\"{$second->getKey()}\"] .fi-board-card-preview-trigger")
+        ->wait(1)
+        ->assertScript($openPreviews, 1)
+        ->assertScript('document.querySelector(".fi-modal-window.fi-record-preview .fi-record-preview-title").innerText.trim()', 'Fleet renewal')
+        ->assertNoJavaScriptErrors();
+});

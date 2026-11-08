@@ -27,7 +27,7 @@ enum ReviewFilter: string implements HasIcon, HasLabel
     public function getIcon(): ?string
     {
         return match ($this) {
-            self::NeedsReview => 'heroicon-o-exclamation-triangle',
+            self::NeedsReview => 'lucide-triangle-exclamation-point',
             default => null,
         };
     }

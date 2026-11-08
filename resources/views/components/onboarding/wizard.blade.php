@@ -120,7 +120,7 @@
 
                             {{
                                 \Filament\Support\generate_icon_html(
-                                    $completedIcon ?? \Filament\Support\Icons\Heroicon::OutlinedCheck,
+                                    $completedIcon ?? 'lucide-check',
                                     alias: filled($completedIcon) ? null : \Filament\Schemas\View\SchemaIconAlias::COMPONENTS_WIZARD_COMPLETED_STEP,
                                     attributes: new \Illuminate\View\ComponentAttributeBag([
                                         'x-cloak' => 'x-cloak',
@@ -197,7 +197,7 @@
                 class="flex items-center gap-x-1 text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
             >
                 {{ \Filament\Support\generate_icon_html(
-                    \Filament\Support\Icons\Heroicon::OutlinedArrowLeft,
+                    'lucide-arrow-left',
                     attributes: new \Illuminate\View\ComponentAttributeBag(['class' => 'h-3.5 w-3.5']),
                 ) }}
 

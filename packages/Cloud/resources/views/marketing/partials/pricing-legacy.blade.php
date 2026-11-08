@@ -64,7 +64,7 @@
                         <ul class="space-y-3 text-sm leading-5 text-gray-700 dark:text-gray-300">
                             @foreach($features as $feature)
                                 <li class="flex items-start gap-3">
-                                    <x-ri-check-line class="mt-0.5 size-4 shrink-0 text-gray-950 dark:text-white" />
+                                    <x-lucide-check class="mt-0.5 size-4 shrink-0 text-gray-950 dark:text-white" />
                                     {{ $feature }}
                                 </li>
                             @endforeach

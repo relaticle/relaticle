@@ -15,7 +15,6 @@ use App\Models\Workspace;
 use App\Support\CanonicalRecordUrl;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification as FilamentNotification;
-use Filament\Support\Icons\Heroicon;
 
 final class TaskAssignedNotification extends InboxNotification
 {
@@ -73,7 +72,7 @@ final class TaskAssignedNotification extends InboxNotification
                 ? __('notifications.events.task_assigned.title_without_actor')
                 : __('notifications.events.task_assigned.title', ['actor' => $actorName]))
             ->body((string) data_get($row->data, 'task_title'))
-            ->icon(Heroicon::OutlinedCheckCircle)
+            ->icon('lucide-circle-check')
             ->iconColor('primary')
             ->actions($url === null ? [] : [
                 Action::make('view')

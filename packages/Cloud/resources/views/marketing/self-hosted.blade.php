@@ -100,7 +100,7 @@
     :ogDescription="$description"
     :ogImage="url('/images/open-graph-self-hosted.jpg').'?v=1'"
 >
-    <x-cloud::marketing.hero>
+    <x-cloud::marketing.hero align="start">
         <x-slot:eyebrow>
             <x-cloud::marketing.eyebrow>{{ __('Self-hosted') }}</x-cloud::marketing.eyebrow>
         </x-slot:eyebrow>
@@ -130,10 +130,14 @@
                 @endif
             </div>
 
-            <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">{{ __('2 GB of RAM to start. Docker 20.10+ with Compose v2.') }}</p>
+            <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">{{ __('2 GB of RAM to start. Docker 20.10+ with Compose v2.') }}</p>
         </x-slot:aside>
 
-        @include('cloud::marketing.partials.self-hosted-install')
+        <x-slot:visual>
+            <x-cloud::marketing.stage light="corners" class="bg-tint rounded-3xl">
+                @include('cloud::marketing.partials.self-hosted-install')
+            </x-cloud::marketing.stage>
+        </x-slot:visual>
     </x-cloud::marketing.hero>
 
     @if($stats !== [])
@@ -238,15 +242,21 @@
         </x-cloud::marketing.frame-header>
 
         <div class="bg-rail grid gap-px">
+            <div class="bg-rail hidden gap-px md:grid md:grid-cols-12" aria-hidden="true">
+                <span class="bg-surface md:col-span-3"></span>
+                <span class="bg-surface type-label px-8 py-4 text-gray-500 md:col-span-5 dark:text-gray-400">{{ __('Self-hosted') }}</span>
+                <span class="bg-surface type-label px-8 py-4 text-gray-500 md:col-span-4 dark:text-gray-400">{{ __('Cloud') }}</span>
+            </div>
+
             @foreach($comparison as [$rowLabel, $selfHostedValue, $hostedValue])
                 <div class="bg-rail grid grid-cols-1 gap-px md:grid-cols-12">
                     <p class="bg-surface px-6 py-5 text-sm font-medium text-gray-950 md:col-span-3 md:px-10 dark:text-white">{{ $rowLabel }}</p>
                     <p class="bg-surface px-6 py-5 md:col-span-5 md:px-8">
-                        <span class="type-label mb-1 block text-gray-500 dark:text-gray-400">{{ __('Self-hosted') }}:</span>
+                        <span class="type-label mb-1 block text-gray-500 md:sr-only dark:text-gray-400">{{ __('Self-hosted') }}:</span>
                         <span class="type-prose text-gray-700 dark:text-gray-300">{{ $selfHostedValue }}</span>
                     </p>
                     <p class="bg-surface px-6 py-5 md:col-span-4 md:px-8">
-                        <span class="type-label mb-1 block text-gray-500 dark:text-gray-400">{{ __('Cloud') }}:</span>
+                        <span class="type-label mb-1 block text-gray-500 md:sr-only dark:text-gray-400">{{ __('Cloud') }}:</span>
                         <span class="type-prose text-gray-700 dark:text-gray-300">{{ $hostedValue }}</span>
                     </p>
                 </div>

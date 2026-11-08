@@ -41,7 +41,7 @@
                             aria-label="{{ __('filament/pages/dashboard.activation.more_actions') }}"
                             class="rounded-lg p-1.5 text-gray-400 transition max-sm:flex max-sm:size-11 max-sm:items-center max-sm:justify-center hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/5 dark:hover:text-gray-200"
                         >
-                            <x-heroicon-m-ellipsis-horizontal class="h-4 w-4" />
+                            <x-lucide-ellipsis class="h-4 w-4" />
                         </button>
 
                         <button
@@ -50,7 +50,7 @@
                             aria-label="{{ __('filament/pages/dashboard.activation.collapse') }}"
                             class="rounded-lg p-1.5 text-gray-400 transition max-sm:flex max-sm:size-11 max-sm:items-center max-sm:justify-center hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/5 dark:hover:text-gray-200"
                         >
-                            <x-heroicon-m-arrow-down-left class="h-4 w-4" />
+                            <x-lucide-arrow-down-left class="h-4 w-4" />
                         </button>
 
                         <div
@@ -64,7 +64,7 @@
                                 wire:click="dismiss"
                                 class="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
                             >
-                                <x-heroicon-o-check-circle class="h-4 w-4 flex-shrink-0 text-gray-400" />
+                                <x-lucide-circle-check class="h-4 w-4 flex-shrink-0 text-gray-400" />
                                 <span>{{ __('filament/pages/dashboard.activation.dismiss') }}</span>
                             </button>
 
@@ -75,7 +75,7 @@
                                     wire:confirm="{{ __('filament/pages/dashboard.activation.remove_sample_data_confirm') }}"
                                     class="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
                                 >
-                                    <x-heroicon-o-trash class="h-4 w-4 flex-shrink-0 text-gray-400" />
+                                    <x-lucide-trash class="h-4 w-4 flex-shrink-0 text-gray-400" />
                                     <span>{{ __('filament/pages/dashboard.activation.remove_sample_data') }}</span>
                                 </button>
                             @endif

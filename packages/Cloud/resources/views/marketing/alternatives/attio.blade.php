@@ -157,7 +157,7 @@
                     @foreach ([[__('Companies'), __('Companies')], [__('People'), __('People')], [__('Deals'), __('Opportunities')]] as [$from, $to])
                         <div class="grid grid-cols-2 gap-4 py-3">
                             <dt class="text-gray-500 dark:text-gray-400">{{ __('Attio :record', ['record' => $from]) }}</dt>
-                            <dd class="flex items-center gap-2 font-medium text-gray-950 dark:text-white"><x-ri-arrow-right-line class="size-4 shrink-0 text-gray-400" aria-hidden="true"/>{{ $to }}</dd>
+                            <dd class="flex items-center gap-2 font-medium text-gray-950 dark:text-white"><x-lucide-arrow-right class="size-4 shrink-0 text-gray-400" aria-hidden="true"/>{{ $to }}</dd>
                         </div>
                     @endforeach
                 </dl>
@@ -205,7 +205,7 @@
                     <details class="group py-5" @if ($loop->first) open @endif>
                         <summary class="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-semibold text-gray-900 [&::-webkit-details-marker]:hidden dark:text-white">
                             {{ $question }}
-                            <x-ri-add-line class="size-5 shrink-0 text-gray-400 transition-transform group-open:rotate-45 motion-reduce:transition-none" aria-hidden="true"/>
+                            <x-lucide-plus class="size-5 shrink-0 text-gray-400 transition-transform group-open:rotate-45 motion-reduce:transition-none" aria-hidden="true"/>
                         </summary>
                         <p class="type-prose mt-3 pr-8 text-gray-600 dark:text-gray-400">{{ $answer }}</p>
                     </details>

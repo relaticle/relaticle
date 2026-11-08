@@ -158,7 +158,11 @@
             <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">{{ __(':days-day trial, no card, unlimited users.', ['days' => $trialDays]) }}</p>
         </x-slot:aside>
 
-        @include('cloud::marketing.partials.ai-native-checklist', ['checks' => $checks])
+        <x-slot:visual>
+            <x-cloud::marketing.stage dots class="bg-tint rounded-2xl">
+                @include('cloud::marketing.partials.ai-native-checklist', ['checks' => $checks])
+            </x-cloud::marketing.stage>
+        </x-slot:visual>
     </x-cloud::marketing.hero>
 
     <x-cloud::marketing.frame id="definitions">
@@ -198,11 +202,11 @@
                                 <p class="max-w-[85%] rounded-2xl rounded-br-md bg-gray-100 px-3.5 py-2.5 text-sm leading-relaxed text-gray-900 dark:bg-white/10 dark:text-gray-100">{{ __('Move the Northwind renewal to Negotiation') }}</p>
                             </div>
                             <p class="border-rail inline-flex items-center gap-1.5 rounded-md border bg-tint px-2 py-1 text-xs text-gray-600 dark:text-gray-300">
-                                <x-ri-plug-line class="size-3.5 shrink-0 text-primary dark:text-primary-400"/>
+                                <x-lucide-plug class="size-3.5 shrink-0 text-primary dark:text-primary-400"/>
                                 {{ __('Relaticle') }}
                                 <span aria-hidden="true">·</span>
                                 {{ __('Update opportunity') }}
-                                <x-ri-check-line class="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400"/>
+                                <x-lucide-check class="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400"/>
                             </p>
                             <p class="text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ __('Done. Northwind renewal is now in Negotiation/Review.') }}</p>
                         </div>
@@ -233,7 +237,7 @@
                                 <p class="flex items-center gap-2 px-3 py-2 text-sm">
                                     <span class="text-gray-500 dark:text-gray-400">{{ __('Stage') }}</span>
                                     <span class="text-gray-500 line-through dark:text-gray-400">{{ __('Proposal/Price Quote') }}</span>
-                                    <x-ri-arrow-right-line class="size-3.5 text-gray-400" aria-hidden="true"/>
+                                    <x-lucide-arrow-right class="size-3.5 text-gray-400" aria-hidden="true"/>
                                     <span class="font-medium text-gray-950 dark:text-white">{{ __('Negotiation/Review') }}</span>
                                 </p>
                                 <div class="border-rail flex items-center justify-end gap-2 border-t px-3 py-2">

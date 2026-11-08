@@ -49,7 +49,7 @@
             x-tooltip="{ content: @js($validationError . ' Select a valid option from the dropdown.'), theme: $store.theme }"
             class="ml-2 cursor-help"
         >
-            <x-filament::icon icon="heroicon-o-exclamation-triangle" class="w-4 h-4 text-warning-500 shrink-0"/>
+            <x-filament::icon icon="lucide-triangle-exclamation-point" class="w-4 h-4 text-warning-500 shrink-0"/>
         </span>
     @endif
 

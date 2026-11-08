@@ -45,11 +45,11 @@
                 </p>
             </div>
             <p class="inline-flex items-center gap-1.5 rounded-md border border-gray-200/80 bg-gray-50 px-2 py-1 text-xs text-gray-600 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-gray-300" data-agent-step>
-                <x-ri-plug-line class="size-3.5 shrink-0 text-primary dark:text-primary-400"/>
+                <x-lucide-plug class="size-3.5 shrink-0 text-primary dark:text-primary-400"/>
                 {{ __('Relaticle') }}
                 <span aria-hidden="true">·</span>
                 {{ __('Create task') }}
-                <x-ri-check-line class="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400"/>
+                <x-lucide-check class="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400"/>
             </p>
             <p class="text-sm leading-relaxed text-gray-700 dark:text-gray-300" data-agent-step>
                 {{ __('Done. The task is due Thursday and linked to Lena Ortiz and the Northwind renewal.') }}
@@ -75,7 +75,7 @@
                 <p class="truncate text-sm font-medium text-gray-900 dark:text-white">{{ __('Follow up with Lena Ortiz') }}</p>
                 <div class="mt-1.5 flex min-w-0 items-center gap-1.5 overflow-hidden text-xs">
                     <span class="inline-flex shrink-0 items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 font-medium text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
-                        <x-ri-calendar-line class="size-3"/>{{ __('Thursday') }}
+                        <x-lucide-calendar class="size-3"/>{{ __('Thursday') }}
                     </span>
                     <span class="shrink-0 rounded-md bg-gray-100 px-1.5 py-0.5 text-gray-600 dark:bg-white/[0.06] dark:text-gray-300">Lena Ortiz</span>
                     <span class="min-w-0 truncate rounded-md bg-gray-100 px-1.5 py-0.5 text-gray-600 dark:bg-white/[0.06] dark:text-gray-300">{{ __('Northwind renewal') }}</span>

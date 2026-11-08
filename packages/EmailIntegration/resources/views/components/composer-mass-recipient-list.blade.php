@@ -22,7 +22,7 @@
                 <p class="truncate text-xs text-gray-500 dark:text-gray-400">{{ $recipient['email'] }}</p>
             </div>
             <x-email-integration::composer-icon-button
-                icon="heroicon-m-x-mark"
+                icon="lucide-x"
                 :label="$removeLabel"
                 class="!p-1"
                 wire:click="removeMassRecipient('{{ $recipient['personId'] }}')"

@@ -110,13 +110,13 @@ enum OnboardingUseCase: string implements HasLabel
     public function getIcon(): string
     {
         return match ($this) {
-            self::Sales => 'ri-funds-line',
-            self::CustomerSuccess => 'ri-hand-heart-line',
-            self::Recruiting => 'ri-team-line',
-            self::Marketing => 'ri-bar-chart-2-line',
-            self::Fundraising => 'ri-money-dollar-circle-line',
-            self::Investing => 'ri-stock-line',
-            self::Other => 'ri-more-line',
+            self::Sales => 'lucide-trending-up',
+            self::CustomerSuccess => 'lucide-hand-heart',
+            self::Recruiting => 'lucide-users',
+            self::Marketing => 'lucide-chart-column',
+            self::Fundraising => 'lucide-circle-dollar-sign',
+            self::Investing => 'lucide-chart-candlestick',
+            self::Other => 'lucide-ellipsis',
         };
     }
 

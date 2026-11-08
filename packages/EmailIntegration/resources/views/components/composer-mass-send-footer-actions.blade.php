@@ -10,7 +10,7 @@
 
         @if ($isMassSend && $recipientCount > 0)
             <x-email-integration::composer-icon-button
-                icon="heroicon-o-trash"
+                icon="lucide-trash"
                 :label="__('filament/emails/composer.actions.discard')"
                 wire:click="discard"
             />

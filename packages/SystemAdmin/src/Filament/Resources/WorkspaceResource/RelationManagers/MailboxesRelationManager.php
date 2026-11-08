@@ -21,7 +21,7 @@ final class MailboxesRelationManager extends RelationManager
 
     protected static ?string $title = 'Mailboxes';
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-envelope';
+    protected static string|\BackedEnum|null $icon = 'lucide-mail';
 
     #[Override]
     public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool

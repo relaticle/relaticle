@@ -3,7 +3,7 @@
     class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-500 dark:border-white/10 dark:text-gray-400"
     aria-hidden="true"
 >
-    <x-heroicon-o-arrow-path class="h-3.5 w-3.5 motion-safe:animate-spin" />
+    <x-lucide-refresh-cw class="h-3.5 w-3.5 motion-safe:animate-spin" />
 </span>
 
 <span class="min-w-0 flex-1 text-sm leading-snug font-medium text-gray-900 dark:text-white">

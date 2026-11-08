@@ -10,7 +10,6 @@ use App\Models\Workspace;
 use App\Notifications\InboxNotification;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification as FilamentNotification;
-use Filament\Support\Icons\Heroicon;
 use Relaticle\Cloud\Billing\Filament\Billing;
 
 final class PaymentFailedNotification extends InboxNotification
@@ -60,7 +59,7 @@ final class PaymentFailedNotification extends InboxNotification
             ->body(data_get($row->data, 'managed') === true || data_get($row->data, 'enterprise') === true
                 ? __('cloud::billing.managed.previous_subscription_past_due')
                 : __('cloud::billing.payment_failed.notification_body'))
-            ->icon(Heroicon::OutlinedExclamationTriangle)
+            ->icon('lucide-triangle-exclamation-point')
             ->iconColor('danger')
             ->actions($workspace instanceof Workspace ? [
                 Action::make('billing')

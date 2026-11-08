@@ -6,14 +6,14 @@
      * section picks up the fallback instead of rendering nothing.
      */
     $icon = match ((string) $topic) {
-        'help/getting-started' => 'ri-rocket-line',
-        'docs/guides' => 'ri-code-s-slash-line',
-        'help/import' => 'ri-upload-2-line',
-        'docs/guides/contributing' => 'ri-git-pull-request-line',
-        'docs/guides/self-hosting' => 'ri-server-line',
-        'docs/guides/mcp' => 'ri-cpu-line',
-        'api-reference' => 'ri-terminal-box-line',
-        default => 'ri-book-open-line',
+        'help/getting-started' => 'lucide-rocket',
+        'docs/guides' => 'lucide-code',
+        'help/import' => 'lucide-upload',
+        'docs/guides/contributing' => 'lucide-git-pull-request',
+        'docs/guides/self-hosting' => 'lucide-server',
+        'docs/guides/mcp' => 'lucide-cpu',
+        'api-reference' => 'lucide-square-terminal',
+        default => 'lucide-book-open',
     };
 @endphp
 

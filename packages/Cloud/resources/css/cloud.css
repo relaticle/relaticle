@@ -31,31 +31,10 @@ html:has(#main-header) {
     scroll-padding-top: calc(var(--header-height) + 1.5rem);
 }
 
-/* The framed header floats below the top edge: its card's top gap plus its height. */
-html:has(#main-header[data-framed]) {
-    --header-height: 4.5rem;
-
-    @media (width >= 48rem) {
-        --header-height: 4.75rem;
-    }
-}
-
 .dark {
     --color-rail: rgb(255 255 255 / 0.1);
     --color-surface: var(--color-gray-950);
     --color-tint: var(--color-gray-900);
-}
-
-@utility shadow-navbar {
-    box-shadow:
-        0 0 0 1px var(--color-gray-200),
-        0 8px 24px -12px rgb(0 0 0 / 0.12);
-
-    &:where(.dark, .dark *) {
-        box-shadow:
-            0 0 0 1px rgb(255 255 255 / 0.1),
-            0 8px 24px -12px rgb(0 0 0 / 0.6);
-    }
 }
 
 /* The hero's product panel takes the logo's own colours, #4038CD to #5D54E8. */
@@ -108,6 +87,32 @@ html:has(#main-header[data-framed]) {
 
     &:where(.dark, .dark *) {
         background-image: radial-gradient(circle, rgb(255 255 255 / 0.08) 1px, transparent 1.25px);
+    }
+}
+
+/* Soft light for a stage, in the logo's colours. Each is a blurred radial spot; a
+   stage places two or three of them, so no hard edge ever shows. */
+@utility glow-indigo {
+    background-image: radial-gradient(closest-side, color-mix(in oklab, var(--color-indigo-400) 50%, transparent), transparent);
+
+    &:where(.dark, .dark *) {
+        background-image: radial-gradient(closest-side, color-mix(in oklab, var(--color-indigo-500) 38%, transparent), transparent);
+    }
+}
+
+@utility glow-violet {
+    background-image: radial-gradient(closest-side, color-mix(in oklab, var(--color-primary-300) 55%, transparent), transparent);
+
+    &:where(.dark, .dark *) {
+        background-image: radial-gradient(closest-side, color-mix(in oklab, var(--color-primary-500) 24%, transparent), transparent);
+    }
+}
+
+@utility glow-sky {
+    background-image: radial-gradient(closest-side, color-mix(in oklab, var(--color-sky-200) 60%, transparent), transparent);
+
+    &:where(.dark, .dark *) {
+        background-image: radial-gradient(closest-side, color-mix(in oklab, var(--color-sky-500) 14%, transparent), transparent);
     }
 }
 

@@ -13,9 +13,9 @@
                 <div class="flex items-center">
                     <div>
                         @if ($session->agent->isDesktop())
-                            <x-filament::icon icon="heroicon-o-computer-desktop" class="w-8 h-8 "/>
+                            <x-filament::icon icon="lucide-monitor" class="w-8 h-8 "/>
                         @else
-                            <x-filament::icon icon="heroicon-o-device-phone-mobile" class="w-8 h-8 "/>
+                            <x-filament::icon icon="lucide-smartphone" class="w-8 h-8 "/>
                         @endif
                     </div>
 

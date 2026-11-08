@@ -100,6 +100,10 @@ return [
         'member_self' => ':name (You)',
     ],
 
+    'record_chips' => [
+        'show_all' => 'Show all :count :label',
+    ],
+
     'restore_blocked' => [
         'title' => ':record can\'t be restored',
         'conflict' => ':value in :field now belongs to :holder.',

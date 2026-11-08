@@ -1,6 +1,6 @@
 <script>
     window.resizableWidths = {
-        'sidebar-width': { property: '--sidebar-width', min: 220, max: 360 },
+        'sidebar-width': { property: '--sidebar-width', min: 220, max: 360, collapsedProperty: '--sidebar-collapsed-width' },
         'record-rail-width': { property: '--record-rail-width', min: 320, max: 560 },
         'chat-panel-width': { property: '--chat-panel-width', min: 360, max: 720 },
     }
@@ -50,7 +50,7 @@
                     document.documentElement.classList.toggle('fi-record-stacked', entry.contentRect.width < railMin + paneMin)
                 })
 
-                this.observer.observe(this.$el.closest('.fi-main-ctn'))
+                this.observer.observe(this.$el.closest('.fi-modal-window, .fi-main-ctn'))
             },
 
             destroy() {

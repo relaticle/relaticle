@@ -18,7 +18,7 @@ final class AiCreditTransactionResource extends Resource
 {
     protected static ?string $model = AiCreditTransaction::class;
 
-    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-receipt-percent';
+    protected static string|BackedEnum|null $navigationIcon = 'lucide-receipt';
 
     protected static ?int $navigationSort = 20;
 

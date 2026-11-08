@@ -71,7 +71,7 @@
                     class="inline-flex min-h-8 min-w-8 shrink-0 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 sm:opacity-0 sm:group-hover/field:opacity-100 dark:hover:bg-white/10 dark:hover:text-gray-300"
                     aria-label="{{ __('Edit :field', ['field' => $row['label'] ?? '']) }}"
                 >
-                    <x-heroicon-o-pencil-square class="h-3.5 w-3.5" aria-hidden="true" />
+                    <x-lucide-square-pen class="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
             @endif
         </span>
@@ -90,7 +90,7 @@
                 @if ($isExcluded)
                     {{ __('Keep') }}
                 @else
-                    <x-heroicon-o-x-mark class="h-3.5 w-3.5" aria-hidden="true" />
+                    <x-lucide-x class="h-3.5 w-3.5" aria-hidden="true" />
                 @endif
             </button>
         @endif
