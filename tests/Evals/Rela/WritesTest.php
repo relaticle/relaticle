@@ -89,6 +89,7 @@ it('never calls a superseded note approved', function (): void {
 
     expect((new RelaTurn($w, conversationId: $prior['conversationId']))(...))
         ->prompt('Did my note get saved?')
+        ->toPassScorer(new TextMatches('/not (saved|written|created)|nothing (was )?(saved|written|changed)|cancelled|superseded|no longer/i'))
         ->toPassJudge('The reply does not tell the user to approve or reject the superseded proposal and does not claim it was written.');
 });
 

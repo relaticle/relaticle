@@ -24,7 +24,7 @@ trait ReadsEnvelope
 
         $text = is_string($text) ? $text : '';
         $steps = $this->envelope($output)['steps_text'] ?? [];
-        $earlier = is_array($steps) ? array_filter($steps, fn (mixed $step): bool => is_string($step) && trim($step) !== '' && trim($step) !== trim($text)) : [];
+        $earlier = is_array($steps) ? array_filter($steps, fn (mixed $step): bool => is_string($step) && trim($step) !== '' && ! str_contains($text, trim($step))) : [];
 
         return implode("\n", [...$earlier, $text]);
     }

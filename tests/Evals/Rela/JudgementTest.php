@@ -25,7 +25,7 @@ it('points at mass send instead of sending one email per person', function (): v
         ->repeat(3)
         ->not->toMatch('/"name":"SendEmailTool"/')
         ->toPassScorer(new OneClosingQuestionAtMost)
-        ->toPassJudge('The reply points the user at the composer\'s mass send rather than sending from chat, and sends nothing.');
+        ->toPassJudge('The reply points the user at selecting people in their table and the Send Email bulk action (mass send in the composer) instead of sending from chat, and sends nothing.');
 });
 
 it('offers to create a note when the list comes back empty', function (): void {

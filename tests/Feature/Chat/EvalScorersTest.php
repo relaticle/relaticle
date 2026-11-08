@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Pest\Evals\Scorers\Scorer;
 use Tests\Evals\Scorers\CalledAnyOf;
+use Tests\Evals\Scorers\FirstToolCalled;
 use Tests\Evals\Scorers\NoContactWord;
 use Tests\Evals\Scorers\NoDuplicateRowSet;
 use Tests\Evals\Scorers\NoEmDash;
@@ -161,6 +162,28 @@ it('reads the text before a tool call as well as the final reply', function (): 
         ->and((new OneClosingQuestionAtMost)->score('', $plain)->score)->toBe(1.0);
 });
 
+it('reads the closing question from the final reply and not from the steps', function (): void {
+    $earlierStep = scorerEnvelope('Done. Want more?', stepsText: ['Checking the list?']);
+    $repeated = scorerEnvelope('Let me check? Want me to add it?', stepsText: ['Let me check?']);
+    $stepHeading = scorerEnvelope('Done.', stepsText: ["## Reading data\nChecking."]);
+    $repeatedHeading = scorerEnvelope("## Reading data\nDone.", stepsText: ['## Reading data']);
+
+    expect((new OneClosingQuestionAtMost)->score('', $earlierStep)->score)->toBe(1.0)
+        ->and((new OneClosingQuestionAtMost)->score('', $repeated)->reasoning)->toContain('2 question marks')
+        ->and((new NoHeadingLine)->score('', $stepHeading)->score)->toBe(0.0)
+        ->and((new NoHeadingLine)->score('', $repeatedHeading)->score)->toBe(0.0);
+});
+
+it('passes when the first tool called is the named one', function (): void {
+    $scorer = new FirstToolCalled('SearchDocsTool');
+    $docs = ['name' => 'SearchDocsTool', 'arguments' => []];
+    $list = ['name' => 'ListTasksTool', 'arguments' => []];
+
+    expect($scorer->score('', scorerEnvelope('x', [$docs, $list]))->score)->toBe(1.0)
+        ->and($scorer->score('', scorerEnvelope('x', [$list, $docs]))->score)->toBe(0.0)
+        ->and($scorer->score('', scorerEnvelope('x'))->score)->toBe(0.0);
+});
+
 it('fails narration of the next step in any step', function (): void {
     $scorer = new NoNarration;
 
@@ -206,4 +229,5 @@ it('fails every scorer on a failed turn', function (Scorer $scorer): void {
     'NoNarration' => fn (): Scorer => new NoNarration,
     'TextMatches' => fn (): Scorer => new TextMatches('/x/'),
     'CalledAnyOf' => fn (): Scorer => new CalledAnyOf(['ListTasksTool']),
+    'FirstToolCalled' => fn (): Scorer => new FirstToolCalled('ListTasksTool'),
 ]);

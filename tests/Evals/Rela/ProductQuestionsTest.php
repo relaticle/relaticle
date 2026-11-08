@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Tests\Evals\Scorers\FirstToolCalled;
 use Tests\Evals\Support\EvalWorkspace;
 use Tests\Evals\Support\RelaTurn;
 
@@ -19,7 +20,7 @@ it('searches the docs first for a product question', function (): void {
 
     expect((new RelaTurn($w))(...))
         ->prompt('How do I import people from a CSV file?')
-        ->toFollowTrajectory(['SearchDocsTool'], strictOrder: true);
+        ->toPassScorer(new FirstToolCalled('SearchDocsTool'));
 });
 
 it('declines an out of scope request in one sentence and offers one CRM action', function (): void {
