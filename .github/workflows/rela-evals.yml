@@ -82,9 +82,12 @@ jobs:
           php artisan key:generate
           php artisan passport:keys --force --no-interaction
 
-      # A pass rate below 100% is expected today, so the step never fails the job and the
-      # artifact always uploads. The comparison against tests/Evals/baselines is manual.
+      # A pass rate below 100% is expected today, so a failing eval must not hide a broken
+      # harness: the step records its exit code and the check below fails the job only when
+      # no report exists or no turn ran at all. The comparison against tests/Evals/baselines
+      # is manual.
       - name: Evals
+        id: evals
         continue-on-error: true
         run: composer test:evals
         env:
@@ -98,4 +101,17 @@ jobs:
         with:
           name: rela-evals-${{ matrix.model }}
           path: storage/evals/*.json
+          if-no-files-found: error
+
+      - name: Fail when the harness ran no turn
+        if: always()
+        run: |
+          php -r '
+            $files = glob("storage/evals/*.json");
+            if ($files === []) { fwrite(STDERR, "no eval report written\n"); exit(1); }
+            $report = json_decode(file_get_contents(end($files)), true);
+            $ran = array_filter($report["cases"], fn (array $c): bool => ! str_starts_with($c["reasons"][0] ?? "", "no turn ran"));
+            if ($ran === []) { fwrite(STDERR, "every case reported no turn ran: the harness is broken\n"); exit(1); }
+            echo count($ran), " of ", count($report["cases"]), " cases ran a turn\n";
+          '
           if-no-files-found: warn
