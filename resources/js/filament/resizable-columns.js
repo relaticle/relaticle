@@ -227,6 +227,9 @@ function markScrolledSideways(table) {
     table?.toggleAttribute('data-scrolled-x', (table.closest('.fi-ta-content-ctn')?.scrollLeft ?? 0) > 0)
 }
 
+// Matches ResizableColumns::MIN_WIDTH, the narrowest a column gets.
+const MIN_COLUMN_WIDTH = 120
+
 // Each pinned cell sticks at the selection column's width plus the pinned widths before it.
 function applyPinnedOffsets(table) {
     const pinned = headersOf(table).filter((th) => th.dataset.columnPinned === '1')
@@ -237,7 +240,9 @@ function applyPinnedOffsets(table) {
         left += parseInt(th.dataset.resizableWidth, 10) || th.offsetWidth
         return offset
     })
-    const active = pinned.length > 0
+    // Pins that leave no room for one more column would hide the rest, so they scroll with the table instead.
+    const room = table.closest('.fi-ta-content-ctn')?.clientWidth || Infinity
+    const active = pinned.length > 0 && left + MIN_COLUMN_WIDTH <= room
 
     table.classList.toggle('fi-ta-has-pinned', active)
     table.querySelectorAll('[data-column-pinned-last]').forEach((cell) => cell.removeAttribute('data-column-pinned-last'))
@@ -537,6 +542,17 @@ function swallowNextClick() {
     setTimeout(() => window.removeEventListener('click', swallow, true))
 }
 
+// The second press of a double-click lands on what the closed menu uncovered, often a row link.
+function swallowDoubleClickTail() {
+    const swallow = (clickEvent) => {
+        if (clickEvent.detail < 2) return
+        clickEvent.preventDefault()
+        clickEvent.stopPropagation()
+    }
+    window.addEventListener('click', swallow, { capture: true })
+    setTimeout(() => window.removeEventListener('click', swallow, true), 500)
+}
+
 function startColumnDrag(event, th, wire) {
 
     const table = th.closest('table')
@@ -706,6 +722,7 @@ function registerColumnMenu() {
             rememberColumnFocus(focusColumn)
             Promise.resolve(run()).catch(forgetColumnFocus)
             this.close(false)
+            swallowDoubleClickTail()
         },
     }))
 }

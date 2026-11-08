@@ -117,6 +117,28 @@ it('keeps sorting on the header and gives the title column a handle', function (
         ->assertNoJavaScriptErrors();
 });
 
+it('stays on the list when a column menu item is double-clicked', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
+    $page->script(openColumnMenu('created_at'));
+    waitUntil($page, menuItemFocused());
+
+    $page->script(sprintf(<<<'JS'
+        (() => {
+            const item = document.querySelector(`%s`);
+            const box = item.getBoundingClientRect();
+            const point = { bubbles: true, cancelable: true, clientX: box.left + box.width / 2, clientY: box.top + box.height / 2 };
+            item.dispatchEvent(new MouseEvent('click', { ...point, detail: 1 }));
+            requestAnimationFrame(() => document.elementFromPoint(point.clientX, point.clientY)?.dispatchEvent(new MouseEvent('click', { ...point, detail: 2 })));
+            return true;
+        })();
+    JS, columnMenuItem('Pin to left')));
+
+    waitUntil($page, sprintf('document.querySelector(`%s`)?.dataset.columnPinned === "1"', columnHeader('created_at')))
+        ->wait(0.5)
+        ->assertPathIs("/app/{$this->workspace->slug}/companies")
+        ->assertNoJavaScriptErrors();
+});
+
 it('disables the moves at the edges', function (): void {
     $page = companiesTable($this->user, $this->workspace->slug);
     $order = $page->script(headerOrder());
@@ -578,6 +600,19 @@ it('keeps pins stuck on a phone-sized screen', function (): void {
     waitUntil($page, 'document.querySelector("table.fi-ta-table").hasAttribute("data-scrolled-x")')
         ->assertScript('document.querySelector("table.fi-ta-table").classList.contains("fi-ta-has-pinned")', true)
         ->assertScript(sprintf('(() => { const cell = %s; const box = cell.getBoundingClientRect(); return box.left < window.innerWidth && document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)?.closest("td") === cell })()', firstCell('name')), true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('lets pins that leave no room for another column scroll with the table on a phone', function (): void {
+    $page = pinFromMenu(companiesTable($this->user, $this->workspace->slug)->resize(390, 844)->wait(0.5), 'name');
+    $page = pinFromMenu($page, 'created_at');
+
+    $page->script('(() => { const wrapper = document.querySelector(".fi-ta-content-ctn"); wrapper.scrollLeft = wrapper.scrollWidth; return true })()');
+
+    waitUntil($page, 'document.querySelector("table.fi-ta-table").hasAttribute("data-scrolled-x")')
+        ->assertScript('document.querySelector("table.fi-ta-table").classList.contains("fi-ta-has-pinned")', false)
+        ->assertScript(sprintf('document.querySelector(`%s`).dataset.columnPinned', columnHeader('created_at')), '1')
+        ->assertScript('[...document.querySelectorAll(`th[x-data^="resizableColumn"][data-column-pinned="0"]`)].some((th) => { const box = th.getBoundingClientRect(); return box.left >= 0 && box.right <= window.innerWidth })', true)
         ->assertNoJavaScriptErrors();
 });
 

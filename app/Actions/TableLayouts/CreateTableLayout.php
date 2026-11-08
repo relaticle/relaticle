@@ -18,12 +18,15 @@ final readonly class CreateTableLayout
     {
         abort_unless($user->belongsToWorkspaceId($workspace->getKey()), 403);
 
-        return TableLayout::query()->create([
+        $layout = new TableLayout([
             'workspace_id' => $workspace->getKey(),
             'user_id' => $user->getKey(),
             'entity' => $entity,
-            'name' => $this->ensureNameIsFree->execute($user, $workspace->getKey(), $entity, $name),
             'state' => $state->withoutWidths(),
         ]);
+        $layout->name = $this->ensureNameIsFree->execute($user, $layout, $name);
+        $layout->save();
+
+        return $layout;
     }
 }

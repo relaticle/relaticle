@@ -142,6 +142,19 @@ it('refuses a layout name the member already uses, ignoring case', function (): 
     expect(TableLayout::query()->withoutGlobalScopes()->count())->toBe(1);
 });
 
+it('names the owner when an admin renames their layout to a name the owner already uses', function (): void {
+    $owner = tableLayoutMember(WorkspaceRole::Member);
+    $shared = layoutFor($owner, ['name' => 'Team', 'is_shared' => true]);
+    layoutFor($owner, ['name' => 'Private plan']);
+    $this->actingAs(tableLayoutMember(WorkspaceRole::Admin));
+
+    livewire(ListCompanies::class)
+        ->callAction('renameTableLayout', ['name' => 'private PLAN'], ['layout' => $shared->getKey()])
+        ->assertHasActionErrors(['name' => "{$owner->name} already has a layout with this name."]);
+
+    expect($shared->refresh()->name)->toBe('Team');
+});
+
 it('lets two members use the same layout name', function (): void {
     layoutFor(tableLayoutMember(WorkspaceRole::Member), ['name' => 'Hot leads', 'is_shared' => true]);
 
@@ -410,7 +423,8 @@ it('refuses a layout id from another workspace at every entry point', function (
         ->assertActionHidden('shareTableLayout', ['layout' => $foreign->getKey()])
         ->assertActionHidden('deleteTableLayout', ['layout' => $foreign->getKey()])
         ->call('toggleDefaultTableLayout', $foreign->getKey())
-        ->assertStatus(404);
+        ->assertNotified('That layout is no longer available.')
+        ->assertSet('defaultTableLayoutId', null);
 
     expect($foreign->refresh()->name)->toBe('Elsewhere')
         ->and(preferenceRow()?->default_layout_id)->toBeNull();
@@ -553,6 +567,23 @@ it('confirms a deleted layout', function (): void {
         ->assertNotified('"Renewals" deleted');
 });
 
+it('escapes the layout name in the toasts it sends', function (): void {
+    $name = '<a href="https://evil.example">Renewals</a>';
+    $escaped = e($name);
+
+    livewire(ListCompanies::class)
+        ->callAction('saveTableLayoutAs', ['name' => $name])
+        ->assertNotified("\"{$escaped}\" saved as a new layout");
+
+    $layout = TableLayout::query()->withoutGlobalScopes()->sole();
+
+    livewire(ListCompanies::class)
+        ->callAction('shareTableLayout', arguments: ['layout' => $layout->getKey()])
+        ->assertNotified("\"{$escaped}\" is shared with the workspace")
+        ->callAction('deleteTableLayout', arguments: ['layout' => $layout->getKey()])
+        ->assertNotified("\"{$escaped}\" deleted");
+});
+
 it('tells the owner when an admin deletes their layout', function (): void {
     $owner = tableLayoutMember(WorkspaceRole::Member);
     $layout = layoutFor($owner, ['name' => 'Renewals', 'is_shared' => true]);
@@ -568,6 +599,20 @@ it('tells the owner when an admin deletes their layout', function (): void {
         ->and($notice->actor_id)->toBe($admin->getKey())
         ->and($notice->subject_id)->toBe($this->workspace->getKey())
         ->and($notice->data)->toBe(['layout_name' => 'Renewals', 'entity' => CrmEntity::Company->value, 'change' => TableLayoutChangedNotification::DELETED]);
+});
+
+it('tells the owner once when two admins delete their layout at the same moment', function (): void {
+    $owner = tableLayoutMember(WorkspaceRole::Member);
+    $layout = layoutFor($owner, ['name' => 'Renewals', 'is_shared' => true]);
+    $admin = tableLayoutMember(WorkspaceRole::Admin);
+    $sameLayoutInAnotherRequest = TableLayout::query()->withoutGlobalScopes()->findOrFail($layout->getKey());
+
+    $first = resolve(DeleteTableLayout::class)->execute($admin, $layout);
+    $second = resolve(DeleteTableLayout::class)->execute($admin, $sameLayoutInAnotherRequest);
+
+    expect($first)->toBeTrue()
+        ->and($second)->toBeFalse()
+        ->and($owner->notifications()->count())->toBe(1);
 });
 
 it('tells the owner when an admin stops sharing their layout', function (): void {
@@ -684,6 +729,43 @@ it('tells the member instead of failing when the layout they save over was delet
         ->assertSet('activeTableLayoutId', null);
 
     expect(TableLayout::query()->withoutGlobalScopes()->count())->toBe(0);
+});
+
+it('tells the member instead of failing when the layout they set as default was deleted elsewhere', function (): void {
+    $layout = layoutFor($this->user, ['state' => hotLeads()]);
+    $component = livewire(ListCompanies::class)->call('applySavedLayout', $layout->getKey());
+
+    $layout->delete();
+
+    $component->call('toggleDefaultTableLayout', $layout->getKey())
+        ->assertNotified('That layout is no longer available.')
+        ->assertSet('activeTableLayoutId', null)
+        ->assertSet('defaultTableLayoutId', null);
+
+    expect(preferenceRow()?->default_layout_id)->toBeNull();
+});
+
+it('closes the modal and tells the member when the layout it acts on was deleted elsewhere', function (string $action): void {
+    $layout = layoutFor($this->user, ['name' => 'Renewals']);
+    $component = livewire(ListCompanies::class)->mountAction($action, ['layout' => $layout->getKey()]);
+
+    $layout->delete();
+
+    $component->callMountedAction()
+        ->assertNotified('That layout is no longer available.')
+        ->assertActionNotMounted($action);
+})->with(['renameTableLayout', 'shareTableLayout', 'deleteTableLayout']);
+
+it('closes the stop sharing modal and tells the admin when the layout was deleted elsewhere', function (): void {
+    $layout = layoutFor(tableLayoutMember(WorkspaceRole::Member), ['name' => 'Renewals', 'is_shared' => true]);
+    $this->actingAs(tableLayoutMember(WorkspaceRole::Admin));
+    $component = livewire(ListCompanies::class)->mountAction('stopSharingTableLayout', ['layout' => $layout->getKey()]);
+
+    $layout->delete();
+
+    $component->callMountedAction()
+        ->assertNotified('That layout is no longer available.')
+        ->assertActionNotMounted('stopSharingTableLayout');
 });
 
 it('shows the name error when a rename races another save to the same name', function (): void {

@@ -634,6 +634,22 @@ it('shows a renamed layout notice with both names', function (): void {
         ->assertSeeText('It is still shared on the companies table.');
 });
 
+it('escapes the layout and actor names in a layout notice', function (): void {
+    $admin = User::factory()->create(['name' => '<b>Dana</b>']);
+    $this->workspaceA->users()->attach($admin, ['role' => 'admin']);
+
+    $layout = TableLayout::factory()->for($this->user)->for($this->workspaceA)->create(['entity' => CrmEntity::Company, 'name' => '<a href="https://evil.example">Renewals</a>']);
+
+    $this->user->notify(TableLayoutChangedNotification::renamed($layout, $admin, '<img src="https://evil.example/px.gif">'));
+
+    Livewire::actingAs($this->user)->test(AppDatabaseNotifications::class)
+        ->assertSee('&lt;a href', escape: false)
+        ->assertSee('&lt;img src', escape: false)
+        ->assertSee('&lt;b&gt;Dana&lt;/b&gt;', escape: false)
+        ->assertDontSee('<a href="https://evil.example"', escape: false)
+        ->assertDontSee('<img src="https://evil.example/px.gif"', escape: false);
+});
+
 it('shows a layout notice whose actor has since been deleted', function (): void {
     $admin = User::factory()->create();
     $this->workspaceA->users()->attach($admin, ['role' => 'admin']);
