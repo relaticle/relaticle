@@ -577,8 +577,8 @@ it('moves the pinned columns after a pinned column that is resized', function ()
         ->assertNoJavaScriptErrors();
 });
 
-it('keeps every pin stuck however much of the table the pins cover', function (): void {
-    $page = companiesTable($this->user, $this->workspace->slug)->resize(1024, 900)->wait(0.5);
+it('keeps pins stuck while a full column still fits beside them', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug)->resize(1440, 900)->wait(0.5);
 
     foreach (['accountOwner.name', 'creator.name', 'created_at'] as $column) {
         pinFromMenu($page, $column);
@@ -589,6 +589,21 @@ it('keeps every pin stuck however much of the table the pins cover', function ()
     waitUntil($page, 'document.querySelector("table.fi-ta-table").hasAttribute("data-scrolled-x")')
         ->assertScript('document.querySelector("table.fi-ta-table").classList.contains("fi-ta-has-pinned")', true)
         ->assertScript(sprintf('(() => { const cell = %s; const box = cell.getBoundingClientRect(); return document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)?.closest("td") === cell })()', firstCell('created_at')), true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('lets three pins scroll with the table on a tablet, so the last column can be read in full', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug)->resize(768, 1024)->wait(0.5);
+
+    foreach (['name', 'accountOwner.name', 'creator.name'] as $column) {
+        pinFromMenu($page, $column);
+    }
+
+    $page->script('(() => { const wrapper = document.querySelector(".fi-ta-content-ctn"); wrapper.scrollLeft = wrapper.scrollWidth; return true })()');
+
+    waitUntil($page, 'document.querySelector("table.fi-ta-table").hasAttribute("data-scrolled-x")')
+        ->assertScript('document.querySelector("table.fi-ta-table").classList.contains("fi-ta-has-pinned")', false)
+        ->assertScript(sprintf('(() => { const box = document.querySelector(`%s`).getBoundingClientRect(); return box.left >= 0 && box.right <= window.innerWidth })()', columnHeader('custom_fields.domains')), true)
         ->assertNoJavaScriptErrors();
 });
 
