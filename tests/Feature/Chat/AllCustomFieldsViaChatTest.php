@@ -120,7 +120,7 @@ it('proposes an update with the envelope every write tool shares', function (): 
 
     $envelope = json_decode(runUpdateToolForCustomFieldsTest(UpdateCompanyTool::class, $company, ['domains' => ['acme.io']]), true);
 
-    expect(array_keys($envelope))->toBe(['type', 'pending_action_id', 'turn_id', 'action', 'entity_type', 'operation', 'data', 'display', 'meta'])
+    expect(array_keys($envelope))->toBe(['type', 'pending_action_id', 'turn_id', 'action', 'entity_type', 'operation', 'data', 'display', 'summary', 'meta'])
         ->and($envelope['meta'])->toBe(['agent_should_stop' => true]);
 });
 
