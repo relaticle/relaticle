@@ -123,7 +123,8 @@
                 `animation-range:${start}px ${start + maxShift}px}`
         })
 
-        stickyHeaderStyleElement().textContent = css
+        const style = stickyHeaderStyleElement()
+        if (style.textContent !== css) style.textContent = css
     }
 
     let stickyRecalcPending = false
@@ -244,7 +245,8 @@
         table.querySelectorAll('[data-column-pinned-last]').forEach((cell) => cell.removeAttribute('data-column-pinned-last'))
         pinned.forEach((th, index) => {
             [th, ...table.querySelectorAll(`.fi-ta-cell-${CSS.escape(th.dataset.resizableColumnId)}`)].forEach((cell) => {
-                cell.style.left = active ? `${offsets[index]}px` : ''
+                const left = active ? `${offsets[index]}px` : ''
+                if (cell.style.left !== left) cell.style.left = left
                 cell.toggleAttribute('data-column-pinned-last', active && index === pinned.length - 1)
             })
         })
@@ -289,9 +291,12 @@
     // A morph keeps the server-rendered widths but strips the table class, the lock flag, the
     // label wrappers and the handles, so a table its component morphed is rebuilt from its headers.
     function rebuildResizableTablesAfterMorph({ el }) {
-        document.querySelectorAll('table.fi-ta-table:has(thead th[x-data^="resizableColumn"])').forEach((table) => {
-            if (!el.contains(table) && !table.contains(el)) return
+        const selector = 'table.fi-ta-table:has(thead th[x-data^="resizableColumn"])'
+        const tables = new Set(el.querySelectorAll?.(selector))
+        const enclosing = el.closest?.(selector)
+        if (enclosing) tables.add(enclosing)
 
+        tables.forEach((table) => {
             delete table.dataset.resizableLayoutLocked
             lockTable(table)
             table.querySelectorAll('thead th[x-data^="resizableColumn"]').forEach(reapplyHeader)
@@ -523,8 +528,11 @@
         const { ghost, table, slots, source, grabOffset, pointer } = drag
 
         Object.assign(ghost.style, { left: `${pointer.x - grabOffset}px`, top: `${table.tHead.getBoundingClientRect().top}px` })
-        drag.index = dropIndex(slots, source, pointer.x - grabOffset - table.getBoundingClientRect().left)
-        shiftColumns(slots, source, drag.index)
+        const index = dropIndex(slots, source, pointer.x - grabOffset - table.getBoundingClientRect().left)
+        if (index === drag.index) return
+
+        drag.index = index
+        shiftColumns(slots, source, index)
     }
 
     // Within the wrapper's edge zone the table scrolls sideways, faster the closer the pointer gets to the edge.
