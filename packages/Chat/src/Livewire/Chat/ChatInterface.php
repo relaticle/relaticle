@@ -18,6 +18,7 @@ use Relaticle\Chat\Queries\ConversationMessagesQuery;
 use Relaticle\Chat\Queries\ConversationsQuery;
 use Relaticle\Chat\Support\DisplayBlocks;
 use Relaticle\Chat\Support\NextSteps;
+use Relaticle\Chat\Support\PendingActionEnvelope;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\StoredSteps;
 use Relaticle\Chat\Support\TitleSanitizer;
@@ -368,7 +369,7 @@ final class ChatInterface extends BaseLivewireComponent
             ->get();
 
         return array_values(array_map(static fn (PendingAction $action): array => [
-            'type' => 'pending_action',
+            'type' => PendingActionEnvelope::TYPE,
             'pending_action_id' => (string) $action->getKey(),
             'turn_id' => $action->turn_id,
             'operation' => $action->operation->value,
