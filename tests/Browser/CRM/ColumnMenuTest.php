@@ -799,3 +799,15 @@ it('keeps the column menu on screen when its column sits near the left edge', fu
         ->assertScript('document.querySelector(".fi-ta-column-menu").getBoundingClientRect().right <= window.innerWidth - 8', true)
         ->assertNoJavaScriptErrors();
 });
+
+it('starts every options button collapsed and named after its column, and hides the resize handles from assistive tech', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
+
+    $buttons = '[...document.querySelectorAll(`th[x-data^="resizableColumn"] .fi-ta-column-handle`)]';
+
+    $page->assertScript("{$buttons}.length > 3 && {$buttons}.every((button) => button.getAttribute(\"aria-expanded\") === \"false\")", true)
+        ->assertScript(sprintf('document.querySelector(`%s .fi-ta-column-handle`).getAttribute("aria-label")', columnHeader('name')), 'Company options')
+        ->assertScript("new Set({$buttons}.map((button) => button.getAttribute(\"aria-label\"))).size === {$buttons}.length", true)
+        ->assertScript('[...document.querySelectorAll(`th[x-data^="resizableColumn"] .column-resize-handle-bar`)].every((handle) => handle.getAttribute("aria-hidden") === "true")', true)
+        ->assertNoJavaScriptErrors();
+});

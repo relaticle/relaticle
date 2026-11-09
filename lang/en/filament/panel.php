@@ -34,6 +34,7 @@ return [
         'resize_column_hint' => 'Drag to resize. Double-click to fit.',
         'column_menu' => [
             'options' => 'Column options',
+            'options_for' => ':column options',
             'edit_label' => 'Edit column label',
             'label' => 'Label',
             'label_hint' => 'Only you see this name until you save it in a layout you share. Leave it empty to use the original.',

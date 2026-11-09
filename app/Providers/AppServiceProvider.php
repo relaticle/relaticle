@@ -871,7 +871,7 @@ final class AppServiceProvider extends ServiceProvider
             'payloadTooLarge' => __('filament/panel.payload_too_large'),
             'resizeColumnLabel' => __('filament/panel.tables.resize_column'),
             'resizeColumnHint' => __('filament/panel.tables.resize_column_hint'),
-            'columnOptionsLabel' => __('filament/panel.tables.column_menu.options'),
+            'columnOptionsFor' => __('filament/panel.tables.column_menu.options_for'),
             'defaultColumnWidth' => ResizableColumns::DEFAULT_COLUMN_WIDTH,
             'checklistItemLabel' => __('filament/rich-editor.checklist.item'),
             'checklistEmptyItemLabel' => __('filament/rich-editor.checklist.empty_item'),

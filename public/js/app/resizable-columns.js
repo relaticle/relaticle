@@ -748,8 +748,10 @@ function registerResizableColumn() {
             const handle = document.createElement('button')
             handle.type = 'button'
             handle.className = 'fi-ta-column-handle'
-            handle.setAttribute('aria-label', window.filamentData?.columnOptionsLabel ?? '')
+            const label = this.column.querySelector(':scope > .fi-ta-resizable-label')?.textContent.replace(/\s+/g, ' ').trim()
+            handle.setAttribute('aria-label', window.filamentData.columnOptionsFor.replace(':column', label || columnName))
             handle.setAttribute('aria-haspopup', 'menu')
+            handle.setAttribute('aria-expanded', 'false')
             if (isMovable(this.column)) {
                 handle.addEventListener('keydown', (e) => this.moveByKey(e))
             }
@@ -794,6 +796,8 @@ function registerResizableColumn() {
                 title: window.filamentData?.resizeColumnHint ?? '',
             })
             handle.setAttribute('aria-label', window.filamentData?.resizeColumnLabel ?? '')
+            // A pointer control: a screen reader would reach it and find nothing to activate.
+            handle.setAttribute('aria-hidden', 'true')
             this.handleBar = handle
             this.column.appendChild(handle)
             handle.addEventListener('pointerdown', (e) => this.startResize(e))
