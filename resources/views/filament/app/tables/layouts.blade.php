@@ -160,10 +160,9 @@
         </div>
 
         <x-filament::dropdown.list>
-            <button type="button" class="fi-dropdown-list-item fi-ta-layouts-save-current" wire:click="mountAction('saveTableLayoutAs')">
-                <x-filament::icon icon="lucide-plus" />
+            <x-filament::dropdown.list.item icon="lucide-plus" class="fi-ta-layouts-save-current" wire:click="mountAction('saveTableLayoutAs')">
                 {{ __('filament/panel.tables.layouts.save_current') }}
-            </button>
+            </x-filament::dropdown.list.item>
         </x-filament::dropdown.list>
         </div>
     </x-filament::dropdown>
