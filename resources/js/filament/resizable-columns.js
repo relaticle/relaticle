@@ -345,16 +345,17 @@ function createHandleBar() {
     return handle
 }
 
+function wrapHeaderLabel(th) {
+    if (th.querySelector(':scope > .fi-ta-resizable-label')) return
+
+    const wrapper = document.createElement('span')
+    wrapper.className = 'fi-ta-resizable-label'
+    wrapper.append(...Array.from(th.childNodes).filter((node) => !node.matches?.('.column-resize-handle-bar, .fi-ta-column-handle')))
+    th.insertBefore(wrapper, th.firstChild)
+}
+
 function reapplyHeader(th) {
-    if (!th.querySelector(':scope > .fi-ta-resizable-label')) {
-        const wrapper = document.createElement('span')
-        wrapper.className = 'fi-ta-resizable-label'
-        Array.from(th.childNodes).forEach((node) => {
-            if (node.nodeType === 1 && (node.classList?.contains('column-resize-handle-bar') || node.classList?.contains('fi-ta-column-handle'))) return
-            wrapper.appendChild(node)
-        })
-        th.insertBefore(wrapper, th.firstChild)
-    }
+    wrapHeaderLabel(th)
     if (!th.querySelector('.column-resize-handle-bar')) {
         window.Alpine?.$data?.(th)?.createHandle?.()
     }
@@ -737,7 +738,7 @@ function registerResizableColumn() {
             this.column.classList.add('fi-ta-resizable-header')
 
             lockTable(this.table)
-            this.wrapHeaderLabel()
+            wrapHeaderLabel(this.column)
             this.createHandle()
             this.createColumnControls()
 
@@ -787,16 +788,6 @@ function registerResizableColumn() {
 
             rememberColumnFocus(columnName)
             Promise.resolve(this.$wire.moveTableColumn(columnName, isLeft ? targets.before.left : targets.before.right)).catch(forgetColumnFocus)
-        },
-
-        wrapHeaderLabel() {
-            if (this.column.querySelector(':scope > .fi-ta-resizable-label')) return
-            const wrapper = document.createElement('span')
-            wrapper.className = 'fi-ta-resizable-label'
-            while (this.column.firstChild) {
-                wrapper.appendChild(this.column.firstChild)
-            }
-            this.column.appendChild(wrapper)
         },
 
         createHandle() {
