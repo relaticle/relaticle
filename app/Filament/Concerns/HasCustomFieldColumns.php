@@ -10,6 +10,7 @@ use App\Filament\Tables\Concerns\HasResizableColumns;
 use App\Filament\Tables\Concerns\HasTableLayouts;
 use App\Filament\Tables\Concerns\PersistsTableState;
 use App\Models\CustomField;
+use BackedEnum;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
@@ -23,6 +24,9 @@ trait HasCustomFieldColumns
     use HasTableLayouts;
     use PersistsTableState;
 
+    /** @var array<string, Htmlable> */
+    private array $columnHeaderLabels = [];
+
     public function table(Table $table): Table
     {
         $builder = CustomFields::table()->forModel($this->getModel());
@@ -34,7 +38,7 @@ trait HasCustomFieldColumns
                 $field = $fields->get($column->getName());
 
                 return $field instanceof CustomField
-                    ? $column->label(fn (): Htmlable => ColumnHeaderLabel::make($this->tableColumnLabel($column->getName(), $field->name), $field->typeData->icon))
+                    ? $column->label(fn (): Htmlable => $this->columnHeaderLabel($column->getName(), $field->name, $field->typeData->icon))
                     : $column;
             })
             ->all();
@@ -50,7 +54,7 @@ trait HasCustomFieldColumns
 
             $icon = $column->getName() === $titleColumn ? null : self::nativeColumnIcon($column->getName());
 
-            $column->label(fn (): Htmlable => ColumnHeaderLabel::make($this->tableColumnLabel($column->getName(), $label), $icon));
+            $column->label(fn (): Htmlable => $this->columnHeaderLabel($column->getName(), $label, $icon));
         }
 
         return $this->stampResizableColumns(
@@ -62,6 +66,14 @@ trait HasCustomFieldColumns
                 ->pushColumns($columns)
                 ->pushFilters($builder->filters()->all()),
         );
+    }
+
+    private function columnHeaderLabel(string $columnName, string $original, string|BackedEnum|null $icon): Htmlable
+    {
+        $label = $this->tableColumnLabel($columnName, $original);
+
+        // Stacked rows print the label in every cell, so each label is built once per request.
+        return $this->columnHeaderLabels["{$columnName}\0{$label}"] ??= ColumnHeaderLabel::make($label, $icon);
     }
 
     private static function nativeColumnIcon(string $name): string
