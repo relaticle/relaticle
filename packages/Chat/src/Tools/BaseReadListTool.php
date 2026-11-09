@@ -116,7 +116,7 @@ abstract class BaseReadListTool implements Tool
             'per_page' => $schema->integer()->description('Results per page (default 10, max 25).')->default(10),
             'page' => $schema->integer()->description('Page number.')->default(1),
             'lookup' => $schema->boolean()->description('Set true when you call this only to find ids for another tool call (e.g. before an update or delete): the user then sees no table. Leave unset when the user asked to see the records.'),
-            'response_format' => $schema->string()->enum(ResponseFormat::class)->description('concise (default) shortens long text fields to 300 characters and lists them in truncated_fields. detailed returns them whole as Markdown. Use the Get tool for one record\'s full text; use detailed only when the question turns on the text of many.'),
+            'response_format' => $schema->string()->enum(ResponseFormat::class)->description('concise (default) shortens long text fields to '.LongTextForModel::CONCISE_LIMIT.' characters and lists them in truncated_fields. detailed returns them whole as Markdown. Use the Get tool for one record\'s full text; use detailed only when the question turns on the text of many.'),
         ];
 
         $includes = $this->availableIncludes();
@@ -155,7 +155,7 @@ abstract class BaseReadListTool implements Tool
         $responseFormat = $this->responseFormat($request);
 
         if ($responseFormat === null) {
-            return (string) json_encode(['error' => 'response_format must be concise or detailed'], JSON_UNESCAPED_SLASHES);
+            return (string) json_encode(['error' => 'response_format must be one of: '.implode(', ', array_column(ResponseFormat::cases(), 'value'))], JSON_UNESCAPED_SLASHES);
         }
 
         try {
@@ -197,14 +197,7 @@ abstract class BaseReadListTool implements Tool
             return $collection->toJson(JSON_UNESCAPED_SLASHES);
         }
 
-        $resolver = resolve(RecordReferenceResolver::class);
-        $linkable = in_array($this->citationType(), RecordReferenceResolver::CHIP_TYPES, true);
-
-        $items = array_map(function (mixed $item, int $index) use ($models, $responseFormat, $requestedIncludes, $resolver, $linkable): mixed {
-            $model = $models[$index] ?? null;
-
-            return $this->decorateRow($this->shortenFreeText($item, $model, $responseFormat), $model, $requestedIncludes, $resolver, $linkable);
-        }, $items, array_keys($items));
+        $items = $this->rows($items, $models, $responseFormat, $requestedIncludes);
 
         $payload = [
             'data' => $items,
@@ -224,22 +217,41 @@ abstract class BaseReadListTool implements Tool
     }
 
     /**
+     * @param  array<mixed>  $items
+     * @param  list<mixed>  $models
      * @param  list<string>  $requestedIncludes
+     * @return list<mixed>
      */
-    private function decorateRow(mixed $item, mixed $model, array $requestedIncludes, RecordReferenceResolver $resolver, bool $linkable): mixed
+    private function rows(array $items, array $models, ResponseFormat $format, array $requestedIncludes): array
     {
-        if (! is_array($item)) {
-            return $item;
-        }
+        $resolver = resolve(RecordReferenceResolver::class);
+        $linkType = in_array($this->citationType(), RecordReferenceResolver::CHIP_TYPES, true) ? $this->citationType() : null;
 
+        return array_map(function (mixed $item, int|string $index) use ($models, $format, $requestedIncludes, $resolver, $linkType): mixed {
+            $model = $models[$index] ?? null;
+            $model = $model instanceof Model ? $model : null;
+
+            return is_array($item)
+                ? $this->decorateRow($this->shortenFreeText($item, $model, $format), $model, $requestedIncludes, $resolver, $linkType)
+                : $item;
+        }, $items, array_keys($items));
+    }
+
+    /**
+     * @param  array<mixed>  $item
+     * @param  list<string>  $requestedIncludes
+     * @return array<mixed>
+     */
+    private function decorateRow(array $item, ?Model $model, array $requestedIncludes, RecordReferenceResolver $resolver, ?string $linkType): array
+    {
         $id = isset($item['id']) && (is_string($item['id']) || is_int($item['id']))
             ? (string) $item['id']
             : null;
 
         // Never call $resolver->resolve() per row: it runs a label query each time,
         // and whether this type links at all is decided once by the caller.
-        $item['url'] = $id !== null && $linkable
-            ? $resolver->referenceUrl($this->citationType(), $id)
+        $item['url'] = $id !== null && $linkType !== null
+            ? $resolver->referenceUrl($linkType, $id)
             : null;
 
         if ($requestedIncludes !== [] && $model instanceof Model) {
@@ -249,9 +261,13 @@ abstract class BaseReadListTool implements Tool
         return $item;
     }
 
-    private function shortenFreeText(mixed $item, mixed $model, ResponseFormat $format): mixed
+    /**
+     * @param  array<mixed>  $item
+     * @return array<mixed>
+     */
+    private function shortenFreeText(array $item, ?Model $model, ResponseFormat $format): array
     {
-        if (! is_array($item) || ! $model instanceof Model) {
+        if (! $model instanceof Model) {
             return $item;
         }
 
