@@ -198,6 +198,7 @@ function applyTableSizing(table) {
 }
 
 const widthRecalcPending = new WeakSet()
+const observedWrappers = new WeakSet()
 
 function scheduleSizingUpdate(table) {
     if (widthRecalcPending.has(table)) return
@@ -294,9 +295,9 @@ function lockTable(table) {
         if (getComputedStyle(wrapper).position === 'static') {
             wrapper.style.position = 'relative'
         }
-        if (wrapperResizeObserver && !wrapper.dataset.resizableWrapperObserved) {
+        if (wrapperResizeObserver && !observedWrappers.has(wrapper)) {
+            observedWrappers.add(wrapper)
             wrapperResizeObserver.observe(wrapper)
-            wrapper.dataset.resizableWrapperObserved = '1'
         }
     }
 
@@ -304,8 +305,6 @@ function lockTable(table) {
     applyPinnedOffsets(table)
     scheduleStickyRecalc()
 }
-
-let morphHookRegistered = false
 
 // A morph keeps the server-rendered widths but strips the table class, the lock flag, the
 // label wrappers and the handles, so a table its component morphed is rebuilt from its headers.
@@ -325,17 +324,6 @@ function rebuildResizableTablesAfterMorph({ el }) {
             wrapper.scrollLeft = savedScrollLeft
         }
     })
-}
-
-// `morphed` fires once per component after the morph settles. `morph.updated` fires per node
-// mid-morph, and the rest of the same pass strips what it adds.
-function ensureGlobalMorphHook() {
-    if (morphHookRegistered) return
-    if (!window.Livewire?.hook) return
-
-    window.Livewire.hook('morphed', rebuildResizableTablesAfterMorph)
-
-    morphHookRegistered = true
 }
 
 // A block laid out at `max-content` takes the width its content asks for. All writes come before
@@ -738,7 +726,6 @@ function registerColumnMenu() {
 }
 
 function registerResizableColumn() {
-    ensureGlobalMorphHook()
     wireStickyHeaders()
     window.Alpine.data('resizableColumn', (columnName, columnId, min = 40, max = 1000) => ({
         columnName,
@@ -937,6 +924,10 @@ function registerResizableColumn() {
         },
     }))
 }
+
+// `morphed` fires once per component after the morph settles. `morph.updated` fires per node
+// mid-morph, and the rest of the same pass strips what it adds.
+document.addEventListener('livewire:init', () => window.Livewire.hook('morphed', rebuildResizableTablesAfterMorph))
 
 if (window.Alpine && window.Alpine.version) {
     registerResizableColumn()
