@@ -110,6 +110,24 @@ it('keeps state apart per workspace', function (): void {
         ->and(savedPreferences())->toBe(2);
 });
 
+it('keeps one member\'s sort from showing for another member of the workspace', function (): void {
+    livewire(ListCompanies::class)->set('tableSort', 'created_at:desc');
+
+    $colleague = User::factory()->create(['current_workspace_id' => $this->user->currentWorkspace->getKey()]);
+    $this->user->currentWorkspace->users()->attach($colleague, ['role' => 'member']);
+    $this->actingAs($colleague);
+    session()->flush();
+
+    expect(livewire(ListCompanies::class)->get('tableSort'))->toBeNull();
+});
+
+it('brings back a grouping on a new visit', function (): void {
+    livewire(ManageTasks::class)->set('tableGrouping', 'status_group');
+    session()->flush();
+
+    expect(livewire(ManageTasks::class)->get('tableGrouping'))->toBe('status_group');
+});
+
 it('writes nothing on a follow-up request that changes nothing', function (string $page): void {
     livewire($page)->call('$refresh')->call('gotoPage', 2)->call('$refresh');
 
