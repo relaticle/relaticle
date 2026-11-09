@@ -26,15 +26,10 @@
     @apply max-sm:w-auto! max-sm:max-w-none! max-sm:min-w-0! max-sm:overflow-visible! max-sm:border-r-0!;
 }
 
-/* Each cell owns its borders, so a divider travels with a column that slides. Rows cannot draw
-   borders in this model, so Filament's row lines move onto the cells. */
+/* Each cell owns its borders, so a divider travels with a column that slides. The row lines sit on
+   the cells in theme.css too, because rows cannot draw borders in this model. */
 .fi-ta-resizable-table {
     @apply border-separate border-spacing-0;
-}
-
-.fi-ta-resizable-table > thead > tr > th,
-.fi-ta-resizable-table > tbody > tr:not(:last-child) > td {
-    @apply border-b border-b-gray-200 dark:border-b-white/5;
 }
 
 /* A cell clips its overflow only when it is positioned. The checkbox cell stays out: Filament's phone card
@@ -45,7 +40,7 @@
 
 .fi-ta-resizable-table th:not(:last-child):not(.fi-ta-selection-cell),
 .fi-ta-resizable-table td:not(:last-child):not(.fi-ta-selection-cell) {
-    @apply border-r border-r-gray-200 dark:border-r-gray-700;
+    @apply border-r border-r-gray-200/60 dark:border-r-gray-800;
 }
 
 /* The toolbar stacks above the sticky head and the rows, so its dropdowns and the phone's sticky bulk bar stay on top.
