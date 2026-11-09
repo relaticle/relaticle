@@ -77,6 +77,6 @@ final class TableLayout extends Model
             ->where('workspace_id', $workspaceId)
             ->where('entity', $entity)
             ->whereBelongsTo($user)
-            ->whereRaw('lower(name) = ?', [mb_strtolower(trim($name))]);
+            ->whereRaw('lower(name) = lower(?)', [trim($name)]);
     }
 }
