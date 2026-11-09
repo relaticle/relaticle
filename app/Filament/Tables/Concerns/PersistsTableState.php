@@ -271,7 +271,7 @@ trait PersistsTableState
     private function currentTableState(): TableStateData
     {
         return new TableStateData(
-            columns: array_map(fn (array $item): array => Arr::only($item, ['type', 'name', 'isToggled']), $this->tableColumns),
+            columns: array_values(array_map(fn (array $item): array => Arr::only($item, ['type', 'name', 'isToggled']), $this->tableColumns)),
             sort: filled($this->tableSort) ? $this->tableSort : null,
             filters: $this->tableFilters ?? [],
             search: filled($this->tableSearch) ? $this->tableSearch : null,
