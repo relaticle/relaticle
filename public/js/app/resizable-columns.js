@@ -33,23 +33,11 @@ function ensureDragBadge() {
     return dragBadge
 }
 
-function showDragOverlay(wrapper, contentX, height, width, cursorX, cursorY) {
-    const guideline = ensureDragGuideline(wrapper)
-    Object.assign(guideline.style, { display: 'block', left: `${contentX}px`, height: `${height}px` })
+function moveDragOverlay(wrapper, contentX, height, width, cursorX, cursorY) {
+    Object.assign(ensureDragGuideline(wrapper).style, { display: 'block', left: `${contentX}px`, height: `${height}px` })
     const badge = ensureDragBadge()
     Object.assign(badge.style, { display: 'block', left: `${cursorX}px`, top: `${cursorY}px` })
     badge.textContent = `${width}px`
-}
-
-function moveDragOverlay(contentX, width, cursorX, cursorY) {
-    if (dragGuideline) {
-        dragGuideline.style.left = `${contentX}px`
-    }
-    if (dragBadge) {
-        dragBadge.style.left = `${cursorX}px`
-        dragBadge.style.top = `${cursorY}px`
-        dragBadge.textContent = `${width}px`
-    }
 }
 
 function hideDragOverlay() {
@@ -841,8 +829,15 @@ function registerResizableColumn() {
                 this.column.getBoundingClientRect().left - wrapperRect.left + this.tableWrapper.scrollLeft
             const guidelineHeight = this.table.offsetHeight
             let currentWidth = startColumnWidth
-            // Shown on the first move only, so a double-click never flashes the overlay.
-            let overlayShown = false
+            let widthFrame = null
+
+            // Pointer moves outpace the screen, so the cells are restyled once per frame.
+            const flushWidth = () => {
+                if (widthFrame === null) return
+                cancelAnimationFrame(widthFrame)
+                widthFrame = null
+                this.applyWidth(currentWidth)
+            }
 
             const onMove = (moveEvent) => {
                 if (moveEvent.pointerId !== event.pointerId || moveEvent.pageX === startX) return
@@ -852,19 +847,16 @@ function registerResizableColumn() {
                         Math.max(this.minWidth, startColumnWidth + (moveEvent.pageX - startX)),
                     ),
                 )
-                this.applyWidth(currentWidth)
-
-                const contentX = contentLeftEdge + currentWidth
-                if (overlayShown) {
-                    moveDragOverlay(contentX, currentWidth, moveEvent.clientX, moveEvent.clientY)
-                } else {
-                    showDragOverlay(this.tableWrapper, contentX, guidelineHeight, currentWidth, moveEvent.clientX, moveEvent.clientY)
-                    overlayShown = true
-                }
+                widthFrame ??= requestAnimationFrame(() => {
+                    widthFrame = null
+                    this.applyWidth(currentWidth)
+                })
+                moveDragOverlay(this.tableWrapper, contentLeftEdge + currentWidth, guidelineHeight, currentWidth, moveEvent.clientX, moveEvent.clientY)
             }
 
             const onUp = (upEvent) => {
                 if (upEvent.pointerId !== event.pointerId) return
+                flushWidth()
                 this.handleBar.classList.remove('active')
                 document.body.classList.remove('resizing-column')
                 hideDragOverlay()

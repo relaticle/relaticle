@@ -376,3 +376,32 @@ it('rebuilds a table only when its own component morphs', function (): void {
         ->assertScript($isLocked, true)
         ->assertNoJavaScriptErrors();
 });
+
+it('releases a column at the last pointer position when several moves land in one frame', function (): void {
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
+
+    $before = $page->script(headerWidth('created_at'));
+
+    $page->script(sprintf(<<<'JS'
+        (() => {
+            const handle = document.querySelector(`%s .column-resize-handle-bar`);
+            const box = handle.getBoundingClientRect();
+            const x = box.left + box.width / 2;
+            const y = box.top + box.height / 2;
+            const pointer = (type, clientX, target = document) => target.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, pointerId: 1, isPrimary: true, clientX, clientY: y }));
+            pointer('pointerdown', x, handle);
+            [20, 60, 140, 90].forEach((by) => pointer('pointermove', x + by));
+            pointer('pointerup', x + 90);
+            return true;
+        })();
+    JS, headerSelector('created_at')));
+
+    $page->assertScript(headerWidth('created_at'), $before + 90)
+        ->wait(1)
+        ->assertScript(headerWidth('created_at'), $before + 90)
+        ->assertNoJavaScriptErrors();
+});
