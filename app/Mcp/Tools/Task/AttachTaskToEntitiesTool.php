@@ -52,10 +52,10 @@ final class AttachTaskToEntitiesTool extends BaseAttachTool
     public function relationshipSchema(JsonSchema $schema): array
     {
         return [
-            'company_ids' => $schema->array()->description('Company IDs to attach this task to.'),
-            'people_ids' => $schema->array()->description('People IDs to attach this task to.'),
-            'opportunity_ids' => $schema->array()->description('Opportunity IDs to attach this task to.'),
-            'assignee_ids' => $schema->array()->description('User IDs to assign this task to. Use whoami tool to discover valid user IDs.'),
+            'company_ids' => $schema->array()->items($schema->string())->description('Company IDs to attach this task to.'),
+            'people_ids' => $schema->array()->items($schema->string())->description('People IDs to attach this task to.'),
+            'opportunity_ids' => $schema->array()->items($schema->string())->description('Opportunity IDs to attach this task to.'),
+            'assignee_ids' => $schema->array()->items($schema->string())->description('User IDs to assign this task to. Use whoami tool to discover valid user IDs.'),
         ];
     }
 

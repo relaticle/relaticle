@@ -45,9 +45,9 @@ final class DetachNoteFromEntitiesTool extends BaseDetachTool
     public function relationshipSchema(JsonSchema $schema): array
     {
         return [
-            'company_ids' => $schema->array()->description('Company IDs to detach from this note.'),
-            'people_ids' => $schema->array()->description('People IDs to detach from this note.'),
-            'opportunity_ids' => $schema->array()->description('Opportunity IDs to detach from this note.'),
+            'company_ids' => $schema->array()->items($schema->string())->description('Company IDs to detach from this note.'),
+            'people_ids' => $schema->array()->items($schema->string())->description('People IDs to detach from this note.'),
+            'opportunity_ids' => $schema->array()->items($schema->string())->description('Opportunity IDs to detach from this note.'),
         ];
     }
 
