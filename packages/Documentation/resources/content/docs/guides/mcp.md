@@ -83,30 +83,16 @@ The MCP server endpoint is `https://mcp.relaticle.com`. ChatGPT, Claude and Clau
 2. Sign in to Relaticle and choose one workspace.
 3. Start a message with **@Relaticle**.
 
-### Claude
+### Claude and Claude Desktop
+
+Claude on the web and the Claude Desktop app share the same connectors.
 
 1. Open **Customize → Connectors**.
 2. Select the plus button, then **Add custom connector**.
 3. Enter `Relaticle` and `https://mcp.relaticle.com`.
 4. Connect, sign in to Relaticle, and choose one workspace.
 
-### Claude Desktop with a personal access token
-
-Add this to your Claude Desktop configuration file (`claude_desktop_config.json`):
-
-```json
-{
-  "mcpServers": {
-    "relaticle": {
-      "type": "streamable-http",
-      "url": "https://mcp.relaticle.com",
-      "headers": {
-        "Authorization": "Bearer YOUR_TOKEN"
-      }
-    }
-  }
-}
-```
+Claude Desktop's `claude_desktop_config.json` is for local servers. Add Relaticle as a connector instead, as Anthropic's guide to [adding a connector by URL](https://claude.com/docs/connectors/custom/add-unlisted) describes.
 
 ### Claude Code
 
