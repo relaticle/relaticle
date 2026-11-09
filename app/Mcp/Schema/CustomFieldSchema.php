@@ -103,7 +103,7 @@ final readonly class CustomFieldSchema
                 'type' => $field->type,
                 'required' => $required,
                 'input_format' => $field->holdsChecklists()
-                    ? $type->inputFormat().'; '.TaskField::CHECKLIST_INPUT_FORMAT
+                    ? $type->inputFormat().'; '.TaskField::CHECKLIST_INPUT_FORMAT.'; '.TaskField::CHECKLIST_HTML_READ_FORMAT
                     : $type->inputFormat(),
                 'example' => $type->example(),
             ];

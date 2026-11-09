@@ -11,7 +11,9 @@ enum TaskField: string
 {
     public const string DONE_STATUS = 'Done';
 
-    public const string CHECKLIST_INPUT_FORMAT = 'bulleted markdown items "- [ ]" and "- [x]" become a checklist, while numbered items such as "1. [ ]" stay a numbered list; read back as li[data-type="taskItem"] with data-checked="true" or "false"';
+    public const string CHECKLIST_INPUT_FORMAT = 'bulleted markdown items "- [ ]" and "- [x]" become a checklist, while numbered items such as "1. [ ]" stay a numbered list';
+
+    public const string CHECKLIST_HTML_READ_FORMAT = 'read back as li[data-type="taskItem"] with data-checked="true" or "false"';
 
     use CustomFieldTrait;
 

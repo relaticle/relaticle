@@ -76,9 +76,16 @@ it('returns valid task schema with correct fields', function (): void {
         ->assertSee('"title"');
 });
 
+it('never tells an mcp client that rich text comes back as markdown', function (): void {
+    RelaticleServer::actingAs($this->user)
+        ->resource(TaskSchemaResource::class)
+        ->assertOk()
+        ->assertDontSee('Markdown');
+});
+
 it('publishes the checklist hint on the task description and not on the note body', function (): void {
     $hint = substr(json_encode(TaskField::CHECKLIST_INPUT_FORMAT, JSON_THROW_ON_ERROR), 1, -1);
-    $entry = substr(json_encode(CustomFieldType::RICH_EDITOR->inputFormat().'; '.TaskField::CHECKLIST_INPUT_FORMAT, JSON_THROW_ON_ERROR), 1, -1);
+    $entry = substr(json_encode(CustomFieldType::RICH_EDITOR->inputFormat().'; '.TaskField::CHECKLIST_INPUT_FORMAT.'; '.TaskField::CHECKLIST_HTML_READ_FORMAT, JSON_THROW_ON_ERROR), 1, -1);
 
     RelaticleServer::actingAs($this->user)
         ->resource(TaskSchemaResource::class)

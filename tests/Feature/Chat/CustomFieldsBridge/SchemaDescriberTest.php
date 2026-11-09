@@ -66,6 +66,16 @@ it('tells Rela that a task description takes checklist items and a note body doe
         ->and($bodyLine)->not->toContain(TaskField::CHECKLIST_INPUT_FORMAT);
 });
 
+it('tells Rela no html read format for a description the get tools return as markdown', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+
+    $descriptionLine = collect(explode("\n", resolve(CustomFieldsSchemaDescriber::class)->describe($user->currentWorkspace, 'task')))
+        ->first(fn (string $line): bool => str_starts_with($line, '- description ('));
+
+    expect($descriptionLine)->not->toContain('li[data-type="taskItem"]')
+        ->and($descriptionLine)->not->toContain('returned as HTML');
+});
+
 it('returns a stable, sorted listing so the description is cache-friendly', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $describer = resolve(CustomFieldsSchemaDescriber::class);

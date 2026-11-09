@@ -116,8 +116,3 @@ it('returns a textarea value unchanged', function (): void {
 
     expect($payload['attributes']['custom_fields']['notes_plain'])->toBe("line one\nline two");
 });
-
-it('describes the rich editor format as stored html returned as markdown', function (): void {
-    expect(CustomFieldType::RICH_EDITOR->inputFormat())
-        ->toBe('markdown, or HTML when the value starts with <; stored as HTML, returned as Markdown');
-});

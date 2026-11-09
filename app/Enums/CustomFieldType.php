@@ -52,7 +52,7 @@ enum CustomFieldType: string
             self::SELECT, self::RADIO, self::TOGGLE_BUTTONS => 'option label or option ID',
             self::MULTI_SELECT, self::CHECKBOX_LIST => 'array of option labels or IDs',
             self::TAGS_INPUT => 'array of arbitrary string values',
-            self::RICH_EDITOR => 'markdown, or HTML when the value starts with <; stored as HTML, returned as Markdown',
+            self::RICH_EDITOR => 'markdown, or HTML when the value starts with <; stored as HTML',
             self::COLOR_PICKER => 'hex color string',
             self::DATE => 'ISO 8601 date',
             self::DATE_TIME => 'ISO 8601 datetime string; an offset is converted to UTC',
