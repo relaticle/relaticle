@@ -9,6 +9,7 @@ use App\Actions\TableLayouts\SetDefaultTableLayout;
 use App\Actions\TableLayouts\UpdateTableLayout;
 use App\Data\TableStateData;
 use App\Enums\CrmEntity;
+use App\Enums\Notifications\TableLayoutChange;
 use App\Enums\WorkspaceRole;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\NoteResource\Pages\ManageNotes;
@@ -653,7 +654,7 @@ it('tells the owner when an admin deletes their layout', function (): void {
         ->and($notice->type)->toBe(TableLayoutChangedNotification::class)
         ->and($notice->actor_id)->toBe($admin->getKey())
         ->and($notice->subject_id)->toBe($this->workspace->getKey())
-        ->and($notice->data)->toBe(['layout_name' => 'Renewals', 'entity' => CrmEntity::Company->value, 'change' => TableLayoutChangedNotification::DELETED]);
+        ->and($notice->data)->toBe(['layout_name' => 'Renewals', 'entity' => CrmEntity::Company->value, 'change' => TableLayoutChange::Deleted->value]);
 });
 
 it('tells the owner once when two admins delete their layout at the same moment', function (): void {
@@ -677,7 +678,7 @@ it('tells the owner when an admin stops sharing their layout', function (): void
 
     livewire(ListCompanies::class)->callAction('stopSharingTableLayout', arguments: ['layout' => $layout->getKey()]);
 
-    expect($owner->notifications()->sole()->data)->toBe(['layout_name' => 'Renewals', 'entity' => CrmEntity::Company->value, 'change' => TableLayoutChangedNotification::UNSHARED]);
+    expect($owner->notifications()->sole()->data)->toBe(['layout_name' => 'Renewals', 'entity' => CrmEntity::Company->value, 'change' => TableLayoutChange::Unshared->value]);
 });
 
 it('tells no one when a member deletes or stops sharing their own layout', function (): void {
@@ -709,7 +710,7 @@ it('tells the owner when an admin renames their layout', function (): void {
 
     expect($layout->refresh()->name)->toBe('Team pipeline')
         ->and($notice->actor_id)->toBe($admin->getKey())
-        ->and($notice->data)->toBe(['layout_name' => 'Team pipeline', 'entity' => CrmEntity::Company->value, 'change' => TableLayoutChangedNotification::RENAMED, 'previous_name' => 'Team']);
+        ->and($notice->data)->toBe(['layout_name' => 'Team pipeline', 'entity' => CrmEntity::Company->value, 'change' => TableLayoutChange::Renamed->value, 'previous_name' => 'Team']);
 });
 
 it('asks an admin before saving over someone else\'s layout, then tells the owner', function (): void {
@@ -728,7 +729,7 @@ it('asks an admin before saving over someone else\'s layout, then tells the owne
         ->assertNotified('"Team" saved');
 
     expect($layout->refresh()->state->sort)->toBe('name:asc')
-        ->and($owner->notifications()->sole()->data)->toBe(['layout_name' => 'Team', 'entity' => CrmEntity::Company->value, 'change' => TableLayoutChangedNotification::UPDATED]);
+        ->and($owner->notifications()->sole()->data)->toBe(['layout_name' => 'Team', 'entity' => CrmEntity::Company->value, 'change' => TableLayoutChange::Updated->value]);
 });
 
 it('saves over your own layout without asking and tells no one', function (): void {
