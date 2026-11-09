@@ -394,16 +394,18 @@ final class AppPanelProvider extends PanelProvider
 
     private function registerTableHooks(Panel $panel): void
     {
+        $listPages = [ListCompanies::class, ListPeople::class, ListOpportunities::class, ManageTasks::class, ManageNotes::class];
+
         $panel
             ->renderHook(
                 TablesRenderHook::TOOLBAR_SEARCH_AFTER,
                 fn (): View|Factory => view('filament.app.tables.layouts'),
-                scopes: [ListCompanies::class, ListPeople::class, ListOpportunities::class, ManageTasks::class, ManageNotes::class],
+                scopes: $listPages,
             )
             ->renderHook(
                 TablesRenderHook::TOOLBAR_SEARCH_AFTER,
                 fn (): View|Factory => view('filament.app.tables.column-menu'),
-                scopes: [ListCompanies::class, ListPeople::class, ListOpportunities::class, ManageTasks::class, ManageNotes::class],
+                scopes: $listPages,
             )
             ->renderHook(
                 TablesRenderHook::FILTER_INDICATORS,
