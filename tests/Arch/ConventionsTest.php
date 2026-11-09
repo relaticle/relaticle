@@ -1425,3 +1425,22 @@ it('builds scripts with Vite, never with a bin script or a committed dist bundle
         'vite.config.js builds every script that imports a package (.ai/guidelines/relaticle/ui.md): '.implode(', ', $problems),
     );
 });
+
+it('draws UI icons from Lucide, never from Heroicons', function (): void {
+    $root = dirname(__DIR__, 2);
+    $offenders = [];
+
+    foreach (['app', 'resources/views'] as $directory) {
+        /** @var SplFileInfo $file */
+        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root.'/'.$directory, FilesystemIterator::SKIP_DOTS)) as $file) {
+            if (preg_match('/Heroicon::|heroicon-/', (string) file_get_contents($file->getPathname())) === 1) {
+                $offenders[] = str_replace($root.'/', '', $file->getPathname());
+            }
+        }
+    }
+
+    expect($offenders)->toBe(
+        [],
+        'UI icons are Lucide (.ai/guidelines/relaticle/ui.md). Use lucide-<name>. Offending files: '.implode(', ', $offenders),
+    );
+});
