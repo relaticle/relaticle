@@ -59,11 +59,6 @@ final readonly class CanonicalRecordUrl
         }
     }
 
-    public function entityPluralLabel(CrmEntity $entity): string
-    {
-        return $this->resource($entity)::getPluralModelLabel();
-    }
-
     /**
      * @param  class-string<FilamentResource>  $resource
      */

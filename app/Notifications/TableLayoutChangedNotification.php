@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CanonicalRecordUrl;
 use Filament\Actions\Action;
+use Filament\Facades\Filament;
 use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Support\Str;
 
@@ -87,7 +88,7 @@ final class TableLayoutChangedNotification extends InboxNotification
 
         $entity = CrmEntity::from((string) data_get($row->data, 'entity'));
         $urls = resolve(CanonicalRecordUrl::class);
-        $table = $urls->entityPluralLabel($entity);
+        $table = Filament::getPanel('app')->getModelResource($entity->model())::getPluralModelLabel();
         $url = $row->workspace instanceof Workspace ? $urls->listPageUrl($entity, $row->workspace) : null;
         $actorName = $row->actor?->name;
         // The panel renders a title as HTML, and a member types the names.
