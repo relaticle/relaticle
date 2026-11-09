@@ -42,16 +42,38 @@ final readonly class PendingActionEnvelope
     private static function summary(PendingAction $pending): array
     {
         return ['records' => array_map(static function (array $item) use ($pending): array {
-            $fields = array_values(array_filter(
-                array_keys($item['data']),
-                static fn (int|string $key): bool => ! str_starts_with((string) $key, '_'),
-            ));
+            $fields = self::fieldNames($item['data']);
 
             return [
                 'label' => ProposalLabel::of($pending->entity_type, $item['data'], $item['display']),
                 ...($fields === [] ? [] : ['fields' => $fields]),
             ];
         }, ProposalPayload::from($pending)->items())];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return list<string>
+     */
+    private static function fieldNames(array $data): array
+    {
+        $fields = [];
+
+        foreach ($data as $key => $value) {
+            if (str_starts_with((string) $key, '_')) {
+                continue;
+            }
+
+            if ($key === 'custom_fields' && is_array($value)) {
+                $fields = [...$fields, ...array_map(strval(...), array_keys($value))];
+
+                continue;
+            }
+
+            $fields[] = (string) $key;
+        }
+
+        return $fields;
     }
 
     /**

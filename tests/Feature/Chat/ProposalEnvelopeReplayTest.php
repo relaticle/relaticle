@@ -108,15 +108,30 @@ it('keeps one summary entry per record of a batch create in the replayed echo', 
         ->and($replayed['summary']['records'][0])->toBe(['label' => 'Acme', 'fields' => ['name']]);
 });
 
-it('keeps a label and no fields for a delete in the replayed echo', function (): void {
-    $action = ProposalCardFixture::proposal($this->user, ['_record_ids' => ['01ABC']], ['title' => 'Delete Company', 'summary' => 'Delete Acme']);
+it('names each custom field a record changes in the replayed echo', function (): void {
+    $action = ProposalCardFixture::proposal(
+        $this->user,
+        ['_record_id' => '01ABC', '_model_class' => 'company', 'name' => 'Acme', 'custom_fields' => ['tier' => 'gold', 'region' => 'EMEA']],
+        ['title' => 'Update Company', 'summary' => 'Update Acme'],
+    );
+    $action->forceFill(['operation' => 'update'])->save();
+
+    $replayed = json_decode(DisplayBlocks::strip((string) json_encode(PendingActionEnvelope::for($action->refresh(), 'UpdateCompany', []))), true);
+
+    expect($replayed['summary']['records'][0])->toBe(['label' => 'Acme', 'fields' => ['name', 'tier', 'region']]);
+});
+
+it('keeps the record name and no fields for a delete in the replayed echo', function (): void {
+    $action = ProposalCardFixture::proposal(
+        $this->user,
+        ['_record_ids' => ['01ABC']],
+        ['title' => 'Delete Company', 'summary' => 'Delete Acme', 'fields' => [['label' => 'Name', 'value' => 'Acme']]],
+    );
     $action->forceFill(['operation' => 'delete'])->save();
 
     $replayed = json_decode(DisplayBlocks::strip((string) json_encode(PendingActionEnvelope::for($action->refresh(), 'DeleteCompany', ['ids' => ['01ABC']]))), true);
 
-    expect($replayed['summary']['records'])->toHaveCount(1)
-        ->and($replayed['summary']['records'][0])->toBe(['label' => 'Delete Acme'])
-        ->and($replayed['summary']['records'][0])->not->toHaveKey('fields');
+    expect($replayed['summary']['records'])->toBe([['label' => 'Acme']]);
 });
 
 it('keeps display and drops data in the stream payload while the stored envelope carries both', function (): void {
