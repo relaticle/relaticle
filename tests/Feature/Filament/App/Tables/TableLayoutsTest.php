@@ -24,6 +24,8 @@ use App\Models\User;
 use App\Notifications\TableLayoutChangedNotification;
 use App\Policies\TableLayoutPolicy;
 use Filament\Facades\Filament;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\DB;
 
 mutates(
     HasTableLayouts::class,
@@ -209,6 +211,25 @@ it('ignores widths when telling whether a layout was changed', function (): void
     $component = livewire(ListCompanies::class)->call('applySavedLayout', $layout->getKey())->call('updateResizableColumnWidth', 'created_at', '300');
 
     expect($component->instance()->isTableLayoutModified())->toBeFalse();
+});
+
+it('sets a default when another request writes the member\'s first preference row at the same moment', function (): void {
+    $layout = layoutFor($this->user, ['state' => hotLeads()]);
+    $component = livewire(ListCompanies::class);
+    $raced = false;
+    DB::listen(function (QueryExecuted $query) use (&$raced): void {
+        if ($raced || ! str_starts_with($query->sql, 'select') || ! str_contains($query->sql, 'table_preferences')) {
+            return;
+        }
+
+        $raced = true;
+        TablePreference::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Company]);
+    });
+
+    $component->call('toggleDefaultTableLayout', $layout->getKey())->assertOk();
+
+    expect(TablePreference::query()->withoutGlobalScopes()->count())->toBe(1)
+        ->and(preferenceRow()->default_layout_id)->toBe($layout->getKey());
 });
 
 it('brings back the last state within a session, and the default layout at the start of the next one', function (): void {

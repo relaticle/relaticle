@@ -21,11 +21,11 @@ final readonly class SetDefaultTableLayout
 
         $preference = TablePreference::query()
             ->withoutGlobalScope(WorkspaceScope::class)
-            ->firstOrNew(['user_id' => $user->getKey(), 'workspace_id' => $workspace->getKey(), 'entity' => $entity]);
-
-        $preference->state ??= new TableStateData;
-        $preference->default_layout_id = $layout?->getKey();
-        $preference->save();
+            ->firstOrCreate(
+                ['user_id' => $user->getKey(), 'workspace_id' => $workspace->getKey(), 'entity' => $entity],
+                ['state' => new TableStateData],
+            );
+        $preference->update(['default_layout_id' => $layout?->getKey()]);
 
         return $preference;
     }
