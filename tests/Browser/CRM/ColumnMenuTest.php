@@ -811,3 +811,38 @@ it('starts every options button collapsed and named after its column, and hides 
         ->assertScript('[...document.querySelectorAll(`th[x-data^="resizableColumn"] .column-resize-handle-bar`)].every((handle) => handle.getAttribute("aria-hidden") === "true")', true)
         ->assertNoJavaScriptErrors();
 });
+
+function columnMenuPlacement(AwaitableWebpage $page, string $column): array
+{
+    $page->script(openColumnMenu($column));
+    waitUntil($page, menuItemFocused());
+
+    return $page->script(sprintf(<<<'JS'
+        (() => {
+            const panel = document.querySelector('.fi-ta-column-menu').getBoundingClientRect();
+            const trigger = document.querySelector(`%s .fi-ta-column-handle`).getBoundingClientRect();
+            return { panelTop: panel.top, panelBottom: panel.bottom, triggerTop: trigger.top, viewport: document.documentElement.clientHeight };
+        })()
+    JS, columnHeader($column)));
+}
+
+it('opens the column menu above its button when only the space above fits it', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug)->resize(1280, 600)->wait(0.5);
+    $page->script('document.querySelector(".fi-ta-ctn").style.marginTop = "300px"');
+
+    $placement = columnMenuPlacement($page, 'created_at');
+
+    expect($placement['panelTop'])->toBeGreaterThanOrEqual(0)
+        ->and($placement['panelBottom'])->toBeLessThanOrEqual($placement['triggerTop']);
+    $page->assertNoJavaScriptErrors();
+});
+
+it('keeps the column menu inside a viewport too short for either side of its button', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug)->resize(1280, 340)->wait(0.5);
+
+    $placement = columnMenuPlacement($page, 'created_at');
+
+    expect($placement['panelTop'])->toBeGreaterThanOrEqual(0)
+        ->and($placement['panelBottom'])->toBeLessThanOrEqual($placement['viewport']);
+    $page->assertNoJavaScriptErrors();
+});

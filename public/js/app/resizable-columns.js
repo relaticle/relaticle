@@ -680,7 +680,24 @@ function registerColumnMenu() {
             Object.assign(this, detail, { top: rect.bottom + 4, right: Math.max(8, right) })
             this.trigger.setAttribute('aria-expanded', 'true')
 
-            this.$nextTick(() => this.items()[0]?.focus())
+            // Alpine reveals the menu sections a frame after the update, so the height is read then.
+            this.$nextTick(() => requestAnimationFrame(() => {
+                if (this.column !== detail.column) return
+
+                this.top = this.verticalPosition(rect)
+                this.$nextTick(() => this.items()[0]?.focus())
+            }))
+        },
+
+        verticalPosition(rect) {
+            const height = this.panel.offsetHeight
+            const viewportHeight = document.documentElement.clientHeight
+            const below = rect.bottom + 4
+            const above = rect.top - 4 - height
+
+            if (below + height <= viewportHeight - 8) return below
+
+            return above >= 8 ? above : Math.max(8, viewportHeight - height - 8)
         },
 
         items() {
