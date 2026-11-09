@@ -88,7 +88,7 @@ abstract class BaseReadShowTool implements Tool
             'id' => $schema->string()->description("The {$label} ID to retrieve.")->required(),
         ];
 
-        $fields['lookup'] = $schema->boolean()->description('Set true when you call this only to get ids for another tool call: the user then sees no card. Leave unset when the user asked to see the record.');
+        $fields['lookup'] = $schema->boolean()->description('Set true when you call this only to get ids for another tool call, or to re-read a record already shown in this conversation so you can judge or investigate it: the user then sees no card. Leave unset when the user\'s latest message asks to see the record, even one shown before.');
 
         $includes = array_keys($this->availableIncludes());
 

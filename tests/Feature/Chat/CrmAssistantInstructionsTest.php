@@ -245,6 +245,8 @@ it('marks the context blocks as internal so the model never names them to the us
 it('tells the model how to look a record up without rendering it', function (): void {
     expect(resolve(CrmAssistant::class)->staticInstructions())
         ->toContain('pass `lookup: true` to the list or get tool')
+        ->toContain('or to re-read records already shown in this conversation so you can judge or investigate them')
+        ->toContain('Only a call the user\'s latest message asks to see renders a block, even for records shown before.')
         ->toContain('N counts tool calls in this turn, including calls that render nothing');
 });
 
