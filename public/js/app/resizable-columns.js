@@ -354,12 +354,13 @@ function reapplyHeader(th) {
 // A move re-renders the headers, so the control that started it is focused again afterwards.
 let pendingColumnFocus = null
 
-function rememberColumnFocus(column) {
-    pendingColumnFocus = column
-}
-
 function forgetColumnFocus() {
     pendingColumnFocus = null
+}
+
+function runColumnAction(run, focusColumn) {
+    pendingColumnFocus = focusColumn
+    Promise.resolve(run()).catch(forgetColumnFocus)
 }
 
 function restoreColumnFocus(table) {
@@ -525,68 +526,98 @@ function swallowDoubleClickTail() {
     setTimeout(() => window.removeEventListener('click', swallow, true), 500)
 }
 
-function startColumnDrag(event, th, wire) {
+function updateDrag(drag) {
+    const { ghost, table, slots, source, grabOffset, pointer } = drag
 
+    Object.assign(ghost.style, { left: `${pointer.x - grabOffset}px`, top: `${table.tHead.getBoundingClientRect().top}px` })
+    drag.index = dropIndex(slots, source, pointer.x - grabOffset - table.getBoundingClientRect().left)
+    shiftColumns(slots, source, drag.index)
+}
+
+// Within the wrapper's edge zone the table scrolls sideways, faster the closer the pointer gets to the edge.
+function autoScrollDrag(drag) {
+    const { wrapper, pointer } = drag
+    drag.scrollFrame = null
+    if (!drag.ghost || !wrapper) return
+
+    const box = wrapper.getBoundingClientRect()
+    const towardsLeft = AUTO_SCROLL_EDGE - (pointer.x - box.left)
+    const towardsRight = AUTO_SCROLL_EDGE - (box.right - pointer.x)
+    const pressure = Math.max(towardsLeft, towardsRight)
+    if (pressure <= 0) return
+
+    const before = wrapper.scrollLeft
+    wrapper.scrollLeft += Math.sign(towardsRight - towardsLeft) * Math.ceil(AUTO_SCROLL_MAX_SPEED * Math.min(1, pressure / AUTO_SCROLL_EDGE))
+    if (wrapper.scrollLeft === before) return
+
+    updateDrag(drag)
+    drag.scrollFrame = requestAnimationFrame(() => autoScrollDrag(drag))
+}
+
+function endDrag({ ghost, source, table, slots }) {
+    ghost.remove()
+    source.elements.forEach((element) => element.classList.remove('fi-ta-column-dragging'))
+    table.classList.remove('fi-ta-reordering')
+    document.body.classList.remove('reordering-column')
+    clearShift(slots)
+}
+
+function dropColumn({ th, wire, table, wrapper, source, others, index, startIndex, pointer }) {
+    const box = (wrapper ?? table).getBoundingClientRect()
+    const insideTable = pointer.x >= box.left && pointer.x <= box.right && pointer.y >= box.top && pointer.y <= table.getBoundingClientRect().bottom
+
+    if (!insideTable || index === startIndex) return
+
+    // The cells move in the page at once, so the server's re-render arrives with nothing left to change.
+    moveColumnCells(source, others[index] ?? null, others.at(-1))
+    runColumnAction(() => wire.moveTableColumn(headerName(th), others[index] ? headerName(others[index].th) : null), null)
+}
+
+function startColumnDrag(event, th, wire) {
     const table = th.closest('table')
-    const wrapper = table.closest('.fi-ta-content-ctn')
     const slots = columnSlots(table)
     const source = slots.find((slot) => slot.th === th)
-    const others = slots.filter((slot) => slot !== source)
     const startIndex = slots.indexOf(source)
-    const grabOffset = event.clientX - th.getBoundingClientRect().left
     const startX = event.clientX
-    let ghost = null
-    let index = startIndex
-    let pointer = { x: event.clientX, y: event.clientY }
-    let scrollFrame = null
-    let moveFrame = null
-
-    const update = () => {
-        Object.assign(ghost.style, { left: `${pointer.x - grabOffset}px`, top: `${table.tHead.getBoundingClientRect().top}px` })
-        index = dropIndex(slots, source, pointer.x - grabOffset - table.getBoundingClientRect().left)
-        shiftColumns(slots, source, index)
+    const drag = {
+        th,
+        wire,
+        table,
+        slots,
+        source,
+        startIndex,
+        wrapper: table.closest('.fi-ta-content-ctn'),
+        others: slots.filter((slot) => slot !== source),
+        grabOffset: startX - th.getBoundingClientRect().left,
+        index: startIndex,
+        pointer: { x: startX, y: event.clientY },
+        ghost: null,
+        scrollFrame: null,
+        moveFrame: null,
     }
 
     // The pointer reports more often than the screen paints, so the moves in a frame shift the columns once.
     const scheduleUpdate = () => {
-        moveFrame ??= requestAnimationFrame(() => {
-            moveFrame = null
-            update()
+        drag.moveFrame ??= requestAnimationFrame(() => {
+            drag.moveFrame = null
+            updateDrag(drag)
         })
     }
 
-    const autoScroll = () => {
-        scrollFrame = null
-        if (!ghost || !wrapper) return
-
-        const box = wrapper.getBoundingClientRect()
-        const towardsLeft = AUTO_SCROLL_EDGE - (pointer.x - box.left)
-        const towardsRight = AUTO_SCROLL_EDGE - (box.right - pointer.x)
-        const pressure = Math.max(towardsLeft, towardsRight)
-        if (pressure <= 0) return
-
-        const before = wrapper.scrollLeft
-        wrapper.scrollLeft += Math.sign(towardsRight - towardsLeft) * Math.ceil(AUTO_SCROLL_MAX_SPEED * Math.min(1, pressure / AUTO_SCROLL_EDGE))
-        if (wrapper.scrollLeft === before) return
-
-        update()
-        scrollFrame = requestAnimationFrame(autoScroll)
-    }
-
     const onMove = (moveEvent) => {
-        pointer = { x: moveEvent.clientX, y: moveEvent.clientY }
+        drag.pointer = { x: moveEvent.clientX, y: moveEvent.clientY }
 
-        if (!ghost) {
+        if (!drag.ghost) {
             if (Math.abs(moveEvent.clientX - startX) < DRAG_THRESHOLD) return
             window.getSelection()?.removeAllRanges()
-            ghost = createDragGhost(th, source.elements.slice(1))
+            drag.ghost = createDragGhost(th, source.elements.slice(1))
             source.elements.forEach((element) => element.classList.add('fi-ta-column-dragging'))
             table.classList.add('fi-ta-reordering')
             document.body.classList.add('reordering-column')
         }
 
         scheduleUpdate()
-        scrollFrame ??= requestAnimationFrame(autoScroll)
+        drag.scrollFrame ??= requestAnimationFrame(() => autoScrollDrag(drag))
     }
 
     const finish = (shouldDrop) => {
@@ -594,31 +625,19 @@ function startColumnDrag(event, th, wire) {
         document.removeEventListener('pointerup', onUp)
         document.removeEventListener('pointercancel', onCancel)
         document.removeEventListener('keydown', onKey)
-        if (scrollFrame) cancelAnimationFrame(scrollFrame)
-        if (moveFrame) cancelAnimationFrame(moveFrame)
+        if (drag.scrollFrame) cancelAnimationFrame(drag.scrollFrame)
+        if (drag.moveFrame) cancelAnimationFrame(drag.moveFrame)
 
-        if (!ghost) return
+        if (!drag.ghost) return
 
-        update()
+        updateDrag(drag)
         swallowNextClick()
-        ghost.remove()
-        source.elements.forEach((element) => element.classList.remove('fi-ta-column-dragging'))
-        table.classList.remove('fi-ta-reordering')
-        document.body.classList.remove('reordering-column')
-        clearShift(slots)
-
-        const box = (wrapper ?? table).getBoundingClientRect()
-        const insideTable = pointer.x >= box.left && pointer.x <= box.right && pointer.y >= box.top && pointer.y <= table.getBoundingClientRect().bottom
-
-        if (!shouldDrop || !insideTable || index === startIndex) return
-
-        // The cells move in the page at once, so the server's re-render arrives with nothing left to change.
-        moveColumnCells(source, others[index] ?? null, others.at(-1))
-        Promise.resolve(wire.moveTableColumn(headerName(th), others[index] ? headerName(others[index].th) : null)).catch(forgetColumnFocus)
+        endDrag(drag)
+        if (shouldDrop) dropColumn(drag)
     }
 
     const onUp = (upEvent) => {
-        pointer = { x: upEvent.clientX, y: upEvent.clientY }
+        drag.pointer = { x: upEvent.clientX, y: upEvent.clientY }
         finish(true)
     }
     const onCancel = () => finish(false)
@@ -693,8 +712,7 @@ function registerColumnMenu() {
         },
 
         choose(run, focusColumn) {
-            rememberColumnFocus(focusColumn)
-            Promise.resolve(run()).catch(forgetColumnFocus)
+            runColumnAction(run, focusColumn)
             this.close(false)
             swallowDoubleClickTail()
         },
@@ -769,8 +787,7 @@ function registerResizableColumn() {
             const isLeft = event.key === 'ArrowLeft'
             if (isLeft ? !targets.canMoveLeft : !targets.canMoveRight) return
 
-            rememberColumnFocus(columnName)
-            Promise.resolve(this.$wire.moveTableColumn(columnName, isLeft ? targets.before.left : targets.before.right)).catch(forgetColumnFocus)
+            runColumnAction(() => this.$wire.moveTableColumn(columnName, isLeft ? targets.before.left : targets.before.right), columnName)
         },
 
         createHandle() {
