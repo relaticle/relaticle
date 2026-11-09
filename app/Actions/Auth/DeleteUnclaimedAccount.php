@@ -9,7 +9,7 @@ use App\Enums\SocialiteProvider;
 use App\Models\User;
 use Laravel\Socialite\Contracts\User as SocialiteUser;
 
-// A provider that vouches for an address nobody verified outranks whoever registered it. Deleting the
+// A provider authoritative for an address nobody verified outranks whoever registered it. Deleting the
 // row, not claiming it in place, drops every passkey, second factor and grant that registrant could leave.
 final readonly class DeleteUnclaimedAccount
 {
@@ -17,7 +17,7 @@ final readonly class DeleteUnclaimedAccount
 
     public function execute(User $holder, SocialiteProvider $provider, SocialiteUser $claimant): bool
     {
-        if (! $provider->vouchesForEmailOf($claimant)) {
+        if (! $provider->isAuthoritativeForEmailOf($claimant)) {
             return false;
         }
 

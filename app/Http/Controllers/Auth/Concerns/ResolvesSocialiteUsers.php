@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Auth\Concerns;
 
 use App\Enums\SocialiteProvider;
+use Laravel\Socialite\AbstractUser;
 use Laravel\Socialite\Contracts\User as SocialiteUser;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\AbstractProvider;
 use Laravel\Socialite\Two\InvalidStateException;
+use SocialiteProviders\Microsoft\Provider as MicrosoftProvider;
 use Throwable;
 
 trait ResolvesSocialiteUsers
@@ -26,7 +28,13 @@ trait ResolvesSocialiteUsers
             $driver->redirectUrl($redirectUrl);
         }
 
-        return $driver->user();
+        $user = $driver->user();
+
+        if ($driver instanceof MicrosoftProvider && $user instanceof AbstractUser) {
+            $user->setRaw([...$user->getRaw(), 'tid' => $driver->getClaims()?->tid]);
+        }
+
+        return $user;
     }
 
     private function parseProviderError(string $exceptionMessage, SocialiteProvider $provider): string
