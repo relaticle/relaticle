@@ -200,3 +200,35 @@ it('declares an output schema on every registered tool', function (): void {
         expect($definition['outputSchema']['properties'] ?? [])->not->toBeEmpty();
     }
 });
+
+it('declares the item type of every array parameter', function (): void {
+    $collectMissingItems = function (mixed $schema, string $path) use (&$collectMissingItems): array {
+        if (! is_array($schema)) {
+            return [];
+        }
+
+        $types = (array) ($schema['type'] ?? []);
+        $missing = in_array('array', $types, true) && ! array_key_exists('items', $schema) ? [$path] : [];
+
+        foreach ($schema['properties'] ?? [] as $name => $property) {
+            $missing = [...$missing, ...$collectMissingItems($property, "{$path}.{$name}")];
+        }
+
+        return [...$missing, ...$collectMissingItems($schema['items'] ?? null, "{$path}[]")];
+    };
+
+    $tools = new ReflectionClass(RelaticleServer::class)
+        ->getDefaultProperties()['tools'];
+
+    $offenders = [];
+
+    foreach ($tools as $toolClass) {
+        $inputSchema = resolve($toolClass)->toArray()['inputSchema'];
+
+        foreach ($collectMissingItems($inputSchema, 'inputSchema') as $path) {
+            $offenders[] = "{$toolClass}: {$path}";
+        }
+    }
+
+    expect($offenders)->toBe([], implode("\n", $offenders));
+});

@@ -40,9 +40,9 @@ final class CreateNoteTool extends BaseCreateTool
     {
         return [
             'title' => $schema->string()->description('The note title.')->required(),
-            'company_ids' => $schema->array()->description('Company IDs to link this note to.'),
-            'people_ids' => $schema->array()->description('People IDs to link this note to.'),
-            'opportunity_ids' => $schema->array()->description('Opportunity IDs to link this note to.'),
+            'company_ids' => $schema->array()->items($schema->string())->description('Company IDs to link this note to.'),
+            'people_ids' => $schema->array()->items($schema->string())->description('People IDs to link this note to.'),
+            'opportunity_ids' => $schema->array()->items($schema->string())->description('Opportunity IDs to link this note to.'),
         ];
     }
 
