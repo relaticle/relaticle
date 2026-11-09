@@ -11,6 +11,9 @@ return [
         'failed' => 'La vérification a échoué. Veuillez réessayer.',
         'unavailable' => 'La vérification est temporairement indisponible. Veuillez réessayer dans un instant.',
         'checking' => 'Vérification de votre navigateur…',
-        'blocked' => 'Nous n\'avons pas pu vérifier votre navigateur. Désactivez les bloqueurs de contenu pour ce site et réessayez.',
+        'blocked' => 'Nous n\'avons pas pu vérifier votre navigateur. Vérifiez votre connexion et vos bloqueurs de contenu, puis réessayez.',
+        'blocked_with_providers' => 'Nous n\'avons pas pu vérifier votre navigateur. Réessayez, ou continuez avec :providers ci-dessus.',
+        'or' => 'ou',
+        'retry' => 'Réessayer',
     ],
 ];

@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Models\WorkspaceInvitation;
 use App\Rules\RegistrableEmail;
 use App\Rules\TurnstileChallenge;
+use App\Support\Auth\AuthenticationSession;
 use App\Support\EmailAddress;
 use App\Support\Http\TorExitNodes;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
@@ -33,6 +34,7 @@ use Filament\View\PanelsRenderHook;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
@@ -466,7 +468,7 @@ final class Login extends \Filament\Auth\Pages\Login
             ->autocomplete('username webauthn')
             ->autofocus()
             ->dehydrateStateUsing(fn (?string $state): string => EmailAddress::canonicalize((string) $state))
-            ->default(fn (): ?string => $this->getWorkspaceInvitationFromSession()?->email)
+            ->default(fn (): ?string => $this->getWorkspaceInvitationFromSession()->email ?? AuthenticationSession::linkSuggestion()['email'] ?? null)
             ->rules(RegistrableEmail::rules(), condition: fn (): bool => $this->authMethod === 'signup')
             ->unique(table: fn (): ?string => $this->authMethod === 'signup' ? 'users' : null)
             ->live(onBlur: true)
@@ -522,12 +524,26 @@ final class Login extends \Filament\Auth\Pages\Login
             ->view('filament.forms.components.turnstile')
             ->viewData(fn (ViewField $component): array => [
                 'expandedStatePath' => $component->getContainer()->getStatePath().'.cf_turnstile_expanded',
+                'blockedMessage' => $this->getTurnstileBlockedMessage(),
             ])
             ->visibleJs('$get(\'cf_turnstile_expanded\') === true')
             ->dehydrated(false)
             ->rules(TurnstileChallenge::rules(), condition: fn (): bool => $this->authMethod === 'signup')
             ->validationMessages(['required' => __('auth.turnstile.required')])
             ->visible(fn (): bool => $this->authMethod === 'signup' && TurnstileChallenge::isEnabled());
+    }
+
+    private function getTurnstileBlockedMessage(): string
+    {
+        $providers = array_map(fn (SocialiteProvider $provider): string => $provider->label(), SocialiteProvider::available());
+
+        if ($providers === []) {
+            return __('auth.turnstile.blocked');
+        }
+
+        return __('auth.turnstile.blocked_with_providers', [
+            'providers' => Arr::join($providers, ', ', ' '.__('auth.turnstile.or').' '),
+        ]);
     }
 
     /**

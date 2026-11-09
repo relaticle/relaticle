@@ -28,6 +28,8 @@ use stdClass;
  */
 final readonly class CustomFieldSchema
 {
+    private const string RICH_TEXT_READ_FORMAT = 'stored and returned as HTML';
+
     public function __construct(private FilterVocabulary $vocabulary) {}
 
     public static function usage(CrmEntity $entity): string
@@ -102,9 +104,7 @@ final readonly class CustomFieldSchema
                 'name' => $field->name,
                 'type' => $field->type,
                 'required' => $required,
-                'input_format' => $field->holdsChecklists()
-                    ? $type->inputFormat().'; '.TaskField::CHECKLIST_INPUT_FORMAT
-                    : $type->inputFormat(),
+                'input_format' => $this->inputFormat($field, $type),
                 'example' => $type->example(),
             ];
 
@@ -119,5 +119,20 @@ final readonly class CustomFieldSchema
         }
 
         return $result;
+    }
+
+    private function inputFormat(CustomField $field, CustomFieldType $type): string
+    {
+        $parts = [$type->inputFormat()];
+
+        if ($type === CustomFieldType::RICH_EDITOR) {
+            $parts[] = self::RICH_TEXT_READ_FORMAT;
+        }
+
+        if ($field->holdsChecklists()) {
+            $parts = [...$parts, TaskField::CHECKLIST_INPUT_FORMAT, TaskField::CHECKLIST_HTML_READ_FORMAT];
+        }
+
+        return implode('; ', $parts);
     }
 }

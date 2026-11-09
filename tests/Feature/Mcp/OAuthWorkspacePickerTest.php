@@ -237,7 +237,7 @@ it('spells out what the connector will be able to do, including deletion', funct
     $response->assertOk();
     $response->assertSee('Read and search your records');
     $response->assertSee('Create and update them');
-    $response->assertSee('Delete them permanently');
+    $response->assertSee('Delete them. You can restore deleted records.');
 });
 
 it('lists only the permissions a REST client asks for', function (): void {

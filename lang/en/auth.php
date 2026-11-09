@@ -63,6 +63,10 @@ return [
     ],
     'link' => [
         'account_exists' => 'An account with this email already exists. Sign in with the method you already use to continue.',
+        'account_exists_password' => 'You already have an account with this email. Sign in with your password. You can connect :provider afterwards under Security.',
+        'account_exists_passkey' => 'You already have an account with this email. Sign in with your passkey. You can connect :provider afterwards under Security.',
+        'account_exists_provider' => 'You already have an account with this email. Sign in with :existing. You can connect :provider afterwards under Security.',
+        'account_exists_reset' => 'You already have an account with this email. Reset your password to sign in.',
         'already_linked' => 'That :provider account is already linked to a different profile.',
         'last_method' => 'Link another way to sign in before removing this one.',
     ],
@@ -105,6 +109,9 @@ return [
         'failed' => 'Verification failed. Please try again.',
         'unavailable' => 'Verification is temporarily unavailable. Please try again in a moment.',
         'checking' => 'Checking your browser…',
-        'blocked' => 'We couldn\'t verify your browser. Turn off content blockers for this site and try again.',
+        'blocked' => 'We couldn\'t verify your browser. Check your connection and content blockers, then try again.',
+        'blocked_with_providers' => 'We couldn\'t verify your browser. Try again, or continue with :providers above.',
+        'or' => 'or',
+        'retry' => 'Try again',
     ],
 ];

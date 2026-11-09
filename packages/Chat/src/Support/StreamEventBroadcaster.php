@@ -139,7 +139,7 @@ final readonly class StreamEventBroadcaster
 
         $decoded = json_decode((string) $raw, true);
 
-        if (! is_array($decoded) || ($decoded['type'] ?? null) !== 'pending_action') {
+        if (! is_array($decoded) || ($decoded['type'] ?? null) !== PendingActionEnvelope::TYPE) {
             return null;
         }
 

@@ -151,6 +151,29 @@
     max-width: none;
 }
 
+/* A checklist item in a reply: both pipelines emit this read-only checkbox (TaskMarkerRenderer,
+   chat.js). It takes the bullet's place and is drawn like the rich editor's checkbox. */
+li:has(> .chat-md-task) {
+    @apply list-none;
+}
+
+.chat-md-task {
+    @apply -ms-5 me-1.5 inline-block size-3.5 rounded-[4px] border border-gray-300 bg-white align-[-0.15em];
+}
+
+.chat-md-task[aria-checked="true"] {
+    @apply border-primary-600 bg-primary-600 bg-contain bg-center bg-no-repeat;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+}
+
+.dark .chat-md-task {
+    @apply border-white/20 bg-white/5;
+}
+
+.dark .chat-md-task[aria-checked="true"] {
+    @apply border-primary-500 bg-primary-500;
+}
+
 /* Hero gradient text animation: slow, subtle shimmer */
 @keyframes gradient-shift {
     0%, 100% { background-position: 0% center; }

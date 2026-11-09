@@ -2,7 +2,7 @@
 title: MCP Server
 description: Read the reference for Relaticle's MCP server, with OAuth and personal access token setup, custom field access and direct writes.
 order: 2
-updated: "2026-11-08"
+updated: "2026-11-09"
 ---
 
 MCP (Model Context Protocol) lets AI assistants like Claude work directly with your Relaticle CRM data. Instead of copy-pasting between tools, your AI assistant can list companies, create tasks, update people, and more -- all from a natural conversation.
@@ -28,7 +28,7 @@ Writes made over MCP apply immediately. The approval card belongs to the assista
 
 ## Connect to Relaticle
 
-Clients with OAuth support need only the MCP endpoint. ChatGPT and Claude open Relaticle's consent screen and let you choose one workspace.
+Clients with OAuth support need only the MCP endpoint. ChatGPT, Claude and Claude Code open Relaticle's consent screen and let you choose one workspace.
 
 Clients without OAuth support need a personal access token:
 
@@ -75,7 +75,7 @@ A token gets email access through its permissions: **Read email**, **Draft email
 
 ## Setup by Client
 
-The MCP server endpoint is `https://mcp.relaticle.com`. ChatGPT and Claude use OAuth. The remaining examples use a personal access token.
+The MCP server endpoint is `https://mcp.relaticle.com`. ChatGPT, Claude and Claude Code use OAuth. The remaining examples use a personal access token.
 
 ### ChatGPT
 
@@ -83,41 +83,38 @@ The MCP server endpoint is `https://mcp.relaticle.com`. ChatGPT and Claude use O
 2. Sign in to Relaticle and choose one workspace.
 3. Start a message with **@Relaticle**.
 
-### Claude
+### Claude and Claude Desktop
+
+Claude on the web and the Claude Desktop app share the same connectors.
 
 1. Open **Customize → Connectors**.
 2. Select the plus button, then **Add custom connector**.
 3. Enter `Relaticle` and `https://mcp.relaticle.com`.
 4. Connect, sign in to Relaticle, and choose one workspace.
 
-### Claude Desktop with a personal access token
+Claude Desktop's `claude_desktop_config.json` is for local servers. Add Relaticle as a connector instead, as Anthropic's guide to [adding a connector by URL](https://claude.com/docs/connectors/custom/add-unlisted) describes.
 
-Add this to your Claude Desktop configuration file (`claude_desktop_config.json`):
+### Claude Code
 
-```json
-{
-  "mcpServers": {
-    "relaticle": {
-      "type": "streamable-http",
-      "url": "https://mcp.relaticle.com",
-      "headers": {
-        "Authorization": "Bearer YOUR_TOKEN"
-      }
-    }
-  }
-}
+Add the server, then sign in:
+
+```bash
+claude mcp add relaticle --transport http https://mcp.relaticle.com
+claude mcp login relaticle
 ```
 
-### Claude Code with a personal access token
+`claude mcp login` opens the consent screen in your browser, where you choose one workspace. You can also run `/mcp` inside a session. Claude Code stores the OAuth tokens itself, so its configuration holds only the server URL.
 
-Add the server from your terminal:
+To use a personal access token instead, reference it through an environment variable:
 
 ```bash
 claude mcp add relaticle \
-  --transport streamable-http \
+  --transport http \
   https://mcp.relaticle.com \
-  --header "Authorization: Bearer YOUR_TOKEN"
+  --header 'Authorization: Bearer ${RELATICLE_TOKEN}'
 ```
+
+A token typed into the header is saved in plain text in `~/.claude.json`. With `--scope project` it goes into `.mcp.json` at the root of your repository, which Claude Code shares through version control.
 
 ### Cursor with a personal access token
 
@@ -304,7 +301,7 @@ Native fields and relations sit at the top level. Custom fields sit under `custo
 | Tasks | Native fields `title`, `created_at`, `updated_at`, `creation_source`, `assigned_to_me`. Record relations `companies`, `people`, `opportunities`. Member relations `creator`, `assignees`. |
 | Notes | Native fields `title`, `created_at`, `updated_at`, `creation_source`. Record relations `companies`, `people`, `opportunities`. Member relation `creator`. |
 
-`name` and `title` take the text operators. `created_at` and `updated_at` take the date and time operators. A date operand is `YYYY-MM-DD` or an ISO 8601 date-time such as `2026-10-01T09:30:00Z`, and any other format is an error. A date-time with an offset, such as `2026-10-01T13:00:00+05:00`, is read as the same instant in UTC. A date without a time covers that whole UTC day, on these fields and on a custom date and time field. `creation_source` is a single choice with the values `web`, `sample`, `import`, `api`, `mcp`, `chat` and `mailbox`. `stale_days` matches opportunities by whole days without activity, as in `{"$gte": 30}`. `assigned_to_me` takes `{"$eq": true}`.
+`name` and `title` take the text operators. `created_at` and `updated_at` take the date and time operators. A date operand is `YYYY-MM-DD` or an ISO 8601 date-time such as `2026-10-01T09:30:00Z`, and any other format is an error. A date-time with an offset, such as `2026-10-01T13:00:00+05:00`, is read as the same instant in UTC. A date without a time covers that whole UTC day, on these fields and on a custom date and time field. `creation_source` is a single choice with the values `web`, `sample`, `import`, `api`, `mcp`, `chat`, `mailbox` and `system`. `stale_days` matches opportunities by whole days without activity, as in `{"$gte": 30}`. `assigned_to_me` takes `{"$eq": true}`.
 
 #### Combine conditions
 

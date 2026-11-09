@@ -21,8 +21,8 @@ use Symfony\Component\HttpFoundation\Response;
  * 301'd to the same path on the APP_URL host instead.
  *
  * Functional routes stay untouched: the app-panel host legitimately consumes
- * domainless plumbing (chat, 2FA, logout, Livewire, broadcasting, Passport,
- * Sanctum), so only unauthenticated GET/HEAD requests are redirected, and
+ * domainless plumbing (chat, 2FA, passkeys, logout, Livewire, broadcasting,
+ * Passport, Sanctum), so only unauthenticated GET/HEAD requests are redirected, and
  * signed routes are exempt because signatures are computed over the absolute
  * URL, so rewriting the host would 403 every invitation link.
  *
@@ -34,7 +34,7 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final readonly class RedirectToPrimaryHost
 {
-    private const array EXEMPT_NAME_PREFIXES = ['livewire.', 'default-livewire.', 'sanctum.', 'passport.', 'auth.socialite.', 'filament.exports.', 'filament.imports.'];
+    private const array EXEMPT_NAME_PREFIXES = ['livewire.', 'default-livewire.', 'sanctum.', 'passport.', 'passkey.', 'auth.socialite.', 'filament.exports.', 'filament.imports.'];
 
     private const array EXEMPT_URIS = ['broadcasting/auth'];
 

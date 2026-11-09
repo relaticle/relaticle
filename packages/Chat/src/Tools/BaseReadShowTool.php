@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Tools;
 
-use App\Enums\CustomFieldType;
 use App\Models\User;
-use App\Support\PlainText;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -15,11 +13,12 @@ use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
+use Relaticle\Chat\Enums\ResponseFormat;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\DisplayFieldSelector;
+use Relaticle\Chat\Support\LongTextForModel;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Tools\Concerns\LocalisesDatetimes;
-use Relaticle\CustomFields\Models\CustomFieldValue;
 use stdClass;
 
 abstract class BaseReadShowTool implements Tool
@@ -42,24 +41,7 @@ abstract class BaseReadShowTool implements Tool
     private const string CUSTOM_FIELD_RELATION = 'customFieldValues.customField.options';
 
     /**
-     * Custom field types whose values are free-form prose that can run to
-     * kilobytes of markup (rich text) or long paragraphs (plain long text).
-     * Values on these fields are stripped of markup and capped for included
-     * (related) records. Everything else (numbers, dates, booleans, choice
-     * labels, short text) passes through untouched. Mirrors the old
-     * `RecordContextBuilder::stripHtml()` behaviour.
-     *
-     * @var list<string>
-     */
-    private const array FREE_TEXT_FIELD_TYPES = [
-        CustomFieldType::RICH_EDITOR->value,
-        CustomFieldType::TEXTAREA->value,
-    ];
-
-    /**
-     * Characters kept per free-text value. Shared by the included-record strip
-     * and the record card, so the same field never reads shorter in the payload
-     * the model sees than in the card the user reads.
+     * Characters kept per free-text value on the record card.
      */
     private const int FREE_TEXT_LIMIT = 500;
 
@@ -159,10 +141,7 @@ abstract class BaseReadShowTool implements Tool
             ], JSON_UNESCAPED_SLASHES);
         }
 
-        /** @var class-string<JsonResource> $resourceClass */
-        $resourceClass = $this->resourceClass();
-
-        $payload = $this->flattenResource(new $resourceClass($model));
+        $payload = $this->recordPayload($model);
 
         $id = (string) $model->getKey();
         $resolver = resolve(RecordReferenceResolver::class);
@@ -282,6 +261,54 @@ abstract class BaseReadShowTool implements Tool
         return $data;
     }
 
+    /** @return array<string, mixed> */
+    private function recordPayload(Model $model): array
+    {
+        /** @var class-string<JsonResource> $resourceClass */
+        $resourceClass = $this->resourceClass();
+
+        $payload = $this->flattenResource(new $resourceClass($model));
+        $customFields = $this->customFieldsOf($payload);
+
+        foreach (LongTextForModel::freeTextFields($model) as $code => $type) {
+            if ($customFields instanceof stdClass && is_string($customFields->{$code} ?? null)) {
+                $customFields->{$code} = LongTextForModel::full($customFields->{$code}, $type);
+            }
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function shortenedIncluded(array $payload, Model $model): array
+    {
+        $customFields = $this->customFieldsOf($payload);
+
+        if (! $customFields instanceof stdClass) {
+            return $payload;
+        }
+
+        $shortened = LongTextForModel::forListRow($model, (array) $customFields, ResponseFormat::Concise);
+
+        foreach ($shortened['values'] as $code => $value) {
+            $customFields->{$code} = $value;
+        }
+
+        return $shortened['truncated'] === [] ? $payload : [...$payload, 'truncated_fields' => $shortened['truncated']];
+    }
+
+    /** @param  array<string, mixed>  $payload */
+    private function customFieldsOf(array $payload): ?stdClass
+    {
+        $attributes = $payload['attributes'] ?? null;
+        $customFields = $attributes instanceof stdClass ? ($attributes->custom_fields ?? null) : null;
+
+        return $customFields instanceof stdClass ? $customFields : null;
+    }
+
     /**
      * @return list<string>
      */
@@ -335,10 +362,7 @@ abstract class BaseReadShowTool implements Tool
             $items = [];
 
             foreach ($related as $item) {
-                $items[] = $this->stripFreeTextCustomFields(
-                    $this->flattenResource(new $resourceClass($item)),
-                    $item,
-                );
+                $items[] = $this->shortenedIncluded($this->flattenResource(new $resourceClass($item)), $item);
             }
 
             $totalAttribute = $model->getAttribute(Str::snake($relationName).'_count');
@@ -351,69 +375,5 @@ abstract class BaseReadShowTool implements Tool
         }
 
         return ['included' => $included];
-    }
-
-    /**
-     * Strip HTML and cap the length of free-text custom field values on an
-     * included (related) record. Ten related notes with kilobytes of
-     * rich-text body each would otherwise blow up the tool payload that gets
-     * persisted with the turn and replayed on every subsequent turn.
-     *
-     * Only applied to included records, not the primary record a tool call
-     * targets. A direct "get this note" call is the user asking for that
-     * note's full content, and should return it verbatim.
-     *
-     * @param  array<string, mixed>  $payload
-     * @return array<string, mixed>
-     */
-    private function stripFreeTextCustomFields(array $payload, Model $model): array
-    {
-        $attributes = $payload['attributes'] ?? null;
-
-        if (! $attributes instanceof stdClass) {
-            return $payload;
-        }
-
-        $customFields = $attributes->custom_fields ?? null;
-
-        if (! $customFields instanceof stdClass) {
-            return $payload;
-        }
-
-        if (! $model->relationLoaded('customFieldValues')) {
-            return $payload;
-        }
-
-        /** @var iterable<int, CustomFieldValue> $customFieldValues */
-        $customFieldValues = $model->getRelation('customFieldValues');
-
-        foreach ($customFieldValues as $fieldValue) {
-            if (! isset($fieldValue->getRelations()['customField'])) {
-                continue;
-            }
-
-            if (! in_array($fieldValue->customField->type, self::FREE_TEXT_FIELD_TYPES, true)) {
-                continue;
-            }
-
-            $code = $fieldValue->customField->code;
-
-            if (! isset($customFields->{$code})) {
-                continue;
-            }
-
-            if (! is_string($customFields->{$code})) {
-                continue;
-            }
-
-            $customFields->{$code} = $this->truncateFreeText($customFields->{$code});
-        }
-
-        return $payload;
-    }
-
-    private function truncateFreeText(string $html): string
-    {
-        return Str::limit(PlainText::fromHtml($html), self::FREE_TEXT_LIMIT);
     }
 }

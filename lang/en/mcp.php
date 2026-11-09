@@ -34,7 +34,7 @@ return [
             'heading' => ':client will be able to',
             'read' => 'Read and search your records',
             'write' => 'Create and update them',
-            'delete' => 'Delete them permanently',
+            'delete' => 'Delete them. You can restore deleted records.',
             'email_read' => 'Read the email you can see in this workspace',
             'email_draft' => 'Save email drafts for you to review',
             'email_send' => 'Send email as you, after a hold you can cancel',

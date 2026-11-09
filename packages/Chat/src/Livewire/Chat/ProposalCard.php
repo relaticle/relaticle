@@ -38,6 +38,7 @@ use Relaticle\Chat\Services\TurnContinuationService;
 use Relaticle\Chat\Support\ApprovalFailureMessage;
 use Relaticle\Chat\Support\PlanReference;
 use Relaticle\Chat\Support\ProposalConflictNotice;
+use Relaticle\Chat\Support\ProposalLabel;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\ProposalProgress;
 use Relaticle\Chat\Support\RecordNameResolver;
@@ -796,11 +797,12 @@ final class ProposalCard extends BaseLivewireComponent
     {
         $summary = $display['summary'] ?? null;
 
-        // The quoted record name from the summary ('Create person "Alice"')
-        // comes first: the real tools set each item's `title` to the generic
-        // entity title ("Create Person"), which is the eyebrow, not an identity.
-        if (is_string($summary) && preg_match('/"(.*)"/u', $summary, $matches) === 1 && $matches[1] !== '') {
-            return $matches[1];
+        // The quoted record name comes first: the real tools set each item's `title`
+        // to the generic entity title ("Create Person"), which is the eyebrow, not an identity.
+        $name = ProposalLabel::quotedName($display);
+
+        if ($name !== null) {
+            return $name;
         }
 
         $title = $display['title'] ?? null;
