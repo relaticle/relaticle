@@ -109,6 +109,9 @@ return [
         'failed' => 'Verification failed. Please try again.',
         'unavailable' => 'Verification is temporarily unavailable. Please try again in a moment.',
         'checking' => 'Checking your browser…',
-        'blocked' => 'We couldn\'t verify your browser. Turn off content blockers for this site and try again.',
+        'blocked' => 'We couldn\'t verify your browser. Check your connection and content blockers, then try again.',
+        'blocked_with_providers' => 'We couldn\'t verify your browser. Try again, or continue with :providers above.',
+        'or' => 'or',
+        'retry' => 'Try again',
     ],
 ];

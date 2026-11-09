@@ -89,3 +89,32 @@ it('holds a submit made before the turnstile token exists and replays it', funct
 
     expect(User::where('email', $email)->exists())->toBeTrue();
 });
+
+it('offers a retry when the turnstile challenge cannot verify the browser', function (): void {
+    config([
+        'honeypot.enabled' => true,
+        'relaticle.features.signup_challenge' => true,
+        'services.turnstile.key' => '2x00000000000000000000AB',
+        'services.turnstile.secret' => '2x0000000000000000000000000000000AA',
+    ]);
+    Feature::flushCache();
+
+    $page = $this->visit('/app/login')
+        ->type('[id="form.email"]', 'jane-turnstile-blocked-'.uniqid().'@gmail.com');
+
+    $page->wait(2);
+
+    $page->click('button[type="submit"]')
+        ->assertVisible('[id="form.password"]')
+        ->assertScript(asyncAlpineComponentsLoaded())
+        ->type('[id="form.password"]', 'Password123!')
+        ->click('button[type="submit"]')
+        ->assertSee(__('auth.turnstile.retry'));
+
+    $page->click(__('auth.turnstile.retry'))
+        ->assertSee(__('auth.turnstile.retry'))
+        ->assertNoJavaScriptErrors()
+        ->assertPathIs('/app/login');
+
+    expect(User::query()->where('email', 'like', 'jane-turnstile-blocked-%')->exists())->toBeFalse();
+});
