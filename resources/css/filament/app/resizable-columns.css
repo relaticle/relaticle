@@ -70,7 +70,7 @@
 
 /* Hovering recolours the column's own divider, so the accent lines up with the body rows. */
 .fi-ta-resizable-table thead th.fi-ta-resizable-header {
-    @apply transition-[border-right-color] duration-120 motion-reduce:transition-none;
+    @apply transition-[border-right-color] duration-120;
 }
 
 .fi-ta-resizable-table thead th.fi-ta-resizable-header:hover {
@@ -84,7 +84,7 @@
 
 /* The handle centres on the padding edge, half a border left of the 1px divider. */
 .column-resize-handle-bar::before {
-    @apply pointer-events-none absolute inset-y-0 left-1/2 w-0 translate-x-[calc(-50%+0.5px)] bg-transparent transition-[width,background-color] duration-120 content-[''] motion-reduce:transition-none;
+    @apply pointer-events-none absolute inset-y-0 left-1/2 w-0 translate-x-[calc(-50%+0.5px)] bg-transparent transition-[width,background-color] duration-120 content-[''];
 }
 
 .fi-ta-resizable-table thead th.fi-ta-resizable-header:hover .column-resize-handle-bar::before {
@@ -181,7 +181,7 @@ body.resizing-column {
 /* While a column is dragged, the others slide aside to show where it lands. */
 .fi-ta-resizable-table.fi-ta-reordering td,
 .fi-ta-resizable-table.fi-ta-reordering thead th.fi-ta-resizable-header {
-    @apply transition-transform duration-150 motion-reduce:transition-none;
+    @apply transition-transform duration-150;
 }
 
 .fi-ta-column-drag-ghost {
