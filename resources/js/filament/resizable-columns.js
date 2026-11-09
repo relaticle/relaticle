@@ -182,7 +182,6 @@ function applyTableSizing(table) {
     const columnsWidth = computeMinTableWidth(table)
 
     table.style.width = columnsWidth > wrapperWidth ? `${columnsWidth}px` : '100%'
-    table.style.minWidth = ''
 }
 
 const widthRecalcPending = new WeakSet()
@@ -331,18 +330,6 @@ function horizontalInset(element) {
 
     return ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth']
         .reduce((total, property) => total + parseFloat(style[property]), 0)
-}
-
-function createHandleBar() {
-    const handle = document.createElement('button')
-    handle.type = 'button'
-    // Mouse-only for now, so it stays out of the tab order.
-    handle.tabIndex = -1
-    handle.classList.add('column-resize-handle-bar')
-    handle.setAttribute('aria-label', window.filamentData?.resizeColumnLabel ?? '')
-    handle.title = window.filamentData?.resizeColumnHint ?? ''
-
-    return handle
 }
 
 function wrapHeaderLabel(th) {
@@ -716,12 +703,8 @@ function registerColumnMenu() {
 
 function registerResizableColumn() {
     wireStickyHeaders()
-    window.Alpine.data('resizableColumn', (columnName, columnId, min = 40, max = 1000) => ({
+    window.Alpine.data('resizableColumn', (columnName, columnId, min, max) => ({
         columnName,
-        minWidth: min,
-        maxWidth: max,
-        tableSelector: '.fi-ta-table',
-        tableWrapperSelector: '.fi-ta-content-ctn',
         // Relationship columns keep the dot in Filament's cell class (`user.name`).
         cellSelector: `.fi-ta-cell-${CSS.escape(columnId)}`,
         column: null,
@@ -731,8 +714,8 @@ function registerResizableColumn() {
 
         init() {
             this.column = this.$el
-            this.table = this.$el.closest(this.tableSelector)
-            this.tableWrapper = this.$el.closest(this.tableWrapperSelector)
+            this.table = this.$el.closest('.fi-ta-table')
+            this.tableWrapper = this.$el.closest('.fi-ta-content-ctn')
             if (!this.column || !this.table || !this.tableWrapper) return
 
             this.column.classList.add('fi-ta-resizable-header')
@@ -794,10 +777,18 @@ function registerResizableColumn() {
             const existing = this.column.querySelector('.column-resize-handle-bar')
             if (existing) existing.remove()
 
-            this.handleBar = createHandleBar()
-            this.column.appendChild(this.handleBar)
-            this.handleBar.addEventListener('pointerdown', (e) => this.startResize(e))
-            this.handleBar.addEventListener('dblclick', (e) => {
+            // Mouse-only for now, so it stays out of the tab order.
+            const handle = Object.assign(document.createElement('button'), {
+                type: 'button',
+                tabIndex: -1,
+                className: 'column-resize-handle-bar',
+                title: window.filamentData?.resizeColumnHint ?? '',
+            })
+            handle.setAttribute('aria-label', window.filamentData?.resizeColumnLabel ?? '')
+            this.handleBar = handle
+            this.column.appendChild(handle)
+            handle.addEventListener('pointerdown', (e) => this.startResize(e))
+            handle.addEventListener('dblclick', (e) => {
                 e.preventDefault()
                 e.stopPropagation()
                 this.autoFit()
@@ -834,8 +825,8 @@ function registerResizableColumn() {
                 if (moveEvent.pointerId !== event.pointerId || moveEvent.pageX === startX) return
                 currentWidth = Math.round(
                     Math.min(
-                        this.maxWidth,
-                        Math.max(this.minWidth, startColumnWidth + (moveEvent.pageX - startX)),
+                        max,
+                        Math.max(min, startColumnWidth + (moveEvent.pageX - startX)),
                     ),
                 )
                 widthFrame ??= requestAnimationFrame(() => {
@@ -903,7 +894,7 @@ function registerResizableColumn() {
             const widths = naturalWidths([label, ...contents])
             const widest = Math.max(...widths.map((width, index) => width + insets[index]))
 
-            return Math.ceil(Math.min(this.maxWidth, Math.max(this.minWidth, widest)))
+            return Math.ceil(Math.min(max, Math.max(min, widest)))
         },
     }))
 }
