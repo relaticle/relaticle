@@ -674,7 +674,7 @@ final readonly class PendingActionService
         if (! $payload->isBatch) {
             $codes = is_array($resultData['excluded'] ?? null) ? $resultData['excluded'] : [];
             $displayData = $action->display_data;
-            $fields = $this->excludedFieldLabels($codes, is_array($displayData['fields'] ?? null) ? $displayData['fields'] : []);
+            $fields = $this->excludedFieldNames($codes, is_array($displayData['fields'] ?? null) ? $displayData['fields'] : []);
 
             return $fields === [] ? [] : [['record' => null, 'fields' => $fields]];
         }
@@ -692,7 +692,7 @@ final readonly class PendingActionService
 
             $item = $items[(int) $index] ?? null;
             $display = is_array($item['display'] ?? null) ? $item['display'] : [];
-            $fields = $this->excludedFieldLabels($codes, is_array($display['fields'] ?? null) ? $display['fields'] : []);
+            $fields = $this->excludedFieldNames($codes, is_array($display['fields'] ?? null) ? $display['fields'] : []);
 
             if ($fields === []) {
                 continue;
@@ -709,20 +709,20 @@ final readonly class PendingActionService
     }
 
     /**
-     * Human labels for excluded field codes, read from the proposal's own display
-     * rows; a code with no display row falls back to the code itself.
+     * Each excluded field as "Label (code)": the label the user unchecked, and the code the
+     * replayed proposal summary uses. A code with no display row stays the bare code.
      *
      * @param  array<array-key, mixed>  $codes
      * @param  array<array-key, mixed>  $displayFields
      * @return list<string>
      */
-    private function excludedFieldLabels(array $codes, array $displayFields): array
+    private function excludedFieldNames(array $codes, array $displayFields): array
     {
         $labels = [];
 
         foreach ($displayFields as $row) {
-            if (is_array($row) && is_string($row['code'] ?? null)) {
-                $labels[$row['code']] = is_string($row['label'] ?? null) ? $row['label'] : $row['code'];
+            if (is_array($row) && is_string($row['code'] ?? null) && is_string($row['label'] ?? null) && $row['label'] !== $row['code']) {
+                $labels[$row['code']] = "{$row['label']} ({$row['code']})";
             }
         }
 

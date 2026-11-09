@@ -324,6 +324,30 @@ it('labels each record of a batch update that changes only a custom field by the
         ]);
 });
 
+it('names an unchecked field by its label and the code the proposal summary uses', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+    seedResolvedConv('conv-X', $user);
+
+    PendingAction::query()->create([
+        'workspace_id' => $user->currentWorkspace->getKey(), 'user_id' => $user->getKey(),
+        'conversation_id' => 'conv-X', 'action_class' => CreateTask::class,
+        'operation' => PendingActionOperation::Update, 'entity_type' => 'company',
+        'action_data' => ['_record_id' => 'c-1', '_model_class' => 'App\\Models\\Company', 'name' => 'Acme', 'custom_fields' => ['industry' => 'Retail']],
+        'display_data' => [
+            'title' => 'Update Company',
+            'summary' => 'Update company "Acme"',
+            'fields' => [['label' => 'Industry', 'code' => 'industry', 'old' => 'Tech', 'new' => 'Retail']],
+        ],
+        'status' => PendingActionStatus::Approved, 'expires_at' => now(),
+        'resolved_at' => now(), 'result_data' => ['id' => 'c-1', 'excluded' => ['industry']],
+    ]);
+
+    $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-X', null);
+
+    expect($resolved[0]['excluded'])->toBe([['record' => null, 'fields' => ['Industry (industry)']]]);
+});
+
 it('labels an update by the name its summary quotes when a custom field is named like a title row', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
