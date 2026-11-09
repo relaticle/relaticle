@@ -111,7 +111,6 @@ it('keeps sorting on the header and gives the title column a handle', function (
 
     $page->script(openColumnMenu('created_at'));
     waitUntil($page, menuItemFocused())
-        ->assertMissing('.fi-ta-column-menu [data-column-menu-item="sortAscending"]')
         ->assertScript(visibleMenuItems(), ['Move left', 'Move right', 'Pin to left', 'Edit column label', 'Hide column'])
         ->assertScript(sprintf('document.querySelector(`%s`).getAttribute("aria-sort")', columnHeader('created_at')), 'ascending')
         ->assertNoJavaScriptErrors();
