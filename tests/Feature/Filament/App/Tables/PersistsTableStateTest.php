@@ -189,11 +189,14 @@ it('opens a table whose saved columns are missing a name or a visibility', funct
 it('loads a filter saved for a deleted custom field', function (): void {
     TablePreference::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
         'entity' => CrmEntity::Company,
-        'state' => new TableStateData(filters: ['custom_fields.gone' => ['value' => 'x']]),
+        'state' => new TableStateData(filters: ['custom_fields.gone' => ['value' => 'x'], 'gone_filter' => ['value' => 'x'], 'trashed' => ['value' => 0]]),
     ]);
     $company = Company::factory()->for($this->user->currentWorkspace)->create();
 
-    livewire(ListCompanies::class)->assertOk()->assertCanSeeTableRecords([$company]);
+    $component = livewire(ListCompanies::class)->assertOk()->assertCanSeeTableRecords([$company]);
+
+    expect($component->get('tableFilters'))->not->toHaveKeys(['custom_fields.gone', 'gone_filter'])
+        ->and($component->get('tableFilters.trashed.value'))->toEqual(0);
 });
 
 it('stops writing table state to the session', function (): void {
