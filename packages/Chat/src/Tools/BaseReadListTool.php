@@ -236,10 +236,8 @@ abstract class BaseReadListTool implements Tool
             ? (string) $item['id']
             : null;
 
-        // resolve() was called here purely as a null check while referenceUrl()
-        // supplied the value, and resolve() issues a label query per call. At
-        // MAX_PER_PAGE that is 25 discarded SELECTs per list call. Whether a type
-        // is linkable is a constant, so it is decided once outside the loop.
+        // Never call $resolver->resolve() per row: it runs a label query each time,
+        // and whether this type links at all is decided once by the caller.
         $item['url'] = $id !== null && $linkable
             ? $resolver->referenceUrl($this->citationType(), $id)
             : null;
