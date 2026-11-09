@@ -26,7 +26,7 @@ use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 
-uses(WithConsoleEvents::class);
+pest()->use(WithConsoleEvents::class);
 
 mutates(CurrentSource::class, SetCurrentSource::class, BindCommandSourceListener::class, RelaticleServer::class, PendingActionService::class, HasCreator::class, MergedActivityRenderer::class);
 
