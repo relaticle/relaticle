@@ -2,7 +2,7 @@
 title: MCP Server
 description: Read the reference for Relaticle's MCP server, with OAuth and personal access token setup, custom field access and direct writes.
 order: 2
-updated: "2026-11-08"
+updated: "2026-11-09"
 ---
 
 MCP (Model Context Protocol) lets AI assistants like Claude work directly with your Relaticle CRM data. Instead of copy-pasting between tools, your AI assistant can list companies, create tasks, update people, and more -- all from a natural conversation.
@@ -28,7 +28,7 @@ Writes made over MCP apply immediately. The approval card belongs to the assista
 
 ## Connect to Relaticle
 
-Clients with OAuth support need only the MCP endpoint. ChatGPT and Claude open Relaticle's consent screen and let you choose one workspace.
+Clients with OAuth support need only the MCP endpoint. ChatGPT, Claude and Claude Code open Relaticle's consent screen and let you choose one workspace.
 
 Clients without OAuth support need a personal access token:
 
@@ -75,7 +75,7 @@ A token gets email access through its permissions: **Read email**, **Draft email
 
 ## Setup by Client
 
-The MCP server endpoint is `https://mcp.relaticle.com`. ChatGPT and Claude use OAuth. The remaining examples use a personal access token.
+The MCP server endpoint is `https://mcp.relaticle.com`. ChatGPT, Claude and Claude Code use OAuth. The remaining examples use a personal access token.
 
 ### ChatGPT
 
@@ -108,16 +108,27 @@ Add this to your Claude Desktop configuration file (`claude_desktop_config.json`
 }
 ```
 
-### Claude Code with a personal access token
+### Claude Code
 
-Add the server from your terminal:
+Add the server, then sign in:
+
+```bash
+claude mcp add relaticle --transport http https://mcp.relaticle.com
+claude mcp login relaticle
+```
+
+`claude mcp login` opens the consent screen in your browser, where you choose one workspace. You can also run `/mcp` inside a session. Claude Code stores the OAuth tokens itself, so its configuration holds only the server URL.
+
+To use a personal access token instead, reference it through an environment variable:
 
 ```bash
 claude mcp add relaticle \
-  --transport streamable-http \
+  --transport http \
   https://mcp.relaticle.com \
-  --header "Authorization: Bearer YOUR_TOKEN"
+  --header 'Authorization: Bearer ${RELATICLE_TOKEN}'
 ```
+
+A token typed into the header is saved in plain text in `~/.claude.json`. With `--scope project` it goes into `.mcp.json` at the root of your repository, which Claude Code shares through version control.
 
 ### Cursor with a personal access token
 
