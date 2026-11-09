@@ -1,942 +1,944 @@
 // Each header rendered by ResizableColumns::apply() runs one `resizableColumn` instance,
 // which owns its drag handle.
 
-let dragGuideline = null
-let dragBadge = null
+(() => {
+    let dragGuideline = null
+    let dragBadge = null
 
-// The guideline lives inside the scroll wrapper, so a horizontal scroll mid-drag keeps it on
-// the column edge. The badge is fixed and follows the cursor.
-function ensureDragGuideline(wrapper) {
-    if (!dragGuideline) {
-        dragGuideline = document.createElement('div')
-        dragGuideline.className = 'column-resize-guideline'
-    }
-    if (dragGuideline.parentElement !== wrapper) {
-        wrapper.appendChild(dragGuideline)
-    }
-    return dragGuideline
-}
-
-// `wire:navigate` swaps the whole body, which detaches a badge created on an earlier page.
-function ensureDragBadge() {
-    if (!dragBadge?.isConnected) {
-        dragBadge = document.createElement('div')
-        dragBadge.className = 'column-resize-badge'
-        document.body.appendChild(dragBadge)
-    }
-    return dragBadge
-}
-
-function moveDragOverlay(wrapper, contentX, height, width, cursorX, cursorY) {
-    Object.assign(ensureDragGuideline(wrapper).style, { display: 'block', left: `${contentX}px`, height: `${height}px` })
-    const badge = ensureDragBadge()
-    Object.assign(badge.style, { display: 'block', left: `${cursorX}px`, top: `${cursorY}px` })
-    badge.textContent = `${width}px`
-}
-
-function hideDragOverlay() {
-    if (dragGuideline) dragGuideline.style.display = 'none'
-    if (dragBadge) dragBadge.style.display = 'none'
-}
-
-// `.fi-ta-content-ctn` scrolls horizontally, which defeats `position: sticky` on the header,
-// and a scroll listener lags the compositor. A scroll-driven animation pins it instead.
-const stickyHeadersSupported =
-    typeof CSS !== 'undefined' && CSS.supports('animation-timeline', 'scroll()')
-
-let stickyHeadersWired = false
-let stickyHeadersStyleElement = null
-
-const PAGE_SCROLL_TIMELINE = '--resizable-page-scroll'
-
-// The panel scrolls inside `.fi-layout` (html and body are overflow hidden), not the document.
-function pageScroller(table) {
-    let node = table.closest('.fi-ta-content-ctn')?.parentElement
-    while (node && node !== document.body) {
-        if (/auto|scroll/.test(getComputedStyle(node).overflowY)) return node
-        node = node.parentElement
+    // The guideline lives inside the scroll wrapper, so a horizontal scroll mid-drag keeps it on
+    // the column edge. The badge is fixed and follows the cursor.
+    function ensureDragGuideline(wrapper) {
+        if (!dragGuideline) {
+            dragGuideline = document.createElement('div')
+            dragGuideline.className = 'column-resize-guideline'
+        }
+        if (dragGuideline.parentElement !== wrapper) {
+            wrapper.appendChild(dragGuideline)
+        }
+        return dragGuideline
     }
 
-    return null
-}
-
-function pinLine(scrollerTop) {
-    const topbar = document.querySelector('.fi-topbar-ctn')
-    const topbarBottom = topbar && ['sticky', 'fixed'].includes(getComputedStyle(topbar).position)
-        ? topbar.getBoundingClientRect().bottom
-        : 0
-
-    return Math.max(scrollerTop, topbarBottom)
-}
-
-function stickyHeaderStyleElement() {
-    if (!stickyHeadersStyleElement) {
-        stickyHeadersStyleElement = document.createElement('style')
-        stickyHeadersStyleElement.id = 'resizable-sticky-headers'
-        document.head.appendChild(stickyHeadersStyleElement)
+    // `wire:navigate` swaps the whole body, which detaches a badge created on an earlier page.
+    function ensureDragBadge() {
+        if (!dragBadge?.isConnected) {
+            dragBadge = document.createElement('div')
+            dragBadge.className = 'column-resize-badge'
+            document.body.appendChild(dragBadge)
+        }
+        return dragBadge
     }
 
-    return stickyHeadersStyleElement
-}
+    function moveDragOverlay(wrapper, contentX, height, width, cursorX, cursorY) {
+        Object.assign(ensureDragGuideline(wrapper).style, { display: 'block', left: `${contentX}px`, height: `${height}px` })
+        const badge = ensureDragBadge()
+        Object.assign(badge.style, { display: 'block', left: `${cursorX}px`, top: `${cursorY}px` })
+        badge.textContent = `${width}px`
+    }
 
-// Matches Tailwind's `max-sm`, where a stacked table turns each row into a card.
-const stackedCardsQuery = window.matchMedia('(width < 40rem)')
+    function hideDragOverlay() {
+        if (dragGuideline) dragGuideline.style.display = 'none'
+        if (dragBadge) dragBadge.style.display = 'none'
+    }
 
-function showsCards(table) {
-    return stackedCardsQuery.matches && table.classList.contains('fi-ta-table-stacked-on-mobile')
-}
+    // `.fi-ta-content-ctn` scrolls horizontally, which defeats `position: sticky` on the header,
+    // and a scroll listener lags the compositor. A scroll-driven animation pins it instead.
+    const stickyHeadersSupported =
+        typeof CSS !== 'undefined' && CSS.supports('animation-timeline', 'scroll()')
 
-// Keyframes cannot interpolate CSS variables, so each table's pixel range is written out.
-function measureStickyHeaders() {
-    if (!stickyHeadersSupported) return
+    let stickyHeadersWired = false
+    let stickyHeadersStyleElement = null
 
-    let css = ''
+    const PAGE_SCROLL_TIMELINE = '--resizable-page-scroll'
 
-    document.querySelectorAll('table.fi-ta-resizable-table > thead').forEach((thead, index) => {
-        const table = thead.parentElement
-        const maxShift = Math.max(0, table.offsetHeight - thead.offsetHeight)
-
-        if (maxShift === 0 || showsCards(table)) {
-            thead.removeAttribute('data-sticky-header')
-
-            return
+    // The panel scrolls inside `.fi-layout` (html and body are overflow hidden), not the document.
+    function pageScroller(table) {
+        let node = table.closest('.fi-ta-content-ctn')?.parentElement
+        while (node && node !== document.body) {
+            if (/auto|scroll/.test(getComputedStyle(node).overflowY)) return node
+            node = node.parentElement
         }
 
-        const scroller = pageScroller(table)
-        const scrollerTop = scroller ? scroller.getBoundingClientRect().top : 0
-        const scrollTop = scroller ? scroller.scrollTop : window.scrollY
-        const tableTop = table.getBoundingClientRect().top - scrollerTop + scrollTop
-        const start = Math.max(0, tableTop - (pinLine(scrollerTop) - scrollerTop))
+        return null
+    }
 
-        if (scroller) {
-            scroller.style.scrollTimeline = `${PAGE_SCROLL_TIMELINE} block`
+    function pinLine(scrollerTop) {
+        const topbar = document.querySelector('.fi-topbar-ctn')
+        const topbarBottom = topbar && ['sticky', 'fixed'].includes(getComputedStyle(topbar).position)
+            ? topbar.getBoundingClientRect().bottom
+            : 0
+
+        return Math.max(scrollerTop, topbarBottom)
+    }
+
+    function stickyHeaderStyleElement() {
+        if (!stickyHeadersStyleElement) {
+            stickyHeadersStyleElement = document.createElement('style')
+            stickyHeadersStyleElement.id = 'resizable-sticky-headers'
+            document.head.appendChild(stickyHeadersStyleElement)
         }
 
-        thead.dataset.stickyHeader = String(index)
-        css +=
-            `@keyframes pin-header-${index}{from{transform:translateY(0)}to{transform:translateY(${maxShift}px)}}` +
-            `[data-sticky-header="${index}"]{` +
-            'will-change:transform;' +
-            `animation:pin-header-${index} linear both;` +
-            `animation-timeline:${scroller ? PAGE_SCROLL_TIMELINE : 'scroll(root block)'};` +
-            `animation-range:${start}px ${start + maxShift}px}`
-    })
-
-    stickyHeaderStyleElement().textContent = css
-}
-
-let stickyRecalcPending = false
-
-function scheduleStickyRecalc() {
-    if (!stickyHeadersSupported) return
-    if (stickyRecalcPending) return
-
-    stickyRecalcPending = true
-    requestAnimationFrame(() => {
-        stickyRecalcPending = false
-        measureStickyHeaders()
-    })
-}
-
-function wireStickyHeaders() {
-    if (stickyHeadersWired) return
-    stickyHeadersWired = true
-
-    if (!stickyHeadersSupported) return
-
-    window.addEventListener('resize', scheduleStickyRecalc, { passive: true })
-    document.addEventListener('livewire:navigated', scheduleStickyRecalc)
-
-    measureStickyHeaders()
-}
-
-// Every data column carries an exact width. Under `table-layout: fixed` the actions column,
-// which has only a floor, takes whatever space is left so the table still fills its wrapper.
-function computeMinTableWidth(table) {
-    let total = 0
-    table.querySelectorAll('thead th').forEach((th) => {
-        const saved = th.dataset.resizableWidth
-        if (saved) { total += parseInt(saved, 10); return }
-        if (th.matches('.fi-ta-selection-cell, .fi-ta-actions-header-cell')) { total += parseFloat(getComputedStyle(th).minWidth); return }
-        total += Math.round(th.offsetWidth)
-    })
-    return total
-}
-
-function applyTableSizing(table) {
-    if (showsCards(table)) {
-        table.style.tableLayout = ''
-        table.style.width = ''
-        return
+        return stickyHeadersStyleElement
     }
 
-    table.style.tableLayout = 'fixed'
+    // Matches Tailwind's `max-sm`, where a stacked table turns each row into a card.
+    const stackedCardsQuery = window.matchMedia('(width < 40rem)')
 
-    const wrapper = table.closest('.fi-ta-content-ctn')
-    const wrapperWidth = wrapper?.clientWidth ?? 0
-    const columnsWidth = computeMinTableWidth(table)
-
-    table.style.width = columnsWidth > wrapperWidth ? `${columnsWidth}px` : '100%'
-}
-
-const widthRecalcPending = new WeakSet()
-const observedWrappers = new WeakSet()
-
-function scheduleSizingUpdate(table) {
-    if (widthRecalcPending.has(table)) return
-    widthRecalcPending.add(table)
-    requestAnimationFrame(() => {
-        widthRecalcPending.delete(table)
-        if (table.isConnected) {
-            applyTableSizing(table)
-            applyPinnedOffsets(table)
-            scheduleStickyRecalc()
-        }
-    })
-}
-
-// Observing the wrappers catches sidebar collapses and window resizes without watching rows.
-const wrapperResizeObserver = typeof ResizeObserver === 'undefined'
-    ? null
-    : new ResizeObserver((entries) => {
-        entries.forEach((entry) => {
-            const table = entry.target.querySelector('table.fi-ta-resizable-table')
-            if (table) scheduleSizingUpdate(table)
-        })
-    })
-
-// A Livewire morph resets the wrapper's horizontal scroll to 0. The position is kept off the
-// DOM, which the morph would strip, so a sort or search does not jump back to the left edge.
-const wrapperScrollLeft = new WeakMap()
-const scrollTrackedWrappers = new WeakSet()
-
-function trackWrapperScroll(wrapper) {
-    if (scrollTrackedWrappers.has(wrapper)) return
-    scrollTrackedWrappers.add(wrapper)
-    wrapper.addEventListener('scroll', () => {
-        wrapperScrollLeft.set(wrapper, wrapper.scrollLeft)
-        markScrolledSideways(wrapper.querySelector('table.fi-ta-table'))
-    }, { passive: true })
-}
-
-function markScrolledSideways(table) {
-    table?.toggleAttribute('data-scrolled-x', (table.closest('.fi-ta-content-ctn')?.scrollLeft ?? 0) > 0)
-}
-
-// Each pinned cell sticks at the selection column's width plus the pinned widths before it.
-function applyPinnedOffsets(table) {
-    const pinned = headersOf(table).filter((th) => th.dataset.columnPinned === '1')
-    const selection = table.querySelector('thead .fi-ta-selection-cell')
-    let left = selection?.offsetWidth ?? 0
-    const offsets = pinned.map((th) => {
-        const offset = left
-        left += parseInt(th.dataset.resizableWidth, 10) || th.offsetWidth
-        return offset
-    })
-    // Pins stick only while the widest other column and the actions column still fit beside them, so none is cut off.
-    const room = table.closest('.fi-ta-content-ctn')?.clientWidth || Infinity
-    const actions = table.querySelector('thead .fi-ta-actions-header-cell')?.offsetWidth ?? 0
-    const widest = Math.min(window.filamentData.defaultColumnWidth, Math.max(0, ...headersOf(table).filter((th) => !pinned.includes(th)).map((th) => parseInt(th.dataset.resizableWidth, 10) || th.offsetWidth)))
-    const active = pinned.length > 0 && left + actions + widest <= room && !showsCards(table)
-
-    table.classList.toggle('fi-ta-has-pinned', active)
-    table.querySelectorAll('[data-column-pinned-last]').forEach((cell) => cell.removeAttribute('data-column-pinned-last'))
-    pinned.forEach((th, index) => {
-        [th, ...table.querySelectorAll(`.fi-ta-cell-${CSS.escape(th.dataset.resizableColumnId)}`)].forEach((cell) => {
-            cell.style.left = active ? `${offsets[index]}px` : ''
-            cell.toggleAttribute('data-column-pinned-last', active && index === pinned.length - 1)
-        })
-    })
-    markScrolledSideways(table)
-    keepPinsInColumnManager(table, pinned.map(headerName))
-}
-
-// Filament's column manager has no per-item lock, so its sortable list leaves the pins where they are.
-function keepPinsInColumnManager(table, pinned) {
-    const list = table.closest('.fi-ta')?.querySelector('.fi-ta-col-manager-items')
-    if (!list?.sortable) return
-
-    const isPinned = (item) => pinned.includes(item?.getAttribute('x-sortable-item')?.replace(/^column::/, ''))
-
-    list.sortable.option('onMove', (event) => !isPinned(event.related))
-    list.querySelectorAll(':scope > [x-sortable-item]').forEach((item) => item.toggleAttribute('data-column-pinned', isPinned(item)))
-}
-
-function lockTable(table) {
-    if (table.dataset.resizableLayoutLocked === '1') return
-
-    table.classList.add('fi-ta-resizable-table')
-    applyTableSizing(table)
-
-    const wrapper = table.closest('.fi-ta-content-ctn')
-    if (wrapper) {
-        trackWrapperScroll(wrapper)
-        if (getComputedStyle(wrapper).position === 'static') {
-            wrapper.style.position = 'relative'
-        }
-        if (wrapperResizeObserver && !observedWrappers.has(wrapper)) {
-            observedWrappers.add(wrapper)
-            wrapperResizeObserver.observe(wrapper)
-        }
+    function showsCards(table) {
+        return stackedCardsQuery.matches && table.classList.contains('fi-ta-table-stacked-on-mobile')
     }
 
-    table.dataset.resizableLayoutLocked = '1'
-    applyPinnedOffsets(table)
-    scheduleStickyRecalc()
-}
+    // Keyframes cannot interpolate CSS variables, so each table's pixel range is written out.
+    function measureStickyHeaders() {
+        if (!stickyHeadersSupported) return
 
-// A morph keeps the server-rendered widths but strips the table class, the lock flag, the
-// label wrappers and the handles, so a table its component morphed is rebuilt from its headers.
-function rebuildResizableTablesAfterMorph({ el }) {
-    document.querySelectorAll('table.fi-ta-table:has(thead th[x-data^="resizableColumn"])').forEach((table) => {
-        if (!el.contains(table) && !table.contains(el)) return
+        let css = ''
 
-        delete table.dataset.resizableLayoutLocked
-        lockTable(table)
-        table.querySelectorAll('thead th[x-data^="resizableColumn"]').forEach(reapplyHeader)
+        document.querySelectorAll('table.fi-ta-resizable-table > thead').forEach((thead, index) => {
+            const table = thead.parentElement
+            const maxShift = Math.max(0, table.offsetHeight - thead.offsetHeight)
 
-        if (el.contains(table)) restoreColumnFocus(table)
-
-        const wrapper = table.closest('.fi-ta-content-ctn')
-        const savedScrollLeft = wrapper && wrapperScrollLeft.get(wrapper)
-        if (wrapper && savedScrollLeft && wrapper.scrollLeft !== savedScrollLeft) {
-            wrapper.scrollLeft = savedScrollLeft
-        }
-    })
-}
-
-// A block laid out at `max-content` takes the width its content asks for. All writes come before
-// any read, because a read between writes forces a full table layout per element.
-function naturalWidths(elements) {
-    const saved = elements.map((element) => element && { width: element.style.width, maxWidth: element.style.maxWidth })
-    elements.forEach((element) => element && Object.assign(element.style, { width: 'max-content', maxWidth: 'none' }))
-    const widths = elements.map((element) => (element ? element.getBoundingClientRect().width : 0))
-    elements.forEach((element, index) => element && Object.assign(element.style, saved[index]))
-
-    return widths
-}
-
-// The cells are border-box, so the width a column is given must also cover its 1px divider.
-function horizontalInset(element) {
-    const style = getComputedStyle(element)
-
-    return ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth']
-        .reduce((total, property) => total + parseFloat(style[property]), 0)
-}
-
-function wrapHeaderLabel(th) {
-    if (th.querySelector(':scope > .fi-ta-resizable-label')) return
-
-    const wrapper = document.createElement('span')
-    wrapper.className = 'fi-ta-resizable-label'
-    wrapper.append(...Array.from(th.childNodes).filter((node) => !node.matches?.('.column-resize-handle-bar, .fi-ta-column-handle')))
-    th.insertBefore(wrapper, th.firstChild)
-}
-
-function reapplyHeader(th) {
-    wrapHeaderLabel(th)
-    if (!th.querySelector('.column-resize-handle-bar')) {
-        window.Alpine?.$data?.(th)?.createHandle?.()
-    }
-    if (!th.querySelector('.fi-ta-column-handle')) {
-        window.Alpine?.$data?.(th)?.createColumnControls?.()
-    }
-}
-
-// A move re-renders the headers, so the control that started it is focused again afterwards.
-let pendingColumnFocus = null
-
-function forgetColumnFocus() {
-    pendingColumnFocus = null
-}
-
-function runColumnAction(run, focusColumn) {
-    pendingColumnFocus = focusColumn
-    Promise.resolve(run()).catch(forgetColumnFocus)
-}
-
-function restoreColumnFocus(table) {
-    if (!pendingColumnFocus) return
-    const handle = columnHandle(table, pendingColumnFocus)
-    pendingColumnFocus = null
-    handle?.focus()
-}
-
-// A morph strips and rebuilds the header handles, so a handle is found again by its column.
-function columnHandle(table, column) {
-    const th = headersOf(table).find((header) => headerName(header) === column)
-
-    return th?.querySelector('.fi-ta-column-handle') ?? null
-}
-
-function headersOf(table) {
-    return [...table.querySelectorAll('thead th[x-data^="resizableColumn"]')]
-}
-
-function headerName(th) {
-    return th ? window.Alpine?.$data?.(th)?.columnName ?? null : null
-}
-
-// The pinned columns stay put, so a column moves only among the unpinned ones.
-function isMovable(th) {
-    return th !== undefined && th.dataset.columnPinned !== '1'
-}
-
-function moveTargets(th) {
-    const headers = headersOf(th.closest('table'))
-    const index = headers.indexOf(th)
-    const left = headers[index - 1]
-    const canSwapWith = (other) => isMovable(th) && isMovable(other)
-
-    return {
-        movable: isMovable(th),
-        canMoveLeft: canSwapWith(left),
-        canMoveRight: canSwapWith(headers[index + 1]),
-        before: {
-            left: left ? headerName(left) : null,
-            right: headers[index + 2] ? headerName(headers[index + 2]) : null,
-        },
-        // Where focus goes when this column is hidden.
-        neighbour: headerName(left ?? headers[index + 1]),
-    }
-}
-
-// A header press only turns into a drag past this distance, so a click still sorts.
-const DRAG_THRESHOLD = 4
-// Within this distance of the scroll wrapper's edge, a drag scrolls the table sideways.
-const AUTO_SCROLL_EDGE = 48
-const AUTO_SCROLL_MAX_SPEED = 18
-
-// A copy of the real column follows the pointer: its header and every cell, each at its own height and
-// offset, so group rows keep their gaps. It ends where the table's visible area does.
-function createDragGhost(th, cells) {
-    const top = th.getBoundingClientRect().top
-    const visibleBottom = Math.min(window.innerHeight, th.closest('.fi-ta-content-ctn')?.getBoundingClientRect().bottom ?? window.innerHeight)
-    const ghost = document.createElement('div')
-    ghost.className = 'fi-ta-column-drag-ghost'
-    // The copied cells carry Livewire and Alpine directives that must not start up again.
-    ghost.setAttribute('x-ignore', '')
-    // A copy for the eye only: screen readers and the keyboard skip it.
-    ghost.inert = true
-    const { font, color } = getComputedStyle(th.closest('table'))
-    Object.assign(ghost.style, { width: `${th.offsetWidth}px`, height: `${Math.min(visibleBottom, (cells.at(-1) ?? th).getBoundingClientRect().bottom) - top}px`, font, color })
-    ghost.append(...[...cells, th].map((cell) => copyColumnCell(cell, cell.getBoundingClientRect().top - top)))
-    ghost.querySelectorAll('[id]').forEach((element) => element.removeAttribute('id'))
-    document.body.appendChild(ghost)
-
-    return ghost
-}
-
-function copyColumnCell(cell, top) {
-    const copy = document.createElement('div')
-    copy.className = `${cell.className} fi-ta-column-drag-ghost-cell`
-    Object.assign(copy.style, { top: `${top}px`, height: `${cell.offsetHeight}px`, padding: getComputedStyle(cell).padding })
-    // Only what the cell shows: a stacked table's card label is hidden by rules the copy, outside the table, would lose.
-    copy.append(...[...cell.children].filter((child) => !child.matches('.fi-ta-column-handle, .column-resize-handle-bar') && getComputedStyle(child).display !== 'none').map((child) => child.cloneNode(true)))
-
-    return copy
-}
-
-// Slots keep the layout from before the drag, so the shifted columns never feed back into the target.
-function columnSlots(table) {
-    return headersOf(table).map((th) => ({
-        th,
-        left: th.offsetLeft,
-        width: th.offsetWidth,
-        elements: [th, ...table.querySelectorAll(`.fi-ta-cell-${CSS.escape(th.dataset.resizableColumnId)}`)],
-    }))
-}
-
-// A neighbour swaps once the dragged column's leading edge passes its middle, the same distance either way.
-// The pinned columns keep their places.
-function dropIndex(slots, source, left) {
-    const right = left + source.width
-    const start = slots.indexOf(source)
-    const middle = (slot) => slot.left + slot.width / 2
-    const before = slots.slice(0, start).filter((slot) => middle(slot) < left).length
-    const after = slots.slice(start + 1).filter((slot) => middle(slot) < right).length
-    const pinned = slots.filter((slot) => slot.th.dataset.columnPinned === '1').length
-
-    return Math.max(before + after, pinned)
-}
-
-function shiftColumns(slots, source, index) {
-    const order = slots.filter((slot) => slot !== source)
-    order.splice(index, 0, source)
-
-    let left = slots[0].left
-    order.forEach((slot) => {
-        const shift = left - slot.left
-        slot.elements.forEach((element) => {
-            element.style.transform = shift ? `translateX(${shift}px)` : ''
-        })
-        left += slot.width
-    })
-}
-
-function moveColumnCells(source, target, last) {
-    source.elements.forEach((element) => {
-        const row = element.parentElement
-        const anchor = (target ?? last).elements.find((cell) => cell.parentElement === row)
-        if (!anchor) return
-        target ? row.insertBefore(element, anchor) : anchor.after(element)
-    })
-}
-
-function clearShift(slots) {
-    slots.forEach((slot) => slot.elements.forEach((element) => {
-        element.style.transform = ''
-    }))
-}
-
-// A press on a movable header drags it, except on its controls. Touch keeps swiping the table.
-function startHeaderDrag(event, th, wire) {
-    if (event.button !== 0 || event.pointerType === 'touch' || !isMovable(th)) return
-    if (event.target.closest('.fi-ta-column-handle, .column-resize-handle-bar')) return
-
-    startColumnDrag(event, th, wire)
-}
-
-// The press that ends a drag still clicks what it lands on, and a header click would sort.
-function swallowNextClick() {
-    const swallow = (clickEvent) => {
-        clickEvent.preventDefault()
-        clickEvent.stopPropagation()
-    }
-    window.addEventListener('click', swallow, { capture: true, once: true })
-    setTimeout(() => window.removeEventListener('click', swallow, true))
-}
-
-// The second press of a double-click lands on what the closed menu uncovered, often a row link.
-function swallowDoubleClickTail() {
-    const swallow = (clickEvent) => {
-        if (clickEvent.detail < 2) return
-        clickEvent.preventDefault()
-        clickEvent.stopPropagation()
-    }
-    window.addEventListener('click', swallow, { capture: true })
-    setTimeout(() => window.removeEventListener('click', swallow, true), 500)
-}
-
-function updateDrag(drag) {
-    const { ghost, table, slots, source, grabOffset, pointer } = drag
-
-    Object.assign(ghost.style, { left: `${pointer.x - grabOffset}px`, top: `${table.tHead.getBoundingClientRect().top}px` })
-    drag.index = dropIndex(slots, source, pointer.x - grabOffset - table.getBoundingClientRect().left)
-    shiftColumns(slots, source, drag.index)
-}
-
-// Within the wrapper's edge zone the table scrolls sideways, faster the closer the pointer gets to the edge.
-function autoScrollDrag(drag) {
-    const { wrapper, pointer } = drag
-    drag.scrollFrame = null
-    if (!drag.ghost || !wrapper) return
-
-    const box = wrapper.getBoundingClientRect()
-    const towardsLeft = AUTO_SCROLL_EDGE - (pointer.x - box.left)
-    const towardsRight = AUTO_SCROLL_EDGE - (box.right - pointer.x)
-    const pressure = Math.max(towardsLeft, towardsRight)
-    if (pressure <= 0) return
-
-    const before = wrapper.scrollLeft
-    wrapper.scrollLeft += Math.sign(towardsRight - towardsLeft) * Math.ceil(AUTO_SCROLL_MAX_SPEED * Math.min(1, pressure / AUTO_SCROLL_EDGE))
-    if (wrapper.scrollLeft === before) return
-
-    updateDrag(drag)
-    drag.scrollFrame = requestAnimationFrame(() => autoScrollDrag(drag))
-}
-
-function endDrag({ ghost, source, table, slots }) {
-    ghost.remove()
-    source.elements.forEach((element) => element.classList.remove('fi-ta-column-dragging'))
-    table.classList.remove('fi-ta-reordering')
-    document.body.classList.remove('reordering-column')
-    clearShift(slots)
-}
-
-function dropColumn({ th, wire, table, wrapper, source, others, index, startIndex, pointer }) {
-    const box = (wrapper ?? table).getBoundingClientRect()
-    const insideTable = pointer.x >= box.left && pointer.x <= box.right && pointer.y >= box.top && pointer.y <= table.getBoundingClientRect().bottom
-
-    if (!insideTable || index === startIndex) return
-
-    // The cells move in the page at once, so the server's re-render arrives with nothing left to change.
-    moveColumnCells(source, others[index] ?? null, others.at(-1))
-    runColumnAction(() => wire.moveTableColumn(headerName(th), others[index] ? headerName(others[index].th) : null), null)
-}
-
-function startColumnDrag(event, th, wire) {
-    const table = th.closest('table')
-    const slots = columnSlots(table)
-    const source = slots.find((slot) => slot.th === th)
-    const startIndex = slots.indexOf(source)
-    const startX = event.clientX
-    const drag = {
-        th,
-        wire,
-        table,
-        slots,
-        source,
-        startIndex,
-        wrapper: table.closest('.fi-ta-content-ctn'),
-        others: slots.filter((slot) => slot !== source),
-        grabOffset: startX - th.getBoundingClientRect().left,
-        index: startIndex,
-        pointer: { x: startX, y: event.clientY },
-        ghost: null,
-        scrollFrame: null,
-        moveFrame: null,
-    }
-
-    // The pointer reports more often than the screen paints, so the moves in a frame shift the columns once.
-    const scheduleUpdate = () => {
-        drag.moveFrame ??= requestAnimationFrame(() => {
-            drag.moveFrame = null
-            updateDrag(drag)
-        })
-    }
-
-    const onMove = (moveEvent) => {
-        drag.pointer = { x: moveEvent.clientX, y: moveEvent.clientY }
-
-        if (!drag.ghost) {
-            if (Math.abs(moveEvent.clientX - startX) < DRAG_THRESHOLD) return
-            window.getSelection()?.removeAllRanges()
-            drag.ghost = createDragGhost(th, source.elements.slice(1))
-            source.elements.forEach((element) => element.classList.add('fi-ta-column-dragging'))
-            table.classList.add('fi-ta-reordering')
-            document.body.classList.add('reordering-column')
-        }
-
-        scheduleUpdate()
-        drag.scrollFrame ??= requestAnimationFrame(() => autoScrollDrag(drag))
-    }
-
-    const finish = (shouldDrop) => {
-        document.removeEventListener('pointermove', onMove)
-        document.removeEventListener('pointerup', onUp)
-        document.removeEventListener('pointercancel', onCancel)
-        document.removeEventListener('keydown', onKey)
-        if (drag.scrollFrame) cancelAnimationFrame(drag.scrollFrame)
-        if (drag.moveFrame) cancelAnimationFrame(drag.moveFrame)
-
-        if (!drag.ghost) return
-
-        updateDrag(drag)
-        swallowNextClick()
-        endDrag(drag)
-        if (shouldDrop) dropColumn(drag)
-    }
-
-    const onUp = (upEvent) => {
-        drag.pointer = { x: upEvent.clientX, y: upEvent.clientY }
-        finish(true)
-    }
-    const onCancel = () => finish(false)
-    const onKey = (keyEvent) => {
-        if (keyEvent.key === 'Escape') finish(false)
-    }
-
-    document.addEventListener('pointermove', onMove)
-    document.addEventListener('pointerup', onUp)
-    document.addEventListener('pointercancel', onCancel)
-    document.addEventListener('keydown', onKey)
-}
-
-function registerColumnMenu() {
-    window.Alpine.data('tableColumnMenu', () => ({
-        column: null,
-        trigger: null,
-        panel: null,
-        hideable: false,
-        movable: false,
-        pinned: false,
-        canMoveLeft: false,
-        canMoveRight: false,
-        before: { left: null, right: null },
-        neighbour: null,
-        top: 0,
-        right: 0,
-
-        open(detail) {
-            if (this.column === detail.column) {
-                this.close(true)
+            if (maxShift === 0 || showsCards(table)) {
+                thead.removeAttribute('data-sticky-header')
 
                 return
             }
 
-            pendingColumnFocus = null
-            this.close(false)
+            const scroller = pageScroller(table)
+            const scrollerTop = scroller ? scroller.getBoundingClientRect().top : 0
+            const scrollTop = scroller ? scroller.scrollTop : window.scrollY
+            const tableTop = table.getBoundingClientRect().top - scrollerTop + scrollTop
+            const start = Math.max(0, tableTop - (pinLine(scrollerTop) - scrollerTop))
 
-            // Placed by its right edge in the same update that shows it, so it never appears elsewhere first.
-            // A hidden panel still reports its CSS width, which keeps it on screen beside a column at the left edge.
-            const rect = detail.trigger.getBoundingClientRect()
-            const width = parseFloat(getComputedStyle(this.panel).width) || 0
-            // The viewport width without a classic scrollbar, which `fixed` positioning also excludes.
-            const viewportWidth = document.documentElement.clientWidth
-            // Kept inside the table's own left edge, so the sidebar beside the table never covers it.
-            const minLeft = Math.max(8, (this.$el.closest('.fi-ta')?.getBoundingClientRect().left ?? 0) + 8)
-            const right = Math.min(viewportWidth - rect.right, viewportWidth - width - minLeft)
-            Object.assign(this, detail, { top: rect.bottom + 4, right: Math.max(8, right) })
-            this.trigger.setAttribute('aria-expanded', 'true')
-
-            // Alpine reveals the menu sections a frame after the update, so the height is read then.
-            this.$nextTick(() => requestAnimationFrame(() => {
-                if (this.column !== detail.column) return
-
-                this.top = this.verticalPosition(rect)
-                this.$nextTick(() => this.items()[0]?.focus())
-            }))
-        },
-
-        verticalPosition(rect) {
-            const height = this.panel.offsetHeight
-            const viewportHeight = document.documentElement.clientHeight
-            const below = rect.bottom + 4
-            const above = rect.top - 4 - height
-
-            if (below + height <= viewportHeight - 8) return below
-
-            return above >= 8 ? above : Math.max(8, viewportHeight - height - 8)
-        },
-
-        items() {
-            return [...this.panel.querySelectorAll('[role="menuitem"]')].filter((item) => !item.disabled && item.offsetParent !== null)
-        },
-
-        step(delta) {
-            const items = this.items()
-            const index = items.indexOf(document.activeElement)
-            items[(index + delta + items.length) % items.length]?.focus()
-        },
-
-        close(returnFocus) {
-            if (this.column === null) return
-            const trigger = this.trigger?.isConnected
-                ? this.trigger
-                : columnHandle(this.$el.closest('.fi-ta'), this.column)
-            trigger?.setAttribute('aria-expanded', 'false')
-            if (returnFocus) trigger?.focus()
-            this.column = null
-        },
-
-        choose(run, focusColumn) {
-            runColumnAction(run, focusColumn)
-            this.close(false)
-            swallowDoubleClickTail()
-        },
-    }))
-}
-
-function registerResizableColumn() {
-    wireStickyHeaders()
-    window.Alpine.data('resizableColumn', (columnName, columnId, min, max) => ({
-        columnName,
-        // Relationship columns keep the dot in Filament's cell class (`user.name`).
-        cellSelector: `.fi-ta-cell-${CSS.escape(columnId)}`,
-        column: null,
-        table: null,
-        tableWrapper: null,
-        handleBar: null,
-
-        init() {
-            this.column = this.$el
-            this.table = this.$el.closest('.fi-ta-table')
-            this.tableWrapper = this.$el.closest('.fi-ta-content-ctn')
-            if (!this.column || !this.table || !this.tableWrapper) return
-
-            this.column.classList.add('fi-ta-resizable-header')
-
-            lockTable(this.table)
-            wrapHeaderLabel(this.column)
-            this.createHandle()
-            this.createColumnControls()
-
-            // Alpine re-runs init when the header's x-data changes, so the listener is bound once.
-            if (!this.column.reorderListenerBound) {
-                this.column.reorderListenerBound = true
-                this.column.addEventListener('pointerdown', (e) => startHeaderDrag(e, this.column, this.$wire))
+            if (scroller) {
+                scroller.style.scrollTimeline = `${PAGE_SCROLL_TIMELINE} block`
             }
-        },
 
-        createColumnControls() {
-            this.column.querySelector(':scope > .fi-ta-column-handle')?.remove()
+            thead.dataset.stickyHeader = String(index)
+            css +=
+                `@keyframes pin-header-${index}{from{transform:translateY(0)}to{transform:translateY(${maxShift}px)}}` +
+                `[data-sticky-header="${index}"]{` +
+                'will-change:transform;' +
+                `animation:pin-header-${index} linear both;` +
+                `animation-timeline:${scroller ? PAGE_SCROLL_TIMELINE : 'scroll(root block)'};` +
+                `animation-range:${start}px ${start + maxShift}px}`
+        })
 
-            const handle = document.createElement('button')
-            handle.type = 'button'
-            handle.className = 'fi-ta-column-handle'
-            const label = this.column.querySelector(':scope > .fi-ta-resizable-label')?.textContent.replace(/\s+/g, ' ').trim()
-            handle.setAttribute('aria-label', window.filamentData.columnOptionsFor.replace(':column', label || columnName))
-            handle.setAttribute('aria-haspopup', 'menu')
-            handle.setAttribute('aria-expanded', 'false')
-            if (isMovable(this.column)) {
-                handle.addEventListener('keydown', (e) => this.moveByKey(e))
+        stickyHeaderStyleElement().textContent = css
+    }
+
+    let stickyRecalcPending = false
+
+    function scheduleStickyRecalc() {
+        if (!stickyHeadersSupported) return
+        if (stickyRecalcPending) return
+
+        stickyRecalcPending = true
+        requestAnimationFrame(() => {
+            stickyRecalcPending = false
+            measureStickyHeaders()
+        })
+    }
+
+    function wireStickyHeaders() {
+        if (stickyHeadersWired) return
+        stickyHeadersWired = true
+
+        if (!stickyHeadersSupported) return
+
+        window.addEventListener('resize', scheduleStickyRecalc, { passive: true })
+        document.addEventListener('livewire:navigated', scheduleStickyRecalc)
+
+        measureStickyHeaders()
+    }
+
+    // Every data column carries an exact width. Under `table-layout: fixed` the actions column,
+    // which has only a floor, takes whatever space is left so the table still fills its wrapper.
+    function computeMinTableWidth(table) {
+        let total = 0
+        table.querySelectorAll('thead th').forEach((th) => {
+            const saved = th.dataset.resizableWidth
+            if (saved) { total += parseInt(saved, 10); return }
+            if (th.matches('.fi-ta-selection-cell, .fi-ta-actions-header-cell')) { total += parseFloat(getComputedStyle(th).minWidth); return }
+            total += Math.round(th.offsetWidth)
+        })
+        return total
+    }
+
+    function applyTableSizing(table) {
+        if (showsCards(table)) {
+            table.style.tableLayout = ''
+            table.style.width = ''
+            return
+        }
+
+        table.style.tableLayout = 'fixed'
+
+        const wrapper = table.closest('.fi-ta-content-ctn')
+        const wrapperWidth = wrapper?.clientWidth ?? 0
+        const columnsWidth = computeMinTableWidth(table)
+
+        table.style.width = columnsWidth > wrapperWidth ? `${columnsWidth}px` : '100%'
+    }
+
+    const widthRecalcPending = new WeakSet()
+    const observedWrappers = new WeakSet()
+
+    function scheduleSizingUpdate(table) {
+        if (widthRecalcPending.has(table)) return
+        widthRecalcPending.add(table)
+        requestAnimationFrame(() => {
+            widthRecalcPending.delete(table)
+            if (table.isConnected) {
+                applyTableSizing(table)
+                applyPinnedOffsets(table)
+                scheduleStickyRecalc()
             }
-            handle.addEventListener('click', (e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                window.dispatchEvent(new CustomEvent('column-menu-open', {
-                    detail: {
-                        column: columnName,
-                        trigger: handle,
-                        hideable: this.column.dataset.columnHideable === '1',
-                        pinned: this.column.dataset.columnPinned === '1',
-                        ...moveTargets(this.column),
-                    },
+        })
+    }
+
+    // Observing the wrappers catches sidebar collapses and window resizes without watching rows.
+    const wrapperResizeObserver = typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver((entries) => {
+            entries.forEach((entry) => {
+                const table = entry.target.querySelector('table.fi-ta-resizable-table')
+                if (table) scheduleSizingUpdate(table)
+            })
+        })
+
+    // A Livewire morph resets the wrapper's horizontal scroll to 0. The position is kept off the
+    // DOM, which the morph would strip, so a sort or search does not jump back to the left edge.
+    const wrapperScrollLeft = new WeakMap()
+    const scrollTrackedWrappers = new WeakSet()
+
+    function trackWrapperScroll(wrapper) {
+        if (scrollTrackedWrappers.has(wrapper)) return
+        scrollTrackedWrappers.add(wrapper)
+        wrapper.addEventListener('scroll', () => {
+            wrapperScrollLeft.set(wrapper, wrapper.scrollLeft)
+            markScrolledSideways(wrapper.querySelector('table.fi-ta-table'))
+        }, { passive: true })
+    }
+
+    function markScrolledSideways(table) {
+        table?.toggleAttribute('data-scrolled-x', (table.closest('.fi-ta-content-ctn')?.scrollLeft ?? 0) > 0)
+    }
+
+    // Each pinned cell sticks at the selection column's width plus the pinned widths before it.
+    function applyPinnedOffsets(table) {
+        const pinned = headersOf(table).filter((th) => th.dataset.columnPinned === '1')
+        const selection = table.querySelector('thead .fi-ta-selection-cell')
+        let left = selection?.offsetWidth ?? 0
+        const offsets = pinned.map((th) => {
+            const offset = left
+            left += parseInt(th.dataset.resizableWidth, 10) || th.offsetWidth
+            return offset
+        })
+        // Pins stick only while the widest other column and the actions column still fit beside them, so none is cut off.
+        const room = table.closest('.fi-ta-content-ctn')?.clientWidth || Infinity
+        const actions = table.querySelector('thead .fi-ta-actions-header-cell')?.offsetWidth ?? 0
+        const widest = Math.min(window.filamentData.defaultColumnWidth, Math.max(0, ...headersOf(table).filter((th) => !pinned.includes(th)).map((th) => parseInt(th.dataset.resizableWidth, 10) || th.offsetWidth)))
+        const active = pinned.length > 0 && left + actions + widest <= room && !showsCards(table)
+
+        table.classList.toggle('fi-ta-has-pinned', active)
+        table.querySelectorAll('[data-column-pinned-last]').forEach((cell) => cell.removeAttribute('data-column-pinned-last'))
+        pinned.forEach((th, index) => {
+            [th, ...table.querySelectorAll(`.fi-ta-cell-${CSS.escape(th.dataset.resizableColumnId)}`)].forEach((cell) => {
+                cell.style.left = active ? `${offsets[index]}px` : ''
+                cell.toggleAttribute('data-column-pinned-last', active && index === pinned.length - 1)
+            })
+        })
+        markScrolledSideways(table)
+        keepPinsInColumnManager(table, pinned.map(headerName))
+    }
+
+    // Filament's column manager has no per-item lock, so its sortable list leaves the pins where they are.
+    function keepPinsInColumnManager(table, pinned) {
+        const list = table.closest('.fi-ta')?.querySelector('.fi-ta-col-manager-items')
+        if (!list?.sortable) return
+
+        const isPinned = (item) => pinned.includes(item?.getAttribute('x-sortable-item')?.replace(/^column::/, ''))
+
+        list.sortable.option('onMove', (event) => !isPinned(event.related))
+        list.querySelectorAll(':scope > [x-sortable-item]').forEach((item) => item.toggleAttribute('data-column-pinned', isPinned(item)))
+    }
+
+    function lockTable(table) {
+        if (table.dataset.resizableLayoutLocked === '1') return
+
+        table.classList.add('fi-ta-resizable-table')
+        applyTableSizing(table)
+
+        const wrapper = table.closest('.fi-ta-content-ctn')
+        if (wrapper) {
+            trackWrapperScroll(wrapper)
+            if (getComputedStyle(wrapper).position === 'static') {
+                wrapper.style.position = 'relative'
+            }
+            if (wrapperResizeObserver && !observedWrappers.has(wrapper)) {
+                observedWrappers.add(wrapper)
+                wrapperResizeObserver.observe(wrapper)
+            }
+        }
+
+        table.dataset.resizableLayoutLocked = '1'
+        applyPinnedOffsets(table)
+        scheduleStickyRecalc()
+    }
+
+    // A morph keeps the server-rendered widths but strips the table class, the lock flag, the
+    // label wrappers and the handles, so a table its component morphed is rebuilt from its headers.
+    function rebuildResizableTablesAfterMorph({ el }) {
+        document.querySelectorAll('table.fi-ta-table:has(thead th[x-data^="resizableColumn"])').forEach((table) => {
+            if (!el.contains(table) && !table.contains(el)) return
+
+            delete table.dataset.resizableLayoutLocked
+            lockTable(table)
+            table.querySelectorAll('thead th[x-data^="resizableColumn"]').forEach(reapplyHeader)
+
+            if (el.contains(table)) restoreColumnFocus(table)
+
+            const wrapper = table.closest('.fi-ta-content-ctn')
+            const savedScrollLeft = wrapper && wrapperScrollLeft.get(wrapper)
+            if (wrapper && savedScrollLeft && wrapper.scrollLeft !== savedScrollLeft) {
+                wrapper.scrollLeft = savedScrollLeft
+            }
+        })
+    }
+
+    // A block laid out at `max-content` takes the width its content asks for. All writes come before
+    // any read, because a read between writes forces a full table layout per element.
+    function naturalWidths(elements) {
+        const saved = elements.map((element) => element && { width: element.style.width, maxWidth: element.style.maxWidth })
+        elements.forEach((element) => element && Object.assign(element.style, { width: 'max-content', maxWidth: 'none' }))
+        const widths = elements.map((element) => (element ? element.getBoundingClientRect().width : 0))
+        elements.forEach((element, index) => element && Object.assign(element.style, saved[index]))
+
+        return widths
+    }
+
+    // The cells are border-box, so the width a column is given must also cover its 1px divider.
+    function horizontalInset(element) {
+        const style = getComputedStyle(element)
+
+        return ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth']
+            .reduce((total, property) => total + parseFloat(style[property]), 0)
+    }
+
+    function wrapHeaderLabel(th) {
+        if (th.querySelector(':scope > .fi-ta-resizable-label')) return
+
+        const wrapper = document.createElement('span')
+        wrapper.className = 'fi-ta-resizable-label'
+        wrapper.append(...Array.from(th.childNodes).filter((node) => !node.matches?.('.column-resize-handle-bar, .fi-ta-column-handle')))
+        th.insertBefore(wrapper, th.firstChild)
+    }
+
+    function reapplyHeader(th) {
+        wrapHeaderLabel(th)
+        if (!th.querySelector('.column-resize-handle-bar')) {
+            window.Alpine?.$data?.(th)?.createHandle?.()
+        }
+        if (!th.querySelector('.fi-ta-column-handle')) {
+            window.Alpine?.$data?.(th)?.createColumnControls?.()
+        }
+    }
+
+    // A move re-renders the headers, so the control that started it is focused again afterwards.
+    let pendingColumnFocus = null
+
+    function forgetColumnFocus() {
+        pendingColumnFocus = null
+    }
+
+    function runColumnAction(run, focusColumn) {
+        pendingColumnFocus = focusColumn
+        Promise.resolve(run()).catch(forgetColumnFocus)
+    }
+
+    function restoreColumnFocus(table) {
+        if (!pendingColumnFocus) return
+        const handle = columnHandle(table, pendingColumnFocus)
+        pendingColumnFocus = null
+        handle?.focus()
+    }
+
+    // A morph strips and rebuilds the header handles, so a handle is found again by its column.
+    function columnHandle(table, column) {
+        const th = headersOf(table).find((header) => headerName(header) === column)
+
+        return th?.querySelector('.fi-ta-column-handle') ?? null
+    }
+
+    function headersOf(table) {
+        return [...table.querySelectorAll('thead th[x-data^="resizableColumn"]')]
+    }
+
+    function headerName(th) {
+        return th ? window.Alpine?.$data?.(th)?.columnName ?? null : null
+    }
+
+    // The pinned columns stay put, so a column moves only among the unpinned ones.
+    function isMovable(th) {
+        return th !== undefined && th.dataset.columnPinned !== '1'
+    }
+
+    function moveTargets(th) {
+        const headers = headersOf(th.closest('table'))
+        const index = headers.indexOf(th)
+        const left = headers[index - 1]
+        const canSwapWith = (other) => isMovable(th) && isMovable(other)
+
+        return {
+            movable: isMovable(th),
+            canMoveLeft: canSwapWith(left),
+            canMoveRight: canSwapWith(headers[index + 1]),
+            before: {
+                left: left ? headerName(left) : null,
+                right: headers[index + 2] ? headerName(headers[index + 2]) : null,
+            },
+            // Where focus goes when this column is hidden.
+            neighbour: headerName(left ?? headers[index + 1]),
+        }
+    }
+
+    // A header press only turns into a drag past this distance, so a click still sorts.
+    const DRAG_THRESHOLD = 4
+    // Within this distance of the scroll wrapper's edge, a drag scrolls the table sideways.
+    const AUTO_SCROLL_EDGE = 48
+    const AUTO_SCROLL_MAX_SPEED = 18
+
+    // A copy of the real column follows the pointer: its header and every cell, each at its own height and
+    // offset, so group rows keep their gaps. It ends where the table's visible area does.
+    function createDragGhost(th, cells) {
+        const top = th.getBoundingClientRect().top
+        const visibleBottom = Math.min(window.innerHeight, th.closest('.fi-ta-content-ctn')?.getBoundingClientRect().bottom ?? window.innerHeight)
+        const ghost = document.createElement('div')
+        ghost.className = 'fi-ta-column-drag-ghost'
+        // The copied cells carry Livewire and Alpine directives that must not start up again.
+        ghost.setAttribute('x-ignore', '')
+        // A copy for the eye only: screen readers and the keyboard skip it.
+        ghost.inert = true
+        const { font, color } = getComputedStyle(th.closest('table'))
+        Object.assign(ghost.style, { width: `${th.offsetWidth}px`, height: `${Math.min(visibleBottom, (cells.at(-1) ?? th).getBoundingClientRect().bottom) - top}px`, font, color })
+        ghost.append(...[...cells, th].map((cell) => copyColumnCell(cell, cell.getBoundingClientRect().top - top)))
+        ghost.querySelectorAll('[id]').forEach((element) => element.removeAttribute('id'))
+        document.body.appendChild(ghost)
+
+        return ghost
+    }
+
+    function copyColumnCell(cell, top) {
+        const copy = document.createElement('div')
+        copy.className = `${cell.className} fi-ta-column-drag-ghost-cell`
+        Object.assign(copy.style, { top: `${top}px`, height: `${cell.offsetHeight}px`, padding: getComputedStyle(cell).padding })
+        // Only what the cell shows: a stacked table's card label is hidden by rules the copy, outside the table, would lose.
+        copy.append(...[...cell.children].filter((child) => !child.matches('.fi-ta-column-handle, .column-resize-handle-bar') && getComputedStyle(child).display !== 'none').map((child) => child.cloneNode(true)))
+
+        return copy
+    }
+
+    // Slots keep the layout from before the drag, so the shifted columns never feed back into the target.
+    function columnSlots(table) {
+        return headersOf(table).map((th) => ({
+            th,
+            left: th.offsetLeft,
+            width: th.offsetWidth,
+            elements: [th, ...table.querySelectorAll(`.fi-ta-cell-${CSS.escape(th.dataset.resizableColumnId)}`)],
+        }))
+    }
+
+    // A neighbour swaps once the dragged column's leading edge passes its middle, the same distance either way.
+    // The pinned columns keep their places.
+    function dropIndex(slots, source, left) {
+        const right = left + source.width
+        const start = slots.indexOf(source)
+        const middle = (slot) => slot.left + slot.width / 2
+        const before = slots.slice(0, start).filter((slot) => middle(slot) < left).length
+        const after = slots.slice(start + 1).filter((slot) => middle(slot) < right).length
+        const pinned = slots.filter((slot) => slot.th.dataset.columnPinned === '1').length
+
+        return Math.max(before + after, pinned)
+    }
+
+    function shiftColumns(slots, source, index) {
+        const order = slots.filter((slot) => slot !== source)
+        order.splice(index, 0, source)
+
+        let left = slots[0].left
+        order.forEach((slot) => {
+            const shift = left - slot.left
+            slot.elements.forEach((element) => {
+                element.style.transform = shift ? `translateX(${shift}px)` : ''
+            })
+            left += slot.width
+        })
+    }
+
+    function moveColumnCells(source, target, last) {
+        source.elements.forEach((element) => {
+            const row = element.parentElement
+            const anchor = (target ?? last).elements.find((cell) => cell.parentElement === row)
+            if (!anchor) return
+            target ? row.insertBefore(element, anchor) : anchor.after(element)
+        })
+    }
+
+    function clearShift(slots) {
+        slots.forEach((slot) => slot.elements.forEach((element) => {
+            element.style.transform = ''
+        }))
+    }
+
+    // A press on a movable header drags it, except on its controls. Touch keeps swiping the table.
+    function startHeaderDrag(event, th, wire) {
+        if (event.button !== 0 || event.pointerType === 'touch' || !isMovable(th)) return
+        if (event.target.closest('.fi-ta-column-handle, .column-resize-handle-bar')) return
+
+        startColumnDrag(event, th, wire)
+    }
+
+    // The press that ends a drag still clicks what it lands on, and a header click would sort.
+    function swallowNextClick() {
+        const swallow = (clickEvent) => {
+            clickEvent.preventDefault()
+            clickEvent.stopPropagation()
+        }
+        window.addEventListener('click', swallow, { capture: true, once: true })
+        setTimeout(() => window.removeEventListener('click', swallow, true))
+    }
+
+    // The second press of a double-click lands on what the closed menu uncovered, often a row link.
+    function swallowDoubleClickTail() {
+        const swallow = (clickEvent) => {
+            if (clickEvent.detail < 2) return
+            clickEvent.preventDefault()
+            clickEvent.stopPropagation()
+        }
+        window.addEventListener('click', swallow, { capture: true })
+        setTimeout(() => window.removeEventListener('click', swallow, true), 500)
+    }
+
+    function updateDrag(drag) {
+        const { ghost, table, slots, source, grabOffset, pointer } = drag
+
+        Object.assign(ghost.style, { left: `${pointer.x - grabOffset}px`, top: `${table.tHead.getBoundingClientRect().top}px` })
+        drag.index = dropIndex(slots, source, pointer.x - grabOffset - table.getBoundingClientRect().left)
+        shiftColumns(slots, source, drag.index)
+    }
+
+    // Within the wrapper's edge zone the table scrolls sideways, faster the closer the pointer gets to the edge.
+    function autoScrollDrag(drag) {
+        const { wrapper, pointer } = drag
+        drag.scrollFrame = null
+        if (!drag.ghost || !wrapper) return
+
+        const box = wrapper.getBoundingClientRect()
+        const towardsLeft = AUTO_SCROLL_EDGE - (pointer.x - box.left)
+        const towardsRight = AUTO_SCROLL_EDGE - (box.right - pointer.x)
+        const pressure = Math.max(towardsLeft, towardsRight)
+        if (pressure <= 0) return
+
+        const before = wrapper.scrollLeft
+        wrapper.scrollLeft += Math.sign(towardsRight - towardsLeft) * Math.ceil(AUTO_SCROLL_MAX_SPEED * Math.min(1, pressure / AUTO_SCROLL_EDGE))
+        if (wrapper.scrollLeft === before) return
+
+        updateDrag(drag)
+        drag.scrollFrame = requestAnimationFrame(() => autoScrollDrag(drag))
+    }
+
+    function endDrag({ ghost, source, table, slots }) {
+        ghost.remove()
+        source.elements.forEach((element) => element.classList.remove('fi-ta-column-dragging'))
+        table.classList.remove('fi-ta-reordering')
+        document.body.classList.remove('reordering-column')
+        clearShift(slots)
+    }
+
+    function dropColumn({ th, wire, table, wrapper, source, others, index, startIndex, pointer }) {
+        const box = (wrapper ?? table).getBoundingClientRect()
+        const insideTable = pointer.x >= box.left && pointer.x <= box.right && pointer.y >= box.top && pointer.y <= table.getBoundingClientRect().bottom
+
+        if (!insideTable || index === startIndex) return
+
+        // The cells move in the page at once, so the server's re-render arrives with nothing left to change.
+        moveColumnCells(source, others[index] ?? null, others.at(-1))
+        runColumnAction(() => wire.moveTableColumn(headerName(th), others[index] ? headerName(others[index].th) : null), null)
+    }
+
+    function startColumnDrag(event, th, wire) {
+        const table = th.closest('table')
+        const slots = columnSlots(table)
+        const source = slots.find((slot) => slot.th === th)
+        const startIndex = slots.indexOf(source)
+        const startX = event.clientX
+        const drag = {
+            th,
+            wire,
+            table,
+            slots,
+            source,
+            startIndex,
+            wrapper: table.closest('.fi-ta-content-ctn'),
+            others: slots.filter((slot) => slot !== source),
+            grabOffset: startX - th.getBoundingClientRect().left,
+            index: startIndex,
+            pointer: { x: startX, y: event.clientY },
+            ghost: null,
+            scrollFrame: null,
+            moveFrame: null,
+        }
+
+        // The pointer reports more often than the screen paints, so the moves in a frame shift the columns once.
+        const scheduleUpdate = () => {
+            drag.moveFrame ??= requestAnimationFrame(() => {
+                drag.moveFrame = null
+                updateDrag(drag)
+            })
+        }
+
+        const onMove = (moveEvent) => {
+            drag.pointer = { x: moveEvent.clientX, y: moveEvent.clientY }
+
+            if (!drag.ghost) {
+                if (Math.abs(moveEvent.clientX - startX) < DRAG_THRESHOLD) return
+                window.getSelection()?.removeAllRanges()
+                drag.ghost = createDragGhost(th, source.elements.slice(1))
+                source.elements.forEach((element) => element.classList.add('fi-ta-column-dragging'))
+                table.classList.add('fi-ta-reordering')
+                document.body.classList.add('reordering-column')
+            }
+
+            scheduleUpdate()
+            drag.scrollFrame ??= requestAnimationFrame(() => autoScrollDrag(drag))
+        }
+
+        const finish = (shouldDrop) => {
+            document.removeEventListener('pointermove', onMove)
+            document.removeEventListener('pointerup', onUp)
+            document.removeEventListener('pointercancel', onCancel)
+            document.removeEventListener('keydown', onKey)
+            if (drag.scrollFrame) cancelAnimationFrame(drag.scrollFrame)
+            if (drag.moveFrame) cancelAnimationFrame(drag.moveFrame)
+
+            if (!drag.ghost) return
+
+            updateDrag(drag)
+            swallowNextClick()
+            endDrag(drag)
+            if (shouldDrop) dropColumn(drag)
+        }
+
+        const onUp = (upEvent) => {
+            drag.pointer = { x: upEvent.clientX, y: upEvent.clientY }
+            finish(true)
+        }
+        const onCancel = () => finish(false)
+        const onKey = (keyEvent) => {
+            if (keyEvent.key === 'Escape') finish(false)
+        }
+
+        document.addEventListener('pointermove', onMove)
+        document.addEventListener('pointerup', onUp)
+        document.addEventListener('pointercancel', onCancel)
+        document.addEventListener('keydown', onKey)
+    }
+
+    function registerColumnMenu() {
+        window.Alpine.data('tableColumnMenu', () => ({
+            column: null,
+            trigger: null,
+            panel: null,
+            hideable: false,
+            movable: false,
+            pinned: false,
+            canMoveLeft: false,
+            canMoveRight: false,
+            before: { left: null, right: null },
+            neighbour: null,
+            top: 0,
+            right: 0,
+
+            open(detail) {
+                if (this.column === detail.column) {
+                    this.close(true)
+
+                    return
+                }
+
+                pendingColumnFocus = null
+                this.close(false)
+
+                // Placed by its right edge in the same update that shows it, so it never appears elsewhere first.
+                // A hidden panel still reports its CSS width, which keeps it on screen beside a column at the left edge.
+                const rect = detail.trigger.getBoundingClientRect()
+                const width = parseFloat(getComputedStyle(this.panel).width) || 0
+                // The viewport width without a classic scrollbar, which `fixed` positioning also excludes.
+                const viewportWidth = document.documentElement.clientWidth
+                // Kept inside the table's own left edge, so the sidebar beside the table never covers it.
+                const minLeft = Math.max(8, (this.$el.closest('.fi-ta')?.getBoundingClientRect().left ?? 0) + 8)
+                const right = Math.min(viewportWidth - rect.right, viewportWidth - width - minLeft)
+                Object.assign(this, detail, { top: rect.bottom + 4, right: Math.max(8, right) })
+                this.trigger.setAttribute('aria-expanded', 'true')
+
+                // Alpine reveals the menu sections a frame after the update, so the height is read then.
+                this.$nextTick(() => requestAnimationFrame(() => {
+                    if (this.column !== detail.column) return
+
+                    this.top = this.verticalPosition(rect)
+                    this.$nextTick(() => this.items()[0]?.focus())
                 }))
-            })
+            },
 
-            this.column.appendChild(handle)
-        },
+            verticalPosition(rect) {
+                const height = this.panel.offsetHeight
+                const viewportHeight = document.documentElement.clientHeight
+                const below = rect.bottom + 4
+                const above = rect.top - 4 - height
 
-        moveByKey(event) {
-            if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
-            event.preventDefault()
-            event.stopPropagation()
+                if (below + height <= viewportHeight - 8) return below
 
-            const targets = moveTargets(this.column)
-            const isLeft = event.key === 'ArrowLeft'
-            if (isLeft ? !targets.canMoveLeft : !targets.canMoveRight) return
+                return above >= 8 ? above : Math.max(8, viewportHeight - height - 8)
+            },
 
-            runColumnAction(() => this.$wire.moveTableColumn(columnName, isLeft ? targets.before.left : targets.before.right), columnName)
-        },
+            items() {
+                return [...this.panel.querySelectorAll('[role="menuitem"]')].filter((item) => !item.disabled && item.offsetParent !== null)
+            },
 
-        createHandle() {
-            const existing = this.column.querySelector('.column-resize-handle-bar')
-            if (existing) existing.remove()
+            step(delta) {
+                const items = this.items()
+                const index = items.indexOf(document.activeElement)
+                items[(index + delta + items.length) % items.length]?.focus()
+            },
 
-            // Mouse-only for now, so it stays out of the tab order.
-            const handle = Object.assign(document.createElement('button'), {
-                type: 'button',
-                tabIndex: -1,
-                className: 'column-resize-handle-bar',
-                title: window.filamentData?.resizeColumnHint ?? '',
-            })
-            handle.setAttribute('aria-label', window.filamentData?.resizeColumnLabel ?? '')
-            // A pointer control: a screen reader would reach it and find nothing to activate.
-            handle.setAttribute('aria-hidden', 'true')
-            this.handleBar = handle
-            this.column.appendChild(handle)
-            handle.addEventListener('pointerdown', (e) => this.startResize(e))
-            handle.addEventListener('dblclick', (e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                this.autoFit()
-            })
-        },
+            close(returnFocus) {
+                if (this.column === null) return
+                const trigger = this.trigger?.isConnected
+                    ? this.trigger
+                    : columnHandle(this.$el.closest('.fi-ta'), this.column)
+                trigger?.setAttribute('aria-expanded', 'false')
+                if (returnFocus) trigger?.focus()
+                this.column = null
+            },
 
-        startResize(event) {
-            if (event.button !== 0) return
-            event.preventDefault()
-            event.stopPropagation()
-            this.handleBar.classList.add('active')
-            document.body.classList.add('resizing-column')
+            choose(run, focusColumn) {
+                runColumnAction(run, focusColumn)
+                this.close(false)
+                swallowDoubleClickTail()
+            },
+        }))
+    }
 
-            const startX = event.pageX
-            const startColumnWidth = this.column.offsetWidth
-            // In the wrapper's content coordinates the column's left edge does not move with
-            // scrollLeft, so the guideline sits at contentLeftEdge + currentWidth.
-            const wrapperRect = this.tableWrapper.getBoundingClientRect()
-            const contentLeftEdge =
-                this.column.getBoundingClientRect().left - wrapperRect.left + this.tableWrapper.scrollLeft
-            const guidelineHeight = this.table.offsetHeight
-            let currentWidth = startColumnWidth
-            let widthFrame = null
+    function registerResizableColumn() {
+        wireStickyHeaders()
+        window.Alpine.data('resizableColumn', (columnName, columnId, min, max) => ({
+            columnName,
+            // Relationship columns keep the dot in Filament's cell class (`user.name`).
+            cellSelector: `.fi-ta-cell-${CSS.escape(columnId)}`,
+            column: null,
+            table: null,
+            tableWrapper: null,
+            handleBar: null,
 
-            // Pointer moves outpace the screen, so the cells are restyled once per frame.
-            const flushWidth = () => {
-                if (widthFrame === null) return
-                cancelAnimationFrame(widthFrame)
-                widthFrame = null
-                this.applyWidth(currentWidth)
-            }
+            init() {
+                this.column = this.$el
+                this.table = this.$el.closest('.fi-ta-table')
+                this.tableWrapper = this.$el.closest('.fi-ta-content-ctn')
+                if (!this.column || !this.table || !this.tableWrapper) return
 
-            const onMove = (moveEvent) => {
-                if (moveEvent.pointerId !== event.pointerId || moveEvent.pageX === startX) return
-                currentWidth = Math.round(
-                    Math.min(
-                        max,
-                        Math.max(min, startColumnWidth + (moveEvent.pageX - startX)),
-                    ),
-                )
-                widthFrame ??= requestAnimationFrame(() => {
+                this.column.classList.add('fi-ta-resizable-header')
+
+                lockTable(this.table)
+                wrapHeaderLabel(this.column)
+                this.createHandle()
+                this.createColumnControls()
+
+                // Alpine re-runs init when the header's x-data changes, so the listener is bound once.
+                if (!this.column.reorderListenerBound) {
+                    this.column.reorderListenerBound = true
+                    this.column.addEventListener('pointerdown', (e) => startHeaderDrag(e, this.column, this.$wire))
+                }
+            },
+
+            createColumnControls() {
+                this.column.querySelector(':scope > .fi-ta-column-handle')?.remove()
+
+                const handle = document.createElement('button')
+                handle.type = 'button'
+                handle.className = 'fi-ta-column-handle'
+                const label = this.column.querySelector(':scope > .fi-ta-resizable-label')?.textContent.replace(/\s+/g, ' ').trim()
+                handle.setAttribute('aria-label', window.filamentData.columnOptionsFor.replace(':column', label || columnName))
+                handle.setAttribute('aria-haspopup', 'menu')
+                handle.setAttribute('aria-expanded', 'false')
+                if (isMovable(this.column)) {
+                    handle.addEventListener('keydown', (e) => this.moveByKey(e))
+                }
+                handle.addEventListener('click', (e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    window.dispatchEvent(new CustomEvent('column-menu-open', {
+                        detail: {
+                            column: columnName,
+                            trigger: handle,
+                            hideable: this.column.dataset.columnHideable === '1',
+                            pinned: this.column.dataset.columnPinned === '1',
+                            ...moveTargets(this.column),
+                        },
+                    }))
+                })
+
+                this.column.appendChild(handle)
+            },
+
+            moveByKey(event) {
+                if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+                event.preventDefault()
+                event.stopPropagation()
+
+                const targets = moveTargets(this.column)
+                const isLeft = event.key === 'ArrowLeft'
+                if (isLeft ? !targets.canMoveLeft : !targets.canMoveRight) return
+
+                runColumnAction(() => this.$wire.moveTableColumn(columnName, isLeft ? targets.before.left : targets.before.right), columnName)
+            },
+
+            createHandle() {
+                const existing = this.column.querySelector('.column-resize-handle-bar')
+                if (existing) existing.remove()
+
+                // Mouse-only for now, so it stays out of the tab order.
+                const handle = Object.assign(document.createElement('button'), {
+                    type: 'button',
+                    tabIndex: -1,
+                    className: 'column-resize-handle-bar',
+                    title: window.filamentData?.resizeColumnHint ?? '',
+                })
+                handle.setAttribute('aria-label', window.filamentData?.resizeColumnLabel ?? '')
+                // A pointer control: a screen reader would reach it and find nothing to activate.
+                handle.setAttribute('aria-hidden', 'true')
+                this.handleBar = handle
+                this.column.appendChild(handle)
+                handle.addEventListener('pointerdown', (e) => this.startResize(e))
+                handle.addEventListener('dblclick', (e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    this.autoFit()
+                })
+            },
+
+            startResize(event) {
+                if (event.button !== 0) return
+                event.preventDefault()
+                event.stopPropagation()
+                this.handleBar.classList.add('active')
+                document.body.classList.add('resizing-column')
+
+                const startX = event.pageX
+                const startColumnWidth = this.column.offsetWidth
+                // In the wrapper's content coordinates the column's left edge does not move with
+                // scrollLeft, so the guideline sits at contentLeftEdge + currentWidth.
+                const wrapperRect = this.tableWrapper.getBoundingClientRect()
+                const contentLeftEdge =
+                    this.column.getBoundingClientRect().left - wrapperRect.left + this.tableWrapper.scrollLeft
+                const guidelineHeight = this.table.offsetHeight
+                let currentWidth = startColumnWidth
+                let widthFrame = null
+
+                // Pointer moves outpace the screen, so the cells are restyled once per frame.
+                const flushWidth = () => {
+                    if (widthFrame === null) return
+                    cancelAnimationFrame(widthFrame)
                     widthFrame = null
                     this.applyWidth(currentWidth)
-                })
-                moveDragOverlay(this.tableWrapper, contentLeftEdge + currentWidth, guidelineHeight, currentWidth, moveEvent.clientX, moveEvent.clientY)
-            }
-
-            const onUp = (upEvent) => {
-                if (upEvent.pointerId !== event.pointerId) return
-                flushWidth()
-                this.handleBar.classList.remove('active')
-                document.body.classList.remove('resizing-column')
-                hideDragOverlay()
-                if (currentWidth !== startColumnWidth) {
-                    this.saveWidth(currentWidth)
                 }
-                document.removeEventListener('pointermove', onMove)
-                document.removeEventListener('pointerup', onUp)
-                document.removeEventListener('pointercancel', onUp)
-            }
 
-            document.addEventListener('pointermove', onMove)
-            document.addEventListener('pointerup', onUp)
-            document.addEventListener('pointercancel', onUp)
-        },
+                const onMove = (moveEvent) => {
+                    if (moveEvent.pointerId !== event.pointerId || moveEvent.pageX === startX) return
+                    currentWidth = Math.round(
+                        Math.min(
+                            max,
+                            Math.max(min, startColumnWidth + (moveEvent.pageX - startX)),
+                        ),
+                    )
+                    widthFrame ??= requestAnimationFrame(() => {
+                        widthFrame = null
+                        this.applyWidth(currentWidth)
+                    })
+                    moveDragOverlay(this.tableWrapper, contentLeftEdge + currentWidth, guidelineHeight, currentWidth, moveEvent.clientX, moveEvent.clientY)
+                }
 
-        applyWidth(width) {
-            const headerStyle = `min-width: ${width}px; width: ${width}px; max-width: ${width}px`
-            const cellStyle = `${headerStyle}; overflow: hidden`
+                const onUp = (upEvent) => {
+                    if (upEvent.pointerId !== event.pointerId) return
+                    flushWidth()
+                    this.handleBar.classList.remove('active')
+                    document.body.classList.remove('resizing-column')
+                    hideDragOverlay()
+                    if (currentWidth !== startColumnWidth) {
+                        this.saveWidth(currentWidth)
+                    }
+                    document.removeEventListener('pointermove', onMove)
+                    document.removeEventListener('pointerup', onUp)
+                    document.removeEventListener('pointercancel', onUp)
+                }
 
-            this.column.style.cssText = headerStyle
-            this.column.dataset.resizableWidth = String(width)
-            this.table.querySelectorAll(this.cellSelector).forEach((cell) => {
-                cell.style.cssText = cellStyle
-                cell.dataset.resizableWidth = String(width)
-            })
-            // The style reset above clears a pinned cell's `left`, and only a pinned column moves the pins after it.
-            if (this.column.dataset.columnPinned === '1') applyPinnedOffsets(this.table)
-            scheduleSizingUpdate(this.table)
-        },
+                document.addEventListener('pointermove', onMove)
+                document.addEventListener('pointerup', onUp)
+                document.addEventListener('pointercancel', onUp)
+            },
 
-        // Saved on release, not after a delay: a sort sent before the save re-renders the old width.
-        saveWidth(width) {
-            this.$wire.updateResizableColumnWidth(columnName, String(width))
-        },
+            applyWidth(width) {
+                const headerStyle = `min-width: ${width}px; width: ${width}px; max-width: ${width}px`
+                const cellStyle = `${headerStyle}; overflow: hidden`
 
-        // `table-layout: fixed` never sizes a column to its content, so the header label and each
-        // cell's content are laid out at their natural width and measured, icons and padding included.
-        autoFit() {
-            const width = this.measureContentWidth()
-            this.applyWidth(width)
-            this.saveWidth(width)
-        },
+                this.column.style.cssText = headerStyle
+                this.column.dataset.resizableWidth = String(width)
+                this.table.querySelectorAll(this.cellSelector).forEach((cell) => {
+                    cell.style.cssText = cellStyle
+                    cell.dataset.resizableWidth = String(width)
+                })
+                // The style reset above clears a pinned cell's `left`, and only a pinned column moves the pins after it.
+                if (this.column.dataset.columnPinned === '1') applyPinnedOffsets(this.table)
+                scheduleSizingUpdate(this.table)
+            },
 
-        measureContentWidth() {
-            const label = this.column.querySelector(':scope > .fi-ta-resizable-label')
-            // A stacked table puts the card's hidden label first in each cell, so the value sits in its own wrapper.
-            const contents = [...this.table.querySelectorAll(this.cellSelector)]
-                .map((cell) => cell.querySelector(':scope > .fi-ta-cell-content')?.firstElementChild ?? cell.firstElementChild)
-                .filter(Boolean)
+            // Saved on release, not after a delay: a sort sent before the save re-renders the old width.
+            saveWidth(width) {
+                this.$wire.updateResizableColumnWidth(columnName, String(width))
+            },
 
-            const insets = [this.column, ...contents.map((content) => content.closest('td'))].map(horizontalInset)
-            const widths = naturalWidths([label, ...contents])
-            const widest = Math.max(...widths.map((width, index) => width + insets[index]))
+            // `table-layout: fixed` never sizes a column to its content, so the header label and each
+            // cell's content are laid out at their natural width and measured, icons and padding included.
+            autoFit() {
+                const width = this.measureContentWidth()
+                this.applyWidth(width)
+                this.saveWidth(width)
+            },
 
-            return Math.ceil(Math.min(max, Math.max(min, widest)))
-        },
-    }))
-}
+            measureContentWidth() {
+                const label = this.column.querySelector(':scope > .fi-ta-resizable-label')
+                // A stacked table puts the card's hidden label first in each cell, so the value sits in its own wrapper.
+                const contents = [...this.table.querySelectorAll(this.cellSelector)]
+                    .map((cell) => cell.querySelector(':scope > .fi-ta-cell-content')?.firstElementChild ?? cell.firstElementChild)
+                    .filter(Boolean)
 
-// `morphed` fires once per component after the morph settles. `morph.updated` fires per node
-// mid-morph, and the rest of the same pass strips what it adds.
-document.addEventListener('livewire:init', () => window.Livewire.hook('morphed', rebuildResizableTablesAfterMorph))
+                const insets = [this.column, ...contents.map((content) => content.closest('td'))].map(horizontalInset)
+                const widths = naturalWidths([label, ...contents])
+                const widest = Math.max(...widths.map((width, index) => width + insets[index]))
 
-if (window.Alpine && window.Alpine.version) {
-    registerResizableColumn()
-    registerColumnMenu()
-} else {
-    document.addEventListener('alpine:init', registerResizableColumn)
-    document.addEventListener('alpine:init', registerColumnMenu)
-}
+                return Math.ceil(Math.min(max, Math.max(min, widest)))
+            },
+        }))
+    }
+
+    // `morphed` fires once per component after the morph settles. `morph.updated` fires per node
+    // mid-morph, and the rest of the same pass strips what it adds.
+    document.addEventListener('livewire:init', () => window.Livewire.hook('morphed', rebuildResizableTablesAfterMorph))
+
+    if (window.Alpine && window.Alpine.version) {
+        registerResizableColumn()
+        registerColumnMenu()
+    } else {
+        document.addEventListener('alpine:init', registerResizableColumn)
+        document.addEventListener('alpine:init', registerColumnMenu)
+    }
+})()
