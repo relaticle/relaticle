@@ -13,6 +13,7 @@ use Tests\Evals\Scorers\NoMarkdownTable;
 use Tests\Evals\Scorers\NoNarration;
 use Tests\Evals\Scorers\NoRawUlid;
 use Tests\Evals\Scorers\OneClosingQuestionAtMost;
+use Tests\Evals\Scorers\RendersTable;
 use Tests\Evals\Scorers\ReplayedBytesUnder;
 use Tests\Evals\Scorers\TextMatches;
 use Tests\Evals\Scorers\UsesLookupBeforeWrite;
@@ -28,7 +29,7 @@ function scorerEnvelope(string $text, array $toolCalls = [], int $bytes = 0, arr
         'text' => $text,
         'steps_text' => $stepsText,
         'tool_calls' => $toolCalls,
-        'tool_result_row_ids' => $rowIds,
+        'rendered_row_ids' => $rowIds,
         'replayed_bytes' => $bytes,
         'usage' => ['input_tokens' => 0, 'output_tokens' => 0],
         'duration_ms' => 0,
@@ -141,13 +142,21 @@ it('requires a lookup read before a write', function (): void {
         ->and($scorer->score('', scorerEnvelope('x', [$plain, ['name' => 'RetryEmailTool', 'arguments' => []]]))->score)->toBe(0.0);
 });
 
-it('fails a row set that repeats the previous turn in any order', function (): void {
+it('fails a table that repeats the previous turn in any order', function (): void {
     $scorer = new NoDuplicateRowSet;
     $previous = scorerEnvelope('x', rowIds: [['a', 'b', 'c']]);
 
     expect($scorer->score('', scorerEnvelope('x', rowIds: [['c', 'b', 'a']]), $previous)->score)->toBe(0.0)
         ->and($scorer->score('', scorerEnvelope('x', rowIds: [['a', 'd']]), $previous)->score)->toBe(1.0)
         ->and($scorer->score('', scorerEnvelope('x', rowIds: [[]]), scorerEnvelope('x', rowIds: [[]]))->score)->toBe(1.0);
+});
+
+it('passes a turn that rendered a table and fails one where every read was a lookup', function (): void {
+    $scorer = new RendersTable;
+
+    expect($scorer->score('', scorerEnvelope('x', rowIds: [[], ['a', 'b']]))->score)->toBe(1.0)
+        ->and($scorer->score('', scorerEnvelope('x', rowIds: [[], []]))->score)->toBe(0.0)
+        ->and($scorer->score('', scorerEnvelope('x'))->score)->toBe(0.0);
 });
 
 it('detects Latin and non-Latin scripts', function (): void {

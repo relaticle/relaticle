@@ -8,13 +8,13 @@ final readonly class TurnEnvelope
 {
     /**
      * @param  list<array{name: string, arguments: array<string, mixed>}>  $toolCalls
-     * @param  list<list<string>>  $toolResultRowIds
+     * @param  list<list<string>>  $renderedRowIds
      * @param  list<string>  $stepsText
      */
     public function __construct(
         public string $text,
         public array $toolCalls,
-        public array $toolResultRowIds,
+        public array $renderedRowIds,
         public int $replayedBytes,
         public int $inputTokens,
         public int $outputTokens,
@@ -34,7 +34,7 @@ final readonly class TurnEnvelope
             'text' => $this->text,
             'steps_text' => $this->stepsText,
             'tool_calls' => $this->toolCalls,
-            'tool_result_row_ids' => $this->toolResultRowIds,
+            'rendered_row_ids' => $this->renderedRowIds,
             'replayed_bytes' => $this->replayedBytes,
             'usage' => [
                 'input_tokens' => $this->inputTokens,

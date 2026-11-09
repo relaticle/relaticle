@@ -7,6 +7,7 @@ use Tests\Evals\Scorers\NoHeadingLine;
 use Tests\Evals\Scorers\NoMarkdownTable;
 use Tests\Evals\Scorers\NoNarration;
 use Tests\Evals\Scorers\NoRawUlid;
+use Tests\Evals\Scorers\RendersTable;
 use Tests\Evals\Support\EvalWorkspace;
 use Tests\Evals\Support\Prior;
 use Tests\Evals\Support\RelaTurn;
@@ -17,7 +18,8 @@ it('never prints a raw id', function (): void {
 
     expect((new RelaTurn($w))(...))
         ->prompt('Show me my tasks that are in progress')
-        ->toPassScorer(new NoRawUlid);
+        ->toPassScorer(new NoRawUlid)
+        ->toPassScorer(new RendersTable);
 });
 
 it('never answers with a markdown table', function (): void {
@@ -50,7 +52,8 @@ it('never narrates what it is about to do', function (): void {
 
     expect((new RelaTurn($w))(...))
         ->prompt('Show me my opportunities')
-        ->toPassScorer(new NoNarration);
+        ->toPassScorer(new NoNarration)
+        ->toPassScorer(new RendersTable);
 });
 
 it('counts with the summary tool when asked how many', function (): void {
