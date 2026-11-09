@@ -61,7 +61,7 @@
 
 /* Opaque in dark mode too, so rows scrolling under the pinned head do not show through. */
 .fi-ta-content-ctn:has(thead th[x-data^="resizableColumn"]) thead th {
-    @apply bg-gray-50 dark:bg-[color-mix(in_oklab,var(--gray-900),white_5%)];
+    @apply bg-(--surface-table-head-bg);
 }
 
 .column-resize-handle-bar {
@@ -230,28 +230,16 @@ th[data-column-pinned="1"] > .fi-ta-column-handle {
 }
 
 .fi-ta-has-pinned td:is([data-column-pinned="1"], .fi-ta-selection-cell) {
-    background-color: white;
-}
-
-.dark .fi-ta-has-pinned td:is([data-column-pinned="1"], .fi-ta-selection-cell) {
-    background-color: var(--gray-900);
+    @apply bg-white dark:bg-gray-900;
 }
 
 /* Opaque versions of the row tints, so pinned cells keep the row's state. */
 .fi-ta-has-pinned .fi-ta-row:is(.fi-clickable:hover, .fi-selected, .fi-striped) > :is([data-column-pinned="1"], .fi-ta-selection-cell) {
-    background-color: var(--gray-50);
-}
-
-.dark .fi-ta-has-pinned .fi-ta-row:is(.fi-clickable:hover, .fi-selected, .fi-striped) > :is([data-column-pinned="1"], .fi-ta-selection-cell) {
-    background-color: color-mix(in oklab, var(--gray-900), white 5%);
+    @apply bg-(--surface-table-head-bg);
 }
 
 .fi-ta-has-pinned[data-scrolled-x] [data-column-pinned-last] {
-    box-shadow: 6px 0 8px -4px rgb(0 0 0 / 0.12);
-}
-
-.dark .fi-ta-has-pinned[data-scrolled-x] [data-column-pinned-last] {
-    box-shadow: 6px 0 8px -4px rgb(0 0 0 / 0.5);
+    @apply shadow-[6px_0_8px_-4px] shadow-black/12 dark:shadow-black/50;
 }
 
 /* A pinned column keeps its place, so the column manager offers no way to move it. */
