@@ -154,7 +154,7 @@ abstract class BaseReadListTool implements Tool
 
         $responseFormat = $this->responseFormat($request);
 
-        if ($responseFormat === null) {
+        if (! $responseFormat instanceof ResponseFormat) {
             return (string) json_encode(['error' => 'response_format must be one of: '.implode(', ', array_column(ResponseFormat::cases(), 'value'))], JSON_UNESCAPED_SLASHES);
         }
 
