@@ -19,7 +19,6 @@ use Relaticle\EmailIntegration\Filament\Pages\EmailAccountSettingsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailPrivacySettingsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailSignaturesPage;
-use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages\ManageEmailTemplates;
 use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
 
 /**
@@ -76,7 +75,6 @@ trait HasWorkspaceSettingsNavigation
                 ->isActiveWhen($this->isCurrentPage(
                     EmailAccountsPage::class,
                     EmailAccountSettingsPage::class,
-                    ManageEmailTemplates::class,
                     EmailPrivacySettingsPage::class,
                     EmailSignaturesPage::class,
                     EmailAccessRequestsPage::class,

@@ -412,6 +412,17 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
         return $limit === null || $this->connectedAccounts()->connected()->count() < $limit;
     }
 
+    public function mailboxLimitMessage(): string
+    {
+        if ($this->loadMissing('subscriptions')->billingStatus() === BillingStatus::Trialing) {
+            return __('filament/pages/email-accounts.notifications.limit_reached.trial');
+        }
+
+        $limit = resolve(Entitlements::class)->mailboxLimit($this) ?? 0;
+
+        return trans_choice('filament/pages/email-accounts.notifications.limit_reached.title', $limit, ['count' => $limit]);
+    }
+
     /**
      * Reads the `subscriptions` relation, so eager load it when rendering this
      * for more than one workspace. It deliberately does not `loadMissing()` on your
@@ -570,7 +581,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
     }
 
     /**
-     * Self-serve workspaces that have connected every mailbox their plan allows.
+     * Self-serve and trialing workspaces that have connected every mailbox they may.
      *
      * @param  Builder<Workspace>  $query
      * @return Builder<Workspace>
@@ -590,6 +601,9 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
                     ->where('plan', $plan->value)
                     ->whereHas('connectedAccounts', fn (Builder $accounts): Builder => $accounts->connected(), '>=', $limit));
             }
+
+            $capped->orWhere(fn (Builder $trialing): Builder => BillingStatus::Trialing->applyToQuery($trialing)
+                ->whereHas('connectedAccounts', fn (Builder $accounts): Builder => $accounts->connected(), '>=', Plan::trialConnectedMailboxes()));
         });
     }
 

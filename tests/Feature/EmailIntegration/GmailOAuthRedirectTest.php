@@ -140,10 +140,30 @@ it('does not start consent when the workspace has reached its mailbox limit', fu
         ->assertRedirect(EmailAccountsPage::getUrl(['tenant' => $workspace->slug], panel: 'app'));
 
     Notification::assertNotified(
-        Notification::make()->title('The Pro plan allows 10 connected mailboxes in a workspace. Upgrade to connect more.')->danger(),
+        Notification::make()->title('Mailbox limit reached. This workspace can connect 10 mailboxes. Upgrade to connect more.')->danger(),
     );
 
     expect(session()->has(RedirectController::WORKSPACE_SESSION_KEY))->toBeFalse();
+});
+
+it('holds a trialing workspace to one mailbox', function (): void {
+    withHostedBilling();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(7)])->save();
+    ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $user->getKey(),
+    ]));
+    $this->actingAs($user);
+
+    $this->get(MailboxOAuthWorkspace::redirectUrl('gmail', $workspace))
+        ->assertRedirect(EmailAccountsPage::getUrl(['tenant' => $workspace->slug], panel: 'app'));
+
+    Notification::assertNotified(
+        Notification::make()->title('Free trial account limit reached. Upgrade now to sync more accounts.')->danger(),
+    );
 });
 
 it('starts consent past every plan limit on a self-hosted install', function (): void {

@@ -257,7 +257,6 @@ it('keeps every action on the canonical single-execute() shape', function (): vo
 
     $predatesTheCheck = [
         'Relaticle\Chat\Actions\StoreChatAttachment',
-        'Relaticle\EmailIntegration\Actions\ApplyDefaultSharingTierToExistingEmailsAction',
         'Relaticle\EmailIntegration\Actions\CompleteMailboxHistoryImportAction',
         'Relaticle\EmailIntegration\Actions\DeleteEmailDraftAction',
         'Relaticle\EmailIntegration\Actions\LinkEmailAction',
@@ -348,7 +347,6 @@ it('names an action for what it does, with no Action suffix', function (): void 
         'RetryFailedEmailAction',
         'RetryMailboxHistoryImportFailuresAction',
         'SaveEmailDraftAction',
-        'SaveWorkspaceEmailSharingDefaultAction',
         'SendEmailAction',
         'SendEmailBatchAction',
         'SetDefaultConnectedAccountAction',
@@ -364,7 +362,6 @@ it('names an action for what it does, with no Action suffix', function (): void 
         'UpdateEmailSharingAction',
         'UpdateSignatureAction',
         'UpdateWorkspaceContactCreationSettingsAction',
-        'UpdateWorkspaceEmailPrivacySettingsAction',
         'UpdateWorkspaceEmailVisibilityAction',
         'UpdateWorkspaceEmailVisibilityEntryAction',
         'UpdateWorkspaceEmailVisibilityEntrySubdomainsAction',

@@ -74,7 +74,7 @@ final readonly class RedirectController
     private function redirectAtMailboxLimit(Workspace $workspace, mixed $returnUrl): RedirectResponse
     {
         Notification::make()
-            ->title($workspace->plan->mailboxLimitMessage())
+            ->title($workspace->mailboxLimitMessage())
             ->danger()
             ->send();
 

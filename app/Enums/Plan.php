@@ -166,12 +166,9 @@ enum Plan: string implements HasColor, HasLabel
         };
     }
 
-    public function mailboxLimitMessage(): string
+    public static function trialConnectedMailboxes(): int
     {
-        return __('filament/pages/email-accounts.notifications.limit_reached.title', [
-            'plan' => $this->getLabel(),
-            'limit' => $this->connectedMailboxes(),
-        ]);
+        return 1;
     }
 
     public function throughputMultiplier(): int

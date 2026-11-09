@@ -17,14 +17,14 @@ final readonly class SaveMailboxSharingTier
         private PrivacyService $privacy,
     ) {}
 
-    public function execute(User $actor, ConnectedAccount $mailbox, ?EmailPrivacyTier $tier): void
+    public function execute(User $actor, ConnectedAccount $mailbox, EmailPrivacyTier $tier): void
     {
         abort_unless($mailbox->user_id === $actor->getKey(), 403);
 
         DB::transaction(function () use ($mailbox, $tier): void {
             $mailbox->forceFill(['sharing_tier' => $tier])->save();
 
-            $this->applyRetroactive->executeForMailbox($mailbox, $this->privacy->tierForMailbox($mailbox));
+            $this->applyRetroactive->execute($mailbox, $this->privacy->tierForMailbox($mailbox));
         });
     }
 }

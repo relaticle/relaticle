@@ -35,7 +35,10 @@ enum SendFailureRemedy: string
     public function url(Workspace $workspace): ?string
     {
         return match ($this) {
-            self::Retry => EmailInboxPage::getUrl(['tab' => EmailPageTab::FAILED->value], panel: 'app', tenant: $workspace),
+            self::Retry => EmailInboxPage::getUrl([
+                'tab' => EmailPageTab::OUTBOX->value,
+                'tableFilters' => ['status_tab' => ['value' => OutboxTab::FAILED->value]],
+            ], panel: 'app', tenant: $workspace),
             self::Reconnect => EmailAccountsPage::getUrl(panel: 'app', tenant: $workspace),
             self::Subscribe => resolve(Billing::class)->url($workspace),
         };

@@ -116,7 +116,7 @@ it('counts the credit packs customers bought this month', function (): void {
         ->assertCanNotSeeTableRecords([$lastMonth, $spent]);
 });
 
-it('counts self-serve workspaces at their mailbox cap exactly as the workspace list shows them', function (): void {
+it('counts self-serve and trialing workspaces at their mailbox cap exactly as the workspace list shows them', function (): void {
     $capped = workspaceOn(Plan::Pro);
     ConnectedAccount::factory()->count(10)->create(['workspace_id' => $capped]);
     $nearlyCapped = workspaceOn(Plan::Pro);
@@ -126,6 +126,9 @@ it('counts self-serve workspaces at their mailbox cap exactly as the workspace l
     ConnectedAccount::factory()->count(10)->create(['workspace_id' => $scale]);
     $free = workspaceOn(Plan::Free);
     ConnectedAccount::factory()->create(['workspace_id' => $free]);
+    $trialing = workspaceOn(Plan::Pro);
+    $trialing->forceFill(['trial_ends_at' => now()->addDays(7)])->save();
+    ConnectedAccount::factory()->create(['workspace_id' => $trialing]);
     $internal = OverviewData::workspaceOf(OverviewData::internalOwner());
     $internal->forceFill(['plan' => Plan::Pro])->save();
     ConnectedAccount::factory()->count(10)->create(['workspace_id' => $internal]);
@@ -137,7 +140,7 @@ it('counts self-serve workspaces at their mailbox cap exactly as the workspace l
     livewire(ListWorkspaces::class)
         ->filterTable('internal', false)
         ->filterTable('at_mailbox_cap')
-        ->assertCanSeeTableRecords([$capped])
+        ->assertCanSeeTableRecords([$capped, $trialing])
         ->assertCanNotSeeTableRecords([$nearlyCapped, $scale, $free, $internal]);
 });
 

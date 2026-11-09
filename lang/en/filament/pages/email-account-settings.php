@@ -6,15 +6,15 @@ return [
     'subheading' => 'Update your account permissions and settings.',
     'tabs' => [
         'general' => 'General',
-        'sharing' => 'Sharing',
         'blocklist' => 'Mailbox-only blocklist',
         'signatures' => 'Signatures',
     ],
+    'general' => [
+        'sync_heading' => 'Sync and sending',
+    ],
     'sharing' => [
         'label' => 'Email sharing',
-        'use_workspace_default' => 'Use workspace default',
         'hint' => 'What your workspace sees from this mailbox. Other mailboxes keep their own level.',
-        'workspace_default_description' => 'Follow whatever the workspace has set. Currently :tier',
     ],
     'blocklist' => [
         'label' => 'Blocked addresses and domains',

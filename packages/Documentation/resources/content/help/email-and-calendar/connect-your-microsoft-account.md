@@ -2,7 +2,7 @@
 title: Connect your Microsoft account
 description: Link an Outlook or Microsoft 365 mailbox so its email and calendar sync into Relaticle, and see what access Relaticle asks Microsoft for.
 order: 2
-updated: "2026-10-07"
+updated: "2026-11-08"
 related: [help/email-and-calendar/connect-your-google-account, help/email-and-calendar/read-and-reply-to-email, help/email-and-calendar/choose-who-sees-your-email, help/email-and-calendar/see-meetings-and-link-them-to-records]
 ---
 
@@ -63,7 +63,7 @@ before you connect a mailbox you consider sensitive.
 
 A Microsoft account has the same menu as a Google account. See
 [Manage a connected account](/help/email-and-calendar/connect-your-google-account#manage-a-connected-account)
-for **Manage**, **Set as default**, and **Disconnect account**.
+for its settings, **Set as default**, and **Disconnect account**.
 
 ## If Microsoft asks for admin approval
 
