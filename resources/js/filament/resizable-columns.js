@@ -482,7 +482,8 @@ function copyColumnCell(cell, top) {
     const copy = document.createElement('div')
     copy.className = `${cell.className} fi-ta-column-drag-ghost-cell`
     Object.assign(copy.style, { top: `${top}px`, height: `${cell.offsetHeight}px`, padding: getComputedStyle(cell).padding })
-    copy.append(...[...cell.children].filter((child) => !child.matches('.fi-ta-column-handle, .column-resize-handle-bar')).map((child) => child.cloneNode(true)))
+    // Only what the cell shows: a stacked table's card label is hidden by rules the copy, outside the table, would lose.
+    copy.append(...[...cell.children].filter((child) => !child.matches('.fi-ta-column-handle, .column-resize-handle-bar') && getComputedStyle(child).display !== 'none').map((child) => child.cloneNode(true)))
 
     return copy
 }

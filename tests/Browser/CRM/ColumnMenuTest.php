@@ -270,10 +270,11 @@ function dragHeader(string $column, string $overColumn, string $side = 'left', s
             const header = grip.closest('th');
             const originals = [...header.closest('table').querySelectorAll(`td.fi-ta-cell-${CSS.escape(header.dataset.resizableColumnId)}`), grip];
             const copies = lifted ? [...lifted.children] : [];
-            const media = (element) => element.querySelectorAll('svg, img').length;
+            const shown = (element) => { const clone = element.cloneNode(true); clone.querySelectorAll('.fi-ta-cell-label').forEach((label) => label.remove()); return clone; };
+            const media = (element) => shown(element).querySelectorAll('svg, img').length;
             const mid = {
                 ghost: (lifted?.isConnected && lifted.inert) ?? false,
-                copy: copies.length === originals.length && originals.every((original, index) => copies[index].offsetHeight === (original === grip ? header : original).offsetHeight && copies[index].textContent.trim() === original.textContent.trim() && media(copies[index]) === media(original)),
+                copy: copies.length === originals.length && originals.every((original, index) => copies[index].offsetHeight === (original === grip ? header : original).offsetHeight && !copies[index].querySelector('.fi-ta-cell-label') && shown(copies[index]).textContent.trim() === shown(original).textContent.trim() && media(copies[index]) === media(original)),
                 shifted: document.querySelector(`%s`).style.transform !== '',
                 dragging: header.classList.contains('fi-ta-column-dragging'),
             };
