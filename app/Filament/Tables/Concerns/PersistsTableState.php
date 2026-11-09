@@ -62,8 +62,8 @@ trait PersistsTableState
 
         $table = $this->getTable();
 
-        $this->tableColumnWidths = array_intersect_key($this->tableColumnWidths, $table->getColumns());
-        $this->tableColumnLabels = array_intersect_key($this->tableColumnLabels, $table->getColumns());
+        $this->tableColumnWidths = $this->onlyTableColumns($this->tableColumnWidths);
+        $this->tableColumnLabels = $this->onlyTableColumns($this->tableColumnLabels);
 
         if (filled($this->tableSort) && ! array_key_exists(explode(':', $this->tableSort)[0], $table->getColumns())) {
             $this->tableSort = null;
@@ -106,9 +106,20 @@ trait PersistsTableState
         return $this->tableColumnsFrom($this->initialTableState());
     }
 
+    /**
+     * @template TValue
+     *
+     * @param  array<string, TValue>  $byColumn
+     * @return array<string, TValue>
+     */
+    private function onlyTableColumns(array $byColumn): array
+    {
+        return array_intersect_key($byColumn, $this->getTable()->getColumns());
+    }
+
     private function applyTableState(TableStateData $state): void
     {
-        $this->tableColumnLabels = array_intersect_key($state->labels, $this->getTable()->getColumns());
+        $this->tableColumnLabels = $this->onlyTableColumns($state->labels);
         $this->cachedDefaultTableColumnState = null;
         $this->tablePinnedColumns = $state->pinned;
         $this->applyTableColumnManager($this->tableColumnsFrom($state), wasReordered: true);
@@ -277,7 +288,7 @@ trait PersistsTableState
             columnSearches: array_filter($this->tableColumnSearches, filled(...)),
             grouping: filled($this->tableGrouping) ? $this->tableGrouping : null,
             perPage: $this->tableRecordsPerPage,
-            widths: array_intersect_key($this->tableColumnWidths, $this->getTable()->getColumns()),
+            widths: $this->onlyTableColumns($this->tableColumnWidths),
             labels: $this->tableColumnLabels,
             pinned: $this->tablePinnedColumns,
         );
