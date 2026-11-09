@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Enums\CustomFields;
 
 use App\Enums\CustomFieldType;
+use App\Support\ChecklistHtml;
 use Relaticle\CustomFields\Enums\CustomFieldWidth;
 
 enum TaskField: string
@@ -13,7 +14,7 @@ enum TaskField: string
 
     public const string CHECKLIST_INPUT_FORMAT = 'bulleted markdown items "- [ ]" and "- [x]" become a checklist, while numbered items such as "1. [ ]" stay a numbered list';
 
-    public const string CHECKLIST_HTML_READ_FORMAT = 'read back as li[data-type="taskItem"] with data-checked="true" or "false"';
+    public const string CHECKLIST_HTML_READ_FORMAT = 'read back as '.ChecklistHtml::ITEM.' with data-checked="true" or "false"';
 
     use CustomFieldTrait;
 
