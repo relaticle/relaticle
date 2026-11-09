@@ -24,9 +24,7 @@ trait HasResizableColumns
             return;
         }
 
-        $width = max(ResizableColumns::MIN_WIDTH, min(ResizableColumns::MAX_WIDTH, $width));
-
-        $this->tableColumnWidths[$columnName] = $width;
+        $this->tableColumnWidths[$columnName] = ResizableColumns::clamp($width);
 
         $this->stampResizableColumns($this->getTable());
     }

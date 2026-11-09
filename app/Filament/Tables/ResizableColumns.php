@@ -7,6 +7,7 @@ namespace App\Filament\Tables;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Table;
 use Illuminate\Support\Js;
+use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 
 final class ResizableColumns
@@ -28,10 +29,15 @@ final class ResizableColumns
         foreach ($table->getColumns() as $name => $column) {
             $width = $widths[$name] ?? self::pixels($column->getWidth()) ?? self::DEFAULT_COLUMN_WIDTH;
 
-            self::stamp($column, $name, max(self::MIN_WIDTH, min(self::MAX_WIDTH, $width)), in_array($name, $pinned, true), $name === $title);
+            self::stamp($column, $name, self::clamp($width), in_array($name, $pinned, true), $name === $title);
         }
 
         return $table;
+    }
+
+    public static function clamp(int $width): int
+    {
+        return (int) Number::clamp($width, self::MIN_WIDTH, self::MAX_WIDTH);
     }
 
     private static function pixels(string|int|null $width): ?int
