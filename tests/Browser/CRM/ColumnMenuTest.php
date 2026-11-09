@@ -154,6 +154,26 @@ it('disables the moves at the edges', function (): void {
         ->assertNoJavaScriptErrors();
 });
 
+it('closes the menu when focus leaves it', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
+
+    $page->script(openColumnMenu('created_at'));
+    waitUntil($page, menuItemFocused())->keys(':focus', 'Tab');
+
+    waitUntil($page, visibleMenuItems().'.length === 0')->assertNoJavaScriptErrors();
+});
+
+it('jumps to the first and last menu item with Home and End', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
+    $focusedItem = 'document.activeElement.dataset.columnMenuItem';
+
+    $page->script(openColumnMenu('created_at'));
+    waitUntil($page, menuItemFocused())->keys(':focus', 'End');
+    waitUntil($page, "{$focusedItem} === 'hide'")->keys(':focus', 'Home');
+
+    waitUntil($page, "{$focusedItem} === 'moveLeft'")->assertNoJavaScriptErrors();
+});
+
 it('moves a column right past a hidden one', function (): void {
     $page = companiesTable($this->user, $this->workspace->slug);
 

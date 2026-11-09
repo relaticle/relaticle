@@ -544,3 +544,9 @@ it('opens the label editor with the name the column shows and stores nothing for
 
     expect(TablePreference::query()->withoutGlobalScopes()->sole()->state->labels)->toBe([]);
 });
+
+it('names the column menu for assistive technology', function (): void {
+    Filament::bootCurrentPanel();
+
+    livewire(ListCompanies::class)->assertSeeHtmlInOrder(['role="menu"', 'aria-label="Column options"']);
+});
