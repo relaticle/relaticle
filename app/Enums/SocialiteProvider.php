@@ -8,6 +8,7 @@ use App\Features\SocialAuth;
 use Laravel\Pennant\Feature;
 use Laravel\Socialite\AbstractUser;
 use Laravel\Socialite\Contracts\User as SocialiteUser;
+use SocialiteProviders\Microsoft\Provider as MicrosoftProvider;
 
 enum SocialiteProvider: string
 {
@@ -50,8 +51,25 @@ enum SocialiteProvider: string
 
         return match ($this) {
             self::GOOGLE => $user instanceof AbstractUser && filter_var($user->getRaw()['email_verified'] ?? false, FILTER_VALIDATE_BOOL),
-            // The Microsoft provider reports the user principal name, which Entra issues only on verified domains.
+            // Work accounts report a user principal name on a domain their tenant verified. Personal accounts
+            // carry no such guarantee, which isAuthoritativeForEmailOf() checks before an account is replaced.
             self::MICROSOFT => true,
+        };
+    }
+
+    // Each provider's documented rule for owning an address, not just having verified it once: Google
+    // for Gmail and Workspace (hd) accounts, Microsoft for work and school tenants.
+    public function isAuthoritativeForEmailOf(SocialiteUser $user): bool
+    {
+        if (! $this->vouchesForEmailOf($user) || ! $user instanceof AbstractUser) {
+            return false;
+        }
+
+        $raw = $user->getRaw();
+
+        return match ($this) {
+            self::GOOGLE => str_ends_with(mb_strtolower((string) $user->getEmail()), '@gmail.com') || filled($raw['hd'] ?? null),
+            self::MICROSOFT => filled($raw['tid'] ?? null) && $raw['tid'] !== MicrosoftProvider::MS_ENTRA_CONSUMER_TENANT_ID,
         };
     }
 }
