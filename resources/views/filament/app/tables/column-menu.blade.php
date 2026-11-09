@@ -17,18 +17,62 @@
         x-on:click.outside="$event.target.closest('.fi-ta-column-handle') || close(false)"
         class="fi-dropdown-panel fi-ta-column-menu"
     >
-        @foreach ($this->columnMenuActions() as $actions)
-            @php($visibleWhen = collect($actions)->map->getVisibleWhen()->unique())
-            <div
-                class="fi-dropdown-list"
-                @unless ($visibleWhen->contains(null))
-                    x-bind:style="{ display: ({{ $visibleWhen->implode(') || (') }}) ? null : 'none' }"
-                @endunless
+        <div class="fi-dropdown-list" x-show="movable">
+            <x-filament::dropdown.list.item
+                icon="lucide-arrow-left"
+                data-column-menu-item="moveLeft"
+                x-bind:disabled="! canMoveLeft"
+                x-bind:aria-disabled="(! canMoveLeft).toString()"
+                x-bind:class="{ 'fi-disabled': ! canMoveLeft }"
+                x-on:click="choose(() => $wire.moveTableColumn(column, before.left), column)"
             >
-                @foreach ($actions as $action)
-                    {{ $action }}
-                @endforeach
-            </div>
-        @endforeach
+                {{ __('filament/panel.tables.column_menu.move_left') }}
+            </x-filament::dropdown.list.item>
+            <x-filament::dropdown.list.item
+                icon="lucide-arrow-right"
+                data-column-menu-item="moveRight"
+                x-bind:disabled="! canMoveRight"
+                x-bind:aria-disabled="(! canMoveRight).toString()"
+                x-bind:class="{ 'fi-disabled': ! canMoveRight }"
+                x-on:click="choose(() => $wire.moveTableColumn(column, before.right), column)"
+            >
+                {{ __('filament/panel.tables.column_menu.move_right') }}
+            </x-filament::dropdown.list.item>
+        </div>
+        <div class="fi-dropdown-list">
+            <x-filament::dropdown.list.item
+                icon="lucide-pin"
+                data-column-menu-item="pin"
+                x-show="! pinned"
+                x-on:click="choose(() => $wire.pinTableColumn(column), column)"
+            >
+                {{ __('filament/panel.tables.column_menu.pin') }}
+            </x-filament::dropdown.list.item>
+            <x-filament::dropdown.list.item
+                icon="lucide-pin-off"
+                data-column-menu-item="unpin"
+                x-show="pinned"
+                x-on:click="choose(() => $wire.unpinTableColumn(column), column)"
+            >
+                {{ __('filament/panel.tables.column_menu.unpin') }}
+            </x-filament::dropdown.list.item>
+        </div>
+        <div class="fi-dropdown-list">
+            <x-filament::dropdown.list.item
+                icon="lucide-pencil"
+                data-column-menu-item="editLabel"
+                x-on:click="choose(() => $wire.mountAction('editTableColumnLabel', { column }), null)"
+            >
+                {{ __('filament/panel.tables.column_menu.edit_label') }}
+            </x-filament::dropdown.list.item>
+            <x-filament::dropdown.list.item
+                icon="lucide-eye-off"
+                data-column-menu-item="hide"
+                x-show="hideable"
+                x-on:click="choose(() => $wire.hideTableColumn(column), neighbour)"
+            >
+                {{ __('filament/panel.tables.column_menu.hide') }}
+            </x-filament::dropdown.list.item>
+        </div>
     </div>
 </div>

@@ -46,14 +46,14 @@ function openColumnMenu(string $column): string
     return sprintf('document.querySelector(`%s .fi-ta-column-handle`).click()', columnHeader($column));
 }
 
-function columnMenuItem(string $label): string
+function columnMenuItem(string $key): string
 {
-    return ".fi-ta-column-menu [role=\"menuitem\"][data-label=\"{$label}\"]";
+    return ".fi-ta-column-menu [data-column-menu-item=\"{$key}\"]";
 }
 
 function visibleMenuItems(): string
 {
-    return '[...document.querySelectorAll(".fi-ta-column-menu [role=menuitem]")].filter((item) => item.offsetParent !== null).map((item) => item.dataset.label)';
+    return '[...document.querySelectorAll(".fi-ta-column-menu [role=menuitem]")].filter((item) => item.offsetParent !== null).map((item) => item.textContent.trim())';
 }
 
 function menuItemFocused(): string
@@ -85,13 +85,13 @@ it('moves and hides a column from its handle menu and keeps it after a reload', 
     $index = array_search('creator.name', $order, true);
 
     $page->script(openColumnMenu('creator.name'));
-    $page->click(columnMenuItem('Move right'))
+    $page->click(columnMenuItem('moveRight'))
         ->assertScript(headerOrder().'.indexOf("creator.name")', $index + 1);
 
     $beforeHidden = $page->script('(() => { const order = '.headerOrder().'; const at = order.indexOf("accountOwner.name"); return order[at - 1] ?? order[at + 1]; })()');
 
     $page->script(openColumnMenu('accountOwner.name'));
-    $page->click(columnMenuItem('Hide column'))
+    $page->click(columnMenuItem('hide'))
         ->assertMissing(columnHeader('accountOwner.name'));
     waitUntil($page, '('.focusedColumn().') === '.json_encode($beforeHidden))
         ->wait(1)
@@ -111,7 +111,7 @@ it('keeps sorting on the header and gives the title column a handle', function (
 
     $page->script(openColumnMenu('created_at'));
     waitUntil($page, menuItemFocused())
-        ->assertMissing('.fi-ta-column-menu [data-label="Sort ascending"]')
+        ->assertMissing('.fi-ta-column-menu [data-column-menu-item="sortAscending"]')
         ->assertScript(visibleMenuItems(), ['Move left', 'Move right', 'Pin to left', 'Edit column label', 'Hide column'])
         ->assertScript(sprintf('document.querySelector(`%s`).getAttribute("aria-sort")', columnHeader('created_at')), 'ascending')
         ->assertNoJavaScriptErrors();
@@ -131,7 +131,7 @@ it('stays on the list when a column menu item is double-clicked', function (): v
             requestAnimationFrame(() => document.elementFromPoint(point.clientX, point.clientY)?.dispatchEvent(new MouseEvent('click', { ...point, detail: 2 })));
             return true;
         })();
-    JS, columnMenuItem('Pin to left')));
+    JS, columnMenuItem('pin')));
 
     waitUntil($page, sprintf('document.querySelector(`%s`)?.dataset.columnPinned === "1"', columnHeader('created_at')))
         ->wait(0.5)
@@ -145,12 +145,12 @@ it('disables the moves at the edges', function (): void {
 
     $page->script(openColumnMenu($order[0]));
     waitUntil($page, menuItemFocused())
-        ->assertAttribute(columnMenuItem('Move left'), 'aria-disabled', 'true')
+        ->assertAttribute(columnMenuItem('moveLeft'), 'aria-disabled', 'true')
         ->keys(':focus', 'Escape');
 
     $page->script(openColumnMenu(end($order)));
     waitUntil($page, menuItemFocused())
-        ->assertAttribute(columnMenuItem('Move right'), 'aria-disabled', 'true')
+        ->assertAttribute(columnMenuItem('moveRight'), 'aria-disabled', 'true')
         ->assertNoJavaScriptErrors();
 });
 
@@ -158,14 +158,14 @@ it('moves a column right past a hidden one', function (): void {
     $page = companiesTable($this->user, $this->workspace->slug);
 
     $page->script(openColumnMenu('creator.name'));
-    $page->click(columnMenuItem('Hide column'))
+    $page->click(columnMenuItem('hide'))
         ->assertMissing(columnHeader('creator.name'));
 
     $order = $page->script(headerOrder());
     $next = $order[array_search('accountOwner.name', $order, true) + 1];
 
     $page->script(openColumnMenu('accountOwner.name'));
-    $page->click(columnMenuItem('Move right'))
+    $page->click(columnMenuItem('moveRight'))
         ->assertScript(headerOrder().'.indexOf("accountOwner.name")', array_search($next, $order, true))
         ->assertNoJavaScriptErrors();
 });
@@ -189,7 +189,7 @@ it('works the handle by keyboard alone and keeps focus on the moved column', fun
     $page->keys($handle, 'Enter');
     waitUntil($page, menuItemFocused())->keys(':focus', 'Escape');
     waitUntil($page, $handleFocused)
-        ->assertMissing(columnMenuItem('Move left'))
+        ->assertMissing(columnMenuItem('moveLeft'))
         ->assertNoJavaScriptErrors();
 });
 
@@ -242,7 +242,7 @@ it('keeps the column manager order in step with the headers', function (): void 
     $page = companiesTable($this->user, $this->workspace->slug);
 
     $page->script(openColumnMenu('created_at'));
-    $page->click(columnMenuItem('Move left'));
+    $page->click(columnMenuItem('moveLeft'));
     $page->wait(1);
 
     $headers = $page->script(headerOrder());
@@ -450,7 +450,7 @@ it('focuses the title column after hiding the last column beside it by keyboard'
 
     foreach (array_diff($page->script(headerOrder()), ['name', 'created_at']) as $column) {
         $page->script(openColumnMenu($column));
-        $page->click(columnMenuItem('Hide column'))->assertMissing(columnHeader($column));
+        $page->click(columnMenuItem('hide'))->assertMissing(columnHeader($column));
     }
 
     $page->keys(columnHeader('created_at').' .fi-ta-column-handle', 'Enter');
@@ -463,7 +463,7 @@ it('focuses the title column after hiding the last column beside it by keyboard'
 function pinFromMenu(AwaitableWebpage $page, string $column): AwaitableWebpage
 {
     $page->script(openColumnMenu($column));
-    $page->click(columnMenuItem('Pin to left'));
+    $page->click(columnMenuItem('pin'));
 
     return waitUntil($page, sprintf('document.querySelector(`%s`)?.dataset.columnPinned === "1"', columnHeader($column)));
 }
@@ -499,7 +499,7 @@ it('pins the title column like any other and unpins a column from its lock', fun
 
     $page->script(openColumnMenu('created_at'));
     waitUntil($page, visibleMenuItems().'.join() === "Unpin,Edit column label,Hide column"');
-    $page->click(columnMenuItem('Unpin'));
+    $page->click(columnMenuItem('unpin'));
     waitUntil($page, sprintf('document.querySelector(`%s`).dataset.columnPinned === "0"', columnHeader('created_at')))
         ->assertScript(sprintf('document.querySelector(`%s`).dataset.columnPinned', columnHeader('name')), '1')
         ->assertNoJavaScriptErrors();
@@ -721,7 +721,7 @@ it('renames a column from its handle menu and keeps the name after a reload', fu
     $labelOf = fn (string $column): string => sprintf('document.querySelector(`%s .fi-ta-header-cell-field`).textContent.trim()', columnHeader($column));
 
     $page->script(openColumnMenu('created_at'));
-    $page->click(columnMenuItem('Edit column label'))
+    $page->click(columnMenuItem('editLabel'))
         ->assertVisible('.fi-modal-window input')
         ->type('.fi-modal-window input', 'Added on')
         ->click('.fi-modal-window button[type="submit"]');
