@@ -11,6 +11,7 @@ use App\Models\Scopes\WorkspaceScope;
 use App\Models\TableLayout;
 use App\Models\TablePreference;
 use App\Providers\Filament\AppPanelProvider;
+use Illuminate\Support\Arr;
 use Livewire\Attributes\Locked;
 use LogicException;
 
@@ -264,14 +265,8 @@ trait PersistsTableState
 
     private function currentTableState(): TableStateData
     {
-        $columns = [];
-
-        foreach ($this->tableColumns as $item) {
-            $columns[] = ['type' => $item['type'], 'name' => $item['name'], 'isToggled' => $item['isToggled']];
-        }
-
         return new TableStateData(
-            columns: $columns,
+            columns: array_map(fn (array $item): array => Arr::only($item, ['type', 'name', 'isToggled']), $this->tableColumns),
             sort: filled($this->tableSort) ? $this->tableSort : null,
             filters: $this->tableFilters ?? [],
             search: filled($this->tableSearch) ? $this->tableSearch : null,
