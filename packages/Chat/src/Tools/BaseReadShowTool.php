@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Tools;
 
-use App\Enums\CustomFieldType;
 use App\Models\User;
-use App\Support\PlainText;
-use Closure;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -16,6 +13,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
+use Relaticle\Chat\Enums\ResponseFormat;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\DisplayFieldSelector;
 use Relaticle\Chat\Support\LongTextForModel;
@@ -43,9 +41,7 @@ abstract class BaseReadShowTool implements Tool
     private const string CUSTOM_FIELD_RELATION = 'customFieldValues.customField.options';
 
     /**
-     * Characters kept per free-text value. Shared by the included-record strip
-     * and the record card, so the same field never reads shorter in the payload
-     * the model sees than in the card the user reads.
+     * Characters kept per free-text value on the record card.
      */
     private const int FREE_TEXT_LIMIT = 500;
 
@@ -271,34 +267,46 @@ abstract class BaseReadShowTool implements Tool
         /** @var class-string<JsonResource> $resourceClass */
         $resourceClass = $this->resourceClass();
 
-        return $this->rewriteFreeText(
-            $this->flattenResource(new $resourceClass($model)),
-            $model,
-            LongTextForModel::full(...),
-        );
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     * @param  Closure(string, CustomFieldType): string  $rewrite
-     * @return array<string, mixed>
-     */
-    private function rewriteFreeText(array $payload, Model $model, Closure $rewrite): array
-    {
-        $attributes = $payload['attributes'] ?? null;
-        $customFields = $attributes instanceof stdClass ? ($attributes->custom_fields ?? null) : null;
-
-        if (! $customFields instanceof stdClass) {
-            return $payload;
-        }
+        $payload = $this->flattenResource(new $resourceClass($model));
+        $customFields = $this->customFieldsOf($payload);
 
         foreach (LongTextForModel::freeTextFields($model) as $code => $type) {
-            if (is_string($customFields->{$code} ?? null)) {
-                $customFields->{$code} = $rewrite($customFields->{$code}, $type);
+            if ($customFields !== null && is_string($customFields->{$code} ?? null)) {
+                $customFields->{$code} = LongTextForModel::full($customFields->{$code}, $type);
             }
         }
 
         return $payload;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function shortenedIncluded(array $payload, Model $model): array
+    {
+        $customFields = $this->customFieldsOf($payload);
+
+        if ($customFields === null) {
+            return $payload;
+        }
+
+        $shortened = LongTextForModel::forListRow($model, (array) $customFields, ResponseFormat::Concise);
+
+        foreach ($shortened['values'] as $code => $value) {
+            $customFields->{$code} = $value;
+        }
+
+        return $shortened['truncated'] === [] ? $payload : [...$payload, 'truncated_fields' => $shortened['truncated']];
+    }
+
+    /** @param  array<string, mixed>  $payload */
+    private function customFieldsOf(array $payload): ?stdClass
+    {
+        $attributes = $payload['attributes'] ?? null;
+        $customFields = $attributes instanceof stdClass ? ($attributes->custom_fields ?? null) : null;
+
+        return $customFields instanceof stdClass ? $customFields : null;
     }
 
     /**
@@ -354,11 +362,7 @@ abstract class BaseReadShowTool implements Tool
             $items = [];
 
             foreach ($related as $item) {
-                $items[] = $this->rewriteFreeText(
-                    $this->flattenResource(new $resourceClass($item)),
-                    $item,
-                    static fn (string $value): string => Str::limit(PlainText::fromHtml($value), self::FREE_TEXT_LIMIT),
-                );
+                $items[] = $this->shortenedIncluded($this->flattenResource(new $resourceClass($item)), $item);
             }
 
             $totalAttribute = $model->getAttribute(Str::snake($relationName).'_count');

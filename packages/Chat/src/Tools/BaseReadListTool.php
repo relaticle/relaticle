@@ -267,28 +267,16 @@ abstract class BaseReadListTool implements Tool
      */
     private function shortenFreeText(array $item, ?Model $model, ResponseFormat $format): array
     {
-        if (! $model instanceof Model) {
+        $values = $item['attributes']['custom_fields'] ?? null;
+
+        if (! $model instanceof Model || ! is_array($values)) {
             return $item;
         }
 
-        $truncated = [];
+        $shortened = LongTextForModel::forListRow($model, $values, $format);
+        $item['attributes']['custom_fields'] = $shortened['values'];
 
-        foreach (LongTextForModel::freeTextFields($model) as $code => $type) {
-            $value = $item['attributes']['custom_fields'][$code] ?? null;
-
-            if (! is_string($value)) {
-                continue;
-            }
-
-            $shortened = LongTextForModel::forList($value, $type, $format);
-            $item['attributes']['custom_fields'][$code] = $shortened['text'];
-
-            if ($shortened['truncated']) {
-                $truncated[] = $code;
-            }
-        }
-
-        return $truncated === [] ? $item : [...$item, 'truncated_fields' => $truncated];
+        return $shortened['truncated'] === [] ? $item : [...$item, 'truncated_fields' => $shortened['truncated']];
     }
 
     private function responseFormat(Request $request): ?ResponseFormat

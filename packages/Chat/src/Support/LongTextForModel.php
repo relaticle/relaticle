@@ -42,8 +42,32 @@ final readonly class LongTextForModel
         'td' => ['colspan' => self::ONE, 'rowspan' => self::ONE],
     ];
 
+    /**
+     * @param  array<string, mixed>  $values  custom field values by code
+     * @return array{values: array<string, mixed>, truncated: list<string>}
+     */
+    public static function forListRow(Model $record, array $values, ResponseFormat $format): array
+    {
+        $truncated = [];
+
+        foreach (self::freeTextFields($record) as $code => $type) {
+            if (! is_string($values[$code] ?? null)) {
+                continue;
+            }
+
+            $shortened = self::shortened($values[$code], $type, $format);
+            $values[$code] = $shortened['text'];
+
+            if ($shortened['truncated']) {
+                $truncated[] = $code;
+            }
+        }
+
+        return ['values' => $values, 'truncated' => $truncated];
+    }
+
     /** @return array{text: string, truncated: bool} */
-    public static function forList(string $value, CustomFieldType $type, ResponseFormat $format): array
+    private static function shortened(string $value, CustomFieldType $type, ResponseFormat $format): array
     {
         if ($format === ResponseFormat::Detailed) {
             return ['text' => self::full($value, $type), 'truncated' => false];
