@@ -9,6 +9,16 @@ const escapeHtml = (text) => text
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
 
+// A task item is a read-only checkbox, as TaskMarkerRenderer draws it on the server:
+// DOMPurify drops the <input> marked would emit, and the tick with it.
+marked.use({
+    renderer: {
+        checkbox({ checked }) {
+            return `<span class="chat-md-task" role="checkbox" aria-checked="${checked ? 'true' : 'false'}" aria-disabled="true"></span> `
+        },
+    },
+})
+
 // An image is shown as its alt text, as ImageAltTextRenderer does on the server:
 // a browser would fetch the URL, with whatever it carries, as the reply streams.
 marked.use({
@@ -110,10 +120,10 @@ const wrapTables = (html) => {
 // is far wider than that: it keeps <form>, <input>, <button> and <style>, which is
 // enough to paint a working credential-phishing form inside a trusted surface that
 // then vanishes on reload. This allowlist is exactly what MarkdownRenderer can emit
-// (CommonMark core + TableExtension + the record chip), and nothing else.
+// (CommonMark core + GFM + the record chip and task marker), and nothing else.
 const MARKDOWN_ALLOWED_TAGS = [
     'p', 'br', 'hr', 'blockquote', 'pre', 'code',
-    'em', 'strong', 'a',
+    'em', 'strong', 'del', 'a',
     'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
     'ul', 'ol', 'li',
     'table', 'thead', 'tbody', 'tr', 'th', 'td',
@@ -122,7 +132,7 @@ const MARKDOWN_ALLOWED_TAGS = [
 
 const MARKDOWN_ALLOWED_ATTR = [
     'href', 'title', 'align', 'class',
-    'data-record-type', 'tabindex', 'role', 'aria-hidden',
+    'data-record-type', 'tabindex', 'role', 'aria-hidden', 'aria-checked', 'aria-disabled',
     'viewbox', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'd',
 ]
 

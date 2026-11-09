@@ -8,9 +8,9 @@
 // path: HTML in, structured plain text out.
 //
 // Hand-rolled rather than pulled from a package because the tag set is
-// bounded. A reply is produced by CommonMark core plus the table extension
-// (MarkdownRenderer) or by marked plus DOMPurify (window.renderMarkdown), and
-// the only bespoke markup either emits is the record-chip anchor.
+// bounded. A reply is produced by CommonMark core plus GFM (MarkdownRenderer)
+// or by marked plus DOMPurify (window.renderMarkdown), and the only bespoke
+// markup either emits is the record-chip anchor and the task-list checkbox.
 
 const ELEMENT_NODE = 1;
 const TEXT_NODE = 3;
@@ -32,7 +32,12 @@ const tagOf = (node) => (node.nodeType === ELEMENT_NODE ? node.tagName.toLowerCa
 const collapse = (text) => text.replace(/\s+/g, ' ');
 
 const inline = (node) => {
-    if (node.nodeType === TEXT_NODE) return collapse(node.nodeValue ?? '');
+    // The server writes a newline after each <br />, marked does not.
+    if (node.nodeType === TEXT_NODE) {
+        const text = collapse(node.nodeValue ?? '');
+
+        return node.previousSibling?.nodeName === 'BR' ? text.trimStart() : text;
+    }
     if (node.nodeType !== ELEMENT_NODE) return '';
 
     const tag = tagOf(node);
@@ -40,6 +45,7 @@ const inline = (node) => {
     // The chip and heading glyphs are drawn, not written.
     if (tag === 'svg') return '';
     if (tag === 'br') return '\n';
+    if (node.classList.contains('chat-md-task')) return node.getAttribute('aria-checked') === 'true' ? '[x]' : '[ ]';
     if (tag === 'code') return `\`${collapse(node.textContent ?? '').trim()}\``;
 
     const children = () => Array.from(node.childNodes).map(inline).join('');
