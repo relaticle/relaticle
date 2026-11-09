@@ -155,6 +155,17 @@ it('names the owner when an admin renames their layout to a name the owner alrea
     expect($shared->refresh()->name)->toBe('Team');
 });
 
+it('names the owner when the name is taken between the check and the write', function (): void {
+    $owner = tableLayoutMember(WorkspaceRole::Member);
+    $shared = layoutFor($owner, ['name' => 'Team', 'is_shared' => true]);
+    $this->actingAs(tableLayoutMember(WorkspaceRole::Admin));
+    TableLayout::updating(fn () => layoutFor($owner, ['name' => 'Raced']));
+
+    livewire(ListCompanies::class)
+        ->callAction('renameTableLayout', ['name' => 'Raced'], ['layout' => $shared->getKey()])
+        ->assertHasActionErrors(['name' => "{$owner->name} already has a layout with this name."]);
+});
+
 it('lets two members use the same layout name', function (): void {
     layoutFor(tableLayoutMember(WorkspaceRole::Member), ['name' => 'Hot leads', 'is_shared' => true]);
 

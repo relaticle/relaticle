@@ -10,7 +10,9 @@ use App\Models\TableLayout;
 use App\Models\TablePreference;
 use App\Models\User;
 use App\Notifications\TableLayoutChangedNotification;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 final readonly class UpdateTableLayout
 {
@@ -34,7 +36,7 @@ final readonly class UpdateTableLayout
         return DB::transaction(function () use ($user, $layout, $attributes): TableLayout {
             $previousName = $layout->name;
             $previousStateHash = $layout->state->withoutWidths()->hash();
-            $layout->update($attributes);
+            $this->write($user, $layout, $attributes);
 
             if ($layout->wasChanged('is_shared') && ! $layout->is_shared) {
                 $this->forgetForOtherMembers($layout);
@@ -48,6 +50,18 @@ final readonly class UpdateTableLayout
 
             return $layout;
         });
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    private function write(User $user, TableLayout $layout, array $attributes): void
+    {
+        try {
+            $layout->update($attributes);
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages(['name' => $layout->nameTakenMessage($user)]);
+        }
     }
 
     private function noticeFor(TableLayout $layout, User $actor, string $previousName, string $previousStateHash): ?TableLayoutChangedNotification

@@ -55,6 +55,13 @@ final class TableLayout extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function nameTakenMessage(User $actor): string
+    {
+        return $this->user_id === $actor->getKey()
+            ? __('filament/panel.tables.layouts.name_taken')
+            : __('filament/panel.tables.layouts.name_taken_by_owner', ['owner' => $this->user->name]);
+    }
+
     /**
      * @param  Builder<self>  $query
      */

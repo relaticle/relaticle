@@ -23,11 +23,7 @@ final readonly class EnsureTableLayoutNameIsFree
 
         if ($name === '' || $taken) {
             throw ValidationException::withMessages([
-                'name' => match (true) {
-                    $name === '' => __('filament/panel.tables.layouts.name_required'),
-                    $owner->is($actor) => __('filament/panel.tables.layouts.name_taken'),
-                    default => __('filament/panel.tables.layouts.name_taken_by_owner', ['owner' => $owner->name]),
-                },
+                'name' => $name === '' ? __('filament/panel.tables.layouts.name_required') : $layout->nameTakenMessage($actor),
             ]);
         }
 

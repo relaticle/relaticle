@@ -9,6 +9,8 @@ use App\Enums\CrmEntity;
 use App\Models\TableLayout;
 use App\Models\User;
 use App\Models\Workspace;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Validation\ValidationException;
 
 final readonly class CreateTableLayout
 {
@@ -25,7 +27,12 @@ final readonly class CreateTableLayout
             'state' => $state->withoutWidths(),
         ]);
         $layout->name = $this->ensureNameIsFree->execute($user, $layout, $name);
-        $layout->save();
+
+        try {
+            $layout->save();
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages(['name' => $layout->nameTakenMessage($user)]);
+        }
 
         return $layout;
     }

@@ -20,7 +20,6 @@ use Filament\Notifications\Notification;
 use Filament\Schemas\Schema;
 use Filament\Support\Components\Attributes\Exposed;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Validation\ValidationException;
 
 trait HasTableLayouts
@@ -361,10 +360,6 @@ trait HasTableLayouts
     {
         try {
             return $write();
-        } catch (UniqueConstraintViolationException) {
-            throw ValidationException::withMessages([
-                "{$schema->getStatePath()}.name" => [__('filament/panel.tables.layouts.name_taken')],
-            ]);
         } catch (ValidationException $exception) {
             throw ValidationException::withMessages([
                 "{$schema->getStatePath()}.name" => $exception->errors()['name'] ?? [],
