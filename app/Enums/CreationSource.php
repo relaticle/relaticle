@@ -78,6 +78,21 @@ enum CreationSource: string implements HasColor, HasLabel
         };
     }
 
+    // One categorical slot each, validated for colour-vision separation on light and dark surfaces.
+    public function chartColor(): string
+    {
+        return match ($this) {
+            self::WEB => '#2a78d6',
+            self::SAMPLE => '#d95926',
+            self::IMPORT => '#1baf7a',
+            self::API => '#c98500',
+            self::MCP => '#d55181',
+            self::CHAT => '#008300',
+            self::MAILBOX => '#6250d6',
+            self::SYSTEM => '#e34948',
+        };
+    }
+
     public function getLabel(): string
     {
         return match ($this) {
