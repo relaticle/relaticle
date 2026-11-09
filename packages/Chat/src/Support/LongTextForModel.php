@@ -8,6 +8,7 @@ use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Support\Markdown\DecodeHtmlEntitiesPostprocessor;
 use App\Support\PlainText;
+use Dom\HTMLDocument;
 use Illuminate\Database\Eloquent\Model;
 use League\HTMLToMarkdown\Converter\TableConverter;
 use League\HTMLToMarkdown\HtmlConverter;
@@ -18,6 +19,28 @@ use Relaticle\CustomFields\Models\CustomFieldValue;
 final readonly class LongTextForModel
 {
     public const int CONCISE_LIMIT = 300;
+
+    private const string ANY = '/^/';
+
+    private const string ONE = '/^1$/';
+
+    /** @var array<string, array<string, string>> tag => attribute => allowed value pattern */
+    private const array MARKDOWN_ATTRIBUTES = [
+        'p' => [], 'br' => [], 'hr' => [], 'blockquote' => [], 'pre' => [],
+        'h1' => [], 'h2' => [], 'h3' => [], 'h4' => [], 'h5' => [], 'h6' => [],
+        'strong' => [], 'b' => [], 'em' => [], 'i' => [],
+        'code' => ['class' => '/^language-[\w-]+$/'],
+        'a' => ['href' => self::ANY, 'target' => self::ANY, 'rel' => self::ANY],
+        'img' => ['src' => self::ANY, 'alt' => self::ANY, 'title' => self::ANY, 'data-id' => self::ANY],
+        'ul' => ['data-type' => '/^taskList$/'],
+        'ol' => ['start' => '/^\d+$/'],
+        'li' => ['data-type' => '/^taskItem$/', 'data-checked' => '/^(true|false)$/'],
+        'label' => [], 'div' => [], 'span' => [],
+        'input' => ['type' => '/^checkbox$/', 'checked' => self::ANY],
+        'table' => [], 'thead' => [], 'tbody' => [], 'tr' => [],
+        'th' => ['colspan' => self::ONE, 'rowspan' => self::ONE],
+        'td' => ['colspan' => self::ONE, 'rowspan' => self::ONE],
+    ];
 
     /** @return array{text: string, truncated: bool} */
     public static function forList(string $value, CustomFieldType $type, ResponseFormat $format): array
@@ -36,7 +59,36 @@ final readonly class LongTextForModel
 
     public static function full(string $value, CustomFieldType $type): string
     {
-        return $type === CustomFieldType::RICH_EDITOR ? self::markdown($value) : $value;
+        if ($type !== CustomFieldType::RICH_EDITOR) {
+            return $value;
+        }
+
+        return self::markdownHoldsAllOf($value) ? self::markdown($value) : $value;
+    }
+
+    // A tag or attribute missing here comes back as stored HTML, so an edit through
+    // chat never drops a mark Markdown has no syntax for (underline, alignment, colour).
+    private static function markdownHoldsAllOf(string $html): bool
+    {
+        $document = HTMLDocument::createFromString('<body>'.$html, LIBXML_NOERROR, 'UTF-8');
+
+        foreach ($document->body?->querySelectorAll('*') ?? [] as $element) {
+            $allowed = self::MARKDOWN_ATTRIBUTES[strtolower($element->localName)] ?? null;
+
+            if ($allowed === null) {
+                return false;
+            }
+
+            foreach ($element->attributes as $attribute) {
+                $pattern = $allowed[$attribute->name] ?? null;
+
+                if ($pattern === null || preg_match($pattern, $attribute->value) !== 1) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     private static function markdown(string $html): string

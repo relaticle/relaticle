@@ -95,6 +95,23 @@ it('keeps a hard line break through a markdown round trip', function (): void {
         ->toMatch('/Ann Lee<br\s*\/?>\s*12 Main Street/');
 });
 
+it('returns a description with marks markdown cannot hold as stored html, and an edit keeps them', function (string $html, string $kept): void {
+    $task = taskWithDescription($this->user, $html);
+
+    $returned = getTaskDescription($task);
+
+    expect($returned)->toStartWith('<')->toContain($kept);
+
+    expect(saveTaskDescriptionFromChat($this->user, $task, str_replace('Call Ann', 'Call Ann today', $returned)))
+        ->toContain($kept)
+        ->toContain('Call Ann today');
+})->with([
+    'underline' => ['<p><u>Call Ann</u> first</p>', '<u>'],
+    'strike' => ['<p><s>Call Ann</s> done</p>', '<s>'],
+    'highlight' => ['<p><mark>Call Ann</mark> now</p>', '<mark>'],
+    'alignment' => ['<p style="text-align: center">Call Ann</p>', 'text-align: center'],
+]);
+
 it('returns a textarea value unchanged', function (): void {
     $workspace = $this->user->currentWorkspace;
     $field = CustomField::factory()->create([
