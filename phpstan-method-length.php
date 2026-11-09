@@ -61,7 +61,7 @@ return [
                 'Relaticle\EmailIntegration\Actions\SaveEmailDraftAction::execute' => 81,
                 'Relaticle\EmailIntegration\Actions\SendEmailAction::execute' => 140,
                 'Relaticle\EmailIntegration\Actions\StoreEmailAction::storeForAccount' => 118,
-                'Relaticle\EmailIntegration\Actions\StoreMeetingAction::execute' => 68,
+                'Relaticle\EmailIntegration\Actions\StoreMeetingAction::store' => 68,
                 'Relaticle\EmailIntegration\Console\Commands\DispatchOutboxCommand::dispatchForAccount' => 64,
                 'Relaticle\EmailIntegration\EmailIntegrationServiceProvider::boot' => 75,
                 'Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions::manageSharingAction' => 103,

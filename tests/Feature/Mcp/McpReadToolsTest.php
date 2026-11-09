@@ -339,7 +339,7 @@ it('rejects malformed list tool inputs before building the database query', func
         ->assertHasErrors([$error]);
 })->with([
     'filter date operand' => [ListCompaniesTool::class, ['filter' => ['created_at' => ['$gte' => 'yesterday']]], 'created_at $gte must be a date as YYYY-MM-DD or an ISO 8601 date-time'],
-    'filter creation source' => [ListCompaniesTool::class, ['filter' => ['creation_source' => ['$eq' => 'system']]], 'creation_source $eq: system is not one of'],
+    'filter creation source' => [ListCompaniesTool::class, ['filter' => ['creation_source' => ['$eq' => 'zapier']]], 'creation_source $eq: zapier is not one of'],
     'filter object' => [ListCompaniesTool::class, ['filter' => ['invalid']], 'filter field must be an object'],
     'filter operator object' => [ListCompaniesTool::class, ['filter' => ['name' => 'software']], 'name takes an operator object'],
     'sort object' => [ListCompaniesTool::class, ['sort' => 'name'], 'sort'],
