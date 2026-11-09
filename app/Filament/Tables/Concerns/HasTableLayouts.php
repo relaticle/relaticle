@@ -95,7 +95,7 @@ trait HasTableLayouts
 
         $this->applyTableState($layout->state);
         $this->activeTableLayoutId = $layout->getKey();
-        $this->appliedTableLayoutHash = $this->currentTableState()->withoutWidths()->hash();
+        $this->markTableLayoutApplied();
     }
 
     public function revertTableLayout(): void
@@ -125,7 +125,7 @@ trait HasTableLayouts
                 }
 
                 $layout = resolve(UpdateTableLayout::class)->execute($this->tableLayoutUser(), $layout, ['state' => $this->currentTableState()]);
-                $this->appliedTableLayoutHash = $this->currentTableState()->withoutWidths()->hash();
+                $this->markTableLayoutApplied();
                 $this->visibleTableLayouts = null;
 
                 Notification::make()->success()->title(__('filament/panel.tables.layouts.saved', ['name' => e($layout->name)]))->send();
@@ -173,7 +173,7 @@ trait HasTableLayouts
                 ));
 
                 $this->activeTableLayoutId = $layout->getKey();
-                $this->appliedTableLayoutHash = $this->currentTableState()->withoutWidths()->hash();
+                $this->markTableLayoutApplied();
                 $this->visibleTableLayouts = null;
 
                 Notification::make()->success()->title(__('filament/panel.tables.layouts.created', ['name' => e($layout->name)]))->send();
@@ -263,9 +263,7 @@ trait HasTableLayouts
                     return;
                 }
 
-                $this->forgetActiveTableLayout($layout);
-                $this->defaultTableLayoutId = $this->defaultTableLayoutId === $layout->getKey() ? null : $this->defaultTableLayoutId;
-                $this->visibleTableLayouts = null;
+                $this->forgetTableLayout($layout->getKey());
 
                 Notification::make()->success()->title(__('filament/panel.tables.layouts.deleted', ['name' => e($layout->name)]))->send();
             });
@@ -277,8 +275,7 @@ trait HasTableLayouts
         $this->visibleTableLayouts = null;
 
         if ($this->tableLayoutUser()->cannot('view', $layout)) {
-            $this->forgetActiveTableLayout($layout);
-            $this->defaultTableLayoutId = $this->defaultTableLayoutId === $layout->getKey() ? null : $this->defaultTableLayoutId;
+            $this->forgetTableLayout($layout->getKey());
         }
 
         Notification::make()->success()->title(__($isShared ? 'filament/panel.tables.layouts.shared' : 'filament/panel.tables.layouts.unshared', ['name' => e($layout->name)]))->send();
@@ -323,6 +320,13 @@ trait HasTableLayouts
 
     private function handleMissingTableLayout(?string $layoutId): void
     {
+        $this->forgetTableLayout($layoutId);
+
+        Notification::make()->warning()->title(__('filament/panel.tables.layouts.unavailable'))->send();
+    }
+
+    private function forgetTableLayout(?string $layoutId): void
+    {
         if ($this->activeTableLayoutId === $layoutId) {
             $this->activeTableLayoutId = null;
             $this->appliedTableLayoutHash = null;
@@ -330,18 +334,6 @@ trait HasTableLayouts
 
         $this->defaultTableLayoutId = $this->defaultTableLayoutId === $layoutId ? null : $this->defaultTableLayoutId;
         $this->visibleTableLayouts = null;
-
-        Notification::make()->warning()->title(__('filament/panel.tables.layouts.unavailable'))->send();
-    }
-
-    private function forgetActiveTableLayout(TableLayout $layout): void
-    {
-        if ($this->activeTableLayoutId !== $layout->getKey()) {
-            return;
-        }
-
-        $this->activeTableLayoutId = null;
-        $this->appliedTableLayoutHash = null;
     }
 
     private function tableLayoutNameInput(): TextInput

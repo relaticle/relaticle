@@ -74,7 +74,7 @@ trait PersistsTableState
         }
 
         if ($this->seededFromTableLayout) {
-            $this->appliedTableLayoutHash = $this->currentTableState()->withoutWidths()->hash();
+            $this->markTableLayoutApplied();
         }
     }
 
@@ -261,6 +261,11 @@ trait PersistsTableState
         $this->appliedTableLayoutHash = $active instanceof TableLayout ? $preference->applied_layout_hash : null;
 
         return $preference->state;
+    }
+
+    private function markTableLayoutApplied(): void
+    {
+        $this->appliedTableLayoutHash = $this->currentTableState()->withoutWidths()->hash();
     }
 
     private function currentTableState(): TableStateData
