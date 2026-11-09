@@ -120,22 +120,36 @@ it('returns the structure of a rich description as markdown in detailed mode', f
         ->not->toContain('<');
 });
 
-it('decodes entities once when converting to markdown', function (): void {
-    expect(LongTextForModel::markdown('<p>Import & Export, A&amp;B</p>'))->toBe('Import & Export, A&B');
+it('rejects a response_format that is not a string', function (): void {
+    $payload = json_decode(resolve(ListTasksTool::class)->handle(new Request(['response_format' => 5])), true);
+
+    expect($payload)->toHaveKey('error');
+});
+
+it('decodes entities once when returning markdown in detailed mode', function (): void {
+    describeTasks($this->user, '<p>Import & Export, A&amp;B</p>');
+
+    $payload = json_decode(resolve(ListTasksTool::class)->handle(new Request(['response_format' => 'detailed'])), true);
+
+    expect($payload['data'][0]['attributes']['custom_fields']['description'])->toBe('Import & Export, A&B');
 });
 
 it('cuts 400 CJK characters to exactly 300 and marks them truncated', function (): void {
-    $concise = LongTextForModel::concise('<p>'.str_repeat('日', 400).'</p>');
+    describeTasks($this->user, '<p>'.str_repeat('日', 400).'</p>');
 
-    expect($concise['text'])->toHaveLength(300)
-        ->and($concise['truncated'])->toBeTrue();
+    $payload = json_decode(resolve(ListTasksTool::class)->handle(new Request), true);
+
+    expect($payload['data'][0]['attributes']['custom_fields']['description'])->toBe(str_repeat('日', 300))
+        ->and($payload['data'][0]['truncated_fields'])->toBe(['description']);
 });
 
 it('keeps 300 CJK characters whole and unmarked', function (): void {
-    $concise = LongTextForModel::concise('<p>'.str_repeat('日', 300).'</p>');
+    describeTasks($this->user, '<p>'.str_repeat('日', 300).'</p>');
 
-    expect($concise['text'])->toHaveLength(300)
-        ->and($concise['truncated'])->toBeFalse();
+    $payload = json_decode(resolve(ListTasksTool::class)->handle(new Request), true);
+
+    expect($payload['data'][0]['attributes']['custom_fields']['description'])->toBe(str_repeat('日', 300))
+        ->and($payload['data'][0])->not->toHaveKey('truncated_fields');
 });
 
 it('returns a plain text field untouched in both modes', function (): void {
