@@ -13,11 +13,11 @@ use Illuminate\Support\Facades\RateLimiter;
 
 final readonly class InvitationCeiling
 {
-    private const int WORKSPACE_PER_HOUR = 50;
+    private const int WORKSPACE_PER_HOUR = 20;
 
-    private const int WORKSPACE_PER_DAY = 200;
+    private const int WORKSPACE_PER_DAY = 50;
 
-    private const int INVITER_PER_HOUR = 100;
+    private const int INVITER_PER_HOUR = 30;
 
     private const int HOUR_SECONDS = 3600;
 

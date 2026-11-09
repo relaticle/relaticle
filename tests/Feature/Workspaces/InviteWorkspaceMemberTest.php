@@ -637,18 +637,18 @@ function approveInvitationProposal(User $user, string $email): void
 }
 
 test('invitations are capped per workspace across different inviting users', function (): void {
-    fillWorkspaceHourlyCeiling($this->user, 50);
+    fillWorkspaceHourlyCeiling($this->user, 20);
 
-    Mail::assertQueuedCount(50);
+    Mail::assertQueuedCount(20);
 
     inviteThroughForm($this->user, $this->workspace, ['one-too-many@example.com'])
         ->assertNotified(__('workspaces.notifications.invite_rate_limited.title'));
 
-    expect($this->workspace->workspaceInvitations()->count())->toBe(50);
+    expect($this->workspace->workspaceInvitations()->count())->toBe(20);
 });
 
 test('the chat approval path stops at the workspace ceiling and leaves the proposal pending', function (): void {
-    fillWorkspaceHourlyCeiling($this->user, 50);
+    fillWorkspaceHourlyCeiling($this->user, 20);
 
     expect(fn () => approveInvitationProposal($this->user, 'chat-over@example.com'))
         ->toThrow(WorkspaceInvitationRateLimitedException::class);
@@ -658,7 +658,7 @@ test('the chat approval path stops at the workspace ceiling and leaves the propo
 });
 
 test('a batch the ceiling cuts lists the addresses that were not sent', function (): void {
-    fillWorkspaceHourlyCeiling($this->user, 45);
+    fillWorkspaceHourlyCeiling($this->user, 15);
 
     $batch = invitationEmails('batch', 8);
 
@@ -677,8 +677,8 @@ test('a batch the ceiling cuts lists the addresses that were not sent', function
 });
 
 test('the hourly ceiling resets after an hour and the daily ceiling holds', function (): void {
-    foreach (range(1, 4) as $hour) {
-        fillWorkspaceHourlyCeiling($this->user, 50, "day{$hour}x");
+    foreach ([20, 20, 10] as $hour => $count) {
+        fillWorkspaceHourlyCeiling($this->user, $count, "day{$hour}x");
 
         $this->travelTo(now()->addMinutes(61));
     }
@@ -692,7 +692,7 @@ test('the hourly ceiling resets after an hour and the daily ceiling holds', func
 test('the wait is shown as a duration, not raw seconds', function (): void {
     $this->freezeTime();
 
-    fillWorkspaceHourlyCeiling($this->user, 50);
+    fillWorkspaceHourlyCeiling($this->user, 20);
 
     inviteThroughForm($this->user, $this->workspace, ['wait@example.com'])
         ->assertNotified(
@@ -704,7 +704,7 @@ test('the wait is shown as a duration, not raw seconds', function (): void {
 });
 
 test('one workspace reaching its ceiling does not block another workspace', function (): void {
-    fillWorkspaceHourlyCeiling($this->user, 50);
+    fillWorkspaceHourlyCeiling($this->user, 20);
 
     $other = User::factory()->withWorkspace()->create();
 
@@ -718,8 +718,8 @@ test('one inviter is capped across all the workspaces they own and the trip is l
 
     $owned = [$this->workspace, ...Workspace::factory()->count(2)->create(['user_id' => $this->user->getKey()])->all()];
 
-    foreach ([$owned[0], $owned[1]] as $workspace) {
-        foreach (array_chunk(invitationEmails("inv{$workspace->getKey()}x", 50), 10) as $batch) {
+    foreach ([[$owned[0], 20], [$owned[1], 10]] as [$workspace, $count]) {
+        foreach (array_chunk(invitationEmails("inv{$workspace->getKey()}x", $count), 10) as $batch) {
             inviteThroughForm($this->user, $workspace, $batch);
 
             $this->travelTo(now()->addSeconds(31));
@@ -758,7 +758,7 @@ test('a rolled back invitation does not use up a slot', function (): void {
 });
 
 test('resending an invitation counts against the workspace ceiling', function (): void {
-    fillWorkspaceHourlyCeiling($this->user, 50);
+    fillWorkspaceHourlyCeiling($this->user, 20);
 
     $invitation = $this->workspace->workspaceInvitations()->orderBy('email')->firstOrFail();
 
@@ -766,5 +766,5 @@ test('resending an invitation counts against the workspace ceiling', function ()
         ->callAction(TestAction::make('resendWorkspaceInvitation')->table($invitation->id))
         ->assertNotified(__('workspaces.notifications.invite_rate_limited.title'));
 
-    Mail::assertQueuedCount(50);
+    Mail::assertQueuedCount(20);
 });
