@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Filament\Concerns;
 
-use App\Enums\CrmEntity;
 use App\Filament\Components\Tables\ColumnHeaderLabel;
 use App\Filament\Tables\Concerns\HasColumnMenu;
 use App\Filament\Tables\Concerns\HasResizableColumns;
@@ -40,7 +39,7 @@ trait HasCustomFieldColumns
             })
             ->all();
 
-        $titleColumn = CrmEntity::tryFromModel(new ($this->getModel()))?->titleColumn();
+        $titleColumn = $this->getTableTitleColumn();
 
         foreach ($table->getColumns() as $column) {
             $label = $column->getLabel();
