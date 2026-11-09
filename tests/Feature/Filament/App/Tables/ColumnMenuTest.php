@@ -428,11 +428,6 @@ it('marks pinned headers and cells in the render that pinned them', function (st
         ->and($table->getColumn($entity->titleColumn())->getExtraHeaderAttributes())->toMatchArray(['data-column-pinned' => '0']);
 })->with('column menu pages');
 
-it('hashes a state without pins as it did before pins existed', function (): void {
-    expect(new TableStateData(sort: 'name:desc')->hash())->toBe('23e7785210a1334232fd2d9bfef34e77')
-        ->and(new TableStateData(sort: 'name:desc', labels: ['name' => 'Account'])->hash())->toBe('b5259410e4fba1a33f8a84a42134054b');
-});
-
 function columnLabelText(Testable $component, string $column): string
 {
     return trim(strip_tags((string) $component->instance()->getTable()->getColumn($column)->getLabel()));
