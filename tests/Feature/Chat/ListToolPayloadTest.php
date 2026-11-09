@@ -127,14 +127,14 @@ it('decodes entities once when converting to markdown', function (): void {
 it('cuts 400 CJK characters to exactly 300 and marks them truncated', function (): void {
     $concise = LongTextForModel::concise('<p>'.str_repeat('日', 400).'</p>');
 
-    expect(mb_strlen($concise['text']))->toBe(300)
+    expect($concise['text'])->toHaveLength(300)
         ->and($concise['truncated'])->toBeTrue();
 });
 
 it('keeps 300 CJK characters whole and unmarked', function (): void {
     $concise = LongTextForModel::concise('<p>'.str_repeat('日', 300).'</p>');
 
-    expect(mb_strlen($concise['text']))->toBe(300)
+    expect($concise['text'])->toHaveLength(300)
         ->and($concise['truncated'])->toBeFalse();
 });
 

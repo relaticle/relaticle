@@ -122,7 +122,7 @@ it('keeps a label and no fields for a delete in the replayed echo', function ():
 it('keeps display and drops data in the stream payload while the stored envelope carries both', function (): void {
     $envelope = writeEchoEnvelope($this->user, 100);
 
-    expect($envelope)->toHaveKey('display')->toHaveKey('data');
+    expect($envelope)->toHaveKeys(['display', 'data']);
 
     $event = new ToolResult(
         id: 'evt-1',
