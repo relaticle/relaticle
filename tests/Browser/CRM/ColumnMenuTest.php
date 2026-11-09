@@ -745,6 +745,26 @@ it('shows the move cursor on a movable header and keeps the pointer on its contr
         ->assertNoJavaScriptErrors();
 });
 
+it('keeps the menu of the first column inside the table, clear of the sidebar', function (): void {
+    TablePreference::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+        'entity' => CrmEntity::Company,
+        'state' => new TableStateData(widths: ['name' => ResizableColumns::MIN_WIDTH]),
+    ]);
+    $page = companiesTable($this->user, $this->workspace->slug);
+
+    $page->script(openColumnMenu('name'));
+    waitUntil($page, menuItemFocused())
+        ->assertScript('document.querySelector(".fi-ta-column-menu").getBoundingClientRect().left >= document.querySelector(".fi-ta").getBoundingClientRect().left', true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('lines up the select-all checkbox with the row checkboxes', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
+
+    $page->assertScript('Math.round(document.querySelector("thead th.fi-ta-selection-cell .fi-ta-page-checkbox").getBoundingClientRect().left) === Math.round(document.querySelector("tbody td.fi-ta-selection-cell .fi-ta-record-checkbox").getBoundingClientRect().left)', true)
+        ->assertNoJavaScriptErrors();
+});
+
 it('keeps the column menu on screen when its column sits near the left edge', function (): void {
     TablePreference::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
         'entity' => CrmEntity::Company,

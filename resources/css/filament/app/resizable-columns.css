@@ -46,8 +46,9 @@
     @apply border-b border-b-gray-200 dark:border-b-white/5;
 }
 
-/* A cell clips its overflow only when it is positioned. */
-.fi-ta-resizable-table td {
+/* A cell clips its overflow only when it is positioned. The checkbox cell stays out: Filament's phone card
+   offset on it would move it beside its column header. */
+.fi-ta-resizable-table td:not(.fi-ta-selection-cell) {
     @apply relative;
 }
 

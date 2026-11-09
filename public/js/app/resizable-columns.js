@@ -706,7 +706,9 @@ function registerColumnMenu() {
             const width = parseFloat(getComputedStyle(this.panel).width) || 0
             // The viewport width without a classic scrollbar, which `fixed` positioning also excludes.
             const viewportWidth = document.documentElement.clientWidth
-            const right = Math.min(viewportWidth - rect.right, viewportWidth - width - 8)
+            // Kept inside the table's own left edge, so the sidebar beside the table never covers it.
+            const minLeft = Math.max(8, (this.$el.closest('.fi-ta')?.getBoundingClientRect().left ?? 0) + 8)
+            const right = Math.min(viewportWidth - rect.right, viewportWidth - width - minLeft)
             Object.assign(this, detail, { top: rect.bottom + 4, right: Math.max(8, right) })
             this.trigger.setAttribute('aria-expanded', 'true')
 
