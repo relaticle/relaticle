@@ -455,6 +455,17 @@ it('renames a column for the member in the header and the column manager, and ke
         ->and(columnManagerLabel($revisit, $column))->toBe('Owner of record');
 })->with('column menu pages');
 
+it('escapes markup in a column label in the header and the column manager', function (): void {
+    $component = livewire(ListCompanies::class);
+
+    $component->callAction('editTableColumnLabel', data: ['label' => '<img src=x onerror=alert(1)>'], arguments: ['column' => 'created_at']);
+
+    $managerLabel = (string) collect($component->get('tableColumns'))->firstWhere('name', 'created_at')['label'];
+
+    expect($managerLabel)->toContain('&lt;img src=x onerror=alert(1)&gt;')->not->toContain('<img src=x')
+        ->and($component->html())->toContain('&lt;img src=x onerror=alert(1)&gt;')->not->toContain('<img src=x');
+});
+
 it('puts the original name back when the label is cleared', function (): void {
     $component = livewire(ListCompanies::class);
     $original = columnLabelText($component, 'created_at');

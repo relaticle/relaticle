@@ -153,3 +153,32 @@ it('keeps a pixel width the column sets itself', function (string $width): void 
 
     expect(headerAttributes($component, 'created_at')['data-resizable-width'])->toBe('240');
 })->with(['240px', '240']);
+
+it('marks only the title column as the card heading, also after it is moved', function (string $page): void {
+    $component = livewire($page);
+    $title = titleColumnOf($component);
+    $other = collect(array_keys($component->instance()->getTable()->getColumns()))->first(fn (string $name): bool => $name !== $title);
+    $titleColumns = fn (): array => collect($component->instance()->getTable()->getColumns())
+        ->filter(fn (Column $column): bool => ($column->getExtraHeaderAttributes()['data-column-title'] ?? null) === '1')
+        ->keys()
+        ->all();
+
+    expect($titleColumns())->toBe([$title]);
+
+    $component->call('moveTableColumn', $title, null)->call('moveTableColumn', $other, $title);
+
+    expect($titleColumns())->toBe([$title]);
+})->with('list pages');
+
+it('stamps a new width on the same component right after it is resized', function (): void {
+    $component = livewire(ListCompanies::class);
+    expect(headerAttributes($component, 'created_at')['data-resizable-width'])->not->toBe('300');
+
+    $component->call('updateResizableColumnWidth', 'created_at', '300');
+
+    $column = $component->instance()->getTable()->getColumn('created_at');
+
+    expect($column->getExtraHeaderAttributes())->toMatchArray(['data-resizable-width' => '300'])
+        ->and($column->getExtraHeaderAttributes()['style'])->toContain('width: 300px')
+        ->and($column->getExtraCellAttributes())->toMatchArray(['data-resizable-width' => '300']);
+});
