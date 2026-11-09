@@ -284,7 +284,7 @@ it('labels each record of an approved batch with its own title and url', functio
         ]);
 });
 
-it('labels each record of a batch update that changes only a custom field by its summary', function (): void {
+it('labels each record of a batch update that changes only a custom field by the name its summary quotes', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
     seedResolvedConv('conv-U', $user);
@@ -316,15 +316,15 @@ it('labels each record of a batch update that changes only a custom field by its
 
     $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-U', null);
 
-    expect($resolved[0]['label'])->toBe('Update person "Ada Lovelace", Update person "Grace Hopper", Update person "Alan Turing"')
+    expect($resolved[0]['label'])->toBe('Ada Lovelace, Grace Hopper, Alan Turing')
         ->and(array_column($resolved[0]['records'], 'label'))->toBe([
-            'Update person "Ada Lovelace"',
-            'Update person "Grace Hopper"',
-            'Update person "Alan Turing"',
+            'Ada Lovelace',
+            'Grace Hopper',
+            'Alan Turing',
         ]);
 });
 
-it('labels an update by its summary when a custom field is named like a title row', function (): void {
+it('labels an update by the name its summary quotes when a custom field is named like a title row', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
     seedResolvedConv('conv-E', $user);
@@ -345,10 +345,10 @@ it('labels an update by its summary when a custom field is named like a title ro
 
     $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-E', null);
 
-    expect($resolved[0]['label'])->toBe('Update person "Ada Lovelace"');
+    expect($resolved[0]['label'])->toBe('Ada Lovelace');
 });
 
-it('labels an update by its summary when a custom field shares the title key', function (): void {
+it('labels an update by the name its summary quotes when a custom field shares the title key', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
     seedResolvedConv('conv-K', $user);
@@ -369,7 +369,7 @@ it('labels an update by its summary when a custom field shares the title key', f
 
     $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-K', null);
 
-    expect($resolved[0]['label'])->toBe('Update company "Acme"');
+    expect($resolved[0]['label'])->toBe('Acme');
 });
 
 it('labels a delete by its Name row when the row label is translated', function (): void {
