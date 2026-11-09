@@ -271,7 +271,7 @@ abstract class BaseReadShowTool implements Tool
         $customFields = $this->customFieldsOf($payload);
 
         foreach (LongTextForModel::freeTextFields($model) as $code => $type) {
-            if ($customFields !== null && is_string($customFields->{$code} ?? null)) {
+            if ($customFields instanceof stdClass && is_string($customFields->{$code} ?? null)) {
                 $customFields->{$code} = LongTextForModel::full($customFields->{$code}, $type);
             }
         }
@@ -287,7 +287,7 @@ abstract class BaseReadShowTool implements Tool
     {
         $customFields = $this->customFieldsOf($payload);
 
-        if ($customFields === null) {
+        if (! $customFields instanceof stdClass) {
             return $payload;
         }
 
