@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Enums\WorkspaceRole;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -34,6 +35,13 @@ final class ConnectedAccountFactory extends Factory
             'is_default' => false,
             'status' => EmailAccountStatus::ACTIVE,
         ];
+    }
+
+    public function withOwnerInWorkspace(): static
+    {
+        return $this->afterCreating(function (ConnectedAccount $account): void {
+            $account->workspace->users()->syncWithoutDetaching([$account->user_id => ['role' => WorkspaceRole::Member->value]]);
+        });
     }
 
     public function azure(): static

@@ -5,19 +5,15 @@ declare(strict_types=1);
 use App\Enums\Plan;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceSetupStep;
-use App\Features\Billing as BillingFeature;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\SetupWorkspace;
 use App\Filament\Resources\PeopleResource;
 use App\Http\Middleware\RedirectToWorkspaceSetup;
 use App\Models\User;
-use Laravel\Pennant\Feature;
 
 mutates(RedirectToWorkspaceSetup::class);
 
 beforeEach(function (): void {
-    Feature::define(BillingFeature::class, true);
-
     $this->owner = User::factory()->withPersonalWorkspace()->create();
     $this->workspace = $this->owner->currentWorkspace;
     $this->workspace->forceFill([
@@ -72,6 +68,8 @@ it('does not redirect a request that expects JSON', function (): void {
 });
 
 it('leaves a paused workspace in setup to billing instead of looping', function (): void {
+    withHostedBilling();
+
     $this->workspace->forceFill([
         'plan' => Plan::Free,
         'trial_ends_at' => null,
@@ -88,6 +86,8 @@ it('leaves a paused workspace in setup to billing instead of looping', function 
 });
 
 it('sends the owner of an unfinished workspace to setup from billing while the workspace has access', function (): void {
+    withHostedBilling();
+
     $this->actingAs($this->owner)
         ->get(route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]))
         ->assertRedirect($this->setupUrl);

@@ -206,7 +206,7 @@
                     :title="hasError(value) ? getError(value) : value"
                 >
                     <template x-if="hasError(value)">
-                        <x-heroicon-o-exclamation-triangle class="size-3 shrink-0" aria-hidden="true" />
+                        <x-lucide-triangle-exclamation-point class="size-3 shrink-0" aria-hidden="true" />
                     </template>
                     <span class="truncate" x-text="value"></span>
                 </span>
@@ -226,7 +226,7 @@
         </div>
 
         {{-- Chevron indicator --}}
-        <x-heroicon-m-chevron-down
+        <x-lucide-chevron-down
             class="size-4 text-gray-400 dark:text-gray-500 shrink-0 transition-transform duration-150"
             x-bind:class="{ 'rotate-180': isOpen() }"
             aria-hidden="true"
@@ -287,7 +287,7 @@
                                     x-tooltip="{ content: getError(value), theme: $store.theme }"
                                     class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-danger-50 text-danger-700 dark:bg-danger-950/50 dark:text-danger-400 cursor-help max-w-full"
                                 >
-                                    <x-heroicon-o-exclamation-triangle class="size-3 shrink-0" aria-hidden="true" />
+                                    <x-lucide-triangle-exclamation-point class="size-3 shrink-0" aria-hidden="true" />
                                     <span class="truncate" x-text="value"></span>
                                 </span>
                             </template>
@@ -312,7 +312,7 @@
                             :aria-label="'Delete ' + value"
                             class="shrink-0 text-gray-400 hover:text-danger-500"
                         >
-                            <x-heroicon-m-x-mark class="size-4" aria-hidden="true" />
+                            <x-lucide-x class="size-4" aria-hidden="true" />
                         </button>
                     </div>
                     </template>
@@ -321,7 +321,7 @@
 
             {{-- Add New Value --}}
             <div class="flex items-center gap-2 px-3 py-2.5 bg-gray-50 dark:bg-gray-800/50">
-            <x-heroicon-m-plus class="size-4 text-gray-400 shrink-0" aria-hidden="true" />
+            <x-lucide-plus class="size-4 text-gray-400 shrink-0" aria-hidden="true" />
 
             <input
                 type="text"

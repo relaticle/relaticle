@@ -107,10 +107,10 @@ final class ColumnData extends Data implements Wireable
     public function getIcon(): string
     {
         if ($this->isEntityLinkMapping()) {
-            return $this->entityLinkField?->icon() ?? 'heroicon-o-link';
+            return $this->entityLinkField?->icon() ?? 'lucide-link';
         }
 
-        return $this->importField->icon ?? 'heroicon-o-squares-2x2';
+        return $this->importField->icon ?? 'lucide-layout-grid';
     }
 
     public function getMatcher(): ?MatchableField

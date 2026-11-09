@@ -69,16 +69,7 @@ final readonly class BuildSearchIndex
         return (bool) config('documentation.cache.enabled', true);
     }
 
-    /**
-     * A hash of every field a cached record actually embeds -- the page's
-     * path, title, and body, plus the category titles the crumb is read from
-     * -- cheap to compute from the already-parsed collections, no extra
-     * filesystem walk needed. Any edit to any of them changes the hash, so a
-     * stale cached index (including a front-matter-only title edit) is never
-     * served.
-     *
-     * @param  Collection<string, DocPage>  $pages
-     */
+    /** @param Collection<string, DocPage> $pages */
     private function signature(Collection $pages): string
     {
         $categories = $this->repository->categories()
@@ -87,7 +78,7 @@ final readonly class BuildSearchIndex
 
         return hash('sha256', $pages
             ->map(fn (DocPage $page): string => "{$page->path}:{$page->title}:{$page->body}")
-            ->implode('|').'||'.$categories);
+            ->implode('|').'||'.$categories.'||'.DocUrl::root());
     }
 
     /**

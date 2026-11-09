@@ -197,6 +197,59 @@ it('inline composer prefills a reply from the selected email and queues it', fun
         ->and($reply->in_reply_to)->toBe($this->inboundEmail->rfc_message_id);
 });
 
+it('addresses a reply and a reply-all to the Reply-To address instead of the sender', function (): void {
+    EmailParticipant::create([
+        'email_id' => $this->inboundEmail->id,
+        'email_address' => 'visitor@lead.com',
+        'name' => 'Visitor',
+        'role' => EmailParticipantRole::REPLY_TO,
+    ]);
+
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'reply')
+        ->assertSet('to', ['visitor@lead.com']);
+
+    $replyAll = livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'reply_all')
+        ->get('to');
+
+    expect($replyAll)->toEqualCanonicalizing(['visitor@lead.com', 'cc-person@contact.com']);
+});
+
+it('addresses a reply to an email the mailbox sent to that email\'s recipients', function (): void {
+    $sent = Email::create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Proposal',
+        'sent_at' => now()->subHour(),
+        'direction' => EmailDirection::OUTBOUND,
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'creation_source' => EmailCreationSource::SYNC,
+        'rfc_message_id' => '<sent@example.com>',
+        'thread_id' => 'thread-sent',
+    ]);
+
+    foreach ([
+        ['me@example.com', EmailParticipantRole::FROM],
+        ['client@contact.com', EmailParticipantRole::TO],
+        ['manager@contact.com', EmailParticipantRole::CC],
+    ] as [$address, $role]) {
+        EmailParticipant::create(['email_id' => $sent->id, 'email_address' => $address, 'role' => $role]);
+    }
+
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $sent->id, 'reply')
+        ->assertSet('to', ['client@contact.com']);
+
+    $replyAll = livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $sent->id, 'reply_all')
+        ->get('to');
+
+    expect($replyAll)->toEqualCanonicalizing(['client@contact.com', 'manager@contact.com']);
+});
+
 it('inline composer prefills reply-all and forward from their modes', function (): void {
     $replyAll = livewire(EmailComposer::class, ['dock' => 'inline'])
         ->call('openReply', $this->inboundEmail->id, 'reply_all')
@@ -250,6 +303,47 @@ it('a reply saved as a draft still threads when it is sent later', function (): 
 
     expect($reply->in_reply_to)->toBe($this->inboundEmail->rfc_message_id)
         ->and($reply->thread_id)->toBe($this->inboundEmail->thread_id);
+});
+
+it('resumes a reply draft on the sender own copy when a teammate holds a restricted copy of the message', function (): void {
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'reply')
+        ->set('bodyHtml', '<p>Started, not finished</p>')
+        ->call('close');
+
+    $draftId = Email::query()->where('status', EmailStatus::DRAFT)->sole()->getKey();
+
+    $teammate = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+    $this->workspace->users()->attach($teammate, ['role' => 'member']);
+
+    $teammateAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $teammate->id,
+    ]));
+
+    Email::factory()->inbound()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateAccount->id,
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        'rfc_message_id' => $this->inboundEmail->rfc_message_id,
+        'is_internal' => false,
+    ]);
+
+    $this->inboundEmail->touch();
+
+    livewire(EmailComposer::class)
+        ->call('open', [], $draftId)
+        ->assertSet('inReplyToEmailId', $this->inboundEmail->id)
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $reply = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::REPLY)
+        ->sole();
+
+    expect($reply->body->body_html)->toContain('Original body');
 });
 
 it('includes the original plain-text body when quoting a reply or forward', function (string $mode, string $marker): void {

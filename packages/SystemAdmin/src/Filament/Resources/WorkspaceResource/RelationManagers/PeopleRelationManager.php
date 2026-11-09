@@ -20,7 +20,7 @@ final class PeopleRelationManager extends RelationManager
 
     protected static ?string $modelLabel = 'person';
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-user';
+    protected static string|\BackedEnum|null $icon = 'lucide-user';
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {

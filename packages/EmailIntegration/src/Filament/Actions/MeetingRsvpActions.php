@@ -10,7 +10,6 @@ use Filament\Actions\ActionGroup;
 use Filament\Notifications\Notification;
 use Filament\Support\Enums\IconPosition;
 use Filament\Support\Enums\Size;
-use Filament\Support\Icons\Heroicon;
 use Relaticle\EmailIntegration\Actions\RespondToMeetingAction;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Exceptions\MeetingResponseFailed;
@@ -28,19 +27,19 @@ final class MeetingRsvpActions
             self::respondAction(
                 name: 'acceptMeeting',
                 status: AttendeeResponseStatus::ACCEPTED,
-                icon: Heroicon::Check,
+                icon: 'lucide-check',
                 color: 'success',
             ),
             self::respondAction(
                 name: 'maybeMeeting',
                 status: AttendeeResponseStatus::TENTATIVE,
-                icon: Heroicon::QuestionMarkCircle,
+                icon: 'lucide-circle-question-mark',
                 color: 'warning',
             ),
             self::respondAction(
                 name: 'declineMeeting',
                 status: AttendeeResponseStatus::DECLINED,
-                icon: Heroicon::XMark,
+                icon: 'lucide-x',
                 color: 'danger',
                 confirm: true,
             ),
@@ -51,7 +50,7 @@ final class MeetingRsvpActions
     {
         return ActionGroup::make(self::make())
             ->label(fn (?Meeting $record): string => self::groupLabel($record))
-            ->icon(Heroicon::OutlinedChevronDown)
+            ->icon('lucide-chevron-down')
             ->iconPosition(IconPosition::After)
             ->color(fn (?Meeting $record): string => self::currentStatus($record)->getColor())
             ->button()
@@ -83,7 +82,7 @@ final class MeetingRsvpActions
     private static function respondAction(
         string $name,
         AttendeeResponseStatus $status,
-        Heroicon $icon,
+        string $icon,
         string $color,
         bool $confirm = false,
     ): Action {

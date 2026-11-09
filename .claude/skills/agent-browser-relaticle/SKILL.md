@@ -251,7 +251,7 @@ For any deliverable screenshot, invoke `Skill('screenshot-with-callout')` per sh
   declared in one eval throws `Identifier 'x' has already been declared` in the next.
   Wrap evals in an IIFE: `agent-browser eval '(()=>{ const x=...; return JSON.stringify(x) })()'`.
 - To screenshot a feature-flag branch without flipping the shared `.env`, render it to
-  a file and open that: `php artisan tinker --execute '\Laravel\Pennant\Feature::define(\App\Features\Billing::class, false); file_put_contents(".context/off.html", view("pricing")->render());'`
+  a file and open that: `php artisan tinker --execute '\Laravel\Pennant\Feature::define(\App\Features\Billing::class, false); file_put_contents(".context/off.html", view("cloud::marketing.pricing")->render());'`
   then `agent-browser open "file://$(pwd)/.context/off.html"`. Vite assets resolve to the
   absolute `APP_URL`, so the page styles correctly from `file://`.
 

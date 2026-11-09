@@ -13,6 +13,7 @@ use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -23,12 +24,12 @@ use Illuminate\View\View;
  */
 final readonly class AcceptWorkspaceInvitationController
 {
-    public function show(Request $request, string $token): View|RedirectResponse
+    public function show(Request $request, string $token): View|Response|RedirectResponse
     {
         return $this->render($request, WorkspaceInvitation::findByRawToken($token));
     }
 
-    public function store(Request $request, string $token, AcceptWorkspaceInvitation $acceptWorkspaceInvitation): RedirectResponse|View
+    public function store(Request $request, string $token, AcceptWorkspaceInvitation $acceptWorkspaceInvitation): RedirectResponse|Response|View
     {
         $invitation = WorkspaceInvitation::findByRawToken($token);
         $user = $this->user($request);
@@ -38,6 +39,10 @@ final readonly class AcceptWorkspaceInvitationController
         }
 
         if (! $this->emailMatches($user, $invitation)) {
+            return $this->render($request, $invitation);
+        }
+
+        if ($invitation->workspace->isScheduledOnRequest()) {
             return $this->render($request, $invitation);
         }
 
@@ -51,7 +56,7 @@ final readonly class AcceptWorkspaceInvitationController
         return Str::lower($user->email) === Str::lower($invitation->email);
     }
 
-    private function render(Request $request, ?WorkspaceInvitation $invitation): View|RedirectResponse
+    private function render(Request $request, ?WorkspaceInvitation $invitation): View|Response|RedirectResponse
     {
         $user = $this->user($request);
 
@@ -84,8 +89,13 @@ final readonly class AcceptWorkspaceInvitationController
             return $this->redirectToWorkspace($invitation->workspace, __('workspaces.accept.already_member', ['workspace' => $invitation->workspace->name]));
         }
 
+        if ($invitation->workspace->isScheduledOnRequest()) {
+            return response()->view('workspaces.workspace-deleting', ['workspaceName' => $invitation->workspace->name], 410);
+        }
+
         return view('workspaces.accept-invitation', [
             'state' => 'ready',
+            'accountEmail' => $user->email,
             'workspaceName' => $invitation->workspace->name,
             'workspaceAvatarUrl' => $invitation->workspace->getFilamentAvatarUrl(),
             'inviterName' => $invitation->inviter?->name,

@@ -28,7 +28,7 @@
                 {{ $this->composeEmailAction }}
             </div>
 
-            <div class="flex min-h-[20rem] flex-col divide-y divide-gray-100 border-y border-gray-200 dark:divide-white/5 dark:border-white/10">
+            <div class="flex min-h-[20rem] flex-col divide-y divide-gray-100 border-t border-gray-200 dark:divide-white/5 dark:border-white/10">
                 @forelse ($this->emails as $email)
                     <x-email-integration::list-row-wide :email="$email" wire:key="email-list-row-{{ $email->id }}" />
                 @empty
@@ -48,7 +48,7 @@
                         @disabled($this->emails->onFirstPage())
                         class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
                     >
-                        <x-heroicon-o-chevron-left class="h-3.5 w-3.5" />
+                        <x-lucide-chevron-left class="h-3.5 w-3.5" />
                         {{ __('filament/pages/email-inbox.pagination.previous') }}
                     </button>
                     <span class="text-xs text-gray-400 dark:text-gray-500">
@@ -65,7 +65,7 @@
                         class="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800"
                     >
                         {{ __('filament/pages/email-inbox.pagination.next') }}
-                        <x-heroicon-o-chevron-right class="h-3.5 w-3.5" />
+                        <x-lucide-chevron-right class="h-3.5 w-3.5" />
                     </button>
                 </div>
             @endif

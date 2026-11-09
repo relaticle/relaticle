@@ -33,6 +33,8 @@ it('explains the workspace limit instead of returning a bare 404', function (): 
     expect($user->refresh()->ownedWorkspaces()->count())->toBe(3);
 
     $this->get(route('filament.app.tenant.registration'))
-        ->assertRedirect()
-        ->assertSessionHas('filament.notifications');
+        ->assertRedirect();
+
+    expect(flashedNotifications()->pluck('title')->all())
+        ->toContain(__('filament/pages/workspaces.create_workspace.notifications.workspace_limit_reached.title'));
 });

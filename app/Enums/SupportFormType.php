@@ -22,9 +22,9 @@ enum SupportFormType: string
     public function icon(): string
     {
         return match ($this) {
-            self::Contact => 'heroicon-o-lifebuoy',
-            self::Bug => 'heroicon-o-bug-ant',
-            self::Feature => 'heroicon-o-light-bulb',
+            self::Contact => 'lucide-life-buoy',
+            self::Bug => 'lucide-bug',
+            self::Feature => 'lucide-lightbulb',
         };
     }
 }

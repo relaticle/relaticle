@@ -287,3 +287,28 @@ it('hands the dock no card id when nothing is pending', function (): void {
     Livewire::test(ChatInterface::class, ['conversationId' => $conversationId])
         ->assertViewHas('initialProposalId', null);
 });
+
+it('reports a turn in flight until it ends', function (): void {
+    $conversationId = turnPresenceSeedConversation($this->user);
+
+    $this->getJson(route('chat.turn', $conversationId))->assertOk()->assertExactJson(['in_flight' => false]);
+
+    TurnPresence::begin($conversationId, turnId: 'turn-a', message: 'hello');
+
+    $this->getJson(route('chat.turn', $conversationId))->assertOk()->assertExactJson(['in_flight' => true]);
+
+    TurnPresence::clear($conversationId, 'turn-a');
+
+    $this->getJson(route('chat.turn', $conversationId))->assertOk()->assertExactJson(['in_flight' => false]);
+});
+
+it('never reports a teammate conversation turn', function (): void {
+    $teammate = User::factory()->create();
+    $this->workspace->users()->attach($teammate, ['role' => 'member']);
+    $teammate->forceFill(['current_workspace_id' => $this->workspace->getKey()])->save();
+
+    $conversationId = turnPresenceSeedConversation($teammate);
+    TurnPresence::begin($conversationId, turnId: 'turn-a', message: 'teammate secret prompt');
+
+    $this->getJson(route('chat.turn', $conversationId))->assertNotFound();
+});

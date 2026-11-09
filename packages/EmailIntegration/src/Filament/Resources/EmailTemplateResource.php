@@ -9,12 +9,8 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\RichEditor;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -23,9 +19,8 @@ use Illuminate\Database\Eloquent\Collection;
 use Override;
 use Relaticle\EmailIntegration\Actions\DeleteEmailTemplatesAction;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
-use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages\ManageEmailTemplates;
+use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Schemas\EmailTemplateForm;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
-use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 
 final class EmailTemplateResource extends Resource
 {
@@ -35,43 +30,11 @@ final class EmailTemplateResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
-    protected static ?string $slug = 'workspace/email/templates';
-
     protected static bool $shouldRegisterNavigation = false;
-
-    public static function getNavigationLabel(): string
-    {
-        return __('filament/resources/email-template.navigation_label');
-    }
 
     public static function form(Schema $schema): Schema
     {
-        return $schema->schema([
-            TextInput::make('name')
-                ->required()
-                ->maxLength(100),
-
-            TextInput::make('subject')
-                ->required()
-                ->maxLength(255),
-
-            RichEditor::make('body_html')
-                ->label(__('filament/resources/email-template.fields.body_html.label'))
-                ->required()
-                ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
-                ->activePanel('mergeTags')
-                ->toolbarButtons([
-                    'bold', 'italic', 'underline', 'strike',
-                    'link', 'bulletList', 'orderedList',
-                    'blockquote', 'h2', 'h3', 'undo', 'redo',
-                ])
-                ->columnSpanFull(),
-
-            Toggle::make('is_shared')
-                ->label(__('filament/resources/email-template.fields.is_shared.label'))
-                ->helperText(__('filament/resources/email-template.fields.is_shared.helper_text'))
-                ->disabled(fn (?EmailTemplate $record): bool => $record instanceof EmailTemplate && $record->created_by === null),
-        ]);
+        return EmailTemplateForm::configure($schema);
     }
 
     public static function table(Table $table): Table
@@ -113,14 +76,14 @@ final class EmailTemplateResource extends Resource
                     ->schema(fn (Schema $schema): Schema => self::form($schema))
                     ->hiddenLabel()
                     ->tooltip(__('filament/resources/email-template.actions.edit.label'))
-                    ->icon(Heroicon::OutlinedPencilSquare)
+                    ->icon('lucide-square-pen')
                     ->visible(fn (EmailTemplate $record): bool => auth()->user()?->can('update', $record) === true),
 
                 DeleteAction::make()
                     ->label(__('filament/resources/email-template.actions.delete.label'))
                     ->hiddenLabel()
                     ->tooltip(__('filament/resources/email-template.actions.delete.label'))
-                    ->icon(Heroicon::OutlinedTrash)
+                    ->icon('lucide-trash')
                     ->visible(fn (EmailTemplate $record): bool => auth()->user()?->can('delete', $record) === true),
             ])
             ->toolbarActions([
@@ -134,14 +97,6 @@ final class EmailTemplateResource extends Resource
                         }),
                 ]),
             ]);
-    }
-
-    #[Override]
-    public static function getPages(): array
-    {
-        return [
-            'index' => ManageEmailTemplates::route('/'),
-        ];
     }
 
     #[Override]

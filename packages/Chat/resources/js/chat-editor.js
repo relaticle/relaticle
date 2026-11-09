@@ -34,6 +34,7 @@ export function chatEditor({ placeholder, onSubmit, onChange, onArrowUp, autofoc
         // must read this, not call getText(), because the editor lives outside
         // Alpine's reactive proxy.
         text: '',
+        dictating: false,
 
         init() {
             this.editorEl = this.$refs.editor;
@@ -82,7 +83,7 @@ export function chatEditor({ placeholder, onSubmit, onChange, onArrowUp, autofoc
                 content: { type: 'doc', content: [{ type: 'paragraph' }] },
                 editorProps: {
                     attributes: {
-                        class: 'prose prose-sm max-w-none focus:outline-none min-h-[64px] max-h-[40vh] overflow-y-auto px-4 pt-3 pb-2 text-sm leading-6',
+                        class: 'chat-editor prose prose-sm max-w-none focus:outline-none min-h-[64px] max-h-[40vh] overflow-y-auto px-4 pt-3 pb-2 text-sm leading-6',
                     },
                     handleKeyDown: (view, event) => {
                         if (event.key === 'Enter' && !event.shiftKey) {
@@ -99,7 +100,7 @@ export function chatEditor({ placeholder, onSubmit, onChange, onArrowUp, autofoc
                                 }
                             }
                             event.preventDefault();
-                            onSubmit?.();
+                            if (! this.dictating) onSubmit?.();
                             return true;
                         }
                         // ArrowUp-to-edit: only when the doc is empty (a single empty

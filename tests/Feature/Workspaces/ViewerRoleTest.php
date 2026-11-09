@@ -167,7 +167,8 @@ test('viewer cannot move a task card across board columns', function (): void {
 
     livewire(TasksBoard::class)
         ->call('moveCard', (string) $task->id, (string) $inProgress->getKey())
-        ->assertForbidden();
+        ->assertNotified(__('filament/pages/boards.move_denied'))
+        ->assertNotDispatched('kanban-card-moved');
 
     $currentValue = $task->fresh()->customFieldValues()
         ->where('custom_field_id', $statusField->getKey())

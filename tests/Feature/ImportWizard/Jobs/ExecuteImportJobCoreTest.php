@@ -32,13 +32,15 @@ use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Enums\MatchBehavior;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Relaticle\ImportWizard\Exceptions\ImportStoreException;
+use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
 use Relaticle\ImportWizard\Jobs\ExecuteImportJob;
 use Relaticle\ImportWizard\Models\Import;
+use Relaticle\ImportWizard\Notifications\ImportFinishedNotification;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Relaticle\ImportWizard\Support\EntityLinkResolver;
 use Tests\Helpers\ImportExecutionFixture;
 
-mutates(ExecuteImportJob::class, EntityLinkResolver::class);
+mutates(ExecuteImportJob::class, EntityLinkResolver::class, ImportFinishedNotification::class);
 
 beforeEach(function (): void {
     Event::fake()->except([WorkspaceCreated::class, Authenticated::class, TenantSet::class]);
@@ -743,13 +745,19 @@ it('sends success notification to user on import completion', function (): void 
 
     ImportExecutionFixture::run($this);
 
-    $notifications = $this->user->notifications()->get();
-    expect($notifications)->toHaveCount(1);
+    $row = $this->user->notifications()->sole();
+    $notification = ImportFinishedNotification::present($row);
 
-    $notification = $notifications->first();
-    expect($notification->data['title'])->toBe('Import of People completed')
-        ->and($notification->data['viewData']['results']['created'])->toBe(2)
-        ->and($notification->data['viewData']['results']['failed'])->toBe(0);
+    expect($notification->getTitle())->toBe('Import of People completed')
+        ->and($notification->getBody())->toBe('2 created')
+        ->and($notification->getStatus())->toBe('success')
+        ->and($row->data['outcome'])->toBe('completed')
+        ->and($row->data['failed'])->toBe(0)
+        ->and($row->workspace_id)->toBe($this->workspace->getKey())
+        ->and($row->subject_id)->toBe($this->import->getKey())
+        ->and($row->group_key)->toBe("import:{$this->import->getKey()}")
+        ->and($notification->getActions())->toHaveCount(1)
+        ->and($notification->getActions()[0]->getUrl())->toBe(ImportHistory::getUrl(panel: 'app', tenant: $this->workspace));
 });
 
 it('includes result counts in completion notification body', function (): void {
@@ -772,12 +780,13 @@ it('includes result counts in completion notification body', function (): void {
 
     ImportExecutionFixture::run($this);
 
-    $notification = $this->user->notifications()->first();
-    expect($notification)->not->toBeNull()
-        ->and($notification->data['viewData']['results']['created'])->toBe(1)
-        ->and($notification->data['viewData']['results']['updated'])->toBe(1)
-        ->and($notification->data['viewData']['results']['skipped'])->toBe(1)
-        ->and($notification->data['viewData']['results']['failed'])->toBe(0);
+    $row = $this->user->notifications()->sole();
+
+    expect($row->data['created'])->toBe(1)
+        ->and($row->data['updated'])->toBe(1)
+        ->and($row->data['skipped'])->toBe(1)
+        ->and($row->data['failed'])->toBe(0)
+        ->and(ImportFinishedNotification::present($row)->getBody())->toBe('1 created, 1 updated, 1 skipped');
 });
 
 it('records failed rows with row number and error message', function (): void {
@@ -925,6 +934,141 @@ it('marks import as Failed when job exhausts retries via failed() handler', func
 
     $import = $this->import->fresh();
     expect($import->status)->toBe(ImportStatus::Failed);
+});
+
+it('leaves one failed notice after every attempt fails', function (): void {
+    ImportExecutionFixture::readyStore($this, ['Name'], [
+        ImportExecutionFixture::row(2, ['Name' => 'Ada Lovelace'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+    Event::fake()->except([WorkspaceCreated::class, Authenticated::class, TenantSet::class, QueryExecuted::class]);
+    DB::listen(function (QueryExecuted $query): void {
+        if (str_starts_with($query->sql, 'select * from "import_rows" where "processed"')) {
+            throw new RuntimeException('Database went away');
+        }
+    });
+
+    for ($attempt = 1; $attempt <= 3; $attempt++) {
+        expect(fn () => ImportExecutionFixture::run($this))->toThrow(RuntimeException::class, 'Database went away');
+    }
+
+    (new ExecuteImportJob(
+        importId: $this->import->id,
+        workspaceId: (string) $this->workspace->id,
+    ))->failed(new RuntimeException('Database went away'));
+
+    $notifications = $this->user->notifications()->get();
+    expect($notifications)->toHaveCount(1)
+        ->and($notifications->first()->data['outcome'])->toBe('failed');
+});
+
+it('leaves one completed notice after a transient failure', function (): void {
+    ImportExecutionFixture::readyStore($this, ['Name'], [
+        ImportExecutionFixture::row(2, ['Name' => 'Ada Lovelace'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+    Event::fake()->except([WorkspaceCreated::class, Authenticated::class, TenantSet::class, QueryExecuted::class]);
+    $failures = 0;
+    DB::listen(function (QueryExecuted $query) use (&$failures): void {
+        if ($failures === 0 && str_starts_with($query->sql, 'select * from "import_rows" where "processed"')) {
+            $failures++;
+
+            throw new RuntimeException('Database went away');
+        }
+    });
+
+    expect(fn () => ImportExecutionFixture::run($this))->toThrow(RuntimeException::class, 'Database went away');
+
+    ImportExecutionFixture::run($this);
+
+    $notifications = $this->user->notifications()->get();
+    expect($notifications)->toHaveCount(1)
+        ->and($notifications->first()->data['outcome'])->toBe('completed');
+});
+
+it('replaces a read failed notice when a later run completes', function (): void {
+    ImportExecutionFixture::readyStore($this, ['Name'], [
+        ImportExecutionFixture::row(2, ['Name' => 'Ada Lovelace'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    (new ExecuteImportJob(
+        importId: $this->import->id,
+        workspaceId: (string) $this->workspace->id,
+    ))->failed(new RuntimeException('Queue worker gave up'));
+    $this->user->notifications()->sole()->markAsRead();
+
+    ImportExecutionFixture::run($this);
+
+    $row = $this->user->notifications()->sole();
+
+    expect($row->read_at)->toBeNull()
+        ->and($row->data['outcome'])->toBe('completed')
+        ->and($row->data['created'])->toBe(1);
+});
+
+it('keeps the completed notice when the job fails after completing', function (): void {
+    ImportExecutionFixture::readyStore($this, ['Name'], [
+        ImportExecutionFixture::row(2, ['Name' => 'Ada Lovelace'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    ImportExecutionFixture::run($this);
+
+    (new ExecuteImportJob(
+        importId: $this->import->id,
+        workspaceId: (string) $this->workspace->id,
+    ))->failed(new RuntimeException('Worker killed after completion'));
+
+    $row = $this->user->notifications()->sole();
+    expect($row->data['outcome'])->toBe('completed')
+        ->and($row->data['created'])->toBe(1);
+});
+
+it('keeps the partial outcome when the job fails after completing with failed rows', function (): void {
+    ImportExecutionFixture::readyStore($this, ['Name'], [
+        ImportExecutionFixture::row(2, ['Name' => 'Ada Lovelace'], ['match_action' => RowMatchAction::Create->value]),
+        ImportExecutionFixture::row(3, ['Name' => ''], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    ImportExecutionFixture::run($this);
+
+    (new ExecuteImportJob(
+        importId: $this->import->id,
+        workspaceId: (string) $this->workspace->id,
+    ))->failed(new RuntimeException('Worker killed after completion'));
+
+    $row = $this->user->notifications()->sole();
+    expect($row->data['outcome'])->toBe('completed_with_failures')
+        ->and($row->data['failed'])->toBe(1);
+});
+
+it('reports failed rows as a partial outcome', function (): void {
+    ImportExecutionFixture::readyStore($this, ['Name'], [
+        ImportExecutionFixture::row(2, ['Name' => 'Ada Lovelace'], ['match_action' => RowMatchAction::Create->value]),
+        ImportExecutionFixture::row(3, ['Name' => ''], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    ImportExecutionFixture::run($this);
+
+    $row = $this->user->notifications()->sole();
+    $notification = ImportFinishedNotification::present($row);
+
+    expect($row->data['outcome'])->toBe('completed_with_failures')
+        ->and($row->data['created'])->toBe(1)
+        ->and($row->data['failed'])->toBe(1)
+        ->and($notification->getStatus())->toBe('warning')
+        ->and($notification->getBody())->toBe('1 created, 1 failed')
+        ->and($notification->getActions())->toHaveCount(2)
+        ->and($notification->getActions()[1]->getUrl())->toContain("/imports/{$this->import->getKey()}/failed-rows/download?");
 });
 
 it('hands the rest of the import to a fresh job when the time box runs out', function (bool $remote): void {

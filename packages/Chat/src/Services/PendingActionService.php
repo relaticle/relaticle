@@ -41,20 +41,27 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Laravel\Pennant\Feature;
+use Relaticle\Chat\Actions\GrantWebAccess;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Events\PendingActionResolved;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Queries\ProposalReceiptsQuery;
 use Relaticle\Chat\Support\ProposalLabel;
 use Relaticle\Chat\Support\ProposalOwnership;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\ProposalProgress;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
+use Relaticle\EmailIntegration\Actions\CancelAssistantEmail;
+use Relaticle\EmailIntegration\Actions\DeleteAssistantEmailDraft;
+use Relaticle\EmailIntegration\Actions\RescheduleAssistantEmail;
+use Relaticle\EmailIntegration\Actions\RetryAssistantEmail;
 use Relaticle\EmailIntegration\Actions\SaveAssistantEmailDraft;
 use Relaticle\EmailIntegration\Actions\SendAssistantEmail;
+use Relaticle\EmailIntegration\Actions\SendAssistantEmailDraft;
 use RuntimeException;
 use Throwable;
 
@@ -95,6 +102,12 @@ final readonly class PendingActionService
         RemoveSampleData::class,
         SaveAssistantEmailDraft::class,
         SendAssistantEmail::class,
+        SendAssistantEmailDraft::class,
+        DeleteAssistantEmailDraft::class,
+        CancelAssistantEmail::class,
+        RescheduleAssistantEmail::class,
+        RetryAssistantEmail::class,
+        GrantWebAccess::class,
     ];
 
     /**
@@ -450,6 +463,9 @@ final readonly class PendingActionService
                 status: $status,
                 index: $index,
                 finalized: $finalized,
+                receipts: $finalized
+                    ? resolve(ProposalReceiptsQuery::class)->forPlanBroadcastOf($pendingAction)
+                    : resolve(ProposalReceiptsQuery::class)->forStep($pendingAction),
             ));
         } catch (Throwable $e) {
             report($e);
@@ -942,6 +958,12 @@ final readonly class PendingActionService
         );
 
         $action = app()->make($actionClass);
+
+        if ($action instanceof GrantWebAccess) {
+            $action->execute($user, Workspace::query()->findOrFail($pendingAction->workspace_id));
+
+            return null;
+        }
 
         return match ($pendingAction->operation) {
             PendingActionOperation::Create => $this->executeCreate($action, $user, $pendingAction, $excludedFields),

@@ -16,6 +16,7 @@ use Relaticle\Chat\Tools\Concerns\LocalisesDatetimes;
 use Relaticle\Chat\Tools\Concerns\NormalizesToolInput;
 use Relaticle\Chat\Tools\Concerns\ReportsValidationFailures;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Queries\VisibleEmailsQuery;
 use Relaticle\EmailIntegration\Support\EmailForAgent;
@@ -37,7 +38,8 @@ final readonly class ListEmailsTool implements Tool
 
     public function description(): string
     {
-        return 'List synced emails the user may see, newest first, '.self::PER_PAGE.' per page.'
+        return 'List the emails the user may see, newest first, '.self::PER_PAGE.' per page: synced and sent mail, plus the user\'s own drafts and outbox.'
+            .' `status` says which: draft, queued, sending, sent, failed, cancelled or synced.'
             .' Each row has `access`: metadata_only, subject or full.'
             .' `subject` is null below subject access and `snippet` is null below full access.'
             .' A page can hold fewer than '.self::PER_PAGE.' items. While `next_page` is not null, pass it as `page` to read the next page.';
@@ -51,6 +53,7 @@ final readonly class ListEmailsTool implements Tool
             'record_id' => $schema->string()->description('ID of the person, company or opportunity named by record_type.'),
             'direction' => $schema->string()->enum(array_column(EmailDirection::cases(), 'value'))->description('inbound or outbound.'),
             'thread_id' => $schema->string()->description('Only emails in this thread, as returned in thread_id.'),
+            'status' => $schema->string()->enum(array_column(EmailStatus::cases(), 'value'))->description('Only emails in this status. Drafts and unsent mail are only ever the user\'s own.'),
             'sent_after' => $schema->string()->description('ISO 8601 datetime. Only emails sent after it. A datetime without an offset is read in the user\'s timezone.'),
             'sent_before' => $schema->string()->description('ISO 8601 datetime. Only emails sent before it. A datetime without an offset is read in the user\'s timezone.'),
             'page' => $schema->integer()->description('Page number, starting at 1.'),
@@ -63,7 +66,7 @@ final readonly class ListEmailsTool implements Tool
         $user = auth()->user();
 
         try {
-            /** @var array{search?: string, record_type?: string, record_id?: string, direction?: string, thread_id?: string, sent_after?: string, sent_before?: string, page?: int} $validated */
+            /** @var array{search?: string, record_type?: string, record_id?: string, direction?: string, thread_id?: string, status?: string, sent_after?: string, sent_before?: string, page?: int} $validated */
             $validated = $this->withoutNullArguments($request)->validate([
                 ...VisibleEmailsQuery::filterRules(),
                 'page' => ['sometimes', 'integer', 'min:1', 'max:'.ListQuery::MAX_PAGE],
@@ -93,8 +96,8 @@ final readonly class ListEmailsTool implements Tool
     }
 
     /**
-     * @param  array{search?: string, record_type?: string, record_id?: string, direction?: string, thread_id?: string, sent_after?: string, sent_before?: string}  $filters
-     * @return array{search?: string, record_type?: string, record_id?: string, direction?: string, thread_id?: string, sent_after?: string, sent_before?: string}
+     * @param  array{search?: string, record_type?: string, record_id?: string, direction?: string, thread_id?: string, status?: string, sent_after?: string, sent_before?: string}  $filters
+     * @return array{search?: string, record_type?: string, record_id?: string, direction?: string, thread_id?: string, status?: string, sent_after?: string, sent_before?: string}
      */
     private function sentDatesAsInstants(array $filters, User $user): array
     {

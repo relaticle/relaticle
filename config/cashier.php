@@ -61,6 +61,8 @@ return [
             // Cashier's defaults stop at payment_succeeded; without this the
             // owner is never told a renewal failed.
             'invoice.payment_failed',
+            // Managed plans are granted when their first invoice is paid.
+            'invoice.paid',
         ],
     ],
 

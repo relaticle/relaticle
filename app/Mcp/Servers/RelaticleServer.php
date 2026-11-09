@@ -19,11 +19,17 @@ use App\Mcp\Tools\Company\GetCompanyTool;
 use App\Mcp\Tools\Company\ListCompaniesTool;
 use App\Mcp\Tools\Company\UpdateCompanyTool;
 use App\Mcp\Tools\CreateUploadUrlTool;
+use App\Mcp\Tools\Email\CancelEmailTool;
 use App\Mcp\Tools\Email\CreateEmailDraftTool;
+use App\Mcp\Tools\Email\DeleteEmailDraftTool;
 use App\Mcp\Tools\Email\GetEmailTool;
 use App\Mcp\Tools\Email\ListEmailAccountsTool;
 use App\Mcp\Tools\Email\ListEmailsTool;
+use App\Mcp\Tools\Email\RescheduleEmailTool;
+use App\Mcp\Tools\Email\RetryEmailTool;
+use App\Mcp\Tools\Email\SendEmailDraftTool;
 use App\Mcp\Tools\Email\SendEmailTool;
+use App\Mcp\Tools\Email\UpdateEmailDraftTool;
 use App\Mcp\Tools\FetchTool;
 use App\Mcp\Tools\GetCrmSchemaTool;
 use App\Mcp\Tools\GetCrmSummaryTool;
@@ -123,7 +129,13 @@ final class RelaticleServer extends Server
         GetEmailTool::class,
         ListEmailAccountsTool::class,
         CreateEmailDraftTool::class,
+        UpdateEmailDraftTool::class,
+        DeleteEmailDraftTool::class,
         SendEmailTool::class,
+        SendEmailDraftTool::class,
+        CancelEmailTool::class,
+        RescheduleEmailTool::class,
+        RetryEmailTool::class,
     ];
 
     /** @var array<int, class-string<Server\Resource>> */

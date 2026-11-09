@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Favicon\Drivers;
 
+use App\Models\Company;
 use App\Support\Http\HostResolver;
 use App\Support\Http\SsrfGuard;
 use AshAllenDesign\FaviconFetcher\Collections\FaviconCollection;
@@ -14,6 +15,8 @@ use AshAllenDesign\FaviconFetcher\Contracts\Fetcher;
 use AshAllenDesign\FaviconFetcher\Exceptions\ConnectionException;
 use AshAllenDesign\FaviconFetcher\Exceptions\InvalidUrlException;
 use AshAllenDesign\FaviconFetcher\Favicon;
+use Carbon\CarbonImmutable;
+use Closure;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 
@@ -22,6 +25,20 @@ final class HighQualityDriver implements Fetcher
     use HasDefaultFunctionality;
     use MakesHttpRequests;
     use ValidatesUrls;
+
+    private const int BUDGET_SECONDS = 20;
+
+    private const int REQUEST_TIMEOUT_SECONDS = 5;
+
+    private const int CONNECT_TIMEOUT_SECONDS = 3;
+
+    private const int MINIMUM_SECONDS_PER_REQUEST = 1;
+
+    private const int MINIMUM_SECONDS_TO_VERIFY = 2;
+
+    private CarbonImmutable $deadline;
+
+    private bool $skippedForLackOfTime = false;
 
     /**
      * Attempt to fetch high-quality favicon using a waterfall strategy.
@@ -33,6 +50,14 @@ final class HighQualityDriver implements Fetcher
      * 4. Fall back to DuckDuckGo
      */
     public function fetch(string $url): ?Favicon
+    {
+        $bounded = clone $this;
+        $bounded->deadline = now()->addSeconds(self::BUDGET_SECONDS);
+
+        return $bounded->search($url);
+    }
+
+    private function search(string $url): ?Favicon
     {
         throw_unless($this->urlIsValid($url), InvalidUrlException::class, $url.' is not a valid URL');
 
@@ -59,16 +84,47 @@ final class HighQualityDriver implements Fetcher
             return $favicon;
         }
 
-        $favicon = $this->tryGoogleHighRes($url);
+        $favicon = $this->whileTimeLeft(fn (): ?Favicon => $this->tryGoogleHighRes($url));
         if ($favicon instanceof Favicon && $this->faviconIsAccessible($favicon)) {
             return $favicon;
         }
 
-        $favicon = $this->tryDuckDuckGo($url);
+        $favicon = $this->whileTimeLeft(fn (): ?Favicon => $this->tryDuckDuckGo($url));
 
-        throw_if(! $favicon instanceof Favicon && $siteUnreachable instanceof ConnectionException, $siteUnreachable);
+        if (! $favicon instanceof Favicon) {
+            throw_if($siteUnreachable instanceof ConnectionException, $siteUnreachable);
+            throw_if($this->skippedForLackOfTime, ConnectionException::class, "Ran out of time looking for a favicon for {$url}");
+        }
 
         return $favicon;
+    }
+
+    private function secondsLeft(): float
+    {
+        return now()->diffInSeconds($this->deadline, false);
+    }
+
+    private function whileTimeLeft(Closure $source): ?Favicon
+    {
+        if ($this->hasTimeLeft()) {
+            return $source();
+        }
+
+        $this->skippedForLackOfTime = true;
+
+        return null;
+    }
+
+    private function noteIfOutOfTime(): void
+    {
+        if (! $this->hasTimeLeft()) {
+            $this->skippedForLackOfTime = true;
+        }
+    }
+
+    private function hasTimeLeft(): bool
+    {
+        return $this->secondsLeft() >= self::MINIMUM_SECONDS_PER_REQUEST;
     }
 
     private function hostDoesNotResolve(string $url): bool
@@ -100,7 +156,18 @@ final class HighQualityDriver implements Fetcher
 
     private function guardedHttpClient(): PendingRequest
     {
-        return SsrfGuard::guard($this->httpClient());
+        if (! $this->hasTimeLeft()) {
+            $this->skippedForLackOfTime = true;
+
+            throw new ConnectionException('Ran out of time looking for a favicon');
+        }
+
+        return SsrfGuard::guard(
+            $this->httpClient()
+                ->timeout(self::REQUEST_TIMEOUT_SECONDS)
+                ->connectTimeout(self::CONNECT_TIMEOUT_SECONDS),
+            $this->deadline,
+        );
     }
 
     private function tryAppleTouchIcon(string $url): ?Favicon
@@ -142,9 +209,9 @@ final class HighQualityDriver implements Fetcher
 
             $iconUrl = $this->stripPathFromUrl($url).'/apple-touch-icon.png';
             /** @var Response $testResponse */
-            $testResponse = $this->guardedHttpClient()->head($iconUrl);
+            $testResponse = $this->guardedHttpClient()->get($iconUrl);
 
-            if ($testResponse->successful()) {
+            if ($this->servesStorableIcon($testResponse)) {
                 return new Favicon(
                     url: $url,
                     faviconUrl: $iconUrl,
@@ -220,7 +287,7 @@ final class HighQualityDriver implements Fetcher
                 fn () => $this->guardedHttpClient()->get($faviconUrl)
             );
 
-            if ($response->successful()) {
+            if ($this->servesStorableIcon($response)) {
                 return new Favicon(
                     url: $url,
                     faviconUrl: $faviconUrl,
@@ -229,7 +296,7 @@ final class HighQualityDriver implements Fetcher
             }
 
         } catch (\Exception) {
-            // Fall through
+            $this->noteIfOutOfTime();
         }
 
         return null;
@@ -254,7 +321,7 @@ final class HighQualityDriver implements Fetcher
                 fn () => $this->guardedHttpClient()->get($faviconUrl)
             );
 
-            if ($response->successful()) {
+            if ($this->servesStorableIcon($response)) {
                 return new Favicon(
                     url: $url,
                     faviconUrl: $faviconUrl,
@@ -263,7 +330,7 @@ final class HighQualityDriver implements Fetcher
             }
 
         } catch (\Exception) {
-            // Fall through
+            $this->noteIfOutOfTime();
         }
 
         return $this->notFound($url);
@@ -286,14 +353,25 @@ final class HighQualityDriver implements Fetcher
             return false;
         }
 
+        if ($this->secondsLeft() < self::MINIMUM_SECONDS_TO_VERIFY) {
+            return true;
+        }
+
         try {
             /** @var Response $response */
-            $response = $this->guardedHttpClient()->head($faviconUrl);
+            $response = $this->guardedHttpClient()->get($faviconUrl);
 
-            return $response->successful();
+            return $this->servesStorableIcon($response);
         } catch (\Exception) {
             return false;
         }
+    }
+
+    // Many sites answer a missing path with 200 and their own HTML page, and a Content-Type
+    // header is only the server's claim about the bytes.
+    private function servesStorableIcon(Response $response): bool
+    {
+        return $response->successful() && Company::logoExtensionFor($response->body()) !== null;
     }
 
     private function convertToAbsoluteUrl(string $baseUrl, string $path): string

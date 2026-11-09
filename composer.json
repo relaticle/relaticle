@@ -1,5 +1,5 @@
 {
-    "name": "laravel/laravel",
+    "name": "relaticle/relaticle",
     "type": "project",
     "description": "The Next-Generation Open-Source CRM Platform",
     "keywords": [
@@ -11,7 +11,7 @@
         "sales-pipeline",
         "workspace-collaboration"
     ],
-    "license": "AGPL-3.0",
+    "license": "AGPL-3.0-only",
     "require": {
         "php": "^8.5",
         "ext-intl": "*",
@@ -41,13 +41,14 @@
         "laravel/tinker": "^3.0",
         "league/flysystem-aws-s3-v3": "^3.0",
         "livewire/livewire": "^4.0",
+        "mallardduck/blade-lucide-icons": "^2.0",
         "manukminasyan/blade-mdi": "^1.0",
         "propaganistas/laravel-disposable-email": "^2.5",
         "ralphjsmit/laravel-filament-seo": "^2.2",
         "ralphjsmit/laravel-seo": "^1.8",
         "relaticle/activity-log": "^1.2",
-        "relaticle/custom-fields": "^3.14",
-        "relaticle/flowforge": "^4.0",
+        "relaticle/custom-fields": "^3.18.2",
+        "relaticle/flowforge": "^4.3.4",
         "relaticle/ink": "^2.3",
         "scalar/laravel": "^0.4.0",
         "sentry/sentry-laravel": "^4.13",
@@ -82,8 +83,6 @@
         "driftingly/rector-laravel": "^2.0",
         "fakerphp/faker": "^1.23",
         "larastan/larastan": "^3.0",
-        "laravel-lang/lang": "^15.29",
-        "laravel-lang/publisher": "^16.8",
         "laravel/boost": "^2.0",
         "laravel/pail": "^1.2.2",
         "laravel/pao": "^1.0",
@@ -91,8 +90,9 @@
         "laravel/sail": "^1.26",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.0",
-        "pestphp/pest": "dev-tia-warmup-worktrees as 5.3.0",
+        "pestphp/pest": "dev-tia-warmup-worktrees-5x as 5.3.5",
         "pestphp/pest-plugin-browser": "^5.0",
+        "pestphp/pest-plugin-evals": "^5.1",
         "pestphp/pest-plugin-laravel": "^5.0",
         "pestphp/pest-plugin-rector": "^5.0",
         "pestphp/pest-plugin-type-coverage": "^5.0",
@@ -109,6 +109,7 @@
             "Relaticle\\OnboardSeed\\": "packages/OnboardSeed/src",
             "Relaticle\\ImportWizard\\": "packages/ImportWizard/src",
             "Relaticle\\EmailIntegration\\": "packages/EmailIntegration/src",
+            "Relaticle\\Cloud\\": "packages/Cloud/src",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
         }
@@ -160,6 +161,10 @@
         ],
         "test:types": "phpstan analyse",
         "test:arch": "pest tests/Arch/ --no-tia",
+        "test:evals": [
+            "Composer\\Config::disableProcessTimeout",
+            "pest tests/Evals --evals --no-tia"
+        ],
         "test:type-coverage": [
             "Composer\\Config::disableProcessTimeout",
             "pest --type-coverage --min=100 --no-tia"

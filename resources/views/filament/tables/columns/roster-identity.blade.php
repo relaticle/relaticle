@@ -11,7 +11,7 @@
         />
     @else
         <span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-white/5 dark:text-gray-500">
-            <x-filament::icon icon="heroicon-m-envelope" class="size-4"/>
+            <x-filament::icon icon="lucide-mail" class="size-4"/>
         </span>
     @endif
 

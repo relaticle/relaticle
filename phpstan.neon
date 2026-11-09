@@ -14,6 +14,10 @@ parameters:
     # PHPStan otherwise caches to the system temp dir, which GitHub Actions discards.
     tmpDir: .cache/phpstan
 
+    databaseMigrationsPath:
+        - database/migrations
+        - packages/Cloud/database/migrations
+
     ignoreErrors:
         # Custom field model type covariance - App\Models\CustomField* extends Relaticle\CustomFields\Models\CustomField*
         # Runtime model swapping is configured in AppServiceProvider but PHPStan doesn't know about it
@@ -74,12 +78,6 @@ parameters:
             path: app/Livewire/BaseLivewireComponent.php
             reportUnmatched: false
 
-        # i18n: notification ->title() on OAuth callback failure
-        -
-            identifier: app.i18n.hardcodedUserFacingString
-            path: app/Http/Controllers/Auth/CallbackController.php
-            reportUnmatched: false
-
         # i18n: AI tool ->description() text is the schema passed to the LLM, not user-facing UI
         -
             identifier: app.i18n.hardcodedUserFacingString
@@ -124,12 +122,14 @@ parameters:
         # internal sysadmin panel is English-only; 92 type issues, 67 of them one
         # identical.alwaysTrue cluster). Re-include when SystemAdmin gets dev time.
         - packages/SystemAdmin
+        - packages/Cloud/tests (?)
 
     configDirectories:
         - config
         - packages/Chat/config
         - packages/ImportWizard/config
         - packages/Documentation/config
+        - packages/Cloud/config
         - packages/EmailIntegration/config
 
 services:
@@ -150,8 +150,15 @@ services:
                 - App\Filament
                 - Relaticle\Chat\Tools
                 - Relaticle\Chat\Livewire
+                - Relaticle\Cloud\Admin\Filament
+                - Relaticle\Cloud\Billing\Http
+                - Relaticle\Cloud\Billing\Filament
+                - Relaticle\Cloud\Billing\Livewire
+                - Relaticle\Cloud\Docs\Http
+                - Relaticle\Cloud\Marketing\Http
                 - App\Queries
                 - Relaticle\Chat\Queries
+                - Relaticle\Cloud\Billing\Queries
                 - Relaticle\EmailIntegration\Queries
         tags:
             - phpstan.rules.rule

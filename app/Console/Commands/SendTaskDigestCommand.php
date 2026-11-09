@@ -29,7 +29,7 @@ final class SendTaskDigestCommand extends Command
         User::query()
             ->atLocalHour(8)
             ->where('last_login_at', '>=', now()->subDays(self::ACTIVE_WITHIN_DAYS))
-            ->with(['ownedWorkspaces', 'workspaces'])
+            ->with(['ownedWorkspaces.subscriptions', 'workspaces.subscriptions'])
             ->chunkById(500, function (Collection $users) use ($digestService, &$sent): void {
                 foreach ($users as $user) {
                     if ($this->sendForUser($user, $digestService)) {

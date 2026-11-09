@@ -5,23 +5,26 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Actions;
 
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
-use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
 use Relaticle\EmailIntegration\Notifications\EmailAccessRespondedNotification;
 use Relaticle\EmailIntegration\Services\EmailSharingService;
 
 final readonly class ApproveEmailAccessRequestAction
 {
-    public function __construct(private EmailSharingService $sharingService) {}
+    public function __construct(
+        private DecideEmailAccessRequest $decide,
+        private EmailSharingService $sharingService,
+    ) {}
 
-    public function execute(EmailAccessRequest $accessRequest, User $actor): void
+    public function execute(EmailAccessRequest $accessRequest, User $actor): bool
     {
         abort_unless($accessRequest->owner_id === $actor->getKey(), 403);
 
-        if ($accessRequest->status !== EmailAccessRequestStatus::PENDING) {
-            return;
+        if (! $accessRequest->isOpen()) {
+            return false;
         }
 
         $email = $accessRequest->email;
@@ -29,7 +32,7 @@ final readonly class ApproveEmailAccessRequestAction
         $requester = $accessRequest->requester;
 
         if ($email === null || $owner === null || $requester === null) {
-            return;
+            return false;
         }
 
         // Don't grant a share to a requester who is no longer in the email's workspace.
@@ -37,12 +40,22 @@ final readonly class ApproveEmailAccessRequestAction
 
         $tier = EmailPrivacyTier::from($accessRequest->tier_requested);
 
-        $this->sharingService->shareEmail($email, $owner, $requester, $tier);
+        $approved = DB::transaction(function () use ($accessRequest, $actor, $email, $owner, $requester, $tier): bool {
+            if (! $this->decide->execute($accessRequest, EmailAccessRequestStatus::APPROVED, $actor)) {
+                return false;
+            }
 
-        $accessRequest->update(['status' => EmailAccessRequestStatus::APPROVED]);
+            $this->sharingService->shareEmail($email, $owner, $requester, $tier);
 
-        EmailAccessRequestedNotification::dismissFor($accessRequest);
+            return true;
+        });
+
+        if (! $approved) {
+            return false;
+        }
 
         $requester->notify(new EmailAccessRespondedNotification($accessRequest));
+
+        return true;
     }
 }

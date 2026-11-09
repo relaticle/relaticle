@@ -7,6 +7,7 @@ use App\Exceptions\UploadException;
 use App\Support\Http\HostResolver;
 use App\Support\Http\SsrfGuard;
 use App\Support\Media\UploadAllowlist;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Request as HttpClientRequest;
 use Illuminate\Support\Facades\Exceptions;
@@ -83,11 +84,9 @@ test('accepts a clearly-public address literal', function (): void {
 });
 
 test('guard refuses a redirect to a non-public host and follows a public one', function (string $location, bool $followed): void {
-    Http::fake(function (HttpClientRequest $request) use ($location) {
-        return $request->url() === 'https://1.1.1.1/icon.png'
-            ? Http::response('', 302, ['Location' => $location])
-            : Http::response('png');
-    });
+    Http::fake(fn (HttpClientRequest $request) => $request->url() === 'https://1.1.1.1/icon.png'
+        ? Http::response('', 302, ['Location' => $location])
+        : Http::response('png'));
 
     $send = fn () => SsrfGuard::guard(Http::timeout(5))->get('https://1.1.1.1/icon.png');
 
@@ -207,7 +206,7 @@ test('refuses a host that does not resolve without reporting it', function (): v
     Exceptions::assertNothingReported();
 });
 
-test('reports a host that resolves to a non-public address', function (): void {
+test('reports a non-public address only when a request reaches it', function (): void {
     resolveHostsTo(['169.254.169.254']);
     Http::fake();
 
@@ -215,7 +214,7 @@ test('reports a host that resolves to a non-public address', function (): void {
         ->and(fn () => SsrfGuard::guard(Http::timeout(5))->get('https://metadata.example.com/icon.png'))
         ->toThrow(SsrfGuardException::class);
 
-    Exceptions::assertReportedCount(2);
+    Exceptions::assertReportedCount(1);
 });
 
 test('guard aborts a download larger than the upload limit', function (): void {
@@ -248,4 +247,28 @@ test('guard pins every validated address and leaves an address literal unpinned'
         ['cdn.example.com:443:93.184.216.34,[2606:2800:220:1:248:1893:25c8:1946]'],
         null,
     ]);
+});
+
+test('guard clamps each redirect hop to the time left and refuses a hop past the deadline', function (): void {
+    resolveHostsTo(['93.184.216.34']);
+    $this->freezeTime();
+
+    $sent = [];
+
+    Http::fake(function (HttpClientRequest $request, array $options) use (&$sent) {
+        $sent[] = [$request->url(), $options['timeout'], $options['connect_timeout']];
+        $this->travel(15)->seconds();
+
+        return Http::response('', 302, ['Location' => 'https://hop.example.com/next']);
+    });
+
+    $request = SsrfGuard::guard(Http::timeout(30)->connectTimeout(10), now()->addSeconds(20));
+
+    expect(fn () => $request->get('https://start.example.com/icon.png'))->toThrow(ConnectionException::class)
+        ->and($sent)->toEqual([
+            ['https://start.example.com/icon.png', 20, 10],
+            ['https://hop.example.com/next', 5, 5],
+        ]);
+
+    Exceptions::assertNothingReported();
 });

@@ -52,7 +52,7 @@ final readonly class LinkSocialAccountCallbackController
         } catch (Throwable $e) {
             report($e);
 
-            return $this->handleLinkError($this->parseProviderError($e->getMessage(), $provider->value));
+            return $this->handleLinkError($this->parseProviderError($e->getMessage(), $provider));
         }
 
         $pending = AuthenticationSession::pendingOperation();

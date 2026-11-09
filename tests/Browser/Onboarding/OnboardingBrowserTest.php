@@ -15,9 +15,10 @@ use Laravel\Pennant\Feature;
 use Pest\Browser\Api\AwaitableWebpage;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
-use Symfony\Component\DomCrawler\Crawler;
 
 mutates(CreateWorkspace::class, SetupWorkspace::class);
+
+const FOCUSED_HEADING = 'new Promise(resolve => { const end = Date.now() + 3000; const poll = () => { const focused = document.activeElement; focused?.tagName === "H1" || Date.now() > end ? resolve(focused?.tagName === "H1" ? focused.innerText.trim() : focused?.tagName) : setTimeout(poll, 50); }; poll(); })';
 
 const ACTION_MODALS_READY = 'new Promise(resolve => { const ready = () => document.querySelector(\'[x-data^="filamentActionModals"]\')?._x_dataStack !== undefined; const poll = () => ready() ? resolve(true) : setTimeout(poll, 25); poll(); })';
 
@@ -37,7 +38,18 @@ function walkToMailboxStep(User $user, string $name, string $slug): AwaitableWeb
 
 it('records onboarding conversions after navigation without counting them again', function (string $event): void {
     $page = visit('/app/login');
-    $page->script('window.fathomEvents = []; window.fathomPageviews = []; window.fathom = { trackEvent: event => window.fathomEvents.push(event), trackPageview: options => window.fathomPageviews.push(options.url) };');
+    $page->script(<<<'JS'
+        window.fathomEvents = [];
+        window.fathomPageviews = [];
+        const capture = payload => {
+            if (payload.name) {
+                window.fathomEvents.push(payload.name);
+            } else if (!payload.dp) {
+                window.fathomPageviews.push(payload.p);
+            }
+        };
+        window.fathom = { send: capture, beacon: capture, isTrackingEnabled: () => true };
+        JS);
 
     $environment = app()->environment();
     app()->instance('env', 'production');
@@ -45,25 +57,36 @@ it('records onboarding conversions after navigation without counting them again'
     session()->put('fathom.track_'.$event, true);
 
     try {
-        $html = view('filament.app.analytics')->render();
+        $html = json_encode(view('filament.app.analytics')->render(), JSON_THROW_ON_ERROR);
     } finally {
         app()->instance('env', $environment);
     }
 
-    foreach (new Crawler($html)->filter('script:not([src])') as $script) {
-        $source = json_encode($script->textContent, JSON_THROW_ON_ERROR);
-        $page->script('(() => { const script = document.createElement("script"); script.textContent = '.$source.'; document.head.append(script); })()');
-    }
+    $page->script(<<<JS
+        (() => {
+            const append = document.head.appendChild.bind(document.head);
+            document.head.appendChild = element => element.src === 'https://cdn.usefathom.com/script.js' ? element : append(element);
+            const markup = new DOMParser().parseFromString({$html}, 'text/html');
+            document.head.appendChild(markup.querySelector('[data-relaticle-analytics]'));
+            const script = document.createElement('script');
+            script.textContent = markup.querySelector('script:not([type])').textContent;
+            document.head.appendChild(script);
+            document.head.appendChild = append;
+        })();
+        JS);
+
+    $page->assertScript('window.fathomEvents', [$event])
+        ->assertScript('window.fathomPageviews', ['/login']);
 
     $page->script('Livewire.navigate("/app/login?tracking=first")');
     $page->assertScript('window.location.search', '?tracking=first')
         ->assertScript('window.fathomEvents', [$event])
-        ->assertScript('window.fathomPageviews.map(url => new URL(url).pathname + new URL(url).search)', ['/login']);
+        ->assertScript('window.fathomPageviews', ['/login', '/login']);
 
     $page->script('Livewire.navigate("/app/login?tracking=second")');
     $page->assertScript('window.location.search', '?tracking=second')
         ->assertScript('window.fathomEvents', [$event])
-        ->assertScript('window.fathomPageviews.map(url => new URL(url).pathname + new URL(url).search)', ['/login', '/login'])
+        ->assertScript('window.fathomPageviews', ['/login', '/login', '/login'])
         ->assertNoJavaScriptErrors();
 })->with(['signup', 'workspace_created']);
 
@@ -94,6 +117,7 @@ it('walks a new owner through every setup screen to the setup conversation', fun
         ->waitForText('Continue without your mailbox?')
         ->press('button:visible:has-text("Yes, I\'m sure")')
         ->waitForText('Help us customize your workspace')
+        ->assertScript(asyncAlpineComponentsLoaded())
         ->click('[for$="onboarding_use_case-other"]')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Invite your team')
@@ -176,6 +200,7 @@ it('moves the preview panel with the setup step', function (): void {
         ->waitForText('Help us customize your workspace')
         ->assertScript($activeNavigation, 'dashboard')
         ->assertScript($visibleStages, [])
+        ->assertScript(asyncAlpineComponentsLoaded())
         ->click('[for$="onboarding_use_case-recruiting"]')
         ->waitForText('Pick what applies to you.')
         ->assertScript($activeNavigation, 'opportunities')
@@ -197,6 +222,7 @@ it('changes the invite button when an address is typed and confirms the copied l
         ->waitForText('Continue without your mailbox?')
         ->press('button:visible:has-text("Yes, I\'m sure")')
         ->waitForText('Help us customize your workspace')
+        ->assertScript(asyncAlpineComponentsLoaded())
         ->click('[for$="onboarding_use_case-other"]')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Invite your team')
@@ -224,6 +250,7 @@ it('shows the invite link to copy by hand when the clipboard is unavailable', fu
         ->waitForText('Continue without your mailbox?')
         ->press('button:visible:has-text("Yes, I\'m sure")')
         ->waitForText('Help us customize your workspace')
+        ->assertScript(asyncAlpineComponentsLoaded())
         ->click('[for$="onboarding_use_case-other"]')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Invite your team')
@@ -262,6 +289,7 @@ it('stores the use case and its sub-option chosen in the browser', function (): 
         ->waitForText('Continue without your mailbox?')
         ->press('button:visible:has-text("Yes, I\'m sure")')
         ->waitForText('Help us customize your workspace')
+        ->assertScript(asyncAlpineComponentsLoaded())
         ->click('[for$="onboarding_use_case-recruiting"]')
         ->waitForText('Pick what applies to you.')
         ->click('[for$="onboarding_context-sourcing"]')
@@ -280,6 +308,66 @@ it('stores the use case and its sub-option chosen in the browser', function (): 
         ->and($workspace->name)->toBe('Hiring Desk');
 });
 
+it('moves focus to the heading of each new wizard and setup step', function (): void {
+    Queue::fake();
+
+    $user = User::factory()->create();
+
+    loginViaBrowser($user)
+        ->assertPathIs('/app/new')
+        ->navigate('/app/new')
+        ->waitForText('Create your workspace')
+        ->assertScript('new Promise(resolve => { const end = Date.now() + 3000; const poll = () => document.activeElement?.id === "form.name" || Date.now() > end ? resolve(document.activeElement?.id) : setTimeout(poll, 50); poll(); })', 'form.name')
+        ->type('[id="form.name"]', 'Hiring Desk')
+        ->press('button:visible:has-text("Continue")')
+        ->waitForText('How did you hear about us?')
+        ->assertScript(FOCUSED_HEADING, 'How did you hear about us?')
+        ->press('button:visible:has-text("Back")')
+        ->assertScript(FOCUSED_HEADING, 'Create your workspace')
+        ->press('button:visible:has-text("Continue")')
+        ->assertScript(FOCUSED_HEADING, 'How did you hear about us?')
+        ->press('button:visible:has-text("Continue")')
+        ->waitForText('Start with the people you already email')
+        ->assertScript(FOCUSED_HEADING, 'Start with the people you already email')
+        ->assertScript(ACTION_MODALS_READY, true)
+        ->press("I'll add people and companies myself")
+        ->waitForText('Continue without your mailbox?')
+        ->press('button:visible:has-text("Yes, I\'m sure")')
+        ->waitForText('Help us customize your workspace')
+        ->assertScript(FOCUSED_HEADING, 'Help us customize your workspace')
+        ->press('button:visible:has-text("Back")')
+        ->waitForText('Start with the people you already email')
+        ->assertScript(FOCUSED_HEADING, 'Start with the people you already email')
+        ->assertScript(ACTION_MODALS_READY, true)
+        ->press("I'll add people and companies myself")
+        ->waitForText('Continue without your mailbox?')
+        ->press('button:visible:has-text("Yes, I\'m sure")')
+        ->waitForText('Help us customize your workspace')
+        ->assertScript(asyncAlpineComponentsLoaded())
+        ->click('[for$="onboarding_use_case-other"]')
+        ->press('button:visible:has-text("Continue")')
+        ->waitForText('Invite your team')
+        ->assertScript(FOCUSED_HEADING, 'Invite your team');
+});
+
+it('clears the required details error as soon as a detail is ticked', function (): void {
+    $user = User::factory()->create();
+
+    walkToMailboxStep($user, 'Hiring Desk', 'hiring-desk')
+        ->assertScript(ACTION_MODALS_READY, true)
+        ->press("I'll add people and companies myself")
+        ->waitForText('Continue without your mailbox?')
+        ->press('button:visible:has-text("Yes, I\'m sure")')
+        ->waitForText('Help us customize your workspace')
+        ->assertScript(asyncAlpineComponentsLoaded())
+        ->click('[for$="onboarding_use_case-recruiting"]')
+        ->waitForText('Pick what applies to you.')
+        ->press('button:visible:has-text("Continue")')
+        ->waitForText('The use case details field is required.')
+        ->click('[for$="onboarding_context-sourcing"]')
+        ->assertScript('new Promise(resolve => { const end = Date.now() + 3000; const poll = () => { const shown = document.body.innerText.includes("The use case details field is required."); shown && Date.now() < end ? setTimeout(poll, 50) : resolve(shown); }; poll(); })', false);
+});
+
 it('stores the assistant and the question behind an AI referral picked in the browser', function (): void {
     Queue::fake();
 
@@ -293,9 +381,11 @@ it('stores the assistant and the question behind an AI referral picked in the br
         ->press('button:visible:has-text("Continue")')
         ->waitForText('How did you hear about us?')
         ->assertDontSee('Which assistant was it?')
-        ->click('[for$="onboarding_referral_source-ai"]')
+        ->assertScript(asyncAlpineComponentsLoaded())
+        ->click('[id$="onboarding_referral_source-ai"]')
         ->waitForText('Which assistant was it?')
-        ->click('[for$="onboarding_referral_detail-claude"]')
+        ->assertScript(asyncAlpineComponentsLoaded())
+        ->click('[id$="onboarding_referral_detail-claude"]')
         ->type('[id$="onboarding_referral_prompt"]', 'A CRM my assistant can update')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Start with the people you already email')
@@ -304,6 +394,7 @@ it('stores the assistant and the question behind an AI referral picked in the br
         ->waitForText('Continue without your mailbox?')
         ->press('button:visible:has-text("Yes, I\'m sure")')
         ->waitForText('Help us customize your workspace')
+        ->assertScript(asyncAlpineComponentsLoaded())
         ->click('[for$="onboarding_use_case-other"]')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Invite your team')

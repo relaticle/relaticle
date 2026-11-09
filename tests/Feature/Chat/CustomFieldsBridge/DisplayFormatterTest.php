@@ -8,11 +8,13 @@ use App\Models\CustomField;
 use App\Models\CustomFieldSection;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\ChecklistHtml;
+use App\Support\PlainText;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\CustomFields\Services\TenantContextService;
 
-mutates(CustomFieldsDisplayFormatter::class);
+mutates(CustomFieldsDisplayFormatter::class, PlainText::class);
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
@@ -63,6 +65,31 @@ it('keeps the paragraphs of a rich-text field apart and decodes its entities', f
     expect($rows[0]['new'])->toBe('Send the quote & terms. Loop in finance.');
 });
 
+it('formats a currency field in its currency, as the panel shows it', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+
+    $rows = resolve(CustomFieldsDisplayFormatter::class)
+        ->format($user, 'opportunity', cleanFields: ['amount' => 4500], oldModel: null);
+
+    expect($rows[0])->toMatchArray(['label' => 'Amount', 'new' => '$4,500.00']);
+});
+
+it('formats a currency field shown by code with its code and decimals', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $amount = CustomField::query()
+        ->where('tenant_id', $user->currentWorkspace->getKey())
+        ->where('entity_type', 'opportunity')
+        ->where('code', 'amount')
+        ->firstOrFail();
+    $amount->settings->additional = ['currency_code' => 'JPY', 'display_type' => 'code', 'decimal_places' => 0];
+    $amount->save();
+
+    $rows = resolve(CustomFieldsDisplayFormatter::class)
+        ->format($user, 'opportunity', cleanFields: ['amount' => 4500], oldModel: null);
+
+    expect($rows[0]['new'])->toBe('JPY 4,500');
+});
+
 it('includes the old value for updates with a current value on the model', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
@@ -84,6 +111,44 @@ it('includes the old value for updates with a current value on the model', funct
         'old' => 'Old text',
         'new' => 'New text',
     ]);
+});
+
+it('shows a ticked checklist item on the proposal card', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $task = Task::factory()->for($workspace)->create(['title' => 'T']);
+    $item = fn (string $checked): string => '<ul data-type="taskList"><li data-checked="'.$checked.'" data-type="taskItem"><label><input type="checkbox"><span></span></label><div><p>Call Bob</p></div></li></ul>';
+
+    $descField = CustomField::query()
+        ->where('tenant_id', $workspace->getKey())
+        ->where('entity_type', 'task')
+        ->where('code', 'description')
+        ->firstOrFail();
+
+    $task->saveCustomFieldValue($descField, $item('false'));
+
+    $rows = resolve(CustomFieldsDisplayFormatter::class)
+        ->format($user, 'task', cleanFields: ['description' => $item('true')], oldModel: $task->fresh());
+
+    expect($rows[0])->toMatchArray([
+        'label' => 'Description',
+        'old' => '[ ] Call Bob',
+        'new' => '[x] Call Bob',
+    ]);
+});
+
+it('ticks a proposal card item only where the board badge counts it ticked', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $html = '<ul data-type="taskList">'
+        .'<li data-checked="TRUE" data-type="taskItem"><label><input type="checkbox"><span></span></label><div><p>Call Bob</p></div></li>'
+        .'<li data-checked=true data-type=taskItem><label><input type="checkbox"><span></span></label><div><p>Send quote</p></div></li>'
+        .'</ul>';
+
+    $rows = resolve(CustomFieldsDisplayFormatter::class)
+        ->format($user, 'task', cleanFields: ['description' => $html], oldModel: null);
+
+    expect($rows[0]['new'])->toBe('[ ] Call Bob [x] Send quote')
+        ->and(ChecklistHtml::progress($html))->toBe(['checked' => 1, 'total' => 2]);
 });
 
 /**

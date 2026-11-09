@@ -6,14 +6,17 @@ use App\Actions\Auth\LinkSocialAccount;
 use App\Enums\AuthMethod;
 use App\Enums\SocialiteProvider;
 use App\Filament\Pages\Dashboard;
+use App\Filament\Pages\Security;
 use App\Http\Controllers\Auth\CallbackController;
 use App\Http\Controllers\Auth\LinkSocialAccountCallbackController;
 use App\Http\Controllers\Auth\LinkSocialAccountRedirectController;
 use App\Http\Controllers\Auth\RedirectController;
+use App\Http\Middleware\EnsureSocialiteProviderIsAvailable;
 use App\Models\User;
 use App\Models\UserSocialAccount;
 use App\Support\Auth\AuthenticationSession;
 use App\Support\Auth\IdentityConfirmation;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Foundation\Bootstrap\LoadConfiguration;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider;
 use Illuminate\Foundation\Testing\CachedState;
@@ -31,14 +34,16 @@ mutates(
     LinkSocialAccount::class,
     LinkSocialAccountRedirectController::class,
     LinkSocialAccountCallbackController::class,
+    EnsureSocialiteProviderIsAvailable::class,
 );
 
-function makeSocialiteUser(string $id, string $name, string $email): SocialiteUser
+function makeSocialiteUser(string $id, string $name, ?string $email, bool $emailVerified = true): SocialiteUser
 {
     $user = new SocialiteUser;
     $user->id = $id;
     $user->name = $name;
     $user->email = $email;
+    $user->setRaw(['sub' => $id, 'email' => $email, 'email_verified' => $emailVerified]);
 
     return $user;
 }
@@ -243,6 +248,50 @@ test('callback from socialite provider handles missing code parameter', function
     expect($errors->first('login'))->toBe('Authorization was cancelled or failed. Please try again.');
 });
 
+test('a throttled social callback returns to the sign-in page instead of a bare error page', function () {
+    $this->freezeTime();
+
+    foreach (range(1, 10) as $attempt) {
+        $this->get(route('auth.socialite.callback', ['provider' => SocialiteProvider::GOOGLE->value]));
+    }
+
+    $this->get(route('auth.socialite.callback', ['provider' => SocialiteProvider::GOOGLE->value]))
+        ->assertRedirect(route('login'));
+
+    FilamentNotification::assertNotified(
+        FilamentNotification::make()
+            ->title(__('auth.provider.failed_title'))
+            ->body(__('auth.throttle', ['seconds' => 60]))
+            ->danger()
+            ->persistent(),
+    );
+});
+
+test('a throttled provider step returns a signed-in user to the page that started it', function (string $routeName) {
+    $this->freezeTime();
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $startedOn = Security::getUrl(tenant: $user->personalWorkspace());
+
+    $this->actingAs($user);
+
+    foreach (range(1, 10) as $attempt) {
+        $this->get(route($routeName, ['provider' => SocialiteProvider::GOOGLE->value]));
+    }
+
+    $this->withSession(['url.intended' => $startedOn])
+        ->get(route($routeName, ['provider' => SocialiteProvider::GOOGLE->value]))
+        ->assertRedirect($startedOn);
+
+    FilamentNotification::assertNotified(
+        FilamentNotification::make()
+            ->title(__('auth.provider.failed_title'))
+            ->body(__('auth.throttle', ['seconds' => 60]))
+            ->danger()
+            ->persistent(),
+    );
+})->with(['identity confirmation' => 'auth.socialite.confirm.callback', 'account link' => 'auth.socialite.link.callback']);
+
 test('callback from socialite provider rejects a disposable email address', function () {
     Exceptions::fake();
 
@@ -271,6 +320,44 @@ test('callback from socialite provider rejects a disposable email address', func
  * than merely incomplete, and it is the undercount that made the Fathom
  * signup series disagree with the users table.
  */
+test('callback refuses to create an account from a google identity whose email google has not verified', function () {
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('unverified-google-id', 'Squatter', 'owner@example.com', emailVerified: false),
+    );
+
+    $response = $this->get(route('auth.socialite.callback', [
+        'provider' => SocialiteProvider::GOOGLE->value,
+        'code' => 'test-code',
+    ]));
+
+    $response->assertRedirect(route('login'));
+    $response->assertSessionHasErrors(['login' => __('auth.provider.unverified_email')]);
+
+    $this->assertDatabaseMissing('users', ['email' => 'owner@example.com']);
+    $this->assertDatabaseMissing('user_social_accounts', ['provider_id' => 'unverified-google-id']);
+    $this->assertGuest();
+});
+
+test('callback refuses to create an account when the provider shares no email address', function () {
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('no-email-google-id', 'No Email', null),
+    );
+
+    $response = $this->get(route('auth.socialite.callback', [
+        'provider' => SocialiteProvider::GOOGLE->value,
+        'code' => 'test-code',
+    ]));
+
+    $response->assertRedirect(route('login'));
+    $response->assertSessionHasErrors(['login' => __('auth.provider.unverified_email')]);
+
+    $this->assertDatabaseMissing('user_social_accounts', ['provider_id' => 'no-email-google-id']);
+    $this->assertDatabaseCount('users', 0);
+    $this->assertGuest();
+});
+
 test('callback flags the signup event when the OAuth user is new', function () {
     Socialite::fake(
         SocialiteProvider::GOOGLE->value,
@@ -332,6 +419,13 @@ test('github callback route is gone', function () {
 
 test('callback rejects unknown providers', function () {
     $this->get('/auth/callback/bitbucket?code=x')->assertNotFound();
+});
+
+test('a provider without a client id has no sign-in routes', function (): void {
+    config(['services.microsoft.client_id' => null]);
+
+    $this->get('/auth/redirect/microsoft')->assertNotFound();
+    $this->get('/auth/callback/microsoft?code=x')->assertNotFound();
 });
 
 test('link redirect requires a fresh identity confirmation', function (): void {
@@ -481,6 +575,7 @@ test('link callback rejects a grant minted before the password was rotated', fun
     $this->get(route('auth.socialite.link.redirect', ['provider' => SocialiteProvider::GOOGLE->value]));
 
     $user->forceFill(['password' => Hash::make('a-brand-new-password')])->save();
+    session()->put('password_hash_web', $user->getAuthPassword());
 
     Socialite::fake(
         SocialiteProvider::GOOGLE->value,

@@ -28,7 +28,14 @@ return [
         ],
         'held' => [
             'title' => ':via queued an email',
+            'rescheduled_title' => ':via rescheduled an email',
             'body' => '":subject" goes to :recipients in :minutes. Workspace: :workspace. Cancel it if you did not ask for it.',
+            'scheduled_body' => '":subject" goes to :recipients on :date. Workspace: :workspace. Cancel it if you did not ask for it.',
+            'sent_body' => '":subject" was sent to :recipients. Workspace: :workspace.',
+            'cancelled_body' => '":subject" to :recipients was cancelled and not sent. Workspace: :workspace.',
+            'failed_body' => '":subject" to :recipients could not be sent. Workspace: :workspace.',
+            'sending_body' => '":subject" is being sent to :recipients. Workspace: :workspace.',
+            'waiting_body' => '":subject" to :recipients is waiting to send. Workspace: :workspace. Cancel it if you did not ask for it.',
             'minutes' => ':count minute|:count minutes',
         ],
         'too_late' => [

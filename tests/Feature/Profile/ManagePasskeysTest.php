@@ -574,7 +574,22 @@ it('can remove its only passkey when a linked provider remains available', funct
 it('does not count a disabled provider as another primary method', function (): void {
     $user = User::factory()->socialOnly()->create();
     $this->actingAs($user);
-    Feature::deactivate(SocialAuth::class);
+    Feature::for(null)->deactivate(SocialAuth::class);
+    UserSocialAccount::factory()->create(['user_id' => $user->id, 'provider_name' => SocialiteProvider::GOOGLE->value]);
+    $passkey = createPasskey($user, 'Only Key');
+    AuthenticationSession::startOperation($user, 'delete_passkey', (string) $passkey->id);
+    AuthenticationSession::proveOperation($user, 'delete_passkey', (string) $passkey->id);
+    IdentityConfirmation::markConfirmed();
+
+    $this->deleteJson(route('passkey.destroy', ['passkey' => $passkey->id]))->assertUnprocessable();
+
+    $this->assertModelExists($passkey);
+});
+
+it('does not count a provider without a client id as another primary method', function (): void {
+    $user = User::factory()->socialOnly()->create();
+    $this->actingAs($user);
+    config(['services.google.client_id' => null]);
     UserSocialAccount::factory()->create(['user_id' => $user->id, 'provider_name' => SocialiteProvider::GOOGLE->value]);
     $passkey = createPasskey($user, 'Only Key');
     AuthenticationSession::startOperation($user, 'delete_passkey', (string) $passkey->id);

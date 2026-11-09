@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Contracts\Billing;
+use App\Enums\Plan;
+use App\Enums\WorkspaceRole;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
@@ -16,6 +19,7 @@ use Relaticle\EmailIntegration\Actions\DisconnectConnectedAccountAction;
 use Relaticle\EmailIntegration\Data\ConnectAccountData;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
+use Relaticle\EmailIntegration\Enums\SyncErrorReason;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConnectedAccountActions;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccessRequestsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountSettingsPage;
@@ -43,6 +47,47 @@ beforeEach(function (): void {
         'workspace_id' => $this->workspace->id,
         'user_id' => $this->user->id,
     ]));
+});
+
+it('replaces the connect buttons with an upgrade banner once the workspace reaches its mailbox limit', function (): void {
+    withHostedBilling();
+
+    livewire(EmailAccountsPage::class)
+        ->assertSee('Mailbox limit reached. This workspace can connect 1 mailbox. Upgrade to connect more.')
+        ->assertSee(resolve(Billing::class)->url($this->workspace))
+        ->assertDontSee(__('filament/pages/email-accounts.actions.connect_gmail'));
+});
+
+it('tells a trialing workspace at its limit that the free trial connects one account', function (): void {
+    withHostedBilling();
+    $this->workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(7)])->save();
+
+    livewire(EmailAccountsPage::class)
+        ->assertSee('Free trial account limit reached. Upgrade now to sync more accounts.')
+        ->assertDontSee(__('filament/pages/email-accounts.actions.connect_gmail'));
+});
+
+it('shows the mailbox limit without an upgrade link to a member who cannot manage billing', function (): void {
+    withHostedBilling();
+
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member->forceFill(['current_workspace_id' => $this->workspace->getKey()])->save();
+    $this->actingAs($member);
+
+    $page = livewire(EmailAccountsPage::class)
+        ->assertSee('Mailbox limit reached. This workspace can connect 1 mailbox. Upgrade to connect more.');
+
+    expect($page->instance()->upgradeUrl())->toBeNull();
+});
+
+it('keeps the connect buttons while the workspace has room for another mailbox', function (): void {
+    withHostedBilling();
+    $this->workspace->forceFill(['plan' => Plan::Pro])->save();
+
+    livewire(EmailAccountsPage::class)
+        ->assertSee(__('filament/pages/email-accounts.actions.connect_gmail'))
+        ->assertDontSee('Mailbox limit reached');
 });
 
 it('links reconnect to the mailbox oauth redirect for the account provider', function (EmailProvider $provider): void {
@@ -110,12 +155,10 @@ it('does not expose reconnect for another user\'s account', function (): void {
         ->assertActionHidden(TestAction::make('reconnect')->arguments(['account_id' => $otherAccount->id]));
 });
 
-it('links accountSettings to the per-account settings page', function (): void {
+it('opens the mailbox settings from the account row', function (): void {
     livewire(EmailAccountsPage::class)
-        ->assertActionHasUrl(
-            TestAction::make('accountSettings')->arguments(['account_id' => $this->account->id]),
-            EmailAccountSettingsPage::getUrl(['account' => $this->account->id]),
-        );
+        ->assertSeeHtml('href="'.e(EmailAccountSettingsPage::getUrl(['account' => $this->account->id])).'"')
+        ->assertActionDoesNotExist(TestAction::make('accountSettings')->arguments(['account_id' => $this->account->id]));
 });
 
 it('deletes the authenticated user\'s account on disconnect', function (): void {
@@ -342,8 +385,8 @@ it('queues mailbox history import from the account menu', function (): void {
         ->callAction('reimportHistory', arguments: ['account_id' => $this->account->id])
         ->assertNotified();
 
-    Bus::assertDispatched(RelinkMailboxHistoryJob::class, fn (RelinkMailboxHistoryJob $job): bool => $job->connectedAccount->is($this->account));
-    Bus::assertDispatched(InitialEmailSyncJob::class, fn (InitialEmailSyncJob $job): bool => $job->connectedAccount->is($this->account));
+    Bus::assertDispatched(fn (RelinkMailboxHistoryJob $job): bool => $job->connectedAccount->is($this->account));
+    Bus::assertDispatched(fn (InitialEmailSyncJob $job): bool => $job->connectedAccount->is($this->account));
     Bus::assertNotDispatched(IncrementalEmailSyncJob::class);
 });
 
@@ -445,6 +488,22 @@ it('shows a sync issue badge when incremental sync could not store mail', functi
         ->assertDontSee(__('filament/pages/email-accounts.in_sync'));
 });
 
+it('explains on the sync issue badge that Gmail is switched off', function (): void {
+    $reason = SyncErrorReason::GoogleMailDisabled;
+
+    $this->account->update([
+        'status' => EmailAccountStatus::ERROR,
+        'sync_cursor' => 'mail-cursor',
+        'last_synced_at' => now(),
+        'last_error' => $reason->value,
+    ]);
+
+    livewire(EmailAccountsPage::class)
+        ->assertSee(__('filament/pages/email-accounts.sync_error.badge'))
+        ->assertSeeHtml(e($reason->getLabel()))
+        ->assertDontSee($reason->value);
+});
+
 it('stays in sync after history import store failures', function (): void {
     $batch = resolve(MailboxHistoryImportService::class)->startBatch($this->account);
 
@@ -514,7 +573,7 @@ it('offers Connect Microsoft once a Microsoft mailbox client is configured', fun
         ->assertSee(__('filament/pages/email-accounts.actions.connect_azure'));
 });
 
-it('keeps email settings out of the sidebar and shows only accounts and templates as per-user tabs', function (): void {
+it('keeps email settings out of the sidebar', function (): void {
     expect(EmailAccountsPage::shouldRegisterNavigation())->toBeFalse()
         ->and(EmailTemplateResource::shouldRegisterNavigation())->toBeFalse()
         ->and(EmailSignaturesPage::shouldRegisterNavigation())->toBeFalse()
@@ -522,8 +581,6 @@ it('keeps email settings out of the sidebar and shows only accounts and template
 
     $this->get(EmailAccountsPage::getUrl(tenant: $this->workspace))
         ->assertSuccessful()
-        ->assertSee(__('filament/pages/email-accounts.navigation_label'), false)
-        ->assertSee(__('filament/resources/email-template.navigation_label'), false)
         ->assertDontSee(__('filament/pages/email-access-requests.navigation_label'), false)
         ->assertDontSee(__('filament/pages/email-privacy-settings.navigation_label'), false);
 });

@@ -17,7 +17,7 @@
 @endphp
 
 <div {{ $attributes->class(['shrink-0 divide-y divide-gray-100 text-sm dark:divide-white/5']) }}>
-    <label @class([$rowClass, 'cursor-default'])>
+    <div @class([$rowClass])>
         <span class="{{ $labelClass }}">{{ __('filament/emails/composer.fields.from') }}</span>
         <span class="flex h-10 min-w-0 flex-1 items-center gap-2">
             <x-filament::avatar
@@ -27,16 +27,16 @@
                 class="shrink-0"
             />
             @if (count($accountOptions) > 1)
-                <select wire:model.live="accountId" class="w-full border-0 bg-transparent p-0 text-sm text-gray-900 focus:ring-0 dark:text-gray-100">
+                <select wire:model.live="accountId" class="field-sizing-content w-fit max-w-full cursor-pointer rounded-md border-0 bg-transparent ps-1.5 pe-5 -ms-1.5 text-sm text-gray-900 hover:bg-gray-100 focus:ring-0 focus-visible:bg-gray-100 focus-visible:outline-none dark:text-gray-100 dark:hover:bg-white/10 dark:focus-visible:bg-white/10">
                     @foreach ($accountOptions as $id => $label)
                         <option value="{{ $id }}">{{ $label }}</option>
                     @endforeach
                 </select>
             @else
-                <span class="truncate text-sm text-gray-900 dark:text-gray-100">{{ $fromAccount?->label }}</span>
+                <span class="truncate text-sm text-gray-900 dark:text-gray-100" title="{{ $fromAccount?->label }}">{{ $fromAccount?->label }}</span>
             @endif
         </span>
-    </label>
+    </div>
     @error('accountId')
         <p class="{{ $errorClass }}">{{ $message }}</p>
     @enderror
@@ -57,8 +57,8 @@
                 />
             </div>
             <span class="flex h-10 shrink-0 items-center space-x-2 text-xs font-medium text-gray-400">
-                <button type="button" wire:click="toggleCc" @class(['transition hover:text-gray-700 dark:hover:text-gray-200', 'text-primary-600 dark:text-primary-400' => $showCc])>{{ __('filament/emails/composer.fields.cc') }}</button>
-                <button type="button" wire:click="toggleBcc" @class(['transition hover:text-gray-700 dark:hover:text-gray-200', 'text-primary-600 dark:text-primary-400' => $showBcc])>{{ __('filament/emails/composer.fields.bcc') }}</button>
+                <button type="button" wire:click="toggleCc" @class(['max-sm:min-h-11 transition hover:text-gray-700 dark:hover:text-gray-200', 'text-primary-600 dark:text-primary-400' => $showCc])>{{ __('filament/emails/composer.fields.cc') }}</button>
+                <button type="button" wire:click="toggleBcc" @class(['max-sm:min-h-11 transition hover:text-gray-700 dark:hover:text-gray-200', 'text-primary-600 dark:text-primary-400' => $showBcc])>{{ __('filament/emails/composer.fields.bcc') }}</button>
             </span>
         @endif
     </div>

@@ -4,22 +4,27 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
+use App\Support\PlainText;
 use Google\Service\Exception as GoogleServiceException;
 use Google\Service\Gmail;
 use Google\Service\Gmail\Message;
 use Google\Service\Gmail\MessagePart;
 use Google\Service\Gmail\MessagePartHeader;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Data\MailBackfillPage;
 use Relaticle\EmailIntegration\Data\MailDeltaResult;
 use Relaticle\EmailIntegration\Enums\EmailCategory;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
+use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Exceptions\MailHistoryExpired;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 use Relaticle\EmailIntegration\Support\EmailAddressHeaderParser;
+use Relaticle\EmailIntegration\Support\PublicSuffixList;
+use Symfony\Component\Mime\Encoder\QpContentEncoder;
 
 final readonly class GmailService implements MailServiceInterface
 {
@@ -137,6 +142,7 @@ final readonly class GmailService implements MailServiceInterface
         $bodyHtml = $this->extractBody($payload, 'text/html');
         $referencedContentIds = $this->extractReferencedContentIds(($bodyHtml ?? '').' '.($bodyText ?? ''));
         $attachments = $this->extractAttachments($payload, $referencedContentIds);
+        $participants = $this->extractParticipants($headers);
 
         return new FetchedEmailData(
             providerMessageId: $message->getId(),
@@ -144,7 +150,7 @@ final readonly class GmailService implements MailServiceInterface
             threadId: $message->getThreadId(),
             inReplyTo: $headers->get('in-reply-to')?->getValue(),
             subject: $headers->get('subject')?->getValue(),
-            snippet: mb_substr(strip_tags((string) $message->getSnippet()), 0, 255),
+            snippet: mb_substr(PlainText::fromHtml((string) $message->getSnippet()), 0, 255),
             sentAt: now()->setTimestamp((int) ($message->getInternalDate() / 1000)),
             direction: in_array('SENT', $labelIds) ? EmailDirection::OUTBOUND : EmailDirection::INBOUND,
             folder: $this->resolveFolder($labelIds),
@@ -152,10 +158,10 @@ final readonly class GmailService implements MailServiceInterface
             isRead: ! in_array('UNREAD', $labelIds),
             bodyText: $bodyText,
             bodyHtml: $bodyHtml,
-            participants: $this->extractParticipants($headers),
+            participants: $participants,
             attachments: $attachments,
             providerCategory: in_array('CATEGORY_PERSONAL', $labelIds, true) ? EmailCategory::Personal : null,
-            isBulkMail: $this->isBulkCategory($labelIds),
+            isBulkMail: $this->isBulkCategory($labelIds) && ! $this->isRelayedForAnotherSender($participants, $headers),
         );
     }
 
@@ -212,7 +218,6 @@ final readonly class GmailService implements MailServiceInterface
      * @param array{
      *     subject: string,
      *     body_html: string,
-     *     body_text?: string,
      *     to: array<int, array{email: string, name: ?string}>,
      *     cc?: array<int, array{email: string, name: ?string}>,
      *     bcc?: array<int, array{email: string, name: ?string}>,
@@ -329,14 +334,12 @@ final readonly class GmailService implements MailServiceInterface
             $headers[] = 'References: '.$inReplyTo;
         }
 
-        $bodyText = $data['body_text'] ?? strip_tags($data['body_html'] ?? '');
+        $bodyHtml = $data['body_html'];
 
         $alternative = "--boundary_relaticle\r\n"
-            ."Content-Type: text/plain; charset=UTF-8\r\n\r\n"
-            .$bodyText."\r\n\r\n"
+            .$this->quotedPrintablePart('text/plain', PlainText::paragraphsFromHtml($bodyHtml))
             ."--boundary_relaticle\r\n"
-            ."Content-Type: text/html; charset=UTF-8\r\n\r\n"
-            .($data['body_html'] ?? '')."\r\n\r\n"
+            .$this->quotedPrintablePart('text/html', $bodyHtml)
             .'--boundary_relaticle--';
 
         if ($inlineAttachments === [] && $fileAttachments === []) {
@@ -363,6 +366,15 @@ final readonly class GmailService implements MailServiceInterface
         }
 
         return $raw.'--mixed_relaticle--';
+    }
+
+    // RFC 2045 assumes 7bit without a transfer encoding: ASCII only, lines of 998
+    // octets at most. Quoted-printable carries UTF-8 and wraps lines at 76.
+    private function quotedPrintablePart(string $mimeType, string $content): string
+    {
+        return "Content-Type: {$mimeType}; charset=UTF-8\r\n"
+            ."Content-Transfer-Encoding: quoted-printable\r\n\r\n"
+            .new QpContentEncoder()->encodeString($content)."\r\n\r\n";
     }
 
     private function rootContentTypeHeader(bool $hasInline, bool $hasFiles): string
@@ -467,6 +479,43 @@ final readonly class GmailService implements MailServiceInterface
     private function isBulkCategory(array $labelIds): bool
     {
         return array_any(self::BULK_CATEGORIES, fn (string $category): bool => in_array('CATEGORY_'.strtoupper($category), $labelIds, true));
+    }
+
+    /**
+     * @param  array<int, array{email_address: string, name: string|null, role: string}>  $participants
+     * @param  Collection<string, MessagePartHeader>  $headers
+     */
+    private function isRelayedForAnotherSender(array $participants, Collection $headers): bool
+    {
+        // A form notification names the visitor in Reply-To and has no List-Unsubscribe.
+        // A newsletter that replies to another domain still carries one.
+        if ($headers->has('list-unsubscribe')) {
+            return false;
+        }
+
+        $participants = collect($participants);
+        $senderDomain = $this->registrableDomainOf($participants->firstWhere('role', EmailParticipantRole::FROM->value)['email_address'] ?? null);
+
+        if ($senderDomain === null) {
+            return false;
+        }
+
+        return $participants
+            ->where('role', EmailParticipantRole::REPLY_TO->value)
+            ->contains(function (array $participant) use ($senderDomain): bool {
+                $replyDomain = $this->registrableDomainOf($participant['email_address']);
+
+                return $replyDomain !== null && $replyDomain !== $senderDomain;
+            });
+    }
+
+    private function registrableDomainOf(?string $address): ?string
+    {
+        if ($address === null || ! str_contains($address, '@')) {
+            return null;
+        }
+
+        return resolve(PublicSuffixList::class)->registrableDomain(Str::afterLast($address, '@'));
     }
 
     /**
@@ -583,8 +632,8 @@ final readonly class GmailService implements MailServiceInterface
         $parser = new EmailAddressHeaderParser;
         $participants = [];
 
-        foreach (['from', 'to', 'cc', 'bcc'] as $role) {
-            $value = $headers->get($role)?->getValue();
+        foreach (['from' => 'from', 'to' => 'to', 'cc' => 'cc', 'bcc' => 'bcc', 'reply-to' => 'reply_to'] as $header => $role) {
+            $value = $headers->get($header)?->getValue();
             if (! $value) {
                 continue;
             }

@@ -12,6 +12,7 @@ use App\Models\Company;
 use App\Models\User;
 use Laravel\Mcp\Server\Registrar;
 use Laravel\Passport\Passport;
+use Laravel\Passport\TransientToken as PassportTransientToken;
 
 function listedResourceUris(User $user, array $abilities): array
 {
@@ -195,5 +196,17 @@ describe('passport oauth token', function (): void {
         RelaticleServer::actingAs($this->user)
             ->tool(DeleteCompanyTool::class, ['id' => Company::factory()->recycle([$this->user, $this->workspace])->create()->id])
             ->assertHasErrors(['Invalid ability provided.']);
+    });
+});
+
+describe('passport cookie session', function (): void {
+    it('is refused as an MCP credential', function (): void {
+        $this->user->withAccessToken(new PassportTransientToken);
+        auth()->guard('api')->setUser($this->user);
+        auth()->shouldUse('api');
+
+        $this->postJson('/mcp', ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'resources/list'])
+            ->assertForbidden()
+            ->assertJson(['message' => 'This credential cannot access the API.']);
     });
 });

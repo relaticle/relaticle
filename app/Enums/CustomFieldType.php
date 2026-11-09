@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Support\IconPath;
+
 /**
  * ABOUTME: Maps to the field types available in the relaticle/custom-fields package
  * ABOUTME: Provides type-safe references to custom field types for maintainability
@@ -59,33 +61,38 @@ enum CustomFieldType: string
         };
     }
 
-    /** The outline Heroicon shown before the field's label, matching the native detail rows. */
+    /** The icon shown before the field's label, matching the native detail rows. */
     public function icon(): string
     {
         return match ($this) {
-            self::TEXT => 'heroicon-o-bars-3-bottom-left',
-            self::NUMBER => 'heroicon-o-hashtag',
-            self::EMAIL => 'heroicon-o-envelope',
-            self::PHONE => 'heroicon-o-phone',
-            self::LINK => 'heroicon-o-globe-alt',
-            self::DOMAIN => 'heroicon-o-globe-alt',
-            self::TEXTAREA => 'heroicon-o-document-text',
-            self::CHECKBOX => 'heroicon-o-check-circle',
-            self::CHECKBOX_LIST => 'heroicon-o-list-bullet',
-            self::RADIO => 'heroicon-o-stop-circle',
-            self::RICH_EDITOR => 'heroicon-o-pencil-square',
-            self::TAGS_INPUT => 'heroicon-o-tag',
-            self::COLOR_PICKER => 'heroicon-o-swatch',
-            self::TOGGLE => 'heroicon-o-adjustments-horizontal',
-            self::TOGGLE_BUTTONS => 'heroicon-o-view-columns',
-            self::CURRENCY => 'heroicon-o-banknotes',
-            self::DATE => 'heroicon-o-calendar',
-            self::DATE_TIME => 'heroicon-o-clock',
-            self::SELECT => 'heroicon-o-chevron-up-down',
-            self::MULTI_SELECT => 'heroicon-o-queue-list',
-            self::FILE_UPLOAD => 'heroicon-o-paper-clip',
-            self::RECORD => 'heroicon-o-link',
+            self::TEXT => 'lucide-text-align-start',
+            self::NUMBER => 'lucide-hash',
+            self::EMAIL => 'lucide-mail',
+            self::PHONE => 'lucide-phone',
+            self::LINK => 'lucide-globe',
+            self::DOMAIN => 'lucide-globe',
+            self::TEXTAREA => 'lucide-file-text',
+            self::CHECKBOX => 'lucide-circle-check',
+            self::CHECKBOX_LIST => 'lucide-list',
+            self::RADIO => 'lucide-circle-dot',
+            self::RICH_EDITOR => 'lucide-square-pen',
+            self::TAGS_INPUT => 'lucide-tag',
+            self::COLOR_PICKER => 'lucide-swatch-book',
+            self::TOGGLE => 'lucide-sliders-horizontal',
+            self::TOGGLE_BUTTONS => 'lucide-columns-3',
+            self::CURRENCY => 'lucide-banknote',
+            self::DATE => 'lucide-calendar',
+            self::DATE_TIME => 'lucide-clock',
+            self::SELECT => 'lucide-chevrons-up-down',
+            self::MULTI_SELECT => 'lucide-list-ordered',
+            self::FILE_UPLOAD => 'lucide-paperclip',
+            self::RECORD => 'lucide-link',
         };
+    }
+
+    public function iconPath(): string
+    {
+        return IconPath::for($this->icon());
     }
 
     public function example(): mixed

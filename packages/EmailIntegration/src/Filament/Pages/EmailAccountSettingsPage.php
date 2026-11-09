@@ -15,6 +15,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\ViewField;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Components\Grid;
@@ -25,8 +26,8 @@ use Filament\Schemas\Components\View;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
 use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Alignment;
 use Filament\Support\Enums\Size;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -69,8 +70,6 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
 
     protected static bool $shouldRegisterNavigation = false;
 
-    protected ?string $heading = '';
-
     protected ?string $subheading = null;
 
     public string $accountId;
@@ -92,7 +91,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
             'sync_sent' => $this->account()->sync_sent,
             'hourly_send_limit' => $this->account()->hourly_send_limit,
             'daily_send_limit' => $this->account()->daily_send_limit,
-            'sharing_tier' => $this->account()->sharing_tier->value ?? '',
+            'sharing_tier' => $this->privacy()->tierForMailbox($this->account())->value,
         ]);
 
         $this->signatures = $this->loadSignatures();
@@ -112,15 +111,13 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
         return $this->account()->email_address;
     }
 
-    /**
-     * @return array<int|string, string>
-     */
-    public function getBreadcrumbs(): array
+    public function getHeadingStart(): Htmlable
     {
-        return [
-            EmailAccountsPage::getUrl() => (string) __('workspaces.tabs.email'),
-            $this->account()->email_address,
-        ];
+        return new HtmlString(view('filament.app.record-breadcrumb', [
+            'url' => EmailAccountsPage::getUrl(),
+            'icon' => 'lucide-mail',
+            'label' => __('workspaces.tabs.email'),
+        ])->render());
     }
 
     public function account(): ConnectedAccount
@@ -158,21 +155,19 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
         return $schema
             ->schema([
                 Tabs::make()
+                    ->contained(false)
+                    ->vertical()
                     ->tabs([
                         Tab::make(__('filament/pages/email-account-settings.tabs.general'))
-                            ->icon(Heroicon::OutlinedCog6Tooth)
+                            ->icon('lucide-settings')
                             ->schema($this->generalTabSchema()),
 
-                        Tab::make(__('filament/pages/email-account-settings.tabs.sharing'))
-                            ->icon(Heroicon::OutlinedShieldCheck)
-                            ->schema([$this->sharingTierField()]),
-
                         Tab::make(__('filament/pages/email-account-settings.tabs.blocklist'))
-                            ->icon(Heroicon::OutlinedNoSymbol)
+                            ->icon('lucide-ban')
                             ->schema([
                                 Section::make(__('filament/pages/email-account-settings.blocklist.label'))
                                     ->description(__('filament/pages/email-account-settings.blocklist.hint'))
-                                    ->compact()
+                                    ->contained(false)
                                     ->headerActions([
                                         fn (): Action => $this->addBlocklistAction()
                                             ->visible(fn (): bool => $this->blocklistEntries->isNotEmpty()),
@@ -181,11 +176,11 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
                             ]),
 
                         Tab::make(__('filament/pages/email-account-settings.tabs.signatures'))
-                            ->icon(Heroicon::OutlinedPencilSquare)
+                            ->icon('lucide-square-pen')
                             ->schema([
                                 Section::make(__('filament/pages/email-account-settings.signatures.label'))
                                     ->description(__('filament/pages/email-account-settings.signatures.hint'))
-                                    ->compact()
+                                    ->contained(false)
                                     ->headerActions([
                                         fn (): Action => $this->createSignatureAction()
                                             ->visible(fn (): bool => $this->signatures->isNotEmpty()),
@@ -201,6 +196,26 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
      * @return array<int, Component|Field>
      */
     private function generalTabSchema(): array
+    {
+        return [
+            Section::make(__('filament/pages/email-account-settings.sharing.label'))
+                ->description(__('filament/pages/email-account-settings.sharing.hint'))
+                ->contained(false)
+                ->schema([$this->sharingTierField()]),
+
+            Section::make(__('filament/pages/email-account-settings.general.sync_heading'))
+                ->contained(false)
+                ->schema($this->syncSettingsSchema()),
+
+            Actions::make([$this->saveAction()])
+                ->alignment(Alignment::End),
+        ];
+    }
+
+    /**
+     * @return array<int, Component|Field>
+     */
+    private function syncSettingsSchema(): array
     {
         // One setting per row, label on the left and control on the right: a settings
         // list reads calmer than a grid of mixed control types.
@@ -237,17 +252,11 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
 
     private function sharingTierField(): ViewField
     {
-        $workspaceTier = $this->privacy()->workspaceSharingTier($this->account()->workspace);
-
         return ViewField::make('sharing_tier')
-            ->label($this->labelWithInfo(__('filament/pages/email-account-settings.sharing.label'), __('filament/pages/email-account-settings.sharing.hint')))
+            ->hiddenLabel()
             ->view('email-integration::forms.sharing-tier-cards')
             ->viewData([
                 'ariaLabel' => __('filament/pages/email-account-settings.sharing.label'),
-                'workspaceDefaultLabel' => __('filament/pages/email-account-settings.sharing.use_workspace_default'),
-                'workspaceDefaultDescription' => __('filament/pages/email-account-settings.sharing.workspace_default_description', [
-                    'tier' => $workspaceTier->getLabel(),
-                ]),
             ]);
     }
 
@@ -258,7 +267,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
      */
     private function labelWithInfo(string $label, string $tooltip): Htmlable
     {
-        $icon = svg('heroicon-o-information-circle', 'h-4 w-4 text-gray-400 dark:text-gray-500')->toHtml();
+        $icon = svg('lucide-info', 'h-4 w-4 text-gray-400 dark:text-gray-500')->toHtml();
 
         return new HtmlString(
             e($label).' <span class="inline-flex translate-y-px align-middle" x-tooltip="{ content: '.Js::from($tooltip).', theme: $store.theme }">'.$icon.'</span>'
@@ -307,7 +316,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     {
         return Action::make('addBlocklist')
             ->label(__('filament/pages/email-account-settings.blocklist.add'))
-            ->icon(Heroicon::OutlinedPlus)
+            ->icon('lucide-plus')
             ->size(Size::Small)
             ->modalHeading(__('filament/pages/email-account-settings.blocklist.add'))
             ->schema($this->blocklistFormSchema())
@@ -331,7 +340,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     {
         return Action::make('deleteBlocklistEntry')
             ->label(__('filament/pages/email-signatures.actions.delete'))
-            ->icon(Heroicon::OutlinedTrash)
+            ->icon('lucide-trash')
             ->color('danger')
             ->size(Size::Small)
             ->iconButton()
@@ -458,7 +467,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     {
         return Action::make('createSignature')
             ->label(__('filament/pages/email-account-settings.signatures.add'))
-            ->icon(Heroicon::OutlinedPlus)
+            ->icon('lucide-plus')
             ->size(Size::Small)
             ->modalHeading(__('filament/pages/email-account-settings.signatures.add'))
             ->schema($this->signatureFormSchema())
@@ -478,7 +487,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     {
         return Action::make('editSignature')
             ->label(__('filament/pages/email-signatures.actions.edit'))
-            ->icon(Heroicon::OutlinedPencilSquare)
+            ->icon('lucide-square-pen')
             ->color('gray')
             ->size(Size::Small)
             ->iconButton()
@@ -502,7 +511,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     {
         return Action::make('deleteSignature')
             ->label(__('filament/pages/email-signatures.actions.delete'))
-            ->icon(Heroicon::OutlinedTrash)
+            ->icon('lucide-trash')
             ->color('danger')
             ->size(Size::Small)
             ->iconButton()
@@ -569,12 +578,12 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
                 /** @var User $user */
                 $user = auth()->user();
 
-                $chosenTier = $this->storedSharingTierFromForm($data['sharing_tier'] ?? null);
+                $sharingTierChanged = $this->accountSharingTierChanged();
 
                 $updateSettings->execute($this->account(), $data);
 
-                if ($chosenTier !== $this->account()->sharing_tier) {
-                    resolve(SaveMailboxSharingTier::class)->execute($user, $this->account(), $chosenTier);
+                if ($sharingTierChanged) {
+                    resolve(SaveMailboxSharingTier::class)->execute($user, $this->account(), $this->resolvedAccountSharingTier());
                 }
 
                 $this->account()->refresh();
@@ -591,21 +600,11 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
         return $this->resolvedAccountSharingTier() !== $this->privacy()->tierForMailbox($this->account());
     }
 
-    private function storedSharingTierFromForm(mixed $tierValue): ?EmailPrivacyTier
-    {
-        return match (true) {
-            $tierValue instanceof EmailPrivacyTier => $tierValue,
-            filled($tierValue) => EmailPrivacyTier::from((string) $tierValue),
-            default => null,
-        };
-    }
-
     private function resolvedAccountSharingTier(): EmailPrivacyTier
     {
-        $data = $this->form->getState();
+        $tier = $this->form->getState()['sharing_tier'];
 
-        return $this->storedSharingTierFromForm($data['sharing_tier'] ?? null)
-            ?? $this->privacy()->workspaceSharingTier($this->account()->workspace);
+        return $tier instanceof EmailPrivacyTier ? $tier : EmailPrivacyTier::from((string) $tier);
     }
 
     private function privacy(): PrivacyService

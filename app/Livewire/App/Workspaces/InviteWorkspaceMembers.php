@@ -55,13 +55,13 @@ final class InviteWorkspaceMembers extends BaseLivewireComponent
     {
         return Action::make('manageInviteLink')
             ->label(__('workspaces.actions.invite_link'))
-            ->icon('heroicon-m-link')
+            ->icon('lucide-link')
             ->color('gray')
             ->button()
             ->outlined()
             ->modalHeading(__('workspaces.invite_link.heading'))
             ->modalDescription(__('workspaces.invite_link.description'))
-            ->modalIcon('heroicon-o-link')
+            ->modalIcon('lucide-link')
             ->modalWidth('lg')
             ->modalSubmitAction(false)
             // No footer confirm: every control in here saves on use, so the only
@@ -126,7 +126,7 @@ final class InviteWorkspaceMembers extends BaseLivewireComponent
                     }),
                 Callout::make(__('workspaces.invite_link.disabled.title'))
                     ->description(__('workspaces.invite_link.disabled.notice'))
-                    ->icon('heroicon-o-no-symbol')
+                    ->icon('lucide-ban')
                     ->visible(fn (): bool => ! $this->workspace->hasInviteLink()),
             ])
             ->extraModalFooterActions([
@@ -142,12 +142,12 @@ final class InviteWorkspaceMembers extends BaseLivewireComponent
     {
         return Action::make('rotateInviteLink')
             ->label(__('workspaces.actions.rotate_invite_link'))
-            ->icon('heroicon-m-arrow-path')
+            ->icon('lucide-refresh-cw')
             ->color('gray')
             ->link()
             ->visible(fn (): bool => $this->hasLiveInviteLink())
             ->requiresConfirmation()
-            ->modalIcon('heroicon-o-exclamation-triangle')
+            ->modalIcon('lucide-triangle-exclamation-point')
             ->modalHeading(__('workspaces.modals.rotate_invite_link.heading'))
             ->modalDescription(__('workspaces.modals.rotate_invite_link.notice'))
             ->modalSubmitActionLabel(__('workspaces.actions.rotate_invite_link'))
@@ -163,12 +163,12 @@ final class InviteWorkspaceMembers extends BaseLivewireComponent
     {
         return Action::make('disableInviteLink')
             ->label(__('workspaces.actions.disable_invite_link'))
-            ->icon('heroicon-m-no-symbol')
+            ->icon('lucide-ban')
             ->color('danger')
             ->link()
             ->visible(fn (): bool => $this->workspace->hasInviteLink())
             ->requiresConfirmation()
-            ->modalIcon('heroicon-o-no-symbol')
+            ->modalIcon('lucide-ban')
             ->modalHeading(__('workspaces.modals.disable_invite_link.heading'))
             ->modalDescription(__('workspaces.modals.disable_invite_link.notice'))
             ->modalSubmitActionLabel(__('workspaces.actions.disable_invite_link'))
@@ -188,7 +188,7 @@ final class InviteWorkspaceMembers extends BaseLivewireComponent
             ->label(fn (): string => $this->workspace->hasInviteLink()
                 ? __('workspaces.actions.rotate_invite_link')
                 : __('workspaces.actions.enable_invite_link'))
-            ->icon('heroicon-m-link')
+            ->icon('lucide-link')
             ->button()
             ->extraAttributes(['autofocus' => true])
             ->visible(fn (): bool => ! $this->hasLiveInviteLink())

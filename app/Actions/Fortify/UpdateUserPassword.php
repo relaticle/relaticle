@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Fortify;
 
-use App\Actions\Auth\RevokeUserTokens;
+use App\Actions\Profile\DestroyOtherBrowserSessions;
 use App\Models\User;
 use App\Support\Auth\AuthenticationSession;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +16,7 @@ final readonly class UpdateUserPassword implements UpdatesUserPasswords
 {
     use PasswordValidationRules;
 
-    public function __construct(private RevokeUserTokens $revokeUserTokens) {}
+    public function __construct(private DestroyOtherBrowserSessions $destroyOtherBrowserSessions) {}
 
     /**
      * @param  array<string, string>  $input
@@ -36,7 +36,7 @@ final readonly class UpdateUserPassword implements UpdatesUserPasswords
                 'password' => Hash::make($input['password']),
             ])->save();
 
-            $this->revokeUserTokens->execute($lockedUser);
+            $this->destroyOtherBrowserSessions->execute($lockedUser, session()->getId());
         });
 
         $user->refresh();

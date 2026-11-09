@@ -7,7 +7,6 @@ namespace App\Filament\Concerns;
 use App\Enums\CrmEntity;
 use App\Filament\Components\Tables\ColumnHeaderLabel;
 use App\Models\CustomField;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
@@ -57,18 +56,18 @@ trait HasCustomFieldColumns
             ->pushFilters($builder->filters()->all());
     }
 
-    private static function nativeColumnIcon(string $name): Heroicon
+    private static function nativeColumnIcon(string $name): string
     {
         return match ($name) {
-            'accountOwner.name' => Heroicon::OutlinedUser,
-            'creator.name' => Heroicon::OutlinedUserCircle,
-            'assignees.name' => Heroicon::OutlinedUsers,
-            'company.name' => Heroicon::OutlinedBuildingOffice2,
-            'relations' => Heroicon::OutlinedLink,
-            'created_at' => Heroicon::OutlinedCalendar,
-            'updated_at' => Heroicon::OutlinedClock,
-            'deleted_at' => Heroicon::OutlinedTrash,
-            default => Heroicon::OutlinedBars3BottomLeft,
+            'accountOwner.name' => 'lucide-user',
+            'creator.name' => 'lucide-circle-user',
+            'assignees.name' => 'lucide-users',
+            'company.name' => 'lucide-building-complex',
+            'relations' => 'lucide-link',
+            'created_at' => 'lucide-calendar',
+            'updated_at' => 'lucide-clock',
+            'deleted_at' => 'lucide-trash',
+            default => 'lucide-text-align-start',
         };
     }
 }

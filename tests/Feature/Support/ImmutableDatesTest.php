@@ -19,8 +19,8 @@ it('builds every application date on the immutable class', function (): void {
 it('leaves a date untouched when a mutating method is called on it', function (): void {
     $instant = Date::parse('2026-05-09 08:00:00', 'UTC');
 
-    $instant->addDay();
-    $instant->startOfMonth();
+    (void) $instant->addDay();
+    (void) $instant->startOfMonth();
 
     expect($instant->toDateTimeString())->toBe('2026-05-09 08:00:00');
 });
@@ -31,7 +31,7 @@ it('casts model timestamps to the immutable class', function (): void {
 
     expect($task->created_at)->toBeInstanceOf(CarbonImmutable::class);
 
-    $task->created_at->addDay();
+    (void) $task->created_at->addDay();
 
     expect($task->created_at->toDateTimeString())->toBe('2026-05-09 08:00:00');
 });

@@ -329,12 +329,16 @@ final class EmailVisibilityService
     }
 
     /**
-     * Blocked workspace entries, workspace member addresses, and mailbox-only
-     * blocklists must not spawn CRM records.
+     * Blocked workspace entries, workspace member addresses and domains, and
+     * mailbox-only blocklists must not spawn CRM records.
      */
     public function suppressesRecordCreation(string $address, string $workspaceId, ?string $connectedAccountId): bool
     {
         if ($this->isWorkspaceMemberEmail($address, $workspaceId)) {
+            return true;
+        }
+
+        if ($this->isOnWorkspaceDomain($address, $workspaceId)) {
             return true;
         }
 
@@ -618,14 +622,8 @@ final class EmailVisibilityService
             return EmailVisibilityEnforcement::Protected;
         }
 
-        $workspace = $this->workspace($workspaceId);
-
-        if ($workspace instanceof Workspace) {
-            $domain = $this->domainFromEmail($address);
-
-            if ($domain !== null && in_array($domain, $this->workspaceDomains($workspace), true)) {
-                return EmailVisibilityEnforcement::Protected;
-            }
+        if ($this->isOnWorkspaceDomain($address, $workspaceId)) {
+            return EmailVisibilityEnforcement::Protected;
         }
 
         if ($this->matchesCustomEntry($address, $workspaceId, EmailVisibilityEnforcement::Protected)) {
@@ -633,6 +631,16 @@ final class EmailVisibilityService
         }
 
         return null;
+    }
+
+    private function isOnWorkspaceDomain(string $address, string $workspaceId): bool
+    {
+        $workspace = $this->workspace($workspaceId);
+        $domain = $this->domainFromEmail($address);
+
+        return $workspace instanceof Workspace
+            && $domain !== null
+            && in_array($domain, $this->workspaceDomains($workspace), true);
     }
 
     private function matchesCustomEntry(string $address, string $workspaceId, EmailVisibilityEnforcement $level): bool

@@ -53,9 +53,20 @@ other people's BCC rows (same gate as recipient suggestions).
 `PrivacyService::effectiveTier()` applies a viewer's share before the email's
 `privacy_tier`. Search must do the same. Do not `OR` `privacy_tier` FULL or
 SUBJECT with a share: a metadata-only share on a FULL email would still match
-subject and snippet. Use the share when one exists (direct first, then another
-copy of the same `rfc_message_id`). Fall back to `privacy_tier` only when the
-viewer has no share.
+subject and snippet. Use the share on that email when one exists. Fall back to
+`privacy_tier` only when the viewer has no share.
+
+## A Message-ID is never proof of access
+
+Anyone can put a message with a chosen `Message-ID` into their own mailbox, and a
+reply carries the original's ID in `In-Reply-To`. So a copy of the same
+`rfc_message_id` in the viewer's mailbox grants nothing on a teammate's copy, and a
+share applies only to the email it was made on. `PrivacyService::effectiveTier()`,
+`VisibleEmailScope` and `EmailSearchService` read each copy on its own.
+`PreferredEmailCopyService` still shows one row per message: the viewer's own copy,
+then the copy most open to them, counting their share on it.
+`tests/Feature/Mcp/EmailToolsTest.php` fails when a held copy or a share on another
+copy opens a teammate's email.
 
 ## Meeting attendee "self"
 
@@ -117,12 +128,16 @@ as arbitrary disk paths.
 
 ## The sharing level lives on the mailbox
 
-`connected_accounts.sharing_tier` holds the level, and null follows the workspace
-default. Resolve it with `PrivacyService::tierForMailbox()` from the mailbox the
-email is sent or synced through, never from the user or `currentWorkspace`: the
-same person shares differently in each workspace. Write it only through
-`SaveMailboxSharingTier`, which re-stamps that one mailbox's mail. A
-workspace default is never Full access (`EmailPrivacyTier::canBeWorkspaceDefault()`).
+`connected_accounts.sharing_tier` holds the level. Resolve it with
+`PrivacyService::tierForMailbox()` from the mailbox the email is sent or synced
+through, never from the user or `currentWorkspace`: the same person shares
+differently in each workspace. A null level falls back to
+`workspaces.default_email_sharing_tier`, which no screen edits any more: it keeps
+the level admins chose before the workspace Sharing tab was removed. Write a level
+only through `SaveMailboxSharingTier`, which re-stamps that one mailbox's mail.
+The account page saves it only when the chosen level differs from the resolved
+one, so a null level is never stamped by an unrelated save.
+`tests/Feature/EmailIntegration/EmailAccountSettingsPageTest.php` fails when it is.
 `tests/Feature/EmailIntegration/PrivacyServiceTest.php` fails when a second
 workspace's mailbox changes the level, and
 `ApplyDefaultSharingTierToExistingEmailsActionTest.php` fails when a save
@@ -147,3 +162,16 @@ and a migration queues that command. A new path that ends a membership fires
 `TeamMemberRemoved` or calls the action itself.
 `tests/Feature/Workspaces/RemoveWorkspaceMemberTest.php` fails when a removal
 leaves a token, a syncing mailbox or a queued email behind.
+
+## An agent's queued email answers to the connection that queued it
+
+`HoldAgentEmail` stamps an MCP email with `oauth_client_id` or
+`personal_access_token_id`. `SendEmailJob::agentRefusal()` checks it when the
+email is due: the credential must still be live (`LiveAgentCredentialsQuery`),
+and its user must still hold `EmailAgentSend`. Check at send time, never on a
+revoke path, because one check covers revocation, token deletion, expiry and
+demotion. The user's own Retry (`RetryFailedEmailAction`) clears the binding,
+and an MCP retry (`RequeueAgentEmail`) rebinds it. A reschedule keeps it, so
+revoking the assistant that wrote an email always stops it. Rela emails carry
+no binding, because the person approves each one.
+`tests/Feature/Mcp/EmailToolsTest.php` fails when any of this changes.

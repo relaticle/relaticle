@@ -14,7 +14,6 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailShare;
-use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
 use Relaticle\EmailIntegration\Services\EmailSearchService;
 
 mutates(AccessRequestsTable::class, EmailAccessRequestsPage::class, InteractsWithEmailAccessRequests::class, EmailSearchService::class);
@@ -131,6 +130,39 @@ describe('Tab switching', function (): void {
             ->assertCanNotSeeTableRecords([$incomingRequest]);
     });
 
+    it('leaves an overdue pending request out of the list and its review actions', function (): void {
+        $requester = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+
+        $overdue = EmailAccessRequest::factory()->overdue()->create([
+            'owner_id' => $this->user->id,
+            'requester_id' => $requester->id,
+            'email_id' => $this->email->getKey(),
+        ]);
+        $denied = EmailAccessRequest::factory()->denied()->create([
+            'owner_id' => $this->user->id,
+            'requester_id' => $requester->id,
+            'email_id' => $this->email->getKey(),
+        ]);
+
+        livewire(AccessRequestsTable::class)
+            ->assertCanSeeTableRecords([$denied])
+            ->assertCanNotSeeTableRecords([$overdue]);
+    });
+
+    it('keeps a pending request with no deadline in the list', function (): void {
+        $requester = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+
+        $request = EmailAccessRequest::factory()->create([
+            'owner_id' => $this->user->id,
+            'requester_id' => $requester->id,
+            'email_id' => $this->email->getKey(),
+            'expires_at' => null,
+        ]);
+
+        livewire(AccessRequestsTable::class)
+            ->assertCanSeeTableRecords([$request])
+            ->assertTableActionVisible('approveAccessRequest', $request);
+    });
 });
 
 describe('Empty state', function (): void {
@@ -172,14 +204,10 @@ describe('approveAccessRequest action', function (): void {
             'email_id' => $this->email->getKey(),
         ]);
 
-        $this->user->notify(new EmailAccessRequestedNotification($request));
-
         livewire(AccessRequestsTable::class)
             ->callTableAction('approveAccessRequest', $request)
             ->assertDispatched('databaseNotificationsSent')
             ->assertNotified('Access request approved.');
-
-        expect($this->user->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(0);
     });
 
     it('does nothing when a non-owner passes a request id', function (): void {
@@ -202,6 +230,30 @@ describe('approveAccessRequest action', function (): void {
             ->assertCanNotSeeTableRecords([$request]);
 
         expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::PENDING);
+    });
+
+    it('warns instead of confirming when the approval lost the decision', function (): void {
+        $owner = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+        $requester = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+
+        $this->workspace->users()->attach($requester, ['role' => 'member']);
+
+        $request = EmailAccessRequest::factory()->create([
+            'owner_id' => $this->user->id,
+            'requester_id' => $requester->id,
+            'email_id' => $this->email->getKey(),
+        ]);
+
+        $table = livewire(AccessRequestsTable::class)
+            ->mountTableAction('approveAccessRequest', $request);
+
+        denyRequestMidDecision($request);
+
+        $table->callMountedTableAction()
+            ->assertNotified('This request is no longer pending.');
+
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::DENIED)
+            ->and($request->fresh()->decided_by)->toBeNull();
     });
 });
 
@@ -215,14 +267,10 @@ describe('denyAccessRequest action', function (): void {
             'email_id' => $this->email->getKey(),
         ]);
 
-        $this->user->notify(new EmailAccessRequestedNotification($request));
-
         livewire(AccessRequestsTable::class)
             ->callTableAction('denyAccessRequest', $request)
             ->assertDispatched('databaseNotificationsSent')
             ->assertNotified('Access request denied.');
-
-        expect($this->user->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(0);
     });
 
     it('does nothing when a non-owner passes a request id', function (): void {
@@ -246,10 +294,32 @@ describe('denyAccessRequest action', function (): void {
 
         expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::PENDING);
     });
+
+    it('warns instead of confirming when the denial lost the decision', function (): void {
+        $owner = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+        $requester = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+
+        $request = EmailAccessRequest::factory()->create([
+            'owner_id' => $this->user->id,
+            'requester_id' => $requester->id,
+            'email_id' => $this->email->getKey(),
+        ]);
+
+        $table = livewire(AccessRequestsTable::class)
+            ->mountTableAction('denyAccessRequest', $request);
+
+        denyRequestMidDecision($request);
+
+        $table->callMountedTableAction()
+            ->assertNotified('This request is no longer pending.');
+
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::DENIED)
+            ->and($request->fresh()->decided_by)->toBeNull();
+    });
 });
 
 describe('cancelAccessRequest action', function (): void {
-    it('deletes a pending outgoing request', function (): void {
+    it('cancels a pending outgoing request', function (): void {
         $owner = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
 
         $ownerAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
@@ -269,16 +339,13 @@ describe('cancelAccessRequest action', function (): void {
             'email_id' => $otherEmail->getKey(),
         ]);
 
-        $owner->notify(new EmailAccessRequestedNotification($request));
-
         livewire(AccessRequestsTable::class)
             ->call('setTab', 'outgoing')
             ->callTableAction('cancelAccessRequest', $request)
             ->assertDispatched('databaseNotificationsSent')
             ->assertNotified('Access request cancelled.');
 
-        expect(EmailAccessRequest::query()->whereKey($request->id)->exists())->toBeFalse()
-            ->and($owner->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(0);
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::CANCELLED);
     });
 
     it('does nothing when a non-requester passes a request id', function (): void {
@@ -336,6 +403,29 @@ describe('cancelAccessRequest action', function (): void {
         expect(EmailAccessRequest::query()->whereKey($request->id)->exists())->toBeTrue();
         expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED);
     });
+
+    it('warns instead of confirming when the cancellation lost the decision', function (): void {
+        $owner = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+        $requester = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+
+        $request = EmailAccessRequest::factory()->create([
+            'owner_id' => $owner->id,
+            'requester_id' => $this->user->id,
+            'email_id' => $this->email->getKey(),
+        ]);
+
+        $table = livewire(AccessRequestsTable::class)
+            ->call('setTab', 'outgoing')
+            ->mountTableAction('cancelAccessRequest', $request);
+
+        denyRequestMidDecision($request);
+
+        $table->callMountedTableAction()
+            ->assertNotified('This request is no longer pending.');
+
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::DENIED)
+            ->and($request->fresh()->decided_by)->toBeNull();
+    });
 });
 
 describe('getNavigationBadge', function (): void {
@@ -350,7 +440,7 @@ describe('getNavigationBadge', function (): void {
 
         EmailAccessRequest::factory()->pending()->create([
             'owner_id' => $this->user->id,
-            'requester_id' => $requester->id,
+            'requester_id' => User::factory()->create(['current_workspace_id' => $this->workspace->id])->id,
             'email_id' => $this->email->getKey(),
         ]);
 
@@ -409,6 +499,18 @@ describe('getNavigationBadge', function (): void {
             'owner_id' => $this->user->id,
             'requester_id' => $requester->id,
             'email_id' => $otherEmail->getKey(),
+        ]);
+
+        expect(EmailAccessRequestsPage::getNavigationBadge())->toBeNull();
+    });
+
+    it('does not count a request past its deadline', function (): void {
+        $requester = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+
+        EmailAccessRequest::factory()->overdue()->create([
+            'owner_id' => $this->user->id,
+            'requester_id' => $requester->id,
+            'email_id' => $this->email->getKey(),
         ]);
 
         expect(EmailAccessRequestsPage::getNavigationBadge())->toBeNull();

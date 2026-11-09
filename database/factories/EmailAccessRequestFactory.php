@@ -25,7 +25,12 @@ final class EmailAccessRequestFactory extends Factory
             'owner_id' => User::factory(),
             'email_id' => Email::factory(),
             'tier_requested' => EmailPrivacyTier::FULL->value,
+            'workspace_id' => fn (array $attributes): ?string => Email::query()
+                ->withoutGlobalScopes()
+                ->whereKey($attributes['email_id'])
+                ->value('workspace_id'),
             'status' => EmailAccessRequestStatus::PENDING,
+            'expires_at' => now()->addDays(EmailAccessRequest::EXPIRES_AFTER_DAYS),
         ];
     }
 
@@ -47,6 +52,21 @@ final class EmailAccessRequestFactory extends Factory
     {
         return $this->state(fn (): array => [
             'status' => EmailAccessRequestStatus::DENIED,
+        ]);
+    }
+
+    public function cancelled(): static
+    {
+        return $this->state(fn (): array => [
+            'status' => EmailAccessRequestStatus::CANCELLED,
+        ]);
+    }
+
+    public function overdue(): static
+    {
+        return $this->state(fn (): array => [
+            'status' => EmailAccessRequestStatus::PENDING,
+            'expires_at' => now()->subMinute(),
         ]);
     }
 

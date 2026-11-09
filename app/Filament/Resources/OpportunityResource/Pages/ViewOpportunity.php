@@ -6,6 +6,7 @@ namespace App\Filament\Resources\OpportunityResource\Pages;
 
 use App\Enums\CrmEntity;
 use App\Filament\Components\Infolists\RecordChipEntry;
+use App\Filament\Components\Infolists\RecordOverview;
 use App\Filament\Concerns\HasRecordPageLayout;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\OpportunityResource;
@@ -22,7 +23,19 @@ final class ViewOpportunity extends ViewRecord
 
     protected static string $resource = OpportunityResource::class;
 
-    protected function nativeDetailEntries(): array
+    public static function highlightNames(): array
+    {
+        return [
+            RecordOverview::STAGE_PROGRESS,
+            'custom_fields.amount',
+            'custom_fields.close_date',
+            'company.name',
+            'contact.name',
+            RecordOverview::NEXT_TASK,
+        ];
+    }
+
+    public static function nativeDetailEntries(): array
     {
         return [
             RecordChipEntry::make('company.name')

@@ -13,7 +13,6 @@ use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Filters\Filter;
@@ -36,7 +35,7 @@ abstract class BaseMeetingsRelationManager extends RelationManager
 
     protected static ?string $title = 'Meetings';
 
-    protected static string|\BackedEnum|null $icon = Heroicon::Calendar;
+    protected static string|\BackedEnum|null $icon = 'lucide-calendar';
 
     public function table(Table $table): Table
     {
@@ -93,9 +92,9 @@ abstract class BaseMeetingsRelationManager extends RelationManager
                     ->badge(),
             ])
             ->defaultSort('starts_at', 'desc')
-            ->emptyStateIcon(fn (): Heroicon => $this->hidesOwnerMailbox()
-                ? Heroicon::OutlinedShieldCheck
-                : Heroicon::Calendar)
+            ->emptyStateIcon(fn (): string => $this->hidesOwnerMailbox()
+                ? 'lucide-shield-check'
+                : 'lucide-calendar')
             ->emptyStateHeading(fn (): ?string => $this->recordMailboxHiddenCopy()['heading'] ?? null)
             ->emptyStateDescription(fn (): ?string => $this->recordMailboxHiddenCopy()['description'] ?? null)
             ->filters([
@@ -109,7 +108,7 @@ abstract class BaseMeetingsRelationManager extends RelationManager
                     MeetingDetailInfolist::viewAction(),
                     Action::make('linkToRecord')
                         ->label(__('filament/relation-managers/meetings.actions.link_to_record.label'))
-                        ->icon(Heroicon::Link)
+                        ->icon('lucide-link')
                         ->color('gray')
                         ->authorize(fn (Meeting $record): bool => $this->authUser()->hasWorkspaceCapability($record->workspace_id, WorkspaceCapability::RecordsUpdate))
                         ->schema(MeetingDetailInfolist::linkRecordFields())
@@ -124,7 +123,7 @@ abstract class BaseMeetingsRelationManager extends RelationManager
                         }),
                     Action::make('unlinkFromRecord')
                         ->label(__('filament/relation-managers/meetings.actions.unlink_from_record.label'))
-                        ->icon(Heroicon::LinkSlash)
+                        ->icon('lucide-unlink')
                         ->color('danger')
                         ->visible(fn (Meeting $record): bool => $record->isLinkedTo($this->getOwnerRecord()))
                         ->authorize(fn (): bool => $this->authUser()->can('update', $this->getOwnerRecord()))

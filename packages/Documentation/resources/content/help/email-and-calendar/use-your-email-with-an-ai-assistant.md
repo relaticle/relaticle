@@ -2,7 +2,7 @@
 title: Use your email with an AI assistant
 description: Let Rela, Claude, or ChatGPT read email you can see, save drafts, and send for you. You approve or can cancel every send.
 order: 9
-updated: "2026-10-07"
+updated: "2026-11-08"
 related: [help/email-and-calendar/choose-who-sees-your-email, help/ai-assistant/connect-claude-or-chatgpt, help/ai-assistant/approve-what-the-assistant-changes, help/workspace/manage-members-and-roles]
 ---
 
@@ -23,14 +23,14 @@ Thursday", or "email Lena the new price list".
   goes into your **Drafts**, where you review it before you send.
 - **Sending.** Rela proposes the email on a card that shows the mailbox, every
   recipient, the subject, the message, and your signature. Nothing leaves
-  until you click **Send**.
+  until you click **Send email**.
 
-After you click **Send**, an **Undo** button stays on screen for five
+After you click **Send email**, an **Undo** button stays on screen for five
 seconds. Then the email goes out from your own mailbox.
 
-Every email gets its own card and its own **Send** click. When Rela proposes
-an email together with other changes, **Approve all** saves the other
-changes and leaves each email waiting for you.
+Every email gets its own card and its own **Send email** click. When Rela
+proposes an email together with other changes, approving the plan saves the
+other changes, then each email takes the card on its own and waits for you.
 
 The Owner, Admin, and Member roles can send through Rela. A Viewer can read
 and save drafts.
@@ -112,11 +112,14 @@ After five minutes the email goes out and cannot be cancelled. It then shows
 in your synced email like any other.
 
 The Owner, Admin, and Member roles can send through an assistant. A Viewer
-cannot. See [Manage members and roles](/help/workspace/manage-members-and-roles).
+cannot. If your role changes to Viewer before a queued email goes out, it is
+not sent. See [Manage members and roles](/help/workspace/manage-members-and-roles).
 
 ## Turn it off
 
-For a connector, click **Revoke** under **AI Connectors**. A connector has
+For a connector, click **Revoke** under **AI Connectors**. Emails it queued
+that have not gone out are not sent. They wait in the **Outbox** under
+**Failed**, where you can send one yourself with **Retry**. A connector has
 no setting for email alone, so an assistant that should keep your records
 without your email needs an access token with the email boxes empty. For an
 access token, click its **Permissions** icon and untick the email boxes.

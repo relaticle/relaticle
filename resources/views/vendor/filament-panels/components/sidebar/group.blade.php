@@ -17,16 +17,18 @@
 @php
     $sidebarCollapsible = $sidebarCollapsible && filament()->isSidebarCollapsibleOnDesktop();
     $hasDropdown = filled($label) && filled($icon) && $sidebarCollapsible;
+    $labelHtml = ($label instanceof \Illuminate\Contracts\Support\Htmlable) ? $label->toHtml() : $label;
+    $labelText = ($label instanceof \Illuminate\Contracts\Support\Htmlable) ? html_entity_decode(strip_tags($labelHtml), ENT_QUOTES | ENT_HTML5, 'UTF-8') : $label;
     // A slug alone is not unique: non-Latin labels slug to an empty string and distinct labels can
     // share a slug, producing duplicate ids that break each disclosure button's `aria-controls`.
     // A short hash of the raw label keeps the id unique per label and stable across renders.
-    $groupLabel = $subNavigation ? "sub_navigation_{$label}" : (string) $label;
+    $groupLabel = $subNavigation ? "sub_navigation_{$labelHtml}" : (string) $labelHtml;
     $groupItemsId = 'fi-sidebar-group-items-' . \Illuminate\Support\Str::slug($groupLabel) . '-' . substr(md5($groupLabel), 0, 8);
 @endphp
 
 <li
-    x-data="{ label: @js($subNavigation ? "sub_navigation_{$label}" : $label) }"
-    data-group-label="{{ $subNavigation ? "sub_navigation_{$label}" : $label }}"
+    x-data="{ label: @js($groupLabel) }"
+    data-group-label="{{ $groupLabel }}"
     x-bind:class="{ 'fi-collapsed': $store.sidebar.groupIsCollapsed(label) }"
     {{
         $attributes->class([
@@ -63,9 +65,10 @@
             @if ($collapsible)
                 <x-filament::icon-button
                     color="gray"
-                    :icon="\Filament\Support\Icons\Heroicon::ChevronUp"
+                    icon="lucide-chevron-up"
                     :icon-alias="\Filament\View\PanelsIconAlias::SIDEBAR_GROUP_COLLAPSE_BUTTON"
-                    :label="$label"
+                    :label="$labelText"
+                    :aria-label="$labelText"
                     :aria-controls="$groupItemsId"
                     x-bind:aria-expanded="! $store.sidebar.groupIsCollapsed(label)"
                     x-on:click.stop="$store.sidebar.toggleCollapsedGroup(label)"
@@ -82,18 +85,19 @@
         >
             <x-slot name="trigger">
                 <button
-                    aria-label="{{ $label }}"
+                    aria-label="{{ $labelText }}"
                     x-data="{ tooltip: false }"
                     x-effect="
                         tooltip = $store.sidebar.isOpen
                             ? false
                             : {
-                                  content: @js($label),
+                                  content: @js($labelHtml),
+                                  allowHTML: @js($label instanceof \Illuminate\Contracts\Support\Htmlable),
                                   placement: document.dir === 'rtl' ? 'left' : 'right',
                                   theme: $store.theme,
                               }
                     "
-                    x-tooltip.html="tooltip"
+                    x-tooltip="tooltip"
                     class="fi-sidebar-group-dropdown-trigger-btn"
                 >
                     {{ \Filament\Support\generate_icon_html($icon, size: \Filament\Support\Enums\IconSize::Large) }}
@@ -205,7 +209,7 @@
                         $itemIcon = null;
                         $itemActiveIcon = null;
                     } else {
-                        throw new \Exception('Navigation group [' . $label . '] has an icon but one or more of its items also have icons. Either the group or its items can have icons, but not both. This is to ensure a proper user experience.');
+                        throw new \Exception('Navigation group [' . $labelHtml . '] has an icon but one or more of its items also have icons. Either the group or its items can have icons, but not both. This is to ensure a proper user experience.');
                     }
                 }
             @endphp
@@ -221,6 +225,7 @@
                 :first="$loop->first"
                 :grouped="filled($label)"
                 :icon="$itemIcon"
+                :label="$item->getLabel()"
                 :last="$loop->last"
                 :should-open-url-in-new-tab="$shouldItemOpenUrlInNewTab"
                 :sidebar-collapsible="$sidebarCollapsible"
@@ -228,8 +233,6 @@
                 :url="$itemUrl"
                 :attributes="\Filament\Support\prepare_inherited_attributes($itemExtraAttributes)"
             >
-                {{ $item->getLabel() }}
-
                 @if ($itemIcon instanceof \Illuminate\Contracts\Support\Htmlable)
                     <x-slot name="icon">
                         {{ $itemIcon }}

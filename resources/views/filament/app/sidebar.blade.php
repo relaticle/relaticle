@@ -9,6 +9,8 @@
 --}}
 <div>
     @php
+        use Illuminate\Support\Facades\Vite;
+
         $navigation = filament()->getNavigation();
         $isRtl = __('filament-panels::layout.direction') === 'rtl';
         $isSidebarCollapsibleOnDesktop = filament()->isSidebarCollapsibleOnDesktop();
@@ -16,17 +18,27 @@
         $hasNavigation = filament()->hasNavigation();
         $hasTopbar = filament()->hasTopbar();
         $isCollapsible = $isSidebarCollapsibleOnDesktop || $isSidebarFullyCollapsibleOnDesktop;
+
+        $cspNonce = Vite::cspNonce();
     @endphp
 
     {{-- format-ignore-start --}}
     <div
-        x-data="{}"
+        x-data="filamentSidebar({
+            hasTopNavigation: @js(filament()->hasTopNavigation()),
+            isSidebarCollapsibleOnDesktop: @js($isSidebarCollapsibleOnDesktop),
+            isSidebarFullyCollapsibleOnDesktop: @js($isSidebarFullyCollapsibleOnDesktop),
+        })"
         @if ($isCollapsible)
             x-cloak
         @else
             x-cloak="-lg"
         @endif
         x-bind:class="{ 'fi-sidebar-open': $store.sidebar.isOpen }"
+        x-bind:inert="isHidden"
+        x-effect="focusInitialNavigation()"
+        x-on:keydown.tab="handleTab($event)"
+        x-on:keydown.escape.document="handleEscape($event)"
         id="fi-main-sidebar"
         class="fi-sidebar fi-main-sidebar"
     >
@@ -39,7 +51,7 @@
                 @if ((! $hasTopbar) && $isSidebarCollapsibleOnDesktop)
                     <x-filament::icon-button
                         color="gray"
-                        :icon="$isRtl ? \Filament\Support\Icons\Heroicon::OutlinedChevronLeft : \Filament\Support\Icons\Heroicon::OutlinedChevronRight"
+                        :icon="$isRtl ? 'lucide-chevron-left' : 'lucide-chevron-right'"
                         :icon-alias="
                             $isRtl
                             ? [
@@ -63,7 +75,7 @@
                 @if ((! $hasTopbar) && $isCollapsible)
                     <x-filament::icon-button
                         color="gray"
-                        :icon="$isRtl ? \Filament\Support\Icons\Heroicon::OutlinedChevronRight : \Filament\Support\Icons\Heroicon::OutlinedChevronLeft"
+                        :icon="$isRtl ? 'lucide-chevron-right' : 'lucide-chevron-left'"
                         :icon-alias="
                             $isRtl
                             ? [
@@ -102,6 +114,18 @@
                 </div>
 
                 {{ \Filament\Support\Facades\FilamentView::renderHook(\Filament\View\PanelsRenderHook::SIDEBAR_LOGO_AFTER) }}
+
+                <x-filament::icon-button
+                    color="gray"
+                    icon="lucide-x"
+                    icon-size="lg"
+                    :label="__('filament-panels::layout.actions.sidebar.collapse.label')"
+                    x-data="{}"
+                    aria-controls="fi-main-sidebar"
+                    x-bind:aria-expanded="$store.sidebar.isOpen"
+                    x-on:click="$store.sidebar.close()"
+                    class="fi-sidebar-drawer-close-btn"
+                />
             </header>
         </div>
 
@@ -133,6 +157,12 @@
                             x-transition:leave-start="fi-transition-leave-start"
                             x-transition:leave-end="fi-transition-leave-end"
                         @endif
+                        x-on:mousedown="
+                            if ($event.target.closest('.fi-input-wrp-prefix, .fi-input-wrp-suffix')) {
+                                $event.preventDefault()
+                                $el.querySelector('.fi-input')?.focus()
+                            }
+                        "
                         class="fi-sidebar-search"
                     >
                         @livewire(Filament\Livewire\GlobalSearch::class)
@@ -175,18 +205,18 @@
                 @endforeach
             </ul>
 
-            <script>
+            <script @if (filled($cspNonce)) nonce="{{ $cspNonce }}" @endif>
                 var collapsedGroups = JSON.parse(
-                    localStorage.getItem('collapsedGroups'),
+                    localStorage.getItem('filament:sidebar:collapsed_groups'),
                 )
 
                 if (collapsedGroups === null || collapsedGroups === 'null') {
                     localStorage.setItem(
-                        'collapsedGroups',
+                        'filament:sidebar:collapsed_groups',
                         JSON.stringify(@js(
                         collect($navigation)
                             ->filter(fn (\Filament\Navigation\NavigationGroup $group): bool => $group->isCollapsed())
-                            ->map(fn (\Filament\Navigation\NavigationGroup $group): string => $group->getLabel())
+                            ->map(fn (\Filament\Navigation\NavigationGroup $group): ?string => ($label = $group->getLabel()) instanceof \Illuminate\Contracts\Support\Htmlable ? $label->toHtml() : $label)
                             ->values()
                             ->all()
                     )),
@@ -194,7 +224,7 @@
                 }
 
                 collapsedGroups = JSON.parse(
-                    localStorage.getItem('collapsedGroups'),
+                    localStorage.getItem('filament:sidebar:collapsed_groups'),
                 )
 
                 document

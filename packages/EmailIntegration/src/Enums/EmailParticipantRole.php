@@ -10,4 +10,5 @@ enum EmailParticipantRole: string
     case TO = 'to';
     case CC = 'cc';
     case BCC = 'bcc';
+    case REPLY_TO = 'reply_to';
 }

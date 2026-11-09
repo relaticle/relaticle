@@ -7,7 +7,11 @@ namespace App\Notifications\Auth;
 use Filament\Auth\Notifications\VerifyEmailChange as FilamentVerifyEmailChange;
 use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Queue\Attributes\Backoff;
+use Illuminate\Queue\Attributes\Tries;
 
+#[Tries(3)]
+#[Backoff(60, 300)]
 final class VerifyEmailChange extends FilamentVerifyEmailChange
 {
     /**

@@ -49,7 +49,6 @@ final readonly class AuthenticationSession
         'delete_passkey',
         'set_password',
         'link_provider',
-        'unlink_provider',
         'change_email',
         'email_sign_in',
         'manage_mfa',

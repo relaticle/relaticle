@@ -14,6 +14,9 @@ paths:
   - 'packages/ImportWizard/src/**'
   - 'packages/EmailIntegration/src/Livewire/**'
   - 'packages/EmailIntegration/src/Services/EmailTemplateRenderService.php'
+  - 'packages/Cloud/src/**/Filament/**'
+  - 'packages/Cloud/src/**/Livewire/**'
+  - 'packages/Cloud/src/**/Commands/**'
 ---
 
 # File uploads
@@ -55,6 +58,12 @@ and outbound email compose/template images on `EmailAttachment::DISK`.
   inside the driver turns a dead host into "no favicon" and wipes a working logo.
   `tests/Feature/Services/Favicon/HighQualityDriverTest.php` and
   `tests/Feature/Jobs/FetchFaviconForCompanyTest.php` fail when either half changes.
+- A favicon candidate counts only when its bytes are an image the `logo` collection stores.
+  `Company::logoExtensionFor()` sniffs them for both the driver's checks and the job's download.
+  A 2xx status or an image Content-Type proves nothing: many sites answer a missing
+  `/apple-touch-icon.png` with 200 and their own HTML page, and the waterfall must move on to the
+  next source. `tests/Feature/Services/Favicon/HighQualityDriverTest.php` fails when a check
+  trusts the status or the header.
 - `logo` collections stay on the public disk. Everything else, `chat-attachments`
   included, follows `MEDIA_DISK`, default `local`, which must name a disk in
   `config/filesystems.php`. A row keeps the disk it was uploaded to.

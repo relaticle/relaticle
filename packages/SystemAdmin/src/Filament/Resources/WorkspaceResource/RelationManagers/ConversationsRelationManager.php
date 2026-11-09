@@ -19,7 +19,7 @@ final class ConversationsRelationManager extends RelationManager
 
     protected static ?string $title = 'AI Conversations';
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-chat-bubble-left-right';
+    protected static string|\BackedEnum|null $icon = 'lucide-messages-square';
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {

@@ -307,7 +307,7 @@ test('a user scheduled for deletion cannot accept from the card', function (): v
     expect(WorkspaceInvitation::query()->whereKey($invitation->id)->exists())->toBeTrue();
 });
 
-test('a workspace scheduled for deletion cannot be joined from the card', function (): void {
+test('an invitation to a workspace scheduled for deletion is neither listed nor acceptable', function (): void {
     $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
     $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(30)])->save();
 
@@ -321,8 +321,8 @@ test('a workspace scheduled for deletion cannot be joined from the card', functi
     $this->actingAs($invitee);
 
     livewire(PendingInvitationsForUser::class)
-        ->call('accept', $invitation->id)
-        ->assertNotified(__('workspaces.accept.workspace_deleting'));
+        ->assertDontSee($workspace->name)
+        ->call('accept', $invitation->id);
 
     expect($invitee->fresh()->belongsToWorkspace($workspace))->toBeFalse();
     expect(WorkspaceInvitation::query()->whereKey($invitation->id)->exists())->toBeTrue();

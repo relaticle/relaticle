@@ -400,6 +400,35 @@ it('does not auto-create a company when the person already exists', function ():
     expect(Company::where('workspace_id', $this->workspace->id)->count())->toBe($countBefore);
 });
 
+it('does not auto-create a company for a regional consumer mail domain', function (string $address): void {
+    $this->workspace->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    $countBefore = Company::where('workspace_id', $this->workspace->id)->count();
+
+    $email = makeLinkEmail();
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => $address,
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(Company::where('workspace_id', $this->workspace->id)->count())->toBe($countBefore);
+})->with([
+    'kunde@gmx.de',
+    'kunde@web.de',
+    'kunde@t-online.de',
+    'kunde@email.de',
+    'client@yahoo.fr',
+    'client@hotmail.fr',
+    'client@orange.fr',
+    'klient@mail.ru',
+    'cliente@bol.com.br',
+]);
+
 it('does not auto-create a company for a www-prefixed public domain', function (): void {
     $this->workspace->update([
         'contact_creation_mode' => ContactCreationMode::All,
@@ -964,6 +993,57 @@ it('still auto-creates a person for a protected address', function (): void {
     app(LinkEmailAction::class)->execute($email);
 
     expect(People::where('workspace_id', $this->workspace->id)->where('name', 'Protected Contact')->exists())->toBeTrue();
+});
+
+it('does not auto-create a person or company for a colleague on the workspace domain', function (): void {
+    $this->workspace->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+    $this->user->update(['email' => 'owner@ownco.com']);
+    $companyCountBefore = Company::where('workspace_id', $this->workspace->id)->count();
+
+    $email = makeLinkEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'colleague@ownco.com',
+        'name' => 'Colleague',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(People::where('workspace_id', $this->workspace->id)->where('name', 'Colleague')->exists())->toBeFalse()
+        ->and(Company::where('workspace_id', $this->workspace->id)->count())->toBe($companyCountBefore);
+});
+
+it('still links a colleague on the workspace domain to an existing person', function (): void {
+    $this->user->update(['email' => 'owner@ownco.com']);
+
+    $emailField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->workspace->getKey())
+        ->where('entity_type', 'people')
+        ->where('code', 'emails')
+        ->firstOrFail();
+
+    $person = People::create([
+        'workspace_id' => $this->workspace->id,
+        'name' => 'Colleague',
+        'creator_id' => $this->user->id,
+    ]);
+    $person->saveCustomFieldValue($emailField, ['colleague@ownco.com'], $this->workspace);
+
+    $email = makeLinkEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'colleague@ownco.com',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect($email->people()->whereKey($person->getKey())->exists())->toBeTrue();
 });
 
 it('does not auto-create a person for a mailbox-blocklisted address', function (): void {

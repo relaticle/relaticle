@@ -7,6 +7,8 @@ namespace App\Models;
 use App\Casts\AsCanonicalEmail;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -39,6 +41,13 @@ final class WorkspaceInvitation extends Model
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
+    }
+
+    /** @param Builder<self> $query */
+    #[Scope]
+    protected function unexpired(Builder $query): void
+    {
+        $query->where('expires_at', '>', now());
     }
 
     public function isExpired(): bool

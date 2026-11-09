@@ -12,6 +12,8 @@ use Relaticle\Chat\Services\CreditService;
 mutates(CreditService::class);
 
 it('resets a Free workspace to 300 credits via the scheduled reset', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     expect($workspace->plan)->toBe(Plan::Free);
@@ -31,6 +33,8 @@ it('resets a Free workspace to 300 credits via the scheduled reset', function ()
 });
 
 it('resets a Pro workspace to 2000 credits when the scheduled reset runs', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $workspace->forceFill(['plan' => Plan::Pro->value])->save();
@@ -51,6 +55,8 @@ it('resets a Pro workspace to 2000 credits when the scheduled reset runs', funct
 });
 
 it('resets an Enterprise workspace to 10000 credits when the scheduled reset runs', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $workspace->forceFill(['plan' => Plan::Enterprise->value])->save();
@@ -71,6 +77,8 @@ it('resets an Enterprise workspace to 10000 credits when the scheduled reset run
 });
 
 it('refills a past-due Pro workspace at the Free allowance, not the one it stopped paying for', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $workspace->forceFill(['plan' => Plan::Pro->value])->save();
@@ -97,6 +105,8 @@ it('refills a past-due Pro workspace at the Free allowance, not the one it stopp
 });
 
 it('leaves purchased packs intact when a past-due workspace refills', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $workspace->forceFill(['plan' => Plan::Pro->value])->save();
@@ -127,6 +137,8 @@ it('leaves purchased packs intact when a past-due workspace refills', function (
 });
 
 it('restores the Pro allowance once the past-due charge clears', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $workspace->forceFill(['plan' => Plan::Pro->value])->save();
@@ -155,6 +167,8 @@ it('restores the Pro allowance once the past-due charge clears', function (): vo
 });
 
 it('skips workspaces whose period has not yet expired', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
 
@@ -173,6 +187,8 @@ it('skips workspaces whose period has not yet expired', function (): void {
 });
 
 it('writes plan metadata in the audit transaction', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $workspace->forceFill(['plan' => Plan::Pro->value])->save();

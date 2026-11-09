@@ -10,6 +10,7 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Tools\BaseWriteCreateTool;
 use Relaticle\Chat\Tools\Concerns\DescribesEmailProposals;
+use Relaticle\Chat\Tools\Concerns\ReadsSendTime;
 use Relaticle\EmailIntegration\Actions\PrepareAgentEmail;
 use Relaticle\EmailIntegration\Actions\SendAssistantEmail;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
@@ -20,12 +21,13 @@ use Relaticle\EmailIntegration\Support\AgentEmailBody;
 final class SendEmailTool extends BaseWriteCreateTool
 {
     use DescribesEmailProposals;
+    use ReadsSendTime;
 
     public function description(): string
     {
         return 'Propose sending an email as the user from one of their mailboxes. Returns a proposal the user approves; nothing is sent until they do.'
             .' The email reaches people outside the workspace, so propose it only when the user asked for it.'
-            .' After approval it waits a few seconds so the user can still undo it.'
+            .' After approval it waits a few seconds so the user can still undo it. Pass `scheduled_for` to send it later instead.'
             .' One call proposes exactly one email: make one call per email, and each gets its own approval.'
             .' Write `body` as plain text or markdown. Prefer the create email draft tool when the user wants to review the email before it can go.';
     }
@@ -71,6 +73,7 @@ final class SendEmailTool extends BaseWriteCreateTool
             'body' => $schema->string()->description('The message as plain text or markdown. Raw HTML is escaped.')->required(),
             'include_signature' => $schema->boolean()->description('Add the mailbox default signature.')->default(true),
             'in_reply_to_email_id' => $schema->string()->description('ID of the email this replies to, so it threads.'),
+            'scheduled_for' => $schema->string()->description($this->sendTimeDescription()),
         ];
     }
 
@@ -81,11 +84,21 @@ final class SendEmailTool extends BaseWriteCreateTool
 
     protected function extractRecordData(array $record): array
     {
-        return $this->emailData($record);
+        /** @var User $user */
+        $user = auth()->user();
+        $sendAt = $this->sendTime($record['scheduled_for'] ?? null, $user);
+
+        return $sendAt === null ? $this->emailData($record) : [...$this->emailData($record), 'scheduled_for' => $sendAt];
     }
 
     protected function validateRecord(array $record, User $user): ?string
     {
+        $sendTimeError = $this->sendTimeError($record['scheduled_for'] ?? null, $user);
+
+        if ($sendTimeError !== null) {
+            return $sendTimeError;
+        }
+
         $data = $this->emailData($record);
 
         return $this->emailError($data, PrepareAgentEmail::RULES, function () use ($data, $user): array {
@@ -99,7 +112,25 @@ final class SendEmailTool extends BaseWriteCreateTool
         return [
             'title' => $this->proposalEntity()->createTitle(),
             'summary' => $this->emailSummary('Send email', $record),
-            'fields' => $this->emailRows($record),
+            'fields' => $this->sendTimeRows($record),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $record
+     * @return list<array{label: string, value: string}>
+     */
+    private function sendTimeRows(array $record): array
+    {
+        $sendAt = $this->extractRecordData($record)['scheduled_for'] ?? null;
+
+        if (! is_string($sendAt)) {
+            return $this->emailRows($record);
+        }
+
+        /** @var User $user */
+        $user = auth()->user();
+
+        return [...$this->emailRows($record), ['label' => 'Send at', 'value' => $this->sendTimeLabel($sendAt, $user)]];
     }
 }

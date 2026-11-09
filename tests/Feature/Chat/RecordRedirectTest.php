@@ -42,10 +42,7 @@ it('redirects to the exact panel url for each mapped type', function (string $ty
         'company' => CompanyResource::getUrl('view', ['record' => $record->getKey()], panel: 'app', tenant: $workspace),
         'people' => PeopleResource::getUrl('view', ['record' => $record->getKey()], panel: 'app', tenant: $workspace),
         'opportunity' => OpportunityResource::getUrl('view', ['record' => $record->getKey()], panel: 'app', tenant: $workspace),
-        'task' => TaskResource::getUrl('index', [
-            'tableAction' => EditAction::getDefaultName(),
-            'tableActionRecord' => $record->getKey(),
-        ], panel: 'app', tenant: $workspace),
+        'task' => TaskResource::getUrl('index', ['task' => $record->getKey()], panel: 'app', tenant: $workspace),
         'note' => NoteResource::getUrl('index', [
             'tableAction' => EditAction::getDefaultName(),
             'tableActionRecord' => $record->getKey(),

@@ -62,7 +62,7 @@ final readonly class LinkSocialAccount
     private function alreadyLinked(SocialiteProvider $provider): ValidationException
     {
         return ValidationException::withMessages([
-            'identity' => [__('auth.link.already_linked', ['provider' => ucfirst($provider->value)])],
+            'identity' => [__('auth.link.already_linked', ['provider' => $provider->label()])],
         ]);
     }
 }

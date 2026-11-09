@@ -13,6 +13,7 @@ use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\RichEditor;
+use Filament\Forms\Components\Select;
 use Filament\Schemas\Components\Component;
 use Filament\Tables\Columns\Column;
 use Illuminate\Database\Eloquent\Model;
@@ -31,6 +32,28 @@ beforeEach(function () {
 it('can render the index page', function (): void {
     livewire(ListCompanies::class)
         ->assertOk();
+});
+
+it('describes an empty list in one line', function (): void {
+    livewire(ListCompanies::class)
+        ->assertSee('Companies you add or import appear here.');
+});
+
+it('leaves the empty list description off a search or filter that finds nothing', function (): void {
+    Company::factory()->recycle([$this->user, $this->workspace])->create([
+        'name' => 'Acme',
+        'creation_source' => CreationSource::WEB,
+    ]);
+
+    livewire(ListCompanies::class)
+        ->searchTable('zzqx-no-match')
+        ->assertCountTableRecords(0)
+        ->assertDontSee('Companies you add or import appear here.');
+
+    livewire(ListCompanies::class)
+        ->filterTable('creation_source', [CreationSource::IMPORT->value])
+        ->assertCountTableRecords(0)
+        ->assertDontSee('Companies you add or import appear here.');
 });
 
 it('can render the view page', function (): void {
@@ -79,6 +102,7 @@ it('can sort `:dataset` column', function (string $column): void {
         : $column;
 
     livewire(ListCompanies::class)
+        ->toggleAllTableColumns()
         ->sortTable($column)
         ->assertCanSeeTableRecords($records->sortBy($sortingKey), inOrder: true)
         ->sortTable($column, 'desc')
@@ -293,6 +317,40 @@ it('keeps the slash menu but not the document canvas on a rich-editor field adde
     expect($editor->getToolbarButtons())->toBe([])
         ->and($editor->getExtraAttributes())->toHaveKey('data-slash-menu')
         ->and($editor->getExtraAttributes())->not->toHaveKey('class');
+});
+
+it('renders a select option name as text on the create form when option colours are on', function (): void {
+    $field = CustomField::forceCreate([
+        'tenant_id' => $this->workspace->id,
+        'code' => 'pipeline_stage',
+        'name' => 'Pipeline stage',
+        'type' => 'select',
+        'entity_type' => 'company',
+        'sort_order' => 50,
+        'active' => true,
+        'system_defined' => false,
+        'validation_rules' => [],
+        'settings' => new CustomFieldSettingsData(enable_option_colors: true),
+    ]);
+
+    $payload = '<img src=x onerror=alert(1)>';
+
+    $option = $field->options()->forceCreate([
+        'custom_field_id' => $field->id,
+        'tenant_id' => $this->workspace->id,
+        'name' => $payload,
+        'sort_order' => 1,
+    ]);
+
+    $page = livewire(ListCompanies::class)
+        ->mountAction('create')
+        ->instance();
+
+    $select = collect($page->getSchema($page->getMountedActionSchemaName())->getFlatComponents(withHidden: true))
+        ->first(fn (Component $component): bool => $component instanceof Select && $component->getName() === 'custom_fields.pipeline_stage');
+
+    expect($select->isHtmlAllowed())->toBeTrue()
+        ->and($select->getOptions()[$option->id])->toBe(e($payload));
 });
 
 it('records a company created in the panel as created on the web', function (): void {

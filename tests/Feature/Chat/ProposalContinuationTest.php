@@ -309,12 +309,13 @@ it('does not resume while another step of the plan is still pending', function (
 
     $turnId = (string) Str::ulid();
     $first = continuationProposal($this->user, $this->convId, $turnId, 'Step One Co');
-    continuationProposal($this->user, $this->convId, $turnId, 'Step Two Co');
+    continuationProposal($this->user, $this->convId, $turnId, 'Step Two Co')->update(['entity_type' => 'workspace_invitations']);
 
     Livewire::test(ProposalCard::class)
         ->dispatch('proposal:set-active', id: (string) $first->getKey(), context: 'conversation')
-        ->call('approveStep', (string) $first->getKey(), resolve(ProposalPlanService::class));
+        ->call('approveAll', resolve(ProposalPlanService::class));
 
+    expect($first->refresh()->status)->toBe(PendingActionStatus::Approved);
     Queue::assertNotPushed(ProcessChatMessage::class);
 });
 
@@ -364,6 +365,8 @@ it('hands the resume back when the queued turn finds a step still pending', func
 });
 
 it('skips the resume when the workspace is out of credits', function (): void {
+    withHostedBilling();
+
     Queue::fake();
 
     AiCreditBalance::query()
@@ -378,6 +381,8 @@ it('skips the resume when the workspace is out of credits', function (): void {
 });
 
 it('charges one credit for the resumed turn', function (): void {
+    withHostedBilling();
+
     Queue::fake();
 
     $before = AiCreditBalance::query()->where('workspace_id', $this->user->currentWorkspace->getKey())->value('credits_remaining');

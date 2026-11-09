@@ -22,8 +22,6 @@ return [
         'signature_content' => 'Signature',
         'signature_default' => 'Use as my default signature',
         'template_none' => 'No templates yet',
-        'template_name' => 'Template name',
-        'template_shared' => 'Share with my workspace',
         'subject_placeholder' => 'Add a subject',
         'body_placeholder' => 'Write your message…',
         'company_team' => 'Company team',

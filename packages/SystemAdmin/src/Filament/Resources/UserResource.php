@@ -30,7 +30,6 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Laravel\Jetstream\Contracts\DeletesUsers;
 use Override;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\CreateUser;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\EditUser;
@@ -40,8 +39,8 @@ use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\Owned
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\SocialAccountsRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\WorkspacesRelationManager;
 use Relaticle\SystemAdmin\Filament\Support\Impersonate;
+use Relaticle\SystemAdmin\Filament\Support\QueuePurge;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
-use Relaticle\SystemAdmin\Filament\Support\SafeDelete;
 use Relaticle\SystemAdmin\Filament\Support\ViewerTime;
 use Relaticle\SystemAdmin\Metrics\Scopes\GenuineSignup;
 use Relaticle\SystemAdmin\Metrics\Scopes\ReachedFirstValue;
@@ -51,7 +50,7 @@ final class UserResource extends Resource
 {
     protected static ?string $model = User::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-user';
+    protected static string|\BackedEnum|null $navigationIcon = 'lucide-user';
 
     protected static string|\UnitEnum|null $navigationGroup = 'User Management';
 
@@ -175,8 +174,8 @@ final class UserResource extends Resource
                 IconColumn::make('email_verified_at')
                     ->label('Verified')
                     ->boolean()
-                    ->trueIcon('heroicon-o-check-badge')
-                    ->falseIcon('heroicon-o-x-mark'),
+                    ->trueIcon('lucide-badge-check')
+                    ->falseIcon('lucide-x'),
                 TextColumn::make('signup_method')
                     ->label('Signup method')
                     ->state(fn (User $record): string => SignupMethod::for($record))
@@ -204,9 +203,9 @@ final class UserResource extends Resource
                     ->label('Mailcoach Rejected')
                     ->state(fn (User $record): bool => $record->rejected_subscriber_profile_hash !== null)
                     ->boolean()
-                    ->trueIcon('heroicon-o-exclamation-triangle')
+                    ->trueIcon('lucide-triangle-exclamation-point')
                     ->trueColor('warning')
-                    ->falseIcon('heroicon-o-minus-small')
+                    ->falseIcon('lucide-minus')
                     ->falseColor('gray')
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('email_bounced_at')
@@ -290,9 +289,7 @@ final class UserResource extends Resource
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    SafeDelete::bulkAction(function (User $record): void {
-                        resolve(DeletesUsers::class)->delete($record);
-                    }),
+                    QueuePurge::bulkAction(),
                 ]),
             ]);
     }

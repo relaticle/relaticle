@@ -39,13 +39,13 @@ trait DetectsWorkspaceInvitation
     {
         $invitation = $this->getWorkspaceInvitationFromSession();
 
-        if ($invitation && ! $invitation->isExpired()) {
+        if ($invitation && ! $invitation->isExpired() && ! $invitation->workspace->isScheduledForDeletion()) {
             return $this->renderInvitationBanner($invitation->workspace->name);
         }
 
         $workspace = $this->getWorkspaceFromInviteLinkInSession();
 
-        if ($workspace && ! $workspace->isInviteLinkTokenExpired()) {
+        if ($workspace && ! $workspace->isInviteLinkTokenExpired() && ! $workspace->isScheduledForDeletion()) {
             return $this->renderInvitationBanner($workspace->name);
         }
 

@@ -31,11 +31,15 @@ use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Size;
 use Filament\Support\Enums\Width;
+use Filament\Support\Exceptions\Halt;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
 use Illuminate\Support\HtmlString;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
+use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Locked;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Override;
 
@@ -48,6 +52,9 @@ final class CreateWorkspace extends RegisterTenant
     protected array $extraBodyAttributes = [
         'class' => 'fi-onboarding-wizard',
     ];
+
+    #[Locked]
+    public bool $isFirstRun = false;
 
     public function getMaxContentWidth(): Width
     {
@@ -71,7 +78,36 @@ final class CreateWorkspace extends RegisterTenant
             return;
         }
 
+        $this->isFirstRun = $this->ownsNoWorkspace();
+
         parent::mount();
+    }
+
+    #[Override]
+    public function hydrate(): void
+    {
+        if (self::canView()) {
+            return;
+        }
+
+        // A first-run tab reaches the cap through the workspace another tab made, and register() opens it.
+        $workspace = $this->isFirstRun ? $this->firstOwnedWorkspace() : null;
+
+        abort_unless($workspace instanceof Workspace, 404);
+
+        $this->tenant = $workspace;
+    }
+
+    #[Override]
+    public function register(): void
+    {
+        if ($this->tenant instanceof Workspace) {
+            $this->redirect(SetupWorkspace::getUrl(['tenant' => $this->tenant]));
+
+            return;
+        }
+
+        parent::register();
     }
 
     #[Override]
@@ -120,7 +156,7 @@ final class CreateWorkspace extends RegisterTenant
             ->components([
                 Wizard::make([
                     $this->getWorkspaceStep(),
-                    ...($this->ownsNoWorkspace() ? [$this->getAttributionStep()] : []),
+                    ...($this->isFirstRun ? [$this->getAttributionStep()] : []),
                 ])
                     ->view('components.onboarding.wizard')
                     ->hiddenHeader()
@@ -217,7 +253,7 @@ final class CreateWorkspace extends RegisterTenant
 
     private function stepHeading(string $title, string ...$paragraphs): HtmlString
     {
-        $html = '<h3 class="text-xl font-bold tracking-tight text-gray-950 dark:text-white">'.e($title).'</h3>';
+        $html = '<h1 tabindex="-1" class="text-xl font-bold tracking-tight text-gray-950 outline-none dark:text-white">'.e($title).'</h1>';
 
         foreach ($paragraphs as $index => $paragraph) {
             $spacing = $index === 0 ? 'mt-1' : 'mt-2';
@@ -233,6 +269,14 @@ final class CreateWorkspace extends RegisterTenant
         $slug = $get('slug');
 
         return blank($slug) || $slug === $get('slug_derived');
+    }
+
+    private function firstOwnedWorkspace(): ?Workspace
+    {
+        /** @var User $user */
+        $user = auth('web')->user();
+
+        return $user->ownedWorkspaces()->oldest()->first();
     }
 
     private function ownsNoWorkspace(): bool
@@ -251,6 +295,24 @@ final class CreateWorkspace extends RegisterTenant
         return ! Filament::getUserDefaultTenant($user) instanceof Workspace;
     }
 
+    private function getUserNameComponent(): TextInput
+    {
+        return TextInput::make('user_name')
+            ->label(__('filament/pages/workspaces.create_workspace.form.your_name.label'))
+            ->trim()
+            ->required()
+            ->maxLength(255)
+            ->placeholder(__('filament/pages/workspaces.create_workspace.form.your_name.placeholder'))
+            ->live(onBlur: true)
+            ->visible(fn (): bool => $this->isFirstWorkspace())
+            ->default(function (): string {
+                /** @var User $user */
+                $user = auth('web')->user();
+
+                return $user->name;
+            });
+    }
+
     /**
      * @return array<Component>
      */
@@ -260,22 +322,11 @@ final class CreateWorkspace extends RegisterTenant
             WorkspaceLogoUpload::make('logo')
                 ->label(__('filament/pages/workspaces.create_workspace.form.company_logo.label')),
 
-            TextInput::make('user_name')
-                ->label(__('filament/pages/workspaces.create_workspace.form.your_name.label'))
-                ->required()
-                ->maxLength(255)
-                ->placeholder(__('filament/pages/workspaces.create_workspace.form.your_name.placeholder'))
-                ->live(onBlur: true)
-                ->visible(fn (): bool => $this->isFirstWorkspace())
-                ->default(function (): string {
-                    /** @var User $user */
-                    $user = auth('web')->user();
-
-                    return $user->name;
-                }),
+            $this->getUserNameComponent(),
 
             TextInput::make('name')
                 ->label(__('filament/pages/workspaces.create_workspace.form.workspace_name.label'))
+                ->trim()
                 ->autofocus()
                 ->required()
                 ->maxLength(255)
@@ -355,13 +406,27 @@ final class CreateWorkspace extends RegisterTenant
         /** @var User $user */
         $user = auth('web')->user();
 
-        $this->updateUserNameIfChanged($user, $data);
-
         if (($this->data['slug_derived'] ?? null) === $data['slug'] && Workspace::query()->where('slug', $data['slug'])->exists()) {
             $data['slug'] = null;
         }
 
-        return resolve(CreateWorkspaceAction::class)->create($user, $data);
+        try {
+            $workspace = resolve(CreateWorkspaceAction::class)->create($user, $data, onlyIfFirst: $this->isFirstRun);
+        } catch (ValidationException $exception) {
+            throw ValidationException::withMessages(Arr::prependKeysWith($exception->errors(), 'data.'));
+        }
+
+        // Filament would save this tab's stale logo state onto the workspace another submit made.
+        if (! $workspace->wasRecentlyCreated) {
+            $this->tenant = $workspace;
+            $this->redirect(SetupWorkspace::getUrl(['tenant' => $workspace]));
+
+            throw new Halt;
+        }
+
+        $this->updateUserNameIfChanged($user, $data);
+
+        return $workspace;
     }
 
     /**

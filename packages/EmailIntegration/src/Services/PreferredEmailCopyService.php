@@ -21,7 +21,8 @@ final readonly class PreferredEmailCopyService
      * Keep one copy the viewer may see of each RFC Message-ID.
      *
      * Two connected mailboxes can store the same message. The record mailbox
-     * should show it once. Prefer the viewer's own copy, then the most open one.
+     * should show it once. Prefer the viewer's own copy, then the one most open
+     * to the viewer, counting a share made with them on that copy.
      *
      * @param  Builder<Email>  $query
      * @return Builder<Email>
@@ -41,31 +42,14 @@ final readonly class PreferredEmailCopyService
             ->selectRaw('distinct on (coalesce(emails.rfc_message_id, emails.id)) emails.id')
             ->orderByRaw('coalesce(emails.rfc_message_id, emails.id)')
             ->orderByRaw('case when emails.user_id = ? then 0 else 1 end', [$viewer->getKey()])
-            ->orderByRaw('array_position(?::text[], emails.privacy_tier::text) desc nulls last', [EmailPrivacyTier::opennessRanking()])
+            ->orderByRaw(
+                'array_position(?::text[], coalesce((select email_shares.tier from email_shares where email_shares.email_id = emails.id and email_shares.shared_with = ?), emails.privacy_tier::text)) desc nulls last',
+                [EmailPrivacyTier::opennessRanking(), $viewer->getKey()],
+            )
             ->latest('emails.sent_at')
             ->orderByDesc('emails.id');
 
         return $query->whereIn($query->qualifyColumn('id'), $preferred);
-    }
-
-    /**
-     * True when this message already exists in the viewer's synced mailbox.
-     */
-    public function viewerHasSyncedCopy(Email $email, User $viewer): bool
-    {
-        if ($email->user_id === $viewer->getKey()) {
-            return true;
-        }
-
-        if (blank($email->rfc_message_id)) {
-            return false;
-        }
-
-        return Email::query()
-            ->where('workspace_id', $email->workspace_id)
-            ->where('user_id', $viewer->getKey())
-            ->where('rfc_message_id', $email->rfc_message_id)
-            ->exists();
     }
 
     /**

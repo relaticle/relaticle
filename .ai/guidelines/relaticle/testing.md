@@ -67,8 +67,9 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
   a test reads from disk, so `PestTiaRuntime::FILES_ARCH_TESTS_READ` maps those to
   `tests/Arch`. A new test that reads a file adds its path there.
 - `pestphp/pest` installs from the `ManukMinasyan/pest` fork, branch
-  `tia-warmup-worktrees`. Stock Pest cannot fetch a baseline inside a git worktree
-  (pestphp/pest#1820) and has no `trustDefaultBranch()`. Return to `^5.0` when both ship.
+  `tia-warmup-worktrees-5x`: the fork's commits rebased onto upstream `5.x`. Stock Pest
+  cannot fetch a baseline inside a git worktree (pestphp/pest#1914, still open) and has no
+  `trustDefaultBranch()`. Return to `^5.0` when both ship.
 - A hand-picked run over more than one file goes parallel on four processes:
   `php artisan test --compact tests/Feature/Api/V1 --parallel --processes=4`. Those 15
   files take 73s in one process and 28s in four. A parallel run accepts one path. For
@@ -85,6 +86,15 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
   a scoped run cannot, and for recording a TIA graph. TIA replays a cached pass whenever
   a test's edges are unchanged, so it cannot see time-dependent failures (`travelTo`,
   expiring tokens), `.env` edits, or dynamic dispatch it did not trace while recording.
-- After changing test timings materially, refresh the CI shard balance with
-  `composer test:update-shards` and commit `tests/.pest/shards.json`; a stale
-  file silently drops new test classes out of time-balancing.
+- Every main run's `Record Shard Timings` job rebuilds `tests/.pest/shards.json` from the
+  JUnit reports of its test and Browser shards, and the next run's shards restore that
+  recording before Pest splits the suite. A class with no recording yet is dealt round-robin.
+  `tests/.pest/shards.json` is only the fallback for a run that finds no recording, so do not
+  refresh it with a local `composer test:update-shards`: a laptop's timings skew the split.
+  Refresh it with `php bin/shard-timings.php <dir>` over a main run's `junit-*` artifacts.
+- `composer test:evals` runs the forty recorded asks in `tests/Evals` through the real assistant on
+  real models, and scores them. It calls Anthropic and OpenAI, so it costs money and needs both
+  keys in the process env or `.env`. A plain `pest` skips every case in seconds, and CI's `Tests`
+  workflow never runs it. The nightly `rela-evals.yml` workflow does, one job per model, and
+  uploads `storage/evals/*.json`. Committed baselines live in `tests/Evals/baselines/`, and its
+  README lists each one.

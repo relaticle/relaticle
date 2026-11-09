@@ -15,9 +15,10 @@ no composer.json of their own. Service providers are registered in
 | `packages/Chat` | AI assistant (agents, chat tools, credit system, streaming) |
 | `packages/SystemAdmin` | Internal admin panel (separate Filament panel) |
 | `packages/ImportWizard` | CSV import flows |
-| `packages/Documentation` | Public docs pages |
+| `packages/Documentation` | Docs and help content, `DocsRepository`, the search index the assistant reads, `DocUrl`, the OpenAPI spec routes |
 | `packages/OnboardSeed` | Demo/onboarding data seeding |
 | `packages/EmailIntegration` | Email + calendar sync (Gmail/Microsoft Graph), sharing, privacy |
+| `packages/Cloud` | The hosted business behind relaticle.com: billing, the business half of the sysadmin panel, the marketing site, the docs and help website, the blog. Proprietary, absent from self-hosted builds |
 
 Create a new package only for a genuinely separable subsystem with its own panel,
 routes, or lifecycle. A new CRM entity is not one of those; it goes in `app/`. Package
@@ -46,6 +47,50 @@ anatomy mirrors a Laravel app: `src/`, `config/`, `routes/`, `resources/`,
   `Relaticle\Chat`. Enums stay in `app/Enums`, because the Pest Laravel preset fails one
   anywhere else. `.ai/rules/queries.md` holds the rules for extending it
 
+## The cloud package
+
+`packages/Cloud` is the hosted business behind relaticle.com: billing behaviour and UI, the
+business half of the sysadmin panel (Overview, revenue, subscriptions, AI credits, trial and
+managed-plan actions), the marketing site, the docs and help website, and the blog: its pages,
+its authoring in the sysadmin panel and its `/mcp/blog` endpoint. Its own `LICENSE` allows
+development and testing use, and production use only under an agreement. The root `LICENSE` stays
+the verbatim AGPL text, so GitHub still detects the repository as AGPL-3.0, and the README names the
+split. Plausible keeps its proprietary directory the same way. The self-hosted build is this
+repository without it.
+
+- Core never references it. `tests/Arch/ArchTest.php` fails a core layer that uses
+  `Relaticle\Cloud`. The `ConventionsTest` check "keeps the cloud package out of core code,
+  config, routes, views and lang" fails a core file that names it or its `cloud::` view and lang
+  namespace. `bootstrap/providers.php` holds the one allowed mention: a `class_exists` check that
+  loads `CloudServiceProvider` only when the class exists and `config('relaticle.cloud')` is on
+- Cloud is off unless `RELATICLE_CLOUD=true`. relaticle.com sets it, and so do `.env.ci`, both
+  phpunit files and a developer's `.env`. A self-hosted install never sets it. The Docker image
+  also leaves the code out, because `.dockerignore` excludes `/packages/Cloud`. A git clone keeps
+  the directory, and the unset switch keeps the provider out of `bootstrap/providers.php` and the
+  package's entries out of `vite.config.js`. `packages/Cloud/tests/Feature/CloudProviderTest.php`
+  pins the provider half. The `Self-hosted Build` job in `.github/workflows/ci.yml` boots once with
+  the switch unset, then deletes the directory, rebuilds the autoload and runs Arch and Smoke. A
+  push to main runs Feature there too. A core class, view or route that needs Cloud fails that job,
+  on the pull request when Arch or Smoke reaches it, and otherwise on main after the merge
+- Core asks Cloud through two contracts and keeps a self-hosted default for each:
+  `App\Contracts\Entitlements` (`SelfHostedEntitlements`) and `App\Contracts\Billing` (`NoBilling`).
+  `CloudServiceProvider` binds Cloud's implementation only while the billing flag is on.
+  `packages/Cloud/tests/Feature/CloudProviderTest.php` fails when either binding changes. What
+  core needs from billing becomes a method on `Billing`
+- Cloud reaches SystemAdmin through `CloudAdminPlugin`, which a `Panel::configureUsing` adds to the
+  `sysadmin` panel. The plugin adds pages, resources, widgets and the admin theme. Its `register(Panel)`
+  calls `Relaticle\SystemAdmin\Support\Extensions` for Workspace actions and relation managers, and
+  `tests/Feature/SystemAdmin/WorkspaceResourceTest.php` pins those. A second `Panel::configureUsing`
+  extends the app panel with the Billing page, render hooks and the theme
+- Register actions and relation managers from a provider's or plugin's `register()`, never `boot()`,
+  because the panel turns relation managers into Livewire components when it registers. No test reads
+  for that
+- A command Cloud owns is scheduled from `CloudServiceProvider`, never `bootstrap/app.php`. The
+  self-hosted build has no such class to schedule
+- Cloud is analysed by PHPStan, unlike SystemAdmin, and its Filament, Livewire and Http namespaces
+  sit under `EloquentWriteOutsideActionRule`. A literal that PHPStan's i18n rules guard goes in a
+  `__('cloud::...')` key
+
 ## Workspace scope (fails closed)
 
 Company, People, Opportunity, Task and Note carry `App\Models\Scopes\WorkspaceScope`. With no
@@ -72,6 +117,13 @@ every workspace. `tests/Feature/Models/Scopes/WorkspaceScopeTest.php` fails when
 - Livewire matches persistent middleware by class. `AppServiceProvider` registers
   `ReadAcrossWorkspaces`, because the alias alone skips every update request.
   `tests/Feature/SystemAdmin/SystemAdminPanelProviderTest.php` fails without it
+- A job that calls `auth()->setUser()`, as Filament's `ExportCsv` does, fires `Authenticated`.
+  `BindCurrentWorkspaceListener` then binds the user's stored workspace over the one `Context`
+  carried, and every job dispatched from there inherits it. A job that must act in its record's
+  workspace declares `App\Support\Workspaces\BindWorkspace` as middleware with the record's own
+  `workspace_id`, as `App\Jobs\CompleteExport` does.
+  `tests/Feature/Filament/App/Exports/ExportDownloadTest.php` fails when the export notice lands
+  in the other workspace
 
 ## Actions (business operations)
 
@@ -130,6 +182,20 @@ final readonly class CreateOpportunity
   (`Relaticle\ImportWizard\Data\ColumnData`). Use a plain `final readonly` class when code
   builds the object with `new` (`App\Data\ListQuery`). No test tells the two apart, so a
   reviewer reads for a data object that only ever meets `new`
+- Settings that a feature will keep adding to share one nullable `jsonb` column on their
+  owner, named for the feature: `workspaces.ai_settings` holds every workspace-level setting
+  for the assistant. A new setting is a new property, not a migration. Use a boolean or enum
+  column only for a standalone setting that SQL filters or reports on
+- A laravel-data class types that column: `App\Data\AiSettings` is the worked example. The
+  model casts it with `AiSettings::class.':default'`, so a `null` column reads as the
+  defaults. Each property carries its default in the constructor, and
+  `#[MapName(SnakeCaseMapper::class)]` keeps the stored keys snake case. Readers use the typed
+  property (`$workspace->ai_settings->webSearch`) and never index the raw array. The action
+  that writes one setting rebuilds the object from the current values:
+  `AiSettings::from([...$workspace->ai_settings->toArray(), 'web_search' => $enabled])`.
+  `tests/Feature/Chat/AssistantSettingsTest.php` fails when the stored key or a default
+  changes. `users.ai_preferences` and `users.notification_preferences` predate this rule and
+  still use the `array` cast
 - Name domain concepts plainly (`Plan`, not `AiPlan`). Context comes from the
   namespace
 - `Support` holds code with no business rule in it: code that could ship as a standalone
@@ -295,8 +361,8 @@ production: message ordering, approval races, duplicate proposals.
   `SendEmailTool` takes one email per call, and `PendingAction::isEmailSend()` makes
   `approveStep()` refuse a batch of them. An invitation step may hold several
   addresses, and its button sends them all. `tests/Feature/Chat/EmailToolsTest.php`
-  and `tests/Feature/Chat/InviteWorkspaceMemberToolTest.php` fail when "Approve all"
-  or its shortcut sends either.
+  and `tests/Feature/Chat/InviteWorkspaceMemberToolTest.php` fail when approving the
+  plan, or its shortcut, sends either.
 - `Relaticle\Chat\Enums\ProposalEntity` owns every fact that follows from what a proposal
   writes: its title key, its core fields, its verbs, and whether it is approved on its own.
   `PendingAction::entity_type` is cast to it. A new kind of proposal is a new case, and every
@@ -434,9 +500,10 @@ months two copies of the same field vocabulary drifted apart.
 ## Quality Checks
 
 The local loop is scoped to the change. GitHub CI (`.github/workflows/ci.yml`) is the
-only full run: it executes lint, rector, PHPStan, type coverage, five test shards and
-six Browser shards on every push to a pull request. A run takes about 4 minutes when
-runners are free, and longer when several runs queue for them.
+only full run: it executes lint, rector, PHPStan, type coverage, eight test shards and
+five Browser shards on every push to a pull request. The test and Browser shards run on arm
+runners, and each of those jobs takes under 3 minutes when runners are free. Runs queue when
+the organization's 20 concurrent jobs are taken.
 
 After each change, while iterating:
 
@@ -526,6 +593,9 @@ are under about 50. Each rule below names what fails when it is broken.
   property form, and `composer test:refactor` fails until the rewrite is taken. Code that needs
   the number at runtime reads a class constant the attribute also uses, as `SendEmailJob` does
   with `TIMEOUT_SECONDS`. `$this->timeout` no longer exists once the attribute replaces it.
+- A queued Mailable or Notification declares `#[Tries]` and `#[Backoff]`, or inherits them as every
+  `InboxNotification` does. The default queue tries a job once, so one mail provider 502 loses the
+  message. `tests/Arch/ConventionsTest.php` fails a queued mail class without them.
 - An accessor is `Attribute::get()` with a typed closure and a `@return Attribute<TGet, never>`
   docblock. Larastan reads the property type from that docblock, so PHPStan reports the
   attribute as an undefined property without it.
@@ -550,6 +620,7 @@ is the exception that admits the code could not.
 ## Scheduling
 
 - All scheduled commands go in `bootstrap/app.php` via `withSchedule()`, not in `routes/console.php`
+- A package the self-hosted build deletes schedules its own commands from its provider with `callAfterResolving(Schedule::class, ...)`, as `CloudServiceProvider` does. No test reads for this
 
 === .ai/relaticle/custom-fields rules ===
 
@@ -637,8 +708,9 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
   a test reads from disk, so `PestTiaRuntime::FILES_ARCH_TESTS_READ` maps those to
   `tests/Arch`. A new test that reads a file adds its path there.
 - `pestphp/pest` installs from the `ManukMinasyan/pest` fork, branch
-  `tia-warmup-worktrees`. Stock Pest cannot fetch a baseline inside a git worktree
-  (pestphp/pest#1820) and has no `trustDefaultBranch()`. Return to `^5.0` when both ship.
+  `tia-warmup-worktrees-5x`: the fork's commits rebased onto upstream `5.x`. Stock Pest
+  cannot fetch a baseline inside a git worktree (pestphp/pest#1914, still open) and has no
+  `trustDefaultBranch()`. Return to `^5.0` when both ship.
 - A hand-picked run over more than one file goes parallel on four processes:
   `php artisan test --compact tests/Feature/Api/V1 --parallel --processes=4`. Those 15
   files take 73s in one process and 28s in four. A parallel run accepts one path. For
@@ -655,9 +727,18 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
   a scoped run cannot, and for recording a TIA graph. TIA replays a cached pass whenever
   a test's edges are unchanged, so it cannot see time-dependent failures (`travelTo`,
   expiring tokens), `.env` edits, or dynamic dispatch it did not trace while recording.
-- After changing test timings materially, refresh the CI shard balance with
-  `composer test:update-shards` and commit `tests/.pest/shards.json`; a stale
-  file silently drops new test classes out of time-balancing.
+- Every main run's `Record Shard Timings` job rebuilds `tests/.pest/shards.json` from the
+  JUnit reports of its test and Browser shards, and the next run's shards restore that
+  recording before Pest splits the suite. A class with no recording yet is dealt round-robin.
+  `tests/.pest/shards.json` is only the fallback for a run that finds no recording, so do not
+  refresh it with a local `composer test:update-shards`: a laptop's timings skew the split.
+  Refresh it with `php bin/shard-timings.php <dir>` over a main run's `junit-*` artifacts.
+- `composer test:evals` runs the forty recorded asks in `tests/Evals` through the real assistant on
+  real models, and scores them. It calls Anthropic and OpenAI, so it costs money and needs both
+  keys in the process env or `.env`. A plain `pest` skips every case in seconds, and CI's `Tests`
+  workflow never runs it. The nightly `rela-evals.yml` workflow does, one job per model, and
+  uploads `storage/evals/*.json`. Committed baselines live in `tests/Evals/baselines/`, and its
+  README lists each one.
 
 === .ai/relaticle/ui rules ===
 
@@ -671,12 +752,16 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
 - Any change to a Blade view, Livewire component, or Filament page must be
   clicked through with agent-browser (including empty-state data) before being
   reported done. Tests passing is not sufficient for UI work.
-- agent-browser and the Browser suite both drive Chromium, and CI installs
-  Chromium only (`.github/workflows/ci.yml`). A defect that only WebKit shows
-  passes every gate. After the Chromium pass, run the browser tests for the
-  surfaces you changed in WebKit:
-  `php artisan test --compact <files> --browser safari`. Install the engine once
-  per machine with `pnpm exec playwright install webkit`.
+- agent-browser and the Browser suite both drive Chromium. CI runs WebKit only
+  for test files tagged `pest()->group('webkit')`, in the `Browser Tests (WebKit)`
+  job of `.github/workflows/ci.yml`. A defect that only WebKit shows passes every
+  other gate. After the Chromium pass, run the browser tests for the surfaces you
+  changed in WebKit: `php artisan test --compact <files> --browser safari`.
+  Install the engine once per machine with `pnpm exec playwright install webkit`.
+- When WebKit breaks a surface Chromium passes, tag the test file that covers it
+  with `pest()->group('webkit')`, so CI keeps checking it in WebKit.
+  `tests/Browser/CRM/RichEditorBrowserTest.php` is the example: a rich editor
+  selection froze Safari while every Chromium test passed.
 - An SVG that reaches the page as a string (`svg()->toHtml()` inside `@js`, a
   JavaScript template) carries its own size class:
   `svg('ri-claude-fill', 'size-full')`. With only a `viewBox`, Chromium stretches
@@ -698,12 +783,53 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
 - Demo/example content (names, companies, conversations) must read like real CRM
   data for the buyer persona. No placeholder-looking values.
 
-## Icons (Remix Icon)
+## Stylesheets
 
-- **Brand/social icons** (GitHub, Discord, Twitter, LinkedIn) → always `fill` variant
-- **UI/functional icons** (arrows, chevrons, checks, close) → always `line` variant
-- **Feature/section icons** → `line` variant, stay consistent within a section
-- **Status/emphasis icons** (success checkmarks, alerts) → `fill` variant
+- Each Tailwind entry lists its sources with `@source`, and `app.css` turns automatic detection off with
+  `source(none)`. Detection reads `.gitignore`, which the Docker build never sees, so the image once
+  scanned all of `vendor/` and shipped different CSS from production.
+- A class written in a directory no entry lists never reaches the CSS. Add the directory to the entry
+  whose pages render it.
+- The docs, help, marketing and blog pages load `packages/Cloud/resources/css/cloud.css`, which imports core `app.css` and
+  lists Cloud's own `@source` directories. `documentation.css` only `@reference`s `cloud.css`, because the docs shell loads
+  both. It emits no utilities.
+- The Dockerfile frontend stage copies or mounts every `@source` path. `tests/Arch/ConventionsTest.php`
+  fails a path that does not exist or that the stage cannot see.
+- Cloud's own stylesheets are exempt from that stage check, because the image never builds them. No core stylesheet may
+  name `packages/Cloud`, and `tests/Arch/ConventionsTest.php` fails one that does.
+- With Cloud present, the app and sysadmin panels load `packages/Cloud/resources/css/filament/{app,admin}/theme.css` in place
+  of the core themes. Each imports its core theme and adds Cloud's `@source` directories. A class added to a Cloud billing view
+  or sysadmin page reaches CSS only through them, and `packages/Cloud/tests/Feature/AppPanelThemeTest.php` pins the swap.
+
+## Scripts
+
+- `vite.config.js` builds every script that imports a package. Never add a second bundler, a build script in `bin/`, or a
+  committed `dist/` file: a committed bundle drifts from its source, and only an extra CI check catches it.
+  `tests/Arch/ConventionsTest.php` fails a `dist/` directory under `resources/` and a `bin/` script that imports a bundler.
+- A script with no imports that Filament loads through `FilamentAsset` stays unbuilt in `resources/js/filament/`, as
+  `slash-menu.js` and `payload-guard.js` do. `php artisan filament:assets` publishes it to `public/js/app/`.
+- A rich editor plugin that imports TipTap is a Vite input in `resources/js/filament/rich-content-plugins/`, and its
+  `getTipTapJsExtensions()` returns `Vite::asset()` for it. Filament's docs build one with esbuild from `bin/`. Do not
+  follow them here.
+- The `filament-rich-editor-modules` plugin in `vite.config.js` resolves `@tiptap/core` and `@tiptap/pm/{state,model,view}`
+  to `window.FilamentRichEditor.tiptap`, for those plugin files and the packages listed in `richEditorPackages`. The chat
+  composer keeps its own TipTap. A second ProseMirror copy breaks the editor's `instanceof` checks.
+- A TipTap package a plugin imports goes in `richEditorPackages`, which also keeps it out of Vite's dev pre-bundling. The
+  build fails when a plugin imports an unlisted `@tiptap/` package or another ProseMirror module, when code outside the
+  plugins imports a listed package, and when a plugin's chunk loses the default export Filament imports.
+
+## Icons (Lucide)
+
+- UI icons are Lucide through `mallardduck/blade-lucide-icons`: `lucide-<name>`, outline only. Take names from
+  Lucide's current list. The package still ships pre-1.0 aliases with stale artwork, such as `check-circle` for
+  `circle-check`.
+- Every Lucide icon carries the `lucide` class from `config/blade-lucide-icons.php`, and `resources/css/theme.css`
+  draws it at a 1.75 stroke. A raw `<svg>` that draws `IconPath` data sets `stroke-width="1.75"` itself.
+- Filament's own icons map to Lucide in `App\Support\PanelIcons`, registered for every panel in
+  `AppServiceProvider`. `tests/Feature/Filament/PanelIconsTest.php` fails when a panel draws Filament's default set.
+- Brand logos (GitHub, Discord, Claude, OpenAI, Google) stay Remix Icon `fill`, because Lucide draws no brand logos.
+- `App\Support\IconPath::for()` turns an icon into one `d` for chat chips and record glyphs. It throws on an SVG
+  element it cannot convert.
 
 === .ai/relaticle/workflow rules ===
 
@@ -731,6 +857,11 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
 ## Releases
 
 - Merge to main and tag only on explicit instruction, never on your own.
+- Security fixes to dependencies come from Dependabot security updates (`.github/dependabot.yml`),
+  one pull request per ecosystem group, and a person merges and releases them like any other.
+  Packagist can list a Composer advisory hours or days before GitHub's advisory database. Then
+  Oh Dear's `SecurityAdvisoriesCheck` (`HealthServiceProvider`) alerts first, and a person runs
+  `composer update <package> -W`, which skips versions with advisories, and opens the pull request.
 - Procedure: merge → `git checkout main && git pull` → confirm local and remote
   parity (`git log origin/main..main` and the reverse are both empty) → tag
   `vX.Y.Z` (minor for features, patch for fixes) → `git push origin <tag>`.
@@ -831,7 +962,7 @@ can do. The MCP guide's tool reference is the one place that counts tools.
 
 `tests/Arch/ConventionsTest.php` fails "AI chat" in published copy, and fails the MCP guide
 when its count differs from the tools `RelaticleServer` registers.
-`tests/Feature/Public/PublicPagesTest.php` fails a marketing page that quotes a count.
+`packages/Cloud/tests/Feature/Marketing/PublicPagesTest.php` fails a marketing page that quotes a count.
 
 ## House style
 

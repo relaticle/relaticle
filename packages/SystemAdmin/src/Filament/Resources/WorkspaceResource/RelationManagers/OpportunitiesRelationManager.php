@@ -19,7 +19,7 @@ final class OpportunitiesRelationManager extends RelationManager
 {
     protected static string $relationship = 'opportunities';
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-currency-dollar';
+    protected static string|\BackedEnum|null $icon = 'lucide-circle-dollar-sign';
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {

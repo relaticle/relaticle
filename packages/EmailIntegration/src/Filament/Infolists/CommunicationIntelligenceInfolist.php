@@ -14,7 +14,6 @@ use Closure;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Icon;
 use Filament\Schemas\Components\Section;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Data\VisibleCommunicationIntelligence;
@@ -38,53 +37,53 @@ final class CommunicationIntelligenceInfolist
                     'visible_first_interaction_at',
                     'first_interaction',
                     fn (People|Company|Opportunity $record): ?CarbonInterface => self::metrics($record)->firstInteractionAt(),
-                    Heroicon::OutlinedClock,
+                    'lucide-clock',
                 ),
                 self::timestampEntry(
                     'visible_last_interaction_at',
                     'last_interaction',
                     fn (People|Company|Opportunity $record): ?CarbonInterface => self::metrics($record)->lastInteractionAt(),
-                    Heroicon::OutlinedClock,
+                    'lucide-clock',
                 ),
                 TextEntry::make('visible_connection_strength')
                     ->label(__("{$translationKey}.fields.connection_strength.label"))
-                    ->beforeLabel(Icon::make(Heroicon::OutlinedSignal))
+                    ->beforeLabel(Icon::make('lucide-signal'))
                     ->getStateUsing(fn (People|Company|Opportunity $record): ConnectionStrength => self::metrics($record)->connectionStrength)
                     ->badge(),
                 TextEntry::make('visible_strongest_connection')
                     ->label(__("{$translationKey}.fields.strongest_connection.label"))
-                    ->beforeLabel(Icon::make(Heroicon::OutlinedUser))
+                    ->beforeLabel(Icon::make('lucide-user'))
                     ->getStateUsing(fn (People|Company|Opportunity $record): ?string => self::metrics($record)->strongestConnectionName)
                     ->placeholder(__("{$translationKey}.fields.strongest_connection.placeholder")),
                 self::timestampEntry(
                     'visible_first_email_at',
                     'first_email',
                     fn (People|Company|Opportunity $record): ?CarbonInterface => self::metrics($record)->firstEmailAt,
-                    Heroicon::OutlinedEnvelope,
+                    'lucide-mail',
                 ),
                 self::timestampEntry(
                     'visible_last_email_at',
                     'last_email',
                     fn (People|Company|Opportunity $record): ?CarbonInterface => self::metrics($record)->lastEmailAt,
-                    Heroicon::OutlinedEnvelope,
+                    'lucide-mail',
                 ),
                 self::timestampEntry(
                     'visible_first_calendar_at',
                     'first_calendar',
                     fn (People|Company|Opportunity $record): ?CarbonInterface => self::metrics($record)->firstMeetingAt,
-                    Heroicon::OutlinedCalendar,
+                    'lucide-calendar',
                 ),
                 self::timestampEntry(
                     'visible_last_calendar_at',
                     'last_calendar',
                     fn (People|Company|Opportunity $record): ?CarbonInterface => self::metrics($record)->lastMeetingAt,
-                    Heroicon::OutlinedCalendar,
+                    'lucide-calendar',
                 ),
                 self::timestampEntry(
                     'visible_next_calendar_at',
                     'next_calendar',
                     fn (People|Company|Opportunity $record): ?CarbonInterface => self::metrics($record)->nextMeetingAt,
-                    Heroicon::OutlinedCalendar,
+                    'lucide-calendar',
                     withTime: true,
                 ),
             ]);
@@ -97,7 +96,7 @@ final class CommunicationIntelligenceInfolist
         string $name,
         string $field,
         Closure $state,
-        Heroicon $icon,
+        string $icon,
         bool $withTime = false,
     ): TextEntry {
         $entry = TextEntry::make($name)

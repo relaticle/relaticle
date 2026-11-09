@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Queue;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Enums\SyncErrorReason;
 use Relaticle\EmailIntegration\Jobs\EnsureCalendarPushChannelJob;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
@@ -25,6 +26,7 @@ use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterfac
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
+use Relaticle\EmailIntegration\Services\MailboxHistoryImportService;
 use Relaticle\EmailIntegration\Services\ProviderRateLimit;
 
 mutates(HandlesProviderFailures::class, ProviderRateLimit::class);
@@ -191,4 +193,135 @@ it('reports a client error and leaves the mailbox unparked', function (): void {
     expect(ProviderRateLimit::remainingSeconds((string) $account->getKey()))->toBeNull();
 
     Exceptions::assertReported(RequestException::class);
+});
+
+function googleMailServiceNotEnabled(): GoogleServiceException
+{
+    return new GoogleServiceException(
+        '{"error":{"code":400,"message":"Mail service not enabled","errors":[{"message":"Mail service not enabled","domain":"global","reason":"failedPrecondition"}],"status":"FAILED_PRECONDITION"}}',
+        400,
+        null,
+        [['message' => 'Mail service not enabled', 'domain' => 'global', 'reason' => 'failedPrecondition']],
+    );
+}
+
+function googleNotACalendarUser(): GoogleServiceException
+{
+    return new GoogleServiceException(
+        '{"error":{"errors":[{"domain":"calendar","reason":"notACalendarUser","message":"The user must be signed up for Google Calendar."}],"code":403}}',
+        403,
+        null,
+        [['domain' => 'calendar', 'reason' => 'notACalendarUser', 'message' => 'The user must be signed up for Google Calendar.']],
+    );
+}
+
+function googleRateLimited(): GoogleServiceException
+{
+    return new GoogleServiceException(
+        '{"error":{"code":403,"message":"Rate Limit Exceeded","errors":[{"message":"Rate Limit Exceeded","domain":"usageLimits","reason":"rateLimitExceeded"}]}}',
+        403,
+        null,
+        [['message' => 'Rate Limit Exceeded', 'domain' => 'usageLimits', 'reason' => 'rateLimitExceeded']],
+    );
+}
+
+it('fails the mailbox with a plain reason when the workspace has switched the mail service off', function (Closure $job): void {
+    $account = mailboxWithCursors();
+    providerThrows(googleMailServiceNotEnabled());
+
+    workMailboxJob($job($account));
+
+    Exceptions::assertNothingReported();
+
+    expect(DB::table('jobs')->count())->toBe(0)
+        ->and(DB::table('failed_jobs')->count())->toBe(1)
+        ->and($account->fresh()?->status)->toBe(EmailAccountStatus::ERROR)
+        ->and($account->fresh()?->last_error)->toBe(SyncErrorReason::GoogleMailDisabled->value)
+        ->and($account->fresh()?->syncErrorReason())->toBe("Gmail isn't enabled for this Google Workspace account. Ask your Google admin to turn it on, then reconnect.");
+})->with([
+    'incremental email' => [fn (ConnectedAccount $account): IncrementalEmailSyncJob => new IncrementalEmailSyncJob($account)],
+    'initial email' => [fn (ConnectedAccount $account): InitialEmailSyncJob => new InitialEmailSyncJob($account)],
+]);
+
+it('turns calendar sync off and keeps the mailbox active when the user has no Google Calendar', function (Closure $job): void {
+    config()->set('app.url', 'https://app.relaticle.com');
+    $account = mailboxWithCursors();
+    $account->update(['calendar_push_channel_id' => 'channel-1', 'calendar_push_resource_id' => 'resource-1']);
+    providerThrows(googleNotACalendarUser());
+
+    workMailboxJob($job($account));
+
+    Exceptions::assertNothingReported();
+
+    $fresh = $account->fresh();
+
+    expect(DB::table('jobs')->count())->toBe(0)
+        ->and(DB::table('failed_jobs')->count())->toBe(0)
+        ->and($fresh?->status)->toBe(EmailAccountStatus::ACTIVE)
+        ->and($fresh?->hasCalendar())->toBeFalse()
+        ->and($fresh?->hasEmail())->toBeTrue()
+        ->and($fresh?->calendar_push_channel_id)->toBeNull()
+        ->and($fresh?->last_error)->toBeNull();
+})->with([
+    'incremental calendar' => [fn (ConnectedAccount $account): IncrementalCalendarSyncJob => new IncrementalCalendarSyncJob($account)],
+    'initial calendar' => [fn (ConnectedAccount $account): InitialCalendarSyncJob => new InitialCalendarSyncJob($account)],
+    'calendar push channel' => [fn (ConnectedAccount $account): EnsureCalendarPushChannelJob => new EnsureCalendarPushChannelJob($account)],
+]);
+
+it('keeps reporting a google 403 that is not a disabled service', function (): void {
+    $account = mailboxWithCursors();
+    providerThrows(googleRateLimited());
+
+    workMailboxJob(new IncrementalCalendarSyncJob($account));
+
+    $fresh = $account->fresh();
+
+    Exceptions::assertReported(GoogleServiceException::class);
+
+    expect($fresh?->hasCalendar())->toBeTrue()
+        ->and($fresh?->status)->not->toBe(EmailAccountStatus::REAUTH_REQUIRED);
+});
+
+it('keeps the plain mail-disabled reason when the account already carried it', function (): void {
+    $account = mailboxWithCursors();
+    $account->update(['last_error' => SyncErrorReason::GoogleMailDisabled->value]);
+    providerThrows(googleMailServiceNotEnabled());
+
+    workMailboxJob(new IncrementalEmailSyncJob($account->fresh()));
+
+    expect($account->fresh()?->status)->toBe(EmailAccountStatus::ERROR)
+        ->and($account->fresh()?->last_error)->toBe(SyncErrorReason::GoogleMailDisabled->value);
+});
+
+it('settles a pending calendar history import when the user has no Google Calendar', function (): void {
+    $account = mailboxWithCursors();
+    $import = resolve(MailboxHistoryImportService::class);
+    $batch = $import->startBatch($account);
+    $account->update(['history_import_batch_id' => $batch->id]);
+    $import->markCalendarImportPending($batch->id);
+    providerThrows(googleNotACalendarUser());
+
+    workMailboxJob(new InitialCalendarSyncJob($account->fresh()));
+
+    $fresh = $account->fresh();
+
+    expect($import->isCalendarImportPending($batch->id))->toBeFalse()
+        ->and($fresh?->history_import_notified_batch_id)->toBe($batch->id)
+        ->and($fresh?->hasCalendar())->toBeFalse();
+});
+
+it('retries a token refresh that Google answers with internal_failure instead of reporting it', function (): void {
+    $account = mailboxWithCursors();
+
+    $mailFactory = Mockery::mock(MailServiceFactoryInterface::class);
+    $mailFactory->shouldReceive('make')->andThrow(new RuntimeException('internal_failure: token refresh failed'));
+    app()->instance(MailServiceFactoryInterface::class, $mailFactory);
+
+    workMailboxJob(new IncrementalEmailSyncJob($account));
+
+    Exceptions::assertNothingReported();
+
+    expect(DB::table('jobs')->count())->toBe(1)
+        ->and(DB::table('failed_jobs')->count())->toBe(0)
+        ->and($account->fresh()?->status)->toBe(EmailAccountStatus::ACTIVE);
 });

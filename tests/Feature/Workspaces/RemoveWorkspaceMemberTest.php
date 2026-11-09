@@ -4,23 +4,31 @@ declare(strict_types=1);
 
 use App\Actions\Jetstream\RemoveWorkspaceMember;
 use App\Enums\WorkspaceRole;
+use App\Features\EmailIntegration;
+use App\Models\Notification as NotificationRow;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Notifications\WorkspaceMemberRemovedNotification;
+use App\Support\Inbox\InboxRequests;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Jetstream\Events\TeamMemberRemoved;
 use Laravel\Jetstream\Http\Livewire\TeamMemberManager;
+use Laravel\Pennant\Feature;
 use Livewire\Livewire;
+use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\Scopes\ActiveAccountScope;
 
 mutates(User::class);
@@ -266,4 +274,74 @@ test('removing a member cancels the mail they had queued and leaves a teammate m
 
     expect(Email::withoutGlobalScope(ActiveAccountScope::class)->findOrFail($membersMail->getKey())->status)->toBe(EmailStatus::CANCELLED)
         ->and($ownersMail->fresh()->status)->toBe(EmailStatus::QUEUED);
+});
+
+test('removing a member deletes their notifications from that workspace only', function () {
+    $owner = User::factory()->withWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
+    $otherWorkspace = User::factory()->withWorkspace()->create()->currentWorkspace;
+    $workspace->users()->attach($member = User::factory()->create(), ['role' => 'member']);
+
+    NotificationRow::factory()->for($member, 'notifiable')->create(['workspace_id' => $workspace->getKey()]);
+    $otherWorkspaceRow = NotificationRow::factory()->for($member, 'notifiable')->create(['workspace_id' => $otherWorkspace->getKey()]);
+    $accountRow = NotificationRow::factory()->for($member, 'notifiable')->create(['workspace_id' => null]);
+    $teammateRow = NotificationRow::factory()->for($owner, 'notifiable')->create(['workspace_id' => $workspace->getKey()]);
+
+    resolve(RemoveWorkspaceMember::class)->remove($owner, $workspace, $member);
+
+    expect($member->notifications()->pluck('id')->all())->toEqualCanonicalizing([$otherWorkspaceRow->getKey(), $accountRow->getKey()])
+        ->and($owner->notifications()->pluck('id')->all())->toBe([$teammateRow->getKey()]);
+});
+
+test('removing a member keeps them in the workspace when the notification purge fails', function () {
+    Event::fake([TeamMemberRemoved::class]);
+
+    $owner = User::factory()->withWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
+    $workspace->users()->attach($member = User::factory()->create(), ['role' => 'member']);
+    $row = NotificationRow::factory()->for($member, 'notifiable')->create(['workspace_id' => $workspace->getKey()]);
+
+    DB::listen(function (QueryExecuted $query): void {
+        throw_if(str_starts_with($query->sql, 'delete from "notifications"'), RuntimeException::class, 'The purge failed.');
+    });
+
+    expect(fn () => resolve(RemoveWorkspaceMember::class)->remove($owner, $workspace, $member))
+        ->toThrow(RuntimeException::class, 'The purge failed.');
+
+    expect($member->fresh()->belongsToWorkspace($workspace))->toBeTrue()
+        ->and(NotificationRow::query()->whereKey($row->getKey())->exists())->toBeTrue();
+
+    Event::assertNotDispatched(TeamMemberRemoved::class);
+});
+
+test('removing a member cancels their open access requests and leaves a teammate request open', function () {
+    Feature::for(null)->activate(EmailIntegration::class);
+
+    $owner = User::factory()->withWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
+    $workspace->users()->attach($member = User::factory()->create(), ['role' => 'member']);
+    $workspace->users()->attach($teammate = User::factory()->create(), ['role' => 'member']);
+
+    $email = Email::factory()->private()->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $owner->getKey(),
+        'connected_account_id' => syncingMailbox($owner, $workspace)->getKey(),
+    ]);
+
+    $requestFrom = fn (User $requester): EmailAccessRequest => EmailAccessRequest::factory()->create([
+        'requester_id' => $requester->getKey(),
+        'owner_id' => $owner->getKey(),
+        'email_id' => $email->getKey(),
+    ]);
+
+    $membersRequest = $requestFrom($member);
+    $teammatesRequest = $requestFrom($teammate);
+
+    resolve(RemoveWorkspaceMember::class)->remove($owner, $workspace, $member);
+
+    $listed = resolve(InboxRequests::class)->for($owner, $workspace);
+
+    expect($membersRequest->fresh()->status)->toBe(EmailAccessRequestStatus::CANCELLED)
+        ->and($teammatesRequest->fresh()->status)->toBe(EmailAccessRequestStatus::PENDING)
+        ->and($listed->pluck('id')->all())->toBe([$teammatesRequest->getKey()]);
 });

@@ -16,17 +16,16 @@
 /* Chat */
 @source '../../../../packages/Chat/resources/views';
 @source '../../../../packages/Chat/resources/js';
+@source '../../../../packages/Chat/src/Support/ChatProse.php';
 
 /* ImportWizard */
 @source '../../../../packages/ImportWizard/resources';
-@source '../../../../packages/ImportWizardNew/resources';
 
 /* EmailIntegration */
 @source '../../../../packages/EmailIntegration/resources';
 @source '../../../../packages/EmailIntegration/src';
 
 /* Custom Fields */
-@source '../../../../vendor/relaticle/flowforge/resources/views/**/*.blade.php';
 @source '../../../../vendor/relaticle/custom-fields/resources';
 
 /* Activity Log */
@@ -39,19 +38,19 @@
 
 /* App Panel Custom Layout
 
-   Profile (and any tall page) was scrolling the document. Overflow past
-   <body> paints on <html>. html.fi is only min-h-dvh; Filament also sets
-   .fi-main-ctn to min-h-[calc(100dvh-4rem)]. The app shell used h-screen
-   (100vh), which can be taller than 100dvh. Lock html/body and keep the
-   only scroller on .fi-layout. */
-html.fi:has(body.fi-panel-app) {
+   A shell with its own scroller (the app layout, the settings layout) locks html and body, so the only
+   scroller is that shell. Profile (and any tall page) was scrolling the document: overflow past <body>
+   paints on <html>, and h-screen (100vh) can be taller than 100dvh. Guest and onboarding pages have no
+   such scroller, so they keep document scrolling. */
+html.fi:has(body.fi-panel-app :is(.fi-app-layout, .fi-settings-layout)),
+.fi-body.fi-panel-app:has(:is(.fi-app-layout, .fi-settings-layout)) {
     height: 100dvh;
     overflow: hidden;
 }
 
 .fi-body.fi-panel-app {
-    height: 100dvh;
-    overflow: hidden;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+        env(safe-area-inset-left);
 }
 
 /* The content area is the surface colour on every page; the sidebar carries the canvas grey.
@@ -93,25 +92,18 @@ html.fi:has(body.fi-panel-app) {
     @apply h-full border-r border-gray-200/60 bg-(--surface-sidebar-bg) dark:border-white/10;
 }
 
-/* Heroicons draw a 1.5 stroke on a 24 grid, a 1px line at the sidebar's 16px,
-   too faint beside a medium-weight label. Menus keep the panel-wide weight. */
-.fi-sidebar svg[stroke-width]:not(.fi-dropdown-panel *) {
-    stroke-width: 1.75;
-}
-
 .fi-sidebar .fi-dropdown-list-item-image,
 [data-workspace-switcher] .fi-dropdown-list-item-image {
     @apply rounded-md;
 }
 
 /* Search row (AppSidebar): the search field and the notifications trigger,
-   inset to exactly the gutter the navigation items sit in: the nav's `px-6`
-   less the groups' `-mx-2`. Padding rather than margin, so the rule separating
-   it from the workspace switcher runs the full width of the sidebar. */
+   inset to the header's edges: the workspace avatar and the toggle glyph.
+   Padding rather than margin, so the rule above it runs the full width. */
 .fi-sidebar-search-ctn {
     /* 12px above and below the rule; the field then gets a wider gap before the
        navigation starts (`.fi-sidebar-nav` already opens with 10px of its own). */
-    @apply mt-2 flex items-center justify-center gap-x-2 border-t border-gray-200/60 px-4 pt-3 pb-2.5 dark:border-white/10;
+    @apply mt-2 flex items-center justify-end-safe gap-x-2 border-t border-gray-200/60 px-6 pt-3 pb-2.5 dark:border-white/10;
 }
 
 .fi-sidebar-search {
@@ -125,11 +117,11 @@ html.fi:has(body.fi-panel-app) {
 
     /* Compact field on the surface colour, so it lifts off the sidebar's canvas grey. */
     .fi-input-wrp {
-        @apply h-8 rounded-lg bg-white shadow-xs ring-gray-950/10 dark:bg-white/5 dark:ring-white/10;
+        @apply h-8 rounded-lg bg-white shadow-xs ring-gray-950/10 focus-within:ring-primary-600 dark:bg-white/5 dark:ring-white/10 dark:focus-within:ring-primary-500;
     }
 
     .fi-input-wrp-prefix {
-        @apply ps-2.5;
+        @apply cursor-text ps-2.5;
 
         .fi-icon {
             @apply h-4 w-4 text-gray-500 dark:text-gray-400;
@@ -152,7 +144,7 @@ html.fi:has(body.fi-panel-app) {
 
     /* Keyboard hint reads as a key cap rather than trailing text */
     .fi-input-wrp-suffix {
-        @apply pe-1.5;
+        @apply cursor-text pe-1.5 max-sm:hidden;
 
         .fi-input-wrp-label {
             @apply rounded-md bg-gray-50 px-1.5 py-px text-[0.6875rem]/[1.125rem] font-medium text-gray-500 ring-1 ring-gray-950/[0.06] dark:bg-white/10 dark:text-gray-400 dark:ring-white/10;
@@ -172,17 +164,96 @@ html.fi:has(body.fi-panel-app) {
     @apply absolute -end-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-primary-600 px-1 text-[0.625rem] font-semibold leading-4 text-white;
 }
 
-/* Collapsed rail: only the trigger remains (the search field is hidden by the
-   sidebar store), so drop the gutter and let it centre. */
+/* `--inbox-left` is the sidebar's measured right edge, set each time the panel opens. */
+.fi-inbox-panel {
+    @apply fixed inset-0 z-40 flex flex-col overflow-hidden bg-white text-sm dark:bg-gray-900;
+}
+
+@media (width >= 64rem) {
+    .fi-inbox-panel {
+        @apply inset-auto top-2 max-h-[calc(100dvh-1rem)] w-96 rounded-xl shadow-lg ring-1 ring-gray-950/10 dark:ring-white/10;
+
+        left: var(--inbox-left, 0.5rem);
+    }
+}
+
+.fi-inbox-header {
+    @apply shrink-0 border-b border-gray-200/60 bg-white dark:border-white/10 dark:bg-gray-900;
+}
+
+.fi-inbox-tab {
+    @apply inline-flex items-center gap-1.5 border-b-2 border-transparent pb-2 text-sm font-medium text-gray-500 transition hover:text-gray-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:text-gray-200;
+}
+
+.fi-inbox-tab-active {
+    @apply border-primary-600 text-gray-950 dark:border-primary-400 dark:text-white;
+}
+
+.fi-inbox-tab-count {
+    @apply rounded-full bg-primary-50 px-1.5 text-xs/5 font-semibold text-primary-700 dark:bg-primary-400/10 dark:text-primary-400;
+}
+
+.fi-inbox-group-heading {
+    @apply px-4 pt-3 pb-1 text-xs font-medium text-gray-500 dark:text-gray-400;
+}
+
+.fi-inbox-icon-btn {
+    @apply flex size-6 items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-200;
+}
+
+.fi-inbox-row {
+    @apply flex w-full gap-3 px-4 py-3 text-start transition;
+}
+
+.fi-inbox-row-interactive {
+    @apply cursor-pointer hover:bg-gray-50 focus-visible:bg-gray-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500 dark:hover:bg-white/5 dark:focus-visible:bg-white/5;
+}
+
+/* Touch screens have no hover or focus, so the controls sit under the row
+   instead of over its title. */
+.fi-inbox-row-controls {
+    @apply absolute end-3 top-2 flex gap-0.5 rounded-lg bg-white p-0.5 opacity-0 shadow-xs ring-1 ring-gray-950/10 transition dark:bg-gray-900 dark:ring-white/10;
+
+    .group:hover &,
+    .group:focus-within & {
+        @apply opacity-100;
+    }
+
+    @media (hover: none) {
+        @apply static ms-auto me-3 mb-2 w-max opacity-100;
+    }
+}
+
+/* Collapsed rail: only the trigger remains, held at the end of the row so it
+   does not jump when the search field leaves. It lands in the toggle's column. */
 .fi-sidebar:not(.fi-sidebar-open) .fi-sidebar-search-ctn {
     @apply mx-0 px-2;
 }
 
-/* The 3rem rail centres a 2rem item: 1rem of nav padding less the groups'
-   -0.5rem, then the item's own 0.5rem. */
+/* The rail keeps the open layout and only narrows the padding, which glides with the width.
+   Filament centres a 40px group with `mx-auto`, which threw the icons to the middle of the still-wide
+   panel on the first frame of a collapse. */
 @media (width >= 64rem) {
-    .fi-sidebar:not(.fi-sidebar-open) .fi-sidebar-nav {
-        @apply ps-4;
+    /* Longhands: WebKit does not animate the `padding-inline` shorthand. */
+    .fi-sidebar-nav,
+    .fi-sidebar-search-ctn {
+        transition-property: padding-inline-start, padding-inline-end;
+        transition-duration: var(--sidebar-motion-duration);
+        transition-timing-function: var(--sidebar-motion-easing);
+    }
+
+    .fi-sidebar:not(.fi-sidebar-open) {
+        .fi-sidebar-nav {
+            @apply px-4;
+        }
+
+        .fi-sidebar-nav-groups {
+            @apply -mx-2 w-auto max-w-none;
+        }
+
+        .fi-sidebar-item-btn {
+            @apply px-2;
+        }
     }
 }
 
@@ -192,6 +263,11 @@ html.fi:has(body.fi-panel-app) {
     .fi-sidebar.fi-sidebar-open {
         width: min(90vw, 18rem);
     }
+}
+
+/* Against the scrimmed page the drawer's white/10 hairline vanishes in dark mode. */
+.fi-sidebar.fi-sidebar-open {
+    @apply max-sm:dark:border-white/20 max-sm:dark:ring-white/20;
 }
 
 /* Drag handle straddling a resizable edge (components/resize-handle). */
@@ -250,19 +326,24 @@ html.fi-chat-docked .fi-app-main-wrapper {
 
 .fi-sidebar-nav {
     @apply gap-y-5 pt-2.5;
+}
+
+.fi-sidebar-nav,
+.ff-cards {
     scrollbar-width: thin;
     scrollbar-color: var(--color-gray-300) transparent;
 }
 
-.dark .fi-sidebar-nav {
+.dark :is(.fi-sidebar-nav, .ff-cards) {
     scrollbar-color: var(--color-gray-700) transparent;
 }
 
 .fi-sidebar-item {
     @apply transition-colors duration-200 ease-in-out;
 
+    /* A fixed row height, so rows keep their pitch on the rail where the label leaves only the icon. */
     .fi-sidebar-item-btn {
-        @apply hover:bg-(--surface-sidebar-hover-bg) focus-visible:bg-(--surface-sidebar-hover-bg);
+        @apply min-h-8 hover:bg-(--surface-sidebar-hover-bg) focus-visible:bg-(--surface-sidebar-hover-bg);
         padding-block: calc(var(--spacing) * 1.5);
     }
 
@@ -336,9 +417,12 @@ html.fi-chat-docked .fi-app-main-wrapper {
     }
 }
 
-/* Top Navigation Bar: 3rem, the height of the sidebar's workspace row. */
+/* Top Navigation Bar: 3rem, the height of the sidebar's workspace row. The phone tab bar sits below the content. */
 .fi-body {
     --topbar-height: 3rem;
+    --bottom-nav-height: 0rem;
+
+    @apply max-sm:[--bottom-nav-height:3.75rem];
 }
 
 .fi-topbar {
@@ -403,10 +487,10 @@ html.fi-chat-docked .fi-app-main-wrapper {
     }
 
     /* Filament sizes the collapsed rail from its content, and `auto` cannot be
-       animated from a fixed width. `--collapsed-sidebar-width` comes from the
+       animated from a fixed width. `--sidebar-collapsed-width` comes from the
        panel's `collapsedSidebarWidth()`, so both ends are explicit. */
     .fi-sidebar:not(.fi-sidebar-open) {
-        width: var(--collapsed-sidebar-width);
+        width: var(--sidebar-collapsed-width);
     }
 
     /* Keeping the icons start-aligned means they hold their column while the
@@ -442,25 +526,38 @@ html.fi-chat-docked .fi-app-main-wrapper {
         @apply overflow-hidden;
     }
 
-    /* The lane the toggle sits in, beside the switcher when open. It has to
-       clear everything the button occupies, which is its 4.5 inset plus its own
-       8 of width: anything narrower and the trigger's box runs under the button
-       even though the workspace name still looks clear of it. It is not
-       transitioned: animating it let the trigger's edge overtake the button,
-       and the fading workspace name ran out from under it. Snapping it at the
-       start of the collapse is invisible, since the name is already clipped by
-       the panel edge well before it reaches the button. */
+    /* The lane the collapse button sits in, beside the switcher. It has to clear
+       the button's 4.5 inset plus its own 8 of width, or the trigger's box runs under
+       the button. It never animates, since that let the trigger's edge overtake the
+       button, and a collapse keeps it until the rail is reached, since dropping it
+       first slid the chevron under the button. */
     #fi-main-sidebar.fi-sidebar-open:has(> [data-sidebar-workspace-toggle]) > .fi-tenant-menu {
         margin-inline-end: calc(var(--spacing) * 14);
     }
 
-    /* On the rail the toggle drops below the switcher rather than beside it,
-       so the rail can be narrow enough to centre both on the navigation's icon
-       column. The avatar is pinned so the narrow box cannot squeeze it. */
+    /* The avatar is pinned so the narrow rail cannot squeeze it. */
     #fi-main-sidebar:not(.fi-sidebar-open):has(> [data-sidebar-workspace-toggle]) > .fi-tenant-menu {
-        margin-top: calc(var(--spacing) * 2);
         margin-inline: calc(var(--spacing) * 1);
-        padding-bottom: calc(var(--spacing) * 10);
+        transition-delay: 0s, var(--sidebar-motion-duration);
+    }
+
+    /* The avatar glides to the rail's centre with the width. */
+    #fi-main-sidebar:has(> [data-sidebar-workspace-toggle]) > .fi-tenant-menu {
+        transition-property: margin-inline-start, margin-inline-end;
+        transition-duration: var(--sidebar-motion-duration), 0s;
+        transition-timing-function: var(--sidebar-motion-easing);
+    }
+
+    /* The top bar's start widens to hold the expand button on the same curve as
+       the rail, so the page heading glides aside instead of jumping when it appears. */
+    .fi-topbar {
+        transition-property: padding-inline-start;
+        transition-duration: var(--sidebar-motion-duration);
+        transition-timing-function: var(--sidebar-motion-easing);
+    }
+
+    .fi-topbar:has(> .fi-topbar-expand-sidebar-btn.fi-sidebar-collapsed) {
+        padding-inline-start: calc(var(--spacing) * 14);
     }
 
     .fi-tenant-menu-trigger .fi-avatar {
@@ -468,58 +565,57 @@ html.fi-chat-docked .fi-app-main-wrapper {
     }
 }
 
-/* The panel's own collapse button is inline in the topbar view, with no config
-   to turn it off. Hiding it leaves one toggle, in the sidebar it controls. */
+/* The panel's own collapse buttons are inline in the topbar view, with no config
+   to turn them off. Ours replace them. */
 body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
     display: none;
 }
 
-.fi-sidebar-toggle-btn {
+.fi-sidebar-toggle-btn,
+.fi-topbar-expand-sidebar-btn {
     @apply absolute top-2 z-20 hidden h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-(--surface-sidebar-hover-bg) hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 lg:flex dark:text-gray-500 dark:hover:text-gray-200;
-
-    /* 4.5 spacing from the trailing edge is also the centre of the collapsed
-       rail, so this one value serves both states and the button never moves
-       horizontally relative to the panel. It rides the edge as the panel
-       animates, which is the only path across the sidebar that crosses no
-       labels: everything beside it is clipped by that same edge. */
-    inset-inline-end: calc(var(--spacing) * 4.5);
-
-    /* Expanding: the button leaves the rail immediately, so it is back on the
-       header line before the panel is wide enough to show one. */
-    transition-property: color, background-color, top, inset-inline-end;
-    transition-duration: var(--sidebar-motion-duration),
-        var(--sidebar-motion-duration), calc(var(--sidebar-motion-duration) / 2),
-        var(--sidebar-motion-duration);
-    transition-timing-function: var(--sidebar-motion-easing);
 
     .fi-sidebar-toggle-icon {
         @apply h-5 w-5;
     }
 }
 
-/* On the rail the button drops to the row below the workspace avatar, which is
-   the only thing that changes between the two states.
+/* Collapse rides the panel's trailing edge. Expanding, it fades in only once the
+   edge has carried it past the workspace avatar. */
+.fi-sidebar-toggle-btn {
+    inset-inline-end: calc(var(--spacing) * 4.5);
+    transition-property: color, background-color, opacity, visibility;
+    transition-duration: var(--sidebar-motion-duration), var(--sidebar-motion-duration),
+        calc(var(--sidebar-motion-duration) / 4), 0s;
+    transition-delay: 0s, 0s, calc(var(--sidebar-motion-duration) / 2.5), 0s;
+    transition-timing-function: var(--sidebar-motion-easing);
+}
 
-   Collapsing, that drop is the last thing to happen: running it against the
-   width made the button descend past a sidebar still at full width. A CSS
-   transition is read off the state being entered, so the delay belongs here and
-   not on the rule above. */
+/* Collapsing, it is gone before the narrowing edge brings it to the avatar. */
 #fi-main-sidebar:not(.fi-sidebar-open) .fi-sidebar-toggle-btn {
-    top: calc(var(--spacing) * 11);
-    inset-inline-end: calc(var(--spacing) * 2);
-    transition-delay: 0s, 0s, calc(var(--sidebar-motion-duration) / 2), 0s;
+    @apply invisible opacity-0;
+    transition-delay: 0s, 0s, 0s, calc(var(--sidebar-motion-duration) / 4);
 }
 
-/* One glyph per direction, swapped by the sidebar's own state class so the icon
-   never lags a frame behind the panel it describes. */
-.fi-sidebar-toggle-icon-expand,
-#fi-main-sidebar.fi-sidebar-open .fi-sidebar-toggle-icon-collapse {
-    @apply block;
-}
+/* Expand fades in as the rail lands, over the top bar's widened start. Its glyph,
+   not its box, sits on the page's 24px content edge, as the page heading's icon does. */
+.fi-topbar-expand-sidebar-btn {
+    inset-inline-start: calc(var(--spacing) * 4.5);
 
-.fi-sidebar-toggle-icon-collapse,
-#fi-main-sidebar.fi-sidebar-open .fi-sidebar-toggle-icon-expand {
-    @apply hidden;
+    &.fi-transition-enter {
+        transition-property: opacity;
+        transition-duration: calc(var(--sidebar-motion-duration) / 2);
+        transition-delay: calc(var(--sidebar-motion-duration) * 0.6);
+        transition-timing-function: var(--sidebar-motion-easing);
+    }
+
+    &.fi-transition-enter-start {
+        @apply opacity-0;
+    }
+
+    &.fi-transition-enter-end {
+        @apply opacity-100;
+    }
 }
 
 /* Labels fade out before the panel narrows past them, and back in behind the
@@ -527,12 +623,23 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
 .fi-sidebar-item-label,
 .fi-sidebar-item-badge-ctn,
 .fi-sidebar-group-btn,
+.fi-sidebar-chats .fi-sidebar-item,
 .fi-sidebar-search,
 .fi-tenant-menu-trigger-text,
 .fi-tenant-menu-trigger .fi-icon {
     &.fi-transition-enter {
+        @apply lg:transition;
+
         transition-delay: calc(var(--sidebar-motion-duration) / 2.5);
         transition-duration: calc(var(--sidebar-motion-duration) / 2);
+    }
+
+    &.fi-transition-enter-start {
+        @apply opacity-0;
+    }
+
+    &.fi-transition-enter-end {
+        @apply opacity-100;
     }
 
     &.fi-transition-leave {
@@ -799,8 +906,8 @@ a.fi-linked-records-chip {
 
 /* Row and card menus recede until hovered; a primary-coloured trigger on every row reads as noise. */
 .fi-ta-row .fi-ac-icon-btn-group,
-.flowforge-card .fi-ac-icon-btn-group,
-.flowforge-column-header .fi-icon-btn {
+.ff-card-actions .fi-ac-icon-btn-group,
+.ff-column-header .fi-icon-btn {
     @apply text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200;
 }
 
@@ -849,6 +956,131 @@ a.fi-linked-records-chip {
 
 .fi-ta-table tbody tr:not(:last-child) td {
     @apply dark:border-white/5;
+}
+
+/* Below sm a stacked row is a card: the first column heads it, then one label and value per line. */
+.fi-ta-table-stacked-on-mobile > tbody > tr.fi-ta-row {
+    @apply max-sm:py-3;
+
+    & > td {
+        @apply max-sm:border-0!;
+    }
+
+    & > td.fi-ta-cell:not(.fi-ta-selection-cell, :has(.fi-ta-actions), [class*=':fi-visible']) {
+        @apply max-sm:grid max-sm:grid-cols-[8.5rem_minmax(0,1fr)] max-sm:items-center max-sm:gap-x-3 max-sm:py-1;
+
+        & > .fi-ta-cell-label {
+            @apply max-sm:truncate max-sm:pt-0 max-sm:font-normal;
+        }
+
+        & > .fi-ta-cell-content {
+            @apply max-sm:min-w-0;
+        }
+
+        & .fi-ta-text > .inline-flex {
+            @apply max-sm:max-w-full;
+        }
+
+        & .fi-ta-text > .inline-flex .group\/value {
+            @apply max-sm:min-w-0 max-sm:shrink;
+
+            & > a {
+                @apply max-sm:max-w-full;
+            }
+        }
+
+        &:is(
+                :has(.fi-ta-text:not(.fi-ta-text-item)):not(:has(.fi-ta-text:not(.fi-ta-text-item) > :not(.sr-only))),
+                :has(.fi-linked-records-cell-empty)
+            ) {
+            @apply max-sm:hidden;
+        }
+    }
+
+    & > td:is(.fi-ta-selection-cell + td, :first-child:not(.fi-ta-selection-cell)) {
+        @apply max-sm:block max-sm:min-w-0 max-sm:overflow-hidden max-sm:pe-24 max-sm:pb-2;
+
+        & > .fi-ta-cell-label {
+            @apply max-sm:hidden;
+        }
+
+        & :is(.fi-ta-text-item, .fi-record-chip) {
+            @apply max-sm:font-semibold;
+        }
+
+        & :is(.fi-ta-text-item, .fi-record-chip .truncate) {
+            @apply max-sm:line-clamp-2 max-sm:break-words max-sm:whitespace-normal;
+        }
+    }
+
+    & > td:has(.fi-ta-actions) {
+        @apply max-sm:absolute max-sm:end-12 max-sm:top-2 max-sm:p-0;
+    }
+
+    &:not(:has(.fi-ta-selection-cell)) > td:has(.fi-ta-actions) {
+        @apply max-sm:end-4;
+    }
+}
+
+.fi-ta-table-stacked-on-mobile .fi-ta-cell-content > .fi-ta-col > * {
+    @apply max-sm:min-w-0 max-sm:p-0;
+}
+
+.fi-ta-table-stacked-on-mobile .fi-ta-cell-content > .fi-ta-col > * > * {
+    @apply max-sm:max-w-full max-sm:min-w-0;
+}
+
+.fi-icon-btn:is(.fi-record-preview-trigger, .fi-board-card-preview-trigger) {
+    @apply m-0 size-6 shrink-0 rounded-md bg-white text-gray-500 opacity-0 ring-1 ring-gray-950/10 transition-opacity duration-75 pointer-coarse:opacity-100 hover:bg-gray-50 hover:text-gray-950 focus-visible:opacity-100 max-sm:hidden dark:text-gray-400 dark:ring-white/10 dark:hover:bg-white/10 dark:hover:text-white;
+
+    & .fi-icon {
+        @apply size-3.5;
+    }
+}
+
+.fi-icon-btn.fi-record-preview-trigger {
+    @apply dark:bg-white/5;
+}
+
+/* Over the card's text, so it stays opaque. The offsets match Flowforge's card menu beside it. */
+.fi-icon-btn.fi-board-card-preview-trigger {
+    @apply absolute end-[calc(0.5rem+1.25rem+0.25rem)] top-[calc(0.5rem-0.125rem)] z-10 dark:bg-(--surface-block-bg);
+}
+
+.fi-ta-row:is(:hover, :focus-within) .fi-record-preview-trigger,
+.ff-card:is(:hover, :focus-within) .fi-board-card-preview-trigger {
+    @apply opacity-100;
+}
+
+/* The trigger sits beside the card menu, so its schema slot takes no room in the card body. */
+.ff-card-body :is(.fi-grid-col:has(> .fi-sc-component > .fi-board-card-preview-trigger), .fi-sc-component:has(> .fi-board-card-preview-trigger)) {
+    @apply contents;
+}
+
+.fi-ta-row.fi-record-previewing {
+    @apply bg-gray-50 dark:bg-white/5;
+}
+
+/* On a phone the table search fills the toolbar row, beside the filter and column buttons. The actions after
+   it are often only bulk actions waiting on a selection, so they take a margin once shown rather than a gap. */
+.fi-ta-header-toolbar {
+    @apply max-sm:gap-x-0;
+
+    & > :has(> .fi-ta-search-field) {
+        @apply max-sm:ms-0 max-sm:flex-1;
+
+        & > .fi-ta-search-field {
+            @apply max-sm:w-full max-sm:max-w-none;
+        }
+    }
+
+    & > .fi-ta-actions {
+        @apply max-sm:order-last;
+
+        &:has(> :not([style*='display: none'])) {
+            @apply max-sm:ms-3;
+        }
+    }
 }
 
 /* The head cells already rule off an empty table. */
@@ -917,7 +1149,7 @@ a.fi-linked-records-chip {
     }
 
     .fi-modal-close-btn {
-        @apply end-4.5 top-2.5 m-0 size-7 rounded-md text-gray-500 hover:bg-gray-950/5 hover:text-gray-950 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white;
+        @apply end-4.5 top-2.5 m-0 size-7 rounded-md max-sm:-m-2 max-sm:size-11 text-gray-500 hover:bg-gray-950/5 hover:text-gray-950 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white;
 
         .fi-icon {
             @apply size-4.5;
@@ -989,7 +1221,7 @@ html.fi-record-stacked .fi-record-layout {
     @apply record-split:px-0;
 }
 
-.fi-record-page .fi-page-header-main-ctn {
+:is(.fi-record-page, .fi-record-embedded-page) .fi-page-header-main-ctn {
     @apply record-split:py-0;
 }
 
@@ -1011,7 +1243,289 @@ html.fi-record-stacked .fi-record-layout {
 
 .fi-record-rail {
     @apply record-split:sticky record-split:top-0 record-split:max-h-[calc(100dvh-var(--topbar-height))] record-split:overflow-y-auto record-split:px-5 record-split:py-5;
+}
 
+.fi-record-pane {
+    .fi-record-overview {
+        @apply flex flex-col gap-8 px-6 pt-5 pb-8 max-sm:px-0;
+    }
+
+    .fi-record-overview-section > .fi-section-header,
+    .fi-record-overview-related-header {
+        @apply mb-3 min-h-7;
+    }
+
+    .fi-record-overview-section .fi-section-header-heading,
+    .fi-record-overview-related-title {
+        @apply text-sm font-medium text-gray-600 dark:text-gray-400;
+    }
+
+    .fi-record-overview-card {
+        @apply overflow-hidden rounded-xl bg-(--surface-block-bg) ring-1 ring-(--surface-block-border);
+    }
+
+    .fi-record-highlights .fi-grid {
+        @apply gap-2.5;
+
+        & > .fi-grid-col,
+        & > .fi-grid-col > * {
+            @apply h-full;
+        }
+    }
+
+    .fi-record-highlight {
+        @apply flex h-full min-h-26 flex-col justify-between gap-3 rounded-xl bg-(--surface-block-bg) px-3.5 py-3 ring-1 ring-(--surface-block-border);
+
+        & .fi-in-entry-label-col,
+        & .fi-in-entry-label-ctn {
+            @apply w-full;
+        }
+
+        & .fi-in-entry-label-ctn {
+            @apply flex-row-reverse justify-between;
+
+            & .fi-sc-icon {
+                @apply size-4 text-gray-400 dark:text-gray-500;
+            }
+        }
+
+        & .fi-in-entry-label {
+            @apply truncate text-sm font-normal text-gray-500 dark:text-gray-400;
+        }
+
+        & .fi-in-entry-content-col {
+            @apply min-w-0;
+        }
+
+        & .fi-in-entry-content {
+            @apply text-sm font-medium;
+        }
+    }
+
+    .fi-record-highlight-empty {
+        @apply text-sm text-gray-400 dark:text-gray-500;
+    }
+
+    .fi-record-next-task {
+        @apply -mx-1.5 -my-1 flex w-[calc(100%+0.75rem)] min-w-0 flex-col items-start gap-0.5 rounded-md px-1.5 py-1 text-start outline-none hover:bg-(--surface-row-hover-bg) focus-visible:ring-2 focus-visible:ring-primary-500;
+    }
+
+    .fi-record-next-task-title {
+        @apply w-full truncate text-sm font-medium text-gray-950 dark:text-white;
+    }
+
+    .fi-record-due {
+        @apply inline-flex shrink-0 items-center gap-1 text-sm text-gray-500 tabular-nums dark:text-gray-400;
+    }
+
+    .fi-record-due-today {
+        @apply text-warning-600 dark:text-warning-400;
+    }
+
+    .fi-record-due-overdue {
+        @apply text-danger-600 dark:text-danger-400;
+    }
+
+    .fi-record-stage {
+        @apply flex flex-col gap-2;
+    }
+
+    .fi-record-stage-name {
+        @apply text-sm font-medium text-gray-950 dark:text-white;
+    }
+
+    .fi-record-stage-track {
+        @apply -my-1 flex gap-1;
+    }
+
+    .fi-record-stage-step {
+        @apply relative h-3 flex-1 cursor-default before:absolute before:inset-x-0 before:top-1 before:h-1 before:rounded-full before:bg-(--stage-color) before:opacity-20 before:content-[''];
+
+        &.fi-passed {
+            @apply before:opacity-45;
+        }
+
+        &.fi-current {
+            @apply before:opacity-100;
+        }
+    }
+
+    .fi-record-overview-activity {
+        @apply px-2 py-1.5;
+
+        & ol > li > [data-type] {
+            @apply grid-cols-[20px_minmax(0,1fr)_auto] items-start gap-x-2.5 px-2 py-1.5;
+
+            & > div:first-child {
+                @apply pt-0;
+
+                & > span {
+                    @apply size-5;
+                }
+            }
+
+            & time {
+                @apply text-xs;
+            }
+        }
+
+        & ol > li > span[aria-hidden] {
+            @apply start-1 top-7 -bottom-1.5;
+        }
+    }
+
+    .fi-record-overview-related {
+        @apply flex flex-col gap-6;
+    }
+
+    .fi-record-overview-related-header {
+        @apply flex items-center justify-between gap-3;
+    }
+
+    .fi-record-overview-related-title {
+        @apply inline-flex items-center gap-2;
+    }
+
+    .fi-record-overview-related-actions {
+        @apply flex items-center gap-1;
+    }
+
+    .fi-record-overview-section .fi-section-header-after-ctn .fi-link {
+        @apply rounded-md px-2 py-1 hover:bg-(--surface-control-hover-bg);
+
+        & .fi-link-label {
+            @apply text-sm font-normal text-gray-500 dark:text-gray-400;
+        }
+
+        &:hover .fi-link-label {
+            @apply text-gray-950 no-underline dark:text-white;
+        }
+    }
+
+    .fi-record-overview-view-all {
+        @apply rounded-md px-2 py-1 text-sm text-gray-500 outline-none hover:bg-(--surface-control-hover-bg) hover:text-gray-950 focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-gray-400 dark:hover:text-white;
+    }
+
+    .fi-record-overview-count,
+    .fi-record-pane .fi-tabs-item .fi-badge {
+        @apply min-w-5 justify-center rounded bg-transparent px-1 py-0 text-center text-xs font-medium text-gray-600 ring-1 ring-gray-950/10 dark:text-gray-300 dark:ring-white/10;
+    }
+
+    .fi-icon-btn.fi-record-overview-add {
+        @apply m-0 size-7 rounded-lg text-gray-500 hover:bg-(--surface-control-hover-bg) hover:text-gray-950 dark:text-gray-400 dark:hover:text-white;
+
+        & .fi-icon {
+            @apply size-4;
+        }
+    }
+
+    .fi-record-overview-list {
+        @apply px-2 py-1.5;
+    }
+
+    .fi-record-overview-item {
+        @apply flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-start text-sm outline-none hover:bg-(--surface-row-hover-bg) focus-visible:ring-2 focus-visible:ring-primary-500 max-sm:min-h-11;
+    }
+
+    .fi-avatar.fi-record-overview-item-avatar {
+        @apply size-5 shrink-0;
+    }
+
+    .fi-record-overview-item-icon {
+        @apply size-4 shrink-0 text-gray-400 dark:text-gray-500;
+    }
+
+    .fi-record-overview-item-text {
+        @apply flex min-w-0 flex-1 items-baseline gap-2;
+    }
+
+    .fi-record-overview-item-title {
+        @apply shrink-0 truncate font-medium text-gray-950 max-sm:shrink dark:text-white;
+    }
+
+    .fi-record-overview-item-snippet {
+        @apply min-w-0 truncate text-gray-500 dark:text-gray-400;
+    }
+
+    .fi-record-overview-item-person {
+        @apply flex max-w-40 shrink-0 items-center gap-1.5 text-gray-600 max-sm:hidden dark:text-gray-300;
+
+        & .fi-avatar {
+            @apply size-5;
+        }
+    }
+
+    .fi-record-overview-item-meta {
+        @apply shrink-0 text-gray-500 tabular-nums dark:text-gray-400;
+    }
+}
+
+.fi-modal-window.fi-record-preview {
+    @apply border-s border-gray-200/60 shadow-xl dark:border-white/10;
+
+    & > .fi-modal-header {
+        @apply hidden;
+    }
+
+    & > .fi-modal-content {
+        @apply gap-0 p-0!;
+    }
+
+    .fi-record-preview-header {
+        @apply sticky top-0 z-30 flex h-(--topbar-height) shrink-0 items-center gap-2 border-b border-gray-200/60 bg-white/95 px-3 backdrop-blur dark:border-white/10 dark:bg-gray-900/95;
+    }
+
+    .fi-record-preview-header .fi-icon-btn {
+        @apply m-0 size-7 rounded-lg text-gray-500 hover:bg-(--surface-control-hover-bg) hover:text-gray-950 dark:text-gray-400 dark:hover:text-white;
+
+        & .fi-icon {
+            @apply size-4;
+        }
+
+        &.fi-record-preview-header-btn {
+            @apply bg-white ring-1 ring-gray-950/10 hover:bg-gray-50 dark:bg-white/5 dark:ring-white/10 dark:hover:bg-white/10;
+        }
+
+        &.fi-disabled {
+            @apply opacity-40;
+        }
+    }
+
+    .fi-record-preview-close {
+        @apply me-0.5;
+    }
+
+    .fi-record-preview-header .fi-icon-btn.fi-record-preview-open {
+        @apply ms-auto;
+
+        /* maximize-2 spans 18 of 24 units; at 12px it reads the size of the 12-unit close and chevron glyphs. */
+        & .fi-icon {
+            @apply size-3;
+        }
+    }
+
+    .fi-record-preview-position {
+        @apply ms-2 truncate text-sm text-gray-600 tabular-nums dark:text-gray-300;
+    }
+
+    .fi-record-embedded-page .fi-page-header-main-ctn {
+        @apply gap-0 p-0;
+    }
+
+    .fi-record-preview-title {
+        @apply px-6 pt-5 pb-3 text-xl font-semibold tracking-tight text-gray-950 dark:text-white;
+
+        & .fi-record-chip {
+            @apply gap-3;
+        }
+    }
+
+    .fi-record-pane .fi-tabs:not(.fi-contained) {
+        @apply pt-0;
+    }
+}
+
+.fi-record-rail {
     .fi-record-rail-section {
         @apply border-t border-gray-200/60 pt-4 dark:border-white/10;
     }
@@ -1037,7 +1551,7 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-in-entry-has-inline-label .fi-in-entry-label {
-        @apply truncate font-normal text-gray-500 dark:text-gray-400;
+        @apply truncate font-normal text-gray-500 max-sm:overflow-visible max-sm:text-clip max-sm:whitespace-normal dark:text-gray-400;
     }
 
     .fi-in-entry-label-ctn {
@@ -1049,20 +1563,62 @@ html.fi-record-stacked .fi-record-layout {
     }
 }
 
+.fi-record-header {
+    @apply max-sm:flex-wrap max-sm:gap-y-2;
+
+    & > .fi-growable {
+        @apply max-sm:basis-full;
+    }
+}
+
+.fi-record-title .truncate {
+    @apply max-sm:break-words max-sm:whitespace-normal;
+}
+
 .fi-record-details-toggle {
     @apply justify-self-start text-sm font-medium text-gray-500 hover:text-gray-950 dark:text-gray-400 dark:hover:text-white;
 }
 
 .fi-record-pane {
     .fi-tabs:not(.fi-contained) {
-        @apply mx-0 rounded-none border-b border-gray-200/60 bg-transparent px-0 pt-0 pb-0 shadow-none ring-0 record-split:px-3.5 record-split:pt-5 dark:border-white/10 dark:bg-transparent;
+        @apply mx-0 max-w-none gap-x-0.5 rounded-none border-b border-gray-200/60 bg-transparent px-4 py-0 shadow-none ring-0 record-split:pt-2 dark:border-white/10 dark:bg-transparent;
     }
 
     .fi-tabs-item {
-        @apply -mb-px rounded-none border-b-2 border-transparent bg-transparent px-2.5 hover:bg-transparent dark:bg-transparent dark:hover:bg-transparent;
+        @apply relative my-1.5 gap-x-1.5 rounded-md border-0 bg-transparent px-2.5 py-1 text-gray-950 hover:bg-gray-100/80 dark:bg-transparent dark:text-white dark:hover:bg-white/5;
+
+        & .fi-tabs-item-label {
+            @apply text-sm font-medium text-gray-600 dark:text-gray-400;
+        }
+
+        & > .fi-icon {
+            @apply size-4 text-gray-400 dark:text-gray-500;
+        }
 
         &.fi-active {
-            @apply border-primary-600 dark:border-primary-400;
+            @apply bg-gray-100/80 dark:bg-white/10;
+
+            & .fi-tabs-item-label,
+            & > .fi-icon {
+                @apply text-gray-950 dark:text-white;
+            }
+
+            /* The underline takes the item's text colour, because dark: does not compile onto a pseudo-element here. */
+            &::after {
+                @apply absolute inset-x-0 -bottom-[calc(0.375rem+1px)] h-0.5 rounded-full bg-current content-[''];
+            }
+        }
+    }
+
+    .fi-sc-tabs-tab.fi-record-overview-tab {
+        @apply mt-0;
+    }
+
+    .fi-tabs-item.fi-record-overview-tab:first-child {
+        @apply me-3;
+
+        &::before {
+            @apply absolute -end-2 inset-y-1 w-px bg-current opacity-15 content-[''];
         }
     }
 
@@ -1072,9 +1628,10 @@ html.fi-record-stacked .fi-record-layout {
         @apply isolate rounded-none bg-transparent shadow-none ring-0 dark:bg-transparent;
     }
 
-    /* One row: heading, then search and filters, then the header actions at the end. */
+    /* One row: heading, then search and filters, then the header actions at the end.
+       Below sm the heading keeps its actions on the first line and search takes the second. */
     .fi-ta-header-ctn {
-        @apply flex flex-wrap items-center gap-x-3 gap-y-2 px-6 py-2.5;
+        @apply flex flex-wrap items-center gap-x-3 gap-y-2 px-6 py-2.5 max-sm:px-0;
     }
 
     .fi-ta-header {
@@ -1085,16 +1642,43 @@ html.fi-record-stacked .fi-record-layout {
         }
 
         & > .fi-ta-actions {
-            @apply order-2;
+            @apply order-2 max-sm:order-1;
         }
     }
 
     .fi-ta-header-toolbar {
-        @apply order-1 border-b-0 p-0;
+        @apply order-1 border-b-0 p-0 max-sm:order-2 max-sm:basis-full;
     }
 
-    /* A modal mounted in the pane keeps its sections as cards, as it has them everywhere else. */
-    .fi-section:not(.fi-section-not-contained):not(.fi-modal *) {
+    .fi-ta-header-heading {
+        @apply text-base font-semibold;
+    }
+
+    .fi-ta-header .fi-ta-actions .fi-btn {
+        @apply bg-white text-gray-950 shadow-none ring-1 ring-gray-950/10 hover:bg-gray-50 dark:bg-white/5 dark:text-white dark:ring-white/10 dark:hover:bg-white/10;
+
+        & .fi-icon {
+            @apply size-4 text-gray-500 dark:text-gray-400;
+        }
+    }
+
+    .fi-ta-table :is(.fi-ta-header-cell, .fi-ta-cell) {
+        @apply border-x-0;
+    }
+
+    /* Rows start and end on the same inset as the tab's heading and its header actions. */
+    .fi-ta-table tr > :is(th, td):first-child {
+        @apply ps-6 max-sm:ps-0;
+    }
+
+    .fi-ta-table tr > :is(th, td):last-child {
+        @apply pe-6 max-sm:pe-0;
+    }
+
+    /* A modal mounted in the pane keeps its sections as cards, as it has them everywhere else.
+       The preview is itself a modal, so inside it only a second, nested modal keeps them. */
+    .fi-section:not(.fi-section-not-contained):not(.fi-modal *),
+    .fi-record-embedded-page & .fi-section:not(.fi-section-not-contained):not(.fi-modal .fi-modal *) {
         @apply rounded-none bg-transparent shadow-none ring-0 dark:bg-transparent;
 
         & > .fi-section-content-ctn > .fi-section-content {
@@ -1128,7 +1712,8 @@ html.fi-record-stacked .fi-record-layout {
 /* Toolbar fields are flat and 2rem tall, the height of a small button, so a row shares one height. */
 .fi-resource-list-records-page:not(.fi-page-has-sub-navigation),
 .fi-edge-to-edge-page,
-.fi-board-header {
+.fi-board-header,
+.fi-record-pane {
     .fi-ta-grouping-settings-fields .fi-input-wrp {
         @apply h-8 shadow-none ring-gray-950/10 dark:ring-white/10;
 
@@ -1242,29 +1827,81 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-board-header {
-        @apply flex items-center gap-x-4 border-b border-gray-200/60 bg-white px-4 py-2 lg:px-6 dark:border-white/10 dark:bg-gray-900;
+        @apply flex items-center gap-x-4 border-b border-gray-200/60 bg-white px-4 py-3 lg:px-6 dark:border-white/10 dark:bg-gray-900;
 
-        & > div:not(.fi-view-switcher) {
+        /* Filament floors table toolbar items at 36px, which would make this row taller than the list's. */
+        & .fi-ta-header-toolbar > * {
+            @apply min-h-0;
+        }
+
+        /* Contents puts the clear filters button on the toolbar line, right after the filter trigger. */
+        & > .ff-header {
+            @apply contents;
+        }
+
+        & > .ff-header > .ff-header-row {
             @apply min-w-0 flex-1;
         }
 
         /* The package reserves this slot for a heading the topbar already shows. */
-        & > div:not(.fi-view-switcher) > div > :first-child:not(:has(.fi-header-subheading)) {
+        & > div:not(.fi-view-switcher) > .ff-header-row > :first-child:not(:has(.ff-header-subheading)) {
             @apply hidden;
         }
 
-        & > div:not(.fi-view-switcher) > div,
-        & > div:not(.fi-view-switcher) > div > :last-child {
+        & > div:not(.fi-view-switcher) > .ff-header-row,
+        & > div:not(.fi-view-switcher) > .ff-header-row > :last-child {
             @apply flex-nowrap;
         }
 
-        & > div:not(.fi-view-switcher) > div > :last-child {
+        & > div:not(.fi-view-switcher) > .ff-header-row > :last-child {
             @apply min-w-0 flex-1 flex-row-reverse justify-between gap-x-3;
         }
 
         .fi-ta-search-field {
-            @apply min-w-0 shrink;
+            @apply me-auto min-w-0 shrink;
         }
+
+        /* The row is reversed, so a lower order sits further right: the filter keeps the edge. */
+        .fi-ta-filters-dropdown,
+        .fi-ta-filters-modal {
+            @apply -order-1;
+        }
+    }
+
+    /* Below sm the trigger is an icon button; give it the same box as the toolbar's gray buttons. */
+    .fi-board-header .fi-ta-filters-dropdown > .fi-dropdown-trigger .fi-icon-btn {
+        @apply m-0 bg-white text-gray-700 ring-1 ring-gray-950/10 hover:bg-gray-50 dark:bg-white/5 dark:text-gray-200 dark:ring-white/10 dark:hover:bg-white/10;
+    }
+
+    /* The clear button is a sibling of the toolbar row, so the active trigger and it join into one pill. */
+    &:has(.fi-board-filter-clear) .fi-ta-filters-dropdown > .fi-dropdown-trigger :is(.fi-btn, .fi-icon-btn) {
+        @apply rounded-e-none bg-primary-50 text-primary-700 ring-primary-200 hover:bg-primary-100 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-400/30 dark:hover:bg-primary-500/20;
+
+        .fi-icon {
+            @apply text-primary-500 dark:text-primary-400;
+        }
+    }
+
+    .fi-board-header .fi-ta-filters-dropdown > .fi-dropdown-trigger .fi-btn-badge-ctn {
+        @apply static translate-none bg-transparent;
+    }
+
+    .fi-board-header .fi-ta-filters-dropdown > .fi-dropdown-trigger .fi-icon-btn-badge-ctn {
+        @apply rounded-full;
+    }
+
+    .fi-board-header .fi-ta-filters-dropdown > .fi-dropdown-trigger :is(.fi-btn-badge-ctn, .fi-icon-btn-badge-ctn) {
+        .fi-badge {
+            @apply min-w-[1.125rem] justify-center rounded-full bg-primary-600 px-1.5 text-white ring-0 dark:bg-primary-500 dark:text-white;
+        }
+    }
+
+    .fi-board-filter-clear {
+        @apply -ms-[calc(1rem-1px)] flex h-8 items-center rounded-e-lg bg-primary-50 px-2 text-primary-500 ring-1 ring-primary-200 transition hover:bg-primary-100 hover:text-primary-700 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-400/30 dark:hover:bg-primary-500/20;
+    }
+
+    .fi-board-filter-clear-icon {
+        @apply size-4;
     }
 
     .fi-page-main {
@@ -1272,45 +1909,27 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-page-content {
-        @apply h-full;
+        @apply h-full grid-rows-[minmax(0,1fr)];
 
         & > div {
             @apply h-full;
         }
     }
 
-    :has(> .flowforge-column) {
-        @apply gap-x-3 px-4 py-4 lg:px-6;
+    .ff-columns {
+        @apply px-4 py-4 lg:px-6;
     }
 
-    .flowforge-column {
-        @apply border-transparent bg-gray-50 shadow-none dark:border-transparent dark:bg-gray-950/50;
+    .ff-cards {
+        @apply max-h-none;
     }
 
-    .flowforge-column-header {
-        @apply rounded-none border-b-0 bg-transparent py-2.5 dark:bg-transparent;
-
-        h3 {
-            @apply font-semibold text-gray-950 dark:text-white;
-        }
+    .ff-lanes {
+        @apply max-h-none px-4 pb-4 lg:px-6;
     }
 
-    /* Positioned, so a card's screen-reader labels scroll with the column instead of stretching the page. */
-    .flowforge-column-content {
-        @apply relative px-2 pt-0 pb-2;
-
-        /* The empty state is a hint, not a drop zone the size of the column. */
-        & > .border-dashed {
-            @apply h-auto min-h-0 border-0 py-10;
-
-            svg {
-                @apply size-6;
-            }
-        }
-    }
-
-    .flowforge-card {
-        @apply mb-2 rounded-xl shadow-xs;
+    .ff-lanes-heads {
+        @apply pt-4;
     }
 }
 
@@ -1511,13 +2130,16 @@ html.fi-record-stacked .fi-record-layout {
     @apply rounded-xl;
 }
 
-/* Onboarding Wizard - split-screen layout overrides */
-html.fi:has(body.fi-onboarding-wizard),
-.fi-body.fi-onboarding-wizard {
-    height: auto;
-    overflow: visible;
+/* On a phone the guest card sits under the logo; centring it in the viewport left a gap of over 100px. */
+.fi-simple-main-ctn {
+    @apply max-sm:items-start;
 }
 
+.fi-simple-main {
+    @apply max-sm:my-4 max-sm:py-6;
+}
+
+/* Onboarding Wizard - split-screen layout overrides */
 .fi-body.fi-onboarding-wizard {
     @apply bg-white dark:bg-gray-950;
 }
@@ -1539,7 +2161,7 @@ html.fi:has(body.fi-onboarding-wizard),
     box-shadow: none;
     --tw-ring-shadow: none;
     --tw-ring-color: transparent;
-    padding: 0;
+    @apply p-0 max-sm:px-4;
     border-radius: 0;
     max-width: none;
     width: 100%;
@@ -1609,9 +2231,21 @@ html.fi:has(body.fi-onboarding-wizard),
     }
 }
 
-/* FlowForge Specific Customizations */
-.flowforge-column-header {
-    @apply bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 rounded-t-xl;
+.ff-board {
+    --ff-surface: #fff;
+    --ff-tray-bg: var(--gray-50);
+    --ff-card-bg: var(--surface-block-bg);
+    --ff-card-ring: var(--surface-block-border);
+    --ff-gap: 0.75rem;
+
+    @media (width < 40rem) {
+        --ff-column-width: min(300px, calc(100vw - 3.5rem));
+    }
+}
+
+.dark .ff-board {
+    --ff-surface: var(--gray-900);
+    --ff-tray-bg: color-mix(in oklab, var(--gray-950) 50%, transparent);
 }
 
 /* Chat Side Panel */
@@ -1713,10 +2347,10 @@ html.fi:has(body.fi-onboarding-wizard),
     }
 }
 
-/* The slash menu is appended to <body> to escape the modal's overflow clipping,
-   so z-40 has to clear the modal window at 30. */
+/* A manual popover in the top layer, so it clears every modal with no z-index to keep in
+   step. The resets undo the browser's popover defaults the dropdown styles leave set. */
 .fi-slash-menu {
-    @apply absolute z-40 max-h-[28rem] w-screen overflow-y-auto p-1;
+    @apply fixed inset-auto m-0 max-h-[28rem] w-screen overflow-y-auto border-0 p-1 text-inherit;
 }
 
 .fi-slash-menu-empty {
@@ -1777,19 +2411,52 @@ html.fi:has(body.fi-onboarding-wizard),
     }
 }
 
+.fi-fo-rich-editor .ProseMirror ul[data-type='taskList'] {
+    @apply list-none ps-0;
+
+    > li {
+        @apply flex items-start gap-2.5 ps-0;
+
+        > label {
+            @apply -mx-1 flex shrink-0 cursor-pointer p-1 select-none;
+            margin-top: calc((1lh - 1rem) / 2 - 0.25rem);
+            margin-bottom: -0.25rem;
+
+            input {
+                @apply size-4 cursor-pointer rounded-sm accent-primary-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:accent-primary-500;
+            }
+        }
+
+        > div {
+            @apply mt-0 min-w-0 flex-1;
+        }
+
+        &[data-checked='true'] > div {
+            @apply text-gray-500 dark:text-gray-400;
+            --prose-code-color: currentColor;
+            --prose-link-color: currentColor;
+            --prose-strong-color: currentColor;
+        }
+    }
+}
+
+.fi-fo-rich-editor .ProseMirror[contenteditable='false'] ul[data-type='taskList'] > li > label {
+    @apply pointer-events-none cursor-default;
+}
+
 /* The editor draws its own placeholder so the trigger can be a key cap, which
    Filament's `content: attr(data-placeholder)` cannot style. */
 .fi-slash-placeholder {
-    @apply pointer-events-none absolute inline-flex select-none items-center gap-1 text-gray-400 dark:text-gray-500;
+    @apply pointer-events-none absolute inline select-none text-gray-400 dark:text-gray-500;
 
     kbd {
-        @apply inline-flex h-5 min-w-5 items-center justify-center rounded border border-gray-200 bg-gray-50 px-1 font-sans text-xs text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-400;
+        @apply inline-flex h-5 min-w-5 items-center align-baseline justify-center rounded border border-gray-200 bg-gray-50 px-1 font-sans text-xs text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-400;
     }
 }
 
 /* Notes cards view: a grouped grid of note cards in place of the table rows. */
 .fi-ta-content-grid:has(.fi-note-card) {
-    @apply gap-5 px-6 pb-8;
+    @apply gap-5 px-6 pb-8 max-sm:px-4;
     grid-template-columns: repeat(auto-fill, minmax(min(22rem, 100%), 1fr)) !important;
 
     @variant xl {
@@ -1832,14 +2499,14 @@ html.fi:has(body.fi-onboarding-wizard),
         /* WebKit does not focus a clicked button, so an open menu holds the actions itself. */
         &:hover .fi-ta-actions,
         &:focus-within .fi-ta-actions,
-        & .fi-ta-actions:has(.fi-dropdown-panel[style*='display: block']) {
+        & .fi-ta-actions:has(.fi-dropdown-trigger > [aria-expanded='true']) {
             @apply opacity-100;
         }
     }
 }
 
 .fi-note-card {
-    @apply flex h-56 w-full flex-col px-5 pt-5 text-start;
+    @apply flex h-56 w-full flex-col px-5 pt-5 text-start max-sm:px-0 max-sm:pt-4;
 }
 
 .fi-note-card-records {
@@ -1862,12 +2529,16 @@ html.fi:has(body.fi-onboarding-wizard),
 }
 
 .fi-note-card-title {
-    @apply truncate text-base font-medium text-gray-950 dark:text-white;
+    @apply truncate text-base font-medium text-gray-950 max-sm:line-clamp-2 max-sm:whitespace-normal dark:text-white;
 }
 
 .fi-note-card-excerpt {
     @apply mt-1 line-clamp-4 min-h-0 flex-1 text-sm/6 text-gray-600 dark:text-gray-300;
     mask-image: linear-gradient(to bottom, black calc(100% - 1.5rem), transparent);
+
+    @media (width < 40rem) {
+        mask-image: none;
+    }
 
     &.fi-note-card-excerpt-empty {
         @apply text-gray-400 dark:text-gray-500;
@@ -1885,4 +2556,212 @@ html.fi:has(body.fi-onboarding-wizard),
 
 .fi-note-card-date {
     @apply shrink-0 text-gray-500 dark:text-gray-400;
+}
+
+/* iOS zooms into a field set under 16px when it is tapped, and the page stays zoomed after, so on a touch
+   screen every text field and editor is 16px. Filament's own inputs only do this below sm. */
+@media (pointer: coarse) {
+    .fi-body.fi-panel-app :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file']), textarea, select, [contenteditable='true']) {
+        font-size: 16px;
+    }
+}
+
+/* A rich editor whose tools sit in one group ran its toolbar off a phone screen: the toolbar wraps groups, not tools. */
+.fi-fo-rich-editor-toolbar-group {
+    @apply max-sm:flex-wrap max-sm:gap-y-1;
+}
+
+/* A toast is capped at max-w-sm and pinned to the right, so on a phone it sat off-centre. It spans the screen
+   there instead, below the notch. */
+.fi-no {
+    @apply max-sm:top-[calc(env(safe-area-inset-top)+1rem)] max-sm:items-stretch;
+
+    & .fi-no-notification {
+        @apply max-sm:max-w-none;
+    }
+}
+
+/* Phones: a tab bar replaces the topbar's menu button, and menus and dialogs rise from the bottom edge. */
+
+/* Phones scroll the document rather than the content box. iOS clips a fixed sheet or dialog to a scrolling
+   box it sits in, and only the document gets tap-to-top and Safari's collapsing toolbar. */
+@media (width < 40rem) {
+    html.fi:has(body.fi-panel-app .fi-app-layout),
+    .fi-body.fi-panel-app:has(.fi-app-layout),
+    .fi-app-layout,
+    .fi-app-main-wrapper > .fi-layout {
+        height: auto;
+        overflow: visible;
+    }
+
+    html.fi:has(body.fi-panel-app .fi-app-layout) {
+        overflow-x: clip;
+    }
+
+    .fi-body.fi-panel-app:has(.fi-app-layout) {
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+
+    .fi-app-layout {
+        min-height: 100dvh;
+    }
+
+    .fi-app-main-wrapper > .fi-topbar-ctn {
+        padding-top: env(safe-area-inset-top);
+    }
+
+    /* The page holds still under an open sheet, as it does under a dialog, so a drag on the sheet never moves it. */
+    html.fi:has(body.fi-panel-app .fi-app-layout):has(.fi-dropdown-panel[x-ref='panel'][style*='display: block'], [data-sheet]:not([x-cloak], [style*='display: none'])) {
+        overflow: hidden;
+    }
+}
+
+/* Filament makes the topbar inert while the drawer is open, so a tap on it reached the overlay anyway. Under the
+   overlay (29) it is scrimmed like the page, and the drawer (30) covers the part its header would. */
+.fi-app-layout:has(.fi-main-sidebar.fi-sidebar-open) > .fi-app-main-wrapper > .fi-topbar-ctn {
+    @apply max-sm:z-28;
+}
+
+/* z-25: above the content's own layers (the table toolbar is 21), under the sidebar overlay (29). */
+.fi-bottom-nav {
+    @apply sticky bottom-0 z-25 box-content flex h-(--bottom-nav-height) shrink-0 border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)] sm:hidden dark:border-white/10 dark:bg-gray-900;
+}
+
+.fi-bottom-nav-item {
+    @apply flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[0.6875rem] font-medium text-gray-500 max-[22.5rem]:text-[0.625rem] max-[22.5rem]:tracking-tight dark:text-gray-400;
+
+    & > .fi-icon {
+        @apply size-6;
+    }
+
+    & > span {
+        @apply max-w-full truncate;
+    }
+
+    &.fi-active {
+        @apply text-primary-600 dark:text-primary-400;
+    }
+}
+
+.fi-sidebar-drawer-close-btn {
+    @apply size-11 lg:hidden;
+}
+
+.fi-topbar-open-sidebar-btn {
+    @apply max-sm:hidden!;
+}
+
+/* Floating UI writes position inline, hence !important; min-width outranks every fi-width-* cap. Menus inside
+   the sidebar or a dialog stay anchored to their trigger. A hand-placed menu opts in with data-sheet. */
+:is(.fi-dropdown-panel[x-ref='panel']:not(.fi-sidebar *, .fi-modal *), [data-sheet]) {
+    @apply max-sm:fixed! max-sm:inset-x-0! max-sm:top-auto! max-sm:bottom-0! max-sm:z-40 max-sm:max-h-[80dvh] max-sm:min-w-full max-sm:overflow-y-auto max-sm:overscroll-contain max-sm:rounded-b-none max-sm:rounded-t-2xl max-sm:border-x-0 max-sm:border-b-0 max-sm:px-2 max-sm:pt-3 max-sm:pb-[max(0.5rem,env(safe-area-inset-bottom))] max-sm:transition-[opacity,translate] max-sm:duration-200;
+    @apply max-sm:shadow-[0_0_0_100vmax_rgb(3_7_18/0.5)] max-sm:dark:ring-white/20;
+
+    &.fi-opacity-0 {
+        @apply max-sm:translate-y-full;
+    }
+
+    & .fi-dropdown-list-item {
+        @apply max-sm:gap-3 max-sm:px-3 max-sm:py-3 max-sm:text-base;
+    }
+}
+
+/* A select inside the filter sheet opens in the flow rather than beside it, where Floating UI placed it past the sheet's edge. */
+.fi-ta-filters .fi-dropdown-panel {
+    @apply max-sm:relative! max-sm:top-auto! max-sm:mt-1 max-sm:max-h-none! max-sm:w-full!;
+}
+
+.fi-ta-filters .fi-select-input-btn {
+    @apply max-sm:h-9;
+}
+
+/* The table and board still scroll their own boxes, so those stop while a sheet is open. Hidden keeps the offset. */
+:is(.fi-ta-content-ctn, .ff-columns, .ff-cards):has(.fi-dropdown-panel[x-ref='panel'][style*='display: block']) {
+    @apply max-sm:overflow-hidden!;
+}
+
+/* A sheet or dialog from the page must outrank the topbar and tab bar. The record pane isolates its content at
+   level 0, so both bars stop sticking and leave the stacking order, keeping their space so nothing shifts. */
+.fi-app-main-wrapper:has(> .fi-layout :is(.fi-dropdown-panel[x-ref='panel'][style*='display: block'], .fi-modal.fi-modal-open)) > :is(.fi-topbar-ctn, .fi-bottom-nav) {
+    @apply max-sm:static max-sm:z-auto;
+}
+
+/* With rows ticked, the toolbar holding the bulk actions trigger follows the scroll, as the rows are far from it. */
+.fi-ta-ctn:not(.fi-modal *):has(.fi-ta-record-checkbox:checked) .fi-ta-header-ctn {
+    @apply max-sm:sticky max-sm:top-[calc(var(--topbar-height)+env(safe-area-inset-top))] max-sm:border-b max-sm:border-gray-200/60 max-sm:bg-white dark:max-sm:border-white/10 dark:max-sm:bg-gray-900;
+}
+
+/* A stacked row's actions cell must outrank the table header. */
+.fi-ta-cell:has(.fi-dropdown-panel[x-ref='panel'][style*='display: block']) {
+    @apply max-sm:z-40;
+}
+
+/* Each table toolbar (z-21) is a stacking context, which traps its sheet at 21 beside the next table's toolbar,
+   and a record pane isolates its tables. The table holding an open sheet outranks its later siblings. */
+:is(.fi-ta-ctn, .fi-ta-header-ctn):not(.fi-modal *):has(.fi-dropdown-panel[x-ref='panel'][style*='display: block']) {
+    @apply max-sm:z-40;
+}
+
+/* The container clips rather than scrolls: mid-rise the window overflows it, and iOS scrolled it to the
+   focused button, so the dialog showed mid-screen and then slid down. The window scrolls itself. */
+.fi-modal:not(.fi-modal-slide-over, .fi-width-screen) > .fi-modal-window-ctn {
+    @apply max-sm:grid-rows-[1fr_auto] max-sm:overflow-clip! max-sm:p-0;
+
+    & > .fi-modal-window {
+        @apply max-sm:max-w-none max-sm:max-h-[90dvh] max-sm:overflow-y-auto max-sm:rounded-b-none max-sm:rounded-t-2xl max-sm:pb-[env(safe-area-inset-bottom)];
+
+        /* Rises on a keyframe: iOS skips a transition whose start state lands as the window is unhidden. */
+        &.fi-transition-enter {
+            @apply max-sm:animate-[fi-sheet-rise_300ms_ease-out];
+        }
+
+        &:is(.fi-transition-enter-start, .fi-transition-enter-end) {
+            @apply max-sm:scale-100 max-sm:opacity-100;
+        }
+
+        &.fi-transition-leave-end {
+            @apply max-sm:translate-y-full max-sm:scale-100 max-sm:opacity-100;
+        }
+    }
+}
+
+@keyframes fi-sheet-rise {
+    from {
+        translate: 0 100%;
+    }
+}
+
+/* A fingertip needs about 44px. The glyphs keep their size and a negative margin keeps each centre where it was. */
+@media (width < 40rem) {
+    .fi-sidebar-item-btn {
+        @apply min-h-11;
+    }
+
+    .fi-inbox-icon-btn {
+        @apply size-11;
+    }
+
+    .fi-inbox-tab {
+        @apply min-h-11 pb-0;
+    }
+
+    .fi-settings-back-link {
+        @apply -my-2 min-h-11;
+    }
+
+    :is(.fi-record-page, .fi-record-embedded-page) .fi-sc-actions :is(.fi-btn, .fi-icon-btn),
+    .fi-record-preview-header .fi-icon-btn,
+    .fi-icon-btn.fi-record-overview-add,
+    .fi-record-overview-view-all {
+        @apply min-h-11 min-w-11;
+    }
+
+    .fi-modal:not(.fi-modal-slide-over) .fi-modal-close-btn {
+        @apply -m-3 size-11;
+    }
+
+    .fi-onboarding-link {
+        @apply inline-flex min-h-11 items-center;
+    }
 }

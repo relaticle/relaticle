@@ -23,6 +23,8 @@ final class Activity extends SpatieActivity
 {
     public const string SOURCE_PROPERTY = 'source';
 
+    public const string EMAIL_ACCESS_LOG = 'email_access';
+
     /** @param  array<array-key, mixed>  $properties */
     public static function sourceFrom(array $properties): ?CreationSource
     {
@@ -63,6 +65,15 @@ final class Activity extends SpatieActivity
     protected function fromSource(Builder $query, CreationSource $source): void
     {
         $query->where('properties->'.self::SOURCE_PROPERTY, $source->value);
+    }
+
+    /** @param  Builder<self>  $query */
+    #[Scope]
+    protected function inAuditTrail(Builder $query): void
+    {
+        $query->where(fn (Builder $log): Builder => $log
+            ->whereNull('activity_log.log_name')
+            ->orWhere('activity_log.log_name', '!=', self::EMAIL_ACCESS_LOG));
     }
 
     protected static function booted(): void

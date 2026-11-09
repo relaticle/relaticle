@@ -14,6 +14,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Support\ActivityLog\RequestActivityBatch;
 use App\Support\CurrentSource;
+use App\Support\PlainText;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Support\Facades\FilamentColor;
@@ -22,8 +23,12 @@ use Illuminate\Support\Str;
 use Livewire\Attributes\Url;
 use Livewire\Features\SupportTesting\Testable;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
+use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 
-mutates(ActivityLog::class, Activity::class);
+mutates(ActivityLog::class, Activity::class, PlainText::class);
 
 function slideOverChanges(Testable $component): string
 {
@@ -496,6 +501,33 @@ test('rich editor markup is read as its text, never as tags', function (): void 
         ->assertDontSee('<strong>', escape: false);
 });
 
+test('a ticked checklist item shows in the activity log', function (): void {
+    $task = Task::factory()->for($this->workspace)->create(['title' => 'Prepare the quote']);
+    $item = fn (string $checked): string => '<ul data-type="taskList"><li data-checked="'.$checked.'" data-type="taskItem"><label><input type="checkbox"><span></span></label><div><p>Call Bob</p></div></li></ul>';
+
+    Activity::withoutGlobalScopes()->create([
+        'log_name' => 'crm',
+        'description' => 'custom_field_changes',
+        'event' => 'custom_field_changes',
+        'subject_type' => $task->getMorphClass(),
+        'subject_id' => $task->getKey(),
+        'causer_type' => 'user',
+        'causer_id' => $this->owner->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
+        'properties' => ['custom_field_changes' => [[
+            'code' => 'description',
+            'label' => 'Description',
+            'type' => 'rich-editor',
+            'old' => ['value' => $item('false'), 'label' => $item('false')],
+            'new' => ['value' => $item('true'), 'label' => $item('true')],
+        ]]],
+    ]);
+
+    livewire(ActivityLog::class)
+        ->assertOk()
+        ->assertSee('Description: [ ] Call Bob → [x] Call Bob', escape: false);
+});
+
 test('a row whose only change fits inline offers no slide-over', function (): void {
     $company = Company::factory()->for($this->workspace)->create(['name' => 'One Change Co']);
     $company->update(['name' => 'One Change Co Renamed']);
@@ -538,7 +570,7 @@ test('a task row links to the modal that edits it', function (): void {
     livewire(ActivityLog::class)
         ->assertOk()
         ->assertSee('Renew the contract')
-        ->assertSee('tableActionRecord='.$task->getKey());
+        ->assertSee('tasks?task='.$task->getKey());
 });
 
 test('searching never reaches into another workspace records', function (): void {
@@ -827,4 +859,35 @@ test('a long plain text change keeps its line breaks in the slide-over', functio
         ->mountAction(TestAction::make('viewChanges')->table($activity));
 
     expect(slideOverChanges($component))->toContain("keeps going\nclosing words");
+});
+
+test('a decided email access request is logged under its own name and stays off the audit trail', function (): void {
+    $requester = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+    $this->workspace->users()->attach($requester, ['role' => 'member']);
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->owner->id,
+    ]));
+    $email = Email::factory()->private()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->owner->id,
+        'connected_account_id' => $account->getKey(),
+    ]);
+    $request = EmailAccessRequest::factory()->create([
+        'requester_id' => $requester->id,
+        'owner_id' => $this->owner->id,
+        'email_id' => $email->getKey(),
+    ]);
+    Company::factory()->for($this->workspace)->create(['name' => 'Lumen Robotics'])->delete();
+
+    resolve(DenyEmailAccessRequestAction::class)->execute($request, $this->owner);
+
+    $decision = Activity::query()->where('subject_id', $request->getKey())->sole();
+    $deletion = Activity::query()->where('event', 'deleted')->sole();
+
+    expect($decision->log_name)->toBe(Activity::EMAIL_ACCESS_LOG);
+
+    livewire(ActivityLog::class)
+        ->assertCanSeeTableRecords([$deletion])
+        ->assertCanNotSeeTableRecords([$decision]);
 });

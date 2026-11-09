@@ -2,27 +2,32 @@
 
 declare(strict_types=1);
 
-use App\Actions\Billing\StartProTrial;
 use App\Actions\Jetstream\CreateWorkspace as CreateWorkspaceAction;
 use App\Actions\User\UpdateUserName;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\Plan;
 use App\Enums\WorkspaceRole;
-use App\Features\Billing as BillingFeature;
 use App\Features\SetupConversation;
 use App\Filament\Pages\CreateWorkspace;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\SetupWorkspace;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\NoBilling;
 use Filament\Schemas\Components\Wizard;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
+use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Cloud\Billing\Actions\StartProTrial;
+use Relaticle\Cloud\Billing\StripeBilling;
 
-mutates(CreateWorkspace::class, CreateWorkspaceAction::class, StartProTrial::class, UpdateUserName::class);
+mutates(CreateWorkspace::class, CreateWorkspaceAction::class, StartProTrial::class, UpdateUserName::class, NoBilling::class, StripeBilling::class);
 
 it('renders the create workspace page with wizard for workspaceless users', function (): void {
     $user = User::factory()->create();
@@ -32,6 +37,29 @@ it('renders the create workspace page with wizard for workspaceless users', func
     livewire(CreateWorkspace::class)
         ->assertSuccessful()
         ->assertSee('Create your workspace');
+});
+
+it('links the configured legal pages in the onboarding footer', function (): void {
+    config()->set('relaticle.legal.privacy_url', 'https://legal.example.test/privacy');
+    config()->set('relaticle.legal.terms_url', 'https://legal.example.test/terms');
+
+    $this->actingAs(User::factory()->create());
+
+    livewire(CreateWorkspace::class)
+        ->assertSee('href="https://legal.example.test/privacy"', escape: false)
+        ->assertSee('href="https://legal.example.test/terms"', escape: false);
+});
+
+it('shows no legal links in the onboarding footer when none are configured', function (): void {
+    config()->set('relaticle.legal.privacy_url');
+    config()->set('relaticle.legal.terms_url');
+
+    $this->actingAs(User::factory()->create());
+
+    livewire(CreateWorkspace::class)
+        ->assertSee(__('auth.verify_email.sign_out'))
+        ->assertDontSee(__('auth.footer.privacy_policy'))
+        ->assertDontSee(__('auth.footer.terms_of_service'));
 });
 
 it('shows a back affordance but no step counter in the wizard', function (): void {
@@ -80,6 +108,134 @@ it('does not flag the workspace created event for an additional workspace', func
 
     expect(Workspace::query()->where('name', 'Second Corp')->exists())->toBeTrue()
         ->and(session()->has('fathom.track_workspace_created'))->toBeFalse();
+});
+
+it('stores the names typed in the wizard without surrounding spaces', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm(['user_name' => '  Jane Doe  ', 'name' => '  Padded Corp  '])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    expect(Workspace::query()->where('name', 'Padded Corp')->exists())->toBeTrue()
+        ->and($user->fresh()->name)->toBe('Jane Doe');
+});
+
+it('opens the workspace it already made when the wizard is submitted twice', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+
+    $this->actingAs($user);
+
+    $wizard = livewire(CreateWorkspace::class)
+        ->fillForm(['name' => 'Twice Corp'])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $wizard->call('register')
+        ->assertRedirect(SetupWorkspace::getUrl(['tenant' => Workspace::query()->where('name', 'Twice Corp')->sole()]));
+
+    expect(Workspace::query()->where('name', 'like', 'Twice Corp%')->count())->toBe(1);
+});
+
+it('opens the first workspace instead of a second one when a first-run wizard is submitted from another tab', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    $staleTab = livewire(CreateWorkspace::class)->fillForm(['name' => 'Stale Tab Corp']);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm(['name' => 'First Tab Corp'])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $first = Workspace::query()->where('name', 'First Tab Corp')->sole();
+
+    $staleTab->call('register')
+        ->assertRedirect(SetupWorkspace::getUrl(['tenant' => $first]));
+
+    expect($user->ownedWorkspaces()->count())->toBe(1)
+        ->and($first->fresh()->personal_workspace)->toBeTrue();
+});
+
+it('keeps the first workspace logo and the user name when a stale first-run tab is submitted', function (): void {
+    Storage::fake('public');
+
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    $staleTab = livewire(CreateWorkspace::class)->fillForm(['name' => 'Stale Tab Corp', 'user_name' => 'Stale Tab Name']);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm([
+            'logo' => UploadedFile::fake()->image('logo.png', 200, 200),
+            'name' => 'First Tab Corp',
+            'user_name' => 'First Tab Name',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $first = Workspace::query()->where('name', 'First Tab Corp')->sole();
+
+    $staleTab->call('register')
+        ->assertRedirect(SetupWorkspace::getUrl(['tenant' => $first]));
+
+    expect($first->fresh()->getFirstMedia(Workspace::LOGO_MEDIA_COLLECTION))->not->toBeNull()
+        ->and($user->fresh()->name)->toBe('First Tab Name');
+});
+
+it('leaves no half-made workspace when creating it fails after the insert', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    Workspace::created(fn (): never => throw new RuntimeException('listener failed'));
+
+    expect(fn () => livewire(CreateWorkspace::class)
+        ->fillForm(['name' => 'Half Made Corp'])
+        ->call('register'))
+        ->toThrow(RuntimeException::class);
+
+    expect(Workspace::query()->where('name', 'Half Made Corp')->exists())->toBeFalse()
+        ->and($user->fresh()->current_workspace_id)->toBeNull();
+});
+
+it('leaves no workspace behind when a step after the insert fails', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    User::updating(fn (): never => throw new RuntimeException('switch failed'));
+
+    expect(fn () => livewire(CreateWorkspace::class)
+        ->fillForm(['name' => 'Unswitched Corp'])
+        ->call('register'))
+        ->toThrow(RuntimeException::class);
+
+    expect(Workspace::query()->where('name', 'Unswitched Corp')->exists())->toBeFalse();
+});
+
+it('reports a handle taken by the time the workspace is saved on the handle field', function (): void {
+    $user = User::factory()->create();
+    $other = User::factory()->withPersonalWorkspace()->create();
+
+    $this->actingAs($user);
+
+    $wizard = livewire(CreateWorkspace::class)->fillForm(['name' => 'Raced Corp', 'slug' => 'raced-handle']);
+
+    Workspace::creating(function (Workspace $workspace) use ($other): void {
+        if ($workspace->slug === 'raced-handle') {
+            DB::table('workspaces')->where('id', $other->personalWorkspace()->id)->update(['slug' => 'raced-handle']);
+        }
+    });
+
+    $wizard->call('register')->assertHasFormErrors(['slug']);
+
+    expect($user->ownedWorkspaces()->count())->toBe(0);
 });
 
 it('resolves every wizard heading from translations', function (): void {
@@ -521,6 +677,7 @@ it('asks which assistant and what was asked only for an AI referral', function (
     $this->actingAs($user);
 
     livewire(CreateWorkspace::class)
+        ->fillForm(['name' => 'Acme Corp'])
         ->goToWizardStep(2)
         ->assertWizardCurrentStep(2)
         ->fillForm([
@@ -544,8 +701,12 @@ it('shows the AI follow-ups as soon as the source is picked, without waiting for
     $this->actingAs($user);
 
     livewire(CreateWorkspace::class)
+        ->fillForm(['name' => 'Acme Corp'])
         ->goToWizardStep(2)
-        ->assertSeeHtml('wire:model.live="data.onboarding_referral_source"');
+        ->assertSeeHtmlInOrder([
+            'stateBindingModifiers: JSON.parse(&#039;[\u0022live\u0022]&#039;)',
+            '$wire.$entangle(&#039;data.onboarding_referral_source&#039;',
+        ]);
 });
 
 it('caps the question behind an AI referral at 200 characters', function (): void {
@@ -660,7 +821,7 @@ it('shows the account menu links inside a workspace', function (): void {
 });
 
 it('automatically starts one 14-day Cloud Pro trial after hosted onboarding', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $user = User::factory()->create();
     $this->actingAs($user);
@@ -684,7 +845,7 @@ it('automatically starts one 14-day Cloud Pro trial after hosted onboarding', fu
 });
 
 it('starts a fresh trial for each additional hosted workspace', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $user = User::factory()->withPersonalWorkspace()->create();
     $user->currentWorkspace?->forceFill(['pro_trial_used_at' => now()])->save();
@@ -704,6 +865,25 @@ it('starts a fresh trial for each additional hosted workspace', function (): voi
         ->and($workspace->onGenericTrial())->toBeTrue()
         ->and($workspace->pro_trial_used_at)->not->toBeNull()
         ->and($workspace->hosted_free_grandfathered_at)->toBeNull();
+});
+
+it('starts no trial when billing is off', function (): void {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm([
+            'name' => 'Self Hosted Workspace',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    /** @var Workspace $workspace */
+    $workspace = $user->refresh()->currentWorkspace;
+
+    expect($workspace->plan)->toBe(Plan::Free)
+        ->and($workspace->trial_ends_at)->toBeNull()
+        ->and($workspace->pro_trial_used_at)->toBeNull();
 });
 
 it('creates a workspace with a custom slug', function (): void {
@@ -849,6 +1029,67 @@ it('redirects a first workspace to its setup page', function (): void {
         ->assertNotNotified();
 
     $component->assertRedirect(SetupWorkspace::getUrl(['tenant' => $user->fresh()->currentWorkspace]));
+});
+
+it('still creates the workspace when its setup conversation appears between the check and the insert', function (): void {
+    Feature::define(SetupConversation::class, true);
+
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    $inserted = false;
+
+    DB::listen(function (QueryExecuted $query) use ($user, &$inserted): void {
+        if ($inserted || ! str_contains($query->sql, 'from "agent_conversations"') || ! str_contains($query->sql, 'exists')) {
+            return;
+        }
+
+        $inserted = true;
+
+        DB::table('agent_conversations')->insert([
+            'id' => (string) Str::uuid7(),
+            'participant_type' => $user->getMorphClass(),
+            'participant_id' => (string) $user->getKey(),
+            'workspace_id' => $query->bindings[0],
+            'title' => 'Raced setup',
+            'purpose' => AgentConversation::PURPOSE_SETUP,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    });
+
+    livewire(CreateWorkspace::class)
+        ->fillForm(['name' => 'Raced Setup Corp'])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $workspace = Workspace::query()->where('name', 'Raced Setup Corp')->sole();
+
+    expect($inserted)->toBeTrue()
+        ->and($workspace->setupConversation()->count())->toBe(1);
+});
+
+it('opens the first workspace when a first-run tab is submitted at a cap of one', function (): void {
+    config(['relaticle.workspaces.max_owned_per_user' => 1]);
+
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    $staleTab = livewire(CreateWorkspace::class)->fillForm(['name' => 'Capped Stale Corp']);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm(['name' => 'Capped First Corp'])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $first = Workspace::query()->where('name', 'Capped First Corp')->sole();
+
+    $staleTab->call('register')
+        ->assertRedirect(SetupWorkspace::getUrl(['tenant' => $first]));
+
+    expect($user->ownedWorkspaces()->count())->toBe(1);
 });
 
 it('redirects a first workspace to its setup page when the setup conversation is off', function (): void {

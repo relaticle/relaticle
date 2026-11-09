@@ -7,6 +7,6 @@
         aria-label="{{ $help }}"
         class="inline-flex cursor-help text-gray-400 hover:text-gray-600 focus:text-gray-600 focus:outline-none dark:text-gray-500 dark:hover:text-gray-300 dark:focus:text-gray-300"
     >
-        <x-filament::icon icon="heroicon-m-information-circle" class="size-4" />
+        <x-filament::icon icon="lucide-info" class="size-4" />
     </span>
 </span>

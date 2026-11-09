@@ -4,16 +4,20 @@ declare(strict_types=1);
 
 use App\Actions\Jetstream\CancelUserDeletion;
 use App\Actions\Jetstream\ScheduleUserDeletion;
+use App\Enums\DeletionReason;
 use App\Features\AccountDeletion;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Notifications\UserDeletionCancelledNotification;
 use App\Notifications\UserDeletionScheduledNotification;
+use App\Services\NoBilling;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
+use Laravel\Cashier\Subscription;
 use Laravel\Pennant\Feature;
+use Relaticle\Cloud\Billing\StripeBilling;
 
-mutates(ScheduleUserDeletion::class, CancelUserDeletion::class);
+mutates(ScheduleUserDeletion::class, CancelUserDeletion::class, NoBilling::class, StripeBilling::class);
 
 beforeEach(function (): void {
     Feature::define(AccountDeletion::class, true);
@@ -40,7 +44,8 @@ test('personal workspace is scheduled for deletion alongside user', function () 
 
     resolve(ScheduleUserDeletion::class)->schedule($user);
 
-    expect($personalWorkspace->refresh()->scheduled_deletion_at)->not->toBeNull();
+    expect($personalWorkspace->refresh()->scheduled_deletion_at)->not->toBeNull()
+        ->and($personalWorkspace->deletion_reason)->toBe(DeletionReason::Requested);
 });
 
 test('user retains workspace memberships during grace period', function () {
@@ -57,18 +62,17 @@ test('user retains workspace memberships during grace period', function () {
     expect($user->refresh()->workspaces)->toHaveCount(1);
 });
 
-test('user cannot schedule deletion when owning workspace with other members', function () {
+test('user cannot schedule deletion when owning workspace with other members', function (string $ownedWorkspace) {
     Notification::fake();
 
-    $user = User::factory()->withWorkspace()->create();
-    $workspace = $user->currentWorkspace;
-    $workspace->users()->attach(User::factory()->create(), ['role' => 'member']);
+    $user = User::factory()->{$ownedWorkspace}()->create();
+    $user->ownedWorkspaces()->firstOrFail()->users()->attach(User::factory()->create(), ['role' => 'member']);
 
     expect(fn () => resolve(ScheduleUserDeletion::class)->schedule($user))
         ->toThrow(ValidationException::class);
 
     expect($user->refresh()->scheduled_deletion_at)->toBeNull();
-});
+})->with(['personal workspace' => 'withPersonalWorkspace', 'team workspace' => 'withWorkspace']);
 
 test('the deletion blocker names an action the app supports', function (): void {
     Notification::fake();
@@ -94,12 +98,37 @@ test('user can cancel scheduled deletion', function () {
 
     $user = User::factory()->withPersonalWorkspace()->scheduledForDeletion()->create();
     $personalWorkspace = $user->personalWorkspace();
-    $personalWorkspace->update(['scheduled_deletion_at' => $user->scheduled_deletion_at]);
+    $personalWorkspace->forceFill(['scheduled_deletion_at' => $user->scheduled_deletion_at, 'deletion_reason' => DeletionReason::Requested])->save();
 
     resolve(CancelUserDeletion::class)->cancel($user);
 
     expect($user->refresh()->scheduled_deletion_at)->toBeNull()
-        ->and($personalWorkspace->refresh()->scheduled_deletion_at)->toBeNull();
+        ->and($personalWorkspace->refresh()->scheduled_deletion_at)->toBeNull()
+        ->and($personalWorkspace->deletion_reason)->toBeNull();
 
     Notification::assertSentTo($user, UserDeletionCancelledNotification::class);
+});
+
+test('an account whose personal workspace holds an open managed plan is not scheduled for deletion', function () {
+    withHostedBilling();
+    Notification::fake();
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+    Subscription::factory()->active()->create(['workspace_id' => $user->personalWorkspace()->getKey(), 'type' => 'managed']);
+
+    expect(fn () => resolve(ScheduleUserDeletion::class)->schedule($user))
+        ->toThrow(ValidationException::class);
+
+    expect($user->refresh()->scheduled_deletion_at)->toBeNull();
+});
+
+test('an account whose personal workspace holds a leftover managed plan is scheduled for deletion while billing is off', function () {
+    Notification::fake();
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+    Subscription::factory()->active()->create(['workspace_id' => $user->personalWorkspace()->getKey(), 'type' => 'managed']);
+
+    resolve(ScheduleUserDeletion::class)->schedule($user);
+
+    expect($user->refresh()->scheduled_deletion_at)->not->toBeNull();
 });

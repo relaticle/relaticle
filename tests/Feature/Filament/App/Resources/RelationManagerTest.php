@@ -21,6 +21,7 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
+use App\Notifications\TaskAssignedNotification;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 
@@ -226,7 +227,7 @@ it('notifies the assignees of a task duplicated from a record tab', function ():
         ->callAction(TestAction::make('duplicate')->table($record), data: ['title' => 'Follow up again'])
         ->assertHasNoActionErrors();
 
-    expect(data_get($assignee->notifications()->sole()->data, 'title'))->toBe('New Task Assignment: Follow up again');
+    expect(TaskAssignedNotification::present($assignee->notifications()->sole())->getBody())->toBe('Follow up again');
 });
 
 it('asks before duplicating an unchanged task from a record tab', function (): void {
@@ -244,3 +245,92 @@ it('asks before duplicating an unchanged task from a record tab', function (): v
 
     expect(Task::query()->where('title', 'Follow up')->count())->toBe(2);
 });
+
+it('notifies a member newly assigned from a record tasks tab', function (string $relationManager, Closure $setUp): void {
+    $kept = User::factory()->create();
+    $added = User::factory()->create();
+    $this->workspace->users()->attach([$kept->getKey(), $added->getKey()], ['role' => 'member']);
+
+    [$ownerRecord, $pageClass, $task] = $setUp($this->user, $this->workspace);
+    $task->assignees()->attach($kept);
+
+    livewire($relationManager, [
+        'ownerRecord' => $ownerRecord,
+        'pageClass' => $pageClass,
+    ])
+        ->callAction(TestAction::make('edit')->table($task), data: ['assignees' => [$kept->getKey(), $added->getKey()]])
+        ->assertHasNoActionErrors();
+
+    expect($added->notifications()->where('subject_id', $task->getKey())->count())->toBe(1)
+        ->and($kept->notifications()->count())->toBe(0);
+})->with([
+    'company tasks' => [
+        CompanyTasksRelationManager::class,
+        function (User $user, $workspace): array {
+            $company = Company::factory()->recycle([$user, $workspace])->create();
+            $task = $company->tasks()->save(Task::factory()->recycle([$user, $workspace])->make());
+
+            return [$company, ViewCompany::class, $task];
+        },
+    ],
+    'opportunity tasks' => [
+        OpportunityTasksRelationManager::class,
+        function (User $user, $workspace): array {
+            $opportunity = Opportunity::factory()->recycle([$user, $workspace])->create();
+            $task = $opportunity->tasks()->save(Task::factory()->recycle([$user, $workspace])->make());
+
+            return [$opportunity, ViewOpportunity::class, $task];
+        },
+    ],
+    'people tasks' => [
+        PeopleTasksRelationManager::class,
+        function (User $user, $workspace): array {
+            $people = People::factory()->recycle([$user, $workspace])->create();
+            $task = $people->tasks()->save(Task::factory()->recycle([$user, $workspace])->make());
+
+            return [$people, ViewPeople::class, $task];
+        },
+    ],
+]);
+
+it('shows one assignee on a record tasks tab and lists the rest behind a count', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $task = $company->tasks()->save(Task::factory()->recycle([$this->user, $this->workspace])->make());
+    $members = User::factory()->count(2)->sequence(['name' => 'Priya Raman'], ['name' => 'Tomas Berg'])->create();
+    $this->workspace->users()->attach($members, ['role' => 'member']);
+    $task->assignees()->attach([$this->user->getKey(), ...$members->modelKeys()]);
+
+    livewire(CompanyTasksRelationManager::class, [
+        'ownerRecord' => $company,
+        'pageClass' => ViewCompany::class,
+    ])
+        ->assertSeeHtml('fi-linked-records-cell-more')
+        ->assertSee('+2')
+        ->assertSeeHtml('aria-label="Show all 3 assignees"')
+        ->assertSee([$this->user->name, 'Priya Raman', 'Tomas Berg']);
+});
+
+it('shows a lone assignee without a count and an unassigned task as empty', function (int $assignees, bool $showsCount, bool $showsEmpty): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $task = $company->tasks()->save(Task::factory()->recycle([$this->user, $this->workspace])->make());
+    $members = User::factory()->count($assignees)->create();
+    $this->workspace->users()->attach($members, ['role' => 'member']);
+    $task->assignees()->attach($members->modelKeys());
+
+    $component = livewire(CompanyTasksRelationManager::class, [
+        'ownerRecord' => $company,
+        'pageClass' => ViewCompany::class,
+    ]);
+
+    $showsCount
+        ? $component->assertSeeHtml('fi-linked-records-cell-more')->assertSee('+1')
+        : $component->assertDontSeeHtml('fi-linked-records-cell-more');
+
+    $showsEmpty
+        ? $component->assertSeeHtml('fi-linked-records-cell-empty')
+        : $component->assertDontSeeHtml('fi-linked-records-cell-empty');
+})->with([
+    'none' => [0, false, true],
+    'one' => [1, false, false],
+    'two' => [2, true, false],
+]);

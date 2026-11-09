@@ -12,9 +12,10 @@ no composer.json of their own. Service providers are registered in
 | `packages/Chat` | AI assistant (agents, chat tools, credit system, streaming) |
 | `packages/SystemAdmin` | Internal admin panel (separate Filament panel) |
 | `packages/ImportWizard` | CSV import flows |
-| `packages/Documentation` | Public docs pages |
+| `packages/Documentation` | Docs and help content, `DocsRepository`, the search index the assistant reads, `DocUrl`, the OpenAPI spec routes |
 | `packages/OnboardSeed` | Demo/onboarding data seeding |
 | `packages/EmailIntegration` | Email + calendar sync (Gmail/Microsoft Graph), sharing, privacy |
+| `packages/Cloud` | The hosted business behind relaticle.com: billing, the business half of the sysadmin panel, the marketing site, the docs and help website, the blog. Proprietary, absent from self-hosted builds |
 
 Create a new package only for a genuinely separable subsystem with its own panel,
 routes, or lifecycle. A new CRM entity is not one of those; it goes in `app/`. Package
@@ -43,6 +44,50 @@ anatomy mirrors a Laravel app: `src/`, `config/`, `routes/`, `resources/`,
   `Relaticle\Chat`. Enums stay in `app/Enums`, because the Pest Laravel preset fails one
   anywhere else. `.ai/rules/queries.md` holds the rules for extending it
 
+## The cloud package
+
+`packages/Cloud` is the hosted business behind relaticle.com: billing behaviour and UI, the
+business half of the sysadmin panel (Overview, revenue, subscriptions, AI credits, trial and
+managed-plan actions), the marketing site, the docs and help website, and the blog: its pages,
+its authoring in the sysadmin panel and its `/mcp/blog` endpoint. Its own `LICENSE` allows
+development and testing use, and production use only under an agreement. The root `LICENSE` stays
+the verbatim AGPL text, so GitHub still detects the repository as AGPL-3.0, and the README names the
+split. Plausible keeps its proprietary directory the same way. The self-hosted build is this
+repository without it.
+
+- Core never references it. `tests/Arch/ArchTest.php` fails a core layer that uses
+  `Relaticle\Cloud`. The `ConventionsTest` check "keeps the cloud package out of core code,
+  config, routes, views and lang" fails a core file that names it or its `cloud::` view and lang
+  namespace. `bootstrap/providers.php` holds the one allowed mention: a `class_exists` check that
+  loads `CloudServiceProvider` only when the class exists and `config('relaticle.cloud')` is on
+- Cloud is off unless `RELATICLE_CLOUD=true`. relaticle.com sets it, and so do `.env.ci`, both
+  phpunit files and a developer's `.env`. A self-hosted install never sets it. The Docker image
+  also leaves the code out, because `.dockerignore` excludes `/packages/Cloud`. A git clone keeps
+  the directory, and the unset switch keeps the provider out of `bootstrap/providers.php` and the
+  package's entries out of `vite.config.js`. `packages/Cloud/tests/Feature/CloudProviderTest.php`
+  pins the provider half. The `Self-hosted Build` job in `.github/workflows/ci.yml` boots once with
+  the switch unset, then deletes the directory, rebuilds the autoload and runs Arch and Smoke. A
+  push to main runs Feature there too. A core class, view or route that needs Cloud fails that job,
+  on the pull request when Arch or Smoke reaches it, and otherwise on main after the merge
+- Core asks Cloud through two contracts and keeps a self-hosted default for each:
+  `App\Contracts\Entitlements` (`SelfHostedEntitlements`) and `App\Contracts\Billing` (`NoBilling`).
+  `CloudServiceProvider` binds Cloud's implementation only while the billing flag is on.
+  `packages/Cloud/tests/Feature/CloudProviderTest.php` fails when either binding changes. What
+  core needs from billing becomes a method on `Billing`
+- Cloud reaches SystemAdmin through `CloudAdminPlugin`, which a `Panel::configureUsing` adds to the
+  `sysadmin` panel. The plugin adds pages, resources, widgets and the admin theme. Its `register(Panel)`
+  calls `Relaticle\SystemAdmin\Support\Extensions` for Workspace actions and relation managers, and
+  `tests/Feature/SystemAdmin/WorkspaceResourceTest.php` pins those. A second `Panel::configureUsing`
+  extends the app panel with the Billing page, render hooks and the theme
+- Register actions and relation managers from a provider's or plugin's `register()`, never `boot()`,
+  because the panel turns relation managers into Livewire components when it registers. No test reads
+  for that
+- A command Cloud owns is scheduled from `CloudServiceProvider`, never `bootstrap/app.php`. The
+  self-hosted build has no such class to schedule
+- Cloud is analysed by PHPStan, unlike SystemAdmin, and its Filament, Livewire and Http namespaces
+  sit under `EloquentWriteOutsideActionRule`. A literal that PHPStan's i18n rules guard goes in a
+  `__('cloud::...')` key
+
 ## Workspace scope (fails closed)
 
 Company, People, Opportunity, Task and Note carry `App\Models\Scopes\WorkspaceScope`. With no
@@ -69,6 +114,13 @@ every workspace. `tests/Feature/Models/Scopes/WorkspaceScopeTest.php` fails when
 - Livewire matches persistent middleware by class. `AppServiceProvider` registers
   `ReadAcrossWorkspaces`, because the alias alone skips every update request.
   `tests/Feature/SystemAdmin/SystemAdminPanelProviderTest.php` fails without it
+- A job that calls `auth()->setUser()`, as Filament's `ExportCsv` does, fires `Authenticated`.
+  `BindCurrentWorkspaceListener` then binds the user's stored workspace over the one `Context`
+  carried, and every job dispatched from there inherits it. A job that must act in its record's
+  workspace declares `App\Support\Workspaces\BindWorkspace` as middleware with the record's own
+  `workspace_id`, as `App\Jobs\CompleteExport` does.
+  `tests/Feature/Filament/App/Exports/ExportDownloadTest.php` fails when the export notice lands
+  in the other workspace
 
 ## Actions (business operations)
 
@@ -127,6 +179,20 @@ final readonly class CreateOpportunity
   (`Relaticle\ImportWizard\Data\ColumnData`). Use a plain `final readonly` class when code
   builds the object with `new` (`App\Data\ListQuery`). No test tells the two apart, so a
   reviewer reads for a data object that only ever meets `new`
+- Settings that a feature will keep adding to share one nullable `jsonb` column on their
+  owner, named for the feature: `workspaces.ai_settings` holds every workspace-level setting
+  for the assistant. A new setting is a new property, not a migration. Use a boolean or enum
+  column only for a standalone setting that SQL filters or reports on
+- A laravel-data class types that column: `App\Data\AiSettings` is the worked example. The
+  model casts it with `AiSettings::class.':default'`, so a `null` column reads as the
+  defaults. Each property carries its default in the constructor, and
+  `#[MapName(SnakeCaseMapper::class)]` keeps the stored keys snake case. Readers use the typed
+  property (`$workspace->ai_settings->webSearch`) and never index the raw array. The action
+  that writes one setting rebuilds the object from the current values:
+  `AiSettings::from([...$workspace->ai_settings->toArray(), 'web_search' => $enabled])`.
+  `tests/Feature/Chat/AssistantSettingsTest.php` fails when the stored key or a default
+  changes. `users.ai_preferences` and `users.notification_preferences` predate this rule and
+  still use the `array` cast
 - Name domain concepts plainly (`Plan`, not `AiPlan`). Context comes from the
   namespace
 - `Support` holds code with no business rule in it: code that could ship as a standalone

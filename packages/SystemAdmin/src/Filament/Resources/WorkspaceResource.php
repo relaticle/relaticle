@@ -7,6 +7,7 @@ namespace Relaticle\SystemAdmin\Filament\Resources;
 use App\Enums\BillingStatus;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
+use App\Enums\Plan;
 use App\Models\Workspace;
 use App\Rules\ValidWorkspaceSlug;
 use Filament\Actions\BulkActionGroup;
@@ -27,7 +28,6 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Laravel\Jetstream\Contracts\DeletesTeams;
 use Override;
 use Relaticle\EmailIntegration\EmailIntegrationServiceProvider;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\Pages\CreateWorkspace;
@@ -43,24 +43,22 @@ use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\NotesRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\OpportunitiesRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\PeopleRelationManager;
-use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\SubscriptionsRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\TasksRelationManager;
-use Relaticle\SystemAdmin\Filament\Support\EndTrial;
-use Relaticle\SystemAdmin\Filament\Support\ExtendTrial;
+use Relaticle\SystemAdmin\Filament\Support\QueuePurge;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
-use Relaticle\SystemAdmin\Filament\Support\SafeDelete;
 use Relaticle\SystemAdmin\Metrics\Scopes\AbuseSuspect;
-use Relaticle\SystemAdmin\Metrics\Scopes\ExternalWorkspace;
+use Relaticle\SystemAdmin\Metrics\Scopes\CustomerWorkspace;
 use Relaticle\SystemAdmin\Metrics\Scopes\FormedHabit;
 use Relaticle\SystemAdmin\Metrics\Scopes\InternalWorkspace;
 use Relaticle\SystemAdmin\Metrics\Scopes\StuckAfterSetup;
 use Relaticle\SystemAdmin\Metrics\WorkspaceJourney;
+use Relaticle\SystemAdmin\Support\Extensions;
 
 final class WorkspaceResource extends Resource
 {
     protected static ?string $model = Workspace::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-user-group';
+    protected static string|\BackedEnum|null $navigationIcon = 'lucide-users';
 
     protected static string|\UnitEnum|null $navigationGroup = 'User Management';
 
@@ -142,15 +140,18 @@ final class WorkspaceResource extends Resource
                         ->label('Billing')
                         ->state(fn (Workspace $record): BillingStatus => $record->billingStatus())
                         ->tooltip(fn (BillingStatus $state): string => $state->getDescription())
-                        ->badge(),
+                        ->badge()
+                        ->visible(BillingStatus::billingEnabled(...)),
                     TextEntry::make('plan')
                         ->label('Plan')
                         ->tooltip(self::PLAN_TOOLTIP)
-                        ->badge(),
+                        ->badge()
+                        ->visible(BillingStatus::billingEnabled(...)),
                     TextEntry::make('trial_ends_at')
                         ->label('Trial Ends')
                         ->dateTime()
-                        ->placeholder('—'),
+                        ->placeholder('—')
+                        ->visible(BillingStatus::billingEnabled(...)),
                     TextEntry::make('onboarding_use_case')
                         ->label('Use Case')
                         ->badge()
@@ -234,13 +235,15 @@ final class WorkspaceResource extends Resource
                     ->label('Billing')
                     ->state(fn (Workspace $record): BillingStatus => $record->billingStatus())
                     ->tooltip(fn (BillingStatus $state): string => $state->getDescription())
-                    ->badge(),
+                    ->badge()
+                    ->visible(BillingStatus::billingEnabled(...)),
                 TextColumn::make('plan')
                     ->label('Plan')
                     ->tooltip(self::PLAN_TOOLTIP)
                     ->badge()
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->visible(BillingStatus::billingEnabled(...)),
                 TextColumn::make('onboarding_use_case')
                     ->label('Use Case')
                     ->badge()
@@ -289,7 +292,10 @@ final class WorkspaceResource extends Resource
                     ->label('Billing')
                     ->options(BillingStatus::class)
                     ->multiple()
-                    ->query(self::filterByBillingStatus(...)),
+                    ->query(self::filterByBillingStatus(...))
+                    ->visible(BillingStatus::billingEnabled(...)),
+                SelectFilter::make('plan')
+                    ->options(Plan::class),
                 TernaryFilter::make('personal_workspace')
                     ->label('Personal Workspace'),
                 SelectFilter::make('onboarding_use_case')
@@ -304,7 +310,7 @@ final class WorkspaceResource extends Resource
                 TernaryFilter::make('internal')
                     ->label('Internal')
                     ->placeholder('All workspaces')
-                    ->trueLabel('Owned by a system administrator')
+                    ->trueLabel('Ours: a system administrator or our own email domain')
                     ->falseLabel('Customers only')
                     ->queries(
                         true: function (Builder $query): Builder {
@@ -313,7 +319,7 @@ final class WorkspaceResource extends Resource
                             return $query;
                         },
                         false: function (Builder $query): Builder {
-                            (new ExternalWorkspace)->apply($query, $query->getModel());
+                            (new CustomerWorkspace)->apply($query, $query->getModel());
 
                             return $query;
                         },
@@ -340,6 +346,11 @@ final class WorkspaceResource extends Resource
                     ->toggle()
                     ->visible(fn (): bool => EmailIntegrationServiceProvider::enabled())
                     ->query(fn (Builder $query): Builder => $query->withConnectedMailbox()),
+                Filter::make('at_mailbox_cap')
+                    ->label('At the mailbox cap')
+                    ->toggle()
+                    ->visible(fn (): bool => EmailIntegrationServiceProvider::enabled())
+                    ->query(fn (Builder $query): Builder => $query->atMailboxCap()),
                 Filter::make('stuck_after_setup')
                     ->label('Stuck after setup')
                     ->toggle()
@@ -352,15 +363,12 @@ final class WorkspaceResource extends Resource
             ->recordActions([
                 ViewAction::make(),
                 EditAction::make()->action(null),
-                ExtendTrial::action(),
-                EndTrial::action(),
+                ...resolve(Extensions::class)->workspaceTableActions(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    EndTrial::bulkAction(),
-                    SafeDelete::bulkAction(function (Workspace $record): void {
-                        resolve(DeletesTeams::class)->delete($record);
-                    }),
+                    ...resolve(Extensions::class)->workspaceBulkActions(),
+                    QueuePurge::bulkAction(),
                 ]),
             ]);
     }
@@ -404,7 +412,7 @@ final class WorkspaceResource extends Resource
             ConversationsRelationManager::class,
             ImportsRelationManager::class,
             MailboxesRelationManager::class,
-            SubscriptionsRelationManager::class,
+            ...resolve(Extensions::class)->workspaceRelationManagers(),
             ActivityRelationManager::class,
         ];
     }

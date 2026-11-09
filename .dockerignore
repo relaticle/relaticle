@@ -25,6 +25,9 @@
 .env.*.local
 .env.backup
 
+# Closed-source package
+/packages/Cloud
+
 # Testing
 .env.testing
 .env.ci
@@ -43,6 +46,7 @@ Makefile
 # Documentation
 *.md
 !README.md
+!INTEGRATION-EXCEPTION.md
 CLAUDE.md
 
 # Cache and logs

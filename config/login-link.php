@@ -4,8 +4,13 @@ declare(strict_types=1);
 
 use Spatie\LoginLink\Http\Controllers\LoginLinkController;
 
+// An Amp orb serves the app on its portal hostname, which only the thread's participants can open.
+$orbPortalDomain = env('AMP_ORB') ? env('AMP_PORTAL_DOMAIN') : null;
+
 $isDevelopmentHost = static fn (mixed $host): bool => is_string($host)
-    && (in_array($host, ['localhost', '127.0.0.1'], true) || str_ends_with($host, '.test'));
+    && (in_array($host, ['localhost', '127.0.0.1'], true)
+        || str_ends_with($host, '.test')
+        || (is_string($orbPortalDomain) && $orbPortalDomain !== '' && str_ends_with($host, ".{$orbPortalDomain}")));
 
 return [
     /*

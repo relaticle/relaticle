@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Exceptions;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
+use Laravel\Ai\Exceptions\RateLimitedException;
 use Laravel\Ai\Prompts\TranscriptionPrompt;
 use Laravel\Ai\Transcription;
 use Relaticle\Chat\Http\Controllers\TranscribeController;
@@ -84,6 +88,7 @@ it('422s when the audio exceeds the size cap', function (): void {
         'audio' => UploadedFile::fake()->create('recording.webm', 2049, 'audio/webm'),
     ])
         ->assertStatus(422)
+        ->assertJsonPath('message', "That recording couldn't be read. Try again.")
         ->assertJsonValidationErrors('audio');
 });
 
@@ -93,6 +98,17 @@ it('422s when the upload is not audio', function (): void {
     ])
         ->assertStatus(422)
         ->assertJsonValidationErrors('audio');
+});
+
+it('answers an upload that fails validation with the same message as an unreadable recording', function (): void {
+    $message = "That recording couldn't be read. Try again.";
+
+    $this->postJson(route('chat.transcribe'), [
+        'audio' => new UploadedFile(base_path('tests/fixtures/imports/companies.csv'), 'recording.webm', null, null, true),
+    ])
+        ->assertStatus(422)
+        ->assertJsonPath('message', $message)
+        ->assertJsonPath('errors.audio', [$message]);
 });
 
 it('returns the transcribed text', function (): void {
@@ -173,4 +189,83 @@ it('bills that allowance to the workspace, not to each member of it', function (
     $this->actingAs($teammate)
         ->postJson(route('chat.transcribe'), ['audio' => audioUpload()])
         ->assertStatus(429);
+});
+
+it('422s instead of 500ing when the provider rejects the recording as unreadable', function (): void {
+    Exceptions::fake();
+    Http::fake(['api.openai.com/*' => Http::response([
+        'error' => [
+            'message' => 'Audio file might be corrupted or unsupported',
+            'type' => 'invalid_request_error',
+            'param' => 'file',
+            'code' => 'invalid_value',
+        ],
+    ], 400)]);
+
+    $this->postJson(route('chat.transcribe'), ['audio' => audioUpload()])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('audio');
+
+    Exceptions::assertNotReported(RequestException::class);
+});
+
+it('does not 500 on a provider failure', function (int $status): void {
+    Exceptions::fake();
+    Http::fake(['api.openai.com/*' => Http::response(['error' => ['message' => 'upstream said no']], $status)]);
+
+    $this->postJson(route('chat.transcribe'), ['audio' => audioUpload()])
+        ->assertStatus(in_array($status, [413, 400], true) ? 422 : 503);
+
+    Exceptions::assertNothingReported();
+})->with([
+    'file too large' => 413,
+    'rate limited' => 429,
+    'bad gateway' => 502,
+    'internal error' => 500,
+]);
+
+it('counts a rejected recording against the minute allowance', function (): void {
+    Cache::flush();
+    Http::fake(['api.openai.com/*' => Http::response(['error' => ['message' => 'Audio file might be corrupted or unsupported']], 400)]);
+
+    $this->postJson(route('chat.transcribe'), ['audio' => audioUpload()]);
+
+    $response = $this->postJson(route('chat.transcribe'), ['audio' => audioUpload()]);
+
+    expect($response->headers->get('X-RateLimit-Remaining'))->toBe('8');
+});
+
+it('still reports a provider auth failure', function (int $status): void {
+    Exceptions::fake();
+    Http::fake(['api.openai.com/*' => Http::response(['error' => ['message' => 'Incorrect API key provided']], $status)]);
+
+    $this->postJson(route('chat.transcribe'), ['audio' => audioUpload()])
+        ->assertStatus(500);
+
+    Exceptions::assertReported(RequestException::class);
+})->with([
+    'unauthorized' => 401,
+    'forbidden' => 403,
+    'other bad request' => 400,
+]);
+
+it('503s when the provider cannot be reached', function (): void {
+    Exceptions::fake();
+    Http::fake(['api.openai.com/*' => Http::failedConnection()]);
+
+    $this->postJson(route('chat.transcribe'), ['audio' => audioUpload()])
+        ->assertStatus(503)
+        ->assertJsonPath('message', 'Voice input is busy. Try again in a moment.');
+
+    Exceptions::assertNothingReported();
+});
+
+it('still reports an exhausted provider quota', function (): void {
+    Exceptions::fake();
+    Http::fake(['api.openai.com/*' => Http::response(['error' => ['message' => 'You exceeded your current quota', 'code' => 'insufficient_quota']], 429)]);
+
+    $this->postJson(route('chat.transcribe'), ['audio' => audioUpload()])
+        ->assertStatus(500);
+
+    Exceptions::assertReported(RateLimitedException::class);
 });

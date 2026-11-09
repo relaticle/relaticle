@@ -6,6 +6,29 @@ on:
     tags: ['v*']
   pull_request:
     branches: [main]
+    # The image boots the app without dev dependencies (package:discover), the only
+    # check of that boot before merge, so what the boot loads is listed too.
+    paths:
+      - .dockerignore
+      - .github/workflows/docker-publish.yml
+      - Dockerfile
+      - app/Providers/**
+      - bootstrap/**
+      - composer.json
+      - composer.lock
+      - config/**
+      - package.json
+      - packages/*/resources/css/**
+      - packages/*/src/*Provider.php
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - resources/css/**
+      - routes/**
+      - vite.config.js
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   REGISTRY: ghcr.io
@@ -62,11 +85,10 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
+        with:
+          cleanup: false
 
       - name: Extract metadata
         id: meta
@@ -85,6 +107,8 @@ jobs:
       - name: Build and push by digest
         id: build
         uses: docker/build-push-action@v7
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: .
           target: production
@@ -93,8 +117,8 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
             ${{ env.DOCKERHUB_IMAGE }}
-          cache-from: type=gha,scope=${{ matrix.platform }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-${{ env.PLATFORM_PAIR }}
+          cache-to: ${{ github.ref == 'refs/heads/main' && format('type=registry,ref={0}/{1}:buildcache-{2},mode=max', env.REGISTRY, env.IMAGE_NAME, env.PLATFORM_PAIR) || '' }}
           outputs: ${{ github.event_name != 'pull_request' && 'type=image,push-by-digest=true,name-canonical=true,push=true' || '' }}
 
       - name: Export digest

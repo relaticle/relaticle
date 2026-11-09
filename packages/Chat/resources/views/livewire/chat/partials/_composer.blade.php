@@ -4,12 +4,8 @@
         {{-- Docked pending proposal: a nested Livewire component hosts the active proposal so it can
              render real Filament field editors in place (Phase C). Alpine stays the source of truth for
              whether a proposal is pending and pushes the active id to the card via `proposal:set-active`. --}}
-        {{-- The composer below is hidden while a proposal is docked, and its editor
-             holds focus at that moment, so focus would otherwise fall to <body>: a
-             keyboard user lands at the top of the document with no idea a decision is
-             waiting. tabindex plus the focus on show moves them onto the dock, and
-             role=status announces it to a screen reader (the transcript's own log
-             region is a sibling and does not cover this). --}}
+        {{-- The composer hides while a proposal is docked and its editor held focus,
+             so focus moves onto the dock instead of falling to <body>. --}}
         <div
             x-show="hasPendingProposal"
             x-effect="syncActiveProposal()"
@@ -23,12 +19,10 @@
             x-transition:leave="motion-safe:transition motion-safe:duration-[var(--duration-fast)] motion-safe:ease-in"
             x-transition:leave-start="motion-safe:translate-y-0 motion-safe:opacity-100"
             x-transition:leave-end="motion-safe:translate-y-1 motion-safe:opacity-0"
-            class="mb-3"
+            class="mb-3 outline-none"
         >
-            {{-- No visible eyebrow above the card (Attio): the halo marks it as
-                 the pending decision, and the wrapper's aria-label plus this
-                 status line announce it to screen readers without taking space. --}}
-            <span class="sr-only" role="status">{{ __('Review before continuing') }}</span>
+            {{-- The halo marks the pending decision; the wrapper's aria-label
+                 announces it to screen readers. --}}
             {{-- Bounded, but NOT a scroller: the card scrolls its own steps and keeps
                  the decision buttons pinned. Scrolling here instead would push
                  Approve below the fold on any plan taller than the dock. --}}
@@ -61,7 +55,7 @@
                     x-bind:aria-label="@js(__('Stop referring to :label')).replace(':label', pageContextLabel)"
                     class="-me-0.5 shrink-0 rounded p-0.5 transition hover:bg-primary-600/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary-500 dark:hover:bg-primary-400/20"
                 >
-                    <x-heroicon-m-x-mark class="h-3.5 w-3.5" aria-hidden="true" />
+                    <x-lucide-x class="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
             </span>
         </div>

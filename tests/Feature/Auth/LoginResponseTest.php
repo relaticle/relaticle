@@ -36,6 +36,14 @@ function loginResponseFor(User $user, ?string $intended): string
     return $response->getTargetUrl();
 }
 
+it('falls back to the dashboard for an intended url that only matches a non-GET route', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+
+    $target = loginResponseFor($user, '/logout');
+
+    expect($target)->toBe(Dashboard::getUrl(['tenant' => $user->currentWorkspace]));
+});
+
 it('honors a pre-login deep link into a workspace the user belongs to', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->currentWorkspace;

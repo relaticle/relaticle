@@ -21,6 +21,7 @@ it('completes a signup from the unified login page', function (): void {
 
     $page->click('button[type="submit"]')
         ->assertVisible('[id="form.password"]')
+        ->assertScript(asyncAlpineComponentsLoaded())
         ->type('[id="form.password"]', 'Password123!');
 
     $page->wait(2);
@@ -50,6 +51,7 @@ it('completes a signup through the turnstile challenge without showing a widget'
 
     $page->click('button[type="submit"]')
         ->assertVisible('[id="form.password"]')
+        ->assertScript(asyncAlpineComponentsLoaded())
         ->assertScript('document.querySelector(\'[x-ref="widget"]\').closest(\'.fi-grid-col\').classList.contains(\'fi-hidden\')', true)
         ->type('[id="form.password"]', 'Password123!');
 
@@ -80,6 +82,7 @@ it('holds a submit made before the turnstile token exists and replays it', funct
 
     $page->click('button[type="submit"]')
         ->assertVisible('[id="form.password"]')
+        ->assertScript(asyncAlpineComponentsLoaded())
         ->type('[id="form.password"]', 'Password123!')
         ->click('button[type="submit"]')
         ->assertPathIs('/app/email-verification/prompt');

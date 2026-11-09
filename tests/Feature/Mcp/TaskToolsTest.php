@@ -7,7 +7,6 @@ use App\Actions\Task\CreateTask;
 use App\Actions\Task\DetachTaskRelationships;
 use App\Actions\Task\NotifyTaskAssignees;
 use App\Actions\Task\UpdateTask;
-use App\Mail\TaskAssignedMail;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\BaseAttachTool;
 use App\Mcp\Tools\BaseCreateTool;
@@ -28,13 +27,14 @@ use App\Models\Company;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Notifications\TaskAssignedNotification;
 use App\Support\CurrentWorkspace;
 use Illuminate\Database\Events\TransactionCommitted;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Exceptions;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Testing\Fluent\AssertableJson;
 
 mutates(
@@ -191,7 +191,7 @@ it('can attach assignees to a task', function (): void {
 });
 
 it('notifies assignees added through the MCP attach tool', function (): void {
-    Mail::fake();
+    Notification::fake();
 
     $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $member = User::factory()->create([
@@ -206,13 +206,11 @@ it('notifies assignees added through the MCP attach tool', function (): void {
         ])
         ->assertOk();
 
-    defer()->invoke();
-
-    Mail::assertQueued(TaskAssignedMail::class, fn (TaskAssignedMail $mail): bool => $mail->hasTo($member->email));
+    Notification::assertSentTo($member, TaskAssignedNotification::class, fn (TaskAssignedNotification $notification, array $channels): bool => in_array('mail', $channels, true));
 });
 
 it('only notifies assignees attached by its own write', function (): void {
-    Mail::fake();
+    Notification::fake();
 
     $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $intendedAssignee = User::factory()->create([
@@ -243,14 +241,12 @@ it('only notifies assignees attached by its own write', function (): void {
         ])
         ->assertOk();
 
-    defer()->invoke();
-
-    Mail::assertQueued(TaskAssignedMail::class, fn (TaskAssignedMail $mail): bool => $mail->hasTo($intendedAssignee->email));
-    Mail::assertNotQueued(TaskAssignedMail::class, fn (TaskAssignedMail $mail): bool => $mail->hasTo($concurrentAssignee->email));
+    Notification::assertSentTo($intendedAssignee, TaskAssignedNotification::class, fn (TaskAssignedNotification $notification, array $channels): bool => in_array('mail', $channels, true));
+    Notification::assertNotSentTo($concurrentAssignee, TaskAssignedNotification::class);
 });
 
 it('only notifies assignees added by its own update', function (): void {
-    Mail::fake();
+    Notification::fake();
 
     $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $intendedAssignee = User::factory()->create([
@@ -281,14 +277,12 @@ it('only notifies assignees added by its own update', function (): void {
         ])
         ->assertOk();
 
-    defer()->invoke();
-
-    Mail::assertQueued(TaskAssignedMail::class, fn (TaskAssignedMail $mail): bool => $mail->hasTo($intendedAssignee->email));
-    Mail::assertNotQueued(TaskAssignedMail::class, fn (TaskAssignedMail $mail): bool => $mail->hasTo($concurrentAssignee->email));
+    Notification::assertSentTo($intendedAssignee, TaskAssignedNotification::class, fn (TaskAssignedNotification $notification, array $channels): bool => in_array('mail', $channels, true));
+    Notification::assertNotSentTo($concurrentAssignee, TaskAssignedNotification::class);
 });
 
 it('does not re-notify an assignee the update kept in place', function (): void {
-    Mail::fake();
+    Notification::fake();
 
     $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $existingAssignee = User::factory()->create([
@@ -307,14 +301,12 @@ it('does not re-notify an assignee the update kept in place', function (): void 
         ])
         ->assertOk();
 
-    defer()->invoke();
-
-    Mail::assertQueued(TaskAssignedMail::class, fn (TaskAssignedMail $mail): bool => $mail->hasTo($newAssignee->email));
-    Mail::assertNotQueued(TaskAssignedMail::class, fn (TaskAssignedMail $mail): bool => $mail->hasTo($existingAssignee->email));
+    Notification::assertSentTo($newAssignee, TaskAssignedNotification::class, fn (TaskAssignedNotification $notification, array $channels): bool => in_array('mail', $channels, true));
+    Notification::assertNotSentTo($existingAssignee, TaskAssignedNotification::class);
 });
 
 it('only notifies assignees added by its own create', function (): void {
-    Mail::fake();
+    Notification::fake();
 
     $intendedAssignee = User::factory()->create([
         'notification_preferences' => ['task_assigned' => ['email' => true]],
@@ -350,14 +342,12 @@ it('only notifies assignees added by its own create', function (): void {
         ])
         ->assertOk();
 
-    defer()->invoke();
-
-    Mail::assertQueued(TaskAssignedMail::class, fn (TaskAssignedMail $mail): bool => $mail->hasTo($intendedAssignee->email));
-    Mail::assertNotQueued(TaskAssignedMail::class, fn (TaskAssignedMail $mail): bool => $mail->hasTo($concurrentAssignee->email));
+    Notification::assertSentTo($intendedAssignee, TaskAssignedNotification::class, fn (TaskAssignedNotification $notification, array $channels): bool => in_array('mail', $channels, true));
+    Notification::assertNotSentTo($concurrentAssignee, TaskAssignedNotification::class);
 });
 
 it('does not duplicate assignees or notifications when an attachment is repeated', function (): void {
-    Mail::fake();
+    Notification::fake();
 
     $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $member = User::factory()->create([
@@ -372,23 +362,22 @@ it('does not duplicate assignees or notifications when an attachment is repeated
                 'assignee_ids' => [$member->id],
             ])
             ->assertOk();
-
-        defer()->invoke();
     }
 
     expect(DB::table('task_user')
         ->where('task_id', $task->id)
         ->where('user_id', $member->id)
         ->count())->toBe(1);
-    Mail::assertQueued(TaskAssignedMail::class, 1);
+    Notification::assertSentToTimes($member, TaskAssignedNotification::class, 1);
 });
 
 it('waits for a concurrent task row lock before attaching relationships', function (): void {
-    Mail::fake();
+    Notification::fake();
 
-    $this->user->update([
+    $member = User::factory()->create([
         'notification_preferences' => ['task_assigned' => ['email' => true]],
     ]);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
     $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
 
     $defaultConnectionName = DB::getDefaultConnection();
@@ -414,7 +403,7 @@ it('waits for a concurrent task row lock before attaching relationships', functi
         RelaticleServer::actingAs($writerUser)
             ->tool(AttachTaskToEntitiesTool::class, [
                 'id' => $task->id,
-                'assignee_ids' => [$writerUser->id],
+                'assignee_ids' => [$member->id],
             ])
             ->assertHasErrors();
         Exceptions::assertReported(
@@ -427,17 +416,15 @@ it('waits for a concurrent task row lock before attaching relationships', functi
         RelaticleServer::actingAs($writerUser)
             ->tool(AttachTaskToEntitiesTool::class, [
                 'id' => $task->id,
-                'assignee_ids' => [$writerUser->id],
+                'assignee_ids' => [$member->id],
             ])
             ->assertOk();
 
-        defer()->invoke();
-
         expect($writer->table('task_user')
             ->where('task_id', $task->id)
-            ->where('user_id', $writerUser->id)
+            ->where('user_id', $member->id)
             ->count())->toBe(1);
-        Mail::assertQueued(TaskAssignedMail::class, 1);
+        Notification::assertSentToTimes($member, TaskAssignedNotification::class, 1);
     } finally {
         if ($lockHolder->transactionLevel() > 0) {
             $lockHolder->rollBack();
@@ -446,11 +433,11 @@ it('waits for a concurrent task row lock before attaching relationships', functi
         DB::setDefaultConnection($defaultConnectionName);
         DB::connection($defaultConnectionName)
             ->table('notifications')
-            ->where('notifiable_id', $this->user->id)
+            ->whereIn('notifiable_id', [$this->user->id, $member->id])
             ->delete();
         DB::connection($defaultConnectionName)
             ->table('users')
-            ->where('id', $this->user->id)
+            ->whereIn('id', [$this->user->id, $member->id])
             ->delete();
         DB::purge('relationship_lock_holder');
         DB::purge('relationship_writer');
@@ -584,4 +571,21 @@ describe('workspace scoping', function (): void {
             ])
             ->assertHasErrors(['not found']);
     });
+});
+
+it('links the in-app assignment notification of an MCP-created task to that task', function (): void {
+    $assignee = User::factory()->create();
+    $this->workspace->users()->attach($assignee, ['role' => 'member']);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(CreateTaskTool::class, [
+            'title' => 'Follow Up',
+            'assignee_ids' => [$assignee->id],
+        ])
+        ->assertOk();
+
+    $task = Task::query()->where('title', 'Follow Up')->firstOrFail();
+    $url = TaskAssignedNotification::present($assignee->notifications()->sole())->getActions()[0]->getUrl();
+
+    expect($url)->toEndWith("/{$this->workspace->slug}/tasks?task={$task->getKey()}");
 });

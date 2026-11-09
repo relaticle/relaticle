@@ -44,6 +44,20 @@ it('removes pending media and temp files older than a day, keeps the rest', func
     TemporaryUploads::disk()->assertExists(TemporaryUploads::path($freshTemp));
 });
 
+it('removes a temp file after an hour and keeps one still inside it', function (): void {
+    $stale = TemporaryUploads::newName('stale.pdf', (string) $this->workspace->getKey());
+    TemporaryUploads::disk()->put(TemporaryUploads::path($stale), pdfBytes());
+    touch(TemporaryUploads::disk()->path(TemporaryUploads::path($stale)), now()->subHours(2)->getTimestamp());
+    $recent = TemporaryUploads::newName('recent.pdf', (string) $this->workspace->getKey());
+    TemporaryUploads::disk()->put(TemporaryUploads::path($recent), pdfBytes());
+    touch(TemporaryUploads::disk()->path(TemporaryUploads::path($recent)), now()->subMinutes(30)->getTimestamp());
+
+    $this->artisan('app:purge-pending-uploads')->assertSuccessful();
+
+    TemporaryUploads::disk()->assertMissing(TemporaryUploads::path($stale));
+    TemporaryUploads::disk()->assertExists(TemporaryUploads::path($recent));
+});
+
 it('is scheduled hourly without overlap on a single server', function (): void {
     $this->artisan('schedule:list')->assertSuccessful();
 

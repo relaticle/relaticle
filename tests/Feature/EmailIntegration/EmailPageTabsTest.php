@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -15,6 +14,7 @@ use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPageTab;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Enums\SendFailureRemedy;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Livewire\AccessRequestsTable;
 use Relaticle\EmailIntegration\Livewire\DraftsTable;
@@ -58,13 +58,9 @@ function makeDraft(User $user, ConnectedAccount $account, array $overrides = [])
     ], $overrides));
 }
 
-it('uses an outlined icon for the failed tab', function (): void {
-    expect(EmailPageTab::FAILED->getIcon())->toBe(Heroicon::OutlinedExclamationCircle);
-});
-
 it('uses an outlined key for the requests empty state', function (): void {
     expect(Livewire::test(AccessRequestsTable::class)->instance()->getTable()->getEmptyStateIcon())
-        ->toBe(Heroicon::OutlinedKey);
+        ->toBe('lucide-key');
 });
 
 it('shows the emails icon beside the page title', function (): void {
@@ -74,19 +70,24 @@ it('shows the emails icon beside the page title', function (): void {
 
 it('defaults to the first tab and switches between tabs', function (): void {
     Livewire::test(EmailInboxPage::class)
-        ->assertSet('tab', EmailPageTab::DRAFTS)
+        ->assertSet('tab', EmailPageTab::DRAFTS->value)
         ->call('setTab', 'outbox')
-        ->assertSet('tab', EmailPageTab::OUTBOX)
-        ->call('setTab', 'failed')
-        ->assertSet('tab', EmailPageTab::FAILED)
+        ->assertSet('tab', EmailPageTab::OUTBOX->value)
         ->call('setTab', 'templates')
-        ->assertSet('tab', EmailPageTab::TEMPLATES);
+        ->assertSet('tab', EmailPageTab::TEMPLATES->value);
 });
 
-it('loads the failed tab from the URL', function (): void {
+it('sends a link to the retired failed tab to the failed outbox filter', function (): void {
     Livewire::withQueryParams(['tab' => 'failed'])
         ->test(EmailInboxPage::class)
-        ->assertSet('tab', EmailPageTab::FAILED);
+        ->assertRedirect(SendFailureRemedy::Retry->url($this->workspace));
+});
+
+it('shows drafts for an unknown tab in the URL', function (): void {
+    Livewire::withQueryParams(['tab' => 'archive'])
+        ->test(EmailInboxPage::class)
+        ->assertOk()
+        ->assertSeeLivewire(DraftsTable::class);
 });
 
 it('counts drafts, pending outbox mail and available templates for the tab badges', function (): void {
@@ -126,7 +127,6 @@ it('counts drafts, pending outbox mail and available templates for the tab badge
     expect($counts)->toBe([
         'drafts' => 2,
         'outbox' => 1,
-        'failed' => 1,
         'templates' => 1,
     ]);
 });
@@ -148,7 +148,7 @@ it('refreshes the tab badges when the composer saves a draft', function (): void
     expect($page->instance()->tabCounts()['drafts'])->toBe(1);
 });
 
-it('refreshes the outbox and failed badges when a failed email is retried', function (): void {
+it('refreshes the outbox badge when a failed email is retried', function (): void {
     $failed = Email::query()->create([
         'workspace_id' => $this->workspace->id,
         'user_id' => $this->user->id,
@@ -162,17 +162,16 @@ it('refreshes the outbox and failed badges when a failed email is retried', func
 
     $page = Livewire::test(EmailInboxPage::class);
 
-    expect($page->instance()->tabCounts())
-        ->toMatchArray(['outbox' => 0, 'failed' => 1]);
+    expect($page->instance()->tabCounts()['outbox'])->toBe(0);
 
-    Livewire::test(OutboxTable::class, ['lockedStatus' => EmailStatus::FAILED])
+    Livewire::test(OutboxTable::class)
+        ->filterTable('status_tab', 'failed')
         ->callAction(TestAction::make('retry')->table($failed))
         ->assertDispatched('outbox:changed');
 
     $page->dispatch('outbox:changed');
 
-    expect($page->instance()->tabCounts())
-        ->toMatchArray(['outbox' => 1, 'failed' => 0]);
+    expect($page->instance()->tabCounts()['outbox'])->toBe(1);
 });
 
 it('offers a direct gmail connect on drafts when no mailbox is connected', function (): void {

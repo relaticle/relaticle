@@ -22,7 +22,7 @@ return [
             'attribution_description' => 'Please select below where you found out about Relaticle. This step is optional.',
             'use_case' => 'Help us customize your workspace',
             'use_case_description' => 'Relaticle is all about empowering you to build the exact CRM you need, no matter how complex.',
-            'use_case_hint' => 'Tell us about your use case to get started with templates, or start with a blank canvas.',
+            'use_case_hint' => 'Tell us about your use case and we set up a pipeline template that fits it.',
         ],
         'form' => [
             'your_name' => [

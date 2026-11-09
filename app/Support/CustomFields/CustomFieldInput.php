@@ -7,6 +7,7 @@ namespace App\Support\CustomFields;
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Queries\Operand;
+use App\Support\ChecklistHtml;
 use App\Support\Media\RichContentAttachments;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Validator;
@@ -163,7 +164,12 @@ final readonly class CustomFieldInput
             return $value;
         }
 
-        $html = str_starts_with(ltrim($value), '<') ? $value : $this->markdown->toHtml($value);
+        $isHtml = str_starts_with(ltrim($value), '<');
+        $html = $isHtml ? $value : $this->markdown->toHtml($value);
+
+        if ($field->holdsChecklists()) {
+            $html = $isHtml ? ChecklistHtml::normalize($html) : ChecklistHtml::fromMarkdownHtml($html);
+        }
 
         return RichContentAttachments::forWorkspace((string) $field->tenant_id)->canonicalize($html);
     }

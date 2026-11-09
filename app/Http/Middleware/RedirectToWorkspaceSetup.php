@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Contracts\Entitlements;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Services\Billing\HostedWorkspaceAccess;
 use Closure;
 use Filament\Facades\Filament;
 use Illuminate\Http\Request;
@@ -16,7 +16,7 @@ final readonly class RedirectToWorkspaceSetup
 {
     private const string SETUP_ROUTE = 'filament.app.pages.setup';
 
-    public function __construct(private HostedWorkspaceAccess $access) {}
+    public function __construct(private Entitlements $entitlements) {}
 
     /**
      * @param  Closure(Request): (Response)  $next
@@ -39,7 +39,7 @@ final readonly class RedirectToWorkspaceSetup
         }
 
         // A paused workspace belongs to billing: redirecting it here would loop with EnsureHostedWorkspaceAccess.
-        if (! $this->access->allows($workspace)) {
+        if (! $this->entitlements->allowsAccess($workspace)) {
             return $next($request);
         }
 

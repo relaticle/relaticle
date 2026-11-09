@@ -23,21 +23,15 @@ use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Alignment;
 use Filament\Support\Enums\Size;
-use Filament\Support\Enums\Width;
-use Filament\Support\Icons\Heroicon;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Url;
-use Relaticle\EmailIntegration\Actions\SaveWorkspaceEmailSharingDefaultAction;
 use Relaticle\EmailIntegration\Actions\UpdateWorkspaceContactCreationSettingsAction;
 use Relaticle\EmailIntegration\Actions\UpdateWorkspaceEmailVisibilityAction;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
-use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailVisibilityEnforcement;
 use Relaticle\EmailIntegration\Models\WorkspaceEmailBlocklist;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
-use Relaticle\EmailIntegration\Services\PrivacyService;
-use Relaticle\EmailIntegration\Support\SharingTierChangeConfirmation;
 
 final class EmailPrivacySettingsPage extends Page implements HasSchemas
 {
@@ -89,17 +83,14 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
         return __('workspaces.tabs.email');
     }
 
-    public string $default_email_sharing_tier = 'metadata_only';
-
     public string $contact_creation_mode = 'selective';
 
     public bool $auto_create_companies = true;
 
-    /** @var array<string, Heroicon> */
+    /** @var array<string, string> */
     public const array TABS = [
-        'visibility' => Heroicon::OutlinedNoSymbol,
-        'sharing' => Heroicon::OutlinedShieldCheck,
-        'record_creation' => Heroicon::OutlinedUserPlus,
+        'visibility' => 'lucide-ban',
+        'record_creation' => 'lucide-user-plus',
     ];
 
     #[Url]
@@ -110,8 +101,6 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
         /** @var User $user */
         $user = auth()->user();
         $workspace = $user->currentWorkspace;
-
-        $this->default_email_sharing_tier = ($workspace->default_email_sharing_tier ?? EmailPrivacyTier::METADATA_ONLY)->value;
 
         $this->contact_creation_mode = ($workspace->contact_creation_mode ?? ContactCreationMode::Selective)->value;
         $this->auto_create_companies = $workspace->auto_create_companies;
@@ -141,33 +130,12 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
     {
         return Action::make('save')
             ->label(__('filament/pages/email-privacy-settings.actions.save'))
-            ->requiresConfirmation(fn (): bool => $this->shouldConfirmSave())
-            ->modalHeading(fn (): ?string => $this->shouldConfirmSave()
-                ? SharingTierChangeConfirmation::modalHeading()
-                : null)
-            ->modalWidth(Width::Small)
-            ->modalDescription(fn (): ?string => $this->shouldConfirmSave()
-                ? SharingTierChangeConfirmation::modalDescription(
-                    EmailPrivacyTier::from($this->default_email_sharing_tier),
-                )
-                : null)
-            ->schema(fn (): array => $this->shouldConfirmSave()
-                ? SharingTierChangeConfirmation::schema(
-                    EmailPrivacyTier::from($this->default_email_sharing_tier),
-                )
-                : [])
             ->action(function (): void {
-                /** @var User $user */
-                $user = auth()->user();
-                $workspace = $user->currentWorkspace;
+                if ($this->tab !== 'record_creation') {
+                    return;
+                }
 
-                $saved = match ($this->tab) {
-                    'sharing' => $this->persistWorkspaceSharingSettings($workspace, $user),
-                    'record_creation' => $this->persistContactCreationSettings(),
-                    default => false,
-                };
-
-                if (! $saved) {
+                if (! $this->persistContactCreationSettings()) {
                     return;
                 }
 
@@ -178,36 +146,11 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
             });
     }
 
-    private function shouldConfirmSave(): bool
-    {
-        return $this->tab === 'sharing' && $this->workspaceSharingTierChanged();
-    }
-
-    private function workspaceSharingTierChanged(): bool
-    {
-        /** @var User $user */
-        $user = auth()->user();
-        $workspace = $user->currentWorkspace;
-
-        $newTier = EmailPrivacyTier::from($this->default_email_sharing_tier);
-
-        return $newTier !== $this->privacy()->workspaceSharingTier($workspace);
-    }
-
-    private function persistWorkspaceSharingSettings(Workspace $workspace, User $user): bool
-    {
-        $newTier = EmailPrivacyTier::from($this->default_email_sharing_tier);
-
-        resolve(SaveWorkspaceEmailSharingDefaultAction::class)->execute($workspace, $user, $newTier);
-
-        return true;
-    }
-
     public function addVisibilityContactAction(): Action
     {
         return Action::make('addVisibilityContact')
             ->label(__('filament/pages/email-privacy-settings.visibility.add'))
-            ->icon(Heroicon::OutlinedPlus)
+            ->icon('lucide-plus')
             ->size(Size::Small)
             ->modalHeading(__('filament/pages/email-privacy-settings.visibility.add'))
             ->schema([
@@ -261,7 +204,7 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
         return $schema->schema([
             Section::make(__('filament/pages/email-privacy-settings.visibility.heading'))
                 ->description(__('filament/pages/email-privacy-settings.visibility.description'))
-                ->compact()
+                ->contained(false)
                 ->visible(fn (): bool => $this->tab === 'visibility')
                 ->headerActions([
                     $this->addVisibilityContactAction(...),
@@ -270,27 +213,9 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
                     View::make('email-integration::livewire.email-visibility-table-embed'),
                 ]),
 
-            Section::make(__('filament/pages/email-privacy-settings.workspace_default.heading'))
-                ->description(__('filament/pages/email-privacy-settings.workspace_default.description'))
-                ->compact()
-                ->visible(fn (): bool => $this->tab === 'sharing')
-                ->schema([
-                    ViewField::make('default_email_sharing_tier')
-                        ->label(__('filament/pages/email-privacy-settings.workspace_default.tier_label'))
-                        ->view('email-integration::forms.sharing-tier-cards')
-                        ->viewData([
-                            'tiers' => EmailPrivacyTier::workspaceDefaults(),
-                            'ariaLabel' => __('filament/pages/email-privacy-settings.workspace_default.tier_label'),
-                        ]),
-                ])
-                ->footerActions([
-                    $this->saveAction(),
-                ])
-                ->footerActionsAlignment(Alignment::End),
-
             Section::make(__('filament/pages/email-privacy-settings.record_creation.heading'))
                 ->description(__('filament/pages/email-privacy-settings.record_creation.description'))
-                ->compact()
+                ->contained(false)
                 ->visible(fn (): bool => $this->tab === 'record_creation')
                 ->schema([
                     ViewField::make('contact_creation_mode')
@@ -333,11 +258,6 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
         );
 
         return true;
-    }
-
-    private function privacy(): PrivacyService
-    {
-        return resolve(PrivacyService::class);
     }
 
     /**

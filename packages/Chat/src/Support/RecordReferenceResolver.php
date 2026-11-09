@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Support;
 
+use App\Enums\CrmEntity;
 use App\Filament\Pages\Workspace\CustomFields;
 use App\Filament\Pages\Workspace\Members;
 use App\Filament\Resources\CompanyResource;
@@ -20,7 +21,7 @@ use App\Models\Scopes\WorkspaceScope;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
-use Filament\Actions\EditAction;
+use App\Support\CanonicalRecordUrl;
 use Throwable;
 
 final readonly class RecordReferenceResolver
@@ -112,6 +113,12 @@ final readonly class RecordReferenceResolver
             return null;
         }
 
+        $entity = CrmEntity::tryFrom($entityType);
+
+        if ($entity instanceof CrmEntity) {
+            return resolve(CanonicalRecordUrl::class)->build($entity, $recordId, $workspace);
+        }
+
         try {
             return match ($entityType) {
                 // Custom field definitions have no per-record route. The management page
@@ -121,17 +128,6 @@ final readonly class RecordReferenceResolver
                 // lives in the Members page's list, so every invitation resolves there
                 // regardless of id.
                 'workspace_invitations' => Members::getUrl(panel: 'app', tenant: $workspace),
-                'company' => CompanyResource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $workspace),
-                'people' => PeopleResource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $workspace),
-                'opportunity' => OpportunityResource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $workspace),
-                'task' => TaskResource::getUrl('index', [
-                    'tableAction' => EditAction::getDefaultName(),
-                    'tableActionRecord' => $recordId,
-                ], panel: 'app', tenant: $workspace),
-                'note' => NoteResource::getUrl('index', [
-                    'tableAction' => EditAction::getDefaultName(),
-                    'tableActionRecord' => $recordId,
-                ], panel: 'app', tenant: $workspace),
                 default => null,
             };
         } catch (Throwable) {

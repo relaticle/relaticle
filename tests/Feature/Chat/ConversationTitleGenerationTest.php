@@ -163,6 +163,22 @@ it('titles a conversation whose turn was served by OpenAI', function (): void {
     expect(AgentConversation::query()->find($conversationId)->title)->toBe('Follow Up With Acme');
 });
 
+it('titles a conversation when a reasoning model spends part of the token budget thinking', function (): void {
+    OpenAiResponses::fakeStructuredWithinBudget(['has_topic' => true, 'title' => 'Total Companies In Workspace']);
+
+    $conversationId = seedTitlingConversation('How many companies do I have?');
+
+    (new GenerateConversationTitle(
+        conversationId: $conversationId,
+        provisionalTitle: 'How many companies do I have?',
+        message: 'How many companies do I have?',
+        provider: 'openai',
+        reply: 'You have 5 companies, though much of this workspace is still sample data.',
+    ))->handle();
+
+    expect(AgentConversation::query()->find($conversationId)->title)->toBe('Total Companies In Workspace');
+});
+
 it('never overwrites a title the user renamed while the model was thinking', function (): void {
     Event::fake([ConversationTitleGenerated::class]);
     ConversationTitler::fake([['has_topic' => true, 'title' => 'Follow Up With Acme']]);

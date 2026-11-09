@@ -41,6 +41,10 @@ return [
         ],
     ],
 
+    'empty_state' => [
+        'description' => 'Companies you add or import appear here.',
+    ],
+
     'pages' => [
         'list' => [
             'actions' => [

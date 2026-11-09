@@ -20,13 +20,13 @@ final readonly class SyncEmailBatchCountersAction
      * leave the batch hanging, a retry cannot double-count, and cancelled
      * recipients still let the batch finish.
      */
-    public function execute(?string $batchId): void
+    public function execute(?string $batchId, bool $reportFailures = false): void
     {
         if ($batchId === null) {
             return;
         }
 
-        $finishedWithFailures = DB::transaction(function () use ($batchId): ?EmailBatch {
+        $finishedWithFailures = DB::transaction(function () use ($batchId, $reportFailures): ?EmailBatch {
             $batch = EmailBatch::query()->lockForUpdate()->find($batchId);
 
             if ($batch === null) {
@@ -53,7 +53,9 @@ final readonly class SyncEmailBatchCountersAction
                 'status' => $status,
             ]);
 
-            return $wasNeverFinished && $status === EmailBatchStatus::PartialFailure ? $batch : null;
+            $finishedFirstRun = $wasNeverFinished && $status === EmailBatchStatus::PartialFailure;
+
+            return $finishedFirstRun || ($reportFailures && $failedCount > 0) ? $batch : null;
         });
 
         if ($finishedWithFailures instanceof EmailBatch) {
@@ -82,6 +84,8 @@ final readonly class SyncEmailBatchCountersAction
             $batch->connectedAccount,
             $batch->failed_count,
             is_string($onlyFailedSubject) ? $onlyFailedSubject : null,
+            EmailSendFailedNotification::batchGroupKey((string) $batch->getKey()),
+            $batch->sent_count,
         ));
     }
 }

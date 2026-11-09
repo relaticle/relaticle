@@ -10,7 +10,23 @@ mutates(MailPreview::class, MailPreviewController::class);
 it('renders every registered preview to html with the layout language attribute', function (): void {
     $preview = resolve(MailPreview::class);
 
-    expect($preview->names())->toHaveCount(19);
+    expect($preview->names())->toContain(
+        'setup-nudge',
+        'task-assigned',
+        'task-digest',
+        'workspace-invitation',
+        'workspace-deletion-scheduled',
+        'workspace-deletion-reminder',
+        'workspace-deletion-cancelled',
+        'workspace-member-removed',
+        'account-deletion-scheduled',
+        'account-deletion-reminder',
+        'account-deletion-cancelled',
+        'verify-email',
+        'verify-email-change',
+        'email-change-notice',
+        'reset-password',
+    );
 
     foreach ($preview->names() as $name) {
         $html = $preview->render($name);

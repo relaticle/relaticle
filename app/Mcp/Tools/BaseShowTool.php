@@ -47,7 +47,7 @@ abstract class BaseShowTool extends Tool
 
         return [
             'id' => $schema->string()->description("The {$label} ID to retrieve.")->required(),
-            'include' => $schema->array()->description('Related records to expand in response. To-many relationships return at most 25 records with truncation metadata.'),
+            'include' => $schema->array()->items($schema->string())->description('Related records to expand in response. To-many relationships return at most 25 records with truncation metadata.'),
         ];
     }
 

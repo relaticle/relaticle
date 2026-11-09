@@ -15,6 +15,7 @@ return [
         ],
         'redirect' => 'After you authorize, you go back to :host. Continue only if you trust that site.',
         'signed_in_as' => 'Signed in as :email.',
+        'invalid_resource' => 'This connection asked for access to a different server. Relaticle only authorizes connections to its own MCP server.',
 
         'workspace' => [
             'heading' => 'Which workspace?',
@@ -22,7 +23,7 @@ return [
             'aria_label' => 'Workspace selection',
             'personal' => 'Personal',
             'paused' => 'Paused. Subscribe to connect',
-            'all_paused' => 'Every workspace on this account is paused. Subscribe to Cloud Pro before connecting. A connector authorized against a paused workspace cannot read or write any data.',
+            'all_paused' => 'Every workspace on this account is paused. Subscribe to a Cloud plan before connecting. A connector authorized against a paused workspace cannot read or write any data.',
             'none' => [
                 'heading' => 'You do not belong to any workspaces.',
                 'description' => 'Create or join a workspace in Relaticle before authorizing this connector.',

@@ -15,7 +15,6 @@ use App\Support\CurrentSource;
 use App\Support\CurrentWorkspace;
 use App\Support\CustomFields\CanonicalValue;
 use Carbon\CarbonImmutable;
-use Filament\Notifications\Notification;
 use Illuminate\Bus\Batch;
 use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -49,6 +48,7 @@ use Relaticle\ImportWizard\Data\MatchableField;
 use Relaticle\ImportWizard\Data\RelationshipMatch;
 use Relaticle\ImportWizard\Enums\DateFormat;
 use Relaticle\ImportWizard\Enums\EntityLinkStorage;
+use Relaticle\ImportWizard\Enums\ImportOutcome;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Enums\MatchBehavior;
 use Relaticle\ImportWizard\Enums\NumberFormat;
@@ -59,6 +59,7 @@ use Relaticle\ImportWizard\Exceptions\MissingRequiredFieldException;
 use Relaticle\ImportWizard\Exceptions\UnparsableDateException;
 use Relaticle\ImportWizard\Importers\BaseImporter;
 use Relaticle\ImportWizard\Models\Import;
+use Relaticle\ImportWizard\Notifications\ImportFinishedNotification;
 use Relaticle\ImportWizard\Store\ImportRow;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Relaticle\ImportWizard\Support\EntityLinkResolver;
@@ -311,11 +312,6 @@ final class ExecuteImportJob implements ShouldQueue
             $this->rememberDedupMaps();
             $import->update(['status' => ImportStatus::Failed]);
 
-            try {
-                $this->notifyUser($import, $results, failed: true);
-            } catch (\Throwable) {
-            }
-
             throw $e;
         } finally {
             $currentImport->clear();
@@ -368,7 +364,7 @@ final class ExecuteImportJob implements ShouldQueue
         });
 
         try {
-            $this->notifyUser($import, $results, failed: true);
+            $this->notifyUser($import, $results, failed: $import->completed_at === null);
         } catch (\Throwable) {
         }
     }
@@ -1500,18 +1496,13 @@ final class ExecuteImportJob implements ShouldQueue
             return;
         }
 
-        $entityLabel = $import->entity_type->label();
-        $status = $failed ? 'failed' : 'completed';
+        $outcome = match (true) {
+            $failed => ImportOutcome::Failed,
+            $results['failed'] > 0 => ImportOutcome::CompletedWithFailures,
+            default => ImportOutcome::Completed,
+        };
 
-        $notification = Notification::make()
-            ->title("Import of {$entityLabel} {$status}")
-            ->viewData(['results' => $results]);
-
-        $failed
-            ? $notification->danger()
-            : $notification->success();
-
-        $notification->sendToDatabase($user);
+        $user->notify(new ImportFinishedNotification($import, $outcome));
     }
 
     /**

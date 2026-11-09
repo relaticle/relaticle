@@ -41,6 +41,10 @@ final class CustomFieldValue extends BaseCustomFieldValue
     /** @param array<string, mixed> $options */
     public function save(array $options = []): bool
     {
+        if ($this->exists && ! $this->isDirty()) {
+            return parent::save($options);
+        }
+
         return $this->getConnection()->transaction(function () use ($options): bool {
             $entity = $this->ownRecord();
 

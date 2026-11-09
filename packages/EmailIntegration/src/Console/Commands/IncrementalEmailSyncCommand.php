@@ -7,7 +7,6 @@ namespace Relaticle\EmailIntegration\Console\Commands;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
-use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
@@ -18,7 +17,7 @@ final class IncrementalEmailSyncCommand extends Command
     public function handle(): int
     {
         ConnectedAccount::query()
-            ->where('status', EmailAccountStatus::ACTIVE)
+            ->syncable()
             ->whereNotNull('sync_cursor')
             ->each(function (ConnectedAccount $account): void {
                 dispatch(new IncrementalEmailSyncJob($account));

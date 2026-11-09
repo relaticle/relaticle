@@ -2,12 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Actions\Jetstream\CancelUserDeletion;
 use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
 use App\Enums\Plan;
 use App\Enums\SocialiteProvider;
 use App\Enums\SubscriberTagEnum;
 use App\Enums\WorkspaceRole;
+use App\Jobs\PurgeUser;
 use App\Models\User;
 use App\Models\UserSocialAccount;
 use App\Models\Workspace;
@@ -17,6 +19,8 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 use Relaticle\SystemAdmin\Actions\UpdateCustomerRecord;
 use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 use Relaticle\SystemAdmin\Filament\Pages\EditCustomerRecord;
@@ -228,6 +232,8 @@ it('hydrates notification toggles from the enum defaults', function (): void {
         ->assertFormSet([
             'notification_preferences' => [
                 'task_assigned' => ['in_app' => true, 'email' => false],
+                'email_access' => ['in_app' => true, 'email' => true],
+                'email_shared' => ['in_app' => true, 'email' => true],
                 'task_digest' => ['email' => true],
             ],
         ]);
@@ -372,6 +378,60 @@ it('deletes users in bulk through the Jetstream deleter so their workspaces are 
 
     expect(User::query()->whereKey([$first->getKey(), $second->getKey()])->count())->toBe(0)
         ->and(Workspace::query()->whereKey($workspaceIds)->count())->toBe(0);
+});
+
+it('queues the purge on the imports lane and keeps the user until the job runs', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    Queue::fake([PurgeUser::class]);
+    $this->freezeSecond();
+
+    livewire(EditUser::class, ['record' => $user->getKey()])
+        ->callAction('delete')
+        ->assertHasNoActionErrors()
+        ->assertNotified('Queued for deletion');
+
+    expect($user->fresh()->scheduled_deletion_at)->toEqual(now());
+    Queue::assertPushedOn('imports', PurgeUser::class, fn (PurgeUser $job): bool => $job->user->is($user));
+});
+
+it('refuses to delete a user who owns a workspace other members still use', function (string $ownedWorkspace): void {
+    $owner = User::factory()->{$ownedWorkspace}()->create();
+    $owner->ownedWorkspaces()->firstOrFail()->users()->attach(User::factory()->create(), ['role' => 'member']);
+    Queue::fake([PurgeUser::class]);
+
+    livewire(EditUser::class, ['record' => $owner->getKey()])
+        ->callAction('delete')
+        ->assertNotified('Cannot delete');
+
+    expect($owner->fresh()->scheduled_deletion_at)->toBeNull();
+    Queue::assertNotPushed(PurgeUser::class);
+})->with(['personal workspace' => 'withPersonalWorkspace', 'team workspace' => 'withWorkspace']);
+
+it('names the reason when a bulk delete refuses an owner of a workspace with members', function (): void {
+    $owner = User::factory()->withWorkspace()->create();
+    $owner->ownedWorkspaces()->firstOrFail()->users()->attach(User::factory()->create(), ['role' => 'member']);
+    Queue::fake([PurgeUser::class]);
+
+    livewire(ListUsers::class)
+        ->selectTableRecords([$owner->getKey()])
+        ->callAction([['name' => 'delete', 'context' => ['table' => true, 'bulk' => true]]])
+        ->assertNotified('Cannot delete');
+
+    Queue::assertNotPushed(PurgeUser::class);
+});
+
+it('keeps a user whose deletion is cancelled before the queued purge runs', function (): void {
+    Notification::fake();
+    $user = User::factory()->withPersonalWorkspace()->create();
+    Queue::fake([PurgeUser::class]);
+
+    livewire(EditUser::class, ['record' => $user->getKey()])->callAction('delete');
+    resolve(CancelUserDeletion::class)->cancel($user->fresh());
+
+    $job = unserialize(serialize(Queue::pushed(PurgeUser::class)->first()));
+    app()->call($job->handle(...));
+
+    expect($user->fresh())->not->toBeNull();
 });
 
 it('renders the engagement badge derived from the last login timestamp', function (): void {

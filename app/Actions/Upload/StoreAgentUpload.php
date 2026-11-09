@@ -14,6 +14,7 @@ use App\Support\Media\TemporaryUploads;
 use App\Support\Media\UploadAllowlist;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
@@ -60,7 +61,7 @@ final readonly class StoreAgentUpload
 
             return $media;
         } finally {
-            @unlink($temp);
+            File::delete($temp);
         }
     }
 

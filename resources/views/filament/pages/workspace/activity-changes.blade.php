@@ -23,7 +23,7 @@
                 </span>
 
                 <x-filament::icon
-                    icon="heroicon-m-arrow-right"
+                    icon="lucide-arrow-right"
                     class="h-3 w-3 shrink-0 self-center text-gray-300 dark:text-gray-600"
                 />
 

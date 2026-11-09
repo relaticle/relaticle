@@ -81,15 +81,11 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             ['value' => 'other', 'label' => __('Other')],
         ]),
         proposalTexts: @js([
-            'createdVerb' => \Relaticle\Chat\Enums\PendingActionOperation::Create->done(),
-            'updatedVerb' => \Relaticle\Chat\Enums\PendingActionOperation::Update->done(),
-            'deletedVerb' => \Relaticle\Chat\Enums\PendingActionOperation::Delete->done(),
-            'countCreated' => \Relaticle\Chat\Enums\PendingActionOperation::Create->count(),
-            'countUpdated' => \Relaticle\Chat\Enums\PendingActionOperation::Update->count(),
-            'countDeleted' => \Relaticle\Chat\Enums\PendingActionOperation::Delete->count(),
-            'entityVerbs' => \Relaticle\Chat\Enums\ProposalEntity::receipts(),
-            'countSkipped' => __(':count skipped'),
-            'countKept' => __(':count kept'),
+            ...\Relaticle\Chat\Enums\ProposalOutcome::forClient(),
+            'receipts' => \Relaticle\Chat\Enums\ProposalEntity::receipts(),
+            'proposeAgain' => __('Propose again'),
+            'proposeAgainPrompt' => __('Propose again: :summary'),
+            'leftOut' => __('(:fields left out)'),
         ]),
     }),
     ...window.ChatModules.sendModule({
@@ -112,6 +108,8 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             'streamError' => __('The assistant encountered an error. Please try again.'),
             'timeout' => __('The assistant took too long to respond.'),
             'retrying' => __('Provider is busy, retrying (attempt :attempt of :max)…'),
+            'searchingWebFor' => __('Searching the web for ":query"…'),
+            'readingDomain' => __('Reading :domain…'),
         ]),
         {{-- The shimmer label for each tool the agent can call, keyed by the
              snake_case class basename laravel/ai broadcasts as `tool_name`.
@@ -138,10 +136,19 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             'list_email_accounts' => __('Checking your mailboxes…'),
             'create_email_draft' => __('Preparing an email draft…'),
             'send_email' => __('Preparing an email…'),
+            'update_email_draft' => __('Preparing a draft update…'),
+            'delete_email_draft' => __('Preparing to delete a draft…'),
+            'send_email_draft' => __('Preparing to send a draft…'),
+            'cancel_email' => __('Preparing to cancel an email…'),
+            'reschedule_email' => __('Preparing to reschedule an email…'),
+            'retry_email' => __('Preparing to send an email again…'),
             'list_custom_fields' => __('Reading custom fields…'),
             'search_docs' => __('Searching the documentation…'),
             'guide_to_page' => __('Finding the right page…'),
             'get_credit_balance' => __('Checking your AI credits…'),
+            'request_web_access' => __('Asking to search the web…'),
+            'web_search' => __('Searching the web…'),
+            'web_fetch' => __('Reading a web page…'),
             'create_company' => __('Drafting a company…'),
             'update_company' => __('Preparing company changes…'),
             'delete_company' => __('Preparing company deletion…'),
@@ -271,6 +278,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             this.isStreaming = true;
             this.currentToolStatus = null;
             this.startStreamTimeout();
+            this.watchTurn();
         }
 
         // Land at the latest message when reopening an existing conversation.
@@ -380,8 +388,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.approvalKeyHandler = (e) => {
             if (!((e.metaKey || e.ctrlKey) && e.key === 'Enter')) return;
 
-            const pending = this.visiblePendingActions();
-            if (pending.length !== 1 || this.isStreaming) return;
+            if (this.isStreaming || !this.hasPendingProposal || !this.$root.querySelector('[data-proposal-shortcut]:not([disabled])')) return;
             if (this.input.trim().length > 0) return; // composer draft wins
 
             e.preventDefault();
@@ -450,7 +457,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             window.Livewire.on('proposal:lapsed', (payload) => {
                 if ((payload?.context ?? 'conversation') !== this.context) return;
                 const action = this.findPendingAction(payload?.pendingActionId);
-                if (action?.status === 'pending') action.status = 'expired';
+                if (action?.status === 'pending') this.settleLocally(action, 'expired');
             }),
             // The dock queued a resumed turn (TurnContinuationService). Nothing
             // streams for a second or two while the job picks it up, and without
@@ -463,6 +470,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                 this.isStreaming = true;
                 this.currentToolStatus = null;
                 this.startStreamTimeout();
+                this.watchTurn();
             }),
         ];
 
@@ -486,6 +494,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.teardownAnchorObserver();
         this.teardownMessageSearch();
         this.clearStreamTimeout();
+        this.stopWatchingTurn();
         clearTimeout(this._copiedTimer);
         clearTimeout(this._scrollAnimationTimer);
         this.clearRateLimit();

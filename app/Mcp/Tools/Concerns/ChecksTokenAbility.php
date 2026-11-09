@@ -12,6 +12,7 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Registrar;
 use Laravel\Passport\AccessToken as PassportAccessToken;
 use Laravel\Passport\Passport;
+use Relaticle\EmailIntegration\Data\AgentConnection;
 
 trait ChecksTokenAbility
 {
@@ -46,6 +47,10 @@ trait ChecksTokenAbility
             return Response::error('Invalid ability provided.');
         }
 
+        if ($this->abilitiesTheRoleGrants([$ability]) === []) {
+            return Response::error('Your role in this workspace does not allow this.');
+        }
+
         return null;
     }
 
@@ -65,7 +70,26 @@ trait ChecksTokenAbility
         return array_any($grants, fn (EmailGrant $grant): bool => in_array($grant, $held, true));
     }
 
-    protected function connectionName(): string
+    protected function roleAllowsAgentSend(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User
+            && $user->hasWorkspaceCapability($user->currentWorkspace?->getKey(), WorkspaceCapability::EmailAgentSend);
+    }
+
+    protected function agentConnection(): AgentConnection
+    {
+        $token = $this->currentToken();
+
+        return new AgentConnection(
+            $this->connectionName(),
+            $token instanceof PassportAccessToken ? ($token->oauth_client_id ?: null) : null,
+            $token instanceof PersonalAccessToken && $token->getKey() ? (int) $token->getKey() : null,
+        );
+    }
+
+    private function connectionName(): string
     {
         $token = $this->currentToken();
 

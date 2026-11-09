@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Console\Commands\SendTaskDigestCommand;
 use App\Enums\CreationSource;
+use App\Enums\Plan;
 use App\Features\OnboardSeed;
 use App\Mail\TaskDigestMail;
 use App\Models\Task;
@@ -79,6 +80,19 @@ it('filters recipients by timezone so only users at their local 08:00 are queued
 
     Mail::assertQueued(TaskDigestMail::class, fn (TaskDigestMail $mail): bool => $mail->hasTo($tokyo->email));
     Mail::assertNotQueued(TaskDigestMail::class, fn (TaskDigestMail $mail): bool => $mail->hasTo($utc->email));
+});
+
+it('leaves tasks in a paused workspace out of the digest', function (): void {
+    withHostedBilling();
+    $this->travelTo(Date::parse('2026-06-29 08:00:00', 'UTC'));
+    $paused = userWithDueTask('UTC');
+    $trialing = userWithDueTask('UTC');
+    $trialing->currentWorkspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(5)])->save();
+
+    $this->artisan('notifications:send-task-digest')->assertSuccessful();
+
+    Mail::assertQueued(TaskDigestMail::class, fn (TaskDigestMail $mail): bool => $mail->hasTo($trialing->email));
+    Mail::assertNotQueued(TaskDigestMail::class, fn (TaskDigestMail $mail): bool => $mail->hasTo($paused->email));
 });
 
 it('suppresses the digest when the user has no due tasks', function (): void {

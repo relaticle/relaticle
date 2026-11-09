@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Notifications\WorkspaceMemberRemovedNotification;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Laravel\Jetstream\Contracts\RemovesTeamMembers;
@@ -27,7 +28,11 @@ final readonly class RemoveWorkspaceMember implements RemovesTeamMembers
 
         $this->ensureAdminIsNotRemovingAnotherAdmin($user, $workspace, $workspaceMember);
 
-        $workspace->removeUser($workspaceMember);
+        DB::transaction(function () use ($workspace, $workspaceMember): void {
+            $workspace->removeUser($workspaceMember);
+
+            $workspaceMember->notifications()->where('workspace_id', $workspace->getKey())->delete();
+        });
 
         event(new TeamMemberRemoved($workspace, $workspaceMember));
 

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Support;
 
+use App\Contracts\Entitlements;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Services\Billing\HostedWorkspaceAccess;
 use Illuminate\Support\Facades\URL;
 
 final class MailboxOAuthWorkspace
@@ -32,7 +32,7 @@ final class MailboxOAuthWorkspace
 
         $workspace = Workspace::query()->find($workspaceId);
 
-        if (! $workspace instanceof Workspace || resolve(HostedWorkspaceAccess::class)->isPaused($workspace)) {
+        if (! $workspace instanceof Workspace || ! resolve(Entitlements::class)->allowsAccess($workspace)) {
             return null;
         }
 

@@ -16,8 +16,11 @@ permissions:
 
 jobs:
   composer:
-    runs-on: ubuntu-latest
-    name: Warm Composer Cache
+    strategy:
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    name: Warm Composer Cache (${{ matrix.runner }})
 
     steps:
       - name: Checkout
@@ -29,9 +32,9 @@ jobs:
           path: |
             ~/.composer/cache
             vendor
-          key: ${{ runner.os }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
           restore-keys: |
-            ${{ runner.os }}-php-8.5-composer-
+            ${{ runner.os }}-${{ runner.arch }}-php-8.5-composer-
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2

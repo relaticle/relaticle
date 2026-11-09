@@ -29,10 +29,19 @@ return [
         'resize' => 'Resize sidebar',
     ],
 
+    'bottom_navigation' => [
+        'label' => 'Main',
+        'more' => 'More',
+    ],
+
     'payload_too_large' => 'That change is too large to save. Shorten the content and try again.',
 
     'selects' => [
         'member_self' => ':name (You)',
+    ],
+
+    'record_chips' => [
+        'show_all' => 'Show all :count :label',
     ],
 
     'restore_blocked' => [

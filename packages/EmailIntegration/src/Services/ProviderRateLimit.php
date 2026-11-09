@@ -67,7 +67,7 @@ final readonly class ProviderRateLimit
         $current = $exception;
 
         while ($current instanceof Throwable) {
-            if (self::isUnreachable($current) || (self::httpStatus($current) ?? 0) >= 500) {
+            if (self::isUnreachable($current) || self::isTokenRefreshOutage($current) || (self::httpStatus($current) ?? 0) >= 500) {
                 return self::clamp(self::headerSeconds($current) ?? self::FALLBACK_SECONDS);
             }
 
@@ -80,6 +80,11 @@ final readonly class ProviderRateLimit
     private static function isUnreachable(Throwable $exception): bool
     {
         return $exception instanceof ConnectionException || $exception instanceof NetworkExceptionInterface;
+    }
+
+    private static function isTokenRefreshOutage(Throwable $exception): bool
+    {
+        return str_starts_with($exception->getMessage(), 'internal_failure');
     }
 
     private static function secondsFor(Throwable $exception): ?int

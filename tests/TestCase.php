@@ -6,11 +6,13 @@ namespace Tests;
 
 use App\Features\OnboardSeed;
 use App\Features\SetupConversation;
+use App\Support\Email\MailExchangers;
 use App\Support\Http\HostResolver;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Foundation\Testing\WithCachedConfig;
 use Illuminate\Foundation\Testing\WithCachedRoutes;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
@@ -42,7 +44,16 @@ abstract class TestCase extends BaseTestCase
         // in one process renders against a fresh translator that never received it.
         ScribeServiceProvider::$customTranslationLayerLoaded = false;
 
+        // TrustHosts writes its patterns into Symfony's static Request state, so a test that
+        // fakes production would otherwise answer every later request in the worker with a 400.
+        Request::setTrustedHosts([]);
+
         return parent::createApplication();
+    }
+
+    protected function fakeExceptions(): void
+    {
+        Exceptions::fake();
     }
 
     protected function setUp(): void
@@ -57,8 +68,9 @@ abstract class TestCase extends BaseTestCase
         $this->app->instance(HostResolver::class, new HostResolver(
             fn (string $host): array => filter_var($host, FILTER_VALIDATE_IP) !== false ? [$host] : [],
         ));
+        $this->app->instance(MailExchangers::class, new MailExchangers(fn (): array => []));
         Sleep::fake(syncWithCarbon: true);
-        Exceptions::fake();
+        $this->fakeExceptions();
 
         // InstallCommand shells out to composer, npm and vite. Running those for
         // real cost ~110s and rewrote public/build on every suite run, so any new

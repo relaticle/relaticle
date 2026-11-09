@@ -3,21 +3,15 @@
 declare(strict_types=1);
 
 use App\Enums\WorkspaceRole;
-use App\Features\Billing as BillingFeature;
-use App\Filament\Pages\Billing;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\Workspace\Members;
 use App\Models\User;
 use App\Policies\WorkspacePolicy;
-use App\Services\Billing\SidebarBillingState;
 use Filament\Facades\Filament;
-use Laravel\Pennant\Feature;
 
-mutates(WorkspacePolicy::class, SidebarBillingState::class);
+mutates(WorkspacePolicy::class);
 
 beforeEach(function (): void {
-    Feature::define(BillingFeature::class, true);
-
     $this->owner = User::factory()->withPersonalWorkspace()->create();
     $this->workspace = $this->owner->currentWorkspace;
     $this->workspace->forceFill(['trial_ends_at' => now()->addDays(9)])->save();
@@ -36,7 +30,7 @@ function sidebarFooterHtml(string $html): string
     return $end === false ? substr($html, $start) : substr($html, $start, $end - $start);
 }
 
-test('the owner sees both the invite row and the upgrade modal button', function (): void {
+test('the owner sees the invite row and no billing controls when billing is off', function (): void {
     $this->actingAs($this->owner);
     Filament::setTenant($this->workspace);
 
@@ -44,11 +38,11 @@ test('the owner sees both the invite row and the upgrade modal button', function
 
     expect($footer)
         ->toContain('open-invite-workspace-members')
-        ->toContain(__('billing.sidebar.keep_pro'))
-        ->toContain("id: 'upgrade-plan'");
+        ->not->toContain('/billing')
+        ->not->toContain("id: 'upgrade-plan'");
 });
 
-test('an admin sees the invite row but no billing controls', function (): void {
+test('an admin sees the invite row', function (): void {
     $admin = User::factory()->create();
     $this->workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
 
@@ -57,10 +51,7 @@ test('an admin sees the invite row but no billing controls', function (): void {
 
     $footer = sidebarFooterHtml($this->get(Dashboard::getUrl(tenant: $this->workspace))->assertOk()->getContent());
 
-    expect($footer)
-        ->toContain('open-invite-workspace-members')
-        ->not->toContain(Billing::getUrl())
-        ->not->toContain("id: 'upgrade-plan'");
+    expect($footer)->toContain('open-invite-workspace-members');
 });
 
 test('a member sees neither the invite row nor billing controls', function (): void {
@@ -75,6 +66,6 @@ test('a member sees neither the invite row nor billing controls', function (): v
     expect($footer)
         ->not->toContain('open-invite-workspace-members')
         ->not->toContain(Members::getUrl())
-        ->not->toContain(Billing::getUrl())
+        ->not->toContain('/billing')
         ->not->toContain("id: 'upgrade-plan'");
 });

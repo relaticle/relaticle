@@ -33,12 +33,12 @@
      class="inline-flex items-center rounded-full border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-0.5"
 >
     <button @click="apply('system')" :aria-pressed="theme === 'system'" aria-label="System theme" class="{{ $buttonClass }}">
-        <x-heroicon-o-computer-desktop class="{{ $iconSize }}" />
+        <x-lucide-monitor class="{{ $iconSize }}" />
     </button>
     <button @click="apply('light')" :aria-pressed="theme === 'light'" aria-label="Light theme" class="{{ $buttonClass }}">
-        <x-heroicon-o-sun class="{{ $iconSize }}" />
+        <x-lucide-sun class="{{ $iconSize }}" />
     </button>
     <button @click="apply('dark')" :aria-pressed="theme === 'dark'" aria-label="Dark theme" class="{{ $buttonClass }}">
-        <x-heroicon-o-moon class="{{ $iconSize }}" />
+        <x-lucide-moon class="{{ $iconSize }}" />
     </button>
 </div>

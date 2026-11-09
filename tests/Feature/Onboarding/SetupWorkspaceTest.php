@@ -239,6 +239,33 @@ it('requires a use case', function (): void {
         ->assertHasFormErrors(['onboarding_use_case' => 'required']);
 });
 
+it('clears the required error once the owner picks a use case', function (): void {
+    workspaceInSetup(User::factory()->create());
+
+    livewire(SetupWorkspace::class)
+        ->call('saveUseCase')
+        ->assertHasFormErrors(['onboarding_use_case' => 'required'])
+        ->fillForm(['onboarding_use_case' => OnboardingUseCase::Other->value])
+        ->assertHasNoFormErrors(['onboarding_use_case']);
+});
+
+it('clears the required details error once the owner picks a detail', function (): void {
+    workspaceInSetup(User::factory()->create());
+
+    livewire(SetupWorkspace::class)
+        ->fillForm(['onboarding_use_case' => OnboardingUseCase::Recruiting->value])
+        ->call('saveUseCase')
+        ->assertHasFormErrors(['onboarding_context' => 'required'])
+        ->fillForm(['onboarding_context' => ['sourcing']])
+        ->assertHasNoFormErrors(['onboarding_context']);
+});
+
+it('gives the use case button its own loading target', function (): void {
+    workspaceInSetup(User::factory()->create());
+
+    livewire(SetupWorkspace::class)->assertSeeHtml('wire:target="saveUseCase"');
+});
+
 it('labels the use case button Continue because the invite step follows', function (): void {
     workspaceInSetup(User::factory()->create());
 
@@ -1491,7 +1518,7 @@ describe('invite team', function (): void {
             ->fillForm(['emails' => "maya@northwind.test, leo@northwind.test;\nsam@northwind.test", 'role' => WorkspaceRole::Admin->value])
             ->call('finish')
             ->assertHasNoFormErrors()
-            ->assertNotified(__('workspaces.notifications.workspace_invitation_sent.success'));
+            ->assertNotified(__('workspaces.notifications.workspace_invitation_sent.success_many', ['count' => 3]));
 
         expect($workspace->workspaceInvitations()->pluck('role', 'email')->all())->toEqual([
             'maya@northwind.test' => WorkspaceRole::Admin->value,
@@ -1586,7 +1613,7 @@ describe('invite team', function (): void {
             ->assertHasNoFormErrors()
             ->assertRedirect(Dashboard::getUrl(['tenant' => $workspace]));
 
-        $notifications = collect(session('filament.notifications'));
+        $notifications = flashedNotifications();
 
         Exceptions::assertReported(RuntimeException::class);
 

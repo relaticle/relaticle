@@ -93,7 +93,7 @@ final class PendingAction extends Model
 
     public function isEmailSend(): bool
     {
-        return $this->entity_type === ProposalEntity::Email;
+        return in_array($this->entity_type, [ProposalEntity::Email, ProposalEntity::EmailDraftSend], true);
     }
 
     public function isExpired(): bool

@@ -102,18 +102,18 @@ enum CrmEntity: string
     }
 
     /**
-     * The Heroicon name for the record type: the app panel's navigation icon,
+     * The icon name for the record type: the app panel's navigation icon,
      * the chat chip glyph and every avatar-less record tile read this, so a
      * company looks like a company on every surface.
      */
     public function icon(): string
     {
         return match ($this) {
-            self::Company => 'heroicon-o-building-office',
-            self::People => 'heroicon-o-user',
-            self::Opportunity => 'heroicon-o-currency-dollar',
-            self::Task => 'heroicon-o-clipboard-document-check',
-            self::Note => 'heroicon-o-document-text',
+            self::Company => 'lucide-building',
+            self::People => 'lucide-user',
+            self::Opportunity => 'lucide-circle-dollar-sign',
+            self::Task => 'lucide-clipboard-check',
+            self::Note => 'lucide-file-text',
         };
     }
 

@@ -76,7 +76,7 @@ final readonly class ChatContextService
             // Task and Note records open as Filament modals on index routes, so the id
             // rides in the query string rather than as a route parameter.
             $recordId = $this->extractRecordId($route->parameter('record'))
-                ?? $this->extractRecordId($request->query('tableActionRecord'));
+                ?? $this->extractRecordId($request->query('task', $request->query('tableActionRecord')));
 
             if ($recordId === null) {
                 return $context;

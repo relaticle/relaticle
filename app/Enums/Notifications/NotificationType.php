@@ -7,12 +7,14 @@ namespace App\Enums\Notifications;
 enum NotificationType: string
 {
     case TaskAssigned = 'task_assigned';
+    case EmailAccess = 'email_access';
+    case EmailShared = 'email_shared';
     case TaskDigest = 'task_digest';
 
     public function group(): NotificationGroup
     {
         return match ($this) {
-            self::TaskAssigned => NotificationGroup::Collaboration,
+            self::TaskAssigned, self::EmailAccess, self::EmailShared => NotificationGroup::Collaboration,
             self::TaskDigest => NotificationGroup::Digest,
         };
     }
@@ -31,7 +33,7 @@ enum NotificationType: string
     public function channels(): array
     {
         return match ($this) {
-            self::TaskAssigned => [NotificationChannel::InApp, NotificationChannel::Email],
+            self::TaskAssigned, self::EmailAccess, self::EmailShared => [NotificationChannel::InApp, NotificationChannel::Email],
             self::TaskDigest => [NotificationChannel::Email],
         };
     }
@@ -40,7 +42,15 @@ enum NotificationType: string
     {
         return match ($this) {
             self::TaskAssigned => $channel === NotificationChannel::InApp,
-            self::TaskDigest => true,
+            self::EmailAccess, self::EmailShared, self::TaskDigest => true,
+        };
+    }
+
+    public function requiresEmailIntegration(): bool
+    {
+        return match ($this) {
+            self::EmailAccess, self::EmailShared => true,
+            self::TaskAssigned, self::TaskDigest => false,
         };
     }
 

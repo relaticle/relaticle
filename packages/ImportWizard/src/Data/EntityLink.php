@@ -262,7 +262,7 @@ final class EntityLink extends Data
 
     public function icon(): string
     {
-        return Entities::getEntity($this->targetEntity)?->getIcon() ?? 'heroicon-o-link';
+        return Entities::getEntity($this->targetEntity)?->getIcon() ?? 'lucide-link';
     }
 
     public function isForeignKey(): bool

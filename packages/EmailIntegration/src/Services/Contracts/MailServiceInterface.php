@@ -25,7 +25,6 @@ interface MailServiceInterface
      * @param array{
      *     subject: string,
      *     body_html: string,
-     *     body_text?: string,
      *     to: array<int, array{email: string, name: ?string}>,
      *     cc?: array<int, array{email: string, name: ?string}>,
      *     bcc?: array<int, array{email: string, name: ?string}>,

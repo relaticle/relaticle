@@ -27,11 +27,17 @@ final readonly class SendAssistantEmail
      *     body: string,
      *     include_signature?: bool,
      *     in_reply_to_email_id?: ?string,
+     *     scheduled_for?: ?string,
      * }  $data
      */
     public function execute(User $user, array $data): Email
     {
-        $email = $this->sendEmail->execute($user, $this->prepareEmail->execute($user, $data, EmailCreationSource::CHAT));
+        $payload = $this->prepareEmail->execute($user, $data, EmailCreationSource::CHAT);
+
+        $email = $this->sendEmail->execute($user, [
+            ...$payload,
+            'scheduled_for' => $payload['scheduled_for']?->isFuture() === true ? $payload['scheduled_for'] : null,
+        ]);
 
         $this->notifier->send($email);
 

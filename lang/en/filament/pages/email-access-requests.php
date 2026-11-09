@@ -12,9 +12,13 @@ return [
     'filters' => [
         'label' => 'Status',
         'all' => 'All',
+    ],
+    'statuses' => [
         'pending' => 'Pending',
         'approved' => 'Approved',
         'denied' => 'Denied',
+        'cancelled' => 'Cancelled',
+        'expired' => 'Expired',
     ],
     'columns' => [
         'requested_by' => 'Requested by',
@@ -67,5 +71,6 @@ return [
         'approved' => 'Access request approved.',
         'denied' => 'Access request denied.',
         'cancelled' => 'Access request cancelled.',
+        'no_longer_pending' => 'This request is no longer pending.',
     ],
 ];

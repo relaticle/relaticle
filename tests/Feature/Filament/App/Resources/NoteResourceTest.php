@@ -36,6 +36,14 @@ it('can render the index page', function (): void {
         ->assertOk();
 });
 
+it('describes an empty list in one line', function (): void {
+    livewire(ManageNotes::class)
+        ->assertSee('Notes you add appear here.');
+
+    livewire(NotesCards::class)
+        ->assertSee('Notes you add appear here.');
+});
+
 // Column metadata is checked against a single mounted table rather than one
 // dataset case per column: mounting the page dominates the cost, and Filament's
 // assertion messages already name the offending column.
@@ -67,6 +75,7 @@ it('can sort `:dataset` column', function (string $column): void {
         : $column;
 
     livewire(ManageNotes::class)
+        ->toggleAllTableColumns()
         ->sortTable($column)
         ->assertCanSeeTableRecords($records->sortBy($sortingKey), inOrder: true)
         ->sortTable($column, 'desc')
@@ -276,7 +285,8 @@ it('drives note body formatting from the slash menu rather than a toolbar', func
 
     expect($editor)->not->toBeNull()
         ->and($editor->getToolbarButtons())->toBe([])
-        ->and(array_keys($editor->getFloatingToolbars()))->toBe(['paragraph', 'heading', 'table'])
+        ->and(array_keys($editor->getFloatingToolbars()))->toBe(['paragraph', 'heading', ...array_keys($editor->getDefaultFloatingToolbars())])
+        ->and($editor->getFloatingToolbars())->toHaveKey('table')
         ->and($editor->getExtraAttributes()['class'])->toContain('fi-fo-rich-editor-seamless');
 
     foreach ([$paragraphToolbar, $headingToolbar] as $toolbar) {
@@ -325,10 +335,22 @@ it('drives note body formatting from the slash menu rather than a toolbar', func
         ->and(collect($items)->pluck('icon')->filter()->all())->toHaveSameSize($items);
 });
 
-it('versions the slash menu script by its published file so an edit changes the url', function (): void {
-    $published = filemtime(public_path('js/app/rich-editor-slash-menu.js'));
+it('keeps the checklist out of the note slash menu', function (): void {
+    $page = livewire(ManageNotes::class)
+        ->mountAction('create')
+        ->instance();
 
-    expect(FilamentAsset::getScriptSrc('rich-editor-slash-menu'))->toEndWith("?v={$published}");
+    $editor = collect($page->getSchema($page->getMountedActionSchemaName())->getFlatComponents(withHidden: true))
+        ->first(fn (Component $component): bool => $component instanceof RichEditor);
+
+    $menu = json_decode(base64_decode(SlashMenuPlugin::attributes($editor)['data-slash-menu']), associative: true);
+
+    expect(collect($menu['items'])->pluck('id')->all())->not->toContain('taskList');
+});
+
+it('versions the slash menu script by its published file', function (): void {
+    expect(FilamentAsset::getScriptSrc('rich-editor-slash-menu'))
+        ->toEndWith('?v='.filemtime(public_path('js/app/rich-editor-slash-menu.js')));
 });
 
 it('keeps file attachments enabled on a toolbarless note body', function (): void {

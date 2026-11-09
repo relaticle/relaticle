@@ -7,29 +7,34 @@ namespace Relaticle\EmailIntegration\Actions;
 use App\Models\User;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
-use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
 use Relaticle\EmailIntegration\Notifications\EmailAccessRespondedNotification;
 
 final readonly class DenyEmailAccessRequestAction
 {
-    public function execute(EmailAccessRequest $accessRequest, User $actor): void
+    public function __construct(private DecideEmailAccessRequest $decide) {}
+
+    public function execute(EmailAccessRequest $accessRequest, User $actor): bool
     {
         abort_unless($accessRequest->owner_id === $actor->getKey(), 403);
 
-        if ($accessRequest->status !== EmailAccessRequestStatus::PENDING) {
-            return;
+        if (! $accessRequest->isOpen()) {
+            return false;
         }
 
         $requester = $accessRequest->requester;
 
         if ($requester === null) {
-            return;
+            return false;
         }
 
-        $accessRequest->update(['status' => EmailAccessRequestStatus::DENIED]);
+        $denied = $this->decide->execute($accessRequest, EmailAccessRequestStatus::DENIED, $actor);
 
-        EmailAccessRequestedNotification::dismissFor($accessRequest);
+        if (! $denied) {
+            return false;
+        }
 
         $requester->notify(new EmailAccessRespondedNotification($accessRequest));
+
+        return true;
     }
 }

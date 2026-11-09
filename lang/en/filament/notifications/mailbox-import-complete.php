@@ -21,6 +21,7 @@ return [
     ],
     'actions' => [
         'retry' => 'Retry',
+        'open_inbox' => 'Open inbox',
     ],
     'retry' => [
         'queued' => [

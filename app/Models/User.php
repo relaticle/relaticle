@@ -5,18 +5,21 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Casts\AsCanonicalEmail;
+use App\Contracts\Billing;
 use App\Data\NotificationPreferences;
 use App\Enums\EmailGrant;
 use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
 use App\Enums\WorkspaceCapability;
 use App\Enums\WorkspaceRole;
+use App\Jobs\PurgeUser;
 use App\Models\Concerns\HasProfilePhoto;
 use App\Models\Concerns\HasWorkspaces;
 use App\Models\Pivots\TaskAssignee;
 use App\Notifications\Auth\ResetPassword;
 use App\Notifications\Auth\VerifyEmail;
 use App\Observers\UserObserver;
+use App\Support\EmailAddress;
 use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
 use DateTimeZone;
@@ -44,6 +47,8 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -117,6 +122,8 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
 
     public const int SOCIAL_SIGNUP_WINDOW_SECONDS = 60;
 
+    private const int VERIFICATION_EMAIL_COOLDOWN_SECONDS = 60;
+
     /** @var array<string, bool> */
     private array $ownershipByWorkspaceId = [];
 
@@ -152,10 +159,22 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
 
     public function sendEmailVerificationNotification(): void
     {
-        $notification = resolve(VerifyEmail::class);
-        $notification->url = Filament::getVerifyEmailUrl($this);
+        RateLimiter::attempt($this->verificationEmailCooldownKey(), 1, function (): void {
+            $notification = resolve(VerifyEmail::class);
+            $notification->url = Filament::getVerifyEmailUrl($this);
 
-        $this->notify($notification);
+            $this->notify($notification);
+        }, self::VERIFICATION_EMAIL_COOLDOWN_SECONDS);
+    }
+
+    public function verificationEmailCooldown(): int
+    {
+        return RateLimiter::availableIn($this->verificationEmailCooldownKey());
+    }
+
+    private function verificationEmailCooldownKey(): string
+    {
+        return 'verification-email:'.$this->getKey().':'.hash('sha256', $this->getEmailForVerification());
     }
 
     public function sendPasswordResetNotification($token): void
@@ -185,6 +204,11 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
         return $this->hasMany(UserSocialAccount::class);
     }
 
+    public function availableSocialAccount(): ?UserSocialAccount
+    {
+        return $this->socialAccounts()->available()->first();
+    }
+
     public function hasPassword(): bool
     {
         return $this->password !== null;
@@ -198,6 +222,64 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     public function isScheduledForDeletion(): bool
     {
         return $this->scheduled_deletion_at !== null;
+    }
+
+    public function isDeletionDue(): bool
+    {
+        return $this->scheduled_deletion_at?->lessThanOrEqualTo(now()) ?? false;
+    }
+
+    public function ensureCanBeDeleted(): void
+    {
+        $billing = resolve(Billing::class);
+
+        $managedWorkspaces = $this->ownedWorkspaces()
+            ->with('subscriptions')
+            ->get()
+            ->filter(fn (Workspace $workspace): bool => $billing->blocksDeletion($workspace))
+            ->pluck('name');
+
+        if ($managedWorkspaces->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'workspace' => [__('workspaces.validation.managed_plan_before_deleting_account', [
+                    'workspaces' => $managedWorkspaces->implode(', '),
+                ])],
+            ]);
+        }
+
+        $sharedWorkspaces = $this->ownedWorkspaces()
+            ->whereHas('users')
+            ->pluck('name');
+
+        if ($sharedWorkspaces->isEmpty()) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'workspace' => [__('workspaces.validation.remove_members_before_deleting', [
+                'workspaces' => $sharedWorkspaces->implode(', '),
+            ])],
+        ]);
+    }
+
+    public function queuePurge(): void
+    {
+        $this->ensureCanBeDeleted();
+
+        $this->forceFill(['scheduled_deletion_at' => now()])->save();
+
+        dispatch(new PurgeUser($this));
+    }
+
+    /**
+     * @param  Builder<User>  $query
+     * @param  array<string>  $addresses
+     * @return Builder<User>
+     */
+    #[Scope]
+    protected function withEmailIn(Builder $query, array $addresses): Builder
+    {
+        return $query->whereIn('email', array_map(EmailAddress::canonicalize(...), $addresses));
     }
 
     /**
@@ -350,6 +432,14 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     public function oauthApps(): MorphMany
     {
         return $this->morphMany(Passport::clientModel(), 'owner');
+    }
+
+    /**
+     * @return MorphMany<Notification, $this>
+     */
+    public function notifications(): MorphMany
+    {
+        return $this->morphMany(Notification::class, 'notifiable')->latest();
     }
 
     public function getProviderName(): string

@@ -115,7 +115,12 @@ trait SendsWorkspaceInvitations
         }
 
         if ($sent > 0) {
-            Notification::make()->title(__('workspaces.notifications.workspace_invitation_sent.success'))->success()->send();
+            Notification::make()
+                ->title($sent === 1
+                    ? __('workspaces.notifications.workspace_invitation_sent.success')
+                    : __('workspaces.notifications.workspace_invitation_sent.success_many', ['count' => $sent]))
+                ->success()
+                ->send();
             $this->dispatch('workspaceInvitationSent');
         }
 

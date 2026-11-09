@@ -17,10 +17,14 @@ return [
     | A sensible default is provided using jsDelivr's services. jsDelivr is
     | a free service, so there are no uptime or support guarantees.
     |
+    | The local file lists burner domains seen in signup abuse that the
+    | upstream list does not carry yet.
+    |
     */
 
     'sources' => [
         'https://cdn.jsdelivr.net/gh/disposable/disposable-email-domains@master/domains.json',
+        resource_path('data/disposable-email-domains.json'),
     ],
 
     /*

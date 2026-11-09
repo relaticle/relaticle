@@ -11,6 +11,7 @@ return [
     'fields' => [
         'assignees' => [
             'label' => 'Assignees',
+            'placeholder' => 'Assign a member',
         ],
         'companies' => [
             'label' => 'Companies',
@@ -35,6 +36,11 @@ return [
         ],
     ],
 
+    'actions' => [
+        'copy_url' => 'Copy task URL',
+        'copy_id' => 'Copy task ID',
+    ],
+
     'filters' => [
         'assigned_to_me' => [
             'label' => 'Assigned to me',
@@ -42,6 +48,10 @@ return [
         'creation_source' => [
             'label' => 'Creation Source',
         ],
+    ],
+
+    'empty_state' => [
+        'description' => 'Tasks you add appear here.',
     ],
 
     'pages' => [

@@ -7,6 +7,8 @@ namespace Relaticle\EmailIntegration\Actions;
 use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use App\Models\Workspace;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Validation\ValidationException;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
@@ -32,6 +34,7 @@ final readonly class PrepareAgentEmail
         'body' => ['required', 'string', 'max:50000'],
         'include_signature' => ['sometimes', 'boolean'],
         'in_reply_to_email_id' => ['sometimes', 'string', 'max:64'],
+        'scheduled_for' => ['sometimes', 'date', 'after:now'],
     ];
 
     public function __construct(
@@ -49,6 +52,7 @@ final readonly class PrepareAgentEmail
      *     body: string,
      *     include_signature?: bool,
      *     in_reply_to_email_id?: ?string,
+     *     scheduled_for?: ?string,
      * }  $data
      * @return array{
      *     connected_account_id: string,
@@ -61,6 +65,7 @@ final readonly class PrepareAgentEmail
      *     creation_source: EmailCreationSource,
      *     batch_id: null,
      *     priority: EmailPriority,
+     *     scheduled_for: ?CarbonImmutable,
      * }
      *
      * @throws ValidationException
@@ -91,6 +96,7 @@ final readonly class PrepareAgentEmail
             'creation_source' => $source,
             'batch_id' => null,
             'priority' => EmailPriority::PRIORITY,
+            'scheduled_for' => isset($data['scheduled_for']) ? Date::parse($data['scheduled_for'])->utc() : null,
         ];
     }
 

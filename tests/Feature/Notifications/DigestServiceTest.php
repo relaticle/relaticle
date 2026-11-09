@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Features\OnboardSeed;
+use App\Filament\Resources\TaskResource;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\Notifications\DigestService;
@@ -81,6 +82,19 @@ it('daily digest contains overdue and due-today tasks only', function (): void {
     expect($payload->taskCount())->toBe(2)
         ->and(collect($payload->workspaces[0]->overdue)->pluck('title')->all())->toBe(['overdue'])
         ->and(collect($payload->workspaces[0]->upcoming)->pluck('title')->all())->toBe(['today']);
+});
+
+it('links each digest task to its edit modal in the task workspace', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+
+    $task = Task::factory()->for($workspace)->create(['title' => 'overdue']);
+    $task->assignees()->attach($user);
+    digestSetDue($task, digestDueField($workspace->id), now()->subDay());
+
+    $payload = resolve(DigestService::class)->forUser($user);
+
+    expect($payload->workspaces[0]->overdue[0]->editUrl)->toBe(TaskResource::getUrl('index', ['task' => $task->id], panel: 'app', tenant: $workspace));
 });
 
 it('excludes done tasks and tasks without a due date', function (): void {

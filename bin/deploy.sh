@@ -56,6 +56,7 @@ release() {
     $PHP artisan migrate --force
 
     # config:cache stores the release, so web requests and queue workers report under this commit.
+    # Its view:cache also clears compiled views: Laravel reuses a stale plain-text mail copy after a template change (laravel/framework#62153).
     SENTRY_RELEASE="$commit" $PHP artisan optimize
 
     # PHP-FPM serves the previous code from opcache until this reload. Nothing slow may run

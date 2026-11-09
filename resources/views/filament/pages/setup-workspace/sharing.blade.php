@@ -2,10 +2,10 @@
     $mailbox = $this->connectedMailbox();
 @endphp
 
-<form wire:submit="saveSharing" wire:poll.5s class="flex flex-1 flex-col">
-    <h3 class="text-xl font-bold tracking-tight text-gray-950 dark:text-white">
+<form wire:submit="saveSharing" wire:poll.5s class="flex min-w-0 flex-1 flex-col">
+    <x-onboarding.step-heading wire:key="setup-step-heading-sharing">
         {{ __('filament/pages/workspaces.setup_workspace.sharing.heading') }}
-    </h3>
+    </x-onboarding.step-heading>
     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
         @if ($mailbox?->isActive())
             {{ __('filament/pages/workspaces.setup_workspace.sharing.syncing') }}
@@ -21,7 +21,7 @@
             <span class="truncate">{{ $mailbox->email_address }}</span>
             @if ($mailbox->isActive())
                 <span class="ms-auto flex shrink-0 items-center gap-1 text-xs font-medium text-success-700 dark:text-success-400">
-                    <x-filament::icon icon="ri-checkbox-circle-fill" class="size-3.5" />
+                    <x-filament::icon icon="lucide-circle-check" class="size-3.5" />
                     {{ __('filament/pages/workspaces.setup_workspace.sharing.connected') }}
                 </span>
             @endif
@@ -46,7 +46,7 @@
                     @if ($option['subjectShown'])
                         <span class="h-1.5 w-12 rounded-full bg-gray-700 dark:bg-gray-200"></span>
                     @else
-                        <x-filament::icon icon="ri-lock-line" class="size-2.5 text-gray-400" />
+                        <x-filament::icon icon="lucide-lock" class="size-2.5 text-gray-400" />
                     @endif
                     <span class="h-1 w-full rounded-full bg-gray-200 dark:bg-white/10"></span>
                     <span class="h-1 w-2/3 rounded-full bg-gray-200 dark:bg-white/10"></span>
@@ -71,7 +71,7 @@
             {{ __('filament/pages/workspaces.create_workspace.actions.continue') }}
         </x-filament::button>
         <p class="mt-3 flex items-center justify-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-            <x-filament::icon icon="ri-lock-line" class="size-3.5" />
+            <x-filament::icon icon="lucide-lock" class="size-3.5" />
             {{ __('filament/pages/workspaces.setup_workspace.sharing.footer') }}
         </p>
     </div>

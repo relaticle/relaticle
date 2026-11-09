@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Filament\Pages;
 
 use App\Actions\Task\CompleteTask;
+use App\Enums\WorkspaceCapability;
 use App\Filament\Actions\CreateTaskAction;
+use App\Filament\Actions\EditTaskAction;
+use App\Filament\Concerns\KeepsOpenTaskInUrl;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use App\Models\Task;
@@ -17,6 +20,7 @@ use Filament\Panel;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Relaticle\Chat\Data\MyTaskItem;
 use Relaticle\Chat\Queries\ConversationsQuery;
@@ -24,9 +28,11 @@ use Relaticle\Chat\Services\MyTasksService;
 
 final class Dashboard extends Page
 {
+    use KeepsOpenTaskInUrl;
+
     public const string AFTER_COMPOSER_RENDER_HOOK = 'dashboard.after-composer';
 
-    protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-home';
+    protected static string|null|BackedEnum $navigationIcon = 'lucide-house';
 
     protected static ?string $navigationLabel = null;
 
@@ -120,6 +126,15 @@ final class Dashboard extends Page
         return $workspace !== null && resolve(MyTasksService::class)->hasDoneOption($workspace);
     }
 
+    #[Computed]
+    public function canEditTasks(): bool
+    {
+        /** @var User $user */
+        $user = Filament::auth()->user();
+
+        return $user->hasWorkspaceCapability(Filament::getTenant()?->getKey(), WorkspaceCapability::RecordsUpdate);
+    }
+
     public function completeTask(string $taskId): void
     {
         /** @var User $user */
@@ -130,7 +145,7 @@ final class Dashboard extends Page
         // field id written onto it. A row that no longer resolves (completed in
         // another tab, deleted meanwhile) is not an error: the desired end state
         // is already true, so just refresh instead of throwing a 404 over Home.
-        $task = Task::query()->where('workspace_id', Filament::getTenant()?->getKey())->find($taskId);
+        $task = $this->tenantTask($taskId);
 
         if ($task instanceof Task) {
             resolve(CompleteTask::class)->execute($user, $task);
@@ -144,6 +159,45 @@ final class Dashboard extends Page
         return TaskResource::getUrl('index', [
             'tableFilters' => ['assigned_to_me' => ['isActive' => true]],
         ]);
+    }
+
+    public function editTaskAction(): EditTaskAction
+    {
+        return EditTaskAction::make('editTask')
+            ->record(fn (array $arguments): ?Task => $this->tenantTask($arguments['task'] ?? null))
+            ->recordTitleAttribute('title')
+            ->authorize('update')
+            ->slideOver()
+            ->schema(fn (Schema $schema): Schema => TaskForm::get($schema))
+            ->after(function (): void {
+                unset($this->myTasks);
+            });
+    }
+
+    /**
+     * @return array{0: string, 1: array<string, mixed>, 2: array<string, mixed>}|null
+     */
+    protected function taskModal(Task $task): ?array
+    {
+        return Gate::allows('update', $task) ? ['editTask', ['task' => $task->getKey()], []] : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $action
+     */
+    protected function openTaskKey(array $action): ?string
+    {
+        $taskId = $action['arguments']['task'] ?? null;
+
+        return ($action['name'] ?? null) === 'editTask' && is_string($taskId) ? $taskId : null;
+    }
+
+    private function tenantTask(mixed $taskId): ?Task
+    {
+        return Task::query()
+            ->where('workspace_id', Filament::getTenant()?->getKey())
+            ->whereKey($taskId)
+            ->first();
     }
 
     public function createTaskAction(): CreateTaskAction
@@ -165,7 +219,7 @@ final class Dashboard extends Page
     {
         return $action
             ->model(Task::class)
-            ->icon('heroicon-o-plus')
+            ->icon('lucide-plus')
             ->slideOver()
             ->schema(fn (Schema $schema): Schema => TaskForm::get($schema));
     }

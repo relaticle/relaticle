@@ -37,7 +37,7 @@ return [
     | so the assistant splits a longer request instead of being cut off.
     */
 
-    'max_plan_steps' => (int) env('CHAT_MAX_PLAN_STEPS', 6),
+    'max_plan_steps' => (int) env('CHAT_MAX_PLAN_STEPS', 5),
 
     /*
     |--------------------------------------------------------------------------
@@ -46,6 +46,14 @@ return [
     */
 
     'tool_call_credit_bonus' => 0.5,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Web Search Credit Cost
+    |--------------------------------------------------------------------------
+    */
+
+    'web_search_credit_cost' => 2,
 
     /*
     |--------------------------------------------------------------------------
@@ -122,6 +130,19 @@ return [
     */
 
     'provider_starts_per_second' => (int) env('CHAT_PROVIDER_STARTS_PER_SECOND', 8),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Self-Hosted Send Rate (per minute, per workspace)
+    |--------------------------------------------------------------------------
+    |
+    | Caps how many messages a workspace may send per minute when billing is
+    | off. Hosted installs take the limit from the workspace plan instead.
+    | Override with CHAT_RATE_LIMIT_PER_MINUTE in .env. Zero or less: no limit.
+    | A value that is not a whole number keeps the default of 60.
+    */
+
+    'rate_limit_per_minute' => filter_var(env('CHAT_RATE_LIMIT_PER_MINUTE', 60), FILTER_VALIDATE_INT, ['options' => ['default' => 60]]),
 
     /*
     |--------------------------------------------------------------------------

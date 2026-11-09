@@ -13,10 +13,8 @@ use Illuminate\Support\Collection;
 /**
  * A record rendered as one avatar-and-name pill.
  *
- * Three ways to draw the leading mark, in order: the record's own image, the
- * shared entity icon for a record type that has no per-record image worth
- * inventing (a company with no logo), and a name-derived initials tile for a
- * person, whose hue is the only thing telling two of them apart.
+ * The leading mark is the record's own image, or the shared entity icon when it
+ * has none: a company with no logo, and every person.
  */
 final readonly class RecordChip implements Htmlable
 {

@@ -147,7 +147,7 @@ it('continueToMapping creates ImportStore with rows', function (): void {
     $component->assertDispatched('completed', function (string $event, array $params): bool {
         $this->createdStoreIds[] = $params['storeId'];
 
-        $import = Import::find($params['storeId']);
+        $import = Import::query()->find($params['storeId']);
         $store = ImportStore::forRead($params['storeId']);
 
         expect($import)->not->toBeNull()
@@ -162,6 +162,84 @@ it('continueToMapping creates ImportStore with rows', function (): void {
         $firstRow = $rows->first();
         expect($firstRow->raw_data->get('Name'))->toBe('John')
             ->and($firstRow->raw_data->get('Email'))->toBe('john@test.com');
+
+        return true;
+    });
+});
+
+it('rejects a csv that is not utf-8 with a message the user can act on', function (): void {
+    Exceptions::fake();
+
+    $csv = makeCsvFile("Full Name,Email\nAda,ada@test.com\nJos\xE9 Mu\xF1oz,jose@test.com\nGrace,grace@test.com\n");
+
+    $component = mountUploadStep($this);
+    $component->set('uploadedFile', $csv);
+
+    $message = 'Row 3 is not UTF-8 text. In Excel, choose File > Save As > CSV UTF-8, then upload the file again.';
+
+    $component->assertHasErrors(['uploadedFile' => $message]);
+    Exceptions::assertNothingReported();
+});
+
+it('reports the physical line when the file has empty lines before a non-utf-8 row', function (): void {
+    $csv = makeCsvFile("Full Name,Email\nAda,a@x.com\n\nJos\xE9,j@x.com\n");
+
+    $component = mountUploadStep($this);
+    $component->set('uploadedFile', $csv);
+
+    $component->assertHasErrors(['uploadedFile' => 'Row 4 is not UTF-8 text. In Excel, choose File > Save As > CSV UTF-8, then upload the file again.']);
+});
+
+it('counts the file row when blank lines come before a non-utf-8 row', function (): void {
+    $csv = makeCsvFile("Full Name,Email\nAda,ada@test.com\n,\nJos\xE9,jose@test.com\n");
+
+    $component = mountUploadStep($this);
+    $component->set('uploadedFile', $csv);
+
+    $component->assertHasErrors(['uploadedFile' => 'Row 4 is not UTF-8 text. In Excel, choose File > Save As > CSV UTF-8, then upload the file again.']);
+});
+
+it('imports a utf-8 csv with accented and arabic names', function (): void {
+    $csv = makeCsvFile("Full Name,Email\nJosé Núñez,jose@test.com\nمحمد العمري,mohammed@test.com\n");
+
+    $component = mountUploadStep($this);
+    $component->set('uploadedFile', $csv);
+    $component->call('continueToMapping');
+
+    $component->assertHasNoErrors();
+    $component->assertDispatched('completed', function (string $event, array $params): bool {
+        $this->createdStoreIds[] = $params['storeId'];
+
+        expect($params['rowCount'])->toBe(2);
+
+        $names = ImportStore::forRead($params['storeId'])
+            ->query()
+            ->orderBy('row_number')
+            ->get()
+            ->map(fn (object $row): string => $row->raw_data['Full Name'])
+            ->all();
+
+        expect($names)->toBe(['José Núñez', 'محمد العمري']);
+
+        return true;
+    });
+});
+
+it('continueToMapping skips blank, comma-only, whitespace-only rows and survives bom and crlf', function (): void {
+    $csv = makeCsvFile("\xEF\xBB\xBFName,Email\r\n\r\n,\r\n  ,  \r\nAda,ada@test.com\r\n,,\r\n");
+
+    $component = mountUploadStep($this);
+    $component->set('uploadedFile', $csv);
+
+    expect($component->get('rowCount'))->toBe(1);
+
+    $component->call('continueToMapping');
+
+    $component->assertHasNoErrors();
+    $component->assertDispatched('completed', function (string $event, array $params): bool {
+        $this->createdStoreIds[] = $params['storeId'];
+
+        expect($params['rowCount'])->toBe(1);
 
         return true;
     });

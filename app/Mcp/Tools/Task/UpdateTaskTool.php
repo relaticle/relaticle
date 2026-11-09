@@ -47,10 +47,10 @@ final class UpdateTaskTool extends BaseUpdateTool
     {
         return [
             'title' => $schema->string()->description('The task title.'),
-            'company_ids' => $schema->array()->description('Company IDs to link. Omit to leave unchanged, pass [] to remove all.'),
-            'people_ids' => $schema->array()->description('People IDs to link. Omit to leave unchanged, pass [] to remove all.'),
-            'opportunity_ids' => $schema->array()->description('Opportunity IDs to link. Omit to leave unchanged, pass [] to remove all.'),
-            'assignee_ids' => $schema->array()->description('User IDs to assign this task to. Use whoami tool to discover valid user IDs.'),
+            'company_ids' => $schema->array()->items($schema->string())->description('Company IDs to link. Omit to leave unchanged, pass [] to remove all.'),
+            'people_ids' => $schema->array()->items($schema->string())->description('People IDs to link. Omit to leave unchanged, pass [] to remove all.'),
+            'opportunity_ids' => $schema->array()->items($schema->string())->description('Opportunity IDs to link. Omit to leave unchanged, pass [] to remove all.'),
+            'assignee_ids' => $schema->array()->items($schema->string())->description('User IDs to assign this task to. Use whoami tool to discover valid user IDs.'),
         ];
     }
 

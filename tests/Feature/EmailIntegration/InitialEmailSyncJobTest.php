@@ -241,7 +241,7 @@ it('sets the cursor and notifies the owner when the last page is stored', functi
     Bus::fake();
     Notification::fake();
 
-    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create());
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->withOwnerInWorkspace()->create());
 
     $service = Mockery::mock(MailServiceInterface::class);
     $service->shouldReceive('initialBackfill')->andReturn(new MailBackfillPage(
@@ -268,7 +268,7 @@ it('sets the cursor after the last page store batch finishes', function (): void
     Bus::fake();
     Notification::fake();
 
-    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create());
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->withOwnerInWorkspace()->create());
 
     $service = Mockery::mock(MailServiceInterface::class);
     $service->shouldReceive('initialBackfill')->andReturn(new MailBackfillPage(

@@ -67,7 +67,7 @@ final readonly class UpdateTask
             return $lockedTask->refresh();
         });
 
-        $this->notifyAssignees->execute($task, $newAssigneeIds);
+        $this->notifyAssignees->execute($task, $newAssigneeIds, $user);
 
         return $task->load('customFieldValues.customField.options');
     }

@@ -575,8 +575,7 @@ it('lists every record of a batch step the dock is not focused on before approvi
         ->assertSee('Grace Hopper')
         // The rows have to be interactive for step 2, not just visible: a step
         // the dock never focuses would otherwise have no way to open record 2.
-        ->assertSee("focusItem('".$people->getKey()."', 1)", escape: false)
-        ->assertSee("skipItem('".$people->getKey()."', 1)", escape: false);
+        ->assertSee("toggleLeftOutRow('".$people->getKey()."', 1)", escape: false);
 
     $card->call('focusItem', (string) $people->getKey(), 1)
         ->assertSet('activeStepId', (string) $people->getKey())

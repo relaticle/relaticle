@@ -41,7 +41,7 @@ final readonly class AttachTaskRelationships
         });
 
         $task->refresh();
-        $this->notifyAssignees->execute($task, $newAssigneeIds);
+        $this->notifyAssignees->execute($task, $newAssigneeIds, $user);
 
         return $task;
     }

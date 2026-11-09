@@ -250,6 +250,9 @@ it('hands off a wide file sent alone instead of inlining megabytes of prompt', f
 });
 
 it('stores a handoff reply for a large file sent alone without running the model or spending a credit', function (): void {
+    withHostedBilling();
+    $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
+
     Queue::fake();
     $attachmentId = attachCsv(26);
     $before = AiCreditBalance::query()->where('workspace_id', $this->workspace->getKey())->value('credits_remaining');
@@ -603,6 +606,9 @@ it('keeps the typed text when a text file carries its own attached file lead', f
 });
 
 it('runs the model on a preview of a large file when the user typed a request', function (): void {
+    withHostedBilling();
+    $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
+
     Queue::fake();
     $attachmentId = attachCsv(26);
     $before = AiCreditBalance::query()->where('workspace_id', $this->workspace->getKey())->value('credits_remaining');
@@ -626,6 +632,9 @@ it('runs the model on a preview of a large file when the user typed a request', 
 });
 
 it('answers a large file with a typed request like any send when the workspace is out of credits', function (): void {
+    withHostedBilling();
+    $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
+
     Queue::fake();
     $attachmentId = attachCsv(26);
     AiCreditBalance::query()->where('workspace_id', $this->workspace->getKey())->update(['credits_remaining' => 0]);

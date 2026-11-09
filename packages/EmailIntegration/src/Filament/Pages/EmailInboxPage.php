@@ -13,6 +13,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 use Relaticle\EmailIntegration\Enums\EmailPageTab;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Enums\SendFailureRemedy;
 use Relaticle\EmailIntegration\Filament\Actions\ConnectMailboxAction;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -29,7 +30,7 @@ final class EmailInboxPage extends Page
 
     protected static ?string $slug = 'email';
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-envelope';
+    protected static string|\BackedEnum|null $navigationIcon = 'lucide-mail';
 
     protected static ?int $navigationSort = 6;
 
@@ -53,7 +54,25 @@ final class EmailInboxPage extends Page
      * bodies are nested Livewire components shared with their standalone pages.
      */
     #[Url(as: 'tab')]
-    public EmailPageTab $tab = EmailPageTab::DRAFTS;
+    public string $tab = EmailPageTab::DRAFTS->value;
+
+    private const string RETIRED_FAILED_TAB = 'failed';
+
+    public function mount(): void
+    {
+        $workspace = filament()->getTenant();
+
+        // Send-failure notifications already delivered still link to the retired Failed tab.
+        if ($this->tab === self::RETIRED_FAILED_TAB && $workspace instanceof Workspace) {
+            $this->redirect(SendFailureRemedy::Retry->url($workspace));
+        }
+    }
+
+    #[Computed]
+    public function activeTab(): EmailPageTab
+    {
+        return EmailPageTab::tryFrom($this->tab) ?? EmailPageTab::DRAFTS;
+    }
 
     /**
      * @return array<string, string>
@@ -75,7 +94,8 @@ final class EmailInboxPage extends Page
 
     public function setTab(string $tab): void
     {
-        $this->tab = EmailPageTab::from($tab);
+        $this->tab = EmailPageTab::from($tab)->value;
+        unset($this->activeTab);
     }
 
     #[Computed]
@@ -98,8 +118,8 @@ final class EmailInboxPage extends Page
 
     /**
      * Badge counts for the tab bar. Drafts are the user's own unsent messages,
-     * the outbox counts what is still waiting to go out, failed counts delivery
-     * failures, and templates count what the user may actually apply.
+     * the outbox counts what is still waiting to go out, and templates count what
+     * the user may actually apply.
      *
      * @return array<string, int>
      */
@@ -119,11 +139,6 @@ final class EmailInboxPage extends Page
                 ->forWorkspace($workspaceId)
                 ->where('user_id', $user->getKey())
                 ->where('status', EmailStatus::QUEUED)
-                ->count(),
-            EmailPageTab::FAILED->value => Email::query()
-                ->forWorkspace($workspaceId)
-                ->where('user_id', $user->getKey())
-                ->where('status', EmailStatus::FAILED)
                 ->count(),
             EmailPageTab::TEMPLATES->value => EmailTemplate::query()
                 ->where('workspace_id', $workspaceId)

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Filament\Concerns;
 
 use Filament\Actions\Action;
+use Illuminate\Contracts\Support\Htmlable;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 
 /**
@@ -29,7 +30,7 @@ trait HasEmailSettingsHeader
     }
 
     /**
-     * @return array<int|string, string>
+     * @return array<int|string, string|Htmlable>
      */
     public function getBreadcrumbs(): array
     {

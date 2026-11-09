@@ -141,6 +141,7 @@ return [
         'photo_remove_failed' => 'Could not remove your profile photo. Please try again.',
         'logged_out_other_sessions' => [
             'success' => 'All other browser sessions have been logged out successfully.',
+            'remembered_only' => 'Other devices are signed out once they sit idle for :minutes minutes. A device with Relaticle open stays signed in. Change your password to sign it out at once.',
         ],
         'delete_account_blocked' => [
             'title' => 'Account deletion blocked',

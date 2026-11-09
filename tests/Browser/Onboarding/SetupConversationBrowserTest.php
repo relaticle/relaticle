@@ -95,13 +95,11 @@ it('approves a seeded proposal in the setup thread and completes the first-recor
     $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId);
 
     foreach ($names as $name) {
-        $page->assertSee($name)
-            ->script(<<<'JS'
-                document.querySelector('[wire\\:click="createCurrent"]')?.click();
-            JS);
+        $page->assertSee($name);
     }
 
-    $page->waitForText('5 created');
+    $page->click('[data-proposal-shortcut]')
+        ->waitForText('Applied 5 changes');
 
     expect(People::query()->where('workspace_id', $workspace->getKey())->where('creation_source', CreationSource::CHAT)->count())->toBe(5);
 

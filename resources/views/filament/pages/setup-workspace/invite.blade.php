@@ -6,9 +6,9 @@
 @endphp
 
 <form wire:submit="finish" class="flex flex-1 flex-col">
-    <h3 class="text-xl font-bold tracking-tight text-gray-950 dark:text-white">
+    <x-onboarding.step-heading wire:key="setup-step-heading-invite">
         {{ __('filament/pages/workspaces.setup_workspace.invite.heading') }}
-    </h3>
+    </x-onboarding.step-heading>
     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
         {{ __('filament/pages/workspaces.setup_workspace.invite.description') }}
     </p>
@@ -49,7 +49,7 @@
     >
         <div class="flex items-center justify-between gap-3">
             <span class="flex items-center gap-2">
-                <x-filament::icon icon="ri-link" class="size-4 text-gray-400" />
+                <x-filament::icon icon="lucide-link" class="size-4 text-gray-400" />
                 {{ __('filament/pages/workspaces.setup_workspace.invite.link_label') }}
             </span>
 

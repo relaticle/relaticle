@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Features\EmailIntegration;
-use App\Http\Controllers\Billing\StripeWebhookController;
 use App\Http\Middleware\ConfigureTrustedProxies;
 use App\Http\Middleware\DenyIndexingOnSecondaryHosts;
 use App\Http\Middleware\EnsureAuthenticationComplete;
@@ -19,26 +18,37 @@ use App\Http\Middleware\SubdomainRootResponse;
 use App\Http\Middleware\SuperviseImpersonation;
 use App\Http\Middleware\ThrottleBeforeAuthentication;
 use App\Http\Middleware\ValidateSignature;
+use App\Models\Notification;
 use Filament\Facades\Filament;
 use Filament\Http\Middleware\SetUpPanel;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Routing\Middleware\SubstituteBindings;
-use Illuminate\Session\Middleware\AuthenticateSession;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
-use Laravel\Cashier\Http\Middleware\VerifyWebhookSignature;
+use Laravel\Fortify\Fortify;
 use Laravel\Pennant\Feature;
 use League\OAuth2\Server\Exception\OAuthServerException;
+use Livewire\Exceptions\MethodNotFoundException;
 use Livewire\Exceptions\PayloadTooLargeException;
+use Livewire\Exceptions\PublicPropertyNotFoundException;
+use Livewire\Features\SupportComputed\CannotCallComputedDirectlyException;
+use Livewire\Features\SupportLifecycleHooks\DirectlyCallingLifecycleHooksNotAllowedException;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Mechanisms\HandleComponents\CorruptComponentPayloadException;
+use Relaticle\Documentation\Support\DocUrl;
 use Relaticle\SystemAdmin\Http\Middleware\EnsureAuthenticationContext;
 use Relaticle\SystemAdmin\Http\Middleware\IsolateAuthenticationSession;
 use Sentry\Laravel\Integration;
@@ -48,6 +58,7 @@ use Spatie\Health\Commands\ScheduleCheckHeartbeatCommand;
 use Spatie\MarkdownResponse\Actions\DetectsMarkdownRequest;
 use Spatie\MarkdownResponse\Enums\DetectionMethod;
 use Spatie\MarkdownResponse\Support\Config;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -55,14 +66,6 @@ return Application::configure(basePath: dirname(__DIR__))
         web: __DIR__.'/../routes/web.php',
         health: '/up',
         then: function (): void {
-            // Registered here rather than by Cashier (see AppServiceProvider):
-            // signature verification must apply whether or not the webhook
-            // secret is configured, otherwise an unset secret silently turns
-            // this into an unauthenticated, plan-mutating endpoint.
-            Route::post('stripe/webhook', [StripeWebhookController::class, 'handleWebhook'])
-                ->middleware(VerifyWebhookSignature::class)
-                ->name('cashier.webhook');
-
             $apiDomain = config('app.api_domain');
 
             $routes = Route::middleware('api');
@@ -76,7 +79,7 @@ return Application::configure(basePath: dirname(__DIR__))
             $routes->group(base_path('routes/api.php'));
         },
     )
-    ->withBroadcasting(__DIR__.'/../routes/channels.php', ['middleware' => ['web', AuthenticateSession::class]])
+    ->withBroadcasting(__DIR__.'/../routes/channels.php', ['middleware' => ['web']])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trimStrings(except: [
             'document.*',
@@ -107,6 +110,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Global rather than the web group: Filament panel routes do not run the web group.
         $middleware->append(SecurityHeaders::class);
+
+        $middleware->authenticateSessions();
 
         $middleware->web(
             append: [
@@ -145,8 +150,9 @@ return Application::configure(basePath: dirname(__DIR__))
             );
         }, subdomains: false);
 
+        // The API and MCP limiters read the plan from the token's workspace, so it must be bound first.
         $middleware->prependToPriorityList(
-            before: SubstituteBindings::class,
+            before: ThrottleRequests::class,
             prepend: SetApiWorkspaceContext::class,
         );
 
@@ -225,16 +231,16 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             $indexes = array_filter([
-                __('Site index') => 'llms-txt',
-                __('Help centre') => 'help.index',
-                __('Developer docs') => 'documentation.index',
-                __('REST API spec') => 'openapi.json',
-            ], Route::has(...));
+                __('Site index') => DocUrl::root().'/llms.txt',
+                __('Help center') => DocUrl::area(DocUrl::HELP),
+                __('Developer docs') => DocUrl::area(DocUrl::DOCS),
+                __('REST API spec') => Route::has('openapi.json') ? route('openapi.json') : null,
+            ]);
 
             $lines = ['# '.__('Not found'), '', __('Nothing lives at :url.', ['url' => '`'.str_replace('`', '%60', $request->url()).'`']), ''];
 
-            foreach ($indexes as $label => $routeName) {
-                $lines[] = "- {$label}: ".route($routeName);
+            foreach ($indexes as $label => $url) {
+                $lines[] = "- {$label}: {$url}";
             }
 
             $lines[] = '- '.__('Home: :url', ['url' => config('app.url')]);
@@ -243,11 +249,90 @@ return Application::configure(basePath: dirname(__DIR__))
             return response(implode("\n", $lines), 404, ['Content-Type' => 'text/markdown; charset=UTF-8']);
         });
 
+        // An expired or wrong-account verification link returns to the prompt, where Resend gets a working one.
+        $exceptions->render(function (HttpException $e, Request $request): ?RedirectResponse {
+            if ($e->getStatusCode() !== 403 || ! $request->routeIs('filament.app.auth.email-verification.verify')) {
+                return null;
+            }
+
+            FilamentNotification::make()->title(__('auth.verify_email.link_unusable'))->warning()->persistent()->send();
+
+            return to_route('filament.app.auth.email-verification.prompt');
+        });
+
+        // Sign-in and provider steps are retried, so a throttled one goes back with the wait instead of a bare 429 page.
+        $exceptions->render(function (ThrottleRequestsException $e, Request $request) use ($rendersJson): ?RedirectResponse {
+            if ($rendersJson($request)) {
+                return null;
+            }
+
+            $wait = __('auth.throttle', ['seconds' => $e->getHeaders()['Retry-After'] ?? 60]);
+
+            if ($request->routeIs('auth.socialite.*')) {
+                FilamentNotification::make()->title(__('auth.provider.failed_title'))->body($wait)->danger()->persistent()->send();
+
+                return $request->user() === null
+                    ? to_route('login')
+                    : redirect()->intended(Fortify::redirects('password-confirmation'));
+            }
+
+            $form = match (true) {
+                $request->routeIs('two-factor.login.store') => route('two-factor.login'),
+                $request->routeIs('identity.confirm.mfa.store') => route('identity.confirm.mfa'),
+                default => null,
+            };
+
+            return $form === null ? null : redirect()->to($form)->withErrors(['code' => $wait]);
+        });
+
         // Stale tabs and deploy boundaries produce checksum failures that
         // Livewire already renders as 419 (page expired -> client refreshes).
         // They are user-state noise, not actionable errors, so keep them out of
         // Sentry (issue #125406836).
         $exceptions->dontReport(CorruptComponentPayloadException::class);
+
+        // Tampered updates are client noise, not bugs. Logging inside the dontReport check is the
+        // only point that runs before Sentry and before an exception's own report().
+        $livewireTamperExceptions = [
+            CannotUpdateLockedPropertyException::class,
+            PublicPropertyNotFoundException::class,
+            DirectlyCallingLifecycleHooksNotAllowedException::class,
+            MethodNotFoundException::class,
+            CannotCallComputedDirectlyException::class,
+        ];
+        $isLivewireTamper = fn (Throwable $e): bool => Arr::first(
+            $livewireTamperExceptions,
+            fn (string $class): bool => $e instanceof $class,
+        ) !== null;
+
+        $exceptions->dontReportWhen(function (Throwable $e) use ($isLivewireTamper): bool {
+            if (! $isLivewireTamper($e) || ! request()->hasHeader('X-Livewire')) {
+                return false;
+            }
+
+            Log::warning('Livewire request rejected as tampered', [
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+                'components' => collect(request()->array('components'))
+                    ->map(fn (mixed $component): mixed => is_string($snapshot = data_get($component, 'snapshot'))
+                        ? data_get(json_decode($snapshot, true), 'memo.name')
+                        : null)
+                    ->filter()
+                    ->values()
+                    ->all(),
+                'ip' => request()->ip(),
+            ]);
+
+            return true;
+        });
+
+        $exceptions->render(function (Throwable $e, Request $request) use ($isLivewireTamper): ?Response {
+            if (! $request->hasHeader('X-Livewire') || ! $isLivewireTamper($e)) {
+                return null;
+            }
+
+            return response('', 419);
+        });
 
         // Passport reports every rejected bearer token; keep league's 5xx server errors visible.
         $exceptions->dontReportWhen(
@@ -266,18 +351,18 @@ return Application::configure(basePath: dirname(__DIR__))
         });
     })
     ->withSchedule(function (Schedule $schedule): void {
-        $schedule->command('app:generate-sitemap')->daily()->onOneServer();
         $schedule->command('import:cleanup')->hourly()->onOneServer();
         $schedule->command('app:purge-pending-uploads')->hourly()->withoutOverlapping()->onOneServer();
         $schedule->command('queue:prune-batches --hours=24')->daily()->onOneServer();
         $schedule->command('invitations:cleanup')->daily()->onOneServer();
         $schedule->command('activitylog:clean --force')->daily()->onOneServer();
+        $schedule->command('model:prune', ['--model' => [Notification::class]])->daily()->onOneServer();
         $schedule->command('chat:expire-pending-actions')->everyFiveMinutes()->onOneServer();
         $schedule->command('chat:release-orphaned-reservations')->everyTenMinutes()->withoutOverlapping()->onOneServer();
         $schedule->command('chat:purge-unsent-attachments')->hourly()->withoutOverlapping()->onOneServer();
         $schedule->command('chat:reset-credits')->hourly()->withoutOverlapping()->onOneServer();
-        $schedule->command('billing:process-trials')->dailyAt('00:15')->withoutOverlapping()->onOneServer();
         $schedule->command('disposable:update')->weekly()->withoutOverlapping()->onOneServer();
+        $schedule->command('tor:update-exit-nodes')->hourly()->withoutOverlapping()->onOneServer();
         $schedule->command('subscribers:reconcile --limit=500')->dailyAt('02:00')
             ->withoutOverlapping()
             ->onOneServer();
@@ -307,6 +392,12 @@ return Application::configure(basePath: dirname(__DIR__))
             $schedule->command('email:dispatch-outbox')
                 ->everyMinute()
                 ->name('email:dispatch-outbox')
+                ->withoutOverlapping()
+                ->onOneServer();
+
+            $schedule->command('email:expire-access-requests')
+                ->hourly()
+                ->name('email:expire-access-requests')
                 ->withoutOverlapping()
                 ->onOneServer();
         }

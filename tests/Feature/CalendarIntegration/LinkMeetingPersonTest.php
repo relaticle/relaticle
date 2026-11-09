@@ -558,6 +558,37 @@ it('does not auto-create a person for a workspace-blocked attendee', function ()
     expect(Company::query()->where('workspace_id', $team->id)->count())->toBe(0);
 });
 
+it('does not auto-create a person or company for a colleague attendee on the workspace domain', function (): void {
+    $user = User::factory()->withWorkspace()->create(['email' => 'owner@ownco.com']);
+    $this->actingAs($user);
+    $team = $user->currentWorkspace;
+    Filament::setTenant($team);
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'workspace_id' => $team->id,
+        'user_id' => $user->id,
+    ]));
+    $team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    $meeting = Meeting::factory()->create([
+        'workspace_id' => $account->workspace_id,
+        'connected_account_id' => $account->getKey(),
+    ]);
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->getKey(),
+        'email_address' => 'colleague@ownco.com',
+        'is_self' => false,
+    ]);
+
+    (app(LinkMeetingAction::class))->execute($meeting->fresh());
+
+    expect(People::query()->where('workspace_id', $team->id)->count())->toBe(0);
+    expect(Company::query()->where('workspace_id', $team->id)->count())->toBe(0);
+});
+
 it('advances the meeting count of an opportunity whose point of contact attended', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);

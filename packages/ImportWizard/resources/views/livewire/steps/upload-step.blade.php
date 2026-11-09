@@ -7,7 +7,7 @@
             $fileExtension = strtoupper(pathinfo($fileName, PATHINFO_EXTENSION));
             $fileSizeFormatted = Number::fileSize($uploadedFile?->getSize() ?? 0, precision: 1);
         @endphp
-        <div class="flex-1 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-12 flex items-center justify-center">
+        <div class="flex-1 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4 md:p-12 flex items-center justify-center">
             {{-- File Info Card --}}
             <div x-data class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 w-full max-w-sm">
                 {{-- Hidden file input for replace --}}
@@ -24,7 +24,7 @@
                         wire:click="removeFile"
                         class="p-1.5 rounded-lg text-gray-400 hover:text-danger-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                     >
-                        <x-filament::icon icon="heroicon-o-trash" class="h-4 w-4" />
+                        <x-filament::icon icon="lucide-trash" class="h-4 w-4" />
                     </button>
                 </div>
 
@@ -35,14 +35,14 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
                         <div class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                            <x-filament::icon icon="heroicon-o-view-columns" class="h-3.5 w-3.5" />
+                            <x-filament::icon icon="lucide-columns-3" class="h-3.5 w-3.5" />
                             <span>Columns found</span>
                         </div>
                         <p class="text-xl font-semibold text-gray-950 dark:text-white mt-1">{{ count($headers) }}</p>
                     </div>
                     <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
                         <div class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                            <x-filament::icon icon="heroicon-o-queue-list" class="h-3.5 w-3.5" />
+                            <x-filament::icon icon="lucide-list-ordered" class="h-3.5 w-3.5" />
                             <span>Rows found</span>
                         </div>
                         <p class="text-xl font-semibold text-gray-950 dark:text-white mt-1">{{ number_format($rowCount) }}</p>
@@ -85,7 +85,7 @@
             x-bind:class="dragging
                 ? 'border-primary-500 bg-primary-50 dark:bg-primary-950 ring-2 ring-primary-500/20'
                 : 'border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900'"
-            class="flex-1 relative rounded-xl border border-dashed p-12 transition-all duration-200 grid place-items-center"
+            class="flex-1 relative rounded-xl border border-dashed p-6 md:p-12 transition-all duration-200 grid place-items-center"
         >
             {{-- Hidden file input (NOT covering the zone) --}}
             <input
@@ -100,7 +100,7 @@
             {{-- Content (hidden during loading) --}}
             <div class="flex flex-col items-center text-center" wire:loading.remove wire:target="uploadedFile">
                 <x-filament::icon
-                    icon="heroicon-o-arrow-up-tray"
+                    icon="lucide-upload"
                     class="h-12 w-12 text-gray-400 dark:text-gray-600 mx-auto"
                 />
                 <p class="mt-6 text-sm text-gray-700 dark:text-gray-400">
@@ -144,13 +144,13 @@
     {{-- Navigation --}}
     <div class="flex items-center justify-between pt-4 mt-6 border-t border-gray-200 dark:border-gray-700 pb-1">
         <a
-            href="{{ url()->getPublicUrl('documentation/import') }}"
+            href="{{ \Relaticle\Documentation\Support\DocUrl::helpCategory('import') }}"
             target="_blank"
             class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400 transition-colors"
         >
-            <x-filament::icon icon="heroicon-o-book-open" class="w-4 h-4" />
+            <x-filament::icon icon="lucide-book-open" class="w-4 h-4" />
             <span>Import Guide</span>
-            <x-filament::icon icon="heroicon-o-arrow-top-right-on-square" class="w-3 h-3" />
+            <x-filament::icon icon="lucide-external-link" class="w-3 h-3" />
         </a>
         <x-filament::button
             wire:click="continueToMapping"

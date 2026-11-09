@@ -1,0 +1,118 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Relaticle\Cloud\Billing\Commands;
+
+use App\Enums\Plan;
+use App\Enums\StripeSubscriptionStatus;
+use App\Enums\SubscriptionType;
+use App\Models\User;
+use App\Models\Workspace;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
+use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Relaticle\Chat\Services\CreditService;
+use Relaticle\Cloud\Billing\Mail\ProEndedMail;
+use Relaticle\Cloud\Billing\Mail\ProTrialEndingSoonMail;
+
+#[Description('Pause expired Pro trials and send trial-ending reminders')]
+#[Signature('billing:process-trials')]
+final class ProcessTrialsCommand extends Command
+{
+    public function handle(CreditService $credits): int
+    {
+        $this->pauseExpired($credits);
+        $this->sendEndingSoonReminders();
+
+        return self::SUCCESS;
+    }
+
+    private function sendEndingSoonReminders(): void
+    {
+        $count = 0;
+
+        Workspace::query()
+            ->whereBetween('trial_ends_at', [now(), now()->addHours(72)])
+            ->where(fn (Builder $query): Builder => $query
+                ->whereNull('trial_reminded_for')
+                ->orWhereColumn('trial_reminded_for', '!=', 'trial_ends_at'))
+            ->notScheduledForDeletion()
+            ->whereDoesntHave('subscriptions', $this->live(...))
+            ->with('owner')
+            ->chunkById(100, function (Collection $workspaces) use (&$count): void {
+                $workspaces->each(function (Workspace $workspace) use (&$count): void {
+                    $owner = $workspace->owner;
+
+                    $endsAt = $workspace->trial_ends_at;
+
+                    if (! $owner instanceof User || $endsAt === null) {
+                        return;
+                    }
+
+                    Mail::to($owner->email)->queue(new ProTrialEndingSoonMail($workspace, $endsAt));
+                    $workspace->forceFill(['trial_reminded_for' => $endsAt])->save();
+                    $count++;
+                });
+            });
+
+        $this->comment("Sent {$count} trial-ending reminder(s).");
+    }
+
+    private function pauseExpired(CreditService $credits): void
+    {
+        $count = 0;
+
+        Workspace::query()
+            ->whereNotNull('trial_ends_at')
+            ->where('trial_ends_at', '<', now())
+            ->with(['subscriptions', 'owner'])
+            ->chunkById(100, function (Collection $workspaces) use ($credits, &$count): void {
+                $workspaces->each(function (Workspace $workspace) use ($credits, &$count): void {
+                    $hasLiveSubscription = $workspace->subscriptions()
+                        ->where($this->live(...))
+                        ->exists();
+
+                    // Only revert what the trial granted. A converted
+                    // subscription, or a plan assigned outside the trial (e.g. a
+                    // sysadmin Enterprise grant), outlives the trial window, so
+                    // clear the stale timestamp so it is not reprocessed on every run.
+                    if ($hasLiveSubscription || $workspace->plan !== Plan::Pro) {
+                        $workspace->forceFill(['trial_ends_at' => null])->save();
+
+                        return;
+                    }
+
+                    DB::transaction(function () use ($workspace, $credits): void {
+                        $workspace->forceFill(['plan' => Plan::Free, 'trial_ends_at' => null, 'paused_at' => now(), 'inactivity_notice_sent_at' => now()])->save();
+                        $credits->resetPeriod($workspace);
+                    });
+
+                    if ($workspace->owner instanceof User && ! $workspace->isScheduledForDeletion()) {
+                        Mail::to($workspace->owner->email)->queue(ProEndedMail::afterTrial($workspace));
+                    }
+
+                    $this->info("Trial expired, paused hosted access: {$workspace->name}");
+                    $count++;
+                });
+            });
+
+        $this->comment("Paused {$count} expired trial(s).");
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     */
+    private function live(Builder $query): void
+    {
+        $query
+            ->whereIn('type', [SubscriptionType::Default->value, SubscriptionType::Managed->value])
+            ->whereNotIn('stripe_status', StripeSubscriptionStatus::neverGranted())
+            ->where(fn (Builder $running): Builder => $running->whereNull('ends_at')->orWhere('ends_at', '>', now()));
+    }
+}

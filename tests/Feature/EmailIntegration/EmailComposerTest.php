@@ -11,9 +11,13 @@ use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\RichEditor;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -28,8 +32,11 @@ use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Schemas\EmailTemplateForm;
+use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
 use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
 use Relaticle\EmailIntegration\Livewire\EmailComposer;
+use Relaticle\EmailIntegration\Livewire\TemplatesTable;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
@@ -46,7 +53,7 @@ use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 
 use function Pest\Laravel\actingAs;
 
-mutates(EmailComposer::class, SaveEmailDraftAction::class, DeleteEmailDraftAction::class, RecipientSuggestionService::class, ConnectedAccount::class, QueuedSendNotifier::class, ComposerInlineImage::class);
+mutates(EmailComposer::class, SaveEmailDraftAction::class, DeleteEmailDraftAction::class, RecipientSuggestionService::class, ConnectedAccount::class, QueuedSendNotifier::class, ComposerInlineImage::class, EmailTemplateForm::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -489,7 +496,7 @@ it('offers undo on the queued toast for the undo window', function (): void {
         ->call('send');
 
     $email = Email::query()->where('subject', 'Undo me')->sole();
-    $notification = collect(session('filament.claimed_notifications'))
+    $notification = flashedNotifications()
         ->firstWhere('title', __('filament/concerns/email-compose.notifications.queued.title'));
 
     expect($notification)->not->toBeNull()
@@ -1249,9 +1256,9 @@ it('presents composer recipient options as record chips', function (): void {
         'type' => 'person',
         'label' => 'Ada Lovelace',
         'circular' => true,
-        'iconPath' => null,
+        'avatarUrl' => null,
+        'iconPath' => CrmEntity::People->iconPath(),
     ]);
-    expect($personOption['avatarColor'])->toBeIn(['primary', 'success', 'warning', 'danger', 'info']);
     expect($companyOption)->toMatchArray([
         'circular' => false,
         'iconPath' => CrmEntity::Company->iconPath(),
@@ -1787,6 +1794,100 @@ it('sends a reopened forward once an unavailable attachment can be downloaded', 
     expect(Storage::disk(EmailAttachment::DISK)->get($sentPath))->toBe('gmail-contract-bytes');
 });
 
+it('downloads a reopened forward attachment through the sender own copy when a teammate holds a restricted copy', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $this->account->update(['email_address' => 'me@example.com']);
+
+    $inbound = Email::factory()->create([
+        'workspace_id' => $this->user->current_workspace_id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'provider_message_id' => 'provider-msg-1',
+        'rfc_message_id' => '<original@example.com>',
+        'subject' => 'Has a contract',
+    ]);
+
+    EmailParticipant::factory()->create([
+        'email_id' => $inbound->id,
+        'email_address' => 'sender@contact.com',
+        'role' => EmailParticipantRole::FROM,
+    ]);
+
+    EmailAttachment::factory()->create([
+        'email_id' => $inbound->getKey(),
+        'filename' => 'contract.pdf',
+        'storage_path' => null,
+        'provider_attachment_id' => 'provider-att-1',
+        'size' => 18,
+        'is_inline' => false,
+    ]);
+
+    $mail = Mockery::mock(MailServiceInterface::class);
+    $mail->shouldReceive('downloadAttachment')
+        ->twice()
+        ->with('provider-msg-1', 'provider-att-1')
+        ->andReturnUsing(function (): string {
+            static $attempt = 0;
+            $attempt++;
+
+            throw_if($attempt === 1, RuntimeException::class, 'provider unavailable');
+
+            return 'gmail-contract-bytes';
+        });
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->twice()->andReturn($mail);
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    Livewire::test(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', (string) $inbound->getKey(), 'forward')
+        ->set('to', ['forward-to@example.com'])
+        ->set('bodyHtml', '<p>Passing this on</p>')
+        ->call('close');
+
+    $draft = Email::query()->where('status', EmailStatus::DRAFT)->sole();
+
+    $teammate = User::factory()->create(['current_workspace_id' => $this->user->current_workspace_id]);
+    $this->user->currentWorkspace->users()->attach($teammate, ['role' => 'member']);
+
+    $teammateAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'user_id' => $teammate->id,
+        'workspace_id' => $this->user->current_workspace_id,
+    ]));
+
+    Email::factory()->create([
+        'workspace_id' => $this->user->current_workspace_id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateAccount->id,
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        'provider_message_id' => 'teammate-msg-1',
+        'rfc_message_id' => '<original@example.com>',
+        'is_internal' => false,
+    ]);
+
+    $inbound->touch();
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: $draft->id)
+        ->call('send')
+        ->assertHasNoErrors()
+        ->assertSet('isOpen', false);
+
+    $forward = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::FORWARD)
+        ->sole();
+    $sentPath = (string) $forward->attachments->sole()->storage_path;
+
+    expect($forward->attachments->sole()->filename)->toBe('contract.pdf');
+    Storage::disk(EmailAttachment::DISK)->assertExists($sentPath);
+    expect(Storage::disk(EmailAttachment::DISK)->get($sentPath))->toBe('gmail-contract-bytes');
+});
+
 it('deletes a draft\'s attachment files when the draft is deleted', function (): void {
     Storage::fake(EmailAttachment::DISK);
 
@@ -1933,6 +2034,42 @@ it('fills subject and body from a template and keeps the signature below it', fu
     $email = Email::query()->where('subject', 'Renewal options')->sole();
     expect($email->body->body_html)->toContain('Here are your options.')
         ->and($email->body->body_html)->toContain('Ada');
+});
+
+it('saves a template from the composer with the templates page message editor', function (): void {
+    $fromTemplates = null;
+
+    Livewire::test(TemplatesTable::class)
+        ->mountTableAction('create')
+        ->assertSchemaComponentExists('body_html', checkComponentUsing: function (RichEditor $editor) use (&$fromTemplates): bool {
+            $fromTemplates = [
+                'toolbar' => $editor->getToolbarButtons(),
+                'tags' => $editor->getMergeTags(),
+                'panel' => $editor->getActivePanel(),
+            ];
+
+            return $fromTemplates['panel'] === null
+                && in_array('mergeTags', Arr::flatten($fromTemplates['toolbar']), true);
+        });
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('subject', 'Renewal outreach')
+        ->set('bodyHtml', '<p>Here are your options.</p><div data-type="customBlock" data-id="'.SignatureBlock::ID.'"></div>')
+        ->mountAction('createTemplate')
+        ->assertSchemaComponentExists('name', checkComponentUsing: fn (TextInput $field): bool => $field->getLabel() === __('filament/resources/email-template.fields.name.label'))
+        ->assertSchemaComponentExists('subject', checkComponentUsing: fn (TextInput $field): bool => $field->getLabel() === __('filament/resources/email-template.fields.subject.label'))
+        ->assertSchemaComponentExists('is_shared', checkComponentUsing: fn (Toggle $field): bool => $field->getLabel() === __('filament/resources/email-template.fields.is_shared.label'))
+        ->assertSchemaStateSet([
+            'name' => 'Renewal outreach',
+            'subject' => 'Renewal outreach',
+            'body_html' => '<p>Here are your options.</p>',
+        ])
+        ->assertSchemaComponentExists('body_html', checkComponentUsing: function (RichEditor $editor) use ($fromTemplates): bool {
+            return $editor->getToolbarButtons() === $fromTemplates['toolbar']
+                && $editor->getMergeTags() === $fromTemplates['tags']
+                && $editor->getActivePanel() === $fromTemplates['panel'];
+        });
 });
 
 it('saves the current message as a template from the composer', function (): void {

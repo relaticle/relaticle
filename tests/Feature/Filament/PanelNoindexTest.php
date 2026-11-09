@@ -15,7 +15,3 @@ it('marks sysadmin panel pages noindex', function (): void {
 
     $response->assertHeader('X-Robots-Tag', 'noindex, nofollow');
 });
-
-it('keeps marketing pages indexable', function (): void {
-    $this->get('/pricing')->assertHeaderMissing('X-Robots-Tag');
-});

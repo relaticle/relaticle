@@ -4,94 +4,100 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Notifications;
 
+use App\Enums\Notifications\NotificationReason;
+use App\Enums\Notifications\NotificationType;
+use App\Models\Notification as NotificationRow;
 use App\Models\User;
-use Filament\Actions\Action;
+use App\Models\Workspace;
+use App\Notifications\InboxNotification;
 use Filament\Notifications\Notification as FilamentNotification;
-use Illuminate\Bus\Queueable;
-use Illuminate\Notifications\Notification;
-use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
+use Illuminate\Notifications\Messages\MailMessage;
+use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
+use Relaticle\EmailIntegration\Filament\Pages\EmailAccessRequestsPage;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
+use Relaticle\EmailIntegration\Support\MarkdownText;
 
-final class EmailAccessRequestedNotification extends Notification
+final class EmailAccessRequestedNotification extends InboxNotification
 {
-    use Queueable;
+    private const string LANG = 'filament/notifications/email-access-requested';
 
     public function __construct(public readonly EmailAccessRequest $request) {}
 
-    /**
-     * @return list<string>
-     */
+    public function workspace(): Workspace
+    {
+        return $this->request->workspace ?? $this->request->emailIncludingHidden->workspace;
+    }
+
+    public function subject(): EmailAccessRequest
+    {
+        return $this->request;
+    }
+
+    public function actor(): User
+    {
+        return $this->request->requester;
+    }
+
+    public function reason(): NotificationReason
+    {
+        return NotificationReason::Requested;
+    }
+
+    public function preference(): NotificationType
+    {
+        return NotificationType::EmailAccess;
+    }
+
+    public function shouldSend(User $notifiable, string $channel): bool
+    {
+        if ($this->request->status !== EmailAccessRequestStatus::PENDING) {
+            return false;
+        }
+
+        return parent::shouldSend($notifiable, $channel);
+    }
+
+    /** @return array<string, mixed> */
+    public function facts(): array
+    {
+        return [
+            'email_subject' => $this->request->emailIncludingHidden->subject,
+            'email_id' => $this->request->email_id,
+        ];
+    }
+
+    /** @return list<string> */
     public function via(object $notifiable): array
     {
-        return ['database'];
+        return ['mail'];
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function toDatabase(User $notifiable): array
+    public function toMail(User $notifiable): MailMessage
     {
-        $email = $this->request->email;
+        $email = $this->request->emailIncludingHidden;
         $requesterName = $this->request->requester->name;
-        $subject = $email !== null ? ($email->subject ?? __('filament/pages/email-inbox.subject.none')) : __('filament/pages/email-inbox.subject.none');
 
-        $notification = FilamentNotification::make()
-            ->title(__('filament/notifications/email-access-requested.title', ['name' => $requesterName]))
-            ->body($subject)
-            ->warning()
-            ->icon('heroicon-o-key')
-            ->viewData(['request_id' => (string) $this->request->getKey()]);
-
-        if ($email !== null) {
-            $notification->actions([
-                Action::make('viewEmail')
-                    ->label(__('filament/notifications/email-access-requested.actions.view'))
-                    ->link()
-                    ->color('info')
-                    ->dispatchTo(
-                        EmailAccessNotificationHandler::LIVEWIRE_ALIAS,
-                        'open-email-from-access-request',
-                    )
-                    ->eventData(['emailId' => $email->getKey()]),
-                Action::make('accept')
-                    ->label(__('filament/notifications/email-access-requested.actions.accept'))
-                    ->link()
-                    ->color('success')
-                    ->dispatchTo(
-                        EmailAccessNotificationHandler::LIVEWIRE_ALIAS,
-                        'approve-email-access-request',
-                    )
-                    ->eventData(['requestId' => (string) $this->request->getKey()]),
-                Action::make('decline')
-                    ->label(__('filament/notifications/email-access-requested.actions.decline'))
-                    ->link()
-                    ->color('warning')
-                    ->dispatchTo(
-                        EmailAccessNotificationHandler::LIVEWIRE_ALIAS,
-                        'deny-email-access-request',
-                    )
-                    ->eventData(['requestId' => (string) $this->request->getKey()]),
-            ]);
-        }
-
-        return $notification->getDatabaseMessage();
+        return (new MailMessage)
+            ->subject(__(self::LANG.'.mail.subject', ['name' => $requesterName]))
+            ->line(__(self::LANG.'.mail.line', ['name' => MarkdownText::escape($requesterName)]))
+            ->line(__(self::LANG.'.mail.subject_line', [
+                'subject' => MarkdownText::escape($email->displaySubject()),
+            ]))
+            ->action(
+                __(self::LANG.'.mail.action'),
+                EmailAccessRequestsPage::getUrl(panel: 'app', tenant: $email->workspace),
+            );
     }
 
-    /**
-     * Delete the owner's bell row for this request. Same outcome as the
-     * notification close (X) action: the row is removed, not marked read.
-     */
-    public static function dismissFor(EmailAccessRequest $request): void
+    public static function present(NotificationRow $row): FilamentNotification
     {
-        $owner = $request->owner ?? User::query()->whereKey($request->owner_id)->first();
+        $emailSubject = data_get($row->data, 'email_subject');
+        $requesterName = $row->actor?->name;
 
-        if (! $owner instanceof User) {
-            return;
-        }
-
-        $owner->notifications()
-            ->where('type', self::class)
-            ->where('data->viewData->request_id', (string) $request->getKey())
-            ->delete();
+        return FilamentNotification::make((string) $row->getKey())
+            ->title($requesterName === null
+                ? __('filament/notifications/email-access-requested.title_without_requester')
+                : __('filament/notifications/email-access-requested.title', ['name' => e($requesterName)]))
+            ->body(is_string($emailSubject) && $emailSubject !== '' ? e($emailSubject) : __('filament/pages/email-inbox.subject.none'));
     }
 }

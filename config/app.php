@@ -71,11 +71,6 @@ return [
 
     'csp' => [
         'mode' => env('CSP_MODE', 'enforce'),
-        'reverb' => [
-            'host' => env('REVERB_HOST'),
-            'port' => (int) env('REVERB_PORT', 443),
-            'scheme' => env('REVERB_SCHEME', 'https'),
-        ],
         'extra' => [
             'script-src' => $commaSeparated('CSP_SCRIPT_SRC'),
             'style-src' => $commaSeparated('CSP_STYLE_SRC'),

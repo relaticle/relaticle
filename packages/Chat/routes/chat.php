@@ -33,6 +33,10 @@ Route::middleware(['auth:web', AuthenticateSession::class, EnsureHostedWorkspace
         ->middleware('throttle:60,1,chat-search')
         ->name('chat.conversations.search');
 
+    Route::get('/chat/conversations/{conversationId}/turn', [ChatController::class, 'turn'])
+        ->middleware('throttle:60,1,chat-turn')
+        ->name('chat.turn');
+
     Route::post('/chat/conversations/{conversationId}/cancel', [ChatController::class, 'cancel'])
         ->middleware('throttle:30,1,chat-cancel')
         ->name('chat.cancel');

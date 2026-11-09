@@ -35,7 +35,7 @@ if [[ -n "$UNPLACED" ]]; then
     printf '%s\n' "$UNPLACED" | sed 's/^/  /'
 fi
 
-CLASSES="$(printf '%s\n' "$LISTING" | sed -nE 's/^ - P\\(Tests\\[^:]+)::.*/\1/p' | sort -u)"
+CLASSES="$(printf '%s\n' "$LISTING" | sed -nE 's/^ - P\\((Tests|Packages\\Cloud\\tests)\\[^:]+)::.*/\1/p' | sort -u)"
 
 if [[ -z "$CLASSES" ]]; then
     echo "✓ No test in the baseline reaches this change"
@@ -43,7 +43,7 @@ if [[ -z "$CLASSES" ]]; then
 fi
 
 COUNT="$(printf '%s\n' "$CLASSES" | wc -l | tr -d ' ')"
-FILES="$(printf '%s\n' "$CLASSES" | sed -E 's/^Tests/tests/; s#\\#/#g; s/$/.php/')"
+FILES="$(printf '%s\n' "$CLASSES" | sed -E 's/^Tests/tests/; s/^Packages/packages/; s#\\#/#g; s/$/.php/')"
 
 echo "→ ${COUNT} affected test files"
 

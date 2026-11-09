@@ -17,7 +17,7 @@ final class NotesRelationManager extends RelationManager
 {
     protected static string $relationship = 'notes';
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-document-text';
+    protected static string|\BackedEnum|null $icon = 'lucide-file-text';
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {

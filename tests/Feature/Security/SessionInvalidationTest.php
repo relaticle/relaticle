@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use App\Support\Auth\AuthenticationSession;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Laravel\Passport\Client;
@@ -10,6 +12,7 @@ use Laravel\Passport\Client;
 use function Pest\Laravel\actingAs;
 use function Pest\Laravel\getJson;
 use function Pest\Laravel\postJson;
+use function Pest\Laravel\putJson;
 
 function changePassword(User $user): void
 {
@@ -72,6 +75,69 @@ it('rejects a broadcasting auth request from a session opened before the passwor
         'socket_id' => '1234.5678',
         'channel_name' => "private-App.Models.User.{$this->user->getKey()}",
     ])->assertUnauthorized();
+});
+
+it('rejects an account settings write from a session opened before the password changed', function (): void {
+    actingAs($this->user);
+    getJson(route('chat.conversations'))->assertOk();
+
+    changePassword($this->user);
+
+    putJson(route('user-profile-information.update'), ['name' => 'Someone Else', 'email' => $this->user->email])
+        ->assertUnauthorized();
+
+    expect($this->user->fresh()->name)->not->toBe('Someone Else');
+});
+
+it('refuses a transient api token to a session opened before the password changed', function (): void {
+    actingAs($this->user);
+    getJson(route('chat.conversations'))->assertOk();
+
+    changePassword($this->user);
+
+    postJson(route('passport.token.refresh'))->assertUnauthorized();
+});
+
+it('keeps the session that changed the password through the account endpoint signed in', function (): void {
+    actingAs($this->user);
+    getJson(route('chat.conversations'))->assertOk();
+
+    AuthenticationSession::startOperation($this->user, 'set_password', null);
+    AuthenticationSession::proveOperation($this->user, 'set_password', null);
+
+    putJson(route('user-password.update'), [
+        'password' => 'a-new-password',
+        'password_confirmation' => 'a-new-password',
+    ])->assertOk();
+
+    getJson(route('chat.conversations'))->assertOk();
+});
+
+it('ends the other sessions of an account that sets its first password', function (): void {
+    config(['session.driver' => 'database']);
+
+    $user = User::factory()->socialOnly()->withPersonalWorkspace()->create();
+
+    DB::table('sessions')->insert([
+        'id' => 'signed-in-elsewhere',
+        'user_id' => $user->getKey(),
+        'ip_address' => '127.0.0.1',
+        'user_agent' => 'Mozilla/5.0',
+        'payload' => base64_encode('test'),
+        'last_activity' => time(),
+    ]);
+
+    actingAs($user);
+
+    AuthenticationSession::startOperation($user, 'set_password', null);
+    AuthenticationSession::proveOperation($user, 'set_password', null);
+
+    putJson(route('user-password.update'), [
+        'password' => 'a-first-password',
+        'password_confirmation' => 'a-first-password',
+    ])->assertOk();
+
+    expect(DB::table('sessions')->where('id', 'signed-in-elsewhere')->exists())->toBeFalse();
 });
 
 it('rejects an oauth consent approval from a session opened before the password changed', function (): void {

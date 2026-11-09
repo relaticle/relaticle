@@ -85,6 +85,10 @@ final class InviteWorkspaceMemberTool extends BaseWriteCreateTool
             return __('Only workspace owners and admins can invite teammates. Tell the user to ask one, and do not link to any page.');
         }
 
+        if ($workspace->isScheduledForDeletion()) {
+            return __('This workspace is scheduled for deletion, so it cannot take invitations. Tell the user to cancel the deletion in the workspace settings first.');
+        }
+
         $email = (string) ($record['email'] ?? '');
 
         if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {

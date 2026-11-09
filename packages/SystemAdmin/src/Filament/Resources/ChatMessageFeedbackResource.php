@@ -24,7 +24,7 @@ final class ChatMessageFeedbackResource extends Resource
 {
     protected static ?string $model = ChatMessageFeedback::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-hand-thumb-up';
+    protected static string|\BackedEnum|null $navigationIcon = 'lucide-thumbs-up';
 
     protected static string|\UnitEnum|null $navigationGroup = 'AI';
 

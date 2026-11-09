@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Auth\Concerns;
 
+use App\Enums\SocialiteProvider;
 use Laravel\Socialite\Contracts\User as SocialiteUser;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\AbstractProvider;
@@ -28,7 +29,7 @@ trait ResolvesSocialiteUsers
         return $driver->user();
     }
 
-    private function parseProviderError(string $exceptionMessage, string $provider): string
+    private function parseProviderError(string $exceptionMessage, SocialiteProvider $provider): string
     {
         $errorPatterns = [
             'invalid_request' => __('auth.provider.invalid_request'),
@@ -41,6 +42,6 @@ trait ResolvesSocialiteUsers
             }
         }
 
-        return __('auth.provider.failed', ['provider' => ucfirst($provider)]);
+        return __('auth.provider.failed', ['provider' => $provider->label()]);
     }
 }
