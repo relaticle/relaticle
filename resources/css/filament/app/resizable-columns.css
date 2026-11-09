@@ -145,7 +145,7 @@ body.resizing-column {
 }
 
 .fi-ta-column-handle {
-    @apply absolute top-1/2 right-2 z-11 grid size-5 -translate-y-1/2 cursor-pointer place-items-center rounded-sm border-0 bg-transparent p-0 text-gray-400;
+    @apply absolute top-1/2 right-2 z-11 grid size-5 -translate-y-1/2 cursor-pointer place-items-center rounded-sm border-0 bg-transparent p-0 text-gray-400 focus-visible:outline-2 focus-visible:outline-primary-500;
 }
 
 /* Lucide's ellipsis-vertical, drawn through a mask so it takes the button's text colour. */
@@ -160,7 +160,7 @@ body.resizing-column {
 .fi-ta-column-handle:hover,
 .fi-ta-column-handle:focus-visible,
 .fi-ta-column-handle[aria-expanded="true"] {
-    @apply bg-gray-200 text-gray-700 outline-none dark:bg-gray-700 dark:text-gray-200;
+    @apply bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200;
 }
 
 /* Fixed, so the scrolling table cannot clip it. The script places it from the trigger.

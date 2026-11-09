@@ -846,3 +846,12 @@ it('keeps the column menu inside a viewport too short for either side of its but
         ->and($placement['panelBottom'])->toBeLessThanOrEqual($placement['viewport']);
     $page->assertNoJavaScriptErrors();
 });
+
+it('outlines the options button when the keyboard focuses it', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
+
+    $page->script(sprintf('document.querySelector(`%s .fi-ta-column-handle`).focus()', columnHeader('created_at')));
+
+    $page->assertScript('document.activeElement.matches(":focus-visible") && getComputedStyle(document.activeElement).outlineStyle !== "none" && parseFloat(getComputedStyle(document.activeElement).outlineWidth) >= 2', true)
+        ->assertNoJavaScriptErrors();
+});
