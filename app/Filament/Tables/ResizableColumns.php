@@ -17,7 +17,7 @@ final class ResizableColumns
 
     public const int MAX_WIDTH = 1000;
 
-    private const int DEFAULT_COLUMN_WIDTH = 180;
+    public const int DEFAULT_COLUMN_WIDTH = 180;
 
     /**
      * @param  array<string, int>  $widths

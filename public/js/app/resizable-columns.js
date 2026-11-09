@@ -1,12 +1,6 @@
 // Each header rendered by ResizableColumns::apply() runs one `resizableColumn` instance,
 // which owns its drag handle.
 
-// Every data column carries an exact width. Under `table-layout: fixed` the actions column,
-// which has only a floor, takes whatever space is left so the table still fills its wrapper.
-const SELECTION_CELL_WIDTH = 52
-// Only fits an ActionGroup trigger: bare row actions would overflow into the next column.
-const ACTIONS_CELL_WIDTH = 64
-
 let dragGuideline = null
 let dragBadge = null
 
@@ -156,13 +150,14 @@ function wireStickyHeaders() {
     measureStickyHeaders()
 }
 
+// Every data column carries an exact width. Under `table-layout: fixed` the actions column,
+// which has only a floor, takes whatever space is left so the table still fills its wrapper.
 function computeMinTableWidth(table) {
     let total = 0
     table.querySelectorAll('thead th').forEach((th) => {
         const saved = th.dataset.resizableWidth
         if (saved) { total += parseInt(saved, 10); return }
-        if (th.classList.contains('fi-ta-selection-cell')) { total += SELECTION_CELL_WIDTH; return }
-        if (th.classList.contains('fi-ta-actions-header-cell')) { total += ACTIONS_CELL_WIDTH; return }
+        if (th.matches('.fi-ta-selection-cell, .fi-ta-actions-header-cell')) { total += parseFloat(getComputedStyle(th).minWidth); return }
         total += Math.round(th.offsetWidth)
     })
     return total
@@ -228,9 +223,6 @@ function markScrolledSideways(table) {
     table?.toggleAttribute('data-scrolled-x', (table.closest('.fi-ta-content-ctn')?.scrollLeft ?? 0) > 0)
 }
 
-// Matches ResizableColumns::DEFAULT_COLUMN_WIDTH, the width a column takes until someone resizes it.
-const FULL_COLUMN_WIDTH = 180
-
 // Each pinned cell sticks at the selection column's width plus the pinned widths before it.
 function applyPinnedOffsets(table) {
     const pinned = headersOf(table).filter((th) => th.dataset.columnPinned === '1')
@@ -244,7 +236,7 @@ function applyPinnedOffsets(table) {
     // Pins stick only while the widest other column and the actions column still fit beside them, so none is cut off.
     const room = table.closest('.fi-ta-content-ctn')?.clientWidth || Infinity
     const actions = table.querySelector('thead .fi-ta-actions-header-cell')?.offsetWidth ?? 0
-    const widest = Math.min(FULL_COLUMN_WIDTH, Math.max(0, ...headersOf(table).filter((th) => !pinned.includes(th)).map((th) => parseInt(th.dataset.resizableWidth, 10) || th.offsetWidth)))
+    const widest = Math.min(window.filamentData.defaultColumnWidth, Math.max(0, ...headersOf(table).filter((th) => !pinned.includes(th)).map((th) => parseInt(th.dataset.resizableWidth, 10) || th.offsetWidth)))
     const active = pinned.length > 0 && left + actions + widest <= room && !showsCards(table)
 
     table.classList.toggle('fi-ta-has-pinned', active)

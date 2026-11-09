@@ -14,6 +14,7 @@ use App\Filament\CustomFields\DateFieldType;
 use App\Filament\CustomFields\DateTimeFieldType;
 use App\Filament\CustomFields\DomainFieldType;
 use App\Filament\CustomFields\RichEditorFieldType;
+use App\Filament\Tables\ResizableColumns;
 use App\Http\Middleware\ReadAcrossWorkspaces;
 use App\Http\Responses\LoginResponse;
 use App\Jobs\CompleteExport;
@@ -871,6 +872,7 @@ final class AppServiceProvider extends ServiceProvider
             'resizeColumnLabel' => __('filament/panel.tables.resize_column'),
             'resizeColumnHint' => __('filament/panel.tables.resize_column_hint'),
             'columnOptionsLabel' => __('filament/panel.tables.column_menu.options'),
+            'defaultColumnWidth' => ResizableColumns::DEFAULT_COLUMN_WIDTH,
             'checklistItemLabel' => __('filament/rich-editor.checklist.item'),
             'checklistEmptyItemLabel' => __('filament/rich-editor.checklist.empty_item'),
         ]);
