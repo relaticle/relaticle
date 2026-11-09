@@ -3,11 +3,13 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Ai\Messages\ToolResultMessage;
 use Laravel\Ai\Responses\Data\ToolResult as DataToolResult;
 use Laravel\Ai\Streaming\Events\ToolResult;
+use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Storage\SupersededAwareConversationStore;
 use Relaticle\Chat\Support\DisplayBlocks;
 use Relaticle\Chat\Support\PendingActionEnvelope;
@@ -34,7 +36,7 @@ it('strips data and display from a replayed write echo', function (): void {
 
     $replayed = json_decode(DisplayBlocks::strip($echo), true);
 
-    expect(array_keys($replayed))->toBe(['type', 'pending_action_id', 'turn_id', 'action', 'entity_type', 'operation', 'meta'])
+    expect(array_keys($replayed))->toBe(['type', 'pending_action_id', 'turn_id', 'action', 'entity_type', 'operation', 'summary', 'meta'])
         ->and($replayed['type'])->toBe('pending_action')
         ->and($replayed['meta'])->toBe(['agent_should_stop' => true]);
 });
@@ -64,22 +66,57 @@ it('passes a non json write result through untouched', function (): void {
         ->and(DisplayBlocks::strip('Error: "pending_action" could not be saved.'))->toBe('Error: "pending_action" could not be saved.');
 });
 
-it('leaves a read result without a block untouched', function (): void {
-    $read = '{"data":[{"id":"a"}],"total":1}';
+it('returns a read result without a block byte for byte', function (): void {
+    $read = '{"data": [{"id": "a", "url": "\/r\/note\/a", "name": "Café"}], "total": 1}';
 
     expect(DisplayBlocks::strip($read))->toBe($read);
 });
 
-it('returns a read result that merely mentions pending_action byte for byte', function (): void {
-    $read = '{"data":[{"id":"a","body":"see the \"pending_action\" card","url":"/r/note/a"}],"total":1}';
+it('returns a read result that merely holds the word pending_action byte for byte', function (): void {
+    $read = '{"data": [{"id": "a", "status": "pending_action"}], "total": 1}';
 
     expect(DisplayBlocks::strip($read))->toBe($read);
 });
 
-it('keeps a result typed pending_action untouched when it carries neither key', function (): void {
-    $bare = '{"type":"pending_action","pending_action_id":"p1","url":"/r/a"}';
+it('returns a result typed pending_action byte for byte when it carries neither key', function (): void {
+    $bare = '{"type": "pending_action", "pending_action_id": "p1", "url": "\/r\/a"}';
 
     expect(DisplayBlocks::strip($bare))->toBe($bare);
+});
+
+it('keeps the record name and changed fields of a single update in the replayed echo', function (): void {
+    $action = ProposalCardFixture::proposal(
+        $this->user,
+        ['_record_id' => '01ABC', '_model_class' => 'company', 'name' => 'Acme', 'domain' => 'acme.test'],
+        ['title' => 'Update Company', 'summary' => 'Update Acme'],
+    );
+    $action->forceFill(['operation' => 'update'])->save();
+
+    $envelope = PendingActionEnvelope::for($action->refresh(), 'UpdateCompany', ['name' => 'Acme']);
+    $replayed = json_decode(DisplayBlocks::strip((string) json_encode($envelope)), true);
+
+    expect($replayed['summary'])->toBe(['records' => [['label' => 'Acme', 'fields' => ['name', 'domain']]]]);
+});
+
+it('keeps one summary entry per record of a batch create in the replayed echo', function (): void {
+    $action = ProposalCardFixture::batchCompany($this->user, ['Acme', 'Globex', 'Initech']);
+
+    $replayed = json_decode(DisplayBlocks::strip((string) json_encode(PendingActionEnvelope::for($action, 'CreateCompany', []))), true);
+
+    expect($replayed['summary']['records'])->toHaveCount(3)
+        ->and(array_column($replayed['summary']['records'], 'label'))->toBe(['Acme', 'Globex', 'Initech'])
+        ->and($replayed['summary']['records'][0])->toBe(['label' => 'Acme', 'fields' => ['name']]);
+});
+
+it('keeps a label and no fields for a delete in the replayed echo', function (): void {
+    $action = ProposalCardFixture::proposal($this->user, ['_record_ids' => ['01ABC']], ['title' => 'Delete Company', 'summary' => 'Delete Acme']);
+    $action->forceFill(['operation' => 'delete'])->save();
+
+    $replayed = json_decode(DisplayBlocks::strip((string) json_encode(PendingActionEnvelope::for($action->refresh(), 'DeleteCompany', ['ids' => ['01ABC']]))), true);
+
+    expect($replayed['summary']['records'])->toHaveCount(1)
+        ->and($replayed['summary']['records'][0])->toBe(['label' => 'Delete Acme'])
+        ->and($replayed['summary']['records'][0])->not->toHaveKey('fields');
 });
 
 it('keeps display and drops data in the stream payload while the stored envelope carries both', function (): void {
@@ -120,7 +157,7 @@ it('replays the stripped echo from the conversation store while the stored row k
         'conversation_id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => $userId,
-        'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
+        'agent' => CrmAssistant::class,
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
         'usage' => '{}',
@@ -150,7 +187,7 @@ it('replays the stripped echo from the conversation store while the stored row k
     $replayed = resolve(SupersededAwareConversationStore::class)
         ->getLatestConversationMessages($conversationId, 20)
         ->filter(fn (object $message): bool => $message instanceof ToolResultMessage)
-        ->flatMap(fn (ToolResultMessage $message) => $message->toolResults)
+        ->flatMap(fn (ToolResultMessage $message): Collection => $message->toolResults)
         ->map(fn (object $result): array => json_decode((string) $result->result, true));
 
     $stored = json_decode((string) DB::table('agent_conversation_messages')

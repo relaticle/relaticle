@@ -28,11 +28,30 @@ final readonly class PendingActionEnvelope
             'data' => $data,
             ...$beforeDisplay,
             'display' => $pending->display_data,
+            'summary' => self::summary($pending),
             'meta' => ['agent_should_stop' => $pending->isPending()],
             ...$afterMeta,
         ];
 
         return $pending->isPending() ? $envelope : [...$envelope, ...self::decision($pending)];
+    }
+
+    /**
+     * @return array{records: list<array{label: ?string, fields?: list<string>}>}
+     */
+    private static function summary(PendingAction $pending): array
+    {
+        return ['records' => array_map(static function (array $item) use ($pending): array {
+            $fields = array_values(array_filter(
+                array_keys($item['data']),
+                static fn (int|string $key): bool => ! str_starts_with((string) $key, '_'),
+            ));
+
+            return [
+                'label' => ProposalLabel::of($pending->entity_type, $item['data'], $item['display']),
+                ...($fields === [] ? [] : ['fields' => $fields]),
+            ];
+        }, ProposalPayload::from($pending)->items())];
     }
 
     /**

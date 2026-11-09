@@ -661,10 +661,8 @@ final readonly class PendingActionService
     }
 
     /**
-     * Fields the user unchecked before approving, per record. A field listed here
-     * was NOT written even though the proposal's replayed tool result still shows
-     * it. Without this the model reports values it never set, the same defect
-     * skippedItemLabels() exists to prevent for whole records.
+     * Fields the user unchecked before approving, per record. A listed field was
+     * NOT written, though the replayed proposal summary still names it.
      *
      * @return list<array{record: string|null, fields: list<string>}>
      */

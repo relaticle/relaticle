@@ -486,10 +486,25 @@ it('replays proposal tool results unmutated after a decision', function (): void
             return [$decoded['pending_action_id'] => $decoded];
         });
 
+    $stored = collect(json_decode((string) DB::table('agent_conversation_messages')
+        ->where('conversation_id', 'conv-R')
+        ->where('role', 'assistant')
+        ->value('steps'), true)[0]['tool_calls'])
+        ->mapWithKeys(function (array $call): array {
+            $decoded = json_decode((string) $call['result'], true);
+
+            return [$decoded['pending_action_id'] => $decoded];
+        });
+
     expect($replayed[$approved->getKey()]['type'])->toBe('pending_action')
-        ->and($replayed[$approved->getKey()]['display'])->toBe($approved->display_data)
-        ->and($replayed[$approved->getKey()]['data']['title'])->toBe('Ship it')
-        ->and($replayed[$pending->getKey()]['type'])->toBe('pending_action');
+        ->and($replayed[$approved->getKey()]['pending_action_id'])->toBe($approved->getKey())
+        ->and($replayed[$approved->getKey()])->not->toHaveKey('data')->not->toHaveKey('display')
+        ->and($replayed[$pending->getKey()]['type'])->toBe('pending_action')
+        ->and($replayed[$pending->getKey()])->not->toHaveKey('data')->not->toHaveKey('display')
+        ->and($stored[$approved->getKey()]['display'])->toBe($approved->display_data)
+        ->and($stored[$approved->getKey()]['data']['title'])->toBe('Ship it')
+        ->and($stored[$approved->getKey()])->not->toHaveKey('status')
+        ->and($stored[$pending->getKey()])->toHaveKey('data')->toHaveKey('display');
 });
 
 it('tells the model stamped-pending results are stale via resolved actions', function (): void {

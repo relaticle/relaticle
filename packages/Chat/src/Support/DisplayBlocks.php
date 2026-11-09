@@ -6,12 +6,6 @@ namespace Relaticle\Chat\Support;
 
 /**
  * The model-replay view of a tool result: the `display_block` key and the write echo.
- *
- * A block is presentation, not reasoning. It travels to the UI two ways
- * (`ConversationMessagesQuery` on reload, `ChatInterface::latestAssistantMessage()`
- * at stream-end reconcile) and travels back to the model zero ways: the store
- * strips it from the replayed history, because tool results are replayed on
- * every later turn and a block re-read is pure token cost forever.
  */
 final readonly class DisplayBlocks
 {
@@ -48,9 +42,7 @@ final readonly class DisplayBlocks
     }
 
     /**
-     * The same tool result as the model replays it: the block removed, and the
-     * `data` and `display` echo removed from a pending_action. Anything with
-     * nothing to remove is returned as the original string, never re-encoded.
+     * The tool result as the model replays it; the original string when nothing is removed.
      */
     public static function strip(mixed $result): mixed
     {
@@ -74,9 +66,7 @@ final readonly class DisplayBlocks
             return $result;
         }
 
-        // Same flag the tools encode with: this re-encode is what the model
-        // actually replays for every stripped result, so dropping it would put
-        // escaped slashes back into the prefix the tools just cleaned.
+        // Same flag the tools encode with.
         return json_encode(array_diff_key($decoded, array_flip($keys)), JSON_UNESCAPED_SLASHES);
     }
 
