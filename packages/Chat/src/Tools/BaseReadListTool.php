@@ -266,7 +266,7 @@ abstract class BaseReadListTool implements Tool
             ->where('entity_type', $this->citationType())
             ->active()
             ->get()
-            ->filter(LongTextForModel::isLongText(...))
+            ->filter(static fn (CustomField $field): bool => CustomFieldType::tryFrom($field->type)?->isFreeText() === true)
             ->mapWithKeys(static fn (CustomField $field): array => [$field->code => $field->type === CustomFieldType::RICH_EDITOR->value])
             ->all();
 

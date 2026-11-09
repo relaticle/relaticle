@@ -150,6 +150,12 @@ enum CustomFieldType: string
         return in_array($this, [self::LINK, self::DOMAIN], true);
     }
 
+    /** Whether values are prose that can run to kilobytes: rich text or long plain text. */
+    public function isFreeText(): bool
+    {
+        return in_array($this, [self::RICH_EDITOR, self::TEXTAREA], true);
+    }
+
     /** Whether values are picked from the field's own options rather than typed freely. */
     public function isChoice(): bool
     {

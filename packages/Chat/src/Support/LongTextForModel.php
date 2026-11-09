@@ -18,11 +18,6 @@ final readonly class LongTextForModel
 {
     public const int CONCISE_LIMIT = 300;
 
-    public static function isLongText(CustomField $field): bool
-    {
-        return in_array($field->type, [CustomFieldType::RICH_EDITOR->value, CustomFieldType::TEXTAREA->value], true);
-    }
-
     /** @return array{text: string, truncated: bool} */
     public static function concise(string $html): array
     {

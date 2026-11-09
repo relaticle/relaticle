@@ -43,21 +43,6 @@ abstract class BaseReadShowTool implements Tool
     private const string CUSTOM_FIELD_RELATION = 'customFieldValues.customField.options';
 
     /**
-     * Custom field types whose values are free-form prose that can run to
-     * kilobytes of markup (rich text) or long paragraphs (plain long text).
-     * Values on these fields are stripped of markup and capped for included
-     * (related) records. Everything else (numbers, dates, booleans, choice
-     * labels, short text) passes through untouched. Mirrors the old
-     * `RecordContextBuilder::stripHtml()` behaviour.
-     *
-     * @var list<string>
-     */
-    private const array FREE_TEXT_FIELD_TYPES = [
-        CustomFieldType::RICH_EDITOR->value,
-        CustomFieldType::TEXTAREA->value,
-    ];
-
-    /**
      * Characters kept per free-text value. Shared by the included-record strip
      * and the record card, so the same field never reads shorter in the payload
      * the model sees than in the card the user reads.
@@ -417,7 +402,7 @@ abstract class BaseReadShowTool implements Tool
                 continue;
             }
 
-            if (! in_array($fieldValue->customField->type, self::FREE_TEXT_FIELD_TYPES, true)) {
+            if (CustomFieldType::tryFrom($fieldValue->customField->type)?->isFreeText() !== true) {
                 continue;
             }
 
