@@ -11,7 +11,7 @@
 /* 64px only fits an ActionGroup trigger. `width: auto` drops Filament's w-1, so the actions
    column takes the space the data columns leave and the table still fills its wrapper. */
 .fi-ta-resizable-table .fi-ta-selection-cell {
-    @apply w-13 min-w-13 max-w-13;
+    @apply sm:w-13 sm:min-w-13 sm:max-w-13;
 }
 
 .fi-ta-resizable-table .fi-ta-actions-header-cell,
@@ -21,18 +21,9 @@
 
 /* Below sm the list stacks into cards, so the columns give up the widths and dividers the server stamped on them,
    and Filament's card rules place the cells again. */
-.fi-ta-table-stacked-on-mobile :is(th, td)[data-resizable-width] {
+.fi-ta-table-stacked-on-mobile :is(th, td)[data-resizable-width],
+.fi-ta-table-stacked-on-mobile td:has(> .fi-ta-actions) {
     @apply max-sm:w-auto! max-sm:max-w-none! max-sm:min-w-0! max-sm:overflow-visible! max-sm:border-r-0!;
-}
-
-@media (width < 40rem) {
-    .fi-ta-table-stacked-on-mobile.fi-ta-resizable-table :is(td, .fi-ta-selection-cell) {
-        position: revert-layer;
-        width: revert-layer;
-        min-width: revert-layer;
-        max-width: revert-layer;
-        overflow: revert-layer;
-    }
 }
 
 /* Each cell owns its borders, so a divider travels with a column that slides. Rows cannot draw
@@ -49,7 +40,7 @@
 /* A cell clips its overflow only when it is positioned. The checkbox cell stays out: Filament's phone card
    offset on it would move it beside its column header. */
 .fi-ta-resizable-table td:not(.fi-ta-selection-cell) {
-    @apply relative;
+    @apply relative max-sm:static;
 }
 
 .fi-ta-resizable-table th:not(:last-child):not(.fi-ta-selection-cell),
