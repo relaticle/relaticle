@@ -151,8 +151,7 @@ trait HasTableLayouts
     public function useStandardTableLayout(): void
     {
         $this->applyTableState(new TableStateData);
-        $this->activeTableLayoutId = null;
-        $this->appliedTableLayoutHash = null;
+        $this->clearActiveTableLayout();
     }
 
     public function saveTableLayoutAsAction(): Action
@@ -200,7 +199,7 @@ trait HasTableLayouts
             ->fillForm(fn (array $arguments): array => ['name' => $this->argumentTableLayout($arguments)?->name])
             ->schema([$this->tableLayoutNameInput()])
             ->action(function (array $arguments, array $data, Schema $schema): void {
-                $layout = $this->argumentTableLayout($arguments) ?? abort(404);
+                $layout = $this->requireArgumentTableLayout($arguments);
 
                 $this->withLayoutNameErrors($schema, fn (): TableLayout => resolve(UpdateTableLayout::class)->execute(
                     $this->tableLayoutUser(),
@@ -222,7 +221,7 @@ trait HasTableLayouts
             ->modalDescription(fn (): string => __('filament/panel.tables.layouts.share_description', ['workspace' => $this->tableLayoutWorkspace()->name]))
             ->modalSubmitActionLabel(__('filament/panel.tables.layouts.share_confirm'))
             ->visible(fn (array $arguments): bool => $this->canUpdateArgumentTableLayout($arguments) && ! $this->argumentTableLayout($arguments)?->is_shared)
-            ->action(fn (array $arguments) => $this->setTableLayoutSharing($this->argumentTableLayout($arguments) ?? abort(404), true));
+            ->action(fn (array $arguments) => $this->setTableLayoutSharing($this->requireArgumentTableLayout($arguments), true));
     }
 
     public function stopSharingTableLayoutAction(): Action
@@ -236,7 +235,7 @@ trait HasTableLayouts
             ->modalDescription(fn (array $arguments): string => __('filament/panel.tables.layouts.unshare_description', ['owner' => $this->argumentTableLayout($arguments)?->user?->name]))
             ->modalSubmitActionLabel(__('filament/panel.tables.layouts.unshare'))
             ->visible(fn (array $arguments): bool => $this->canUpdateArgumentTableLayout($arguments) && (bool) $this->argumentTableLayout($arguments)?->is_shared)
-            ->action(fn (array $arguments) => $this->setTableLayoutSharing($this->argumentTableLayout($arguments) ?? abort(404), false));
+            ->action(fn (array $arguments) => $this->setTableLayoutSharing($this->requireArgumentTableLayout($arguments), false));
     }
 
     public function deleteTableLayoutAction(): Action
@@ -255,7 +254,7 @@ trait HasTableLayouts
             })
             ->visible(fn (array $arguments): bool => $this->canUpdateArgumentTableLayout($arguments))
             ->action(function (array $arguments): void {
-                $layout = $this->argumentTableLayout($arguments) ?? abort(404);
+                $layout = $this->requireArgumentTableLayout($arguments);
 
                 if (! resolve(DeleteTableLayout::class)->execute($this->tableLayoutUser(), $layout)) {
                     $this->handleMissingTableLayout($layout->getKey());
@@ -289,6 +288,14 @@ trait HasTableLayouts
         $layoutId = $arguments['layout'] ?? null;
 
         return is_string($layoutId) ? $this->getVisibleTableLayouts()->find($layoutId) : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $arguments
+     */
+    private function requireArgumentTableLayout(array $arguments): TableLayout
+    {
+        return $this->argumentTableLayout($arguments) ?? abort(404);
     }
 
     /**
@@ -328,12 +335,20 @@ trait HasTableLayouts
     private function forgetTableLayout(?string $layoutId): void
     {
         if ($this->activeTableLayoutId === $layoutId) {
-            $this->activeTableLayoutId = null;
-            $this->appliedTableLayoutHash = null;
+            $this->clearActiveTableLayout();
         }
 
-        $this->defaultTableLayoutId = $this->defaultTableLayoutId === $layoutId ? null : $this->defaultTableLayoutId;
+        if ($this->defaultTableLayoutId === $layoutId) {
+            $this->defaultTableLayoutId = null;
+        }
+
         $this->visibleTableLayouts = null;
+    }
+
+    private function clearActiveTableLayout(): void
+    {
+        $this->activeTableLayoutId = null;
+        $this->appliedTableLayoutHash = null;
     }
 
     private function tableLayoutNameInput(): TextInput
