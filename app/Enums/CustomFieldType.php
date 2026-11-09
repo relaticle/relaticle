@@ -52,7 +52,7 @@ enum CustomFieldType: string
             self::SELECT, self::RADIO, self::TOGGLE_BUTTONS => 'option label or option ID',
             self::MULTI_SELECT, self::CHECKBOX_LIST => 'array of option labels or IDs',
             self::TAGS_INPUT => 'array of arbitrary string values',
-            self::RICH_EDITOR => 'markdown, or HTML when the value starts with <; stored and returned as HTML',
+            self::RICH_EDITOR => 'markdown, or HTML when the value starts with <',
             self::COLOR_PICKER => 'hex color string',
             self::DATE => 'ISO 8601 date',
             self::DATE_TIME => 'ISO 8601 datetime string; an offset is converted to UTC',
@@ -148,6 +148,12 @@ enum CustomFieldType: string
     public function isLinkList(): bool
     {
         return in_array($this, [self::LINK, self::DOMAIN], true);
+    }
+
+    /** Whether values are prose that can run to kilobytes: rich text or long plain text. */
+    public function isFreeText(): bool
+    {
+        return in_array($this, [self::RICH_EDITOR, self::TEXTAREA], true);
     }
 
     /** Whether values are picked from the field's own options rather than typed freely. */

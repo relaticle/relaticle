@@ -17,6 +17,7 @@ use Relaticle\Chat\Support\AttachedRows;
 use Relaticle\Chat\Support\DisplayBlocks;
 use Relaticle\Chat\Support\MarkdownRenderer;
 use Relaticle\Chat\Support\NextSteps;
+use Relaticle\Chat\Support\PendingActionEnvelope;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\StoredSteps;
 use Relaticle\Chat\Support\WebSources;
@@ -280,7 +281,7 @@ final readonly class ConversationMessagesQuery
 
             $inner = json_decode((string) $toolResult['result'], true);
 
-            if (is_array($inner) && ($inner['type'] ?? null) === 'pending_action') {
+            if (is_array($inner) && ($inner['type'] ?? null) === PendingActionEnvelope::TYPE) {
                 $envelopes[] = $inner;
             }
         }

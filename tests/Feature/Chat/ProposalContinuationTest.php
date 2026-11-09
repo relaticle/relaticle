@@ -296,9 +296,9 @@ it('names every record of the resumed decisions instead of leaving them unnamed'
         fn (ProcessChatMessage $job): bool => $job->message === implode("\n", [
             'The user decided the proposals above:',
             '- APPROVED (written): update 3 people records:',
-            '    - "Update person Ada Lovelace"',
-            '    - "Update person Grace Hopper"',
-            '    - "Update person Alan Turing"',
+            '    - "Ada Lovelace"',
+            '    - "Grace Hopper"',
+            '    - "Alan Turing"',
             '- APPROVED (written): delete company "Acme"',
         ]) && ! str_contains($job->message, '(unnamed)'),
     );

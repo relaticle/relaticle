@@ -21,7 +21,22 @@ final readonly class ProposalLabel
 
         return self::filled($data[$titleKey] ?? null)
             ?? self::titleRow($display, $titleKey)
+            ?? self::quotedName($display)
             ?? self::filled($display['summary'] ?? null);
+    }
+
+    /**
+     * @param  array<string, mixed>  $display
+     */
+    public static function quotedName(array $display): ?string
+    {
+        $summary = $display['summary'] ?? null;
+
+        if (! is_string($summary) || preg_match('/"(.*)"/u', $summary, $matches) !== 1) {
+            return null;
+        }
+
+        return self::filled($matches[1]);
     }
 
     /**

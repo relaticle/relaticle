@@ -8,7 +8,8 @@ use League\CommonMark\Environment\Environment;
 use League\CommonMark\Extension\CommonMark\CommonMarkCoreExtension;
 use League\CommonMark\Extension\CommonMark\Node\Inline\Image;
 use League\CommonMark\Extension\CommonMark\Node\Inline\Link;
-use League\CommonMark\Extension\Table\TableExtension;
+use League\CommonMark\Extension\GithubFlavoredMarkdownExtension;
+use League\CommonMark\Extension\TaskList\TaskListItemMarker;
 use League\CommonMark\MarkdownConverter;
 
 final readonly class MarkdownRenderer
@@ -17,13 +18,16 @@ final readonly class MarkdownRenderer
 
     public function __construct()
     {
+        // GFM with a <br> per soft break is what marked parses with `gfm` and `breaks`
+        // in resources/js/chat.js, so a reply reads the same streamed and reloaded.
         $environment = new Environment([
             'html_input' => 'strip',
             'allow_unsafe_links' => false,
+            'renderer' => ['soft_break' => "<br />\n"],
         ]);
 
         $environment->addExtension(new CommonMarkCoreExtension);
-        $environment->addExtension(new TableExtension);
+        $environment->addExtension(new GithubFlavoredMarkdownExtension);
 
         // Above the core LinkRenderer (priority 0): a `/r/` citation becomes a
         // record chip, everything else falls through to it untouched.
@@ -32,6 +36,7 @@ final readonly class MarkdownRenderer
         // A reply can quote text an outside sender wrote, and a browser fetches an
         // image URL, with whatever it carries, the moment the reply is painted.
         $environment->addRenderer(Image::class, new ImageAltTextRenderer, 10);
+        $environment->addRenderer(TaskListItemMarker::class, new TaskMarkerRenderer, 10);
 
         $this->converter = new MarkdownConverter($environment);
     }

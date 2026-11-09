@@ -13,6 +13,7 @@ use App\Models\Task;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Ai\Tools\Request;
+use Relaticle\Chat\Support\LongTextForModel;
 use Relaticle\Chat\Tools\Company\GetCompanyTool;
 use Relaticle\Chat\Tools\Company\ListCompaniesTool;
 use Relaticle\Chat\Tools\Note\GetNoteTool;
@@ -171,7 +172,7 @@ it('excludes a related record that belongs to another workspace, even when attac
         ->toBe(['Discovery call']);
 });
 
-it('strips HTML and truncates a long free-text custom field value on an included item', function (): void {
+it('shortens a long free-text value on an included item the way a list row does, and marks it', function (): void {
     $acme = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
 
     $note = Note::factory()->for($this->workspace)->create(['title' => 'Discovery call']);
@@ -187,12 +188,13 @@ it('strips HTML and truncates a long free-text custom field value on an included
         'include' => ['notes'],
     ])), true);
 
-    $body = $payload['included']['notes']['items'][0]['attributes']['custom_fields']['body'];
+    $item = $payload['included']['notes']['items'][0];
+    $body = $item['attributes']['custom_fields']['body'];
 
     expect($body)->not->toContain('<p>')
-        ->and($body)->not->toContain('</p>')
-        ->and(mb_strlen($body))->toBeLessThanOrEqual(503)
-        ->and($body)->toEndWith('...');
+        ->and(mb_strlen($body))->toBe(LongTextForModel::CONCISE_LIMIT)
+        ->and($body)->not->toEndWith('...')
+        ->and($item['truncated_fields'])->toBe(['body']);
 });
 
 it('keeps the paragraphs of a free-text custom field value apart on an included item', function (): void {

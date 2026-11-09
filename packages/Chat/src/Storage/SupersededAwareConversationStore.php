@@ -51,13 +51,8 @@ final class SupersededAwareConversationStore extends DatabaseConversationStore
     private ?string $openedUserMessageId = null;
 
     /**
-     * Drop presentation-only display blocks from the history replayed to the model.
-     *
-     * Read tools persist a `display_block` envelope next to their model-facing
-     * payload so the UI can render a real table on reload. Tool results are
-     * replayed on every later turn, so leaving the block in would re-bill 1-2 KB
-     * per read call for the rest of the conversation, against a prompt prefix we
-     * fought to shrink. The persisted row keeps it; only the replay drops it.
+     * Strip the display block and the write echo from the replayed history through
+     * DisplayBlocks::strip(). The persisted row keeps both; only the replay drops them.
      *
      * Stripping is safe to keep (unlike stamping, see class docblock) because
      * it is deterministic: the same stored result always strips to the same
