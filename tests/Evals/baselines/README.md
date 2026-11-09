@@ -19,8 +19,8 @@ Each case records the metrics of its last sample, and the number of samples it r
 
 | model | judge | date | pass rate | tokens_in mean | replayed_bytes mean | commit |
 |---|---|---|---|---|---|---|
-| claude-sonnet-5 | claude-opus-5-5 | 2026-11-08 | 26/40 (65.0%) | 90236 | 3070 | 86b260a04 |
-| gpt-5.5 | claude-opus-5-5 | 2026-11-08 | 35/40 (87.5%) | 47155 | 4185 | 86b260a04 |
+| claude-sonnet-5 | claude-opus-5-5 | 2026-11-08 | 26/40 (65.0%) | 90236 | 3070 | cf9d4b157 |
+| gpt-5.5 | claude-opus-5-5 | 2026-11-08 | 35/40 (87.5%) | 47155 | 4185 | cf9d4b157 |
 
 Each run happened once, on the commit above, with no change to the Rela code under test. The date is the UTC day in `started_at`.
 GPT 5.5 reports itself as `gpt-6-luna` in stored `meta.model`.
