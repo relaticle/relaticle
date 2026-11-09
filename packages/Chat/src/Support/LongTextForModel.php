@@ -9,7 +9,6 @@ use App\Models\CustomField;
 use App\Support\Markdown\DecodeHtmlEntitiesPostprocessor;
 use App\Support\PlainText;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Collection;
 use League\HTMLToMarkdown\Converter\TableConverter;
 use League\HTMLToMarkdown\HtmlConverter;
 use Relaticle\Chat\Enums\ResponseFormat;
@@ -23,13 +22,11 @@ final readonly class LongTextForModel
     /** @return array{text: string, truncated: bool} */
     public static function forList(string $value, CustomFieldType $type, ResponseFormat $format): array
     {
-        $isRichText = $type === CustomFieldType::RICH_EDITOR;
-
         if ($format === ResponseFormat::Detailed) {
-            return ['text' => $isRichText ? self::markdown($value) : $value, 'truncated' => false];
+            return ['text' => self::full($value, $type), 'truncated' => false];
         }
 
-        $text = $isRichText ? PlainText::fromHtml($value) : $value;
+        $text = $type === CustomFieldType::RICH_EDITOR ? PlainText::fromHtml($value) : $value;
 
         return [
             'text' => mb_substr($text, 0, self::CONCISE_LIMIT),
@@ -37,7 +34,12 @@ final readonly class LongTextForModel
         ];
     }
 
-    public static function markdown(string $html): string
+    public static function full(string $value, CustomFieldType $type): string
+    {
+        return $type === CustomFieldType::RICH_EDITOR ? self::markdown($value) : $value;
+    }
+
+    private static function markdown(string $html): string
     {
         $converter = new HtmlConverter(['strip_tags' => true, 'hard_break' => false, 'header_style' => 'atx']);
         $converter->getEnvironment()->addConverter(new TableConverter);
@@ -53,13 +55,20 @@ final readonly class LongTextForModel
             return [];
         }
 
-        /** @var Collection<int, CustomFieldValue> $values */
+        $fields = [];
+
+        /** @var iterable<int, CustomFieldValue> $values */
         $values = $record->getRelation('customFieldValues');
 
-        return $values
-            ->map(static fn (CustomFieldValue $value): ?CustomField => $value->getRelations()['customField'] ?? null)
-            ->filter(static fn (?CustomField $field): bool => $field !== null && CustomFieldType::tryFrom($field->type)?->isFreeText() === true)
-            ->mapWithKeys(static fn (CustomField $field): array => [$field->code => CustomFieldType::from($field->type)])
-            ->all();
+        foreach ($values as $value) {
+            $field = $value->getRelations()['customField'] ?? null;
+            $type = $field instanceof CustomField ? CustomFieldType::tryFrom($field->type) : null;
+
+            if ($field instanceof CustomField && $type?->isFreeText() === true) {
+                $fields[$field->code] = $type;
+            }
+        }
+
+        return $fields;
     }
 }

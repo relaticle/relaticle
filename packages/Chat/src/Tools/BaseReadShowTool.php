@@ -274,7 +274,7 @@ abstract class BaseReadShowTool implements Tool
         return $this->rewriteFreeText(
             $this->flattenResource(new $resourceClass($model)),
             $model,
-            static fn (string $value, CustomFieldType $type): string => $type === CustomFieldType::RICH_EDITOR ? LongTextForModel::markdown($value) : $value,
+            LongTextForModel::full(...),
         );
     }
 
@@ -354,9 +354,10 @@ abstract class BaseReadShowTool implements Tool
             $items = [];
 
             foreach ($related as $item) {
-                $items[] = $this->stripFreeTextCustomFields(
+                $items[] = $this->rewriteFreeText(
                     $this->flattenResource(new $resourceClass($item)),
                     $item,
+                    static fn (string $value): string => Str::limit(PlainText::fromHtml($value), self::FREE_TEXT_LIMIT),
                 );
             }
 
@@ -370,28 +371,5 @@ abstract class BaseReadShowTool implements Tool
         }
 
         return ['included' => $included];
-    }
-
-    /**
-     * Strip HTML and cap the length of free-text custom field values on an
-     * included (related) record. Ten related notes with kilobytes of
-     * rich-text body each would otherwise blow up the tool payload that gets
-     * persisted with the turn and replayed on every subsequent turn.
-     *
-     * Only applied to included records, not the primary record a tool call
-     * targets. A direct "get this note" call is the user asking for that
-     * note's full content, and should return it verbatim.
-     *
-     * @param  array<string, mixed>  $payload
-     * @return array<string, mixed>
-     */
-    private function stripFreeTextCustomFields(array $payload, Model $model): array
-    {
-        return $this->rewriteFreeText($payload, $model, fn (string $value): string => $this->truncateFreeText($value));
-    }
-
-    private function truncateFreeText(string $html): string
-    {
-        return Str::limit(PlainText::fromHtml($html), self::FREE_TEXT_LIMIT);
     }
 }
