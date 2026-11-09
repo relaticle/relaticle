@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use League\HTMLToMarkdown\Converter\TableConverter;
 use League\HTMLToMarkdown\HtmlConverter;
+use Relaticle\Chat\Enums\ResponseFormat;
 use Relaticle\Chat\Support\Markdown\TaskListConverter;
 use Relaticle\CustomFields\Models\CustomFieldValue;
 
@@ -20,14 +21,16 @@ final readonly class LongTextForModel
     public const int CONCISE_LIMIT = 300;
 
     /** @return array{text: string, truncated: bool} */
-    public static function concise(string $html): array
+    public static function forList(string $value, CustomFieldType $type, ResponseFormat $format): array
     {
-        return self::conciseText(PlainText::fromHtml($html));
-    }
+        $isRichText = $type === CustomFieldType::RICH_EDITOR;
 
-    /** @return array{text: string, truncated: bool} */
-    public static function conciseText(string $text): array
-    {
+        if ($format === ResponseFormat::Detailed) {
+            return ['text' => $isRichText ? self::markdown($value) : $value, 'truncated' => false];
+        }
+
+        $text = $isRichText ? PlainText::fromHtml($value) : $value;
+
         return [
             'text' => mb_substr($text, 0, self::CONCISE_LIMIT),
             'truncated' => mb_strlen($text) > self::CONCISE_LIMIT,

@@ -6,7 +6,6 @@ namespace Relaticle\Chat\Tools;
 
 use App\Data\ListQuery;
 use App\Enums\CrmEntity;
-use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\User;
 use App\Models\Workspace;
@@ -25,6 +24,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
+use Relaticle\Chat\Enums\ResponseFormat;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\CustomFieldsFilterDescriber;
 use Relaticle\Chat\Services\Tools\DisplayFieldSelector;
@@ -67,8 +67,6 @@ abstract class BaseReadListTool implements Tool
      * showing a subset, and `has_more`/`next_page` say whether one exists.
      */
     private const int MAX_PER_PAGE = 25;
-
-    private const array RESPONSE_FORMATS = ['concise', 'detailed'];
 
     /** @var list<string> */
     private const array ARGUMENTS = ['filter', 'sort', 'per_page', 'page', 'lookup', 'include', 'response_format'];
@@ -118,7 +116,7 @@ abstract class BaseReadListTool implements Tool
             'per_page' => $schema->integer()->description('Results per page (default 10, max 25).')->default(10),
             'page' => $schema->integer()->description('Page number.')->default(1),
             'lookup' => $schema->boolean()->description('Set true when you call this only to find ids for another tool call (e.g. before an update or delete): the user then sees no table. Leave unset when the user asked to see the records.'),
-            'response_format' => $schema->string()->enum(self::RESPONSE_FORMATS)->description('concise (default) shortens long text fields to 300 characters and lists them in truncated_fields. detailed returns them whole as Markdown. Use the Get tool for one record\'s full text; use detailed only when the question turns on the text of many.'),
+            'response_format' => $schema->string()->enum(ResponseFormat::class)->description('concise (default) shortens long text fields to 300 characters and lists them in truncated_fields. detailed returns them whole as Markdown. Use the Get tool for one record\'s full text; use detailed only when the question turns on the text of many.'),
         ];
 
         $includes = $this->availableIncludes();
@@ -154,9 +152,9 @@ abstract class BaseReadListTool implements Tool
             ], JSON_UNESCAPED_SLASHES);
         }
 
-        $responseFormat = $request['response_format'] ?? 'concise';
+        $responseFormat = $this->responseFormat($request);
 
-        if (! in_array($responseFormat, self::RESPONSE_FORMATS, true)) {
+        if ($responseFormat === null) {
             return (string) json_encode(['error' => 'response_format must be concise or detailed'], JSON_UNESCAPED_SLASHES);
         }
 
@@ -253,7 +251,7 @@ abstract class BaseReadListTool implements Tool
         return $item;
     }
 
-    private function shortenFreeText(mixed $item, mixed $model, string $mode): mixed
+    private function shortenFreeText(mixed $item, mixed $model, ResponseFormat $format): mixed
     {
         if (! is_array($item) || ! $model instanceof Model) {
             return $item;
@@ -268,7 +266,7 @@ abstract class BaseReadListTool implements Tool
                 continue;
             }
 
-            $shortened = $this->shortenValue($value, $mode, $type === CustomFieldType::RICH_EDITOR);
+            $shortened = LongTextForModel::forList($value, $type, $format);
             $item['attributes']['custom_fields'][$code] = $shortened['text'];
 
             if ($shortened['truncated']) {
@@ -279,14 +277,11 @@ abstract class BaseReadListTool implements Tool
         return $truncated === [] ? $item : [...$item, 'truncated_fields' => $truncated];
     }
 
-    /** @return array{text: string, truncated: bool} */
-    private function shortenValue(string $value, string $mode, bool $isRich): array
+    private function responseFormat(Request $request): ?ResponseFormat
     {
-        if ($mode === 'detailed') {
-            return ['text' => $isRich ? LongTextForModel::markdown($value) : $value, 'truncated' => false];
-        }
+        $requested = $request['response_format'] ?? ResponseFormat::Concise->value;
 
-        return $isRich ? LongTextForModel::concise($value) : LongTextForModel::conciseText($value);
+        return is_string($requested) ? ResponseFormat::tryFrom($requested) : null;
     }
 
     private function perPageFor(Request $request): int
