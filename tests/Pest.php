@@ -44,6 +44,8 @@ use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Pest\Browser\Api\AwaitableWebpage;
 use Pest\Browser\Playwright\Playwright;
+use Pest\Evals\Drivers\LaravelAiJudge;
+use Pest\Evals\Plugin;
 use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\EmailIntegration\Controllers\RedirectController;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
@@ -55,6 +57,10 @@ use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
 use Relaticle\EmailIntegration\Services\MailboxHistoryImportService;
 use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
+use Tests\Evals\EvalTestCase;
+use Tests\Evals\Support\EvalReport;
+use Tests\Evals\Support\RelaTurn;
+use Tests\Evals\Support\TurnEnvelope;
 use Tests\Helpers\ChatCatalog;
 use Tests\Helpers\PestTiaRuntime;
 use Tests\TestCase;
@@ -64,6 +70,43 @@ PestTiaRuntime::configure(dirname(__DIR__), array_slice($_SERVER['argv'], 1));
 pest()->extend(TestCase::class)
     ->use(LazilyRefreshDatabase::class)
     ->in('Feature', 'Smoke', 'Browser', '../packages/Cloud/tests');
+
+pest()->extend(EvalTestCase::class)
+    ->use(LazilyRefreshDatabase::class)
+    ->in('Evals');
+
+pest()->evals()->judgeUsing(new LaravelAiJudge(provider: 'anthropic', model: EvalReport::JUDGE_MODEL));
+
+pest()->afterEach(function (): void {
+    if (! Plugin::isEvalMode()) {
+        return;
+    }
+
+    $status = $this->status();
+
+    if ($status->isSkipped()) {
+        return;
+    }
+
+    $failure = $status->isSuccess() ? null : $status->message();
+
+    if (! RelaTurn::$last instanceof TurnEnvelope) {
+        EvalReport::record($this->getPrintableTestCaseMethodName(), false, null, ['no turn ran: '.($failure ?? 'the test finished without a turn')]);
+        EvalReport::flushOnShutdown(RelaTurn::model(), EvalReport::JUDGE_MODEL);
+
+        return;
+    }
+
+    EvalReport::record(
+        $this->getPrintableTestCaseMethodName(),
+        $status->isSuccess(),
+        RelaTurn::$last,
+        array_values(array_filter([$failure, RelaTurn::$last->error])),
+        count(RelaTurn::$turns),
+    );
+    EvalReport::flushOnShutdown(RelaTurn::model(), EvalReport::JUDGE_MODEL);
+    RelaTurn::forget();
+})->in('Evals');
 
 if (class_exists(Playwright::class)) {
     Playwright::setTimeout(30_000);

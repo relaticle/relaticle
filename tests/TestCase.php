@@ -51,6 +51,11 @@ abstract class TestCase extends BaseTestCase
         return parent::createApplication();
     }
 
+    protected function fakeExceptions(): void
+    {
+        Exceptions::fake();
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -65,7 +70,7 @@ abstract class TestCase extends BaseTestCase
         ));
         $this->app->instance(MailExchangers::class, new MailExchangers(fn (): array => []));
         Sleep::fake(syncWithCarbon: true);
-        Exceptions::fake();
+        $this->fakeExceptions();
 
         // InstallCommand shells out to composer, npm and vite. Running those for
         // real cost ~110s and rewrote public/build on every suite run, so any new

@@ -733,6 +733,12 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
   `tests/.pest/shards.json` is only the fallback for a run that finds no recording, so do not
   refresh it with a local `composer test:update-shards`: a laptop's timings skew the split.
   Refresh it with `php bin/shard-timings.php <dir>` over a main run's `junit-*` artifacts.
+- `composer test:evals` runs the forty recorded asks in `tests/Evals` through the real assistant on
+  real models, and scores them. It calls Anthropic and OpenAI, so it costs money and needs both
+  keys in the process env or `.env`. A plain `pest` skips every case in seconds, and CI's `Tests`
+  workflow never runs it. The nightly `rela-evals.yml` workflow does, one job per model, and
+  uploads `storage/evals/*.json`. Committed baselines live in `tests/Evals/baselines/`, and its
+  README lists each one.
 
 === .ai/relaticle/ui rules ===
 

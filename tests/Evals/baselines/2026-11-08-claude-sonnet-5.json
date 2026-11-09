@@ -1,0 +1,482 @@
+{
+    "model": "claude-sonnet-5",
+    "judge": "claude-opus-5-5",
+    "started_at": "2026-11-08T22:50:24+00:00",
+    "cases": [
+        {
+            "name": "it never prints a raw id",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 166764,
+            "tokens_out": 386,
+            "replayed_bytes": 14009,
+            "tool_calls": 3,
+            "duration_ms": 6939,
+            "reasons": []
+        },
+        {
+            "name": "it never answers with a markdown table",
+            "passed": false,
+            "samples": 1,
+            "tokens_in": 79350,
+            "tokens_out": 894,
+            "replayed_bytes": 1319,
+            "tool_calls": 1,
+            "duration_ms": 9623,
+            "reasons": [
+                "NoMarkdownTable scored 0 (threshold: 0.7). Markdown table in the reply: | Opportunity | Amount | Stage |\n|---|---|---|\n|\nFailed asserting that 0.0 is equal to 0.7 or is greater than 0.7."
+            ]
+        },
+        {
+            "name": "it never opens a section with a heading line",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 78475,
+            "tokens_out": 483,
+            "replayed_bytes": 674,
+            "tool_calls": 1,
+            "duration_ms": 5599,
+            "reasons": []
+        },
+        {
+            "name": "it never writes an em dash",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 123183,
+            "tokens_out": 646,
+            "replayed_bytes": 11617,
+            "tool_calls": 2,
+            "duration_ms": 8591,
+            "reasons": []
+        },
+        {
+            "name": "it never narrates what it is about to do",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 81675,
+            "tokens_out": 265,
+            "replayed_bytes": 4227,
+            "tool_calls": 1,
+            "duration_ms": 4152,
+            "reasons": []
+        },
+        {
+            "name": "it counts with the summary tool when asked how many",
+            "passed": false,
+            "samples": 1,
+            "tokens_in": 78489,
+            "tokens_out": 470,
+            "replayed_bytes": 67,
+            "tool_calls": 1,
+            "duration_ms": 6028,
+            "reasons": [
+                "ToolCallMatch scored 0 (threshold: 0.7). Missing tool calls: GetCrmSummaryTool. Matched: .\nFailed asserting that 0.0 is equal to 0.7 or is greater than 0.7."
+            ]
+        },
+        {
+            "name": "it proposes the task unassigned and offers the invitation for an unknown assignee",
+            "passed": false,
+            "samples": 3,
+            "tokens_in": 157110,
+            "tokens_out": 394,
+            "replayed_bytes": 626,
+            "tool_calls": 3,
+            "duration_ms": 5604,
+            "reasons": [
+                "Sample #1: ToolCallMatch scored 0 (threshold: 0.7). Missing tool calls: CreateTaskTool. Matched: .\nFailed asserting that 0.0 is equal to 0.7 or is greater than 0.7."
+            ]
+        },
+        {
+            "name": "it points at mass send instead of sending one email per person",
+            "passed": false,
+            "samples": 3,
+            "tokens_in": 119824,
+            "tokens_out": 1325,
+            "replayed_bytes": 662,
+            "tool_calls": 2,
+            "duration_ms": 15153,
+            "reasons": [
+                "Sample #1: LlmJudge scored 0.25 (threshold: 0.7). [Mostly fails to meet the criteria] The agent sent no email, which satisfies one part of the criteria. It never pointed the user at the composer's mass send feature, though. Instead it looked up opportunities and offered to link a contact or email another group, which implies it would still send from chat. The key guidance part is missing, so the output mostly fails.\nFailed asserting that 0.25 is equal to 0.7 or is greater than 0.7."
+            ]
+        },
+        {
+            "name": "it offers to create a note when the list comes back empty",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 117962,
+            "tokens_out": 262,
+            "replayed_bytes": 626,
+            "tool_calls": 2,
+            "duration_ms": 4439,
+            "reasons": []
+        },
+        {
+            "name": "it offers nothing to create when the email list comes back empty",
+            "passed": false,
+            "samples": 1,
+            "tokens_in": 118077,
+            "tokens_out": 307,
+            "replayed_bytes": 737,
+            "tool_calls": 2,
+            "duration_ms": 4422,
+            "reasons": [
+                "LlmJudge scored 0.25 (threshold: 0.7). [Mostly fails to meet the criteria] The criteria have two parts: say that no emails were found, and never offer to create, log or draft an email record. The reply meets the first part by stating that no emails are linked to Company 05. It fails the second part by asking \"Want me to draft a new email to someone at this company?\", which is an offer to draft an email. Since that requirement is an explicit prohibition and the reply breaks it, the output mostly fails the criteria.\nFailed asserting that 0.25 is equal to 0.7 or is greater than 0.7."
+            ]
+        },
+        {
+            "name": "it tells a viewer that an owner or admin can do it and links no page",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 34271,
+            "tokens_out": 174,
+            "replayed_bytes": 0,
+            "tool_calls": 0,
+            "duration_ms": 2523,
+            "reasons": []
+        },
+        {
+            "name": "it answers a Persian message in Persian script",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 128788,
+            "tokens_out": 326,
+            "replayed_bytes": 10012,
+            "tool_calls": 2,
+            "duration_ms": 5077,
+            "reasons": []
+        },
+        {
+            "name": "it answers a Spanish message in Spanish",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 81975,
+            "tokens_out": 264,
+            "replayed_bytes": 5006,
+            "tool_calls": 1,
+            "duration_ms": 3744,
+            "reasons": []
+        },
+        {
+            "name": "it answers a request for a new table with custom fields from the docs",
+            "passed": false,
+            "samples": 1,
+            "tokens_in": 39002,
+            "tokens_out": 485,
+            "replayed_bytes": 0,
+            "tool_calls": 0,
+            "duration_ms": 6640,
+            "reasons": [
+                "ToolCallMatch scored 0 (threshold: 0.7). Missing tool calls: SearchDocsTool. Matched: .\nFailed asserting that 0.0 is equal to 0.7 or is greater than 0.7."
+            ]
+        },
+        {
+            "name": "it searches the docs first for a product question",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 118806,
+            "tokens_out": 447,
+            "replayed_bytes": 1980,
+            "tool_calls": 2,
+            "duration_ms": 6724,
+            "reasons": []
+        },
+        {
+            "name": "it declines an out of scope request in one sentence and offers one CRM action",
+            "passed": false,
+            "samples": 1,
+            "tokens_in": 39004,
+            "tokens_out": 53,
+            "replayed_bytes": 0,
+            "tool_calls": 0,
+            "duration_ms": 2098,
+            "reasons": [
+                "LlmJudge scored 0.5 (threshold: 0.7). [Partially meets the criteria] The decline is a single sentence: \"I help with CRM work, not general writing tasks like poetry.\" However, the reply offers three CRM actions (an email, a note, or a task) rather than one, and adds a third sentence asking a follow-up question. The decline part fully meets the criteria, but the 'one CRM action' requirement is not met. The response is concise and close in spirit, so this is a partial-to-mostly fit.\nFailed asserting that 0.5 is equal to 0.7 or is greater than 0.7."
+            ]
+        },
+        {
+            "name": "it asks for web access once when the user wants the web",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 117914,
+            "tokens_out": 284,
+            "replayed_bytes": 671,
+            "tool_calls": 2,
+            "duration_ms": 4364,
+            "reasons": []
+        },
+        {
+            "name": "it answers a credit question from the balance tool",
+            "passed": false,
+            "samples": 1,
+            "tokens_in": 39006,
+            "tokens_out": 139,
+            "replayed_bytes": 0,
+            "tool_calls": 0,
+            "duration_ms": 2335,
+            "reasons": [
+                "ToolCallMatch scored 0 (threshold: 0.7). Missing tool calls: GetCreditBalanceTool. Matched: .\nFailed asserting that 0.0 is equal to 0.7 or is greater than 0.7."
+            ]
+        },
+        {
+            "name": "it answers a judgement question with a subset, never a bulk update offer",
+            "passed": true,
+            "samples": 3,
+            "tokens_in": 123288,
+            "tokens_out": 620,
+            "replayed_bytes": 11215,
+            "tool_calls": 2,
+            "duration_ms": 10720,
+            "reasons": []
+        },
+        {
+            "name": "it does not repeat the same task table when asked to investigate",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 47395,
+            "tokens_out": 798,
+            "replayed_bytes": 0,
+            "tool_calls": 0,
+            "duration_ms": 9988,
+            "reasons": []
+        },
+        {
+            "name": "it answers a how many question from the summary, not from a list",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 78187,
+            "tokens_out": 169,
+            "replayed_bytes": 182,
+            "tool_calls": 1,
+            "duration_ms": 5401,
+            "reasons": []
+        },
+        {
+            "name": "it lists companies in a short reply with no table and no heading",
+            "passed": false,
+            "samples": 1,
+            "tokens_in": 81984,
+            "tokens_out": 273,
+            "replayed_bytes": 5002,
+            "tool_calls": 1,
+            "duration_ms": 4611,
+            "reasons": [
+                "Failed asserting that 236 is less than 200."
+            ]
+        },
+        {
+            "name": "it does not claim to show the first page as everything when more rows exist",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 80607,
+            "tokens_out": 176,
+            "replayed_bytes": 3044,
+            "tool_calls": 1,
+            "duration_ms": 3084,
+            "reasons": []
+        },
+        {
+            "name": "it keeps the replayed task list under ten kilobytes",
+            "passed": false,
+            "samples": 1,
+            "tokens_in": 123169,
+            "tokens_out": 432,
+            "replayed_bytes": 11617,
+            "tool_calls": 2,
+            "duration_ms": 5737,
+            "reasons": [
+                "ReplayedBytesUnder scored 0 (threshold: 0.7). Replayed 11617 bytes, limit 10000\nFailed asserting that 0.0 is equal to 0.7 or is greater than 0.7."
+            ]
+        },
+        {
+            "name": "it reads recent activity with the activity tool",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 95027,
+            "tokens_out": 199,
+            "replayed_bytes": 29575,
+            "tool_calls": 1,
+            "duration_ms": 3811,
+            "reasons": []
+        },
+        {
+            "name": "it looks up workspace members with the members tool",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 78198,
+            "tokens_out": 108,
+            "replayed_bytes": 299,
+            "tool_calls": 1,
+            "duration_ms": 2184,
+            "reasons": []
+        },
+        {
+            "name": "it says person and company where the user did not say contact",
+            "passed": true,
+            "samples": 3,
+            "tokens_in": 118556,
+            "tokens_out": 337,
+            "replayed_bytes": 1221,
+            "tool_calls": 2,
+            "duration_ms": 4918,
+            "reasons": []
+        },
+        {
+            "name": "it may say contact when the user said contact",
+            "passed": false,
+            "samples": 3,
+            "tokens_in": 78953,
+            "tokens_out": 247,
+            "replayed_bytes": 832,
+            "tool_calls": 1,
+            "duration_ms": 3006,
+            "reasons": [
+                "Sample #3: CalledAnyOf scored 0 (threshold: 0.7). Called none of ListPeopleTool, GetCompanyTool\nFailed asserting that 0.0 is equal to 0.7 or is greater than 0.7."
+            ]
+        },
+        {
+            "name": "it greets a new sales workspace with people and companies, briefly, without tools",
+            "passed": false,
+            "samples": 3,
+            "tokens_in": 39201,
+            "tokens_out": 129,
+            "replayed_bytes": 0,
+            "tool_calls": 0,
+            "duration_ms": 2590,
+            "reasons": [
+                "Sample #1: NoContactWord scored 0 (threshold: 0.7). The reply says contacts where the user did not\nFailed asserting that 0.0 is equal to 0.7 or is greater than 0.7."
+            ]
+        },
+        {
+            "name": "it says plainly that a sample only workspace holds sample data",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 78285,
+            "tokens_out": 193,
+            "replayed_bytes": 182,
+            "tool_calls": 1,
+            "duration_ms": 3664,
+            "reasons": []
+        },
+        {
+            "name": "it looks a company up with lookup true before it updates it",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 118153,
+            "tokens_out": 222,
+            "replayed_bytes": 969,
+            "tool_calls": 2,
+            "duration_ms": 5767,
+            "reasons": []
+        },
+        {
+            "name": "it creates five companies in one call",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 78895,
+            "tokens_out": 154,
+            "replayed_bytes": 1329,
+            "tool_calls": 1,
+            "duration_ms": 2492,
+            "reasons": []
+        },
+        {
+            "name": "it chains a company and a person with a plan reference",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 118041,
+            "tokens_out": 217,
+            "replayed_bytes": 920,
+            "tool_calls": 2,
+            "duration_ms": 3697,
+            "reasons": []
+        },
+        {
+            "name": "it reads the custom field before it removes cents from Amount",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 118644,
+            "tokens_out": 234,
+            "replayed_bytes": 1870,
+            "tool_calls": 2,
+            "duration_ms": 3441,
+            "reasons": []
+        },
+        {
+            "name": "it ends a note proposal with at most one question",
+            "passed": true,
+            "samples": 3,
+            "tokens_in": 117867,
+            "tokens_out": 197,
+            "replayed_bytes": 904,
+            "tool_calls": 2,
+            "duration_ms": 3816,
+            "reasons": []
+        },
+        {
+            "name": "it proposes an invitation and does not say it was sent",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 78351,
+            "tokens_out": 119,
+            "replayed_bytes": 466,
+            "tool_calls": 1,
+            "duration_ms": 2363,
+            "reasons": []
+        },
+        {
+            "name": "it reports an approved company as created after the user decides",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 39734,
+            "tokens_out": 77,
+            "replayed_bytes": 0,
+            "tool_calls": 0,
+            "duration_ms": 1477,
+            "reasons": []
+        },
+        {
+            "name": "it reports a rejected task as not written",
+            "passed": false,
+            "samples": 1,
+            "tokens_in": 39654,
+            "tokens_out": 39,
+            "replayed_bytes": 0,
+            "tool_calls": 0,
+            "duration_ms": 1263,
+            "reasons": [
+                "TextMatches scored 0 (threshold: 0.7). The reply does not match /rejected|nothing changed/i\nFailed asserting that 0.0 is equal to 0.7 or is greater than 0.7."
+            ]
+        },
+        {
+            "name": "it never calls a superseded note approved",
+            "passed": false,
+            "samples": 1,
+            "tokens_in": 39486,
+            "tokens_out": 159,
+            "replayed_bytes": 0,
+            "tool_calls": 0,
+            "duration_ms": 3041,
+            "reasons": [
+                "LlmJudge scored 0.25 (threshold: 0.7). [Mostly fails to meet the criteria] The reply correctly avoids claiming the note was written. However, it says the note is 'still a proposal waiting for your approval on the card above.' That treats the superseded proposal as active and implicitly directs the user to approve it. This violates a key half of the criterion. It is not an explicit 'approve it' command, but the effect is the same, so the reply mostly fails.\nFailed asserting that 0.25 is equal to 0.7 or is greater than 0.7."
+            ]
+        },
+        {
+            "name": "it proposes deleting only the company and never claims a cascade",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 118091,
+            "tokens_out": 248,
+            "replayed_bytes": 961,
+            "tool_calls": 2,
+            "duration_ms": 3719,
+            "reasons": []
+        }
+    ],
+    "totals": {
+        "cases": 40,
+        "passed": 26,
+        "pass_rate": 0.65,
+        "tokens_in_mean": 90236,
+        "replayed_bytes_mean": 3070.5
+    }
+}

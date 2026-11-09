@@ -92,6 +92,7 @@
         "nunomaduro/collision": "^8.0",
         "pestphp/pest": "dev-tia-warmup-worktrees-5x as 5.3.5",
         "pestphp/pest-plugin-browser": "^5.0",
+        "pestphp/pest-plugin-evals": "^5.1",
         "pestphp/pest-plugin-laravel": "^5.0",
         "pestphp/pest-plugin-rector": "^5.0",
         "pestphp/pest-plugin-type-coverage": "^5.0",
@@ -160,6 +161,10 @@
         ],
         "test:types": "phpstan analyse",
         "test:arch": "pest tests/Arch/ --no-tia",
+        "test:evals": [
+            "Composer\\Config::disableProcessTimeout",
+            "pest tests/Evals --evals --no-tia"
+        ],
         "test:type-coverage": [
             "Composer\\Config::disableProcessTimeout",
             "pest --type-coverage --min=100 --no-tia"
