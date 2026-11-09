@@ -13,7 +13,6 @@ use App\Models\Workspace;
 use App\Support\CanonicalRecordUrl;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification as FilamentNotification;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Str;
 use LogicException;
 
@@ -110,9 +109,9 @@ final class TableLayoutChangedNotification extends InboxNotification
                 : __("notifications.events.table_layout_changed.{$change}_title", ['actor' => e($actorName), ...$replace]))
             ->body(__("notifications.events.table_layout_changed.{$change}_body", ['table' => $table]))
             ->icon(match ($change) {
-                self::DELETED => Heroicon::OutlinedTrash,
-                self::UNSHARED => Heroicon::OutlinedLockClosed,
-                default => Heroicon::OutlinedPencilSquare,
+                self::DELETED => 'lucide-trash-2',
+                self::UNSHARED => 'lucide-lock',
+                default => 'lucide-square-pen',
             })
             ->iconColor('gray')
             ->actions($url === null ? [] : [
