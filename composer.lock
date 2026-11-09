@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "96e0e797d2ba6fa370191c16ccd3e72d",
+    "content-hash": "b38ef50e82910a934e81672adc4f1fa5",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -21813,6 +21813,97 @@
             "time": "2026-10-29T06:29:23+00:00"
         },
         {
+            "name": "pestphp/pest-plugin-evals",
+            "version": "v5.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/pestphp/pest-plugin-evals.git",
+                "reference": "1689196320efe3ad1ebc07aea2ce45367e8a0773"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/pestphp/pest-plugin-evals/zipball/1689196320efe3ad1ebc07aea2ce45367e8a0773",
+                "reference": "1689196320efe3ad1ebc07aea2ce45367e8a0773",
+                "shasum": ""
+            },
+            "require": {
+                "pestphp/pest": "^5.2.1",
+                "pestphp/pest-plugin": "^5.0.0",
+                "php": "^8.4"
+            },
+            "conflict": {
+                "laravel/ai": "<1.0.0 || >=2.0.0",
+                "pestphp/pest": "<5.0.0"
+            },
+            "require-dev": {
+                "laravel/ai": "^1.0",
+                "laravel/framework": "^13.33.0",
+                "orchestra/testbench": "^11.2.0",
+                "pestphp/pest-dev-tools": "^5.0.0"
+            },
+            "type": "library",
+            "extra": {
+                "pest": {
+                    "plugins": [
+                        "Pest\\Evals\\Plugin"
+                    ]
+                }
+            },
+            "autoload": {
+                "files": [
+                    "src/Autoload.php"
+                ],
+                "psr-4": {
+                    "Pest\\Evals\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Pushpak Chhajed",
+                    "email": "pushpak1300@gmail.com"
+                },
+                {
+                    "name": "Nuno Maduro",
+                    "email": "enunomaduro@gmail.com"
+                }
+            ],
+            "description": "A PestPHP plugin for evaluating LLM agents with LLM-as-judge, semantic similarity, and deterministic scorers",
+            "keywords": [
+                "ai",
+                "eval",
+                "framework",
+                "llm",
+                "pest",
+                "php",
+                "plugin",
+                "test",
+                "testing",
+                "unit"
+            ],
+            "support": {
+                "source": "https://github.com/pestphp/pest-plugin-evals/tree/v5.1.0"
+            },
+            "funding": [
+                {
+                    "url": "https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=66BYDWAT92N6L",
+                    "type": "custom"
+                },
+                {
+                    "url": "https://github.com/nunomaduro",
+                    "type": "github"
+                },
+                {
+                    "url": "https://www.patreon.com/nunomaduro",
+                    "type": "patreon"
+                }
+            ],
+            "time": "2026-09-23T13:39:52+00:00"
+        },
+        {
             "name": "pestphp/pest-plugin-laravel",
             "version": "v5.0.1",
             "source": {
@@ -22366,7 +22457,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-11-03T12:14:22+00:00"
+            "time": "2026-11-03T12:14:22+00:00",
+            "published-time": "2026-11-03T12:14:36+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",
