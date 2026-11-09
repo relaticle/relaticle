@@ -634,10 +634,10 @@ it('rejects an unknown creation source instead of returning an empty list', func
 
     Company::factory()->for($user->currentWorkspace)->create();
 
-    $result = json_decode(resolve(ListCompaniesTool::class)->handle(new Request(['filter' => ['creation_source' => ['$eq' => 'system']]])), true);
+    $result = json_decode(resolve(ListCompaniesTool::class)->handle(new Request(['filter' => ['creation_source' => ['$eq' => 'zapier']]])), true);
 
     expect($result)->toHaveKey('error')
-        ->and($result['error'])->toContain('creation_source $eq: system is not one of');
+        ->and($result['error'])->toContain('creation_source $eq: zapier is not one of');
 });
 
 it('excludes options and keeps tasks without a status', function (): void {

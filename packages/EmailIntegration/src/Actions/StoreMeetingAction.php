@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Actions;
 
+use App\Enums\CreationSource;
+use App\Support\CurrentSource;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Data\NormalizedMeetingPayload;
@@ -20,6 +22,11 @@ final readonly class StoreMeetingAction
     ) {}
 
     public function execute(NormalizedMeetingPayload $payload, ConnectedAccount $account): ?Meeting
+    {
+        return CurrentSource::during(CreationSource::MAILBOX, fn (): ?Meeting => $this->store($payload, $account));
+    }
+
+    private function store(NormalizedMeetingPayload $payload, ConnectedAccount $account): ?Meeting
     {
         if ($this->shouldSkip($payload)) {
             $this->softDeleteCancelledMeetings($account, $payload);

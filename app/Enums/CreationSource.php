@@ -50,10 +50,12 @@ enum CreationSource: string implements HasColor, HasLabel
 
     case MAILBOX = 'mailbox';
 
+    case SYSTEM = 'system';
+
     /** @return list<self> */
     public static function automated(): array
     {
-        return [self::SAMPLE, self::MAILBOX];
+        return [self::SAMPLE, self::MAILBOX, self::SYSTEM];
     }
 
     /** @return list<string> */
@@ -72,6 +74,7 @@ enum CreationSource: string implements HasColor, HasLabel
             self::MCP => 'gray',
             self::CHAT => 'indigo',
             self::MAILBOX => 'gray',
+            self::SYSTEM => 'gray',
         };
     }
 
@@ -85,6 +88,7 @@ enum CreationSource: string implements HasColor, HasLabel
             self::MCP => 'MCP Agent',
             self::CHAT => 'AI Chat',
             self::MAILBOX => 'Mailbox Sync',
+            self::SYSTEM => 'System',
         };
     }
 }
