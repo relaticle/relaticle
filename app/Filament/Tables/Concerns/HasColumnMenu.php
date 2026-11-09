@@ -64,7 +64,7 @@ trait HasColumnMenu
             ->modalHeading(__('filament/panel.tables.column_menu.edit_label'))
             ->modalWidth('md')
             ->modalSubmitActionLabel(__('filament/panel.tables.column_menu.save_label'))
-            ->fillForm(fn (array $arguments): array => ['label' => $this->tableColumnLabels[$arguments['column'] ?? ''] ?? $this->originalTableColumnLabels[$arguments['column'] ?? ''] ?? null])
+            ->fillForm(fn (array $arguments): array => ['label' => $this->currentTableColumnLabel((string) ($arguments['column'] ?? ''))])
             ->schema([
                 TextInput::make('label')
                     ->label(__('filament/panel.tables.column_menu.label'))
@@ -83,11 +83,7 @@ trait HasColumnMenu
 
     public function moveTableColumn(string $columnName, ?string $beforeColumnName): void
     {
-        if (! $this->hasTableColumn($columnName) || $columnName === $beforeColumnName || in_array($columnName, $this->tablePinnedColumns, true)) {
-            return;
-        }
-
-        if ($beforeColumnName !== null && ! $this->hasTableColumn($beforeColumnName)) {
+        if (! $this->isMovableTableColumn($columnName, $beforeColumnName)) {
             return;
         }
 
@@ -160,6 +156,20 @@ trait HasColumnMenu
 
         // The columns were stamped at boot, and this request renders them.
         $this->getTable()->resizableColumns();
+    }
+
+    private function currentTableColumnLabel(string $columnName): ?string
+    {
+        return $this->tableColumnLabels[$columnName] ?? $this->originalTableColumnLabels[$columnName] ?? null;
+    }
+
+    private function isMovableTableColumn(string $columnName, ?string $beforeColumnName): bool
+    {
+        if (! $this->hasTableColumn($columnName) || $columnName === $beforeColumnName || in_array($columnName, $this->tablePinnedColumns, true)) {
+            return false;
+        }
+
+        return $beforeColumnName === null || $this->hasTableColumn($beforeColumnName);
     }
 
     private function hasTableColumn(string $columnName): bool
