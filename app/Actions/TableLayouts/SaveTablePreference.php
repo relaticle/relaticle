@@ -17,7 +17,11 @@ final readonly class SaveTablePreference
     public function execute(User $user, Workspace $workspace, CrmEntity $entity, TableStateData $state, ?TableLayout $activeLayout, ?string $appliedLayoutHash): TablePreference
     {
         abort_unless($user->belongsToWorkspaceId($workspace->getKey()), 403);
-        abort_if($activeLayout instanceof TableLayout && ($activeLayout->entity !== $entity || $activeLayout->workspace_id !== $workspace->getKey() || $user->cannot('view', $activeLayout)), 403);
+
+        if ($activeLayout instanceof TableLayout) {
+            abort_if($activeLayout->entity !== $entity || $activeLayout->workspace_id !== $workspace->getKey(), 403);
+            abort_unless($user->can('view', $activeLayout), 403);
+        }
 
         return TablePreference::query()
             ->withoutGlobalScope(WorkspaceScope::class)
