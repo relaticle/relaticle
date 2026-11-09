@@ -112,7 +112,7 @@ final class RelaTurn
                 'name' => (string) ($call['name'] ?? ''),
                 'arguments' => is_array($call['arguments'] ?? null) ? $call['arguments'] : [],
             ], $toolResults),
-            toolResultRowIds: array_map(self::rowIdsOf(...), $toolResults),
+            renderedRowIds: array_map(self::renderedRowIdsOf(...), $toolResults),
             replayedBytes: self::replayedBytesOf($toolResults),
             inputTokens: (int) ($usage['input_tokens'] ?? 0),
             outputTokens: (int) ($usage['output_tokens'] ?? 0),
@@ -259,10 +259,10 @@ final class RelaTurn
      * @param  array<string, mixed>  $toolResult
      * @return list<string>
      */
-    private static function rowIdsOf(array $toolResult): array
+    private static function renderedRowIdsOf(array $toolResult): array
     {
-        $decoded = json_decode((string) DisplayBlocks::strip($toolResult['result'] ?? ''), true);
-        $rows = is_array($decoded) && is_array($decoded['data'] ?? null) ? $decoded['data'] : [];
+        $decoded = json_decode((string) ($toolResult['result'] ?? ''), true);
+        $rows = is_array($decoded) && is_array($decoded['display_block']['rows'] ?? null) ? $decoded['display_block']['rows'] : [];
 
         return array_values(array_map(
             fn (array $row): string => (string) $row['id'],

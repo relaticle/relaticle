@@ -22,7 +22,7 @@ function reportEnvelope(int $in, int $out, int $bytes, int $ms, int $calls, stri
     return new TurnEnvelope(
         text: $text,
         toolCalls: array_fill(0, $calls, ['name' => 'ListTasksTool', 'arguments' => []]),
-        toolResultRowIds: [],
+        renderedRowIds: [],
         replayedBytes: $bytes,
         inputTokens: $in,
         outputTokens: $out,

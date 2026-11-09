@@ -9,6 +9,7 @@ use Tests\Evals\Scorers\NoDuplicateRowSet;
 use Tests\Evals\Scorers\NoHeadingLine;
 use Tests\Evals\Scorers\NoMarkdownTable;
 use Tests\Evals\Scorers\OneClosingQuestionAtMost;
+use Tests\Evals\Scorers\RendersTable;
 use Tests\Evals\Scorers\ReplayedBytesUnder;
 use Tests\Evals\Scorers\TextMatches;
 use Tests\Evals\Support\EvalWorkspace;
@@ -23,15 +24,16 @@ it('answers a judgement question with a subset, never a bulk update offer', func
         ->prompt('Show me tasks I can update to Waiting on others')
         ->repeat(3)
         ->toHaveToolCalls(['ListTasksTool' => []])
+        ->toPassScorer(new RendersTable)
         ->toPassScorer(new OneClosingQuestionAtMost)
         ->toPassJudge('The reply proposes a subset of the listed tasks or asks which to move. It never offers to update every listed task.');
 });
 
 it('does not repeat the same task table when asked to investigate', function (): void {
     $w = EvalWorkspace::seed();
-    $conversationId = Prior::listedTasks($w);
+    $conversationId = Prior::listedTasksThenQuestioned($w);
     $previous = RelaTurn::envelopeFromRow(
-        AgentConversationMessage::query()->where('conversation_id', $conversationId)->where('role', 'assistant')->sole(),
+        AgentConversationMessage::query()->where('conversation_id', $conversationId)->where('role', 'assistant')->orderBy('created_at')->orderBy('id')->firstOrFail(),
     )->toJson();
 
     expect((new RelaTurn($w, conversationId: $conversationId))(...))
@@ -55,6 +57,7 @@ it('lists companies in a short reply with no table and no heading', function ():
     expect($turn(...))
         ->prompt('Show me my companies')
         ->toHaveToolCalls(['ListCompaniesTool' => []])
+        ->toPassScorer(new RendersTable)
         ->toPassScorer(new NoMarkdownTable)
         ->toPassScorer(new NoHeadingLine);
 
@@ -67,6 +70,7 @@ it('does not claim to show the first page as everything when more rows exist', f
     expect((new RelaTurn($w))(...))
         ->prompt('List all my people')
         ->toHaveToolCalls(['ListPeopleTool' => []])
+        ->toPassScorer(new RendersTable)
         ->toPassScorer(new TextMatches('/first \d+ of/i', negate: true))
         ->toPassJudge('The reply either says more people exist beyond those shown, or shows all 40.');
 });
@@ -78,6 +82,7 @@ it('keeps the replayed task list under ten kilobytes', function (): void {
     expect((new RelaTurn($w))(...))
         ->prompt('Show me all my open tasks')
         ->toHaveToolCalls(['ListTasksTool' => []])
+        ->toPassScorer(new RendersTable)
         ->toPassScorer(new ReplayedBytesUnder(10_000));
 });
 

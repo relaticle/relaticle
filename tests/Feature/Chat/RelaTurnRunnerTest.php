@@ -49,7 +49,7 @@ it('returns a json envelope with the reply text and tool calls', function (): vo
 
     $envelope = json_decode($turn('show me my companies'), true);
 
-    expect($envelope)->toHaveKeys(['text', 'tool_calls', 'tool_result_row_ids', 'replayed_bytes', 'usage', 'duration_ms', 'error'])
+    expect($envelope)->toHaveKeys(['text', 'tool_calls', 'rendered_row_ids', 'replayed_bytes', 'usage', 'duration_ms', 'error'])
         ->and($envelope['text'])->toBe('Here are your companies.')
         ->and($envelope['error'])->toBeNull()
         ->and($envelope['usage'])->toHaveKeys(['input_tokens', 'output_tokens']);
@@ -100,12 +100,13 @@ it('records a failed sample when the turn throws', function (): void {
         ->and($envelope['replayed_bytes'])->toBe(0);
 });
 
-it('lists the row ids of each tool call in the envelope', function (): void {
+it('lists the rendered row ids of each tool call in the envelope', function (): void {
     $row = assistantRowWithResults(
         EvalWorkspace::seed(),
         [
-            ['id' => 'call_1', 'name' => 'ListCompaniesTool', 'arguments' => ['lookup' => true], 'result' => json_encode(['data' => [['id' => 'a'], ['id' => 'b']], 'display_block' => ['rows' => [1, 2, 3]]])],
-            ['id' => 'call_2', 'name' => 'GetCompanyTool', 'arguments' => ['id' => 'a'], 'result' => 'plain text'],
+            ['id' => 'call_1', 'name' => 'ListCompaniesTool', 'arguments' => ['lookup' => true], 'result' => json_encode(['data' => [['id' => 'c'], ['id' => 'd']]])],
+            ['id' => 'call_2', 'name' => 'ListCompaniesTool', 'arguments' => [], 'result' => json_encode(['data' => [['id' => 'a'], ['id' => 'b']], 'display_block' => ['rows' => [['id' => 'a'], ['id' => 'b']]]])],
+            ['id' => 'call_3', 'name' => 'GetCompanyTool', 'arguments' => ['id' => 'a'], 'result' => 'plain text'],
         ],
         ['input_tokens' => 120, 'output_tokens' => 30],
         ['duration_ms' => 450],
@@ -113,8 +114,8 @@ it('lists the row ids of each tool call in the envelope', function (): void {
 
     $envelope = RelaTurn::envelopeFromRow($row);
 
-    expect($envelope->toolResultRowIds)->toBe([['a', 'b'], []])
-        ->and(array_column($envelope->toolCalls, 'name'))->toBe(['ListCompaniesTool', 'GetCompanyTool'])
+    expect($envelope->renderedRowIds)->toBe([[], ['a', 'b'], []])
+        ->and(array_column($envelope->toolCalls, 'name'))->toBe(['ListCompaniesTool', 'ListCompaniesTool', 'GetCompanyTool'])
         ->and($envelope->toolCalls[0]['arguments'])->toBe(['lookup' => true])
         ->and($envelope->inputTokens)->toBe(120)
         ->and($envelope->outputTokens)->toBe(30)

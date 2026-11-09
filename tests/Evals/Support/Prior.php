@@ -24,7 +24,7 @@ use Tests\Helpers\ProposalCardFixture;
 
 final readonly class Prior
 {
-    public static function listedTasks(EvalWorkspace $w): string
+    public static function listedTasksThenQuestioned(EvalWorkspace $w): string
     {
         $arguments = [
             'filter' => ['custom_fields' => ['status' => ['$not_in' => ['Waiting on others', 'Done']]]],
@@ -42,10 +42,12 @@ final readonly class Prior
 
         $conversationId = (string) $w->conversation()->getKey();
 
-        self::userRow($w, $conversationId, 'Show me my open tasks');
-        self::assistantRow($w, $conversationId, 'Here are your open tasks.', [
+        self::userRow($w, $conversationId, 'Show me tasks I can update to “Waiting on others”.');
+        self::assistantRow($w, $conversationId, 'These are tasks not already marked “Waiting on others” or “Done,” so they’re eligible to move to “Waiting on others.” Want me to update all of them?', [
             ['name' => 'ListTasksTool', 'arguments' => $arguments, 'result' => $result],
         ]);
+        self::userRow($w, $conversationId, 'all of them need to move under that status or not?');
+        self::assistantRow($w, $conversationId, 'No, not necessarily. The list included every task not already “Waiting on others” or “Done,” including tasks in “To do,” “Waiting on you,” and “In progress.” Which of those should I move?', []);
 
         return $conversationId;
     }
