@@ -108,7 +108,6 @@ parameters:
     stubFiles:
         - stubs/Mailcoach.stub
         - stubs/Google.stub
-        - stubs/Filament.stub
 
     paths:
         - app

@@ -19,18 +19,12 @@ final class ResizableColumns
 
     private const int DEFAULT_COLUMN_WIDTH = 180;
 
-    public static function apply(Table $table): Table
+    /**
+     * @param  array<string, int>  $widths
+     * @param  list<string>  $pinned
+     */
+    public static function apply(Table $table, array $widths, array $pinned, string $title): Table
     {
-        $livewire = $table->getLivewire();
-
-        if (! method_exists($livewire, 'getResizableColumnWidths')) {
-            return $table;
-        }
-
-        $widths = $livewire->getResizableColumnWidths();
-        $pinned = method_exists($livewire, 'getPinnedTableColumns') ? $livewire->getPinnedTableColumns() : [];
-        $title = method_exists($livewire, 'getTableTitleColumn') ? $livewire->getTableTitleColumn() : null;
-
         foreach ($table->getColumns() as $name => $column) {
             $width = $widths[$name] ?? self::pixels($column->getWidth()) ?? self::DEFAULT_COLUMN_WIDTH;
 

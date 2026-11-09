@@ -230,7 +230,7 @@ it('brings back a width on a new visit', function (string $page): void {
     livewire($page)->call('updateResizableColumnWidth', 'created_at', '300');
     session()->flush();
 
-    expect(livewire($page)->instance()->getResizableColumnWidths())->toBe(['created_at' => 300]);
+    expect(livewire($page)->instance()->tableColumnWidths)->toBe(['created_at' => 300]);
 })->with('remembered list pages');
 
 it('saves a width in the same request that resizes it', function (): void {
@@ -245,5 +245,5 @@ it('drops a saved width for a column the table no longer has', function (): void
         'state' => new TableStateData(widths: ['gone' => 300, 'created_at' => 250]),
     ]);
 
-    expect(livewire(ListCompanies::class)->instance()->getResizableColumnWidths())->toBe(['created_at' => 250]);
+    expect(livewire(ListCompanies::class)->instance()->tableColumnWidths)->toBe(['created_at' => 250]);
 });

@@ -27,14 +27,6 @@ trait HasColumnMenu
     /** @var list<string>|null */
     private ?array $declaredTableColumnNames = null;
 
-    /**
-     * @return list<string>
-     */
-    public function getPinnedTableColumns(): array
-    {
-        return $this->tablePinnedColumns;
-    }
-
     public function pinTableColumn(string $columnName): void
     {
         if (! $this->hasTableColumn($columnName)) {
@@ -129,8 +121,7 @@ trait HasColumnMenu
 
         parent::resetTableColumnManager();
 
-        // The pins were stamped at boot, and this request renders none.
-        $this->getTable()->resizableColumns();
+        $this->stampResizableColumns($this->getTable());
     }
 
     /**
@@ -154,8 +145,7 @@ trait HasColumnMenu
     {
         $this->applyTableColumnManager($this->tableColumns, wasReordered: true);
 
-        // The columns were stamped at boot, and this request renders them.
-        $this->getTable()->resizableColumns();
+        $this->stampResizableColumns($this->getTable());
     }
 
     private function currentTableColumnLabel(string $columnName): ?string

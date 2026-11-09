@@ -53,14 +53,15 @@ trait HasCustomFieldColumns
             $column->label(fn (): Htmlable => ColumnHeaderLabel::make($this->tableColumnLabel($column->getName(), $label), $icon));
         }
 
-        return $table
-            ->modifyQueryUsing(function (Builder $query): void {
-                $query->with('customFieldValues.customField');
-            })
-            ->deferFilters(false)
-            ->pushColumns($columns)
-            ->pushFilters($builder->filters()->all())
-            ->resizableColumns();
+        return $this->stampResizableColumns(
+            $table
+                ->modifyQueryUsing(function (Builder $query): void {
+                    $query->with('customFieldValues.customField');
+                })
+                ->deferFilters(false)
+                ->pushColumns($columns)
+                ->pushFilters($builder->filters()->all()),
+        );
     }
 
     private static function nativeColumnIcon(string $name): string
