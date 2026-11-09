@@ -6,13 +6,14 @@ namespace Relaticle\Chat\Support;
 
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
-use App\Models\Workspace;
 use App\Support\Markdown\DecodeHtmlEntitiesPostprocessor;
 use App\Support\PlainText;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use League\HTMLToMarkdown\Converter\TableConverter;
 use League\HTMLToMarkdown\HtmlConverter;
 use Relaticle\Chat\Support\Markdown\TaskListConverter;
+use Relaticle\CustomFields\Models\CustomFieldValue;
 
 final readonly class LongTextForModel
 {
@@ -42,14 +43,20 @@ final readonly class LongTextForModel
         return trim(resolve(DecodeHtmlEntitiesPostprocessor::class)($converter->convert($html)));
     }
 
-    /** @return Collection<int, CustomField> */
-    public static function richTextFields(Workspace $workspace, string $entityType): Collection
+    /** @return array<string, CustomFieldType> */
+    public static function freeTextFields(Model $record): array
     {
-        return CustomField::query()
-            ->where('tenant_id', $workspace->getKey())
-            ->where('entity_type', $entityType)
-            ->where('type', CustomFieldType::RICH_EDITOR->value)
-            ->active()
-            ->get();
+        if (! $record->relationLoaded('customFieldValues')) {
+            return [];
+        }
+
+        /** @var Collection<int, CustomFieldValue> $values */
+        $values = $record->getRelation('customFieldValues');
+
+        return $values
+            ->map(static fn (CustomFieldValue $value): ?CustomField => $value->getRelations()['customField'] ?? null)
+            ->filter(static fn (?CustomField $field): bool => $field !== null && CustomFieldType::tryFrom($field->type)?->isFreeText() === true)
+            ->mapWithKeys(static fn (CustomField $field): array => [$field->code => CustomFieldType::from($field->type)])
+            ->all();
     }
 }

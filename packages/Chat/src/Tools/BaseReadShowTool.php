@@ -7,6 +7,7 @@ namespace Relaticle\Chat\Tools;
 use App\Enums\CustomFieldType;
 use App\Models\User;
 use App\Support\PlainText;
+use Closure;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -20,7 +21,6 @@ use Relaticle\Chat\Services\Tools\DisplayFieldSelector;
 use Relaticle\Chat\Support\LongTextForModel;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Tools\Concerns\LocalisesDatetimes;
-use Relaticle\CustomFields\Models\CustomFieldValue;
 use stdClass;
 
 abstract class BaseReadShowTool implements Tool
@@ -145,10 +145,7 @@ abstract class BaseReadShowTool implements Tool
             ], JSON_UNESCAPED_SLASHES);
         }
 
-        /** @var class-string<JsonResource> $resourceClass */
-        $resourceClass = $this->resourceClass();
-
-        $payload = $this->richTextAsMarkdown($this->flattenResource(new $resourceClass($model)), $user);
+        $payload = $this->recordPayload($model);
 
         $id = (string) $model->getKey();
         $resolver = resolve(RecordReferenceResolver::class);
@@ -268,11 +265,25 @@ abstract class BaseReadShowTool implements Tool
         return $data;
     }
 
+    /** @return array<string, mixed> */
+    private function recordPayload(Model $model): array
+    {
+        /** @var class-string<JsonResource> $resourceClass */
+        $resourceClass = $this->resourceClass();
+
+        return $this->rewriteFreeText(
+            $this->flattenResource(new $resourceClass($model)),
+            $model,
+            static fn (string $value, CustomFieldType $type): string => $type === CustomFieldType::RICH_EDITOR ? LongTextForModel::markdown($value) : $value,
+        );
+    }
+
     /**
      * @param  array<string, mixed>  $payload
+     * @param  Closure(string, CustomFieldType): string  $rewrite
      * @return array<string, mixed>
      */
-    private function richTextAsMarkdown(array $payload, User $user): array
+    private function rewriteFreeText(array $payload, Model $model, Closure $rewrite): array
     {
         $attributes = $payload['attributes'] ?? null;
         $customFields = $attributes instanceof stdClass ? ($attributes->custom_fields ?? null) : null;
@@ -281,11 +292,9 @@ abstract class BaseReadShowTool implements Tool
             return $payload;
         }
 
-        $richTextFields = LongTextForModel::richTextFields($user->currentWorkspace, $this->citationType());
-
-        foreach ($richTextFields->pluck('code') as $code) {
-            if (isset($customFields->{$code}) && is_string($customFields->{$code})) {
-                $customFields->{$code} = LongTextForModel::markdown($customFields->{$code});
+        foreach (LongTextForModel::freeTextFields($model) as $code => $type) {
+            if (is_string($customFields->{$code} ?? null)) {
+                $customFields->{$code} = $rewrite($customFields->{$code}, $type);
             }
         }
 
@@ -378,48 +387,7 @@ abstract class BaseReadShowTool implements Tool
      */
     private function stripFreeTextCustomFields(array $payload, Model $model): array
     {
-        $attributes = $payload['attributes'] ?? null;
-
-        if (! $attributes instanceof stdClass) {
-            return $payload;
-        }
-
-        $customFields = $attributes->custom_fields ?? null;
-
-        if (! $customFields instanceof stdClass) {
-            return $payload;
-        }
-
-        if (! $model->relationLoaded('customFieldValues')) {
-            return $payload;
-        }
-
-        /** @var iterable<int, CustomFieldValue> $customFieldValues */
-        $customFieldValues = $model->getRelation('customFieldValues');
-
-        foreach ($customFieldValues as $fieldValue) {
-            if (! isset($fieldValue->getRelations()['customField'])) {
-                continue;
-            }
-
-            if (CustomFieldType::tryFrom($fieldValue->customField->type)?->isFreeText() !== true) {
-                continue;
-            }
-
-            $code = $fieldValue->customField->code;
-
-            if (! isset($customFields->{$code})) {
-                continue;
-            }
-
-            if (! is_string($customFields->{$code})) {
-                continue;
-            }
-
-            $customFields->{$code} = $this->truncateFreeText($customFields->{$code});
-        }
-
-        return $payload;
+        return $this->rewriteFreeText($payload, $model, fn (string $value): string => $this->truncateFreeText($value));
     }
 
     private function truncateFreeText(string $html): string

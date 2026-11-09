@@ -199,16 +199,14 @@ abstract class BaseReadListTool implements Tool
             return $collection->toJson(JSON_UNESCAPED_SLASHES);
         }
 
-        $items = $this->shortenLongText($items, $responseFormat, $user);
-
         $resolver = resolve(RecordReferenceResolver::class);
         $linkable = in_array($this->citationType(), RecordReferenceResolver::CHIP_TYPES, true);
 
-        $items = array_map(
-            fn (mixed $item, int $index): mixed => $this->decorateRow($item, $models[$index] ?? null, $requestedIncludes, $resolver, $linkable),
-            $items,
-            array_keys($items),
-        );
+        $items = array_map(function (mixed $item, int $index) use ($models, $responseFormat, $requestedIncludes, $resolver, $linkable): mixed {
+            $model = $models[$index] ?? null;
+
+            return $this->decorateRow($this->shortenFreeText($item, $model, $responseFormat), $model, $requestedIncludes, $resolver, $linkable);
+        }, $items, array_keys($items));
 
         $payload = [
             'data' => $items,
@@ -255,55 +253,30 @@ abstract class BaseReadListTool implements Tool
         return $item;
     }
 
-    /**
-     * @param  array<mixed>  $items
-     * @return list<mixed>
-     */
-    private function shortenLongText(array $items, string $mode, User $user): array
+    private function shortenFreeText(mixed $item, mixed $model, string $mode): mixed
     {
-        $isRichByCode = CustomField::query()
-            ->where('tenant_id', $user->currentWorkspace->getKey())
-            ->where('entity_type', $this->citationType())
-            ->active()
-            ->get()
-            ->filter(static fn (CustomField $field): bool => CustomFieldType::tryFrom($field->type)?->isFreeText() === true)
-            ->mapWithKeys(static fn (CustomField $field): array => [$field->code => $field->type === CustomFieldType::RICH_EDITOR->value])
-            ->all();
-
-        if ($isRichByCode === []) {
-            return array_values($items);
+        if (! is_array($item) || ! $model instanceof Model) {
+            return $item;
         }
 
-        return array_map(function (mixed $item) use ($isRichByCode, $mode): mixed {
-            $fields = is_array($item) ? ($item['attributes']['custom_fields'] ?? null) : null;
+        $truncated = [];
 
-            if (! is_array($fields) || $fields === []) {
-                return $item;
+        foreach (LongTextForModel::freeTextFields($model) as $code => $type) {
+            $value = $item['attributes']['custom_fields'][$code] ?? null;
+
+            if (! is_string($value)) {
+                continue;
             }
 
-            $truncated = [];
+            $shortened = $this->shortenValue($value, $mode, $type === CustomFieldType::RICH_EDITOR);
+            $item['attributes']['custom_fields'][$code] = $shortened['text'];
 
-            foreach ($isRichByCode as $code => $isRich) {
-                if (! isset($fields[$code]) || ! is_string($fields[$code])) {
-                    continue;
-                }
-
-                $shortened = $this->shortenValue($fields[$code], $mode, $isRich);
-                $fields[$code] = $shortened['text'];
-
-                if ($shortened['truncated']) {
-                    $truncated[] = (string) $code;
-                }
+            if ($shortened['truncated']) {
+                $truncated[] = $code;
             }
+        }
 
-            $item['attributes']['custom_fields'] = $fields;
-
-            if ($truncated !== []) {
-                $item['truncated_fields'] = $truncated;
-            }
-
-            return $item;
-        }, array_values($items));
+        return $truncated === [] ? $item : [...$item, 'truncated_fields' => $truncated];
     }
 
     /** @return array{text: string, truncated: bool} */
