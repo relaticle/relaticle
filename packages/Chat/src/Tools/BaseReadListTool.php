@@ -115,7 +115,7 @@ abstract class BaseReadListTool implements Tool
             ),
             'per_page' => $schema->integer()->description('Results per page (default 10, max 25).')->default(10),
             'page' => $schema->integer()->description('Page number.')->default(1),
-            'lookup' => $schema->boolean()->description('Set true when you call this only to find ids for another tool call (e.g. before an update or delete): the user then sees no table. Leave unset when the user asked to see the records.'),
+            'lookup' => $schema->boolean()->description('Set true when you call this only to find ids for another tool call (e.g. before an update or delete), or to re-read records already shown in this conversation so you can judge or investigate them: the user then sees no table. Leave unset when the user\'s latest message asks to see records, even ones shown before.'),
             'response_format' => $schema->string()->enum(ResponseFormat::class)->description('concise (default) shortens long text fields to '.LongTextForModel::CONCISE_LIMIT.' characters and lists them in truncated_fields. detailed returns them whole: rich text as Markdown, or as its stored HTML when it carries formatting Markdown cannot hold. Use the Get tool for one record\'s full text; use detailed only when the question turns on the text of many.'),
         ];
 

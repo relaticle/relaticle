@@ -22,11 +22,11 @@ final readonly class NoDuplicateRowSet implements Scorer
 
         foreach ($this->rowIdSets($output) as $ids) {
             if ($ids !== [] && in_array($this->key($ids), $previous, true)) {
-                return $this->fail('Repeated the row set of the previous turn: '.$this->key($ids));
+                return $this->fail('Rendered the table of the previous turn again: '.$this->key($ids));
             }
         }
 
-        return $this->pass('No row set repeats the previous turn');
+        return $this->pass('No table repeats the previous turn');
     }
 
     /**
@@ -44,7 +44,7 @@ final readonly class NoDuplicateRowSet implements Scorer
      */
     private function rowIdSets(string $envelope): array
     {
-        $sets = $this->envelope($envelope)['tool_result_row_ids'] ?? [];
+        $sets = $this->envelope($envelope)['rendered_row_ids'] ?? [];
 
         return is_array($sets) ? array_values(array_filter($sets, is_array(...))) : [];
     }

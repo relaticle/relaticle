@@ -11,26 +11,28 @@ use Tests\Evals\Support\EvalWorkspace;
 use Tests\Evals\Support\Prior;
 use Tests\Evals\Support\RelaTurn;
 
-it('stores the listed tasks as one assistant step the replay reads back', function (): void {
+it('stores the listed tasks and the question after them as the replay reads them back', function (): void {
     $w = EvalWorkspace::seed();
-    $conversationId = Prior::listedTasks($w);
+    $conversationId = Prior::listedTasksThenQuestioned($w);
 
     $rows = AgentConversationMessage::query()->where('conversation_id', $conversationId)->orderBy('created_at')->orderBy('id')->get();
-    $toolResults = StoredSteps::toolResults($rows->last()->steps);
-    $envelope = RelaTurn::envelopeFromRow($rows->last());
+    $listed = $rows->get(1);
+    $toolResults = StoredSteps::toolResults($listed->steps);
+    $envelope = RelaTurn::envelopeFromRow($listed);
     $payload = json_decode($toolResults[0]['result'], true);
 
-    expect($rows->pluck('role')->all())->toBe(['user', 'assistant'])
-        ->and($rows->last()->steps)->toBeJson()
-        ->and(json_decode($rows->last()->steps, true))->toHaveCount(1)
+    expect($rows->pluck('role')->all())->toBe(['user', 'assistant', 'user', 'assistant'])
+        ->and($rows->last()->content)->toEndWith('Which of those should I move?')
+        ->and(json_decode($rows->last()->steps, true))->toBe([])
+        ->and(json_decode($listed->steps, true))->toHaveCount(1)
         ->and($toolResults)->toHaveCount(1)
         ->and($toolResults[0]['name'])->toBe('ListTasksTool')
         ->and($payload['data'])->toHaveCount(19)
         ->and($envelope->toolCalls[0]['name'])->toBe('ListTasksTool')
-        ->and($envelope->toolResultRowIds[0])->toHaveCount(19)
+        ->and($envelope->renderedRowIds[0])->toHaveCount(19)
         ->and($envelope->replayedBytes)->toBeGreaterThan(1000);
 
-    $storedCalls = collect(json_decode($rows->last()->steps, true))->flatMap(fn (array $step): array => $step['tool_calls']);
+    $storedCalls = collect(json_decode($listed->steps, true))->flatMap(fn (array $step): array => $step['tool_calls']);
 
     expect($storedCalls)->not->toBeEmpty()
         ->and($storedCalls->pluck('result_id')->every(fn (?string $id): bool => is_string($id) && str_starts_with($id, 'call_')))->toBeTrue();
