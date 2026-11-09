@@ -508,10 +508,33 @@ it('lets an admin who stops sharing someone else\'s layout keep working on the t
 });
 
 it('lets the owner keep managing a layout after an admin edits it', function (): void {
+    $owner = tableLayoutMember(WorkspaceRole::Member);
+    $layout = layoutFor($owner, ['name' => 'Team', 'is_shared' => true, 'state' => hotLeads()]);
+
+    $this->actingAs(tableLayoutMember(WorkspaceRole::Admin));
+    livewire(ListCompanies::class)
+        ->callAction('renameTableLayout', ['name' => 'Team pipeline'], ['layout' => $layout->getKey()])
+        ->assertHasNoActionErrors();
+    expect($layout->refresh()->name)->toBe('Team pipeline');
+
+    $this->actingAs($owner);
+    $component = livewire(ListCompanies::class)
+        ->callAction('renameTableLayout', ['name' => 'Mine again'], ['layout' => $layout->getKey()])
+        ->assertHasNoActionErrors()
+        ->callAction('stopSharingTableLayout', arguments: ['layout' => $layout->getKey()]);
+
+    expect($layout->refresh()->name)->toBe('Mine again')
+        ->and($layout->is_shared)->toBeFalse();
+
+    $component->callAction('deleteTableLayout', arguments: ['layout' => $layout->getKey()]);
+
+    expect(TableLayout::query()->withoutGlobalScopes()->whereKey($layout->getKey())->exists())->toBeFalse();
+});
+
+it('limits who can update or see a shared layout', function (): void {
     $layout = layoutFor($this->user, ['is_shared' => true]);
 
-    expect($this->user->can('update', $layout))->toBeTrue()
-        ->and(tableLayoutMember(WorkspaceRole::Viewer)->can('update', $layout))->toBeFalse()
+    expect(tableLayoutMember(WorkspaceRole::Viewer)->can('update', $layout))->toBeFalse()
         ->and(User::factory()->create()->can('view', $layout))->toBeFalse();
 });
 
