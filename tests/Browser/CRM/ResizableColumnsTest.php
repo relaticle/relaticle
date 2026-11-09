@@ -344,3 +344,35 @@ it('keeps a dragged width on a column that sets its own width, and the actions c
         ->assertScript($actionsWidth, $actionsBefore - 100)
         ->assertNoJavaScriptErrors();
 });
+
+function refreshComponent(string $scope): string
+{
+    return sprintf(<<<'JS'
+        (() => {
+            const table = document.querySelector('table.fi-ta-resizable-table');
+            const component = Livewire.all().find((candidate) => candidate.el.contains(table) === %s);
+            component.$wire.$refresh();
+            return true;
+        })()
+    JS, $scope);
+}
+
+it('rebuilds a table only when its own component morphs', function (): void {
+    $isLocked = 'document.querySelector("table.fi-ta-resizable-table").dataset.resizableLayoutLocked === "1"';
+    $unlock = 'delete document.querySelector("table.fi-ta-resizable-table").dataset.resizableLayoutLocked';
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
+
+    $page->script($unlock);
+    $page->script(refreshComponent('false'));
+    $page->wait(1)->assertScript($isLocked, false);
+
+    $page->script(refreshComponent('true'));
+    $page->wait(1)
+        ->assertScript($isLocked, true)
+        ->assertNoJavaScriptErrors();
+});

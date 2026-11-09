@@ -308,22 +308,16 @@ function lockTable(table) {
 let morphHookRegistered = false
 
 // A morph keeps the server-rendered widths but strips the table class, the lock flag, the
-// label wrappers and the handles, so every resizable table is rebuilt from its headers.
-function rebuildResizableTablesAfterMorph({ el } = {}) {
-    const tables = new Set()
-    document.querySelectorAll('thead th[x-data^="resizableColumn"]').forEach((th) => {
-        const table = th.closest('table.fi-ta-table')
-        if (table) tables.add(table)
-    })
+// label wrappers and the handles, so a table its component morphed is rebuilt from its headers.
+function rebuildResizableTablesAfterMorph({ el }) {
+    document.querySelectorAll('table.fi-ta-table:has(thead th[x-data^="resizableColumn"])').forEach((table) => {
+        if (!el.contains(table) && !table.contains(el)) return
 
-    tables.forEach((table) => {
         delete table.dataset.resizableLayoutLocked
         lockTable(table)
         table.querySelectorAll('thead th[x-data^="resizableColumn"]').forEach(reapplyHeader)
-        applyPinnedOffsets(table)
 
-        // Other components morph too, and only the table's own morph has rebuilt its headers.
-        if (el?.contains(table)) restoreColumnFocus(table)
+        if (el.contains(table)) restoreColumnFocus(table)
 
         const wrapper = table.closest('.fi-ta-content-ctn')
         const savedScrollLeft = wrapper && wrapperScrollLeft.get(wrapper)
@@ -331,8 +325,6 @@ function rebuildResizableTablesAfterMorph({ el } = {}) {
             wrapper.scrollLeft = savedScrollLeft
         }
     })
-
-    scheduleStickyRecalc()
 }
 
 // `morphed` fires once per component after the morph settles. `morph.updated` fires per node
