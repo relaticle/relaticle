@@ -40,10 +40,7 @@ final readonly class LongTextForModel
 
     public static function markdown(string $html): string
     {
-        $converter = new HtmlConverter([
-            ...(array) config('markdown-response.driver_options.league.options', []),
-            'header_style' => 'atx',
-        ]);
+        $converter = new HtmlConverter(['strip_tags' => true, 'hard_break' => false, 'header_style' => 'atx']);
         $converter->getEnvironment()->addConverter(new TableConverter);
         $converter->getEnvironment()->addConverter(new TaskListConverter);
 

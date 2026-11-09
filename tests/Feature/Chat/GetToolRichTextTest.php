@@ -48,6 +48,19 @@ function getTaskDescription(Task $task): string
     return $payload['attributes']['custom_fields']['description'];
 }
 
+function saveTaskDescriptionFromChat(User $user, Task $task, string $markdown): string
+{
+    $customFields = resolve(CustomFieldInput::class)->normalize(
+        (string) $user->currentWorkspace->getKey(),
+        'task',
+        ['description' => $markdown],
+    );
+
+    resolve(CurrentWorkspace::class)->within($user->currentWorkspace, fn (): Task => resolve(UpdateTask::class)->execute($user, $task, ['custom_fields' => $customFields]));
+
+    return $task->fresh()->load('customFieldValues.customField.options')->getCustomFieldValue(taskDescriptionField($user));
+}
+
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();
     Auth::guard('web')->setUser($this->user);
@@ -69,17 +82,17 @@ it('keeps checklist ticks through a markdown round trip', function (): void {
 
     expect($markdown)->toContain('- [x] Done one')->toContain('- [ ] Open two');
 
-    $customFields = resolve(CustomFieldInput::class)->normalize(
-        (string) $this->user->currentWorkspace->getKey(),
-        'task',
-        ['description' => $markdown],
-    );
+    expect(saveTaskDescriptionFromChat($this->user, $task, $markdown))
+        ->toContain('data-checked="true"')
+        ->toContain('data-checked="false"')
+        ->toContain('Open two');
+});
 
-    resolve(CurrentWorkspace::class)->within($this->user->currentWorkspace, fn (): Task => resolve(UpdateTask::class)->execute($this->user, $task, ['custom_fields' => $customFields]));
+it('keeps a hard line break through a markdown round trip', function (): void {
+    $task = taskWithDescription($this->user, '<p>Ann Lee<br>12 Main Street</p>');
 
-    $stored = $task->fresh()->load('customFieldValues.customField.options')->getCustomFieldValue(taskDescriptionField($this->user));
-
-    expect($stored)->toContain('data-checked="true"')->toContain('data-checked="false"')->toContain('Open two');
+    expect(saveTaskDescriptionFromChat($this->user, $task, getTaskDescription($task)))
+        ->toMatch('/Ann Lee<br\s*\/?>\s*12 Main Street/');
 });
 
 it('returns a textarea value unchanged', function (): void {
