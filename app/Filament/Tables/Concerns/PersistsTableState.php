@@ -10,10 +10,7 @@ use App\Enums\CrmEntity;
 use App\Models\Scopes\WorkspaceScope;
 use App\Models\TableLayout;
 use App\Models\TablePreference;
-use App\Models\User;
-use App\Models\Workspace;
 use App\Providers\Filament\AppPanelProvider;
-use Filament\Facades\Filament;
 use Livewire\Attributes\Locked;
 use LogicException;
 
@@ -86,17 +83,12 @@ trait PersistsTableState
         $hash = hash('xxh128', "{$state->hash()}|{$this->activeTableLayoutId}|{$this->appliedTableLayoutHash}");
 
         if ($this->savesTableStateOnOpen || ($this->tableStateHash !== null && $this->tableStateHash !== $hash)) {
-            /** @var User $user */
-            $user = auth()->user();
-            /** @var Workspace $workspace */
-            $workspace = Filament::getTenant();
-
             resolve(SaveTablePreference::class)->execute(
-                $user,
-                $workspace,
+                $this->tableLayoutUser(),
+                $this->tableLayoutWorkspace(),
                 $this->tableEntity(),
                 $state,
-                $this->visibleTableLayout($this->activeTableLayoutId),
+                $this->getActiveTableLayout(),
                 $this->appliedTableLayoutHash,
             );
         }
@@ -196,28 +188,14 @@ trait PersistsTableState
             ?? throw new LogicException("{$model} is not a CRM entity, so its table state cannot be remembered.");
     }
 
-    private function visibleTableLayout(?string $id): ?TableLayout
-    {
-        if ($id === null) {
-            return null;
-        }
-
-        /** @var User $user */
-        $user = auth()->user();
-
-        return TableLayout::query()
-            ->visibleTo($user, Filament::getTenant()->getKey(), $this->tableEntity())
-            ->find($id);
-    }
-
     private function storedTablePreference(): ?TablePreference
     {
         if (! $this->hasLoadedTablePreference) {
             $this->hasLoadedTablePreference = true;
             $this->storedTablePreference = TablePreference::query()
                 ->withoutGlobalScope(WorkspaceScope::class)
-                ->where('workspace_id', Filament::getTenant()->getKey())
-                ->whereBelongsTo(auth()->user())
+                ->where('workspace_id', $this->tableLayoutWorkspace()->getKey())
+                ->whereBelongsTo($this->tableLayoutUser())
                 ->where('entity', $this->tableEntity())
                 ->first();
         }
@@ -232,8 +210,8 @@ trait PersistsTableState
         }
 
         $preference = $this->storedTablePreference();
-        $active = $this->visibleTableLayout($preference?->active_layout_id);
-        $default = $this->visibleTableLayout($preference?->default_layout_id);
+        $active = $this->getVisibleTableLayouts()->find($preference?->active_layout_id);
+        $default = $this->getVisibleTableLayouts()->find($preference?->default_layout_id);
 
         $this->defaultTableLayoutId = $default?->getKey();
 
@@ -260,7 +238,7 @@ trait PersistsTableState
 
     private function opensTableFirstThisSession(): bool
     {
-        $key = 'tables.opened.'.Filament::getTenant()->getKey().'.'.$this->tableEntity()->value;
+        $key = 'tables.opened.'.$this->tableLayoutWorkspace()->getKey().'.'.$this->tableEntity()->value;
         $isFirst = ! session()->has($key);
 
         session()->put($key, true);

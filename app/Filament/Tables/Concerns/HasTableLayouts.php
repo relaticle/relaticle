@@ -86,7 +86,7 @@ trait HasTableLayouts
 
     public function applySavedLayout(string $layoutId): void
     {
-        $layout = $this->visibleTableLayout($layoutId);
+        $layout = $this->getVisibleTableLayouts()->find($layoutId);
 
         if (! $layout instanceof TableLayout) {
             $this->handleMissingTableLayout($layoutId);
@@ -135,7 +135,7 @@ trait HasTableLayouts
 
     public function toggleDefaultTableLayout(string $layoutId): void
     {
-        $layout = $this->visibleTableLayout($layoutId);
+        $layout = $this->getVisibleTableLayouts()->find($layoutId);
 
         if (! $layout instanceof TableLayout) {
             $this->handleMissingTableLayout($layoutId);
@@ -292,7 +292,7 @@ trait HasTableLayouts
     {
         $layoutId = $arguments['layout'] ?? null;
 
-        return is_string($layoutId) ? $this->visibleTableLayout($layoutId) : null;
+        return is_string($layoutId) ? $this->getVisibleTableLayouts()->find($layoutId) : null;
     }
 
     /**
@@ -319,7 +319,7 @@ trait HasTableLayouts
             return null;
         }
 
-        return $this->visibleTableLayout($layoutId) instanceof TableLayout ? null : $layoutId;
+        return $this->getVisibleTableLayouts()->find($layoutId) instanceof TableLayout ? null : $layoutId;
     }
 
     private function handleMissingTableLayout(?string $layoutId): void
