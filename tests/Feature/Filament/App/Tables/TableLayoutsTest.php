@@ -27,6 +27,7 @@ use App\Policies\TableLayoutPolicy;
 use Filament\Facades\Filament;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 mutates(
     HasTableLayouts::class,
@@ -562,6 +563,55 @@ it('lets the owner keep managing a layout after an admin edits it', function ():
     $component->callAction('deleteTableLayout', arguments: ['layout' => $layout->getKey()]);
 
     expect(TableLayout::query()->withoutGlobalScopes()->whereKey($layout->getKey())->exists())->toBeFalse();
+});
+
+it('keeps its own layout active and default after the owner stops sharing it', function (): void {
+    $layout = layoutFor($this->user, ['name' => 'Team', 'is_shared' => true, 'state' => hotLeads()]);
+
+    $component = livewire(ListCompanies::class)
+        ->call('applySavedLayout', $layout->getKey())
+        ->call('toggleDefaultTableLayout', $layout->getKey())
+        ->callAction('stopSharingTableLayout', arguments: ['layout' => $layout->getKey()])
+        ->assertSet('activeTableLayoutId', $layout->getKey())
+        ->assertSet('defaultTableLayoutId', $layout->getKey());
+
+    expect($layout->refresh()->is_shared)->toBeFalse()
+        ->and(preferenceRow()->active_layout_id)->toBe($layout->getKey())
+        ->and(preferenceRow()->default_layout_id)->toBe($layout->getKey())
+        ->and($component->instance()->isTableLayoutModified())->toBeFalse();
+});
+
+it('accepts the rename modal when the name is unchanged or only its case changed', function (): void {
+    $layout = layoutFor($this->user, ['name' => 'Renewals']);
+
+    livewire(ListCompanies::class)
+        ->callAction('renameTableLayout', ['name' => 'Renewals'], ['layout' => $layout->getKey()])
+        ->assertHasNoActionErrors()
+        ->callAction('renameTableLayout', ['name' => 'RENEWALS'], ['layout' => $layout->getKey()])
+        ->assertHasNoActionErrors();
+
+    expect($layout->refresh()->name)->toBe('RENEWALS');
+});
+
+it('lets the workspace owner rename a member\'s shared layout', function (): void {
+    $layout = layoutFor(tableLayoutMember(WorkspaceRole::Member), ['name' => 'Team', 'is_shared' => true]);
+
+    livewire(ListCompanies::class)
+        ->callAction('renameTableLayout', ['name' => 'Team pipeline'], ['layout' => $layout->getKey()])
+        ->assertHasNoActionErrors();
+
+    expect($layout->refresh()->name)->toBe('Team pipeline');
+});
+
+it('refuses an update from a former member who still owns a shared layout', function (): void {
+    $former = tableLayoutMember(WorkspaceRole::Member);
+    $layout = layoutFor($former, ['name' => 'Team', 'is_shared' => true]);
+    $this->workspace->users()->detach($former);
+
+    expect(fn () => resolve(UpdateTableLayout::class)->execute($former, $layout, ['name' => 'Mine']))
+        ->toThrow(HttpException::class);
+
+    expect($layout->refresh()->name)->toBe('Team');
 });
 
 it('limits who can update or see a shared layout', function (): void {
