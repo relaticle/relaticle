@@ -10,6 +10,11 @@ use Relaticle\Chat\Models\PendingAction;
 
 final readonly class PendingActionEnvelope
 {
+    public const string TYPE = 'pending_action';
+
+    /** @var list<string> */
+    public const array REPLAY_DROPPED_KEYS = ['data', 'display'];
+
     /**
      * @param  array<string, mixed>  $data
      * @param  array<string, mixed>  $beforeDisplay
@@ -19,7 +24,7 @@ final readonly class PendingActionEnvelope
     public static function for(PendingAction $pending, string $action, array $data, array $beforeDisplay = [], array $afterMeta = []): array
     {
         $envelope = [
-            'type' => 'pending_action',
+            'type' => self::TYPE,
             'pending_action_id' => $pending->id,
             'turn_id' => $pending->turn_id,
             'action' => $action,

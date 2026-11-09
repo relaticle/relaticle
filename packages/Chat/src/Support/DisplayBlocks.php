@@ -11,10 +11,6 @@ final readonly class DisplayBlocks
 {
     private const string KEY = 'display_block';
 
-    private const string PENDING_ACTION = 'pending_action';
-
-    private const array WRITE_ECHO_KEYS = ['data', 'display'];
-
     /**
      * Every block carried by one message's tool results.
      *
@@ -56,22 +52,21 @@ final readonly class DisplayBlocks
             return $result;
         }
 
-        $keys = array_key_exists(self::KEY, $decoded) ? [self::KEY] : [];
+        $dropped = ($decoded['type'] ?? null) === PendingActionEnvelope::TYPE
+            ? [self::KEY, ...PendingActionEnvelope::REPLAY_DROPPED_KEYS]
+            : [self::KEY];
+        $kept = array_diff_key($decoded, array_flip($dropped));
 
-        if (($decoded['type'] ?? null) === self::PENDING_ACTION) {
-            $keys = [...$keys, ...array_filter(self::WRITE_ECHO_KEYS, fn (string $key): bool => array_key_exists($key, $decoded))];
-        }
-
-        if ($keys === []) {
+        if (count($kept) === count($decoded)) {
             return $result;
         }
 
-        // Same flag the tools encode with.
-        return json_encode(array_diff_key($decoded, array_flip($keys)), JSON_UNESCAPED_SLASHES);
+        // The tools encode with this flag, so the replay keeps their unescaped slashes.
+        return json_encode($kept, JSON_UNESCAPED_SLASHES);
     }
 
     private static function mayCarryStrippable(string $result): bool
     {
-        return str_contains($result, self::KEY) || str_contains($result, '"'.self::PENDING_ACTION.'"');
+        return str_contains($result, self::KEY) || str_contains($result, '"'.PendingActionEnvelope::TYPE.'"');
     }
 }
