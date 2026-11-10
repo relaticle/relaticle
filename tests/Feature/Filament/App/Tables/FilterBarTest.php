@@ -1701,8 +1701,8 @@ it('hands the chip bar every field with its conditions and says which have a val
 
     expect($fields['name'])
         ->toMatchArray(['label' => 'Company', 'kind' => 'text', 'editable' => true])
-        ->and(array_column($fields['name']['conditions'], 'value'))->toBe(array_column(FilterFieldKind::Text->conditions(), 'value'))
-        ->and($fields['name']['conditions'][0])->toBe(['value' => 'contains', 'label' => 'contains', 'takesValue' => true])
+        ->and(array_column($fields['name']['conditions'], 'value'))->toBe(['contains', 'does_not_contain', 'starts_with', 'ends_with', 'is', 'is_not', 'is_empty', 'is_not_empty'])
+        ->and($fields['name']['conditions'][0])->toBe(['value' => 'contains', 'label' => 'contains', 'takesValue' => true, 'shape' => 'text'])
         ->and($fields['name']['icon'])->not->toBeEmpty()
         ->and($fields['creator']['editable'])->toBeFalse();
 });
@@ -1774,4 +1774,26 @@ it('tells the empty list which rules hide its records and clears them from a but
     'opportunities' => [ListOpportunities::class, Opportunity::class, 'opportunities'],
     'tasks' => [ManageTasks::class, Task::class, 'tasks'],
     'notes' => [ManageNotes::class, Note::class, 'notes'],
+]);
+
+it('reads a saved number rule as unchanged when the number comes back as text', function (int|float $saved, string $written): void {
+    filterBarScenario('amounts', $this->user);
+    $rule = fn (mixed $value): array => ['match' => 'all', 'rules' => [['field' => 'custom_fields.amount', 'condition' => 'greater_than', 'value' => $value]]];
+    $view = SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'entity' => CrmEntity::Opportunity,
+        'state' => new TableStateData(filters: ['conditions' => $rule($saved)]),
+    ]);
+
+    $component = livewire(ListOpportunities::class)->call('applySavedView', $view->getKey());
+
+    expect($component->instance()->isSavedViewModified())->toBeFalse();
+
+    $component->set('tableFilters.conditions', $rule($written));
+
+    expect($component->instance()->isSavedViewModified())->toBeFalse()
+        ->and($component->get('tableFilters.conditions.rules.0.value'))->toBe($saved);
+})->with([
+    'whole' => [1000, '1000'],
+    'decimal' => [1000.5, '1000.5'],
+    'negative' => [-5, '-5'],
 ]);

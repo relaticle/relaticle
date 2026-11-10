@@ -12,6 +12,7 @@
 
             return {
                 fields: [],
+                view: null,
                 server: [],
                 chips: [],
                 open: null,
@@ -29,7 +30,15 @@
                     this.chips = this.server.map((rule) => this.fromRule(rule))
                     this.sent = this.serialize(this.completeRules())
                     this.observer = new MutationObserver(() => {
+                        const view = this.view
+
                         this.read()
+
+                        if (this.view !== view) {
+                            this.chips = this.chips.filter((chip) => this.complete(chip))
+                            this.open = null
+                        }
+
                         this.reconcile()
                     })
                     this.observer.observe(root, { attributes: true, attributeFilter: ['data-state'] })
@@ -44,6 +53,7 @@
                     const state = JSON.parse(root.dataset.state)
 
                     this.fields = state.fields
+                    this.view = state.view
                     this.server = state.rules
                 },
 
@@ -292,9 +302,11 @@
                 },
 
                 pickCondition(chip, condition) {
+                    const crossesShape = this.conditionOf(chip)?.shape !== condition.shape
+
                     chip.condition = condition.value
 
-                    if (!condition.takesValue) {
+                    if (!condition.takesValue || crossesShape) {
                         chip.value = null
                         chip.display = ''
                     }

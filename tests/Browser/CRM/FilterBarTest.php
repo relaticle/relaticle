@@ -2,12 +2,16 @@
 
 declare(strict_types=1);
 
+use App\Actions\CustomFields\CreateCustomField;
 use App\Data\TableStateData;
 use App\Filament\Tables\Concerns\HasFilterBar;
 use App\Models\Company;
+use App\Models\Opportunity;
 use App\Models\SavedView;
 use App\Models\User;
+use App\Support\CurrentWorkspace;
 use Pest\Browser\Api\AwaitableWebpage;
+use Tests\Helpers\WorkspaceCustomField;
 
 mutates(HasFilterBar::class);
 
@@ -26,6 +30,18 @@ function addChip(AwaitableWebpage $page, string $field, string $condition): Awai
 function valueInput(): string
 {
     return '[data-pop]:not([style*="display: none"]) [data-filter-value]';
+}
+
+function customFieldOn(User $user, string $entity, string $code, string $type): void
+{
+    resolve(CreateCustomField::class)->execute($user, ['entity_type' => $entity, 'name' => ucfirst($code), 'code' => $code, 'type' => $type]);
+}
+
+function setCustomValue(User $user, object $record, string $entity, string $code, mixed $value): void
+{
+    $workspace = $user->currentWorkspace;
+
+    resolve(CurrentWorkspace::class)->within($workspace, fn () => $record->saveCustomFieldValue(WorkspaceCustomField::byCode($workspace->getKey(), $entity, $code), $value));
 }
 
 function chipFocus(string $selector): string
@@ -262,4 +278,132 @@ it('shows the title column icon in view settings like every other column', funct
     ($this->open)()
         ->click('.fi-view-settings-trigger')
         ->assertScript('(() => { const rows = [...document.querySelectorAll("[data-view-settings] .fi-view-settings-row")]; return rows.length > 1 && rows.every((row) => row.querySelector(".fi-view-settings-label svg, .fi-view-settings-label .fi-icon, .fi-view-settings-label img")); })()', true);
+});
+
+it('narrows opportunities with a number chip', function (): void {
+    customFieldOn($this->user, 'opportunity', 'budget', 'number');
+    foreach (['Small' => 100, 'Mid' => 1000, 'Big' => 5000] as $name => $budget) {
+        setCustomValue($this->user, Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => $name]), 'opportunity', 'budget', $budget);
+    }
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/opportunities")
+        ->assertPresent('[data-filter-add]');
+    expect(companyRows($page, 3))->toBeTrue();
+
+    addChip($page, 'custom_fields.budget', 'greater_than')
+        ->assertAttribute(valueInput(), 'type', 'number')
+        ->assertAttribute(valueInput(), 'placeholder', '0')
+        ->type(valueInput(), '1000');
+    expect(companyRows($page, 1))->toBeTrue();
+    $page->assertSee('Big')
+        ->assertSeeIn('[data-filter-chip]', '1000')
+        ->assertNoJavaScriptErrors();
+});
+
+it('narrows companies with a checkbox chip that takes no value', function (): void {
+    customFieldOn($this->user, 'company', 'vip', 'checkbox');
+    $marked = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Marked']);
+    setCustomValue($this->user, $marked, 'company', 'vip', true);
+
+    $page = ($this->open)();
+    expect(companyRows($page, 4))->toBeTrue();
+
+    addChip($page, 'custom_fields.vip', 'is_checked')
+        ->assertMissing('[data-filter-segment="value"]')
+        ->assertScript('document.querySelector("[data-filter-chip]").dataset.complete === "true"', true);
+    expect(companyRows($page, 1))->toBeTrue();
+    $page->assertSee('Marked')->assertNoJavaScriptErrors();
+});
+
+it('completes a condition that takes no value at once and narrows the list', function (): void {
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme Robotics Two']);
+
+    $page = ($this->open)();
+    expect(companyRows($page, 4))->toBeTrue();
+
+    addChip($page, 'name', 'is_not_empty')
+        ->assertMissing('[data-filter-segment="value"]')
+        ->assertScript('document.querySelector("[data-filter-chip]").dataset.complete === "true"', true);
+    expect(companyRows($page, 4))->toBeTrue();
+
+    $page->click('[data-filter-segment="condition"]')
+        ->click('[data-condition="is_empty"]');
+    expect(companyRows($page, 0))->toBeTrue();
+    $page->assertSee('No companies match this view');
+});
+
+it('does not let a stored chip the picker does not offer change its condition', function (): void {
+    SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'name' => 'Made today',
+        'state' => new TableStateData(filters: ['conditions' => ['match' => 'all', 'rules' => [['field' => 'created_at', 'condition' => 'is', 'value' => '@today']]]]),
+    ]);
+
+    $page = ($this->open)()
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->click('Made today')
+        ->assertSeeIn('[data-filter-chip]', 'today');
+
+    $page->assertScript('document.querySelector("[data-filter-chip] [data-filter-segment=condition]").tagName === "SPAN"', true)
+        ->assertScript('document.querySelector("[data-filter-chip] [data-filter-segment=value]").tagName === "SPAN"', true);
+
+    $shapeCrossing = <<<'JS'
+        (() => {
+            const bar = Alpine.$data(document.querySelector('[data-filter-bar]'));
+            const chip = bar.chips[0];
+            bar.pickCondition(chip, bar.fieldOf(chip).conditions.find((condition) => condition.value === 'in_the_past'));
+
+            return chip.value;
+        })()
+    JS;
+
+    expect($page->script($shapeCrossing))->toBeNull();
+});
+
+it('drops an unfinished chip when another view with the same rules is opened', function (): void {
+    foreach (['Oldest first' => 'created_at:asc', 'Newest first' => 'created_at:desc'] as $name => $sort) {
+        SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => $name, 'state' => new TableStateData(sort: $sort)]);
+    }
+
+    $page = ($this->open)()
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->click('Oldest first');
+    expect(companyRows($page, 3))->toBeTrue();
+
+    addChip($page, 'name', 'contains')
+        ->assertPresent('[data-filter-chip].fi-pending')
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->click('Newest first')
+        ->assertSeeIn('.fi-view-switcher-trigger', 'Newest first')
+        ->assertMissing('[data-filter-chip]')
+        ->assertNoJavaScriptErrors();
+});
+
+it('names every popover and every chip menu button after its chip', function (): void {
+    $page = ($this->open)();
+    addChip($page, 'name', 'contains')->type(valueInput(), 'acme');
+    $page->keys(valueInput(), 'Enter');
+    expect(companyRows($page, 1))->toBeTrue();
+
+    $names = <<<'JS'
+        (() => {
+            const chip = document.querySelector('[data-filter-chip]');
+
+            return [
+                chip.querySelector('[role=listbox]').getAttribute('aria-label'),
+                chip.querySelector('[role=dialog]').getAttribute('aria-label'),
+                chip.querySelector('[role=menu]').getAttribute('aria-label'),
+                chip.querySelector('[data-filter-more]').getAttribute('aria-label'),
+            ];
+        })()
+    JS;
+
+    expect($page->script($names))->toBe([
+        'Conditions for Company',
+        'Value for Company contains acme',
+        'Options for Company contains acme',
+        'More options for Company contains acme',
+    ]);
 });

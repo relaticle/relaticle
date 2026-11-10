@@ -66,7 +66,7 @@ trait HasFilterBar
     }
 
     /**
-     * @return array{fields: list<array<string, mixed>>, rules: list<array<string, mixed>>, deleted: ?string}
+     * @return array{view: ?string, fields: list<array<string, mixed>>, rules: list<array<string, mixed>>, deleted: ?string}
      */
     #[Unexposed]
     public function getFilterBarData(): array
@@ -75,7 +75,7 @@ trait HasFilterBar
         $catalog = $this->filterFieldCatalog();
 
         if (! $user instanceof User || $catalog === []) {
-            return ['fields' => [], 'rules' => [], 'deleted' => null];
+            return ['view' => null, 'fields' => [], 'rules' => [], 'deleted' => null];
         }
 
         $state = $this->canonicalTableFilters($this->tableFilters);
@@ -83,6 +83,7 @@ trait HasFilterBar
         $displays = FilterRuleDisplay::for($rules, $catalog, $user);
 
         return [
+            'view' => $this->activeSavedViewId === null ? null : (string) $this->activeSavedViewId,
             'fields' => array_values(array_map(fn (FilterField $field): array => [
                 'key' => $field->key,
                 'label' => $field->label,
@@ -93,6 +94,7 @@ trait HasFilterBar
                     'value' => $condition->value,
                     'label' => $condition->label(),
                     'takesValue' => $condition->takesValue(),
+                    'shape' => $condition->valueShape($field->kind),
                 ], $field->conditions()),
             ], $catalog)),
             'rules' => array_map(

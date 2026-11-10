@@ -23,12 +23,27 @@ final readonly class FilterValueShape
         }
 
         return match ($kind) {
-            FilterFieldKind::Number, FilterFieldKind::Inactivity => is_int($value) || (is_float($value) && is_finite($value)) ? $value : self::text($value),
+            FilterFieldKind::Number, FilterFieldKind::Inactivity => self::number($value),
             FilterFieldKind::Date => $condition->isPeriod() ? self::period($condition, $value) : self::text($value),
             FilterFieldKind::Text, FilterFieldKind::MultiText => self::text($value),
             FilterFieldKind::Choice, FilterFieldKind::MultiChoice, FilterFieldKind::Member,
             FilterFieldKind::Relation, FilterFieldKind::Record, FilterFieldKind::Checkbox => null,
         };
+    }
+
+    private static function number(mixed $value): string|int|float|null
+    {
+        $text = self::text($value);
+
+        if ($text !== null && preg_match('/^-?\d{1,15}(\.\d{1,15})?$/', $text) === 1) {
+            $value = str_contains($text, '.') ? (float) $text : (int) $text;
+        }
+
+        if (is_float($value) && is_finite($value) && $value === floor($value) && abs($value) < 1e15) {
+            return (int) $value;
+        }
+
+        return is_int($value) || (is_float($value) && is_finite($value)) ? $value : $text;
     }
 
     public static function text(mixed $value): ?string

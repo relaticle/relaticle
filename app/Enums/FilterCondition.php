@@ -131,4 +131,16 @@ enum FilterCondition: string
             self::IsChecked, self::IsNotChecked => ['$eq'],
         };
     }
+
+    public function valueShape(FilterFieldKind $kind): string
+    {
+        return match (true) {
+            ! $this->takesValue() => 'none',
+            $this === self::This => 'unit',
+            $this->isPeriod() => 'period',
+            $kind->holdsList() => 'list',
+            $kind === FilterFieldKind::Number, $kind === FilterFieldKind::Inactivity => 'number',
+            default => 'text',
+        };
+    }
 }
