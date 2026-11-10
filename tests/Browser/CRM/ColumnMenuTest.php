@@ -322,6 +322,96 @@ it('reorders a column by dragging it in view settings and keeps the order after 
         ->assertNoJavaScriptErrors();
 });
 
+function companiesTableSort(): string
+{
+    return 'Livewire.all().find((component) => component.name.includes("ListCompanies")).$wire.tableSort';
+}
+
+function sortedCompaniesTable(object $test): AwaitableWebpage
+{
+    $page = openViewSettings(companiesTable($test->user, $test->workspace->slug));
+    $page->script('Livewire.all().find((component) => component.name.includes("ListCompanies")).$wire.set("tableSort", "name:asc")');
+    waitUntil($page, '('.companiesTableSort().') === "name:asc"');
+    $page->click(settingsRow('accountOwner.name', '[data-view-settings-toggle]'))->assertMissing(columnHeader('accountOwner.name'));
+
+    return $page;
+}
+
+it('reaches every hide button from the keyboard and returns focus to the trigger on Escape', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
+
+    $page->keys('.fi-view-settings-trigger', 'Enter')->assertVisible('.fi-view-settings-panel');
+    $page->keys('.fi-view-settings-trigger', 'Tab');
+
+    foreach (range(1, 20) as $attempt) {
+        if ($page->script('document.activeElement.matches("[data-view-settings-toggle]")') === true) {
+            break;
+        }
+
+        $page->keys(':focus', 'Tab');
+    }
+
+    $column = $page->script('document.activeElement.closest("[data-column]").dataset.column');
+
+    expect($column)->toBeString();
+
+    $page->keys(':focus', 'Enter')->assertMissing(columnHeader($column));
+
+    $page->keys(':focus', 'Escape');
+
+    waitUntil($page, 'document.activeElement === document.querySelector(".fi-view-settings-trigger")')
+        ->assertScript('document.querySelector(".fi-view-settings-panel").checkVisibility()', false)
+        ->assertNoJavaScriptErrors();
+});
+
+it('reaches add column and reset to default from the keyboard', function (): void {
+    $page = sortedCompaniesTable($this);
+    $page->keys('.fi-view-settings-trigger', 'Tab');
+
+    foreach (['[data-view-settings-add]', '.fi-view-settings-reset'] as $target) {
+        foreach (range(1, 40) as $attempt) {
+            if ($page->script(sprintf('document.activeElement.matches(`%s`)', $target)) === true) {
+                break;
+            }
+
+            $page->keys(':focus', 'Tab');
+        }
+
+        $page->assertScript(sprintf('document.activeElement.matches(`%s`)', $target), true);
+
+        if ($target === '[data-view-settings-add]') {
+            $page->keys(':focus', 'Enter');
+        }
+    }
+
+    $page->assertNoJavaScriptErrors();
+});
+
+it('resets the table to its default after a confirmation', function (): void {
+    $page = sortedCompaniesTable($this);
+
+    $page->assertScript(companiesTableSort(), 'name:asc')
+        ->click('.fi-view-settings-reset')
+        ->assertSee('Reset this table to its default?')
+        ->click('Reset table');
+
+    waitUntil($page, '('.companiesTableSort().') === null')
+        ->assertVisible(columnHeader('accountOwner.name'))
+        ->assertNoJavaScriptErrors();
+});
+
+it('keeps the table as it was when the reset is cancelled', function (): void {
+    $page = sortedCompaniesTable($this);
+
+    $page->click('.fi-view-settings-reset')
+        ->assertSee('Reset this table to its default?')
+        ->click('Cancel')
+        ->wait(1)
+        ->assertMissing(columnHeader('accountOwner.name'))
+        ->assertScript(companiesTableSort(), 'name:asc')
+        ->assertNoJavaScriptErrors();
+});
+
 it('never hides the title column from view settings', function (): void {
     $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
 

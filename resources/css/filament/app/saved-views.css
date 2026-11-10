@@ -171,7 +171,7 @@
 }
 
 .fi-view-settings-panel {
-    @apply flex max-h-[min(40rem,calc(100dvh-8rem))] flex-col overflow-y-auto p-1;
+    @apply flex max-h-[min(40rem,calc(100dvh-8rem))] flex-col p-1;
 
     & .fi-dropdown-list {
         @apply gap-1;
@@ -181,8 +181,21 @@
         @apply p-2;
     }
 
-    & > .fi-dropdown-list {
+    & .fi-view-settings-list ~ .fi-dropdown-list,
+    & > .fi-view-settings-footer {
         @apply mt-1 shrink-0 border-t border-gray-100 pt-1 dark:border-white/10;
+    }
+}
+
+.fi-view-settings-scroll {
+    @apply min-h-0 flex-1 overflow-y-auto;
+}
+
+.fi-view-settings-note {
+    @apply flex items-center gap-2 p-2 text-sm text-gray-500 dark:text-gray-400;
+
+    & .fi-icon {
+        @apply size-4;
     }
 }
 

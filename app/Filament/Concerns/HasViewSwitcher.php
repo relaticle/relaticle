@@ -89,7 +89,7 @@ trait HasViewSwitcher
     {
         $isList = $this->viewSwitcherPages()['list']['active'] ?? false;
 
-        if (! $isList || ! method_exists($this, 'viewSettingsColumns')) {
+        if (! $isList || ! method_exists($this, 'viewSettingsColumns') || ! auth()->user() instanceof User || ! Filament::getTenant() instanceof Workspace) {
             return null;
         }
 
@@ -98,7 +98,7 @@ trait HasViewSwitcher
         return new HtmlString(view('filament.app.tables.view-settings', [
             'shown' => array_values(array_filter($columns, fn (array $column): bool => $column['isShown'])),
             'hidden' => array_values(array_filter($columns, fn (array $column): bool => ! $column['isShown'] && ! $column['isLocked'])),
-            'canReset' => property_exists($this, 'activeSavedViewId') && $this->activeSavedViewId === null,
+            'canReset' => is_callable([$this, 'canResetTable']) && call_user_func([$this, 'canResetTable']),
         ])->render());
     }
 

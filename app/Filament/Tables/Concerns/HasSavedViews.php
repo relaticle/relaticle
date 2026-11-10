@@ -206,6 +206,23 @@ trait HasSavedViews
         $this->clearActiveSavedView();
     }
 
+    protected function canResetTable(): bool
+    {
+        return ! $this->getActiveSavedView() instanceof SavedView;
+    }
+
+    public function resetTableToDefaultAction(): Action
+    {
+        return Action::make('resetTableToDefault')
+            ->label(__('filament/panel.tables.views.reset'))
+            ->requiresConfirmation()
+            ->modalHeading(__('filament/panel.tables.views.reset_heading'))
+            ->modalDescription(__('filament/panel.tables.views.reset_description'))
+            ->modalSubmitActionLabel(__('filament/panel.tables.views.reset_confirm'))
+            ->visible(fn (): bool => $this->canResetTable())
+            ->action(fn () => $this->useStandardTable());
+    }
+
     private function openRequestedSavedView(): void
     {
         $viewId = $this->requestedSavedViewId;

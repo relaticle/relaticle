@@ -16,6 +16,7 @@ use App\Models\TablePreference;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Livewire\Features\SupportTesting\Testable;
+use Symfony\Component\DomCrawler\Crawler;
 
 mutates(HasColumnMenu::class, ResizableColumns::class);
 
@@ -635,9 +636,12 @@ it('escapes markup in a column label in view settings', function (): void {
 
     $component->callAction('editTableColumnLabel', data: ['label' => '<img src=x onerror=alert(1)>'], arguments: ['column' => 'created_at']);
 
-    $settings = str($component->html())->after('fi-view-settings-panel')->toString();
+    $html = $component->html();
+    $panel = new Crawler($html)->filter('[data-view-settings]');
 
-    expect($settings)->toContain('&lt;img src=x onerror=alert(1)&gt;')->not->toContain('<img src=x');
+    expect($panel)->toHaveCount(1)
+        ->and($panel->html())->toContain('&lt;img src=x onerror=alert(1)&gt;')->not->toContain('<img src=x')
+        ->and($html)->not->toContain('<img src=x');
 });
 
 it('lists the pinned columns first in view settings and marks them', function (): void {
@@ -657,4 +661,35 @@ it('keeps the member\'s widths when the table goes back to its default', functio
     expect($component->get('tableColumnWidths'))->toBe(['created_at' => 300])
         ->and($component->get('tableSort'))->toBeNull()
         ->and(pinnedColumns($component))->toBe([]);
+});
+
+it('offers the reset again once the applied view is deleted elsewhere', function (): void {
+    Filament::bootCurrentPanel();
+    $view = SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create(['entity' => CrmEntity::Company]);
+    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->assertDontSeeText('Reset to default');
+
+    $view->delete();
+
+    $component->call('$refresh')->assertSeeText('Reset to default');
+});
+
+it('resets the table to its default from the confirmation and keeps the widths', function (): void {
+    $component = livewire(ListCompanies::class)
+        ->set('tableSort', 'name:asc')
+        ->call('updateResizableColumnWidth', 'created_at', '300')
+        ->call('toggleTableColumn', 'accountOwner.name')
+        ->callAction('resetTableToDefault')
+        ->assertHasNoActionErrors();
+
+    expect($component->get('tableSort'))->toBeNull()
+        ->and(columnIsShown($component, 'accountOwner.name'))->toBeTrue()
+        ->and($component->get('tableColumnWidths'))->toBe(['created_at' => 300]);
+});
+
+it('hides the reset action while a saved view is applied', function (): void {
+    $view = SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create(['entity' => CrmEntity::Company]);
+
+    livewire(ListCompanies::class)->assertActionVisible('resetTableToDefault')
+        ->call('applySavedView', $view->getKey())
+        ->assertActionHidden('resetTableToDefault');
 });
