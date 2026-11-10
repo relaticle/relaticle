@@ -126,6 +126,7 @@ enum CustomFieldType: string
             self::DOMAIN => 'as a bare host or a full URL, with or without www',
             self::PHONE => 'in any format, and the operand needs a country code such as +1 415 555 0100',
             self::TAGS_INPUT => 'the exact stored value',
+            self::RECORD => 'the ID of a linked record',
             self::DATE_TIME => 'a date without a time, such as 2026-10-01, as that whole day',
             default => null,
         };
@@ -149,7 +150,7 @@ enum CustomFieldType: string
             self::TEXT => ['$contains' => $this->example()],
             self::NUMBER, self::CURRENCY, self::DATE, self::DATE_TIME => ['$gte' => $this->example()],
             self::CHECKBOX, self::TOGGLE => ['$eq' => $this->example()],
-            self::EMAIL, self::PHONE, self::LINK, self::DOMAIN, self::MULTI_SELECT, self::CHECKBOX_LIST, self::TAGS_INPUT => ['$has_any' => $this->example()],
+            self::EMAIL, self::PHONE, self::LINK, self::DOMAIN, self::MULTI_SELECT, self::CHECKBOX_LIST, self::TAGS_INPUT, self::RECORD => ['$has_any' => $this->example()],
             self::SELECT, self::RADIO, self::TOGGLE_BUTTONS => ['$in' => [$this->example()]],
             default => [],
         };

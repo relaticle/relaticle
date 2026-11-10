@@ -327,7 +327,7 @@ Native fields take the operators of the field type they match. `$is_empty` takes
 | Field type | Operators |
 |---|---|
 | Single choice (select, radio, toggle buttons), `creation_source` | `$eq`, `$in`, `$not_in`, `$is_empty` |
-| Multi choice (multi select, checkbox list), tags | `$has_any`, `$has_none`, `$is_empty` |
+| Multi choice (multi select, checkbox list), tags, record | `$has_any`, `$has_none`, `$is_empty` |
 | Email, phone, link, domain | `$has_any`, `$has_none`, `$contains`, `$starts_with`, `$ends_with`, `$is_empty` |
 | Text | `$eq`, `$contains`, `$starts_with`, `$ends_with`, `$is_empty` |
 | Number, currency, date, date and time | `$eq`, `$gt`, `$gte`, `$lt`, `$lte`, `$is_empty` |
@@ -335,7 +335,7 @@ Native fields take the operators of the field type they match. `$is_empty` takes
 
 Email and link fields also take a `domain` sub-field with `$in` and `$not_in`. It matches the domain of each value, so `{"domain": {"$in": ["canva.com"]}}` finds every address at `canva.com`. A domain is a bare host. A path, user or port is an error.
 
-Record, text area, rich text and color fields take no filter. Neither does an encrypted or inactive field.
+Text area, rich text and color fields take no filter. Neither does an encrypted or inactive field.
 
 #### How values match
 
@@ -344,6 +344,7 @@ Record, text area, rich text and color fields take no filter. Neither does an en
 - Domain values match as a bare host or a full URL, with or without `www.`, so `https://www.acme.com/about` finds `acme.com`.
 - Phone values match in any format. A phone operand needs a country code, such as `+1 415 555 0100`. An operand without one returns the error `phone_number needs a country code, for example +1 415 555 0100.`
 - Tags match the exact stored value.
+- A record field takes the IDs of the records it links to.
 - `$contains`, `$starts_with` and `$ends_with` ignore letter case. On a field that holds several values, they match when any value matches. They compare the operand as typed against the value as stored. A phone is stored as `+14155550100`, with no spaces or punctuation, so `+1415` matches and `+1 415` does not. A link keeps a scheme only when one was typed, so `https://acme` matches `https://acme.com/team` and `acme` does not. A domain is stored as a bare host, without a scheme or `www.`.
 - `$not_in` and `$has_none` also match records where the field is empty.
 
