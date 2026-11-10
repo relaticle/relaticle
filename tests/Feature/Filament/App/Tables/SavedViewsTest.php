@@ -30,6 +30,7 @@ use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
+use Livewire\Livewire;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 mutates(
@@ -1014,4 +1015,171 @@ it('lets a read-only member duplicate a shared view into a private copy of their
 
     $copy = SavedView::query()->withoutGlobalScopes()->where('name', 'Team pipeline copy')->sole();
     expect($copy->user_id)->toBe($viewer->getKey())->and($copy->is_shared)->toBeFalse();
+});
+
+it('brings back the member\'s own table after a saved view', function (): void {
+    $view = viewFor($this->user, ['state' => hotLeads()]);
+    $component = livewire(ListCompanies::class)->set('tableSort', 'name:asc');
+
+    $component->call('applySavedView', $view->getKey());
+    expect($component->get('tableSort'))->toBe('created_at:desc');
+
+    $component->call('applyOwnTable');
+    expect($component->get('tableSort'))->toBe('name:asc')
+        ->and($component->get('activeSavedViewId'))->toBeNull()
+        ->and(preferenceRow()->active_view_id)->toBeNull()
+        ->and(preferenceRow()->state->sort)->toBe('name:asc');
+});
+
+it('keeps the member\'s own table across sessions while a view is applied', function (): void {
+    $view = viewFor($this->user, ['state' => hotLeads()]);
+    livewire(ListCompanies::class)->set('tableSort', 'name:asc')->call('applySavedView', $view->getKey());
+
+    session()->flush();
+
+    expect(livewire(ListCompanies::class)->call('applyOwnTable')->get('tableSort'))->toBe('name:asc');
+});
+
+it('forgets the member\'s own table on a reset to the default', function (): void {
+    $view = viewFor($this->user, ['state' => hotLeads()]);
+    $component = livewire(ListCompanies::class)->set('tableSort', 'name:asc')->call('applySavedView', $view->getKey());
+
+    $component->call('useStandardTable');
+    expect(preferenceRow()->own_state)->toBeNull();
+
+    $component->call('applySavedView', $view->getKey())->call('applyOwnTable');
+
+    expect($component->get('tableSort'))->toBeNull();
+});
+
+it('never marks the member\'s own table as modified', function (): void {
+    $component = livewire(ListCompanies::class)->set('tableSort', 'name:asc');
+
+    expect($component->instance()->isSavedViewModified())->toBeFalse();
+});
+
+it('stores the member\'s own table without widths and keeps their widths when it comes back', function (): void {
+    $view = viewFor($this->user, ['state' => hotLeads()]);
+    $component = livewire(ListCompanies::class)
+        ->set('tableSort', 'name:asc')
+        ->call('updateResizableColumnWidth', 'created_at', '300')
+        ->call('applySavedView', $view->getKey());
+
+    expect(preferenceRow()->own_state->widths)->toBe([])
+        ->and(preferenceRow()->own_state->sort)->toBe('name:asc');
+
+    $component->call('applyOwnTable');
+
+    expect($component->get('tableColumnWidths'))->toBe(['created_at' => 300])
+        ->and($component->instance()->isSavedViewModified())->toBeFalse();
+});
+
+it('leaves the member\'s own table alone when another view replaces the active one', function (): void {
+    $first = viewFor($this->user, ['name' => 'Hot leads', 'state' => hotLeads()]);
+    $second = viewFor($this->user, ['name' => 'By name', 'state' => new TableStateData(sort: 'name:desc')]);
+    $component = livewire(ListCompanies::class)->set('tableSort', 'name:asc')->call('applySavedView', $first->getKey());
+
+    $component->call('applySavedView', $second->getKey());
+
+    expect(preferenceRow()->own_state->sort)->toBe('name:asc');
+
+    $component->call('applyOwnTable');
+
+    expect($component->get('tableSort'))->toBe('name:asc');
+});
+
+it('keeps the member\'s own table when a new session opens on their default view', function (): void {
+    $default = viewFor($this->user, ['state' => hotLeads()]);
+    livewire(ListCompanies::class)->call('toggleDefaultSavedView', $default->getKey())->set('tableSort', 'name:asc');
+    expect(preferenceRow()->active_view_id)->toBeNull();
+
+    session()->flush();
+    $nextSession = livewire(ListCompanies::class);
+
+    expect($nextSession->get('activeSavedViewId'))->toBe($default->getKey())
+        ->and($nextSession->get('tableSort'))->toBe('created_at:desc')
+        ->and(preferenceRow()->own_state->sort)->toBe('name:asc');
+
+    expect($nextSession->call('applyOwnTable')->get('tableSort'))->toBe('name:asc');
+});
+
+it('keeps the member\'s own table when a new session opens on a default over a changed view', function (): void {
+    $default = viewFor($this->user, ['name' => 'Hot leads', 'state' => hotLeads()]);
+    $other = viewFor($this->user, ['name' => 'By name', 'state' => new TableStateData(sort: 'name:desc')]);
+    livewire(ListCompanies::class)
+        ->set('tableSort', 'name:asc')
+        ->call('applySavedView', $other->getKey())
+        ->call('toggleDefaultSavedView', $default->getKey())
+        ->set('tableSort', 'created_at:asc');
+
+    session()->flush();
+    livewire(ListCompanies::class);
+
+    expect(preferenceRow()->own_state->sort)->toBe('name:asc');
+});
+
+it('keeps the member\'s own table when the active view is deleted or stops being shared elsewhere', function (string $change): void {
+    $owner = savedViewMember(WorkspaceRole::Member);
+    $view = viewFor($owner, ['is_shared' => true, 'state' => hotLeads()]);
+    livewire(ListCompanies::class)->set('tableSort', 'name:asc')->call('applySavedView', $view->getKey());
+
+    match ($change) {
+        'unshared' => resolve(UpdateSavedView::class)->execute($owner, $view, ['is_shared' => false]),
+        'deleted' => resolve(DeleteSavedView::class)->execute($owner, $view),
+    };
+    session()->flush();
+    $revisit = livewire(ListCompanies::class);
+
+    expect($revisit->get('activeSavedViewId'))->toBeNull()
+        ->and($revisit->get('tableSort'))->toBe('created_at:desc')
+        ->and(preferenceRow()->own_state->sort)->toBe('name:asc');
+
+    expect($revisit->call('applyOwnTable')->get('tableSort'))->toBe('name:asc');
+})->with(['unshared', 'deleted']);
+
+it('opens a view named in the link', function (): void {
+    $view = viewFor($this->user, ['state' => hotLeads()]);
+
+    $component = Livewire::withQueryParams(['view' => $view->getKey()])->test(ListCompanies::class);
+
+    expect($component->get('activeSavedViewId'))->toBe($view->getKey())
+        ->and($component->get('tableSort'))->toBe('created_at:desc')
+        ->and($component->get('requestedSavedViewId'))->toBeNull()
+        ->and($component->instance()->isSavedViewModified())->toBeFalse()
+        ->and(preferenceRow()->active_view_id)->toBe($view->getKey());
+});
+
+it('keeps the member\'s own table when a link opens a view', function (): void {
+    $view = viewFor($this->user, ['state' => hotLeads()]);
+    livewire(ListCompanies::class)->set('tableSort', 'name:asc');
+
+    $component = Livewire::withQueryParams(['view' => $view->getKey()])->test(ListCompanies::class);
+
+    expect(preferenceRow()->own_state->sort)->toBe('name:asc');
+    expect($component->call('applyOwnTable')->get('tableSort'))->toBe('name:asc');
+});
+
+it('ignores a link to a view the member cannot open, and writes nothing', function (string $which): void {
+    $stranger = User::factory()->withWorkspace()->create();
+    $id = match ($which) {
+        'another workspace' => SavedView::factory()->for($stranger)->for($stranger->currentWorkspace)->create(['is_shared' => true])->getKey(),
+        'a private view' => viewFor(savedViewMember(WorkspaceRole::Member))->getKey(),
+        'another record type' => viewFor($this->user, ['entity' => CrmEntity::People])->getKey(),
+        'a view that does not exist' => '01JZZZZZZZZZZZZZZZZZZZZZZZ',
+    };
+
+    $component = Livewire::withQueryParams(['view' => $id])->test(ListCompanies::class);
+
+    expect($component->get('activeSavedViewId'))->toBeNull()
+        ->and($component->get('requestedSavedViewId'))->toBeNull()
+        ->and(preferenceRow())->toBeNull();
+    $component->assertOk()->assertNotNotified();
+})->with(['another workspace', 'a private view', 'another record type', 'a view that does not exist']);
+
+it('writes nothing when a table opens without a link', function (): void {
+    viewFor($this->user, ['state' => hotLeads()]);
+
+    livewire(ListCompanies::class);
+
+    expect(preferenceRow())->toBeNull();
 });

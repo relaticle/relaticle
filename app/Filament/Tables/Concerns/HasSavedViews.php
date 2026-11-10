@@ -24,9 +24,13 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Url;
 
 trait HasSavedViews
 {
+    #[Url(as: 'view')]
+    public ?string $requestedSavedViewId = null;
+
     private const array SAVED_VIEW_ROW_ACTIONS = ['renameSavedView', 'shareSavedView', 'stopSharingSavedView', 'deleteSavedView'];
 
     /** @var Collection<int, SavedView>|null */
@@ -103,6 +107,10 @@ trait HasSavedViews
             $this->handleMissingSavedView($viewId);
 
             return;
+        }
+
+        if (! $this->getActiveSavedView() instanceof SavedView) {
+            $this->rememberOwnTableState($this->currentTableState()->withoutWidths());
         }
 
         $this->applyTableState($view->state);
@@ -183,10 +191,31 @@ trait HasSavedViews
         $this->defaultSavedViewId = $default?->getKey();
     }
 
+    public function applyOwnTable(): void
+    {
+        $this->applyTableState($this->ownTableStateToStore() ?? new TableStateData);
+        $this->clearActiveSavedView();
+    }
+
     public function useStandardTable(): void
     {
+        $this->rememberOwnTableState(null);
         $this->applyTableState(new TableStateData);
         $this->clearActiveSavedView();
+    }
+
+    private function openRequestedSavedView(): void
+    {
+        $viewId = $this->requestedSavedViewId;
+        $this->requestedSavedViewId = null;
+
+        if ($viewId === null || ! $this->getVisibleSavedViews()->contains('id', $viewId)) {
+            return;
+        }
+
+        $this->applySavedView($viewId);
+        $this->seededFromSavedView = true;
+        $this->savesTableStateOnOpen = true;
     }
 
     public function saveSavedViewAsAction(): Action

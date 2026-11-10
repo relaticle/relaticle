@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
 
 final readonly class SaveTablePreference
 {
-    public function execute(User $user, Workspace $workspace, CrmEntity $entity, TableStateData $state, ?SavedView $activeView, ?string $appliedViewHash): TablePreference
+    public function execute(User $user, Workspace $workspace, CrmEntity $entity, TableStateData $state, ?SavedView $activeView, ?string $appliedViewHash, ?TableStateData $ownState): TablePreference
     {
         abort_unless($user->belongsToWorkspaceId($workspace->getKey()), 403);
 
@@ -24,7 +24,7 @@ final readonly class SaveTablePreference
             abort_unless($user->can('view', $activeView), 403);
         }
 
-        return DB::transaction(function () use ($user, $workspace, $entity, $state, $activeView, $appliedViewHash): TablePreference {
+        return DB::transaction(function () use ($user, $workspace, $entity, $state, $activeView, $appliedViewHash, $ownState): TablePreference {
             $activeView = $this->stillExists($activeView) ? $activeView : null;
 
             return TablePreference::query()
@@ -33,6 +33,7 @@ final readonly class SaveTablePreference
                     ['user_id' => $user->getKey(), 'workspace_id' => $workspace->getKey(), 'entity' => $entity],
                     [
                         'state' => $state,
+                        'own_state' => $ownState,
                         'active_view_id' => $activeView?->getKey(),
                         'applied_view_hash' => $activeView instanceof SavedView ? $appliedViewHash : null,
                     ],

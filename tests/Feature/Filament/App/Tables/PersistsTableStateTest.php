@@ -261,6 +261,7 @@ it('saves the table without its view when the view is deleted just before the sa
         new TableStateData(sort: 'name:asc'),
         $staleCopy,
         'hash',
+        null,
     );
 
     expect($preference->active_view_id)->toBeNull()

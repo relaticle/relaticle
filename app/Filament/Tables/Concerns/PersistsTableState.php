@@ -39,6 +39,10 @@ trait PersistsTableState
 
     private bool $savesTableStateOnOpen = false;
 
+    private ?TableStateData $ownTableState = null;
+
+    private bool $ownTableStateChanged = false;
+
     public function mountInteractsWithTable(): void
     {
         parent::mountInteractsWithTable();
@@ -73,6 +77,8 @@ trait PersistsTableState
             $this->tableRecordsPerPage = $this->getDefaultTableRecordsPerPageSelectOption();
         }
 
+        $this->openRequestedSavedView();
+
         if ($this->seededFromSavedView) {
             $this->markSavedViewApplied();
         }
@@ -91,6 +97,7 @@ trait PersistsTableState
                 $state,
                 $this->getActiveSavedView(),
                 $this->appliedSavedViewHash,
+                $this->ownTableStateToStore(),
             );
         }
 
@@ -233,6 +240,10 @@ trait PersistsTableState
         if ($this->opensTableFirstThisSession() && $default instanceof SavedView) {
             $this->savesTableStateOnOpen = $hasSavedState && (! $isCleanCopy || ! $active->is($default));
 
+            if ($hasSavedState && ! $active instanceof SavedView) {
+                $this->rememberOwnTableState($preference->state->withoutWidths());
+            }
+
             return $this->initialTableState = $this->seedFromSavedView($default);
         }
 
@@ -245,6 +256,17 @@ trait PersistsTableState
         return $this->initialTableState = $default instanceof SavedView
             ? $this->seedFromSavedView($default)
             : new TableStateData;
+    }
+
+    private function rememberOwnTableState(?TableStateData $state): void
+    {
+        $this->ownTableState = $state;
+        $this->ownTableStateChanged = true;
+    }
+
+    private function ownTableStateToStore(): ?TableStateData
+    {
+        return $this->ownTableStateChanged ? $this->ownTableState : $this->storedTablePreference()?->own_state;
     }
 
     private function opensTableFirstThisSession(): bool

@@ -19,13 +19,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property CrmEntity $entity
  * @property TableStateData $state
+ * @property ?TableStateData $own_state
  * @property string $user_id
  * @property ?string $active_view_id
  * @property ?string $default_view_id
  * @property ?string $applied_view_hash
  */
 #[ScopedBy(WorkspaceScope::class)]
-#[Fillable(['workspace_id', 'user_id', 'entity', 'state', 'active_view_id', 'default_view_id', 'applied_view_hash'])]
+#[Fillable(['workspace_id', 'user_id', 'entity', 'state', 'own_state', 'active_view_id', 'default_view_id', 'applied_view_hash'])]
 final class TablePreference extends Model
 {
     /** @use HasFactory<TablePreferenceFactory> */
@@ -42,6 +43,7 @@ final class TablePreference extends Model
         return [
             'entity' => CrmEntity::class,
             'state' => TableStateData::class,
+            'own_state' => TableStateData::class,
         ];
     }
 
