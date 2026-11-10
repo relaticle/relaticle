@@ -20,7 +20,7 @@ mutates(AppPanelProvider::class, RecordChipColumn::class);
 
 const CELL_LABELS_SHOWN = '[...document.querySelectorAll(".fi-ta-row .fi-ta-cell-label")].some((label) => label.offsetParent !== null)';
 
-const ROWS_STACKED = '[...document.querySelectorAll(".fi-ta-row")].every((row) => getComputedStyle(row).display === "block")';
+const ROWS_STACKED = '[...document.querySelectorAll(".fi-ta-row")].every((row) => getComputedStyle(row).display !== "table-row")';
 
 const SEARCH_FILLS_TOOLBAR = '(() => { const toolbar = document.querySelector(".fi-ta-header-toolbar"); const style = getComputedStyle(toolbar); const start = toolbar.getBoundingClientRect().left + parseFloat(style.paddingLeft); const width = toolbar.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight); const group = toolbar.querySelector(":scope > :has(> .fi-ta-search-field)"); const used = [...toolbar.children].filter((child) => child.getBoundingClientRect().width > 0).reduce((sum, child) => sum + child.getBoundingClientRect().width + parseFloat(getComputedStyle(child).marginInlineStart) + parseFloat(getComputedStyle(child).marginInlineEnd), 0); return Math.round(group.getBoundingClientRect().left) === Math.round(start) && Math.round(used) === Math.round(width); })()';
 
@@ -85,7 +85,7 @@ it('keeps the list table header row on desktop', function (): void {
         ->assertPathIs("/app/{$workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$workspace->slug}/tasks")
-        ->assertVisible('.fi-ta-header-cell[data-column-name="title"]')
+        ->assertVisible('.fi-ta-header-cell.fi-ta-header-cell-title')
         ->assertScript(CELL_LABELS_SHOWN, false)
         ->assertNoJavaScriptErrors();
 });

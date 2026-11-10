@@ -18,7 +18,8 @@ document.addEventListener(
     (event) => {
         const sheet = openSheet()
 
-        tappedBackdrop = Boolean(sheet) && !sheet.contains(event.target)
+        // A modal opened from the sheet sits above it, and its taps belong to the modal.
+        tappedBackdrop = Boolean(sheet) && !sheet.contains(event.target) && !event.target.closest('.fi-modal')
 
         if (tappedBackdrop) {
             event.preventDefault()

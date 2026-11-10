@@ -14,6 +14,7 @@ use App\Filament\CustomFields\DateFieldType;
 use App\Filament\CustomFields\DateTimeFieldType;
 use App\Filament\CustomFields\DomainFieldType;
 use App\Filament\CustomFields\RichEditorFieldType;
+use App\Filament\Tables\ResizableColumns;
 use App\Http\Middleware\ReadAcrossWorkspaces;
 use App\Http\Responses\LoginResponse;
 use App\Jobs\CompleteExport;
@@ -862,11 +863,16 @@ final class AppServiceProvider extends ServiceProvider
                 ->loadedOnRequest(),
             Js::make('payload-guard', resource_path('js/filament/payload-guard.js')),
             Js::make('linked-records-picker', resource_path('js/filament/linked-records-picker.js')),
+            Js::make('resizable-columns', resource_path('js/filament/resizable-columns.js')),
             Js::make('sheet-backdrop', resource_path('js/filament/sheet-backdrop.js')),
         ]);
 
         FilamentAsset::registerScriptData([
             'payloadTooLarge' => __('filament/panel.payload_too_large'),
+            'resizeColumnLabel' => __('filament/panel.tables.resize_column'),
+            'resizeColumnHint' => __('filament/panel.tables.resize_column_hint'),
+            'columnOptionsFor' => __('filament/panel.tables.column_menu.options_for'),
+            'defaultColumnWidth' => ResizableColumns::DEFAULT_COLUMN_WIDTH,
             'checklistItemLabel' => __('filament/rich-editor.checklist.item'),
             'checklistEmptyItemLabel' => __('filament/rich-editor.checklist.empty_item'),
         ]);

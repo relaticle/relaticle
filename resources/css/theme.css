@@ -72,6 +72,7 @@
     --surface-sidebar-active-bg: rgb(9 9 11 / 0.04);      /* zinc-950/4 */
     --surface-row-hover-bg: rgb(249 250 251);             /* gray-50: a list row or a clickable item */
     --surface-control-hover-bg: rgb(243 244 246);         /* gray-100: an icon button or a text link */
+    --surface-table-head-bg: var(--gray-50);               /* a table head, and the row tint a pinned cell repeats */
 }
 
 .dark {
@@ -89,6 +90,7 @@
     --surface-sidebar-active-bg: rgb(255 255 255 / 0.1);
     --surface-row-hover-bg: rgb(255 255 255 / 0.05);
     --surface-control-hover-bg: rgb(255 255 255 / 0.1);
+    --surface-table-head-bg: color-mix(in oklab, var(--gray-900), white 5%);
 }
 
 @custom-variant dark (&:where(.dark, .dark *));

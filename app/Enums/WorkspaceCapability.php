@@ -21,6 +21,7 @@ enum WorkspaceCapability: string
     case EmailManage = 'email.manage';
     case EmailAgentSend = 'email.agent_send';
     case ActivityView = 'activity.view';
+    case LayoutsManage = 'layouts.manage';
 
     public function label(): string
     {

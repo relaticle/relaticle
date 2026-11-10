@@ -48,6 +48,17 @@ final readonly class CanonicalRecordUrl
         return $this->routeTo($this->resource($entity), $entity, $recordId, $workspace);
     }
 
+    public function listPageUrl(CrmEntity $entity, Workspace $workspace): ?string
+    {
+        $resource = $this->resource($entity);
+
+        try {
+            return $resource::getUrl('index', panel: 'app', tenant: $workspace);
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
     /**
      * @param  class-string<FilamentResource>  $resource
      */
