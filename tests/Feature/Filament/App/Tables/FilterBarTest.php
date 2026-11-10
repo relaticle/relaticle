@@ -82,6 +82,21 @@ it('draws the filter row and no filament filter form', function (string $page): 
         ->not->toContain('class="fi-ta-filters"');
 })->with('filter bar pages');
 
+it('draws no search field and is not searchable', function (string $page): void {
+    $component = livewire($page);
+
+    expect($component->html())->not->toContain('fi-ta-search-field')
+        ->and($component->instance()->getTable()->isSearchable())->toBeFalse();
+})->with('filter bar pages');
+
+it('ignores a search that arrives in the URL', function (string $page, string $model): void {
+    $record = $model::factory()->recycle([$this->user, $this->workspace])->create();
+
+    Livewire::withQueryParams(['search' => 'zzqx-no-match'])->test($page)
+        ->assertSet('tableSearch', '')
+        ->assertCanSeeTableRecords([$record]);
+})->with('filter bar pages');
+
 it('keeps the table filterable while its form stays hidden', function (string $page): void {
     expect(livewire($page)->instance()->getTable()->isFilterable())->toBeTrue();
 })->with('filter bar pages');

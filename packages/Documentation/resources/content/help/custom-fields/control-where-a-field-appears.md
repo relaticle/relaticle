@@ -25,7 +25,8 @@ this for data you capture but don't need to see day-to-day.
 
 ## Search, filters, and sorting
 
-- **Searchable** lets the list's search box match this field's values.
+- **Searchable** lets the search box on boards and on related-record tables
+  match this field's values. Lists have no search box. Filter them instead.
 - **Filters** appear automatically for choice fields: Select, Multi Select,
   Radio, Checkbox List, Toggle Buttons, Tags Input, and Record fields all get
   a filter on their list page. Text, number, and date fields don't.

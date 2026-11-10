@@ -82,15 +82,16 @@ it('can sort `:dataset` column', function (string $column): void {
         ->assertCanSeeTableRecords($records->sortByDesc($sortingKey), inOrder: true);
 })->with(['creator.name', 'deleted_at', 'created_at', 'updated_at']);
 
-it('can search `:dataset` column', function (string $column): void {
+it('narrows the list with a `:dataset` rule', function (string $field, string $condition, string $attribute): void {
     $records = Note::factory(3)->recycle([$this->user, $this->workspace])->create();
-    $search = data_get($records->first(), $column);
+    $value = $records->first()->{$attribute};
+    $matches = $records->filter(fn (Model $record): bool => $record->{$attribute} === $value);
 
     livewire(ManageNotes::class)
-        ->searchTable($search instanceof BackedEnum ? $search->value : $search)
-        ->assertCanSeeTableRecords($records->filter(fn (Model $record) => data_get($record, $column) === $search))
-        ->assertCanNotSeeTableRecords($records->filter(fn (Model $record) => data_get($record, $column) !== $search));
-})->with(['title', 'creator.name']);
+        ->call('setFilterRules', [['field' => $field, 'condition' => $condition, 'value' => $condition === 'contains' ? $value : [$value]]])
+        ->assertCanSeeTableRecords($matches)
+        ->assertCountTableRecords($matches->count());
+})->with(['title' => ['title', 'contains', 'title'], 'creator.name' => ['creator', 'is_any_of', 'creator_id']]);
 
 it('cannot display trashed records by default', function (): void {
     $records = Note::factory()->count(4)->recycle([$this->user, $this->workspace])->create();

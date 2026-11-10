@@ -51,11 +51,10 @@ function createdAtHiddenAndFirst(array $columns): array
     ];
 }
 
-it('brings back hidden columns, order, sort, filters, search and page size on a new visit', function (string $page): void {
+it('brings back hidden columns, order, sort, filters and page size on a new visit', function (string $page): void {
     $component = livewire($page);
     $component->call('applyTableColumnManager', createdAtHiddenAndFirst($component->get('tableColumns')), true)
         ->set('tableSort', 'created_at:desc')
-        ->set('tableSearch', 'acme')
         ->set('tableRecordsPerPage', 50)
         ->set('tableFilters', ['trashed' => ['value' => 0]]);
 
@@ -63,7 +62,6 @@ it('brings back hidden columns, order, sort, filters, search and page size on a 
     $revisit = livewire($page);
 
     expect($revisit->get('tableSort'))->toBe('created_at:desc')
-        ->and($revisit->get('tableSearch'))->toBe('acme')
         ->and((int) $revisit->get('tableRecordsPerPage'))->toBe(50)
         ->and($revisit->get('tableFilters.trashed.value'))->toEqual(0)
         ->and($revisit->get('tableColumns.0.name'))->toBe('created_at')
@@ -75,7 +73,7 @@ it('writes nothing when a table is opened', function (string $page): void {
 
     expect(savedPreferences())->toBe(0);
 
-    livewire($page)->set('tableSearch', 'acme');
+    livewire($page)->set('tableSort', 'created_at:desc');
     $updatedAt = TablePreference::query()->withoutGlobalScopes()->value('updated_at');
 
     $this->travelTo(now()->addHour());
@@ -86,8 +84,8 @@ it('writes nothing when a table is opened', function (string $page): void {
 })->with('remembered list pages');
 
 it('writes one row per member, workspace and table', function (): void {
-    livewire(ListCompanies::class)->set('tableSearch', 'a')->set('tableSearch', 'ab');
-    livewire(ListPeople::class)->set('tableSearch', 'a');
+    livewire(ListCompanies::class)->set('tableSort', 'created_at:asc')->set('tableSort', 'created_at:desc');
+    livewire(ListPeople::class)->set('tableSort', 'created_at:desc');
 
     expect(savedPreferences())->toBe(2);
 });
@@ -139,7 +137,6 @@ it('writes nothing on follow-up requests when a saved state is open', function (
     $component = livewire($page);
     $component->call('applyTableColumnManager', createdAtHiddenAndFirst($component->get('tableColumns')), true)
         ->set('tableSort', 'created_at:desc')
-        ->set('tableSearch', 'acme')
         ->set('tableRecordsPerPage', 50)
         ->set('tableFilters', ['trashed' => ['value' => 0]])
         ->call('updateResizableColumnWidth', 'created_at', '300');

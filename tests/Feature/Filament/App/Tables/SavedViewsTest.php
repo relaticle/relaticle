@@ -83,7 +83,6 @@ function hotLeads(): TableStateData
         columns: [['type' => 'column', 'name' => 'created_at', 'isToggled' => false]],
         sort: 'created_at:desc',
         filters: ['trashed' => ['value' => 0]],
-        search: 'acme',
         perPage: 50,
     );
 }
@@ -93,13 +92,12 @@ function preferenceRow(): ?TablePreference
     return TablePreference::query()->withoutGlobalScopes()->first();
 }
 
-it('applies columns, sort, filters, search and page size in one call', function (string $page, CrmEntity $entity): void {
+it('applies columns, sort, filters and page size in one call', function (string $page, CrmEntity $entity): void {
     $view = viewFor($this->user, ['entity' => $entity, 'state' => hotLeads()]);
 
     $component = livewire($page)->call('applySavedView', $view->getKey());
 
     expect($component->get('tableSort'))->toBe('created_at:desc')
-        ->and($component->get('tableSearch'))->toBe('acme')
         ->and((int) $component->get('tableRecordsPerPage'))->toBe(50)
         ->and($component->get('tableFilters.trashed.value'))->toEqual(0)
         ->and($component->instance()->getTableFiltersForm()->getRawState()['trashed']['value'])->toEqual(0)
@@ -107,6 +105,17 @@ it('applies columns, sort, filters, search and page size in one call', function 
         ->and($component->get('tableColumns.0.isToggled'))->toBeFalse()
         ->and($component->instance()->isSavedViewModified())->toBeFalse()
         ->and(preferenceRow()->active_view_id)->toBe($view->getKey());
+})->with('view list pages');
+
+it('opens a view stored with a search unchanged and applies no search', function (string $page, CrmEntity $entity): void {
+    $view = viewFor($this->user, ['entity' => $entity, 'state' => hotLeads()]);
+    DB::table('saved_views')->where('id', $view->getKey())->update(['state' => json_encode([...$view->state->toArray(), 'search' => 'acme', 'columnSearches' => ['name' => 'acme']])]);
+
+    $component = livewire($page)->call('applySavedView', $view->getKey());
+
+    expect($component->get('tableSearch'))->toBeEmpty()
+        ->and($component->get('tableColumnSearches'))->toBeEmpty()
+        ->and($component->instance()->isSavedViewModified())->toBeFalse();
 })->with('view list pages');
 
 it('falls back to the default page size when a view holds one the table does not offer', function (): void {
@@ -118,10 +127,9 @@ it('falls back to the default page size when a view holds one the table does not
 it('applies a sort through the grouping a view names', function (): void {
     $view = viewFor($this->user, ['state' => new TableStateData(sort: 'name:asc')]);
 
-    $component = livewire(ListCompanies::class)->set('tableSearch', 'acme')->set('tableSort', 'created_at:desc')->call('applySavedView', $view->getKey());
+    $component = livewire(ListCompanies::class)->set('tableSort', 'created_at:desc')->call('applySavedView', $view->getKey());
 
-    expect($component->get('tableSearch'))->toBeEmpty()
-        ->and($component->get('tableSort'))->toBe('name:asc');
+    expect($component->get('tableSort'))->toBe('name:asc');
 });
 
 it('saves the current table as a new view without widths and applies it', function (): void {
@@ -304,7 +312,6 @@ it('switches back to the standard view from a saved one', function (): void {
     $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('useStandardTable');
 
     expect($component->get('tableSort'))->toBeNull()
-        ->and($component->get('tableSearch'))->toBeEmpty()
         ->and((int) $component->get('tableRecordsPerPage'))->toBe(25)
         ->and($component->get('activeSavedViewId'))->toBeNull()
         ->and(collect($component->get('tableColumns'))->firstWhere('name', 'created_at')['isToggled'])->toBeTrue();
@@ -352,14 +359,13 @@ it('gives a member the new version of a shared view they had not changed', funct
 it('keeps a member\'s changed copy when the shared view changes under it', function (): void {
     $owner = savedViewMember(WorkspaceRole::Member);
     $view = viewFor($owner, ['is_shared' => true, 'state' => hotLeads()]);
-    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->set('tableSearch', 'mine');
+    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->set('tableSort', 'updated_at:desc');
 
     resolve(UpdateSavedView::class)->execute($owner, $view, ['state' => new TableStateData(sort: 'name:asc')]);
     session()->flush();
     $revisit = livewire(ListCompanies::class);
 
-    expect($revisit->get('tableSearch'))->toBe('mine')
-        ->and($revisit->get('tableSort'))->toBe('created_at:desc')
+    expect($revisit->get('tableSort'))->toBe('updated_at:desc')
         ->and($revisit->instance()->isSavedViewModified())->toBeTrue();
 });
 
@@ -1346,7 +1352,6 @@ it('clears a view that vanished elsewhere when the member returns to their own t
         ->and($component->get('appliedSavedViewHash'))->toBeNull()
         ->and($component->instance()->isSavedViewModified())->toBeFalse()
         ->and($component->get('tableSort'))->toBe('created_at:desc')
-        ->and($component->get('tableSearch'))->toBe('acme')
         ->and(preferenceRow()->own_state)->toBeNull()
         ->and(preferenceRow()->active_view_id)->toBeNull();
     $component->assertNotNotified();

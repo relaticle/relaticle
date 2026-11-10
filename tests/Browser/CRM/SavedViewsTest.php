@@ -12,6 +12,11 @@ use App\Models\User;
 
 mutates(HasSavedViews::class);
 
+function changeViewByRule(mixed $page, string $value = 'zzz'): void
+{
+    $page->script("Livewire.all().find((component) => component.name.includes('ListCompanies')).\$wire.\$call('setFilterRules', [{ field: 'name', condition: 'contains', value: '{$value}' }])");
+}
+
 beforeEach(function (): void {
     $this->withVite();
 
@@ -35,8 +40,8 @@ it('applies a view from the switcher and offers to discard or save a change', fu
         ->assertSeeIn('.fi-view-switcher-trigger', 'Hot leads')
         ->assertDontSee('Discard changes');
 
-    $page->type('.fi-ta-search-field input', 'zzz')
-        ->assertSee('Discard changes')
+    changeViewByRule($page);
+    $page->assertSee('Discard changes')
         ->assertScript('(() => { const bar = document.querySelector("[data-filter-bar]"); const row = bar.getBoundingClientRect(); const save = document.querySelector("[data-view-save]").getBoundingClientRect(); const padding = parseFloat(getComputedStyle(bar).paddingRight); return save.top >= row.top && save.bottom <= row.bottom && Math.abs(save.right - (row.right - padding)) <= 1; })()', true)
         ->click('[data-view-save-action="discard"]')
         ->assertDontSee('Discard changes')
@@ -50,14 +55,14 @@ it('offers save as new view from the arrow beside save for everyone on a shared 
         'state' => new TableStateData(sort: 'name:desc'),
     ]);
 
-    loginViaBrowser($this->user)
+    $page = loginViaBrowser($this->user)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/companies")
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->click('Team pipeline')
-        ->type('.fi-ta-search-field input', 'zzz')
-        ->assertSeeIn('[data-view-save]', 'Save for everyone')
+        ->click('Team pipeline');
+    changeViewByRule($page);
+    $page->assertSeeIn('[data-view-save]', 'Save for everyone')
         ->click('[aria-label="More ways to save"]')
         ->click('[data-view-save] .fi-dropdown-list-item[data-view-save-action="save-as"]')
         ->assertSee('Share with workspace')
@@ -70,16 +75,16 @@ it('keeps the save controls in the filter row on a phone without overflowing', f
         'state' => new TableStateData(sort: 'name:desc'),
     ]);
 
-    loginViaBrowser($this->user)
+    $page = loginViaBrowser($this->user)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(390, 844)
         ->navigate("/app/{$this->workspace->slug}/companies")
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->click('Hot leads')
-        ->type('.fi-ta-search-field input', 'zzz')
-        ->assertSee('Discard changes')
+        ->click('Hot leads');
+    changeViewByRule($page);
+    $page->assertSee('Discard changes')
         ->assertPresent('[data-filter-bar] [data-view-save]')
-        ->assertScript('document.querySelector("[data-view-save]").getBoundingClientRect().bottom <= document.querySelector(".fi-ta-search-field").getBoundingClientRect().top', true)
+        ->assertScript('document.querySelector("[data-view-save]").getBoundingClientRect().bottom <= document.querySelector(".fi-ta-content-ctn").getBoundingClientRect().top', true)
         ->assertScript('(() => { const bar = document.querySelector("[data-filter-bar]"); const row = bar.getBoundingClientRect(); const save = document.querySelector("[data-view-save]").getBoundingClientRect(); const padding = parseFloat(getComputedStyle(bar).paddingRight); return Math.abs((save.top + save.bottom) / 2 - (row.top + row.bottom) / 2) <= 1 && Math.abs(save.right - (row.right - padding)) <= 1; })()', true)
         ->assertScript('document.documentElement.scrollWidth <= window.innerWidth', true)
         ->assertNoJavaScriptErrors();
@@ -295,17 +300,17 @@ it('returns focus to the view switcher after discarding or saving from the keybo
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/companies")
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->click('Hot leads')
-        ->type('.fi-ta-search-field input', 'zzz')
-        ->assertSee('Discard changes');
+        ->click('Hot leads');
+    changeViewByRule($page);
+    $page->assertSee('Discard changes');
 
     $page->script('document.querySelector("[data-view-save-action=discard]").focus()');
     $page->keys('[data-view-save-action="discard"]', 'Enter')
         ->assertDontSee('Discard changes')
         ->assertScript($onSwitcher, true);
 
-    $page->type('.fi-ta-search-field input', 'yyy')
-        ->assertSee('Discard changes');
+    changeViewByRule($page, 'yyy');
+    $page->assertSee('Discard changes');
     $page->script('document.querySelector("[data-view-save-action=save]").focus()');
     $page->keys('[data-view-save-action="save"]', 'Enter')
         ->assertDontSee('Discard changes')
@@ -327,9 +332,9 @@ it('returns focus to the view switcher once the confirmation for saving over a s
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/companies")
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->click('Team pipeline')
-        ->type('.fi-ta-search-field input', 'zzz')
-        ->click('[data-view-save-action="save"]')
+        ->click('Team pipeline');
+    changeViewByRule($page);
+    $page->click('[data-view-save-action="save"]')
         ->assertSee('Save over "Team pipeline"?');
 
     $page->click('.fi-modal-footer-actions .fi-color-primary')

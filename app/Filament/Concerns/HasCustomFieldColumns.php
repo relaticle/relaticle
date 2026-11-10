@@ -70,6 +70,7 @@ trait HasCustomFieldColumns
                 ->modifyQueryUsing(function (Builder $query): void {
                     $query->with('customFieldValues.customField');
                 })
+                ->searchable(false)
                 ->deferFilters(false)
                 ->filtersLayout(FiltersLayout::Hidden)
                 ->columnManager(false)

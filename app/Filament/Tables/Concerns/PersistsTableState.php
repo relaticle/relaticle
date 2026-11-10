@@ -53,8 +53,9 @@ trait PersistsTableState
 
         $this->tableSort = blank($this->tableSort) ? $initial->sort : $this->tableSort;
         $this->tableFilters = $this->canonicalTableFilters(blank($this->tableFilters) ? $initial->filters : $this->tableFilters);
-        $this->tableSearch = blank($this->tableSearch) ? $initial->search : $this->tableSearch;
-        $this->tableColumnSearches = blank($this->tableColumnSearches) ? $initial->columnSearches : $this->tableColumnSearches;
+        // The lists have no search box, so a ?search= link would filter with nothing to clear it.
+        $this->tableSearch = '';
+        $this->tableColumnSearches = [];
         $this->tableGrouping = blank($this->tableGrouping) ? $initial->grouping : $this->tableGrouping;
         $this->tableRecordsPerPage = blank($this->tableRecordsPerPage) ? $initial->perPage : $this->tableRecordsPerPage;
         $this->tableColumnWidths = $this->storedTablePreference()?->state->widths ?? [];
@@ -141,19 +142,8 @@ trait PersistsTableState
         $this->tableGrouping = $state->grouping;
         $this->updatedTableGrouping();
 
-        if (filled($state->search)) {
-            $this->tableSearch = $state->search;
-            $this->updatedTableSearch();
-        } else {
-            $this->resetTableSearch();
-        }
-
-        if ($state->columnSearches !== []) {
-            $this->tableColumnSearches = $state->columnSearches;
-            $this->updatedTableColumnSearches();
-        } else {
-            $this->resetTableColumnSearches();
-        }
+        $this->resetTableSearch();
+        $this->resetTableColumnSearches();
 
         $this->tableRecordsPerPage = $this->isOfferedTablePageSize($state->perPage)
             ? $state->perPage
@@ -334,8 +324,6 @@ trait PersistsTableState
             columns: array_values(array_map(fn (array $item): array => Arr::only($item, ['type', 'name', 'isToggled']), $this->tableColumns)),
             sort: filled($this->tableSort) ? $this->tableSort : null,
             filters: $this->canonicalTableFilters($this->tableFilters),
-            search: filled($this->tableSearch) ? $this->tableSearch : null,
-            columnSearches: array_filter($this->tableColumnSearches, filled(...)),
             grouping: filled($this->tableGrouping) ? $this->tableGrouping : null,
             perPage: $this->tableRecordsPerPage,
             widths: $this->onlyTableColumns($this->tableColumnWidths),

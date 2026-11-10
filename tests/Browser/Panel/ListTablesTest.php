@@ -48,7 +48,7 @@ function seedListRows(User $user): void
     ]);
 }
 
-it('stacks each list row into a card so no column sits off a phone screen', function (string $path, string $filledColumn): void {
+it('stacks each list row into a card so no column sits off a phone screen', function (string $path, string $filledColumn, bool $searchable): void {
     $this->withVite();
 
     $user = User::factory()->withWorkspace()->create();
@@ -64,15 +64,33 @@ it('stacks each list row into a card so no column sits off a phone screen', func
         ->assertScript(CELL_LABELS_SHOWN, true)
         ->assertScript("(() => { const cell = document.querySelector('.fi-ta-row [class~=\"fi-ta-cell-{$filledColumn}\"]'); return getComputedStyle(cell).display === 'grid' && cell.querySelector('.fi-ta-cell-label').offsetParent !== null; })()", true)
         ->assertScript(TABLE_SCROLLS_SIDEWAYS, false)
-        ->assertScript(SEARCH_FILLS_TOOLBAR, true)
+        ->assertScript($searchable ? SEARCH_FILLS_TOOLBAR : 'document.querySelector(".fi-ta-search-field") === null', true)
         ->assertNoJavaScriptErrors();
 })->with([
-    'tasks' => ['tasks', 'relations'],
-    'companies' => ['companies', 'updated-at'],
-    'people' => ['people', 'company.name'],
-    'opportunities' => ['opportunities', 'custom-fields.amount'],
-    'import-history' => ['import-history', 'status'],
+    'tasks' => ['tasks', 'relations', false],
+    'companies' => ['companies', 'updated-at', false],
+    'people' => ['people', 'company.name', false],
+    'opportunities' => ['opportunities', 'custom-fields.amount', false],
+    'import-history' => ['import-history', 'status', true],
 ]);
+
+it('shows filament\'s toolbar row only while a record is selected', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    seedListRows($user);
+
+    loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/companies")
+        ->assertVisible('[data-filter-bar]')
+        ->assertScript('document.querySelector(".fi-ta-header-toolbar").offsetParent === null', true)
+        ->click('.fi-ta-record-checkbox')
+        ->assertVisible('.fi-ta-header-toolbar')
+        ->assertNoJavaScriptErrors();
+});
 
 it('keeps the list table header row on desktop', function (): void {
     $this->withVite();

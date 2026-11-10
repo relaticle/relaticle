@@ -46,7 +46,7 @@ it('leaves the empty list description off a search or filter that finds nothing'
     ]);
 
     livewire(ListCompanies::class)
-        ->searchTable('zzqx-no-match')
+        ->call('setFilterRules', [['field' => 'name', 'condition' => 'contains', 'value' => 'zzqx-no-match']])
         ->assertCountTableRecords(0)
         ->assertDontSee('Companies you add or import appear here.');
 
@@ -109,17 +109,16 @@ it('can sort `:dataset` column', function (string $column): void {
         ->assertCanSeeTableRecords($records->sortByDesc($sortingKey), inOrder: true);
 })->with(['name', 'accountOwner.name', 'creator.name', 'deleted_at', 'created_at', 'updated_at']);
 
-it('can search `:dataset` column', function (string $column): void {
+it('narrows the list with a `:dataset` rule', function (string $field, string $condition, string $attribute): void {
     $records = Company::factory(3)->recycle([$this->user, $this->workspace])->create();
-    $search = data_get($records->first(), $column);
-
-    $visibleRecords = $records->filter(fn (Model $record) => data_get($record, $column) === $search);
+    $value = $records->first()->{$attribute};
+    $matches = $records->filter(fn (Model $record): bool => $record->{$attribute} === $value);
 
     livewire(ListCompanies::class)
-        ->searchTable($search instanceof BackedEnum ? $search->value : $search)
-        ->assertCanSeeTableRecords($visibleRecords)
-        ->assertCountTableRecords($visibleRecords->count());
-})->with(['name', 'accountOwner.name', 'creator.name']);
+        ->call('setFilterRules', [['field' => $field, 'condition' => $condition, 'value' => $condition === 'contains' ? $value : [$value]]])
+        ->assertCanSeeTableRecords($matches)
+        ->assertCountTableRecords($matches->count());
+})->with(['name' => ['name', 'contains', 'name'], 'accountOwner.name' => ['accountOwner', 'is_any_of', 'account_owner_id'], 'creator.name' => ['creator', 'is_any_of', 'creator_id']]);
 
 it('cannot display trashed records by default', function (): void {
     $records = Company::factory()->count(4)->recycle([$this->user, $this->workspace])->create();

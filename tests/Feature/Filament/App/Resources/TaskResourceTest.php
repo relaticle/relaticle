@@ -115,15 +115,27 @@ it('can sort `:dataset` column', function (string $column): void {
         ->assertCanSeeTableRecords($records->sortByDesc($sortingKey), inOrder: true);
 })->with(['creator.name', 'created_at', 'updated_at', 'deleted_at']);
 
-it('can search `:dataset` column', function (string $column): void {
+it('narrows the list with a `:dataset` rule', function (string $field, string $condition, string $attribute): void {
     $records = Task::factory(3)->recycle([$this->user, $this->workspace])->create();
-    $search = data_get($records->first(), $column);
+    $value = $records->first()->{$attribute};
+    $matches = $records->filter(fn (Model $record): bool => $record->{$attribute} === $value);
 
     livewire(ManageTasks::class)
-        ->searchTable($search instanceof BackedEnum ? $search->value : $search)
-        ->assertCanSeeTableRecords($records->filter(fn (Model $record) => data_get($record, $column) === $search))
-        ->assertCanNotSeeTableRecords($records->filter(fn (Model $record) => data_get($record, $column) !== $search));
-})->with(['title', 'assignees.name', 'creator.name']);
+        ->call('setFilterRules', [['field' => $field, 'condition' => $condition, 'value' => $condition === 'contains' ? $value : [$value]]])
+        ->assertCanSeeTableRecords($matches)
+        ->assertCountTableRecords($matches->count());
+})->with(['title' => ['title', 'contains', 'title'], 'creator.name' => ['creator', 'is_any_of', 'creator_id']]);
+
+it('narrows the list to the tasks assigned to a member', function (): void {
+    $assigned = Task::factory()->recycle([$this->user, $this->workspace])->create();
+    $other = Task::factory()->recycle([$this->user, $this->workspace])->create();
+    $assigned->assignees()->attach($this->user);
+
+    livewire(ManageTasks::class)
+        ->call('setFilterRules', [['field' => 'assignees', 'condition' => 'is_any_of', 'value' => [$this->user->getKey()]]])
+        ->assertCanSeeTableRecords([$assigned])
+        ->assertCanNotSeeTableRecords([$other]);
+});
 
 it('cannot display trashed records by default', function (): void {
     $records = Task::factory()->count(4)->recycle([$this->user, $this->workspace])->create();
