@@ -136,4 +136,10 @@ it('opens each layout row menu with that layout own options and acts on that lay
         ->assertNoJavaScriptErrors();
 
     expect($mine->refresh()->name)->toBe('Mine');
+
+    $page->keys('.fi-modal.fi-modal-open input', 'Escape')
+        ->click('.fi-ta-layouts-trigger')
+        ->hover('.fi-ta-layouts-row:has([title="Mine"])')
+        ->keys('[aria-label="Actions for Mine"]', 'Enter')
+        ->assertScript('document.activeElement?.closest(".fi-ta-layouts-row-menu") !== null && document.activeElement.textContent.trim() === "Rename"', true);
 });

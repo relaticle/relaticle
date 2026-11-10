@@ -1,4 +1,5 @@
 @use('Filament\Support\Enums\IconSize')
+@use('Illuminate\Support\Js')
 
 @php
     $layouts = $this->getVisibleTableLayouts();
@@ -24,7 +25,30 @@
             </x-filament::button>
         </x-slot>
 
-        <div class="fi-ta-layouts-panel" x-data="{ query: '' }">
+        <div
+            class="fi-ta-layouts-panel"
+            x-data="{
+                query: '',
+                rowLayout: null,
+                openRowMenu(trigger, event, layout) {
+                    const panel = document.querySelector('.fi-ta-layouts-row-menu')
+
+                    if (panel._x_isShown && panel.trigger === trigger) {
+                        return
+                    }
+
+                    this.rowLayout = layout
+
+                    setTimeout(() => {
+                        panel.open(trigger)
+
+                        if (event.detail === 0) {
+                            this.$nextTick(() => [...panel.querySelectorAll('.fi-dropdown-list-item')].find((item) => item.offsetParent !== null)?.focus())
+                        }
+                    })
+                },
+            }"
+        >
         @if ($layouts->count() >= 7)
             <label class="fi-ta-layouts-search">
                 <x-filament::icon icon="lucide-search" />
@@ -110,46 +134,13 @@
                                     />
                                 @endif
 
-                                <x-filament::dropdown placement="bottom-end" width="fi-ta-layouts-row-menu" teleport>
-                                    <x-slot name="trigger">
-                                        <x-filament::icon-button
-                                            icon="lucide-ellipsis-vertical"
-                                            color="gray"
-                                            size="sm"
-                                            :label="__('filament/panel.tables.layouts.actions', ['name' => $layout->name])"
-                                        />
-                                    </x-slot>
-
-                                    <x-filament::dropdown.list>
-                                        @if ($canUpdateLayout)
-                                            <x-filament::dropdown.list.item icon="lucide-square-pen" wire:click="mountAction('renameTableLayout', { layout: '{{ $layoutId }}' })">
-                                                {{ __('filament/panel.tables.layouts.rename') }}
-                                            </x-filament::dropdown.list.item>
-
-                                            @if ($layout->is_shared)
-                                                <x-filament::dropdown.list.item icon="lucide-users" wire:click="mountAction('stopSharingTableLayout', { layout: '{{ $layoutId }}' })">
-                                                    {{ __('filament/panel.tables.layouts.unshare') }}
-                                                </x-filament::dropdown.list.item>
-                                            @else
-                                                <x-filament::dropdown.list.item icon="lucide-users" wire:click="mountAction('shareTableLayout', { layout: '{{ $layoutId }}' })">
-                                                    {{ __('filament/panel.tables.layouts.share') }}
-                                                </x-filament::dropdown.list.item>
-                                            @endif
-                                        @endif
-
-                                        <x-filament::dropdown.list.item icon="lucide-star" wire:click="toggleDefaultTableLayout('{{ $layoutId }}')">
-                                            {{ $isDefault ? __('filament/panel.tables.layouts.unset_default') : __('filament/panel.tables.layouts.set_default') }}
-                                        </x-filament::dropdown.list.item>
-                                    </x-filament::dropdown.list>
-
-                                    @if ($canUpdateLayout)
-                                        <x-filament::dropdown.list>
-                                            <x-filament::dropdown.list.item icon="lucide-trash-2" color="danger" wire:click="mountAction('deleteTableLayout', { layout: '{{ $layoutId }}' })">
-                                                {{ __('filament/panel.tables.layouts.delete') }}
-                                            </x-filament::dropdown.list.item>
-                                        </x-filament::dropdown.list>
-                                    @endif
-                                </x-filament::dropdown>
+                                <x-filament::icon-button
+                                    icon="lucide-ellipsis-vertical"
+                                    color="gray"
+                                    size="sm"
+                                    :label="__('filament/panel.tables.layouts.actions', ['name' => $layout->name])"
+                                    x-on:click="openRowMenu($el, $event, {{ Js::from(['id' => $layoutId, 'canUpdate' => $canUpdateLayout, 'isShared' => (bool) $layout->is_shared, 'isDefault' => $isDefault]) }})"
+                                />
                             </div>
                         </div>
                     @endforeach
@@ -158,6 +149,40 @@
         @endforeach
 
         </div>
+
+        @if ($layouts->isNotEmpty())
+            <div>
+                <x-filament::dropdown placement="bottom-end" width="fi-ta-layouts-row-menu" teleport>
+                    <x-slot name="trigger">
+                        <span hidden></span>
+                    </x-slot>
+
+                    <x-filament::dropdown.list>
+                        <x-filament::dropdown.list.item icon="lucide-square-pen" x-show="rowLayout?.canUpdate" x-on:click="$wire.mountAction('renameTableLayout', { layout: rowLayout.id })">
+                            {{ __('filament/panel.tables.layouts.rename') }}
+                        </x-filament::dropdown.list.item>
+
+                        <x-filament::dropdown.list.item icon="lucide-users" x-show="rowLayout?.canUpdate && rowLayout?.isShared" x-on:click="$wire.mountAction('stopSharingTableLayout', { layout: rowLayout.id })">
+                            {{ __('filament/panel.tables.layouts.unshare') }}
+                        </x-filament::dropdown.list.item>
+
+                        <x-filament::dropdown.list.item icon="lucide-users" x-show="rowLayout?.canUpdate && ! rowLayout?.isShared" x-on:click="$wire.mountAction('shareTableLayout', { layout: rowLayout.id })">
+                            {{ __('filament/panel.tables.layouts.share') }}
+                        </x-filament::dropdown.list.item>
+
+                        <x-filament::dropdown.list.item icon="lucide-star" x-on:click="$wire.toggleDefaultTableLayout(rowLayout.id)">
+                            <span x-text="rowLayout?.isDefault ? @js(__('filament/panel.tables.layouts.unset_default')) : @js(__('filament/panel.tables.layouts.set_default'))"></span>
+                        </x-filament::dropdown.list.item>
+                    </x-filament::dropdown.list>
+
+                    <x-filament::dropdown.list x-show="rowLayout?.canUpdate">
+                        <x-filament::dropdown.list.item icon="lucide-trash-2" color="danger" x-on:click="$wire.mountAction('deleteTableLayout', { layout: rowLayout.id })">
+                            {{ __('filament/panel.tables.layouts.delete') }}
+                        </x-filament::dropdown.list.item>
+                    </x-filament::dropdown.list>
+                </x-filament::dropdown>
+            </div>
+        @endif
 
         <x-filament::dropdown.list>
             <x-filament::dropdown.list.item icon="lucide-plus" class="fi-ta-layouts-save-current" wire:click="mountAction('saveTableLayoutAs')">
