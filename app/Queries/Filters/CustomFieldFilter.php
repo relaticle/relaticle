@@ -32,6 +32,13 @@ final readonly class CustomFieldFilter implements Filter
 
     private const string LOWERED_OPERANDS = 'array(select lower(operand) from unnest(?::text[]) as operand)';
 
+    private const array LIST_STORED_TYPES = [
+        CustomFieldType::EMAIL->value,
+        CustomFieldType::PHONE->value,
+        CustomFieldType::LINK->value,
+        CustomFieldType::DOMAIN->value,
+    ];
+
     private const array DOMAIN_OF = [
         CustomFieldType::EMAIL->value => "lower(split_part(element, '@', 2))",
         CustomFieldType::LINK->value => "rtrim(regexp_replace(split_part(regexp_replace(split_part(split_part(split_part(regexp_replace(regexp_replace(lower(element), '[\\s\\u00A0\\u200B\\uFEFF\\u3000]+', '', 'g'), '^[a-z][a-z0-9+.-]*://', ''), '/', 1), '?', 1), '#', 1), '^.*@', ''), ':', 1), '^(www\\.)+', ''), '.')",
@@ -215,6 +222,9 @@ final readonly class CustomFieldFilter implements Filter
                 $this->containsAny($q, $field, $operand);
             }),
             '$is_empty' => $this->emptiness($query, $field, $operand === true),
+            '$contains', '$starts_with', '$ends_with' => in_array($field->type, self::LIST_STORED_TYPES, true)
+                ? $this->partialListMatch($query, $field, $operator, (string) $operand)
+                : $this->partialTextMatch($query, $field, $valueColumn, $operator, (string) $operand),
             default => $query->whereHas('customFieldValues', function (Builder $q) use ($field, $valueColumn, $operator, $operand): void {
                 $q->where('custom_field_id', $field->getKey());
 
@@ -222,14 +232,42 @@ final readonly class CustomFieldFilter implements Filter
                     '$eq', '$gt', '$gte', '$lt', '$lte' => $this->coversTheWholeDay($field, $operand)
                         ? $this->wholeDay($q, $valueColumn, $operator, $operand)
                         : $q->where($valueColumn, CustomFieldFilterSchema::COMPARISONS[$operator], $operand),
-                    '$contains' => $q->where($valueColumn, 'ILIKE', '%'.LikePattern::escape((string) $operand).'%'),
-                    '$starts_with' => $q->where($valueColumn, 'ILIKE', LikePattern::escape((string) $operand).'%'),
-                    '$ends_with' => $q->where($valueColumn, 'ILIKE', '%'.LikePattern::escape((string) $operand)),
                     '$in' => $q->whereIn($valueColumn, $operand),
                     '$has_any' => $this->containsAny($q, $field, $operand),
                     default => throw new \LogicException("Unsupported custom field filter operator [{$operator}]."),
                 };
             }),
+        };
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     */
+    private function partialTextMatch(Builder $query, CustomField $field, string $valueColumn, string $operator, string $operand): void
+    {
+        $query->whereHas('customFieldValues', fn (Builder $q): Builder => $q
+            ->where('custom_field_id', $field->getKey())
+            ->where($valueColumn, 'ILIKE', self::likePattern($operator, $operand)));
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     */
+    private function partialListMatch(Builder $query, CustomField $field, string $operator, string $operand): void
+    {
+        $query->whereHas('customFieldValues', fn (Builder $q): Builder => $q
+            ->where('custom_field_id', $field->getKey())
+            ->whereRaw('exists (select 1 from '.self::LIST_ELEMENTS.' as element where element ilike ?)', [self::likePattern($operator, $operand)]));
+    }
+
+    private static function likePattern(string $operator, string $operand): string
+    {
+        $escaped = LikePattern::escape($operand);
+
+        return match ($operator) {
+            '$starts_with' => "{$escaped}%",
+            '$ends_with' => "%{$escaped}",
+            default => "%{$escaped}%",
         };
     }
 
