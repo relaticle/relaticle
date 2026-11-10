@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Tables\Concerns;
 
 use App\Actions\Views\CreateSavedView;
+use App\Actions\Views\CreateSharedSavedView;
 use App\Actions\Views\DeleteSavedView;
 use App\Actions\Views\DuplicateSavedView;
 use App\Actions\Views\SetDefaultSavedView;
@@ -217,7 +218,19 @@ trait HasSavedViews
         $viewId = $this->requestedSavedViewId;
         $this->requestedSavedViewId = null;
 
-        if ($viewId === null || $viewId === $this->activeSavedViewId || ! $this->getVisibleSavedViews()->contains('id', $viewId)) {
+        if ($viewId === null || $viewId === $this->activeSavedViewId) {
+            return;
+        }
+
+        if ($viewId === SavedView::BUILT_IN_LIST_LINK) {
+            $this->applyOwnTable();
+
+            return;
+        }
+
+        if (! $this->getVisibleSavedViews()->contains('id', $viewId)) {
+            Notification::make()->warning()->title(__('filament/panel.tables.views.unavailable'))->send();
+
             return;
         }
 
@@ -241,19 +254,17 @@ trait HasSavedViews
                     ->default(false),
             ])
             ->action(function (array $data, Schema $schema): void {
-                $view = $this->withViewNameErrors($schema, fn (): SavedView => resolve(CreateSavedView::class)->execute(
+                $isShared = (bool) ($data['is_shared'] ?? false);
+
+                $create = $isShared ? CreateSharedSavedView::class : CreateSavedView::class;
+
+                $view = $this->withViewNameErrors($schema, fn (): SavedView => resolve($create)->execute(
                     $this->savedViewUser(),
                     $this->savedViewWorkspace(),
                     $this->tableEntity(),
                     $data['name'],
                     $this->currentTableState(),
                 ));
-
-                $isShared = (bool) ($data['is_shared'] ?? false);
-
-                if ($isShared) {
-                    $view = resolve(UpdateSavedView::class)->execute($this->savedViewUser(), $view, ['is_shared' => true]);
-                }
 
                 $this->activeSavedViewId = $view->getKey();
                 $this->markSavedViewApplied();

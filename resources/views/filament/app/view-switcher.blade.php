@@ -16,7 +16,7 @@
             color="gray"
             size="sm"
             class="fi-view-switcher-trigger"
-            :aria-label="__('filament/pages/boards.view_switcher.label')"
+            :aria-label="__('filament/panel.tables.views.switch', ['name' => $activeName])"
             :data-active-view="$activeName"
         >
             <span class="fi-view-tile fi-view-tile-{{ $activeTone }}"><x-filament::icon :icon="$activeIcon" /></span>
@@ -108,7 +108,7 @@
 
         @if ($canApply && $hasViews)
             <div>
-                <x-filament::dropdown placement="bottom-end" width="fi-ta-views-row-menu" teleport>
+                <x-filament::dropdown placement="right-start" :offset="16" width="fi-ta-views-row-menu" shift teleport>
                     <x-slot name="trigger">
                         <span hidden></span>
                     </x-slot>

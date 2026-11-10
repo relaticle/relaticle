@@ -15,6 +15,7 @@ use App\Enums\SavedViewType;
 use App\Enums\WorkspaceRole;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\NoteResource\Pages\ManageNotes;
+use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
@@ -1270,13 +1271,14 @@ it('keeps the member\'s own table when a link opens a view', function (): void {
     expect($component->call('applyOwnTable')->get('tableSort'))->toBe('name:asc');
 });
 
-it('ignores a link to a view the member cannot open, and writes nothing', function (string $which): void {
+it('warns that a view named in the link is unavailable, and opens nothing and writes nothing', function (string $which): void {
     $stranger = User::factory()->withWorkspace()->create();
     $id = match ($which) {
         'another workspace' => SavedView::factory()->for($stranger)->for($stranger->currentWorkspace)->create(['is_shared' => true])->getKey(),
         'a private view' => viewFor(savedViewMember(WorkspaceRole::Member))->getKey(),
         'another record type' => viewFor($this->user, ['entity' => CrmEntity::People])->getKey(),
         'a view that does not exist' => '01JZZZZZZZZZZZZZZZZZZZZZZZ',
+        'a random string' => 'not-a-view',
     };
 
     $component = Livewire::withQueryParams(['view' => $id])->test(ListCompanies::class);
@@ -1284,8 +1286,8 @@ it('ignores a link to a view the member cannot open, and writes nothing', functi
     expect($component->get('activeSavedViewId'))->toBeNull()
         ->and($component->get('requestedSavedViewId'))->toBeNull()
         ->and(preferenceRow())->toBeNull();
-    $component->assertOk()->assertNotNotified();
-})->with(['another workspace', 'a private view', 'another record type', 'a view that does not exist']);
+    $component->assertOk()->assertNotified('That view is no longer available.');
+})->with(['another workspace', 'a private view', 'another record type', 'a view that does not exist', 'a random string']);
 
 it('writes nothing when a link names the view that is already active and unchanged', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
@@ -1327,8 +1329,10 @@ it('names the active view on the switcher and the built-in list when none is app
 
     livewire(ListCompanies::class)
         ->assertSeeHtml('data-active-view="All companies"')
+        ->assertSeeHtml('aria-label="All companies, switch view"')
         ->call('applySavedView', $view->getKey())
-        ->assertSeeHtml('data-active-view="Hot leads"');
+        ->assertSeeHtml('data-active-view="Hot leads"')
+        ->assertSeeHtml('aria-label="Hot leads, switch view"');
 });
 
 it('lists the fixed entries a resource has', function (string $page, array $shown, array $hidden): void {
@@ -1355,11 +1359,12 @@ it('offers duplicate on every view and the owner actions only where the member m
 
 it('dates a view in the member zone and names the owner of someone else\'s', function (): void {
     $owner = savedViewMember(WorkspaceRole::Member);
+    $owner->forceFill(['name' => 'Priya Raman'])->save();
     viewFor($owner, ['name' => 'Team pipeline', 'is_shared' => true, 'created_at' => '2026-11-02 12:00:00']);
     viewFor($this->user, ['name' => 'Just me', 'created_at' => '2026-11-03 12:00:00']);
 
     livewire(ListCompanies::class)
-        ->assertSeeHtml('Created on Nov 2, 2026 by '.e($owner->name))
+        ->assertSeeHtml('Created on Nov 2, 2026 by Priya Raman')
         ->assertSeeHtml('Created on Nov 3, 2026');
 });
 
@@ -1387,4 +1392,70 @@ it('lists no view of another record type on the board', function (): void {
     viewFor($this->user, ['entity' => CrmEntity::Company, 'name' => 'Company only']);
 
     livewire(OpportunitiesBoard::class)->assertDontSeeText('Company only');
+});
+
+it('escapes a view name and an owner name that carry markup, quotes and apostrophes', function (): void {
+    $owner = savedViewMember(WorkspaceRole::Member);
+    $ownerName = 'O\'Hara "Q" <b>owner</b>';
+    $viewName = 'It\'s "hot" <b>leads</b>';
+    $owner->forceFill(['name' => $ownerName])->save();
+    viewFor($owner, ['name' => $viewName, 'is_shared' => true]);
+
+    $component = livewire(ListCompanies::class)
+        ->assertOk()
+        ->assertSeeHtml(e($viewName))
+        ->assertSeeHtml(e($ownerName))
+        ->assertDontSeeHtml('<b>leads</b>')
+        ->assertDontSeeHtml('<b>owner</b>');
+
+    expect($component->html())->not->toContain('<b>');
+});
+
+it('opens the built-in list from a link and leaves the applied view behind', function (): void {
+    $view = viewFor($this->user, ['entity' => CrmEntity::Opportunity, 'name' => 'Open pipeline', 'state' => hotLeads()]);
+    livewire(ListOpportunities::class)->call('applySavedView', $view->getKey());
+
+    $component = Livewire::withQueryParams(['view' => SavedView::BUILT_IN_LIST_LINK])->test(ListOpportunities::class);
+
+    expect($component->get('activeSavedViewId'))->toBeNull()
+        ->and($component->get('requestedSavedViewId'))->toBeNull()
+        ->and(preferenceRow()->active_view_id)->toBeNull();
+    $component->assertSeeHtml('data-active-view="All opportunities"')->assertNotNotified();
+});
+
+it('writes nothing when a link names the built-in list and no view is applied', function (): void {
+    livewire(ListCompanies::class)->set('tableSort', 'name:asc');
+    $updatedAt = preferenceRow()->updated_at;
+
+    $this->travelTo(now()->addHour());
+    $component = Livewire::withQueryParams(['view' => SavedView::BUILT_IN_LIST_LINK])->test(ListCompanies::class);
+
+    expect($component->get('requestedSavedViewId'))->toBeNull()
+        ->and($component->get('tableSort'))->toBe('name:asc')
+        ->and(preferenceRow()->updated_at)->toEqual($updatedAt);
+    $component->assertNotNotified();
+});
+
+it('links the built-in list from the board with the sentinel', function (): void {
+    livewire(OpportunitiesBoard::class)
+        ->assertSeeHtml('href="'.OpportunityResource::getUrl('index', ['view' => SavedView::BUILT_IN_LIST_LINK]).'"');
+});
+
+it('tags the member\'s default view on the board and no other row', function (): void {
+    $alpha = viewFor($this->user, ['entity' => CrmEntity::Opportunity, 'name' => 'Alpha']);
+    viewFor($this->user, ['entity' => CrmEntity::Opportunity, 'name' => 'Beta']);
+    livewire(ListOpportunities::class)->call('toggleDefaultSavedView', $alpha->getKey());
+
+    $component = livewire(OpportunitiesBoard::class)->assertSeeHtmlInOrder(['Alpha', 'fi-ta-views-tag', 'Beta']);
+
+    expect(substr_count($component->html(), 'fi-ta-views-tag'))->toBe(1);
+});
+
+it('creates and shares a view in one step, leaving nothing behind when the share fails', function (): void {
+    SavedView::updating(fn () => throw new RuntimeException('share failed'));
+
+    expect(fn () => livewire(ListCompanies::class)->callAction('saveSavedViewAs', ['name' => 'Team pipeline', 'is_shared' => true]))
+        ->toThrow(RuntimeException::class, 'share failed');
+
+    expect(SavedView::query()->withoutGlobalScopes()->count())->toBe(0);
 });

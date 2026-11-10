@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 return [
     'view_switcher' => [
-        'label' => 'Switch view',
         'board' => 'Board',
         'cards' => 'Cards',
     ],

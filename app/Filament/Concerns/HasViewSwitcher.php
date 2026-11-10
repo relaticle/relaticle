@@ -10,6 +10,7 @@ use App\Filament\Tables\Concerns\HasSavedViews;
 use App\Models\SavedView;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Queries\Views\StoredTablePreferenceQuery;
 use App\Queries\Views\VisibleSavedViewsQuery;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
@@ -60,9 +61,13 @@ trait HasViewSwitcher
         }
 
         $canApply = in_array(HasSavedViews::class, class_uses_recursive($this), true);
-        $views = resolve(VisibleSavedViewsQuery::class)->get($user, $workspace, $entity);
+        $views = method_exists($this, 'getVisibleSavedViews')
+            ? $this->getVisibleSavedViews()
+            : once(fn (): Collection => resolve(VisibleSavedViewsQuery::class)->get($user, $workspace, $entity));
         $activeId = property_exists($this, 'activeSavedViewId') ? $this->activeSavedViewId : null;
-        $defaultId = property_exists($this, 'defaultSavedViewId') ? $this->defaultSavedViewId : null;
+        $defaultId = property_exists($this, 'defaultSavedViewId')
+            ? $this->defaultSavedViewId
+            : once(fn (): ?string => resolve(StoredTablePreferenceQuery::class)->get($user, $workspace, $entity)?->default_view_id);
         $active = $views->first(fn (SavedView $view): bool => $view->getKey() === $activeId);
         $fixed = $this->viewSwitcherFixedEntries($pages);
         $current = collect($fixed)->firstWhere('current', true);
@@ -135,7 +140,7 @@ trait HasViewSwitcher
                     : __("filament/pages/boards.view_switcher.{$kind}"),
                 'icon' => $icons[$kind],
                 'tone' => $kind === 'list' ? 'gray' : 'info',
-                'url' => $page['url'],
+                'url' => $kind === 'list' ? static::getResource()::getUrl($page['name'], ['view' => SavedView::BUILT_IN_LIST_LINK]) : $page['url'],
                 'current' => $page['active'],
             ];
         }

@@ -47,6 +47,7 @@ return [
         ],
         'views' => [
             'label' => 'Views',
+            'switch' => ':name, switch view',
             'modified' => '(modified)',
             'mine' => 'My views',
             'shared_with_workspace' => 'Shared with workspace',

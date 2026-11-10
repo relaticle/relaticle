@@ -39,6 +39,8 @@ final class SavedView extends Model
 
     public const int NAME_MAX_LENGTH = 255;
 
+    public const string BUILT_IN_LIST_LINK = 'all';
+
     /**
      * @return array<string, string>
      */

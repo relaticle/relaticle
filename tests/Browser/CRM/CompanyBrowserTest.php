@@ -126,7 +126,7 @@ it('keeps app page headings in the topbar across navigation and viewport sizes',
         ->assertScript('(() => document.querySelector("[data-page-heading] .fi-view-switcher") === null)()')
         ->assertScript('(() => !document.querySelector("main .fi-header-heading").getClientRects().length)()')
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->click(".fi-view-switcher a[href$='/app/{$workspace->slug}/tasks']")
+        ->click(".fi-view-switcher a[href$='/app/{$workspace->slug}/tasks?view=all']")
         ->assertPathIs("/app/{$workspace->slug}/tasks")
         ->assertScript('(() => document.querySelectorAll("[data-page-heading]").length === 1)()');
 

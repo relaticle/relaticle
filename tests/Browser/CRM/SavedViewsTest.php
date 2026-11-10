@@ -189,6 +189,7 @@ it('keeps a long view name beside a long owner name truncated and opens its row 
     $page->hover('.fi-ta-views-row')
         ->click('.fi-ta-views-row [aria-label^="Actions for"]')
         ->assertScript('(() => { const box = document.querySelector(".fi-ta-views-row-menu").getBoundingClientRect(); return box.left >= 0 && box.right <= '.$viewportWidth.' && box.bottom <= window.innerHeight; })()', true)
+        ->assertScript('document.querySelector(".fi-ta-views-row-menu").getBoundingClientRect().left >= document.querySelector(".fi-ta-views-panel").closest(".fi-dropdown-panel").getBoundingClientRect().right', true)
         ->assertScript("{$kebab}.right <= {$viewportWidth}", true)
         ->assertNoJavaScriptErrors();
 
@@ -213,5 +214,28 @@ it('lands on the list with a saved view applied when it is picked from the board
         ->click('Open pipeline')
         ->assertPathIs("/app/{$this->workspace->slug}/opportunities")
         ->assertSeeIn('.fi-view-switcher-trigger', 'Open pipeline')
+        ->assertNoJavaScriptErrors();
+});
+
+it('opens the built-in list from the board even when a view was last applied on the list', function (): void {
+    SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'entity' => CrmEntity::Opportunity,
+        'name' => 'Open pipeline',
+        'state' => new TableStateData(sort: 'name:desc'),
+    ]);
+
+    loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/opportunities")
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->click('Open pipeline')
+        ->assertSeeIn('.fi-view-switcher-trigger', 'Open pipeline')
+        ->navigate("/app/{$this->workspace->slug}/opportunities/board")
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->click('All opportunities')
+        ->assertPathIs("/app/{$this->workspace->slug}/opportunities")
+        ->assertSeeIn('.fi-view-switcher-trigger', 'All opportunities')
+        ->assertScript('location.search', '')
         ->assertNoJavaScriptErrors();
 });

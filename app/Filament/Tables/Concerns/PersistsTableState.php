@@ -8,9 +8,9 @@ use App\Actions\Views\SaveTablePreference;
 use App\Data\TableStateData;
 use App\Enums\CrmEntity;
 use App\Models\SavedView;
-use App\Models\Scopes\WorkspaceScope;
 use App\Models\TablePreference;
 use App\Providers\Filament\AppPanelProvider;
+use App\Queries\Views\StoredTablePreferenceQuery;
 use Illuminate\Support\Arr;
 use Livewire\Attributes\Locked;
 use LogicException;
@@ -213,12 +213,8 @@ trait PersistsTableState
     {
         if (! $this->hasLoadedTablePreference) {
             $this->hasLoadedTablePreference = true;
-            $this->storedTablePreference = TablePreference::query()
-                ->withoutGlobalScope(WorkspaceScope::class)
-                ->where('workspace_id', $this->savedViewWorkspace()->getKey())
-                ->whereBelongsTo($this->savedViewUser())
-                ->where('entity', $this->tableEntity())
-                ->first();
+            $this->storedTablePreference = resolve(StoredTablePreferenceQuery::class)
+                ->get($this->savedViewUser(), $this->savedViewWorkspace(), $this->tableEntity());
         }
 
         return $this->storedTablePreference;

@@ -11,6 +11,7 @@ use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\SavedView;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
@@ -431,7 +432,7 @@ it('links the cards view from the list and the list from the cards view', functi
     livewire(ManageNotes::class)->assertSeeHtml('href="'.NoteResource::getUrl('index').'"');
     livewire(NotesCards::class)
         ->assertSeeHtml('href="'.NoteResource::getUrl('index').'"')
-        ->assertSeeHtml('href="'.NoteResource::getUrl('list').'"');
+        ->assertSeeHtml('href="'.NoteResource::getUrl('list', ['view' => SavedView::BUILT_IN_LIST_LINK]).'"');
 });
 
 it('serves the cards view at the notes index and the table at the list route', function (): void {
