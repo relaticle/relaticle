@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Views\CreateSavedView;
 use App\Actions\Views\DeleteSavedView;
+use App\Actions\Views\DuplicateSavedView;
 use App\Actions\Views\EnsureSavedViewNameIsFree;
 use App\Actions\Views\SetDefaultSavedView;
 use App\Actions\Views\UpdateSavedView;
@@ -38,6 +39,7 @@ mutates(
     CreateSavedView::class,
     UpdateSavedView::class,
     DeleteSavedView::class,
+    DuplicateSavedView::class,
     SetDefaultSavedView::class,
     EnsureSavedViewNameIsFree::class,
 );
@@ -932,4 +934,37 @@ it('shows the name error when a rename races another save to the same name', fun
         ->assertHasActionErrors(['name']);
 
     expect($view->refresh()->name)->toBe('Old pipeline');
+});
+
+it('duplicates a view as a private copy the member owns', function (): void {
+    $view = viewFor($this->user, ['name' => 'Hot leads', 'is_shared' => true, 'state' => hotLeads()]);
+
+    livewire(ListCompanies::class)->call('duplicateSavedView', $view->getKey());
+
+    $copy = SavedView::query()->withoutGlobalScopes()->where('name', 'Hot leads copy')->sole();
+    expect($copy->user_id)->toBe($this->user->getKey())
+        ->and($copy->is_shared)->toBeFalse()
+        ->and($copy->state->sort)->toBe('created_at:desc')
+        ->and($copy->entity)->toBe(CrmEntity::Company);
+});
+
+it('numbers a copy when the member already has one', function (): void {
+    $view = viewFor($this->user, ['name' => 'Hot leads']);
+    viewFor($this->user, ['name' => 'hot leads COPY']);
+
+    livewire(ListCompanies::class)->call('duplicateSavedView', $view->getKey());
+
+    expect(SavedView::query()->withoutGlobalScopes()->where('name', 'Hot leads copy 2')->exists())->toBeTrue();
+});
+
+it('duplicates a view another member shared, and never their private one', function (): void {
+    $owner = savedViewMember(WorkspaceRole::Member);
+    $shared = viewFor($owner, ['name' => 'Team pipeline', 'is_shared' => true]);
+    $private = viewFor($owner, ['name' => 'Mine only']);
+
+    livewire(ListCompanies::class)->call('duplicateSavedView', $shared->getKey());
+    expect(SavedView::query()->withoutGlobalScopes()->where('user_id', $this->user->getKey())->where('name', 'Team pipeline copy')->exists())->toBeTrue();
+
+    livewire(ListCompanies::class)->call('duplicateSavedView', $private->getKey())->assertNotified('That view is no longer available.');
+    expect(SavedView::query()->withoutGlobalScopes()->where('name', 'Mine only copy')->exists())->toBeFalse();
 });

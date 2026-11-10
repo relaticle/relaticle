@@ -6,6 +6,7 @@ namespace App\Filament\Tables\Concerns;
 
 use App\Actions\Views\CreateSavedView;
 use App\Actions\Views\DeleteSavedView;
+use App\Actions\Views\DuplicateSavedView;
 use App\Actions\Views\SetDefaultSavedView;
 use App\Actions\Views\UpdateSavedView;
 use App\Data\TableStateData;
@@ -107,6 +108,22 @@ trait HasSavedViews
         $this->applyTableState($view->state);
         $this->activeSavedViewId = $view->getKey();
         $this->markSavedViewApplied();
+    }
+
+    public function duplicateSavedView(string $viewId): void
+    {
+        $view = $this->getVisibleSavedViews()->find($viewId);
+
+        if (! $view instanceof SavedView) {
+            $this->handleMissingSavedView($viewId);
+
+            return;
+        }
+
+        $copy = resolve(DuplicateSavedView::class)->execute($this->savedViewUser(), $view);
+        $this->visibleSavedViews = null;
+
+        Notification::make()->success()->title(__('filament/panel.tables.views.duplicated', ['name' => e($copy->name)]))->send();
     }
 
     public function revertSavedView(): void
