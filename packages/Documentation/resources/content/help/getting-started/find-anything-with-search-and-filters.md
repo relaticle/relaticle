@@ -26,31 +26,52 @@ remove it from there.
 
 ## Filter a list
 
-1. Click the **Filter** icon above the table.
-2. Set any of the filters shown, such as **Creation Source** and **Deleted records**.
-   Custom fields that hold choices, tags, or linked records appear here too.
-3. Click **Reset** to clear them all.
+1. Click **+ Filter** in the row above the table.
+2. Pick a field. Type to narrow the list of fields.
+3. Pick a condition, such as **contains**, **is any of**, or **in the past**.
+4. Enter or pick a value. The list updates once the filter is complete.
 
-![The Filters panel for Companies, showing Creation Source, Deleted records, Industry Tags, and Region Tags](/help-assets/getting-started/find-anything-with-search-and-filters-2.png)
+Each filter shows as a chip in the row. Click its condition or its value to
+change it. To remove it, click **⋮** on the chip, then **Remove filter**.
+A record must match every chip to stay in the list. When the filters hide
+every record, click **Clear filters**.
 
-## If you can't find a filter for a field you need
+The row stays on one line. Scroll it sideways when it holds more chips than
+fit.
 
-The filter panel only offers custom fields that hold a choice, tags, or a linked
-record. These are the **Select**, **Radio**, **Toggle Buttons**, **Multi Select**,
-**Checkbox List**, **Tags Input**, and **Record** types. Fields of other types,
-such as Text, Number, or Date, have no filter in the panel.
+## Use dates that stay relative
 
-A field of one of those types also needs **Visible in List** turned on.
-Follow these steps to check it.
+Pick **in the past**, **in the next**, or **this** to filter by a period,
+such as the last 30 days or this month. A saved view keeps the period
+relative, so it moves with the calendar. **Today** works the same way.
 
-1. Click your workspace name at the top of the sidebar, click
-   **Workspace Settings**, then open the **Custom Fields** tab.
-2. Select the entity tab, then open the field from its **Actions** menu.
-3. Under **Settings**, turn on **Visible in List**.
-4. Save the field.
+Fields that hold a member offer **Me**. In a shared view, **Me** means
+whoever opens it.
 
-See [Use custom fields](/help/getting-started/use-custom-fields) for every field setting.
+## Show deleted records
+
+**Deleted records** sits at the bottom of the field list. Its chip shows
+deleted records with the rest (**included**) or on their own (**only**).
+Click the second part of the chip to switch. You see it only if you're
+allowed to see deleted records.
+
+## Sort and group a list
+
+Click **Sort** to order the list by a column, flip the direction, or clear
+it. Clicking a column header does the same. On Tasks, **Group** groups the
+list by status or priority.
+
+Filters, sort, and grouping save with the view. When you change them,
+**Discard changes** and **Save** appear at the right of the row.
+
+## If you can't find a field in the filter list
+
+Every custom field can be filtered except Textarea, Rich Editor, and Color
+Picker fields. Encrypted fields can't be filtered either, and neither can a
+field that's turned off. A field doesn't need **Visible in List** to be
+filtered. See [Use custom fields](/help/getting-started/use-custom-fields)
+for every field setting.
 
 ## Filter through the API, MCP or Rela
 
-The filter panel is one way to narrow a list. The REST API, the MCP server and Rela, the built-in AI assistant, use a `filter` object instead. It filters by native fields and custom fields, combines conditions with AND, OR and NOT, and follows links between records. Read [the MCP guide](/developers/mcp) for the full grammar.
+The filter row is one way to narrow a list. The REST API, the MCP server and Rela, the built-in AI assistant, use a `filter` object instead. It filters by native fields and custom fields, combines conditions with AND, OR and NOT, and follows links between records. Read [the MCP guide](/developers/mcp) for the full grammar.
