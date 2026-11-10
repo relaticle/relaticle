@@ -18,6 +18,7 @@ use App\Support\LikePattern;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Spatie\QueryBuilder\Filters\Filter;
 
 /**
@@ -103,7 +104,7 @@ final readonly class CustomFieldFilter implements Filter
                     continue;
                 }
 
-                $operand = $this->normalizeOperand($fieldCode, $operator, $operand, $supportedOperators[$operator], $entry !== null);
+                $operand = $this->recordIds($field, $operator, $this->normalizeOperand($fieldCode, $operator, $operand, $supportedOperators[$operator], $entry !== null));
                 $operand = $this->resolveOptions($fieldCode, $operator, $entry, $operand);
                 $operand = $this->spellings($field, $operator, $operand);
 
@@ -154,6 +155,21 @@ final readonly class CustomFieldFilter implements Filter
             'name' => "{$fieldCode} {$operator}",
             'expected' => $expected,
         ]));
+    }
+
+    private function recordIds(CustomField $field, string $operator, mixed $operand): mixed
+    {
+        if ($field->type !== CustomFieldType::RECORD->value || ! is_array($operand)) {
+            return $operand;
+        }
+
+        $invalid = array_find($operand, static fn (string $id): bool => ! Str::isUlid($id));
+
+        if ($invalid !== null) {
+            throw FilterErrors::at("{$field->code}.{$operator}", __('validation.filter.record_id', ['name' => "{$field->code} {$operator}", 'value' => $invalid]));
+        }
+
+        return $operand;
     }
 
     /**
@@ -307,7 +323,7 @@ final readonly class CustomFieldFilter implements Filter
      */
     private function containsAny(Builder $query, CustomField $field, array $values): void
     {
-        $matches = in_array($field->type, [CustomFieldType::EMAIL->value, CustomFieldType::LINK->value, CustomFieldType::DOMAIN->value], true)
+        $matches = in_array($field->type, [CustomFieldType::EMAIL->value, CustomFieldType::LINK->value, CustomFieldType::DOMAIN->value, CustomFieldType::RECORD->value], true)
             ? 'lower(element) = any('.self::LOWERED_OPERANDS.')'
             : 'element = any(?::text[])';
 

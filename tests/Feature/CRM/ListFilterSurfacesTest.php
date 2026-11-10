@@ -699,19 +699,44 @@ it('filters a record custom field by linked record id alike on the api and mcp',
     $foreign = Company::factory()->for($stranger->personalWorkspace())->create(['name' => 'Foreign']);
     unlinkedRecord($this->user, 'opportunities', 'Low')->saveCustomFieldValue($partner, [$acme->getKey()]);
     unlinkedRecord($this->user, 'opportunities', 'High')->saveCustomFieldValue($partner, [$acme->getKey(), $globex->getKey()]);
+    unlinkedRecord($this->user, 'opportunities', 'Cleared')->saveCustomFieldValue($partner, []);
     unlinkedRecord($this->user, 'opportunities', 'Unset');
     $on = fn (array $condition): array => ['custom_fields' => ['partner' => $condition]];
 
     expectTitlesOnEverySurface($this, $this->user, 'opportunities', [
         [$on(['$has_any' => [$globex->getKey()]]), ['High']],
         [$on(['$has_any' => [$acme->getKey()]]), ['Low', 'High']],
-        [$on(['$has_none' => [$globex->getKey()]]), ['Low', 'Unset']],
-        [$on(['$is_empty' => true]), ['Unset']],
+        [$on(['$has_any' => [strtoupper($acme->getKey())]]), ['Low', 'High']],
+        [$on(['$has_none' => [$globex->getKey()]]), ['Low', 'Cleared', 'Unset']],
+        [$on(['$is_empty' => true]), ['Cleared', 'Unset']],
         [$on(['$is_empty' => false]), ['Low', 'High']],
         [$on(['$has_any' => [$foreign->getKey()]]), []],
-        [$on(['$has_none' => [$foreign->getKey()]]), ['Low', 'High', 'Unset']],
+        [$on(['$has_none' => [$foreign->getKey()]]), ['Low', 'High', 'Cleared', 'Unset']],
+    ]);
+
+    $globex->delete();
+
+    expectTitlesOnEverySurface($this, $this->user, 'opportunities', [
+        [$on(['$has_any' => [$globex->getKey()]]), ['High']],
+        [$on(['$is_empty' => false]), ['Low', 'High']],
     ]);
 });
+
+it('rejects a record custom field operand that is not a record id', function (string $operator): void {
+    resolve(CreateCustomField::class)->execute($this->user, ['entity_type' => 'opportunity', 'name' => 'Partner', 'code' => 'partner', 'type' => 'record', 'lookup_type' => 'company']);
+
+    expectErrorOnEverySurface($this, $this->user, 'opportunities', ['custom_fields' => ['partner' => [$operator => ['Acme']]]], "filter.custom_fields.partner.{$operator}", 'Acme is not a record ID.');
+})->with(['$has_any', '$has_none']);
+
+it('rejects a record custom field operand of the wrong shape', function (mixed $operand, string $message): void {
+    resolve(CreateCustomField::class)->execute($this->user, ['entity_type' => 'opportunity', 'name' => 'Partner', 'code' => 'partner', 'type' => 'record', 'lookup_type' => 'company']);
+
+    expectErrorOnEverySurface($this, $this->user, 'opportunities', ['custom_fields' => ['partner' => ['$has_any' => $operand]]], 'filter.custom_fields.partner.$has_any', $message);
+})->with([
+    'empty list' => [[], 'partner $has_any'],
+    'nested list' => [[['01J8Z4Y6T5Q2M9N3B7K1W0X8VD']], 'partner $has_any'],
+    'one hundred and one ids' => [array_fill(0, 101, '01J8Z4Y6T5Q2M9N3B7K1W0X8VD'), 'partner $has_any takes at most 100 values'],
+]);
 
 it('publishes exactly the operators of each custom field type', function (): void {
     $published = [];
