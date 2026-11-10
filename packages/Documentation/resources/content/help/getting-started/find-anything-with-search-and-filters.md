@@ -31,6 +31,8 @@ remove it from there.
 3. Pick a condition, such as **contains**, **is any of**, or **in the past**.
 4. Enter or pick a value. The list updates once the filter is complete.
 
+![The filter row above the Opportunities list with three chips: Stage is any of Negotiation/Review, Close Date in the next 30 days, and Amount greater than 10000](/help-assets/getting-started/find-anything-with-search-and-filters-2.png)
+
 Each filter shows as a chip in the row. Click its condition or its value to
 change it. To remove it, click **⋮** on the chip, then **Remove filter**.
 A record must match every chip to stay in the list. When the filters hide
