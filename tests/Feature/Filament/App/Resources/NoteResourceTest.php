@@ -427,11 +427,12 @@ it('edits a note from its card', function (): void {
     expect($record->refresh()->title)->toBe('Edited from a card');
 });
 
-it('opens notes on the cards view and links it to the list', function (string $page): void {
-    livewire($page)
+it('links the cards view from the list and the list from the cards view', function (): void {
+    livewire(ManageNotes::class)->assertSeeHtml('href="'.NoteResource::getUrl('index').'"');
+    livewire(NotesCards::class)
         ->assertSeeHtml('href="'.NoteResource::getUrl('index').'"')
         ->assertSeeHtml('href="'.NoteResource::getUrl('list').'"');
-})->with([ManageNotes::class, NotesCards::class]);
+});
 
 it('serves the cards view at the notes index and the table at the list route', function (): void {
     $this->get(NoteResource::getUrl('index'))->assertSeeLivewire(NotesCards::class);

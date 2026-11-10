@@ -16,6 +16,7 @@ use App\Enums\WorkspaceRole;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\NoteResource\Pages\ManageNotes;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
+use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Tables\Concerns\HasSavedViews;
@@ -417,9 +418,9 @@ it('marks the view the table is showing, and only that one', function (): void {
     $view = viewFor($this->user, ['name' => 'Team pipeline']);
 
     $component = livewire(ListCompanies::class)
-        ->assertSeeHtmlInOrder(['aria-current="true"', 'All companies', 'Team pipeline'])
+        ->assertSeeHtmlInOrder(['Team pipeline', 'aria-current="true"', 'All companies'])
         ->call('applySavedView', $view->getKey())
-        ->assertSeeHtmlInOrder(['All companies', 'aria-current="true"', 'Team pipeline']);
+        ->assertSeeHtmlInOrder(['aria-current="true"', 'Team pipeline', 'All companies']);
 
     expect(substr_count($component->html(), 'aria-current="true"'))->toBe(1);
 });
@@ -429,11 +430,11 @@ it('labels the view that opens by default and the views a member shares', functi
     viewFor($this->user, ['name' => 'Just me']);
 
     $component = livewire(ListCompanies::class)
-        ->assertSeeHtmlInOrder(['All companies', 'aria-label="Default"', 'Just me', 'Team pipeline', '<span>Shared</span>'])
+        ->assertDontSeeHtml('fi-ta-views-tag')
         ->call('toggleDefaultSavedView', $shared->getKey())
-        ->assertSeeHtmlInOrder(['All companies', 'Just me', 'Team pipeline', 'aria-label="Default"', '<span>Shared</span>']);
+        ->assertSeeHtmlInOrder(['Just me', 'Team pipeline', 'fi-ta-views-tag', 'Default', '<span>Shared</span>']);
 
-    expect(substr_count($component->html(), 'aria-label="Default"'))->toBe(1)
+    expect(substr_count($component->html(), 'fi-ta-views-tag'))->toBe(1)
         ->and(substr_count($component->html(), '<span>Shared</span>'))->toBe(1);
 });
 
@@ -1299,4 +1300,71 @@ it('writes nothing when a table opens without a link', function (): void {
 
     expect(preferenceRow()->own_state->sort)->toBe('name:asc')
         ->and(preferenceRow()->updated_at)->toEqual($updatedAt);
+});
+
+it('names the active view on the switcher and the built-in list when none is applied', function (): void {
+    $view = viewFor($this->user, ['name' => 'Hot leads']);
+
+    livewire(ListCompanies::class)
+        ->assertSeeHtml('data-active-view="All companies"')
+        ->call('applySavedView', $view->getKey())
+        ->assertSeeHtml('data-active-view="Hot leads"');
+});
+
+it('lists the fixed entries a resource has', function (string $page, array $shown, array $hidden): void {
+    livewire($page)->assertSeeText($shown)->assertDontSeeText($hidden);
+})->with([
+    'companies' => [ListCompanies::class, ['All companies'], ['Board', 'Cards']],
+    'opportunities' => [ListOpportunities::class, ['All opportunities', 'Board'], ['Cards']],
+    'notes' => [ManageNotes::class, ['All notes', 'Cards'], ['Board']],
+]);
+
+it('offers duplicate on every view and the owner actions only where the member may edit', function (): void {
+    $shared = viewFor($this->user, ['name' => 'Team pipeline', 'is_shared' => true]);
+    $mine = viewFor($this->user, ['name' => 'Just me']);
+    $member = savedViewMember(WorkspaceRole::Member);
+    $this->actingAs($member);
+    $own = viewFor($member, ['name' => 'My own']);
+
+    livewire(ListCompanies::class)
+        ->assertSeeText('Duplicate')
+        ->assertSeeHtml('data-view-id="'.$shared->getKey().'" data-can-update="false"')
+        ->assertSeeHtml('data-view-id="'.$own->getKey().'" data-can-update="true"')
+        ->assertDontSeeHtml('data-view-id="'.$mine->getKey().'"');
+});
+
+it('dates a view in the member zone and names the owner of someone else\'s', function (): void {
+    $owner = savedViewMember(WorkspaceRole::Member);
+    viewFor($owner, ['name' => 'Team pipeline', 'is_shared' => true, 'created_at' => '2026-11-02 12:00:00']);
+    viewFor($this->user, ['name' => 'Just me', 'created_at' => '2026-11-03 12:00:00']);
+
+    livewire(ListCompanies::class)
+        ->assertSeeHtml('Created on Nov 2, 2026 by '.e($owner->name))
+        ->assertSeeHtml('Created on Nov 3, 2026');
+});
+
+it('creates a view shared with the workspace when the member ticks the box', function (): void {
+    livewire(ListCompanies::class)->callAction('saveSavedViewAs', ['name' => 'Team pipeline', 'is_shared' => true]);
+
+    expect(SavedView::query()->withoutGlobalScopes()->where('name', 'Team pipeline')->sole()->is_shared)->toBeTrue();
+});
+
+it('creates a private view when the box is left alone', function (): void {
+    livewire(ListCompanies::class)->callAction('saveSavedViewAs', ['name' => 'Mine']);
+
+    expect(SavedView::query()->withoutGlobalScopes()->where('name', 'Mine')->sole()->is_shared)->toBeFalse();
+});
+
+it('links a saved view from the board to the list page', function (): void {
+    $view = viewFor($this->user, ['entity' => CrmEntity::Opportunity, 'name' => 'Open pipeline']);
+
+    livewire(OpportunitiesBoard::class)
+        ->assertSeeHtml('view='.$view->getKey())
+        ->assertSeeHtml('data-active-view="Board"');
+});
+
+it('lists no view of another record type on the board', function (): void {
+    viewFor($this->user, ['entity' => CrmEntity::Company, 'name' => 'Company only']);
+
+    livewire(OpportunitiesBoard::class)->assertDontSeeText('Company only');
 });

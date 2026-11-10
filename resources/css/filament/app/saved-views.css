@@ -1,23 +1,63 @@
-/* The view trigger, Revert and Save read as one control, like Filament's button group. */
+/* Revert, Save and Save as read as one control, like Filament's button group. */
 .fi-ta-views {
+    @apply flex items-center gap-2;
+}
+
+.fi-ta-views-modified {
+    @apply text-sm text-gray-500 max-sm:sr-only dark:text-gray-400;
+}
+
+.fi-ta-views-group {
     @apply flex items-center rounded-lg ring-1 ring-gray-950/10 dark:ring-white/20;
 
     & .fi-btn {
         @apply rounded-none shadow-none ring-0;
     }
 
-    & > .fi-dropdown .fi-btn {
-        @apply rounded-s-lg;
-    }
-
-    & > .fi-btn {
+    & .fi-btn + .fi-btn {
         @apply border-s border-gray-200 dark:border-white/10;
     }
 
-    & > :last-child,
-    & > .fi-dropdown:last-child .fi-btn {
+    & > :first-child {
+        @apply rounded-s-lg;
+    }
+
+    & > :last-child {
         @apply rounded-e-lg;
     }
+}
+
+/* The small tile in front of a view: primary for a saved view, gray for the built-in list, info for board and cards. */
+.fi-view-tile {
+    @apply flex size-5 shrink-0 items-center justify-center rounded-md;
+
+    & .fi-icon {
+        @apply size-3.5;
+    }
+}
+
+.fi-view-tile-primary {
+    @apply bg-primary-100 text-primary-600 dark:bg-primary-400/15 dark:text-primary-400;
+}
+
+.fi-view-tile-gray {
+    @apply bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300;
+}
+
+.fi-view-tile-info {
+    @apply bg-info-100 text-info-600 dark:bg-info-400/15 dark:text-info-400;
+}
+
+.fi-view-switcher-label {
+    @apply block max-w-56 truncate max-sm:max-w-32;
+}
+
+.fi-ta-views-tag {
+    @apply shrink-0 rounded-md px-1.5 text-xs font-medium text-gray-600 ring-1 ring-gray-950/10 dark:text-gray-300 dark:ring-white/20;
+}
+
+.fi-ta-views-row-created {
+    @apply px-3 py-2 text-xs text-gray-500 dark:text-gray-400;
 }
 
 /* A saved view's row highlights as one, its buttons included. */
@@ -36,14 +76,6 @@
 
 .fi-ta-views-row-meta {
     @apply flex max-w-1/2 min-w-0 items-center gap-1.5 text-xs font-normal text-gray-500 dark:text-gray-400;
-}
-
-.fi-ta-views-row-default {
-    @apply flex shrink-0 text-warning-500;
-
-    & .fi-icon {
-        @apply size-3.5!;
-    }
 }
 
 /* The view the table shows. A tint, unlike the gray hover, so the two never read alike. */
@@ -65,10 +97,6 @@
 
 .fi-ta-views-row-menu {
     @apply max-w-56!;
-}
-
-.fi-ta-views-row-delete:hover {
-    @apply text-danger-600 dark:text-danger-400;
 }
 
 /* A pointer swaps the row's status for its buttons. Touch has no hover, so both stay in view there. */
@@ -108,6 +136,10 @@
     }
 }
 
+.fi-ta-views-panel > :is(.fi-ta-views-scroll, .fi-dropdown-list) ~ .fi-dropdown-list {
+    @apply mt-1 border-t border-gray-100 pt-1 dark:border-white/10;
+}
+
 .fi-ta-views-scroll {
     @apply min-h-0 flex-1 overflow-y-auto;
 }
@@ -128,32 +160,8 @@
     @apply flex items-center justify-between gap-2 px-2 pt-2 pb-1 text-xs font-medium text-gray-500 dark:text-gray-400;
 }
 
-.fi-ta-views-pill {
-    @apply shrink-0 rounded-md bg-gray-100 px-1.5 text-xs font-medium text-gray-600 dark:bg-white/10 dark:text-gray-300;
-}
-
-/* An outline, not a border, so the dashed row is exactly as tall as the rows above it. */
-.fi-ta-views-save-current {
-    @apply justify-center text-gray-500 outline-1 -outline-offset-1 outline-gray-300 outline-dashed hover:text-gray-700 hover:outline-gray-400 dark:text-gray-400 dark:outline-white/15 dark:hover:text-gray-200 dark:hover:outline-white/25;
-
-    & .fi-icon {
-        @apply size-4!;
-    }
-}
-
-.fi-ta-views-trigger-label {
-    @apply block max-w-56 truncate;
-}
-
-/* On a phone the trigger is icon only, like the filter and column buttons beside it, and keeps its name for screen readers. */
-.fi-ta-views-trigger {
-    & :is(.fi-ta-views-trigger-label, .fi-ta-views-trigger-modified) {
-        @apply max-sm:sr-only;
-    }
-
-    & .fi-view-switcher-chevron {
-        @apply max-sm:hidden;
-    }
+.fi-ta-views-save-current .fi-icon {
+    @apply size-4!;
 }
 
 .fi-ta-views-save .fi-icon {

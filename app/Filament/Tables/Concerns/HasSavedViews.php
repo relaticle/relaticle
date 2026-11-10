@@ -13,9 +13,11 @@ use App\Data\TableStateData;
 use App\Models\SavedView;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Queries\Views\VisibleSavedViewsQuery;
 use Closure;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Schema;
@@ -69,11 +71,8 @@ trait HasSavedViews
      */
     protected function getVisibleSavedViews(): Collection
     {
-        return $this->visibleSavedViews ??= SavedView::query()
-            ->visibleTo($this->savedViewUser(), $this->savedViewWorkspace()->getKey(), $this->tableEntity())
-            ->with('user:id,name')
-            ->orderByRaw('lower(name)')
-            ->get();
+        return $this->visibleSavedViews ??= resolve(VisibleSavedViewsQuery::class)
+            ->get($this->savedViewUser(), $this->savedViewWorkspace(), $this->tableEntity());
     }
 
     protected function getActiveSavedView(): ?SavedView
@@ -228,7 +227,13 @@ trait HasSavedViews
             ->modalHeading(__('filament/panel.tables.views.save_as'))
             ->modalWidth('md')
             ->modalSubmitActionLabel(__('filament/panel.tables.views.save'))
-            ->schema([$this->savedViewNameInput()])
+            ->schema([
+                $this->savedViewNameInput(),
+                Checkbox::make('is_shared')
+                    ->label(__('filament/panel.tables.views.share'))
+                    ->helperText(fn (): string => __('filament/panel.tables.views.share_description', ['workspace' => $this->savedViewWorkspace()->name]))
+                    ->default(false),
+            ])
             ->action(function (array $data, Schema $schema): void {
                 $view = $this->withViewNameErrors($schema, fn (): SavedView => resolve(CreateSavedView::class)->execute(
                     $this->savedViewUser(),
@@ -238,11 +243,17 @@ trait HasSavedViews
                     $this->currentTableState(),
                 ));
 
+                $isShared = (bool) ($data['is_shared'] ?? false);
+
+                if ($isShared) {
+                    $view = resolve(UpdateSavedView::class)->execute($this->savedViewUser(), $view, ['is_shared' => true]);
+                }
+
                 $this->activeSavedViewId = $view->getKey();
                 $this->markSavedViewApplied();
                 $this->visibleSavedViews = null;
 
-                Notification::make()->success()->title(__('filament/panel.tables.views.created', ['name' => e($view->name)]))->send();
+                Notification::make()->success()->title(__($isShared ? 'filament/panel.tables.views.created_shared' : 'filament/panel.tables.views.created', ['name' => e($view->name)]))->send();
             });
     }
 

@@ -6,6 +6,7 @@ namespace App\Filament\Resources\PeopleResource\Pages;
 
 use App\Filament\Actions\ImportExportActionGroup;
 use App\Filament\Concerns\HasCustomFieldColumns;
+use App\Filament\Concerns\HasViewSwitcher;
 use App\Filament\Exports\PeopleExporter;
 use App\Filament\Resources\PeopleResource;
 use App\Models\People;
@@ -21,6 +22,7 @@ use Relaticle\ImportWizard\Filament\Pages\ImportPeople;
 final class ListPeople extends ListRecords
 {
     use HasCustomFieldColumns;
+    use HasViewSwitcher;
 
     protected static string $resource = PeopleResource::class;
 

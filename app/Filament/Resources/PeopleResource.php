@@ -12,6 +12,7 @@ use App\Filament\Components\Forms\WorkspaceMemberSelect;
 use App\Filament\Components\RecordChip;
 use App\Filament\Components\Tables\EmptyListDescription;
 use App\Filament\Components\Tables\RecordChipColumn;
+use App\Filament\Concerns\RemembersViewMode;
 use App\Filament\Exports\PeopleExporter;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
@@ -54,6 +55,8 @@ use Relaticle\EmailIntegration\Filament\Actions\MassSendBulkAction;
 
 final class PeopleResource extends Resource
 {
+    use RemembersViewMode;
+
     protected static ?string $model = People::class;
 
     protected static ?string $modelLabel = null;
