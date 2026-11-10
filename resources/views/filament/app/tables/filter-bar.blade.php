@@ -45,6 +45,7 @@
                             x-bind:aria-checked="(sort?.column === column.key).toString()"
                             x-on:click="orderBy(column)"
                         >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path x-bind:d="column.icon"></path></svg>
                             <span class="fi-filter-label" x-text="column.label"></span>
                             <x-filament::icon icon="lucide-arrow-up" class="fi-filter-tick" x-show="sort?.column === column.key && sort.direction === 'asc'" />
                             <x-filament::icon icon="lucide-arrow-down" class="fi-filter-tick" x-show="sort?.column === column.key && sort.direction === 'desc'" />
@@ -102,6 +103,7 @@
                             x-bind:aria-checked="(grouping?.id === group.id).toString()"
                             x-on:click="groupBy(group)"
                         >
+                            <svg x-show="group.icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path x-bind:d="group.icon"></path></svg>
                             <span class="fi-filter-label" x-text="group.label"></span>
                             <x-filament::icon icon="lucide-arrow-up" class="fi-filter-tick" x-show="grouping?.id === group.id && grouping.direction === 'asc'" />
                             <x-filament::icon icon="lucide-arrow-down" class="fi-filter-tick" x-show="grouping?.id === group.id && grouping.direction === 'desc'" />
@@ -145,27 +147,19 @@
                 </span>
 
                 <div class="fi-filter-part">
-                    <template x-if="fieldOf(chip).editable">
-                        <button
-                            type="button"
-                            tabindex="0"
-                            class="fi-filter-seg fi-filter-cond"
-                            data-filter-segment="condition"
-                            x-bind:class="{ 'fi-placeholder': ! chip.condition, 'fi-open': isOpen(chip.id, 'cond') }"
-                            x-bind:aria-expanded="isOpen(chip.id, 'cond').toString()"
-                            aria-haspopup="listbox"
-                            data-pop-trigger
-                            x-on:click="toggle(chip.id, 'cond', $event)"
-                        >
-                            <span x-text="conditionOf(chip)?.label ?? @js(__('filament/panel.tables.filters.select_condition'))"></span>
-                        </button>
-                    </template>
-
-                    <template x-if="! fieldOf(chip).editable">
-                        <span class="fi-filter-seg fi-filter-cond" data-filter-segment="condition">
-                            <span x-text="conditionOf(chip)?.label"></span>
-                        </span>
-                    </template>
+                    <button
+                        type="button"
+                        tabindex="0"
+                        class="fi-filter-seg fi-filter-cond"
+                        data-filter-segment="condition"
+                        x-bind:class="{ 'fi-placeholder': ! chip.condition, 'fi-open': isOpen(chip.id, 'cond') }"
+                        x-bind:aria-expanded="isOpen(chip.id, 'cond').toString()"
+                        aria-haspopup="listbox"
+                        data-pop-trigger
+                        x-on:click="toggle(chip.id, 'cond', $event)"
+                    >
+                        <span x-text="conditionOf(chip)?.label ?? @js(__('filament/panel.tables.filters.select_condition'))"></span>
+                    </button>
 
                     <template x-if="isOpen(chip.id, 'cond')">
                     <div class="fi-filter-pop" x-anchor.bottom-start.offset.6.fixed="$el.closest('.fi-filter-chip')" data-pop data-sheet x-bind:data-open="isOpen(chip.id, 'cond')" role="listbox" x-bind:aria-label="@js(__('filament/panel.tables.filters.conditions_for')).replace(':chip', fieldOf(chip).label)" x-on:keydown="navigate($event)">
@@ -191,27 +185,20 @@
 
                 <template x-if="conditionOf(chip)?.takesValue">
                     <div class="fi-filter-part">
-                        <template x-if="fieldOf(chip).editable">
-                            <button
-                                type="button"
-                                tabindex="0"
-                                class="fi-filter-seg fi-filter-val"
-                                data-filter-segment="value"
-                                x-bind:class="{ 'fi-placeholder': ! complete(chip), 'fi-open': isOpen(chip.id, 'val') }"
-                                x-bind:aria-expanded="isOpen(chip.id, 'val').toString()"
-                                aria-haspopup="dialog"
-                                data-pop-trigger
-                                x-on:click="toggle(chip.id, 'val', $event)"
-                            >
-                                <span x-text="complete(chip) ? chip.display : @js(__('filament/panel.tables.filters.select_value'))"></span>
-                            </button>
-                        </template>
+                        <button
+                            type="button"
+                            tabindex="0"
+                            class="fi-filter-seg fi-filter-val"
+                            data-filter-segment="value"
+                            x-bind:class="{ 'fi-placeholder': ! complete(chip), 'fi-open': isOpen(chip.id, 'val') }"
+                            x-bind:aria-expanded="isOpen(chip.id, 'val').toString()"
+                            aria-haspopup="dialog"
+                            data-pop-trigger
+                            x-on:click="toggle(chip.id, 'val', $event)"
+                        >
+                            <span x-text="complete(chip) ? chip.display : @js(__('filament/panel.tables.filters.select_value'))"></span>
+                        </button>
 
-                        <template x-if="! fieldOf(chip).editable">
-                            <span class="fi-filter-seg fi-filter-val" data-filter-segment="value">
-                                <span x-text="chip.display"></span>
-                            </span>
-                        </template>
 
                         <template x-if="isOpen(chip.id, 'val')">
                         <div class="fi-filter-pop" x-anchor.bottom-start.offset.6.fixed="$el.closest('.fi-filter-chip')" data-pop data-sheet x-bind:data-open="isOpen(chip.id, 'val')" role="dialog" x-bind:aria-label="@js(__('filament/panel.tables.filters.value_for')).replace(':chip', label(chip))" x-on:keydown="navigate($event)">

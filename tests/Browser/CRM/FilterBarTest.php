@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\CustomFields\CreateCustomField;
 use App\Data\TableStateData;
+use App\Enums\WorkspaceRole;
 use App\Filament\Tables\Concerns\HasFilterBar;
 use App\Models\Company;
 use App\Models\Opportunity;
@@ -827,8 +828,7 @@ it('narrows opportunities by days without activity', function (): void {
         ->assertPresent('[data-filter-chip].fi-pending')
         ->type(valueInput(), '30')
         ->assertScript(filterBarWaitFor('document.querySelector("[data-filter-chip]").dataset.complete === "true"'), true)
-        ->assertSeeIn('[data-filter-chip]', 'No activity for at least')
-        ->assertScript(filterBarWaitFor('document.querySelector("[data-filter-chip]").textContent.includes("30 days")'), true)
+        ->assertScript(filterBarWaitFor('document.querySelector("[data-filter-chip]").innerText.replace(/\\s+/g, " ").trim() === "No activity for at least 30 days"'), true)
         ->assertNoJavaScriptErrors();
 });
 
@@ -849,6 +849,9 @@ it('adds a deleted records chip last in the field list and switches it between i
     expect(companyRows($page, 1))->toBeTrue();
     $page->assertSee('Gone')
         ->assertSeeIn('[data-filter-deleted]', 'only')
+        ->click('[data-filter-add]')
+        ->assertScript(popVisible(), true)
+        ->assertPresent('[data-pop][data-open="true"] [data-pop-item]')
         ->assertMissing('[data-filter-add-deleted]')
         ->click('[data-deleted-remove]')
         ->assertMissing('[data-filter-deleted]');
@@ -865,12 +868,11 @@ it('sets the sort from the control and shows it in the column header, then flips
     $page->assertScript(filterBarWaitFor('document.querySelector(".fi-ta-header-cell-name")?.getAttribute("aria-sort") === "ascending"'), true)
         ->assertScript(filterBarWaitFor('document.querySelector("[data-filter-sort]").classList.contains("fi-set")'), true)
         ->assertSeeIn('[data-filter-sort]', 'Company')
-        ->click('[data-filter-sort]')
-        ->assertScript(popVisible(), true)
+        ->assertScript('document.querySelector("[data-pop][data-open=true]")?.checkVisibility()', true)
         ->click('[data-sort-flip]')
         ->assertScript(filterBarWaitFor('document.querySelector(".fi-ta-header-cell-name")?.getAttribute("aria-sort") === "descending"'), true)
-        ->click('[data-filter-sort]')
-        ->assertScript(popVisible(), true)
+        ->assertScript('document.querySelector("[data-pop][data-open=true]")?.checkVisibility()', true)
+        ->assertScript('[...document.querySelectorAll("[data-pop][data-open=true] [data-sort-column]")].every((item) => item.querySelector("svg path")?.getAttribute("d"))', true)
         ->click('[data-sort-clear]')
         ->assertScript(filterBarWaitFor('document.querySelector(".fi-ta-header-cell-name")?.getAttribute("aria-sort") === "none"'), true)
         ->assertScript('! document.querySelector("[data-filter-sort]").classList.contains("fi-set")', true)
@@ -907,8 +909,7 @@ it('groups tasks from the group control and leaves Filament no toolbar row at re
         ->assertScript(filterBarWaitFor('document.querySelector("[data-filter-group]").classList.contains("fi-set") && document.querySelector("[data-filter-group]").textContent.includes("Priority")'), true)
         ->assertScript("Livewire.all().find((component) => component.name.includes('ManageTasks')).\$wire.tableGrouping === 'priority_group:asc'", true)
         ->assertMissing('.fi-ta-grouping-settings')
-        ->click('[data-filter-group]')
-        ->assertScript(popVisible(), true)
+        ->assertScript('document.querySelector("[data-pop][data-open=true]")?.checkVisibility()', true)
         ->click('[data-group-clear]')
         ->assertScript("Livewire.all().find((component) => component.name.includes('ManageTasks')).\$wire.tableGrouping === null", true)
         ->assertNoJavaScriptErrors();
@@ -916,6 +917,25 @@ it('groups tasks from the group control and leaves Filament no toolbar row at re
 
 it('offers no group control on a list that groups nothing', function (): void {
     ($this->open)()
+        ->assertScript(filterBarWaitFor('document.querySelector("[data-filter-sort]")?.checkVisibility()'), true)
         ->assertMissing('[data-filter-group]')
+        ->assertNoJavaScriptErrors();
+});
+
+it('draws no empty header row under the filter row on a phone for a viewer', function (): void {
+    $viewer = User::factory()->create(['current_workspace_id' => $this->workspace->getKey()]);
+    $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
+
+    openOn($viewer, $this->workspace, 'companies', 390)
+        ->assertScript(filterBarWaitFor('document.querySelectorAll(".fi-ta-table-stacked-header-row").length > 0'), true)
+        ->assertScript('[...document.querySelectorAll(".fi-ta-table-stacked-header-row")].filter((row) => row.checkVisibility()).length === 0', true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('keeps the select row under the filter row on a phone for an owner', function (): void {
+    $visibleRows = '[...document.querySelectorAll(".fi-ta-table-stacked-header-row")].filter((row) => row.checkVisibility())';
+
+    openOn($this->user, $this->workspace, 'companies', 390)
+        ->assertScript(filterBarWaitFor("{$visibleRows}.length === 1 && {$visibleRows}[0].querySelector('.fi-ta-page-checkbox')"), true)
         ->assertNoJavaScriptErrors();
 });

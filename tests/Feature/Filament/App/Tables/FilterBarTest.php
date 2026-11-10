@@ -9,6 +9,7 @@ use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
 use App\Enums\FilterCondition;
 use App\Enums\FilterFieldKind;
+use App\Enums\WorkspaceRole;
 use App\Filament\Concerns\HasCustomFieldColumns;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\NoteResource\Pages\ManageNotes;
@@ -1701,16 +1702,14 @@ it('keeps a deleted record whose number differs and drops one that equals it, wh
         ->assertCanNotSeeTableRecords([$equal, $liveEqual]);
 });
 
-it('hands the chip bar every field with its conditions and says which have a value editor', function (): void {
+it('hands the chip bar every field with its conditions', function (): void {
     $fields = collect(livewire(ListCompanies::class)->instance()->getFilterBarData()['fields'])->keyBy('key');
 
     expect($fields['name'])
-        ->toMatchArray(['label' => 'Company', 'kind' => 'text', 'editable' => true])
+        ->toMatchArray(['label' => 'Company', 'kind' => 'text'])
         ->and(array_column($fields['name']['conditions'], 'value'))->toBe(['contains', 'does_not_contain', 'starts_with', 'ends_with', 'is', 'is_not', 'is_empty', 'is_not_empty'])
         ->and($fields['name']['conditions'][0])->toBe(['value' => 'contains', 'label' => 'contains', 'takesValue' => true, 'shape' => 'text'])
-        ->and($fields['name']['icon'])->not->toBeEmpty()
-        ->and($fields['creator']['editable'])->toBeTrue()
-        ->and($fields['created_at']['editable'])->toBeTrue();
+        ->and($fields['name']['icon'])->not->toBeEmpty();
 });
 
 it('hands the chip bar a choice field options and pins Me as the only member option', function (): void {
@@ -1967,17 +1966,59 @@ it('draws no grouping settings of its own on any list', function (string $page):
     expect(livewire($page)->html())->not->toContain('fi-ta-grouping-settings');
 })->with('filter bar pages');
 
-it('says whether the member may include deleted records', function (string $page): void {
+it('offers deleted records to every signed-in member, a viewer too', function (string $page): void {
+    $viewer = User::factory()->create(['current_workspace_id' => $this->workspace->getKey()]);
+    $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
+
+    expect(livewire($page)->instance()->getFilterBarData()['deletable'])->toBeTrue();
+
+    $this->actingAs($viewer);
+
     expect(livewire($page)->instance()->getFilterBarData()['deletable'])->toBeTrue();
 })->with('filter bar pages');
 
-it('hands the chip bar the period units with their limits and says every field has an editor', function (): void {
+it('offers deleted records to nobody once the member is signed out', function (): void {
+    $component = livewire(ListCompanies::class);
+
+    Filament::auth()->logout();
+
+    expect($component->instance()->getFilterBarData()['deletable'])->toBeFalse();
+});
+
+it('saves a grouping set from the group control with a view and reads the view as unchanged on return', function (): void {
+    $view = SavedView::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Task, 'state' => new TableStateData]);
+
+    $component = livewire(ManageTasks::class)->call('applySavedView', $view->getKey());
+
+    expect($component->instance()->isSavedViewModified())->toBeFalse();
+
+    $component->call('setFilterBarGrouping', 'status_group', 'desc');
+
+    expect($component->instance()->isSavedViewModified())->toBeTrue();
+
+    $component->callAction('saveSavedView');
+
+    expect($view->refresh()->state->grouping)->toBe('status_group:desc');
+
+    $revisit = livewire(ManageTasks::class)->call('applySavedView', $view->getKey());
+
+    expect($revisit->get('tableGrouping'))->toBe('status_group:desc')
+        ->and($revisit->instance()->isSavedViewModified())->toBeFalse();
+});
+
+it('hands the sort and group controls an icon for each column that has one', function (): void {
+    $sortable = collect(livewire(ListCompanies::class)->instance()->getFilterBarData()['sortable'])->keyBy('key');
+
+    expect($sortable['name']['icon'])->not->toBeEmpty()
+        ->and(collect(livewire(ManageTasks::class)->instance()->getFilterBarData()['groups'])->keyBy('id')['status_group']['icon'])->not->toBeEmpty();
+});
+
+it('hands the chip bar the period units with their limits ', function (): void {
     $data = livewire(ListOpportunities::class)->instance()->getFilterBarData();
     $units = collect($data['periodUnits'])->keyBy('value');
 
     expect(array_keys($units->all()))->toBe(['days', 'weeks', 'months', 'quarters', 'years'])
         ->and($units['days'])->toMatchArray(['label' => 'days', 'singular' => 'day', 'max' => 3650])
         ->and($units['years']['max'])->toBe(100)
-        ->and(collect($data['fields'])->every(fn (array $field): bool => $field['editable']))->toBeTrue()
         ->and(collect($data['fields'])->firstWhere('key', 'stale_days')['limit'])->toBe(StaleDaysFilter::MAX_DAYS);
 });

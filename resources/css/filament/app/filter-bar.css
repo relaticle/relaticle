@@ -260,7 +260,7 @@ button.fi-filter-seg {
 }
 
 @media (width < 40rem) {
-    .fi-ta-ctn:has([data-filter-bar]) .fi-ta-table-stacked-sorting {
+    .fi-ta-ctn:has([data-filter-bar]) :is(.fi-ta-table-stacked-sorting, .fi-ta-table-stacked-header-row:not(:has(.fi-ta-page-checkbox))) {
         @apply hidden;
     }
 }

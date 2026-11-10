@@ -50,8 +50,8 @@ return [
             'sort_by' => 'Sort by',
             'sort_ascending' => 'ascending',
             'sort_descending' => 'descending',
-            'sort_flip_to_ascending' => 'Sort ascending',
-            'sort_flip_to_descending' => 'Sort descending',
+            'sort_flip_to_ascending' => 'Ascending',
+            'sort_flip_to_descending' => 'Descending',
             'sort_clear' => 'Clear sort',
             'sort_set' => 'Sorted by :column, :direction',
             'group' => 'Group',
@@ -131,7 +131,7 @@ return [
                 'companies' => 'Companies',
                 'company' => 'Company',
                 'contact' => 'Point of contact',
-                'stale_days' => 'Inactivity',
+                'stale_days' => 'No activity for',
             ],
             'conditions' => [
                 'contains' => 'contains',
@@ -159,7 +159,7 @@ return [
                 'has_none_of' => 'has none of',
                 'is_checked' => 'is checked',
                 'is_not_checked' => 'is not checked',
-                'no_activity_for' => 'no activity for at least',
+                'no_activity_for' => 'at least',
             ],
         ],
         'views' => [

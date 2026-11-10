@@ -205,7 +205,7 @@
                     const term = this.find.trim().toLowerCase()
 
                     return this.fields
-                        .filter((field) => field.editable && field.label.toLowerCase().includes(term))
+                        .filter((field) => field.label.toLowerCase().includes(term))
                         .slice(0, MAX_FIELD_RESULTS)
                 },
 
@@ -444,12 +444,10 @@
                 async orderBy(column) {
                     const flipped = this.sort?.column === column.key && this.sort.direction === 'asc' ? 'desc' : 'asc'
 
-                    this.close(true)
                     await this.$wire.setFilterBarSort(column.key, flipped)
                 },
 
                 async flipSort() {
-                    this.close(true)
                     await this.$wire.setFilterBarSort(this.sort.column, this.sort.direction === 'asc' ? 'desc' : 'asc')
                 },
 
@@ -461,12 +459,10 @@
                 async groupBy(group) {
                     const flipped = this.grouping?.id === group.id && this.grouping.direction === 'asc' ? 'desc' : 'asc'
 
-                    this.close(true)
                     await this.$wire.setFilterBarGrouping(group.id, flipped)
                 },
 
                 async flipGrouping() {
-                    this.close(true)
                     await this.$wire.setFilterBarGrouping(this.grouping.id, this.grouping.direction === 'asc' ? 'desc' : 'asc')
                 },
 

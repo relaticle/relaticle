@@ -140,7 +140,7 @@ trait HasColumnMenu
             $label = $column->getLabel();
             $label = $label instanceof Htmlable ? $label : new HtmlString(e((string) $label));
 
-            $text = trim((string) preg_replace('/\s+/', ' ', html_entity_decode(strip_tags($label->toHtml()), ENT_QUOTES)));
+            $text = ColumnHeaderLabel::text($label);
 
             $columns[] = [
                 'name' => $item['name'],
