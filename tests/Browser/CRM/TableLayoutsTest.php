@@ -6,6 +6,7 @@ use App\Data\TableStateData;
 use App\Filament\Tables\Concerns\HasTableLayouts;
 use App\Models\Company;
 use App\Models\TableLayout;
+use App\Models\TablePreference;
 use App\Models\User;
 
 mutates(HasTableLayouts::class);
@@ -100,4 +101,39 @@ it('keeps a shared layout name readable beside a long owner name', function (): 
         ->assertScript("{$nameBox}.width >= 80", true)
         ->assertScript("{$ownerBox}.right <= {$panelBox}.right", true)
         ->assertNoJavaScriptErrors();
+});
+
+it('opens each layout row menu with that layout own options and acts on that layout', function (): void {
+    $member = User::factory()->create(['current_workspace_id' => $this->workspace->getKey()]);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
+    $mine = TableLayout::factory()->for($member)->for($this->workspace)->shared()->create(['name' => 'Mine']);
+    $theirs = TableLayout::factory()->for($this->user)->for($this->workspace)->shared()->create(['name' => 'Theirs']);
+
+    $visibleRowMenuItems = '[...document.querySelectorAll(".fi-ta-layouts-row-menu .fi-dropdown-list-item")].filter((item) => item.offsetParent !== null).map((item) => item.textContent.trim())';
+
+    $page = loginViaBrowser($member)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-ta-layouts-trigger');
+
+    $page->hover('.fi-ta-layouts-row:has([title="Mine"])')->click('[aria-label="Actions for Mine"]');
+    $page->assertScript($visibleRowMenuItems, ['Rename', 'Stop sharing', 'Set as my default', 'Delete layout']);
+
+    $page->click('[aria-label="Actions for Mine"]');
+    $page->hover('.fi-ta-layouts-row:has([title="Theirs"])')->click('[aria-label="Actions for Theirs"]');
+    $page->assertScript($visibleRowMenuItems, ['Set as my default']);
+
+    $page->script('[...document.querySelectorAll(".fi-ta-layouts-row-menu .fi-dropdown-list-item")].find((item) => item.offsetParent !== null).click()');
+    $page->wait(1)->assertNoJavaScriptErrors();
+
+    expect(TablePreference::query()->withoutGlobalScopes()->whereBelongsTo($member)->value('default_layout_id'))->toBe($theirs->getKey());
+
+    $page->click('.fi-ta-layouts-trigger');
+    $page->hover('.fi-ta-layouts-row:has([title="Mine"])')->click('[aria-label="Actions for Mine"]');
+    $page->script('[...document.querySelectorAll(".fi-ta-layouts-row-menu .fi-dropdown-list-item")].find((item) => item.offsetParent !== null && item.textContent.trim() === "Rename").click()');
+    $page->assertValue('.fi-modal.fi-modal-open input', 'Mine')
+        ->assertNoJavaScriptErrors();
+
+    expect($mine->refresh()->name)->toBe('Mine');
 });
