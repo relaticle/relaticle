@@ -20,6 +20,8 @@ use Filament\Notifications\Notification;
 use Filament\Schemas\Schema;
 use Filament\Support\Components\Attributes\Exposed;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 
 trait HasTableLayouts
@@ -37,15 +39,24 @@ trait HasTableLayouts
     {
         $layoutId = $this->vanishedMountedTableLayoutId();
 
-        if ($layoutId === null) {
-            return parent::callMountedAction($arguments);
+        if ($layoutId !== null) {
+            // Filament drops the submit of an action that turned hidden, which left the modal open on a blank name.
+            $this->unmountAction();
+            $this->handleMissingTableLayout($layoutId);
+
+            return null;
         }
 
-        // Filament drops the submit of an action that turned hidden, which left the modal open on a blank name.
-        $this->unmountAction();
-        $this->handleMissingTableLayout($layoutId);
+        try {
+            return parent::callMountedAction($arguments);
+        } catch (ModelNotFoundException $exception) {
+            throw_unless($exception->getModel() === TableLayout::class, $exception);
 
-        return null;
+            $this->unmountAction();
+            $this->handleMissingTableLayout((string) Arr::first($exception->getIds()));
+
+            return null;
+        }
     }
 
     /**

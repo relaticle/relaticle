@@ -34,6 +34,8 @@ final readonly class UpdateTableLayout
         }
 
         return DB::transaction(function () use ($user, $layout, $attributes): TableLayout {
+            TableLayout::query()->withoutGlobalScope(WorkspaceScope::class)->whereKey($layout->getKey())->lockForUpdate()->firstOrFail();
+
             $previousName = $layout->name;
             $previousStateHash = $layout->state->withoutWidths()->hash();
             $this->write($user, $layout, $attributes);

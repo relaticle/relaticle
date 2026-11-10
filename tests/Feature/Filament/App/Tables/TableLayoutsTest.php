@@ -25,6 +25,7 @@ use App\Models\User;
 use App\Notifications\TableLayoutChangedNotification;
 use App\Policies\TableLayoutPolicy;
 use Filament\Facades\Filament;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -705,6 +706,39 @@ it('tells the owner when an admin deletes their layout', function (): void {
         ->and($notice->actor_id)->toBe($admin->getKey())
         ->and($notice->subject_id)->toBe($this->workspace->getKey())
         ->and($notice->data)->toBe(['layout_name' => 'Renewals', 'entity' => CrmEntity::Company->value, 'change' => TableLayoutChange::Deleted->value]);
+});
+
+it('tells no one about a rename that loses the race to a delete', function (): void {
+    $owner = tableLayoutMember(WorkspaceRole::Member);
+    $layout = layoutFor($owner, ['name' => 'Renewals', 'is_shared' => true]);
+    $admin = tableLayoutMember(WorkspaceRole::Admin);
+    $staleCopy = TableLayout::query()->withoutGlobalScopes()->findOrFail($layout->getKey());
+    resolve(DeleteTableLayout::class)->execute($admin, $layout);
+    $owner->notifications()->delete();
+
+    expect(fn (): TableLayout => resolve(UpdateTableLayout::class)->execute($admin, $staleCopy, ['name' => 'Renamed']))
+        ->toThrow(ModelNotFoundException::class)
+        ->and($owner->notifications()->count())->toBe(0);
+});
+
+it('shows the admin the layout is gone when it is deleted while they rename it', function (): void {
+    $owner = tableLayoutMember(WorkspaceRole::Member);
+    $layout = layoutFor($owner, ['name' => 'Renewals', 'is_shared' => true]);
+    $this->actingAs(tableLayoutMember(WorkspaceRole::Admin));
+
+    $component = livewire(ListCompanies::class)->mountAction('renameTableLayout', ['layout' => $layout->getKey()]);
+
+    DB::listen(function (QueryExecuted $query) use ($layout): void {
+        if (str_contains($query->sql, 'lower(name) = lower(?)')) {
+            DB::table('table_layouts')->where('id', $layout->getKey())->delete();
+        }
+    });
+
+    $component->fillForm(['name' => 'Renamed'])
+        ->callMountedAction()
+        ->assertNotified('That layout is no longer available.');
+
+    expect($owner->notifications()->count())->toBe(0);
 });
 
 it('tells the owner once when two admins delete their layout at the same moment', function (): void {
