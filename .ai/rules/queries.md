@@ -109,6 +109,9 @@ transport` fails the reverse.
 A new surface gets its adapter on its own side. A panel filter lives under `app/Filament` and
 imports `App\Queries`.
 
+`App\Queries\Filters\TreeFilter` is the entry point for a transport that owns the Eloquent builder, as a
+Filament table does. It validates a tree with `FilterTree` and applies it with the `EntityFilters` registry.
+
 ## One owner per fact
 
 - `EntityFilters::definitions()` owns the filter names each entity accepts. A list query never

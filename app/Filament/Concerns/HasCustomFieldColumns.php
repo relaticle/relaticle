@@ -10,6 +10,8 @@ use App\Filament\Tables\Concerns\HasFilterBar;
 use App\Filament\Tables\Concerns\HasResizableColumns;
 use App\Filament\Tables\Concerns\HasSavedViews;
 use App\Filament\Tables\Concerns\PersistsTableState;
+use App\Filament\Tables\FilterBar\ConditionsFilter;
+use App\Filament\Tables\FilterBar\FilterFieldCatalog;
 use App\Models\CustomField;
 use BackedEnum;
 use Filament\Tables\Columns\Column;
@@ -55,7 +57,7 @@ trait HasCustomFieldColumns
                 continue;
             }
 
-            $icon = $column->getName() === $titleColumn ? null : self::nativeColumnIcon($column->getName());
+            $icon = $column->getName() === $titleColumn ? null : FilterFieldCatalog::columnIcon($column->getName());
 
             $column->label(fn (): Htmlable => $this->columnHeaderLabel($column->getName(), $label, $icon));
         }
@@ -69,7 +71,7 @@ trait HasCustomFieldColumns
                 ->filtersLayout(FiltersLayout::Hidden)
                 ->columnManager(false)
                 ->pushColumns($columns)
-                ->pushFilters($builder->filters()->all()),
+                ->pushFilters([...$builder->filters()->all(), ConditionsFilter::make()]),
         );
     }
 
@@ -79,20 +81,5 @@ trait HasCustomFieldColumns
 
         // Stacked rows print the label in every cell, so each label is built once per request.
         return $this->columnHeaderLabels["{$columnName}\0{$label}"] ??= ColumnHeaderLabel::make($label, $icon);
-    }
-
-    private static function nativeColumnIcon(string $name): string
-    {
-        return match ($name) {
-            'accountOwner.name' => 'lucide-user',
-            'creator.name' => 'lucide-circle-user',
-            'assignees.name' => 'lucide-users',
-            'company.name' => 'lucide-building-complex',
-            'relations' => 'lucide-link',
-            'created_at' => 'lucide-calendar',
-            'updated_at' => 'lucide-clock',
-            'deleted_at' => 'lucide-trash',
-            default => 'lucide-text-align-start',
-        };
     }
 }

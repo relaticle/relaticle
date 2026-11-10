@@ -177,4 +177,20 @@ enum CustomFieldType: string
             default => false,
         };
     }
+
+    /** The kind of filter chip this field type offers, or null when it has no filter. */
+    public function filterFieldKind(): ?FilterFieldKind
+    {
+        return match ($this) {
+            self::TEXT => FilterFieldKind::Text,
+            self::NUMBER, self::CURRENCY => FilterFieldKind::Number,
+            self::DATE, self::DATE_TIME => FilterFieldKind::Date,
+            self::SELECT, self::RADIO, self::TOGGLE_BUTTONS => FilterFieldKind::Choice,
+            self::MULTI_SELECT, self::CHECKBOX_LIST, self::TAGS_INPUT => FilterFieldKind::MultiChoice,
+            self::CHECKBOX, self::TOGGLE => FilterFieldKind::Checkbox,
+            self::EMAIL, self::PHONE, self::LINK, self::DOMAIN => FilterFieldKind::MultiText,
+            self::RECORD => FilterFieldKind::Record,
+            self::TEXTAREA, self::RICH_EDITOR, self::COLOR_PICKER, self::FILE_UPLOAD => null,
+        };
+    }
 }
