@@ -10,7 +10,7 @@
 
 @if ($mode)
     <div class="fi-view-save" data-view-save="{{ $mode }}" wire:key="{{ $this->getId() }}.table.view-save">
-        <x-filament::button color="gray" size="sm" class="fi-view-save-discard" data-view-save-action="discard" wire:click="revertSavedView" x-tooltip="{ content: window.matchMedia('(width < 40rem)').matches ? '{{ __('filament/panel.tables.views.discard') }}' : '', theme: $store.theme }">
+        <x-filament::button color="gray" size="sm" class="fi-view-save-discard" data-view-save-action="discard" wire:click="revertSavedView" data-tooltip="{{ __('filament/panel.tables.views.discard') }}">
             <x-filament::icon icon="lucide-undo-2" class="fi-view-save-discard-icon" />
             <span class="fi-view-save-discard-text">{{ __('filament/panel.tables.views.discard') }}</span>
         </x-filament::button>

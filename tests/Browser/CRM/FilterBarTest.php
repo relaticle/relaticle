@@ -28,6 +28,11 @@ function addChip(AwaitableWebpage $page, string $field, string $condition): Awai
         ->click("[data-pop]:not([style*=\"display: none\"]) [data-condition=\"{$condition}\"]");
 }
 
+function filterBarWaitFor(string $condition): string
+{
+    return "(async () => { for (let attempt = 0; attempt < 50; attempt++) { if ({$condition}) { return true; } await new Promise((resolve) => setTimeout(resolve, 100)); } return false; })()";
+}
+
 function setRules(AwaitableWebpage $page, int $count): void
 {
     $page->script("Livewire.all().find((component) => component.name.includes('ListCompanies')).\$wire.\$call('setFilterRules', Array.from({ length: {$count} }, (_, index) => ({ field: 'name', condition: 'contains', value: 'chip' + index })))");
@@ -310,15 +315,16 @@ it('keeps the filter row on one scrolling line however many chips it holds', fun
         ->assertNoJavaScriptErrors();
 })->with([[1440, 900], [390, 844]]);
 
-it('scrolls a new chip and its list into view', function (): void {
+it('scrolls the add button into view when its field list opens', function (): void {
     $page = ($this->open)();
     setRules($page, 8);
-    $page->assertScript('document.querySelectorAll("[data-filter-chip]").length === 8', true);
+    $page->assertScript('document.querySelectorAll("[data-filter-chip]").length === 8', true)
+        ->script('document.querySelector(".fi-filter-bar-start").scrollLeft = 0');
 
-    addChip($page, 'name', 'contains');
+    $page->script('document.querySelector("[data-filter-add]").click()');
 
-    $page->assertScript('(() => { const strip = document.querySelector(".fi-filter-bar-start").getBoundingClientRect(); const chip = [...document.querySelectorAll("[data-filter-chip]")].at(-1).getBoundingClientRect(); return chip.left >= strip.left && chip.right <= strip.right; })()', true)
-        ->assertScript('(() => { const pop = document.querySelector("[data-pop][data-open=true]").getBoundingClientRect(); return pop.left >= 0 && pop.right <= innerWidth && pop.bottom <= innerHeight; })()', true)
+    $page->assertScript(filterBarWaitFor('document.querySelector("[data-pop][data-open=true]")?.checkVisibility()'), true)
+        ->assertScript('(() => { const strip = document.querySelector(".fi-filter-bar-start").getBoundingClientRect(); const add = document.querySelector("[data-filter-add]").getBoundingClientRect(); return add.left >= strip.left && add.right <= strip.right; })()', true)
         ->assertNoJavaScriptErrors();
 });
 
@@ -330,7 +336,49 @@ it('opens a chip menu from the right edge of the scrolled row without clipping i
 
     $page->script('[...document.querySelectorAll("[data-filter-more]")].at(-1).click()');
 
-    $page->assertScript('(async () => { await new Promise((resolve) => setTimeout(resolve, 500)); const pop = document.querySelector("[data-pop][data-open=true][role=menu]"); const box = pop.getBoundingClientRect(); const item = pop.querySelector("[data-pop-item]").getBoundingClientRect(); const hit = document.elementFromPoint(item.left + item.width / 2, item.top + item.height / 2); const chip = [...document.querySelectorAll("[data-filter-chip]")].at(-1).getBoundingClientRect(); return box.left >= 0 && box.right <= innerWidth && box.top >= chip.bottom && pop.offsetParent === null && pop.contains(hit); })()', true)
+    $inside = <<<'JS'
+        (() => {
+            const pop = document.querySelector("[data-pop][data-open=true][role=menu]");
+
+            if (!pop?.checkVisibility()) {
+                return false;
+            }
+
+            const box = pop.getBoundingClientRect();
+            const chip = [...document.querySelectorAll("[data-filter-chip]")].at(-1).getBoundingClientRect();
+            const corners = [[box.left + 4, box.top + 4], [box.right - 4, box.top + 4], [box.left + 4, box.bottom - 4], [box.right - 4, box.bottom - 4]];
+
+            return corners.every(([x, y]) => pop.contains(document.elementFromPoint(x, y)))
+                && Math.abs(box.right - chip.right) <= 1
+                && Math.abs(box.top - chip.bottom - 6) <= 1;
+        })()
+    JS;
+
+    $page->assertScript(filterBarWaitFor($inside), true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('opens a chip menu from a mouse click on a control under the fade', function (): void {
+    $page = ($this->open)();
+    setRules($page, 8);
+    $page->assertScript('document.querySelectorAll("[data-filter-chip]").length === 8', true)
+        ->script('(() => { const strip = document.querySelector(".fi-filter-bar-start"); const more = document.querySelectorAll("[data-filter-more]")[3]; strip.scrollLeft = 0; strip.scrollLeft += more.getBoundingClientRect().right - (strip.getBoundingClientRect().right - 8); more.setAttribute("data-probe", ""); })()');
+
+    $page->click('[data-probe]')
+        ->assertScript(filterBarWaitFor('document.querySelector("[data-pop][data-open=true][role=menu]")?.checkVisibility()'), true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('anchors only the popover that is open', function (): void {
+    $page = ($this->open)();
+    setRules($page, 8);
+    $anchored = 'document.querySelectorAll("[data-pop]").length';
+
+    $page->assertScript('document.querySelectorAll("[data-filter-chip]").length === 8', true)
+        ->assertScript("{$anchored} === 0", true)
+        ->script('document.querySelectorAll("[data-filter-more]")[2].click()');
+
+    $page->assertScript(filterBarWaitFor("{$anchored} === 1 && [...document.querySelectorAll('[data-pop]')].every((pop) => pop._x_anchor)"), true)
         ->assertNoJavaScriptErrors();
 });
 
@@ -457,13 +505,26 @@ it('names every popover and every chip menu button after its chip', function ():
     expect(companyRows($page, 1))->toBeTrue();
 
     $names = <<<'JS'
-        (() => {
+        (async () => {
             const chip = document.querySelector('[data-filter-chip]');
+            const nameOf = async (trigger, role) => {
+                trigger.click();
+
+                for (let attempt = 0; attempt < 50 && !chip.querySelector(`[role=${role}]`)?.checkVisibility(); attempt++) {
+                    await new Promise((resolve) => setTimeout(resolve, 100));
+                }
+
+                const name = chip.querySelector(`[role=${role}]`).getAttribute('aria-label');
+
+                trigger.click();
+
+                return name;
+            };
 
             return [
-                chip.querySelector('[role=listbox]').getAttribute('aria-label'),
-                chip.querySelector('[role=dialog]').getAttribute('aria-label'),
-                chip.querySelector('[role=menu]').getAttribute('aria-label'),
+                await nameOf(chip.querySelector('[data-filter-segment=condition]'), 'listbox'),
+                await nameOf(chip.querySelector('button[data-filter-segment=value]'), 'dialog'),
+                await nameOf(chip.querySelector('[data-filter-more]'), 'menu'),
                 chip.querySelector('[data-filter-more]').getAttribute('aria-label'),
             ];
         })()

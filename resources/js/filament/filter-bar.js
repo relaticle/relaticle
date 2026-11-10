@@ -14,6 +14,7 @@
     const register = () =>
         window.Alpine.data('filterBar', () => {
             let root = null
+            let scroller = null
 
             return {
                 fields: [],
@@ -37,6 +38,7 @@
 
                 init() {
                     root = this.$root
+                    scroller = this.$refs.strip
                     this.read()
                     this.chips = this.server.map((rule) => this.fromRule(rule))
                     this.sent = this.serialize(this.completeRules())
@@ -54,7 +56,7 @@
                     })
                     this.observer.observe(root, { attributes: true, attributeFilter: ['data-state'] })
                     this.sizeObserver = new ResizeObserver(() => this.fade())
-                    this.sizeObserver.observe(this.$refs.strip)
+                    this.sizeObserver.observe(scroller)
                     this.$watch('chips', () => this.$nextTick(() => this.fade()))
                 },
 
@@ -260,7 +262,7 @@
                 },
 
                 outside(event) {
-                    if (this.open && !event.target.closest('[data-pop], [data-pop-trigger]')) {
+                    if (this.open && !event.composedPath().some((node) => node.matches?.('[data-pop], [data-pop-trigger]'))) {
                         this.close(false)
                     }
                 },
@@ -274,25 +276,30 @@
                 },
 
                 fade() {
-                    const strip = this.$refs.strip
-                    const edge = strip.scrollWidth - strip.clientWidth - Math.abs(strip.scrollLeft)
+                    const edge = scroller.scrollWidth - scroller.clientWidth - Math.abs(scroller.scrollLeft)
 
-                    strip.parentElement.toggleAttribute('data-fade-start', strip.scrollLeft > 1)
-                    strip.parentElement.toggleAttribute('data-fade-end', edge > 1)
+                    scroller.parentElement.toggleAttribute('data-fade-start', scroller.scrollLeft > 1)
+                    scroller.parentElement.toggleAttribute('data-fade-end', edge > 1)
                 },
 
                 reveal(element) {
-                    const strip = this.$refs.strip
-                    const bounds = strip.getBoundingClientRect()
+                    const bounds = scroller.getBoundingClientRect()
                     const box = element.getBoundingClientRect()
 
                     if (box.right > bounds.right - FADE_WIDTH) {
-                        strip.scrollLeft += box.right - (bounds.right - FADE_WIDTH)
+                        scroller.scrollLeft += box.right - (bounds.right - FADE_WIDTH)
                     }
 
                     if (box.left < bounds.left + FADE_WIDTH) {
-                        strip.scrollLeft -= bounds.left + FADE_WIDTH - box.left
+                        scroller.scrollLeft -= bounds.left + FADE_WIDTH - box.left
                     }
+                },
+
+                revealFocus(target) {
+                    const chip = target.closest('.fi-filter-chip')
+                    const fits = chip && chip.offsetWidth <= scroller.clientWidth - FADE_WIDTH * 2
+
+                    this.reveal(fits ? chip : target)
                 },
 
                 visiblePop() {
@@ -311,7 +318,7 @@
                     }
 
 
-                    this.reveal(pop.closest('.fi-filter-chip') ?? pop.parentElement)
+                    this.revealFocus(this.opener ?? pop.parentElement)
 
                     if (pop.contains(document.activeElement)) {
                         return

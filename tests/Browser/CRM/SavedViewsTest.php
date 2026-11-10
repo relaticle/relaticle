@@ -12,6 +12,11 @@ use App\Models\User;
 
 mutates(HasSavedViews::class);
 
+function savedViewsWaitFor(string $condition): string
+{
+    return "(async () => { for (let attempt = 0; attempt < 50; attempt++) { if ({$condition}) { return true; } await new Promise((resolve) => setTimeout(resolve, 100)); } return false; })()";
+}
+
 function changeViewByRule(mixed $page, string $value = 'zzz'): void
 {
     $page->script("Livewire.all().find((component) => component.name.includes('ListCompanies')).\$wire.\$call('setFilterRules', [{ field: 'name', condition: 'contains', value: '{$value}' }])");
@@ -133,13 +138,72 @@ it('leaves the chip strip room on a phone with an icon discard beside save for e
         ->assertScript('(() => { const discard = document.querySelector("[data-view-save-action=discard]"); const icon = discard.querySelector(".fi-view-save-discard-icon"); return discard.textContent.trim() === "Discard changes" && icon.checkVisibility() && discard.querySelector(".fi-view-save-discard-text").getBoundingClientRect().width <= 1 && discard.getBoundingClientRect().height === document.querySelector("[data-filter-chip]").getBoundingClientRect().height; })()', true);
 
     $page->script('document.querySelector(".fi-filter-bar-start").scrollLeft = 99999');
-    $page->script('[...document.querySelectorAll("[data-filter-chip] [data-filter-more]")].at(-1).click()');
-    $page->assertScript('document.querySelector("[data-pop][data-open=true]") !== null', true)
+    $page->script('window.probeMore = [...document.querySelectorAll("[data-filter-chip] [data-filter-more]")].at(-1); window.probeMore.click()');
+    $page->assertScript(savedViewsWaitFor('(() => { const pop = document.querySelector("[data-pop][data-open=true]"); return Boolean(pop?.checkVisibility() && pop.contains(document.activeElement)); })()'), true)
         ->keys('[data-pop][data-open=true] [data-pop-item]', 'Escape')
-        ->assertMissing('[data-pop]:not([style*="display: none"])')
+        ->assertScript(savedViewsWaitFor('document.activeElement === window.probeMore'), true)
         ->click('[data-view-save-action="discard"]')
         ->assertScript('(async () => { for (let attempt = 0; attempt < 50; attempt++) { if (document.querySelectorAll("[data-filter-chip]").length === 0) { return true; } await new Promise((resolve) => setTimeout(resolve, 100)); } return false; })()', true)
         ->assertNoJavaScriptErrors();
+});
+
+it('keeps a tabbed-to chip control inside the strip on a phone', function (): void {
+    SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'name' => 'Team pipeline',
+        'is_shared' => true,
+        'state' => new TableStateData(sort: 'name:desc'),
+    ]);
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(390, 844)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->click('Team pipeline');
+    $page->script("Livewire.all().find((component) => component.name.includes('ListCompanies')).\$wire.\$call('setFilterRules', Array.from({ length: 3 }, (_, index) => ({ field: 'name', condition: 'contains', value: 'chip' + index })))");
+    $page->assertScript('document.querySelectorAll("[data-filter-chip]").length === 3', true);
+
+    $inside = 'document.activeElement.matches("[data-probe-target]") && (() => { const strip = document.querySelector(".fi-filter-bar-start").getBoundingClientRect(); const box = document.activeElement.getBoundingClientRect(); return box.left >= strip.left + 31 && box.right <= strip.right - 31; })()';
+
+    $page->script('document.querySelector(".fi-filter-bar-start").scrollLeft = 0; const chips = document.querySelectorAll("[data-filter-chip]"); chips[1].querySelector("[data-filter-more]").setAttribute("data-probe-prev", ""); chips[2].querySelector("[data-filter-segment=condition]").setAttribute("data-probe-cond", ""); chips[2].querySelector("button[data-filter-segment=value]").setAttribute("data-probe-value", ""); chips[2].querySelector("[data-filter-more]").setAttribute("data-probe-more", "")');
+    $page->keys('[data-probe-prev]', 'Tab')
+        ->keys('[data-probe-cond]', 'Tab')
+        ->script('document.activeElement.setAttribute("data-probe-target", "")');
+    $page->assertScript('document.activeElement === document.querySelector("[data-probe-value]")', true)
+        ->assertScript(savedViewsWaitFor($inside), true);
+
+    $page->script('document.activeElement.removeAttribute("data-probe-target")');
+    $page->keys('[data-probe-value]', 'Tab')
+        ->script('document.activeElement.setAttribute("data-probe-target", "")');
+    $page->assertScript('document.activeElement === document.querySelector("[data-probe-more]")', true)
+        ->assertScript(savedViewsWaitFor($inside), true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('shows the discard tooltip only below the small breakpoint, following a resize', function (): void {
+    SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'name' => 'Hot leads',
+        'state' => new TableStateData(sort: 'name:desc'),
+    ]);
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->click('Hot leads');
+    changeViewByRule($page);
+
+    $tooltip = 'getComputedStyle(document.querySelector("[data-view-save-action=discard]"), "::after").content';
+
+    $page->hover('[data-view-save-action="discard"]')
+        ->assertScript("{$tooltip} === 'none'", true)
+        ->resize(390, 844)
+        ->hover('[data-view-save-action="discard"]')
+        ->assertScript(savedViewsWaitFor("{$tooltip} === '\"Discard changes\"'"), true)
+        ->resize(1440, 900)
+        ->hover('[data-view-save-action="discard"]')
+        ->assertScript(savedViewsWaitFor("{$tooltip} === 'none'"), true);
 });
 
 it('keeps the text discard button at desktop width', function (): void {

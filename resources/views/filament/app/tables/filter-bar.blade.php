@@ -9,7 +9,7 @@
     wire:key="{{ $this->getId() }}.table.filter-bar"
 >
     <div class="fi-filter-bar-scroll" data-filter-scroll>
-    <div class="fi-filter-bar-start" x-ref="strip" x-on:scroll.passive="fade()" x-on:focusin="reveal($event.target.closest('.fi-filter-chip, .fi-filter-ghost') ?? $event.target)" wire:ignore role="group" aria-label="{{ __('filament/panel.tables.filters.bar') }}">
+    <div class="fi-filter-bar-start" x-ref="strip" x-on:scroll.passive="fade()" x-on:focusin="$event.target.matches(':focus-visible') && revealFocus($event.target)" wire:ignore role="group" aria-label="{{ __('filament/panel.tables.filters.bar') }}">
         <button type="button" tabindex="0" disabled class="fi-filter-ghost" data-filter-sort>
             <x-filament::icon icon="lucide-arrow-up-down" />
             {{ __('filament/panel.tables.filters.sort') }}
@@ -56,7 +56,8 @@
                         </span>
                     </template>
 
-                    <div class="fi-filter-pop" x-anchor.bottom-start.offset.6.fixed="$el.closest('.fi-filter-chip')" data-pop data-sheet x-cloak x-show="isOpen(chip.id, 'cond')" x-bind:data-open="isOpen(chip.id, 'cond')" role="listbox" x-bind:aria-label="@js(__('filament/panel.tables.filters.conditions_for')).replace(':chip', fieldOf(chip).label)" x-on:keydown="navigate($event)">
+                    <template x-if="isOpen(chip.id, 'cond')">
+                    <div class="fi-filter-pop" x-anchor.bottom-start.offset.6.fixed="$el.closest('.fi-filter-chip')" data-pop data-sheet x-bind:data-open="isOpen(chip.id, 'cond')" role="listbox" x-bind:aria-label="@js(__('filament/panel.tables.filters.conditions_for')).replace(':chip', fieldOf(chip).label)" x-on:keydown="navigate($event)">
                         <template x-for="condition in fieldOf(chip)?.conditions ?? []" x-bind:key="condition.value">
                             <button
                                 type="button"
@@ -74,6 +75,7 @@
                             </button>
                         </template>
                     </div>
+                    </template>
                 </div>
 
                 <template x-if="conditionOf(chip)?.takesValue">
@@ -100,7 +102,8 @@
                             </span>
                         </template>
 
-                        <div class="fi-filter-pop" x-anchor.bottom-start.offset.6.fixed="$el.closest('.fi-filter-chip')" data-pop data-sheet x-cloak x-show="isOpen(chip.id, 'val')" x-bind:data-open="isOpen(chip.id, 'val')" role="dialog" x-bind:aria-label="@js(__('filament/panel.tables.filters.value_for')).replace(':chip', label(chip))" x-on:keydown="navigate($event)">
+                        <template x-if="isOpen(chip.id, 'val')">
+                        <div class="fi-filter-pop" x-anchor.bottom-start.offset.6.fixed="$el.closest('.fi-filter-chip')" data-pop data-sheet x-bind:data-open="isOpen(chip.id, 'val')" role="dialog" x-bind:aria-label="@js(__('filament/panel.tables.filters.value_for')).replace(':chip', label(chip))" x-on:keydown="navigate($event)">
                             <template x-if="isListEditor(chip)">
                                 <div class="fi-filter-checklist">
                                     <template x-if="showSearch(chip)">
@@ -159,6 +162,7 @@
                                 </div>
                             </template>
                         </div>
+                        </template>
                     </div>
                 </template>
 
@@ -178,12 +182,14 @@
                         <x-filament::icon icon="lucide-ellipsis-vertical" />
                     </button>
 
-                    <div class="fi-filter-pop" x-anchor.bottom-end.offset.6.fixed="$el.closest('.fi-filter-chip')" data-pop data-sheet x-cloak x-show="isOpen(chip.id, 'more')" x-bind:data-open="isOpen(chip.id, 'more')" role="menu" x-bind:aria-label="@js(__('filament/panel.tables.filters.menu_for')).replace(':chip', label(chip))" x-on:keydown="navigate($event)">
+                    <template x-if="isOpen(chip.id, 'more')">
+                    <div class="fi-filter-pop" x-anchor.bottom-end.offset.6.fixed="$el.closest('.fi-filter-chip')" data-pop data-sheet x-bind:data-open="isOpen(chip.id, 'more')" role="menu" x-bind:aria-label="@js(__('filament/panel.tables.filters.menu_for')).replace(':chip', label(chip))" x-on:keydown="navigate($event)">
                         <button type="button" tabindex="0" role="menuitem" class="fi-filter-item fi-danger" data-pop-item data-filter-remove x-on:click="remove(chip)">
                             <x-filament::icon icon="lucide-trash-2" />
                             {{ __('filament/panel.tables.filters.remove') }}
                         </button>
                     </div>
+                    </template>
                 </div>
             </div>
         </template>
@@ -205,7 +211,8 @@
                 <span x-show="chips.length === 0">{{ __('filament/panel.tables.filters.add') }}</span>
             </button>
 
-            <div class="fi-filter-pop fi-filter-pop-picker" x-anchor.bottom-start.offset.6.fixed="$el.parentElement" data-pop data-sheet x-cloak x-show="isOpen('add', 'field')" x-bind:data-open="isOpen('add', 'field')" x-on:keydown="navigate($event)">
+            <template x-if="isOpen('add', 'field')">
+            <div class="fi-filter-pop fi-filter-pop-picker" x-anchor.bottom-start.offset.6.fixed="$el.parentElement" data-pop data-sheet x-bind:data-open="isOpen('add', 'field')" x-on:keydown="navigate($event)">
                 <label class="fi-filter-find">
                     <x-filament::icon icon="lucide-search" />
                     <input
@@ -227,6 +234,7 @@
                     <p class="fi-filter-hint" x-show="matchingFields().length === 0">{{ __('filament/panel.tables.filters.no_field') }}</p>
                 </div>
             </div>
+            </template>
         </div>
     </div>
     </div>
