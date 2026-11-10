@@ -141,9 +141,10 @@ final readonly class FilterFieldCatalog
         $fields = [];
 
         foreach (resolve(WorkspaceCustomFields::class)->forEntity($user->currentWorkspace, $entity->value) as $field) {
-            $kind = CustomFieldType::tryFrom($field->type)?->filterFieldKind();
+            $type = CustomFieldType::tryFrom($field->type);
+            $kind = $type?->filterFieldKind();
 
-            if ($kind === null || (string) $field->tenant_id !== (string) $workspaceId || ! CustomFieldFilterSchema::isFilterable($field)) {
+            if ($type === null || $kind === null || (string) $field->tenant_id !== (string) $workspaceId || ! CustomFieldFilterSchema::isFilterable($field)) {
                 continue;
             }
 
@@ -152,12 +153,12 @@ final readonly class FilterFieldCatalog
                 key: $key,
                 entity: $entity,
                 label: $field->name,
-                icon: $field->typeData->icon,
+                icon: $type->icon(),
                 kind: $kind,
                 related: $kind === FilterFieldKind::Record ? CrmEntity::tryFrom((string) $field->lookup_type) : null,
                 options: self::customOptions($field, $kind),
                 operators: CustomFieldFilterSchema::operatorKeys($field->type),
-                type: CustomFieldType::tryFrom($field->type),
+                type: $type,
                 definition: $field,
             );
         }

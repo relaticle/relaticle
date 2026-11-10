@@ -43,6 +43,10 @@
     & .fi-view-save-more {
         @apply rounded-s-none border-s border-primary-800 px-2 dark:border-primary-700;
     }
+
+    & .fi-btn:focus-visible {
+        @apply relative z-10;
+    }
 }
 
 /* The small tile in front of a view: primary for a saved view, gray for the built-in list, info for board and cards. */

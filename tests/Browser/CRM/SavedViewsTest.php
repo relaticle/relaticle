@@ -117,6 +117,39 @@ it('joins the save halves into one chip-height control that stays pinned beside 
     $page->assertNoJavaScriptErrors();
 });
 
+it('draws the keyboard focus ring of each save half over the half beside it', function (): void {
+    SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'name' => 'Team pipeline',
+        'is_shared' => true,
+        'state' => new TableStateData(sort: 'name:desc'),
+    ]);
+    $focusedHalfIsAbove = 'document.activeElement.matches(":focus-visible") && Number(getComputedStyle(document.activeElement).zIndex) > 0';
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->click('Team pipeline');
+    changeViewByRule($page);
+    $page->assertSee('Save for everyone');
+
+    if (! str_contains((string) $page->script('navigator.userAgent'), 'Chrome')) {
+        $this->markTestSkipped('Safari never matches :focus-visible on a button reached without a real Tab key.');
+    }
+
+    $page->script('document.querySelector("[data-view-save-action=save]").focus()');
+    $page->keys('[data-view-save-action="save"]', 'Shift')
+        ->assertScript('document.activeElement === document.querySelector("[data-view-save-action=save]")', true)
+        ->assertScript($focusedHalfIsAbove, true);
+
+    $page->script('document.querySelector(".fi-view-save-more").focus()');
+    $page->keys('.fi-view-save-more', 'Shift')
+        ->assertScript('document.activeElement === document.querySelector(".fi-view-save-more")', true)
+        ->assertScript($focusedHalfIsAbove, true)
+        ->assertNoJavaScriptErrors();
+});
+
 it('leaves the chip strip room on a phone with an icon discard beside save for everyone', function (): void {
     SavedView::factory()->for($this->user)->for($this->workspace)->create([
         'name' => 'Team pipeline',

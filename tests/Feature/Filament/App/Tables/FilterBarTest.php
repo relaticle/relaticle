@@ -37,6 +37,7 @@ use App\Queries\Filters\LogicFilter;
 use App\Queries\Filters\StaleDaysFilter;
 use App\Queries\Filters\TreeFilter;
 use App\Queries\FilterTree;
+use App\Support\IconPath;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Support\Colors\Color;
@@ -2011,6 +2012,20 @@ it('hands the sort and group controls an icon for each column that has one', fun
 
     expect($sortable['name']['icon'])->not->toBeEmpty()
         ->and(collect(livewire(ManageTasks::class)->instance()->getFilterBarData()['groups'])->keyBy('id')['status_group']['icon'])->not->toBeEmpty();
+});
+
+it('draws every custom field icon from the app own outline set', function (): void {
+    filterBarField($this->user, 'opportunity', 'budget', 'currency');
+    filterBarField($this->user, 'opportunity', 'pick', 'select', ['Won', 'Lost']);
+    filterBarField($this->user, 'opportunity', 'due', 'date');
+
+    $data = livewire(ListOpportunities::class)->instance()->getFilterBarData();
+    $fields = collect($data['fields'])->keyBy('key');
+
+    expect($fields['custom_fields.budget']['icon'])->toBe(IconPath::for(CustomFieldType::CURRENCY->icon()))
+        ->and($fields['custom_fields.pick']['icon'])->toBe(IconPath::for(CustomFieldType::SELECT->icon()))
+        ->and($fields['custom_fields.due']['icon'])->toBe(IconPath::for(CustomFieldType::DATE->icon()))
+        ->and(collect($data['sortable'])->keyBy('key')['custom_fields.budget']['icon'])->toBe(IconPath::for(CustomFieldType::CURRENCY->icon()));
 });
 
 it('hands the chip bar the period units with their limits ', function (): void {
