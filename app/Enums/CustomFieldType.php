@@ -136,7 +136,7 @@ enum CustomFieldType: string
     {
         return match ($this) {
             self::EMAIL => 'the address as stored',
-            self::PHONE => 'the stored number, such as +14155550100, with no spaces or punctuation',
+            self::PHONE => 'the stored number, such as +14155550100, with an extension as ;ext=12 and no spaces',
             self::LINK => 'the link as it was saved, which keeps a scheme only when one was typed',
             self::DOMAIN => 'the bare host, without a scheme or www',
             default => null,
