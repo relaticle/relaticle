@@ -223,6 +223,8 @@ final readonly class CustomFieldFilter implements Filter
                         ? $this->wholeDay($q, $valueColumn, $operator, $operand)
                         : $q->where($valueColumn, CustomFieldFilterSchema::COMPARISONS[$operator], $operand),
                     '$contains' => $q->where($valueColumn, 'ILIKE', '%'.LikePattern::escape((string) $operand).'%'),
+                    '$starts_with' => $q->where($valueColumn, 'ILIKE', LikePattern::escape((string) $operand).'%'),
+                    '$ends_with' => $q->where($valueColumn, 'ILIKE', '%'.LikePattern::escape((string) $operand)),
                     '$in' => $q->whereIn($valueColumn, $operand),
                     '$has_any' => $this->containsAny($q, $field, $operand),
                     default => throw new \LogicException("Unsupported custom field filter operator [{$operator}]."),
