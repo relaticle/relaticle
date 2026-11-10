@@ -10,7 +10,13 @@
     ];
 @endphp
 
-<x-filament::dropdown placement="bottom-start" width="xs" shift class="fi-view-switcher">
+<x-filament::dropdown
+    placement="bottom-start"
+    width="xs"
+    shift
+    class="fi-view-switcher"
+    x-on:view-save-settled.window="setTimeout(() => (document.activeElement === document.body || document.activeElement.closest('[data-view-save]')) && $el.querySelector('.fi-view-switcher-trigger')?.focus())"
+>
     <x-slot name="trigger">
         <x-filament::button
             color="gray"

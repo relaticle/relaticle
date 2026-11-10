@@ -280,3 +280,58 @@ it('opens the built-in list from the board even when a view was last applied on 
         ->assertScript('location.search', '')
         ->assertNoJavaScriptErrors();
 });
+
+it('returns focus to the view switcher after discarding or saving from the keyboard', function (): void {
+    SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'name' => 'Hot leads',
+        'state' => new TableStateData(sort: 'name:desc'),
+    ]);
+    $onSwitcher = 'document.activeElement === document.querySelector(".fi-view-switcher-trigger") && document.activeElement !== document.body';
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->click('Hot leads')
+        ->type('.fi-ta-search-field input', 'zzz')
+        ->assertSee('Discard changes');
+
+    $page->script('document.querySelector("[data-view-save-action=discard]").focus()');
+    $page->keys('[data-view-save-action="discard"]', 'Enter')
+        ->assertDontSee('Discard changes')
+        ->assertScript($onSwitcher, true);
+
+    $page->type('.fi-ta-search-field input', 'yyy')
+        ->assertSee('Discard changes');
+    $page->script('document.querySelector("[data-view-save-action=save]").focus()');
+    $page->keys('[data-view-save-action="save"]', 'Enter')
+        ->assertDontSee('Discard changes')
+        ->assertScript($onSwitcher, true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('returns focus to the view switcher once the confirmation for saving over a shared view closes', function (): void {
+    $member = User::factory()->create(['current_workspace_id' => $this->workspace->getKey()]);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
+    SavedView::factory()->for($member)->for($this->workspace)->create([
+        'name' => 'Team pipeline',
+        'is_shared' => true,
+        'state' => new TableStateData(sort: 'name:desc'),
+    ]);
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->click('Team pipeline')
+        ->type('.fi-ta-search-field input', 'zzz')
+        ->click('[data-view-save-action="save"]')
+        ->assertSee('Save over "Team pipeline"?');
+
+    $page->click('.fi-modal-footer-actions .fi-color-primary')
+        ->assertDontSee('Save over "Team pipeline"?')
+        ->assertScript('document.activeElement === document.querySelector(".fi-view-switcher-trigger")', true)
+        ->assertNoJavaScriptErrors();
+});

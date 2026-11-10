@@ -498,8 +498,17 @@ it('lets a member apply but not change someone else\'s shared view', function ()
         ->call('applySavedView', $view->getKey())
         ->assertActionHidden('renameSavedView', ['view' => $view->getKey()])
         ->assertActionHidden('deleteSavedView', ['view' => $view->getKey()])
-        ->callAction('saveSavedView')
-        ->assertForbidden();
+        ->assertActionHidden('saveSavedView');
+});
+
+it('refuses to save over a shared view the member may not edit, whatever reaches the action', function (): void {
+    $view = viewFor(savedViewMember(WorkspaceRole::Member), ['name' => 'Team', 'is_shared' => true, 'state' => hotLeads()]);
+    $member = savedViewMember(WorkspaceRole::Member);
+
+    expect(fn () => resolve(UpdateSavedView::class)->execute($member, $view, ['state' => hotLeads()]))
+        ->toThrow(HttpException::class);
+
+    expect($view->refresh()->state->sort)->toBe('created_at:desc');
 });
 
 it('lets an admin rename and delete someone else\'s shared view, but not see a private one', function (): void {
@@ -670,8 +679,34 @@ it('labels the save control by who owns the view and who may edit it', function 
     'own shared view' => [WorkspaceRole::Member, true, true, 'shared', ['Save for everyone', 'Save as new view'], []],
     'admin on another member\'s shared view' => [WorkspaceRole::Admin, false, true, 'shared', ['Save for everyone', 'Save as new view'], []],
     'member on another member\'s shared view' => [WorkspaceRole::Member, false, true, 'copy-only', ['Save as new view'], ['Save for everyone']],
+    'viewer on their own private view' => [WorkspaceRole::Viewer, true, false, 'private', ['Save as new view'], ['Save for everyone']],
+    'viewer on their own shared view' => [WorkspaceRole::Viewer, true, true, 'shared', ['Save for everyone', 'Save as new view'], []],
     'viewer on another member\'s shared view' => [WorkspaceRole::Viewer, false, true, 'copy-only', ['Save as new view'], ['Save for everyone']],
 ]);
+
+it('labels the save control for the workspace owner on another member\'s shared view', function (): void {
+    $view = viewFor(savedViewMember(WorkspaceRole::Member), ['name' => 'Team', 'is_shared' => true, 'state' => hotLeads()]);
+
+    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->set('tableSort', 'name:asc')
+        ->assertSeeHtml('data-view-save="shared"')
+        ->assertSeeText(['Discard changes', 'Save for everyone', 'Save as new view']);
+});
+
+it('lets the workspace owner save over another member\'s shared view after confirming', function (): void {
+    $owner = savedViewMember(WorkspaceRole::Member);
+    $view = viewFor($owner, ['name' => 'Team', 'is_shared' => true, 'state' => hotLeads()]);
+
+    livewire(ListCompanies::class)
+        ->call('applySavedView', $view->getKey())
+        ->set('tableSort', 'name:asc')
+        ->mountAction('saveSavedView')
+        ->assertMountedActionModalSee('Save over "Team"?')
+        ->callMountedAction()
+        ->assertNotified('"Team" saved');
+
+    expect($view->refresh()->state->sort)->toBe('name:asc')
+        ->and($owner->notifications()->sole()->data['change'])->toBe(SavedViewChange::Updated->value);
+});
 
 it('offers a plain save and a save as new view on the member\'s own private view', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);

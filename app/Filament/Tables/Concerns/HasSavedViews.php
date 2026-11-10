@@ -138,6 +138,7 @@ trait HasSavedViews
     {
         if ($this->activeSavedViewId !== null) {
             $this->applySavedView($this->activeSavedViewId);
+            $this->dispatch('view-save-settled');
         }
     }
 
@@ -145,6 +146,7 @@ trait HasSavedViews
     {
         return Action::make('saveSavedView')
             ->label(__('filament/panel.tables.views.save'))
+            ->visible(fn (): bool => ! ($this->getActiveSavedView() instanceof SavedView) || $this->canUpdateSavedView($this->getActiveSavedView()))
             ->requiresConfirmation()
             ->modalHidden(fn (): bool => ! $this->isSomeoneElsesSavedView($this->getActiveSavedView()))
             ->modalIcon('lucide-users')
@@ -163,6 +165,7 @@ trait HasSavedViews
                 $view = resolve(UpdateSavedView::class)->execute($this->savedViewUser(), $view, ['state' => $this->currentTableState()]);
                 $this->markSavedViewApplied();
                 $this->visibleSavedViews = null;
+                $this->dispatch('view-save-settled');
 
                 Notification::make()->success()->title(__('filament/panel.tables.views.saved', ['name' => e($view->name)]))->send();
             });
