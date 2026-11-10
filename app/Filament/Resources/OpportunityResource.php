@@ -64,11 +64,9 @@ final class OpportunityResource extends Resource
             ->emptyStateDescription(EmptyListDescription::unlessFiltered(__('filament/resources/opportunity.empty_state.description')))
             ->columns([
                 RecordChipColumn::make('name')
-                    ->previewable()
-                    ->searchable(),
+                    ->previewable(),
                 TextColumn::make('creator.name')
                     ->label(__('filament/resources/opportunity.fields.creator.label'))
-                    ->searchable()
                     ->sortable()
                     ->toggleable()
                     ->visibleFrom('sm')

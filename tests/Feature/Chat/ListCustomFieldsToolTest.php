@@ -123,6 +123,13 @@ it('returns the current settings and the settable ones so a change starts from t
         ->and($amount['settings'])->toHaveKey('visible_in_list');
 });
 
+it('lists no searchable setting for a field', function (): void {
+    $payload = json_decode(resolve(ListCustomFieldsTool::class)->handle(new Request(['entity_type' => 'company'])), true);
+
+    expect($payload['custom_fields'])->not->toBeEmpty()
+        ->and(collect($payload['custom_fields'])->every(fn (array $field): bool => ! array_key_exists('searchable', $field['settings'])))->toBeTrue();
+});
+
 it('offers uniqueness on a regular text field but not on a system one', function (): void {
     $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
 

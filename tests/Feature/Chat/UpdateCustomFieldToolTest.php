@@ -402,6 +402,21 @@ it('refuses to make an encrypted field searchable, as the panel hides the toggle
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
 });
 
+it('refuses the retired searchable setting on a plain field', function (): void {
+    $result = makeUpdateFieldTool($this->convId)->handle(new Request(['records' => [[
+        'entity_type' => 'company',
+        'code' => $this->field->code,
+        'settings' => ['searchable' => true],
+    ]]]));
+
+    expect($result)->toContain('does not accept: searchable')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('does not describe a search setting to the model', function (): void {
+    expect(makeUpdateFieldTool($this->convId)->description())->not->toContain('search');
+});
+
 it('refuses a setting value the panel does not offer', function (string $type, array $settings, string $key): void {
     $field = CustomField::factory()->create([
         config('custom-fields.database.column_names.tenant_foreign_key') => $this->workspace->getKey(),

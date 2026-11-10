@@ -139,7 +139,7 @@ final class SearchCrmTool implements Tool
     }
 
     /**
-     * Adds a single OR-EXISTS clause matching this entity's searchable custom field values.
+     * Adds a single OR-EXISTS clause matching this entity's custom field values.
      *
      * @template TModel of Model
      *

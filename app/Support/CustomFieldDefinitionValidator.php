@@ -196,7 +196,7 @@ final readonly class CustomFieldDefinitionValidator
         if ($unsupported !== []) {
             throw ValidationException::withMessages([
                 'settings' => sprintf(
-                    'A %s field does not accept: %s. It accepts: %s. Some settings only apply alongside another in the same call: max_values needs allow_multiple set to true, list_toggleable_hidden needs visible_in_list set to true, and searchable is unavailable on encrypted fields.',
+                    'A %s field does not accept: %s. It accepts: %s. Some settings only apply alongside another in the same call: max_values needs allow_multiple set to true, and list_toggleable_hidden needs visible_in_list set to true.',
                     $field->type,
                     implode(', ', $unsupported),
                     implode(', ', array_keys($settingRules)),

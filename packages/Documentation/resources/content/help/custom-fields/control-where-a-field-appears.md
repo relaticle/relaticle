@@ -1,8 +1,8 @@
 ---
 title: Control where a field appears
-description: A field's settings decide its place in lists and record pages, and whether it can be searched or filtered.
+description: A field's settings decide its place in lists and record pages, and how it filters and sorts.
 order: 3
-updated: "2026-08-13"
+updated: "2026-11-10"
 related: [help/custom-fields/add-and-manage-fields, help/getting-started/find-anything-with-search-and-filters]
 ---
 
@@ -10,7 +10,7 @@ Every field has a **Settings** section that controls where it shows up and
 how it behaves. Open the field from the **Custom Fields** page to change
 them; changes apply to the whole workspace immediately.
 
-![The Edit field form's Settings section with toggles for Visible in List, Visible in View, Toggleable Hidden, Searchable, Encrypted, and Enable Color Options](/help-assets/custom-fields/control-where-a-field-appears-1.png)
+![The Edit field form's Settings section with toggles for Visible in List, Visible in View, Toggleable Hidden, Encrypted, and Enable Color Options](/help-assets/custom-fields/control-where-a-field-appears-1.png)
 
 ## Visibility
 
@@ -23,13 +23,13 @@ them; changes apply to the whole workspace immediately.
 A field that's off in both places still exists on the create/edit form. Use
 this for data you capture but don't need to see day-to-day.
 
-## Search, filters, and sorting
+## Filters and sorting
 
-- **Searchable** lets the search box on boards and on related-record tables
-  match this field's values. Lists have no search box. Filter them instead.
-- **Filters** appear automatically for choice fields: Select, Multi Select,
-  Radio, Checkbox List, Toggle Buttons, Tags Input, and Record fields all get
-  a filter on their list page. Text, number, and date fields don't.
+- **Filters** need no setting. Choice fields get a filter on their list page:
+  Select, Multi Select, Radio, Checkbox List, Toggle Buttons, Tags Input, and
+  Record fields. Text, Number, and Date fields get one too.
+- **Search** needs no setting. Rela and the MCP server match every field's
+  values. The sidebar search matches names and titles.
 - **Sorting** works on text, number, currency, and date columns. Multi-value
   and contact-type columns (emails, phones, links) don't sort.
 

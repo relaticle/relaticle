@@ -235,6 +235,18 @@ it('refuses a setting the field type does not take', function (): void {
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
 });
 
+it('refuses the retired searchable setting', function (): void {
+    $decoded = proposeCustomFields($this->convId, [
+        'entity_type' => 'company',
+        'name' => 'Region',
+        'type' => 'text',
+        'settings' => ['searchable' => true],
+    ]);
+
+    expect($decoded['error'])->toContain('does not accept: searchable')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
 it('refuses a currency the panel does not offer', function (): void {
     $decoded = proposeCustomFields($this->convId, [
         'entity_type' => 'opportunity',

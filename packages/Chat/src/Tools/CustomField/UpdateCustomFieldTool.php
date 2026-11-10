@@ -40,7 +40,7 @@ final class UpdateCustomFieldTool implements Tool
 
     public function description(): string
     {
-        return 'Propose renaming a custom field, toggling its active status, or changing its settings (decimal places, currency, currency display, list and view visibility, search, option colors, multiple values, uniqueness). Owners and admins only. System-defined fields keep their name and cannot be deactivated, but their settings can change and an inactive one can be reactivated. Call ListCustomFieldsTool first: it returns each field\'s current settings and which ones it accepts. Returns a proposal for user approval.';
+        return 'Propose renaming a custom field, toggling its active status, or changing its settings (decimal places, currency, currency display, list and view visibility, option colors, multiple values, uniqueness). Owners and admins only. System-defined fields keep their name and cannot be deactivated, but their settings can change and an inactive one can be reactivated. Call ListCustomFieldsTool first: it returns each field\'s current settings and which ones it accepts. Returns a proposal for user approval.';
     }
 
     public function schema(JsonSchema $schema): array

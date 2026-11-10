@@ -111,13 +111,11 @@ final class NoteResource extends Resource
     private static function columns(): array
     {
         return [
-            TextColumn::make('title')
-                ->searchable(),
+            TextColumn::make('title'),
             LinkedRecordsColumn::make('relations')
                 ->toggleable(),
             TextColumn::make('creator.name')
                 ->label(__('filament/resources/note.fields.creator.label'))
-                ->searchable()
                 ->sortable()
                 ->toggleable()
                 ->visibleFrom('sm')

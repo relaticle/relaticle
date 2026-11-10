@@ -69,6 +69,7 @@ use Filament\Auth\Notifications\ResetPassword;
 use Filament\Auth\Notifications\VerifyEmail;
 use Filament\Auth\Notifications\VerifyEmailChange;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Toggle;
 use Filament\Livewire\Notifications;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Section;
@@ -736,6 +737,12 @@ final class AppServiceProvider extends ServiceProvider
         ]);
 
         $this->configureCustomFieldSchemaInvalidation();
+        $this->hideRetiredCustomFieldSettings();
+    }
+
+    private function hideRetiredCustomFieldSettings(): void
+    {
+        Toggle::configureUsing(fn (Toggle $toggle): Toggle => $toggle->getName() === 'settings.searchable' ? $toggle->hidden() : $toggle);
     }
 
     /**

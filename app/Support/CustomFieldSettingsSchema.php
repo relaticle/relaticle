@@ -33,6 +33,7 @@ final readonly class CustomFieldSettingsSchema
         'visible_in_list' => 'custom-fields::custom-fields.field.form.visible_in_list',
         'visible_in_view' => 'custom-fields::custom-fields.field.form.visible_in_view',
         'list_toggleable_hidden' => 'custom-fields::custom-fields.field.form.list_toggleable_hidden',
+        // Retired setting, kept so old activity log entries still label it.
         'searchable' => 'custom-fields::custom-fields.field.form.searchable',
         'enable_option_colors' => 'custom-fields::custom-fields.field.form.enable_option_colors',
         'allow_multiple' => 'custom-fields::custom-fields.field.form.allow_multiple',
@@ -61,10 +62,6 @@ final readonly class CustomFieldSettingsSchema
 
         if (FeatureManager::isEnabled(CustomFieldsFeature::UI_TOGGLEABLE_COLUMNS) && (bool) $resulting['visible_in_list']) {
             $rules['list_toggleable_hidden'] = ['boolean'];
-        }
-
-        if ($type?->searchable === true && ! $field->settings->encrypted) {
-            $rules['searchable'] = ['boolean'];
         }
 
         if (FeatureManager::isEnabled(CustomFieldsFeature::FIELD_OPTION_COLORS) && in_array($field->type, self::OPTION_COLOR_TYPES, true)) {

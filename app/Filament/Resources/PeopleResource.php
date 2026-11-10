@@ -145,16 +145,13 @@ final class PeopleResource extends Resource
             RecordChipColumn::make('name')
                 ->previewable()
                 ->label(__('filament/resources/person.fields.name.label'))
-                ->searchable()
                 ->sortable(),
             RecordChipColumn::make('company.name')
                 ->label(__('filament/resources/person.fields.company.label'))
                 ->url(fn (People $record): ?string => $record->company_id ? CompanyResource::getUrl('view', [$record->company_id]) : null)
-                ->searchable()
                 ->sortable(),
             TextColumn::make('creator.name')
                 ->label(__('filament/resources/person.fields.creator.label'))
-                ->searchable()
                 ->sortable()
                 ->toggleable()
                 ->visibleFrom('sm')

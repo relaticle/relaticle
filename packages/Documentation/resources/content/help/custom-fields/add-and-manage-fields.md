@@ -27,7 +27,7 @@ table you can search with **Search fields...**.
 4. Name it (names must be unique per record type).
 5. For choice types, add the **Options**.
 6. Adjust the **Settings** toggles (where the field shows up, whether it's
-   searchable) and save.
+   encrypted) and save.
 
 The field appears on the record form, the record page, and (if you enabled
 it) the list view immediately, for everyone in the workspace. It's also

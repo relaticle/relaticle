@@ -111,16 +111,13 @@ final class CompanyResource extends Resource
             RecordChipColumn::make('name')
                 ->previewable()
                 ->label(__('filament/resources/company.fields.name.label'))
-                ->searchable()
                 ->sortable(),
             RecordChipColumn::make('accountOwner.name')
                 ->label(__('filament/resources/company.fields.account_owner.label'))
-                ->searchable()
                 ->sortable()
                 ->toggleable(),
             TextColumn::make('creator.name')
                 ->label(__('filament/resources/company.fields.created_by.label'))
-                ->searchable()
                 ->sortable()
                 ->toggleable()
                 ->visibleFrom('sm')
@@ -133,7 +130,6 @@ final class CompanyResource extends Resource
             TextColumn::make('created_at')
                 ->label(__('filament/resources/company.fields.created_at.label'))
                 ->dateTime()
-                ->searchable()
                 ->sortable()
                 ->visibleFrom('sm')
                 ->toggleable(),
@@ -144,7 +140,6 @@ final class CompanyResource extends Resource
                 ->label(__('filament/resources/company.fields.updated_at.label'))
                 ->since()
                 ->dateTimeTooltip()
-                ->searchable()
                 ->sortable()
                 ->toggleable(),
         ];

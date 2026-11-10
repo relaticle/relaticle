@@ -102,7 +102,6 @@ final class TaskResource extends Resource
             ->emptyStateDescription(EmptyListDescription::unlessFiltered(__('filament/resources/task.empty_state.description')))
             ->columns(self::columns())
             ->defaultSort('created_at', 'desc')
-            ->searchable()
             ->groups(array_filter([
                 ...collect(['status', 'priority'])->map(fn (string $fieldCode): ?\Filament\Tables\Grouping\Group => $customFields->has($fieldCode) ? self::makeCustomFieldGroup($fieldCode, $customFields, $valueResolver) : null
                 )->filter()->toArray(),
@@ -134,7 +133,6 @@ final class TaskResource extends Resource
     {
         return [
             TextColumn::make('title')
-                ->searchable()
                 ->limit(50)
                 ->weight('medium'),
             LinkedRecordsColumn::make('relations')
@@ -142,11 +140,9 @@ final class TaskResource extends Resource
             RecordChipColumn::make('assignees.name')
                 ->label(__('filament/resources/task.fields.assignees.label'))
                 ->collapsed()
-                ->searchable()
                 ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('creator.name')
                 ->label(__('filament/resources/task.fields.creator.label'))
-                ->searchable()
                 ->sortable()
                 ->toggleable()
                 ->visibleFrom('sm')

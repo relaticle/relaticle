@@ -208,6 +208,14 @@ test('the custom fields form refuses the domain type and still creates a text fi
     expect($created->all())->toBe(['Plain probe' => 'text']);
 });
 
+test('the custom fields form offers no searchable toggle', function (): void {
+    livewire(ManageFieldsTable::class, ['entityType' => 'company'])
+        ->mountAction('createField')
+        ->fillForm(['type' => 'text'])
+        ->assertSchemaComponentExists('settings.visible_in_list', 'mountedActionSchema0')
+        ->assertSchemaComponentHidden('settings.searchable', 'mountedActionSchema0');
+});
+
 function mountFieldsTableThenDemoteAdmin(object $test): array
 {
     $admin = User::factory()->create(['current_workspace_id' => $test->workspace->getKey()]);

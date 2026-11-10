@@ -49,8 +49,7 @@ Follow these steps to check it.
 3. Under **Settings**, turn on **Visible in List**.
 4. Save the field.
 
-The **Searchable** setting has no effect on the filter panel. See
-[Use custom fields](/help/getting-started/use-custom-fields) for every field setting.
+See [Use custom fields](/help/getting-started/use-custom-fields) for every field setting.
 
 ## Filter through the API, MCP or Rela
 
