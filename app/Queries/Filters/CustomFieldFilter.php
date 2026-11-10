@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Queries\Filters;
 
+use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
@@ -17,7 +18,9 @@ use App\Support\CustomFields\WorkspaceCustomFields;
 use App\Support\LikePattern;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Spatie\QueryBuilder\Filters\Filter;
 
@@ -307,9 +310,15 @@ final readonly class CustomFieldFilter implements Filter
      */
     private function emptiness(Builder $query, CustomField $field, bool $empty): void
     {
-        $holdingAValue = static function (Builder $values) use ($field): void {
+        $holdingAValue = function (Builder $values) use ($field): void {
             /** @var Builder<CustomFieldValue> $values */
             $values->holdingAValue($field);
+
+            $liveRecords = $this->liveRecordElements($field);
+
+            if ($liveRecords instanceof QueryBuilder) {
+                $values->whereExists($liveRecords);
+            }
         };
 
         $empty
@@ -327,7 +336,31 @@ final readonly class CustomFieldFilter implements Filter
             ? 'lower(element) = any('.self::LOWERED_OPERANDS.')'
             : 'element = any(?::text[])';
 
+        $liveRecords = $this->liveRecordElements($field);
+
+        if ($liveRecords instanceof QueryBuilder) {
+            $query->whereExists($liveRecords->whereRaw($matches, [$this->textArray($values)]));
+
+            return;
+        }
+
         $query->whereRaw('exists (select 1 from '.self::LIST_ELEMENTS." as element where {$matches})", [$this->textArray($values)]);
+    }
+
+    private function liveRecordElements(CustomField $field): ?QueryBuilder
+    {
+        $entity = $field->type === CustomFieldType::RECORD->value ? CrmEntity::tryFrom((string) $field->lookup_type) : null;
+
+        if ($entity === null) {
+            return null;
+        }
+
+        $liveRecord = DB::table($entity->table(), 'record')
+            ->whereRaw('record.id = lower(element)')
+            ->where('record.workspace_id', $field->tenant_id)
+            ->whereNull('record.deleted_at');
+
+        return DB::query()->fromRaw(self::LIST_ELEMENTS.' as element')->selectRaw('1')->whereExists($liveRecord->selectRaw('1'));
     }
 
     /**

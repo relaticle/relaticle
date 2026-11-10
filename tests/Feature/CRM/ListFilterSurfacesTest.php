@@ -717,7 +717,7 @@ it('filters a record custom field by linked record id alike on the api and mcp',
     $globex->delete();
 
     expectTitlesOnEverySurface($this, $this->user, 'opportunities', [
-        [$on(['$has_any' => [$globex->getKey()]]), ['High']],
+        [$on(['$has_any' => [$globex->getKey()]]), []],
         [$on(['$is_empty' => false]), ['Low', 'High']],
     ]);
 });

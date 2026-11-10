@@ -193,6 +193,11 @@ the REST guide. Update those by hand.
   records with an empty value under $not").
   The inner matched set reads deleted rows when the model soft-deletes. The outer query alone
   decides which rows are listed.
+  `FilterBarTest` "lists neither the live nor the deleted record when a negated name rule matches
+  both" is the gate.
+- A record custom field counts an id only when it names a live record of its lookup type in the
+  field's workspace. A link to a deleted record is no link, and restoring the record restores it.
+  `ListFilterTest` "treats a record custom field link to a deleted record as no link" is the gate.
 - `$not_in` and `$has_none` keep a record whose value is empty too. A relation and a custom
   field compile them as `NOT EXISTS`. A native column compiles `$not_in` as `whereNotIn` with
   `orWhereNull`.

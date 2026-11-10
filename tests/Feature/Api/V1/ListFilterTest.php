@@ -446,6 +446,39 @@ it('counts a person whose company is trashed as having no company', function ():
         ->and(listIds($this, 'people', ['company' => ['$is_empty' => false]]))->toBe([]);
 });
 
+it('treats a record custom field link to a deleted record as no link', function (): void {
+    $field = app(CreateCustomField::class)->execute($this->user, ['entity_type' => 'company', 'name' => 'Partner', 'code' => 'partner', 'type' => 'record', 'lookup_type' => 'people']);
+    $live = People::factory()->recycle([$this->user, $this->workspace])->create();
+    $gone = People::factory()->recycle([$this->user, $this->workspace])->create();
+    $orphaned = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $mixed = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $orphaned->saveCustomFieldValue($field, [$gone->id]);
+    $mixed->saveCustomFieldValue($field, [$live->id, $gone->id]);
+    $gone->delete();
+
+    $partner = fn (array $condition): array => listIds($this, 'companies', ['custom_fields' => ['partner' => $condition]]);
+
+    expect($partner(['$is_empty' => true]))->toBe([$orphaned->id])
+        ->and($partner(['$is_empty' => false]))->toBe([$mixed->id])
+        ->and($partner(['$has_any' => [$gone->id]]))->toBe([])
+        ->and($partner(['$has_none' => [$gone->id]]))->toEqualCanonicalizing([$orphaned->id, $mixed->id])
+        ->and($partner(['$has_any' => [$live->id]]))->toBe([$mixed->id]);
+
+    $gone->restore();
+
+    expect($partner(['$has_any' => [$gone->id]]))->toEqualCanonicalizing([$orphaned->id, $mixed->id]);
+});
+
+it('does not count a record custom field link to another workspace record', function (): void {
+    $field = app(CreateCustomField::class)->execute($this->user, ['entity_type' => 'company', 'name' => 'Partner', 'code' => 'partner', 'type' => 'record', 'lookup_type' => 'people']);
+    $stranger = User::factory()->withPersonalWorkspace()->create();
+    $foreign = People::factory()->recycle([$stranger, $stranger->personalWorkspace()])->create();
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $company->saveCustomFieldValue($field, [$foreign->id]);
+
+    expect(listIds($this, 'companies', ['custom_fields' => ['partner' => ['$is_empty' => true]]]))->toBe([$company->id]);
+});
+
 it('keeps a top-level condition and an $or group in one workspace-bound conjunction', function (): void {
     $stranger = User::factory()->withPersonalWorkspace()->create();
     $match = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme', 'creation_source' => CreationSource::API]);
