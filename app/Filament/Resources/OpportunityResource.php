@@ -7,6 +7,7 @@ namespace App\Filament\Resources;
 use App\Enums\CrmEntity;
 use App\Filament\Actions\PreviewRecordAction;
 use App\Filament\Components\Tables\EmptyListDescription;
+use App\Filament\Components\Tables\FilteredEmptyState;
 use App\Filament\Components\Tables\RecordChipColumn;
 use App\Filament\Concerns\RemembersViewMode;
 use App\Filament\Exports\OpportunityExporter;
@@ -62,6 +63,8 @@ final class OpportunityResource extends Resource
     {
         return $table
             ->emptyStateDescription(EmptyListDescription::unlessFiltered(__('filament/resources/opportunity.empty_state.description')))
+            ->emptyStateHeading(FilteredEmptyState::heading())
+            ->emptyStateActions([FilteredEmptyState::clearAction()])
             ->columns([
                 RecordChipColumn::make('name')
                     ->previewable(),

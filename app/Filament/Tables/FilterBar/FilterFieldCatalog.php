@@ -53,6 +53,7 @@ final readonly class FilterFieldCatalog
             'creator.name' => 'lucide-circle-user',
             'assignees.name' => 'lucide-users',
             'company.name' => 'lucide-building-complex',
+            'name', 'title' => 'lucide-type',
             'relations' => 'lucide-link',
             'created_at' => 'lucide-calendar',
             'updated_at' => 'lucide-clock',

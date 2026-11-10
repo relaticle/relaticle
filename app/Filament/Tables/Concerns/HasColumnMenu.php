@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Filament\Tables\Concerns;
 
+use App\Filament\Components\Tables\ColumnHeaderLabel;
+use App\Filament\Tables\FilterBar\FilterFieldCatalog;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
 use Filament\Support\Components\Attributes\Unexposed;
@@ -138,10 +140,12 @@ trait HasColumnMenu
             $label = $column->getLabel();
             $label = $label instanceof Htmlable ? $label : new HtmlString(e((string) $label));
 
+            $text = trim((string) preg_replace('/\s+/', ' ', html_entity_decode(strip_tags($label->toHtml()), ENT_QUOTES)));
+
             $columns[] = [
                 'name' => $item['name'],
-                'label' => $label,
-                'text' => trim((string) preg_replace('/\s+/', ' ', html_entity_decode(strip_tags($label->toHtml()), ENT_QUOTES))),
+                'label' => $item['name'] === $this->getTableTitleColumn() ? ColumnHeaderLabel::make($text, FilterFieldCatalog::columnIcon($item['name'])) : $label,
+                'text' => $text,
                 'isShown' => $item['isToggled'],
                 'isPinned' => in_array($item['name'], $this->tablePinnedColumns, true),
                 'isLocked' => ! $column->isToggleable(),

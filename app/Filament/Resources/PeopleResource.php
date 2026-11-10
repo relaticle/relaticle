@@ -10,6 +10,7 @@ use App\Filament\Components\Forms\RecordSelect;
 use App\Filament\Components\Forms\WorkspaceMemberSelect;
 use App\Filament\Components\RecordChip;
 use App\Filament\Components\Tables\EmptyListDescription;
+use App\Filament\Components\Tables\FilteredEmptyState;
 use App\Filament\Components\Tables\RecordChipColumn;
 use App\Filament\Concerns\RemembersViewMode;
 use App\Filament\Exports\PeopleExporter;
@@ -111,6 +112,8 @@ final class PeopleResource extends Resource
     {
         return $table
             ->emptyStateDescription(EmptyListDescription::unlessFiltered(__('filament/resources/person.empty_state.description')))
+            ->emptyStateHeading(FilteredEmptyState::heading())
+            ->emptyStateActions([FilteredEmptyState::clearAction()])
             ->columns(self::columns())
             ->defaultSort('created_at', 'desc')
             ->recordActions([

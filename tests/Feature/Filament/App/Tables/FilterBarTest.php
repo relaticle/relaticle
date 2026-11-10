@@ -36,6 +36,7 @@ use App\Queries\Filters\LogicFilter;
 use App\Queries\Filters\StaleDaysFilter;
 use App\Queries\Filters\TreeFilter;
 use App\Queries\FilterTree;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -1694,3 +1695,83 @@ it('keeps a deleted record whose number differs and drops one that equals it, wh
         ->assertCanSeeTableRecords([$other, $blank, $liveOther])
         ->assertCanNotSeeTableRecords([$equal, $liveEqual]);
 });
+
+it('hands the chip bar every field with its conditions and says which have a value editor', function (): void {
+    $fields = collect(livewire(ListCompanies::class)->instance()->getFilterBarData()['fields'])->keyBy('key');
+
+    expect($fields['name'])
+        ->toMatchArray(['label' => 'Company', 'kind' => 'text', 'editable' => true])
+        ->and(array_column($fields['name']['conditions'], 'value'))->toBe(array_column(FilterFieldKind::Text->conditions(), 'value'))
+        ->and($fields['name']['conditions'][0])->toBe(['value' => 'contains', 'label' => 'contains', 'takesValue' => true])
+        ->and($fields['name']['icon'])->not->toBeEmpty()
+        ->and($fields['creator']['editable'])->toBeFalse();
+});
+
+it('reads a rule as the chip shows it', function (): void {
+    $rules = [
+        ['field' => 'name', 'condition' => 'contains', 'value' => 'acme'],
+        ['field' => 'creator', 'condition' => 'is_any_of', 'value' => ['@me']],
+        ['field' => 'name', 'condition' => 'is_empty'],
+    ];
+
+    $shown = livewire(ListCompanies::class)->call('setFilterRules', $rules)->instance()->getFilterBarData()['rules'];
+
+    expect(array_column($shown, 'display'))->toBe(['acme', 'Me', '']);
+});
+
+it('names a deleted company in a rule instead of showing a blank or an id', function (): void {
+    $live = filterBarRecord($this->user, Company::class, 'Initech');
+    $gone = filterBarRecord($this->user, Company::class, 'Globex');
+    $gone->delete();
+
+    $shown = livewire(ListOpportunities::class)
+        ->call('setFilterRules', [['field' => 'company', 'condition' => 'is_any_of', 'value' => [$gone->getKey(), $live->getKey()]]])
+        ->instance()->getFilterBarData()['rules'];
+
+    expect($shown)->toHaveCount(1)
+        ->and($shown[0]['display'])->toBe('Globex (deleted), Initech');
+});
+
+it('summarises a long list of values with a count of the rest', function (): void {
+    $companies = collect(['Aa', 'Bb', 'Cc', 'Dd'])->map(fn (string $name): Model => filterBarRecord($this->user, Company::class, $name));
+
+    $shown = livewire(ListOpportunities::class)
+        ->call('setFilterRules', [['field' => 'company', 'condition' => 'is_any_of', 'value' => $companies->map->getKey()->all()]])
+        ->instance()->getFilterBarData()['rules'];
+
+    expect($shown[0]['display'])->toBe('Aa, Bb +2');
+});
+
+it('writes the relative period of a date rule in words', function (): void {
+    filterBarField($this->user, 'opportunity', 'closes', 'date');
+
+    $shown = livewire(ListOpportunities::class)
+        ->call('setFilterRules', [
+            ['field' => 'custom_fields.closes', 'condition' => 'in_the_next', 'value' => ['amount' => 30, 'unit' => 'days']],
+            ['field' => 'custom_fields.closes', 'condition' => 'this', 'value' => ['unit' => 'months']],
+            ['field' => 'custom_fields.closes', 'condition' => 'is', 'value' => '@today'],
+        ])
+        ->instance()->getFilterBarData()['rules'];
+
+    expect(array_column($shown, 'display'))->toBe(['30 days', 'month', 'today']);
+});
+
+it('tells the empty list which rules hide its records and clears them from a button', function (string $page, string $model, string $records): void {
+    $model::factory()->recycle([$this->user, $this->workspace])->create();
+    $column = $model === Task::class || $model === Note::class ? 'title' : 'name';
+
+    livewire($page)
+        ->assertDontSee("No {$records} match this view")
+        ->call('setFilterRules', [['field' => $column, 'condition' => 'contains', 'value' => 'zzqx-no-match']])
+        ->assertSee("No {$records} match this view")
+        ->assertSee('Clear filters')
+        ->callAction(TestAction::make('clearFilterBar')->table())
+        ->assertDontSee("No {$records} match this view")
+        ->assertSet('tableFilters.conditions.rules', []);
+})->with([
+    'companies' => [ListCompanies::class, Company::class, 'companies'],
+    'people' => [ListPeople::class, People::class, 'people'],
+    'opportunities' => [ListOpportunities::class, Opportunity::class, 'opportunities'],
+    'tasks' => [ManageTasks::class, Task::class, 'tasks'],
+    'notes' => [ManageNotes::class, Note::class, 'notes'],
+]);

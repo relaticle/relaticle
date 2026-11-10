@@ -5,16 +5,20 @@ declare(strict_types=1);
 namespace App\Filament\Tables\Concerns;
 
 use App\Enums\CrmEntity;
+use App\Enums\FilterCondition;
 use App\Enums\FilterFieldKind;
 use App\Filament\Tables\FilterBar\ConditionsFilter;
 use App\Filament\Tables\FilterBar\FilterField;
 use App\Filament\Tables\FilterBar\FilterFieldCatalog;
+use App\Filament\Tables\FilterBar\FilterRuleDisplay;
 use App\Filament\Tables\FilterBar\FilterRules;
 use App\Models\User;
 use App\Queries\Crm\LinkOptionsQuery;
+use App\Support\IconPath;
 use Filament\Facades\Filament;
 use Filament\Support\Components\Attributes\Unexposed;
 use Livewire\Attributes\Renderless;
+use RuntimeException;
 
 trait HasFilterBar
 {
@@ -59,6 +63,54 @@ trait HasFilterBar
             FilterFieldKind::Text, FilterFieldKind::Number, FilterFieldKind::Date, FilterFieldKind::Choice,
             FilterFieldKind::MultiChoice, FilterFieldKind::Checkbox, FilterFieldKind::MultiText, FilterFieldKind::Inactivity => [],
         };
+    }
+
+    /**
+     * @return array{fields: list<array<string, mixed>>, rules: list<array<string, mixed>>, deleted: ?string}
+     */
+    #[Unexposed]
+    public function getFilterBarData(): array
+    {
+        $user = Filament::auth()->user();
+        $catalog = $this->filterFieldCatalog();
+
+        if (! $user instanceof User || $catalog === []) {
+            return ['fields' => [], 'rules' => [], 'deleted' => null];
+        }
+
+        $state = $this->canonicalTableFilters($this->tableFilters);
+        $rules = $state['conditions']['rules'];
+        $displays = FilterRuleDisplay::for($rules, $catalog, $user);
+
+        return [
+            'fields' => array_values(array_map(fn (FilterField $field): array => [
+                'key' => $field->key,
+                'label' => $field->label,
+                'icon' => $this->filterFieldIconPath($field->icon),
+                'kind' => $field->kind->value,
+                'editable' => $field->kind->hasValueEditor(),
+                'conditions' => array_map(fn (FilterCondition $condition): array => [
+                    'value' => $condition->value,
+                    'label' => $condition->label(),
+                    'takesValue' => $condition->takesValue(),
+                ], $field->conditions()),
+            ], $catalog)),
+            'rules' => array_map(
+                fn (array $rule, string $display): array => [...$rule, 'display' => $display],
+                $rules,
+                $displays,
+            ),
+            'deleted' => FilterRules::deletedMode($state['trashed']['value']),
+        ];
+    }
+
+    private function filterFieldIconPath(string $icon): string
+    {
+        try {
+            return IconPath::for($icon);
+        } catch (RuntimeException) {
+            return IconPath::for(FilterFieldCatalog::columnIcon('name'));
+        }
     }
 
     /**

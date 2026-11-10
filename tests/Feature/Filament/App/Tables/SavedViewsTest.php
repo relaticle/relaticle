@@ -1597,3 +1597,24 @@ it('creates and shares a view in one step, leaving nothing behind when the share
 
     expect(SavedView::query()->withoutGlobalScopes()->count())->toBe(0);
 });
+
+it('opens the create dialog from the switcher with its own title, button and note', function (): void {
+    $component = livewire(ListCompanies::class)
+        ->mountAction('saveSavedViewAs', ['create' => true]);
+
+    $action = $component->instance()->getMountedAction();
+
+    expect($action->getModalHeading())->toBe('Create view')
+        ->and($action->getModalSubmitAction()->getLabel())->toBe('Create view');
+});
+
+it('keeps the save as new view dialog when it opens from the save controls', function (): void {
+    $component = livewire(ListCompanies::class)
+        ->mountAction('saveSavedViewAs')
+        ->assertDontSee('Starts from the columns, sort and filters on screen now.');
+
+    $action = $component->instance()->getMountedAction();
+
+    expect($action->getModalHeading())->toBe('Save as new view')
+        ->and($action->getModalSubmitAction()->getLabel())->toBe('Save');
+});

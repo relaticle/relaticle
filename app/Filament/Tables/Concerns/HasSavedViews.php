@@ -21,6 +21,7 @@ use Filament\Facades\Filament;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Text;
 use Filament\Schemas\Schema;
 use Filament\Support\Components\Attributes\Exposed;
 use Illuminate\Database\Eloquent\Collection;
@@ -256,15 +257,16 @@ trait HasSavedViews
     {
         return Action::make('saveSavedViewAs')
             ->label(__('filament/panel.tables.views.save_as'))
-            ->modalHeading(__('filament/panel.tables.views.save_as'))
+            ->modalHeading(fn (array $arguments): string => __($this->opensAsCreate($arguments) ? 'filament/panel.tables.views.create_heading' : 'filament/panel.tables.views.save_as'))
             ->modalWidth('md')
-            ->modalSubmitActionLabel(__('filament/panel.tables.views.save'))
-            ->schema([
+            ->modalSubmitActionLabel(fn (array $arguments): string => __($this->opensAsCreate($arguments) ? 'filament/panel.tables.views.create_submit' : 'filament/panel.tables.views.save'))
+            ->schema(fn (array $arguments): array => [
                 $this->savedViewNameInput(),
                 Checkbox::make('is_shared')
                     ->label(__('filament/panel.tables.views.share'))
                     ->helperText(fn (): string => __('filament/panel.tables.views.share_description', ['workspace' => $this->savedViewWorkspace()->name]))
                     ->default(false),
+                Text::make(__('filament/panel.tables.views.create_note'))->visible($this->opensAsCreate($arguments)),
             ])
             ->action(function (array $data, Schema $schema): void {
                 $isShared = (bool) ($data['is_shared'] ?? false);
@@ -285,6 +287,12 @@ trait HasSavedViews
 
                 Notification::make()->success()->title(__($isShared ? 'filament/panel.tables.views.created_shared' : 'filament/panel.tables.views.created', ['name' => e($view->name)]))->send();
             });
+    }
+
+    /** @param  array<string, mixed>  $arguments */
+    private function opensAsCreate(array $arguments): bool
+    {
+        return ($arguments['create'] ?? false) === true;
     }
 
     public function renameSavedViewAction(): Action

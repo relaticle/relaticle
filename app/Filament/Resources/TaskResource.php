@@ -9,6 +9,7 @@ use App\Enums\FilterCondition;
 use App\Filament\Actions\CopyToClipboardAction;
 use App\Filament\Actions\EditTaskAction;
 use App\Filament\Components\Tables\EmptyListDescription;
+use App\Filament\Components\Tables\FilteredEmptyState;
 use App\Filament\Components\Tables\LinkedRecordsColumn;
 use App\Filament\Components\Tables\RecordChipColumn;
 use App\Filament\Concerns\RemembersViewMode;
@@ -100,6 +101,8 @@ final class TaskResource extends Resource
 
         return $table
             ->emptyStateDescription(EmptyListDescription::unlessFiltered(__('filament/resources/task.empty_state.description')))
+            ->emptyStateHeading(FilteredEmptyState::heading())
+            ->emptyStateActions([FilteredEmptyState::clearAction()])
             ->columns(self::columns())
             ->defaultSort('created_at', 'desc')
             ->groups(array_filter([

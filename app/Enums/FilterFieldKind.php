@@ -71,4 +71,12 @@ enum FilterFieldKind: string
             self::Text, self::Number, self::Date, self::Checkbox, self::MultiText, self::Inactivity => false,
         };
     }
+
+    public function hasValueEditor(): bool
+    {
+        return match ($this) {
+            self::Text, self::MultiText, self::Number, self::Checkbox => true,
+            self::Date, self::Choice, self::MultiChoice, self::Member, self::Relation, self::Record, self::Inactivity => false,
+        };
+    }
 }

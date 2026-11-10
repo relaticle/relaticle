@@ -184,7 +184,7 @@
 
         @if ($canApply)
             <x-filament::dropdown.list>
-                <x-filament::dropdown.list.item icon="lucide-plus" class="fi-ta-views-save-current" wire:click="mountAction('saveSavedViewAs')">
+                <x-filament::dropdown.list.item icon="lucide-plus" class="fi-ta-views-save-current" wire:click="mountAction('saveSavedViewAs', { create: true })">
                     {{ __('filament/panel.tables.views.save_current') }}
                 </x-filament::dropdown.list.item>
             </x-filament::dropdown.list>

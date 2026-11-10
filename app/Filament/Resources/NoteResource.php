@@ -7,6 +7,7 @@ namespace App\Filament\Resources;
 use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
 use App\Filament\Components\Tables\EmptyListDescription;
+use App\Filament\Components\Tables\FilteredEmptyState;
 use App\Filament\Components\Tables\LinkedRecordsColumn;
 use App\Filament\Concerns\RemembersViewMode;
 use App\Filament\Exports\NoteExporter;
@@ -76,6 +77,8 @@ final class NoteResource extends Resource
     {
         return $table
             ->emptyStateDescription(EmptyListDescription::unlessFiltered(__('filament/resources/note.empty_state.description')))
+            ->emptyStateHeading(FilteredEmptyState::heading())
+            ->emptyStateActions([FilteredEmptyState::clearAction()])
             ->columns(self::columns())
             ->defaultSort('created_at', 'desc')
             ->filters([

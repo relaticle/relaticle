@@ -1,11 +1,181 @@
 .fi-filter-bar {
-    @apply flex min-h-11 items-center gap-2 border-b border-gray-200/60 px-4 py-1.5 lg:px-6 dark:border-white/10;
+    @apply flex min-h-11 items-start gap-3 border-b border-gray-200/60 px-4 py-2 lg:px-6 dark:border-white/10;
 }
 
 .fi-filter-bar-start {
-    @apply flex min-w-0 flex-1 flex-wrap items-center gap-2;
+    @apply flex min-w-0 flex-1 flex-wrap items-center gap-1.5;
 }
 
 .fi-filter-bar-end {
-    @apply ms-auto flex shrink-0 items-center gap-2;
+    @apply ms-auto flex h-7 shrink-0 items-center gap-2;
+}
+
+.fi-filter-sep {
+    @apply mx-0.5 h-5 w-px bg-gray-200/75 dark:bg-white/10;
+}
+
+.fi-filter-part {
+    @apply relative inline-flex items-stretch;
+}
+
+.fi-filter-chip .fi-filter-part {
+    @apply static;
+}
+
+.fi-filter-ghost {
+    @apply inline-flex h-7 items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-2 text-sm font-medium whitespace-nowrap text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-gray-500 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200 dark:disabled:hover:text-gray-400;
+
+    &.fi-open {
+        @apply bg-gray-100 dark:bg-white/5;
+    }
+
+    & svg {
+        @apply size-4 shrink-0;
+    }
+}
+
+.fi-filter-chip {
+    @apply relative inline-flex h-7 items-stretch rounded-lg bg-white text-sm ring-1 ring-gray-950/10 dark:bg-gray-900 dark:ring-white/15;
+
+    &.fi-pending {
+        @apply ring-primary-600 dark:ring-primary-400;
+    }
+}
+
+.fi-filter-seg {
+    @apply inline-flex max-w-64 items-center gap-1.5 border-e border-gray-200/75 px-2 whitespace-nowrap dark:border-white/10;
+
+    & > span {
+        @apply truncate;
+    }
+
+    & svg {
+        @apply size-4 shrink-0;
+    }
+}
+
+button.fi-filter-seg {
+    @apply cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5;
+
+    &.fi-open {
+        @apply bg-gray-100 dark:bg-white/5;
+    }
+}
+
+.fi-filter-field {
+    @apply rounded-s-lg font-medium text-gray-700 dark:text-gray-200;
+
+    & svg {
+        @apply text-gray-500 dark:text-gray-400;
+    }
+}
+
+.fi-filter-cond {
+    @apply text-gray-500 dark:text-gray-400;
+}
+
+.fi-filter-val {
+    @apply font-medium text-gray-950 dark:text-white;
+}
+
+.fi-filter-seg.fi-placeholder {
+    @apply font-normal text-gray-400 dark:text-gray-500;
+}
+
+.fi-filter-more {
+    @apply rounded-e-lg border-e-0 px-1 text-gray-500 dark:text-gray-400;
+}
+
+.fi-filter-part:last-child > .fi-filter-seg {
+    @apply border-e-0;
+}
+
+.fi-filter-pop {
+    @apply absolute start-0 top-[calc(100%+0.375rem)] z-30 min-w-52 cursor-default rounded-[10px] bg-white p-1 font-normal text-gray-950 shadow-lg ring-1 ring-gray-950/10 dark:bg-gray-900 dark:text-white dark:ring-white/15;
+
+    &.fi-filter-pop-end {
+        @apply start-auto end-0;
+    }
+
+    &.fi-filter-pop-picker {
+        @apply min-w-70;
+    }
+}
+
+.fi-filter-find {
+    @apply -mx-1 -mt-1 mb-1 flex items-center gap-2 border-b border-gray-200/75 px-2 py-1.5 text-gray-400 dark:border-white/10 dark:text-gray-500;
+
+    & svg {
+        @apply size-4 shrink-0;
+    }
+
+    & input {
+        @apply w-full border-0 bg-transparent p-0 text-sm text-gray-950 outline-0 ring-0 placeholder:text-gray-400 focus:ring-0 dark:text-white dark:placeholder:text-gray-500;
+    }
+}
+
+.fi-filter-item {
+    @apply flex h-8 w-full items-center gap-2 rounded-md px-2 text-start text-sm whitespace-nowrap hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-0 dark:hover:bg-white/5 dark:focus-visible:bg-white/5;
+
+    &.fi-on {
+        @apply bg-gray-100 dark:bg-white/5;
+    }
+
+    & svg {
+        @apply size-4 shrink-0 text-gray-500 dark:text-gray-400;
+    }
+
+    & .fi-filter-tick {
+        @apply ms-auto text-primary-600 dark:text-primary-400;
+    }
+
+    &.fi-danger,
+    &.fi-danger svg {
+        @apply text-danger-600 dark:text-danger-400;
+    }
+}
+
+.fi-filter-hint {
+    @apply px-2 pt-1.5 pb-0.5 text-xs whitespace-normal text-gray-400 dark:text-gray-500;
+}
+
+.fi-filter-editor {
+    @apply flex gap-1.5 p-1;
+
+    & input {
+        @apply h-8 w-56 min-w-0 rounded-lg border-0 bg-white px-2 text-sm text-gray-950 ring-1 ring-gray-950/10 outline-0 focus:ring-2 focus:ring-primary-600 dark:bg-gray-900 dark:text-white dark:ring-white/15 dark:focus:ring-primary-400;
+    }
+
+    & input[type='number'] {
+        @apply w-28;
+    }
+}
+
+@media (width < 40rem) {
+    .fi-filter-pop {
+        @apply min-w-full;
+    }
+
+    .fi-filter-editor input {
+        @apply h-10 w-full text-base;
+    }
+
+    .fi-filter-editor input[type='number'] {
+        @apply w-full;
+    }
+
+    .fi-filter-item {
+        @apply h-11 text-base;
+    }
+}
+
+/* The toolbar is a stacking context at z-21, which would trap a sheet under the tab bar. */
+@media (width < 40rem) {
+    :is(.fi-ta-ctn, .fi-ta-header-ctn):not(.fi-modal *):has([data-filter-bar] [data-sheet]:not([style*='display: none'])) {
+        @apply z-40;
+    }
+
+    .fi-app-main-wrapper:has(> .fi-layout [data-filter-bar] [data-sheet]:not([style*='display: none'])) > :is(.fi-topbar-ctn, .fi-bottom-nav) {
+        @apply static z-auto;
+    }
 }

@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Enums\CreationSource;
+use App\Actions\CustomFields\CreateCustomField;
 use App\Enums\CustomFields\OpportunityField;
+use App\Enums\CustomFieldType;
 use App\Filament\Components\Tables\RecordChipColumn;
 use App\Models\Company;
 use App\Models\CustomField;
@@ -187,27 +188,35 @@ it('hides a phone card row whose value is empty', function (): void {
         ->assertNoJavaScriptErrors();
 });
 
-it('keeps every filter select option inside the phone filter sheet', function (): void {
+it('keeps every filter field option inside the phone filter sheet', function (): void {
     $this->withVite();
 
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
     Company::factory()->recycle([$user, $workspace])->create();
 
+    foreach (range(1, 12) as $number) {
+        resolve(CreateCustomField::class)->execute($user, [
+            'entity_type' => 'company',
+            'name' => "Note {$number}",
+            'code' => "note_{$number}",
+            'type' => CustomFieldType::TEXT->value,
+        ]);
+    }
+
     $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")
         ->resize(390, 664)
         ->navigate("/app/{$workspace->slug}/companies")
         ->assertVisible('.fi-ta-row')
-        ->click('.fi-ta-filters-dropdown .fi-dropdown-trigger button')
-        ->click('.fi-ta-filters .fi-select-input-btn >> nth=0')
-        ->assertVisible('.fi-ta-filters [role=option] >> nth=0')
+        ->click('[data-filter-add]')
+        ->assertVisible('[data-filter-bar] [data-pop-item] >> nth=0')
         ->assertNoJavaScriptErrors();
 
     $lastOptionReachable = <<<'JS'
         (() => {
-            const sheet = document.querySelector('.fi-ta-filters').closest('.fi-dropdown-panel');
-            const options = [...sheet.querySelectorAll('[role=option]')];
+            const sheet = [...document.querySelectorAll('[data-filter-bar] [data-pop]')].find((pop) => pop.checkVisibility());
+            const options = [...sheet.querySelectorAll('[data-pop-item]')];
             const last = options.at(-1);
 
             last.scrollIntoView({ block: 'nearest' });
@@ -216,14 +225,14 @@ it('keeps every filter select option inside the phone filter sheet', function ()
             const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
 
             return {
-                options: options.length,
+                listsEveryField: options.length >= 13,
                 insideScreen: box.bottom <= innerHeight && box.top >= 0,
                 reachable: last.contains(hit),
             };
         })();
     JS;
 
-    expect($page->script($lastOptionReachable))->toBe(['options' => count(CreationSource::cases()), 'insideScreen' => true, 'reachable' => true]);
+    expect($page->script($lastOptionReachable))->toBe(['listsEveryField' => true, 'insideScreen' => true, 'reachable' => true]);
 });
 
 it('keeps the toolbar with the bulk actions in view on a phone while rows are ticked', function (): void {
