@@ -22,6 +22,8 @@ final readonly class FilterRules
 
     private const string ME = '@me';
 
+    private const array DELETED_MODES = ['included' => 1, 'only' => 0];
+
     /**
      * @param  array<string, FilterField>  $catalog
      * @return array{match: string, rules: list<array<string, mixed>>}
@@ -58,11 +60,23 @@ final readonly class FilterRules
         return ['conditions' => ['match' => 'all', 'rules' => $rules], 'trashed' => ['value' => self::deleted(is_array($trashed) ? ($trashed['value'] ?? null) : null)]];
     }
 
+    public static function deletedValue(?string $mode): ?int
+    {
+        return $mode === null ? null : (self::DELETED_MODES[$mode] ?? null);
+    }
+
+    public static function deletedMode(mixed $value): ?string
+    {
+        $mode = array_search(self::deleted($value), self::DELETED_MODES, true);
+
+        return $mode === false ? null : (string) $mode;
+    }
+
     private static function deleted(mixed $value): ?int
     {
         return match (true) {
-            $value === true, $value === 1, $value === '1', $value === 'true' => 1,
-            $value === false, $value === 0, $value === '0', $value === 'false' => 0,
+            $value === true, $value === 1, $value === '1', $value === 'true' => self::DELETED_MODES['included'],
+            $value === false, $value === 0, $value === '0', $value === 'false' => self::DELETED_MODES['only'],
             default => null,
         };
     }

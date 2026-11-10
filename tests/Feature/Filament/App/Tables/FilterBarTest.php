@@ -1498,3 +1498,85 @@ it('keeps a text value that filament would read as a boolean or null', function 
     expect($component->get('tableFilters.conditions.rules'))->toBe($rules)
         ->and(filterBarShownNames($component))->toBe(["The {$word} company"]);
 })->with(['true', 'false', 'null'])->with(['default', 'own table', 'url']);
+
+function filterBarDeletedPair(User $user, string $model, string $name = 'Acme'): array
+{
+    return [filterBarRecord($user, $model, $name), tap(filterBarRecord($user, $model, $name))->delete()];
+}
+
+it('lists live records by default, both with deleted included, and deleted alone with only', function (string $page, string $model): void {
+    [$live, $deleted] = filterBarDeletedPair($this->user, $model);
+
+    livewire($page)
+        ->assertCanSeeTableRecords([$live])
+        ->assertCanNotSeeTableRecords([$deleted])
+        ->call('setDeletedRecordsFilter', 'included')
+        ->assertSet('tableFilters.trashed.value', 1)
+        ->assertCanSeeTableRecords([$live, $deleted])
+        ->call('setDeletedRecordsFilter', 'only')
+        ->assertSet('tableFilters.trashed.value', 0)
+        ->assertCanSeeTableRecords([$deleted])
+        ->assertCanNotSeeTableRecords([$live])
+        ->call('setDeletedRecordsFilter', null)
+        ->assertSet('tableFilters.trashed.value', null)
+        ->assertCanSeeTableRecords([$live])
+        ->assertCanNotSeeTableRecords([$deleted]);
+})->with('filter bar pages');
+
+it('treats any other deleted mode as the default', function (string $page, string $model, mixed $mode): void {
+    [$live, $deleted] = filterBarDeletedPair($this->user, $model);
+
+    livewire($page)
+        ->call('setDeletedRecordsFilter', 'included')
+        ->call('setDeletedRecordsFilter', $mode)
+        ->assertSet('tableFilters.trashed.value', null)
+        ->assertCanSeeTableRecords([$live])
+        ->assertCanNotSeeTableRecords([$deleted]);
+})->with('filter bar pages')->with(['junk', '', '1', 'Included', 'true']);
+
+it('keeps the rules when the deleted mode changes and the deleted mode when the rules change', function (): void {
+    $rules = [['field' => 'name', 'condition' => 'contains', 'value' => 'acme']];
+
+    livewire(ListCompanies::class)
+        ->call('setFilterRules', $rules)
+        ->call('setDeletedRecordsFilter', 'only')
+        ->assertSet('tableFilters.conditions.rules', $rules)
+        ->call('setFilterRules', [])
+        ->assertSet('tableFilters.trashed.value', 0);
+});
+
+it('returns to the default when the filter bar is cleared', function (string $page, string $model, ?string $mode): void {
+    [$live, $deleted] = filterBarDeletedPair($this->user, $model);
+
+    livewire($page)
+        ->call('setFilterRules', [['field' => CrmEntity::tryFromModel($live)->titleColumn(), 'condition' => 'contains', 'value' => 'acme']])
+        ->call('setDeletedRecordsFilter', $mode)
+        ->call('clearFilterBar')
+        ->assertSet('tableFilters', ['conditions' => ['match' => 'all', 'rules' => []], 'trashed' => ['value' => null]])
+        ->assertCanSeeTableRecords([$live])
+        ->assertCanNotSeeTableRecords([$deleted]);
+})->with('filter bar pages')->with(['included', 'only']);
+
+it('reads a saved view that includes deleted records as unchanged until the mode switches', function (): void {
+    $view = SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'entity' => CrmEntity::Company,
+        'state' => new TableStateData(filters: ['trashed' => ['value' => 1]]),
+    ]);
+
+    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey());
+
+    expect($component->get('tableFilters.trashed.value'))->toBe(1)
+        ->and($component->instance()->isSavedViewModified())->toBeFalse();
+
+    $component->call('$refresh');
+
+    expect($component->instance()->isSavedViewModified())->toBeFalse();
+
+    $component->call('setDeletedRecordsFilter', 'only');
+
+    expect($component->instance()->isSavedViewModified())->toBeTrue();
+
+    $component->call('setDeletedRecordsFilter', 'included');
+
+    expect($component->instance()->isSavedViewModified())->toBeFalse();
+});

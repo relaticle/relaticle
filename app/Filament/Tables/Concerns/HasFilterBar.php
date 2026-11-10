@@ -90,6 +90,16 @@ trait HasFilterBar
         $this->updatedTableFilters();
     }
 
+    public function setDeletedRecordsFilter(?string $mode): void
+    {
+        $this->tableFilters = [
+            ...$this->canonicalTableFilters($this->tableFilters),
+            'trashed' => ['value' => FilterRules::deletedValue($mode)],
+        ];
+
+        $this->updatedTableFilters();
+    }
+
     public function clearFilterBar(): void
     {
         $this->tableFilters = null;
