@@ -12,11 +12,11 @@ use App\Features\OnboardSeed;
 use App\Filament\Pages\NotificationPreferences;
 use App\Livewire\App\AppDatabaseNotifications;
 use App\Models\Notification;
-use App\Models\TableLayout;
+use App\Models\SavedView;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Notifications\TableLayoutChangedNotification;
+use App\Notifications\SavedViewChangedNotification;
 use App\Support\CanonicalRecordUrl;
 use App\Support\CurrentWorkspace;
 use Carbon\CarbonImmutable;
@@ -604,43 +604,43 @@ it('renders shared email rows without per-row queries', function (): void {
     expect($withFifty)->toBe($withFive);
 });
 
-it('shows the owner who deleted their layout and links to the table', function (): void {
+it('shows the owner who deleted their view and links to the table', function (): void {
     $admin = User::factory()->create(['name' => 'Dana Whitfield']);
     $this->workspaceA->users()->attach($admin, ['role' => 'admin']);
 
-    $layout = TableLayout::factory()->for($this->user)->for($this->workspaceA)->create(['entity' => CrmEntity::Company, 'name' => 'Renewals']);
+    $view = SavedView::factory()->for($this->user)->for($this->workspaceA)->create(['entity' => CrmEntity::Company, 'name' => 'Renewals']);
 
-    $this->user->notify(TableLayoutChangedNotification::deleted($layout, $admin));
+    $this->user->notify(SavedViewChangedNotification::deleted($view, $admin));
 
     Livewire::actingAs($this->user)->test(AppDatabaseNotifications::class)
-        ->assertSeeText('Dana Whitfield deleted your layout')
+        ->assertSeeText('Dana Whitfield deleted your view')
         ->assertSeeText('Renewals')
         ->assertSeeText('It was on the companies table.')
         ->assertSeeText('Open Companies')
         ->assertSee(resolve(CanonicalRecordUrl::class)->listPageUrl(CrmEntity::Company, $this->workspaceA));
 });
 
-it('shows a renamed layout notice with both names', function (): void {
+it('shows a renamed view notice with both names', function (): void {
     $admin = User::factory()->create(['name' => 'Dana Whitfield']);
     $this->workspaceA->users()->attach($admin, ['role' => 'admin']);
 
-    $layout = TableLayout::factory()->for($this->user)->for($this->workspaceA)->create(['entity' => CrmEntity::Company, 'name' => 'Renewals this quarter']);
+    $view = SavedView::factory()->for($this->user)->for($this->workspaceA)->create(['entity' => CrmEntity::Company, 'name' => 'Renewals this quarter']);
 
-    $this->user->notify(TableLayoutChangedNotification::renamed($layout, $admin, 'Renewals'));
+    $this->user->notify(SavedViewChangedNotification::renamed($view, $admin, 'Renewals'));
 
     Livewire::actingAs($this->user)->test(AppDatabaseNotifications::class)
-        ->assertSeeText('Dana Whitfield renamed your layout')
+        ->assertSeeText('Dana Whitfield renamed your view')
         ->assertSeeText('Renewals this quarter')
         ->assertSeeText('It is still shared on the companies table.');
 });
 
-it('escapes the layout and actor names in a layout notice', function (): void {
+it('escapes the view and actor names in a view notice', function (): void {
     $admin = User::factory()->create(['name' => '<b>Dana</b>']);
     $this->workspaceA->users()->attach($admin, ['role' => 'admin']);
 
-    $layout = TableLayout::factory()->for($this->user)->for($this->workspaceA)->create(['entity' => CrmEntity::Company, 'name' => '<a href="https://evil.example">Renewals</a>']);
+    $view = SavedView::factory()->for($this->user)->for($this->workspaceA)->create(['entity' => CrmEntity::Company, 'name' => '<a href="https://evil.example">Renewals</a>']);
 
-    $this->user->notify(TableLayoutChangedNotification::renamed($layout, $admin, '<img src="https://evil.example/px.gif">'));
+    $this->user->notify(SavedViewChangedNotification::renamed($view, $admin, '<img src="https://evil.example/px.gif">'));
 
     Livewire::actingAs($this->user)->test(AppDatabaseNotifications::class)
         ->assertSee('&lt;a href', escape: false)
@@ -650,18 +650,18 @@ it('escapes the layout and actor names in a layout notice', function (): void {
         ->assertDontSee('<img src="https://evil.example/px.gif"', escape: false);
 });
 
-it('shows a layout notice whose actor has since been deleted', function (): void {
+it('shows a view notice whose actor has since been deleted', function (): void {
     $admin = User::factory()->create();
     $this->workspaceA->users()->attach($admin, ['role' => 'admin']);
 
-    $layout = TableLayout::factory()->for($this->user)->for($this->workspaceA)->create(['entity' => CrmEntity::Company, 'name' => 'Renewals']);
+    $view = SavedView::factory()->for($this->user)->for($this->workspaceA)->create(['entity' => CrmEntity::Company, 'name' => 'Renewals']);
 
-    $this->user->notify(TableLayoutChangedNotification::unshared($layout, $admin));
+    $this->user->notify(SavedViewChangedNotification::unshared($view, $admin));
     $admin->delete();
 
     Livewire::actingAs($this->user)->test(AppDatabaseNotifications::class)
         ->assertSeeText('is no longer shared')
-        ->assertDontSeeText('stopped sharing your layout')
+        ->assertDontSeeText('stopped sharing your view')
         ->assertSeeText('It is private to you again on the companies table.');
 });
 

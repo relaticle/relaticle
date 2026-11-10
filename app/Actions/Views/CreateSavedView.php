@@ -2,38 +2,38 @@
 
 declare(strict_types=1);
 
-namespace App\Actions\TableLayouts;
+namespace App\Actions\Views;
 
 use App\Data\TableStateData;
 use App\Enums\CrmEntity;
-use App\Models\TableLayout;
+use App\Models\SavedView;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Validation\ValidationException;
 
-final readonly class CreateTableLayout
+final readonly class CreateSavedView
 {
-    public function __construct(private EnsureTableLayoutNameIsFree $ensureNameIsFree) {}
+    public function __construct(private EnsureSavedViewNameIsFree $ensureNameIsFree) {}
 
-    public function execute(User $user, Workspace $workspace, CrmEntity $entity, string $name, TableStateData $state): TableLayout
+    public function execute(User $user, Workspace $workspace, CrmEntity $entity, string $name, TableStateData $state): SavedView
     {
         abort_unless($user->belongsToWorkspaceId($workspace->getKey()), 403);
 
-        $layout = new TableLayout([
+        $view = new SavedView([
             'workspace_id' => $workspace->getKey(),
             'user_id' => $user->getKey(),
             'entity' => $entity,
             'state' => $state->withoutWidths(),
         ]);
-        $layout->name = $this->ensureNameIsFree->execute($user, $layout, $name);
+        $view->name = $this->ensureNameIsFree->execute($user, $view, $name);
 
         try {
-            $layout->save();
+            $view->save();
         } catch (UniqueConstraintViolationException) {
-            throw ValidationException::withMessages(['name' => $layout->nameTakenMessage($user)]);
+            throw ValidationException::withMessages(['name' => $view->nameTakenMessage($user)]);
         }
 
-        return $layout;
+        return $view;
     }
 }

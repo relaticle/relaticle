@@ -1,5 +1,5 @@
-/* The layout trigger, Revert and Save read as one control, like Filament's button group. */
-.fi-ta-layouts {
+/* The view trigger, Revert and Save read as one control, like Filament's button group. */
+.fi-ta-views {
     @apply flex items-center rounded-lg ring-1 ring-gray-950/10 dark:ring-white/20;
 
     & .fi-btn {
@@ -20,8 +20,8 @@
     }
 }
 
-/* A saved layout's row highlights as one, its buttons included. */
-.fi-ta-layouts-row {
+/* A saved view's row highlights as one, its buttons included. */
+.fi-ta-views-row {
     @apply relative flex items-center rounded-md;
 
     &:hover,
@@ -34,11 +34,11 @@
     }
 }
 
-.fi-ta-layouts-row-meta {
+.fi-ta-views-row-meta {
     @apply flex max-w-1/2 min-w-0 items-center gap-1.5 text-xs font-normal text-gray-500 dark:text-gray-400;
 }
 
-.fi-ta-layouts-row-default {
+.fi-ta-views-row-default {
     @apply flex shrink-0 text-warning-500;
 
     & .fi-icon {
@@ -46,12 +46,12 @@
     }
 }
 
-/* The layout the table shows. A tint, unlike the gray hover, so the two never read alike. */
-.fi-ta-layouts-selected {
+/* The view the table shows. A tint, unlike the gray hover, so the two never read alike. */
+.fi-ta-views-selected {
     @apply bg-primary-50! dark:bg-primary-400/10!;
 }
 
-.fi-ta-layouts-row-actions {
+.fi-ta-views-row-actions {
     @apply flex shrink-0 items-center gap-0.5 pe-1;
 
     & .fi-icon-btn {
@@ -63,28 +63,28 @@
     }
 }
 
-.fi-ta-layouts-row-menu {
+.fi-ta-views-row-menu {
     @apply max-w-56!;
 }
 
-.fi-ta-layouts-row-delete:hover {
+.fi-ta-views-row-delete:hover {
     @apply text-danger-600 dark:text-danger-400;
 }
 
 /* A pointer swaps the row's status for its buttons. Touch has no hover, so both stay in view there. */
 @media (hover: hover) {
-    .fi-ta-layouts-row-actions {
+    .fi-ta-views-row-actions {
         @apply pointer-events-none absolute inset-y-0 end-0 opacity-0;
     }
 
-    .fi-ta-layouts-row:hover,
-    .fi-ta-layouts-row:has(:focus-visible),
-    .fi-ta-layouts-row:has([aria-expanded='true']) {
-        & .fi-ta-layouts-row-actions {
+    .fi-ta-views-row:hover,
+    .fi-ta-views-row:has(:focus-visible),
+    .fi-ta-views-row:has([aria-expanded='true']) {
+        & .fi-ta-views-row-actions {
             @apply pointer-events-auto opacity-100;
         }
 
-        & .fi-ta-layouts-row-meta {
+        & .fi-ta-views-row-meta {
             @apply hidden;
         }
 
@@ -94,9 +94,9 @@
     }
 }
 
-/* Search and Save stay in view; only the layouts between them scroll.
+/* Search and Save stay in view; only the views between them scroll.
    Spacing keeps a 4px grid: 4 between rows, 8 inside them and to the edge, 16 above a group. */
-.fi-ta-layouts-panel {
+.fi-ta-views-panel {
     @apply flex max-h-112 flex-col p-1;
 
     & .fi-dropdown-list {
@@ -108,11 +108,11 @@
     }
 }
 
-.fi-ta-layouts-scroll {
+.fi-ta-views-scroll {
     @apply min-h-0 flex-1 overflow-y-auto;
 }
 
-.fi-ta-layouts-search {
+.fi-ta-views-search {
     @apply m-1 flex items-center gap-2 rounded-lg p-2 text-gray-400 ring-1 ring-gray-950/10 dark:text-gray-500 dark:ring-white/10;
 
     & .fi-icon {
@@ -124,16 +124,16 @@
     }
 }
 
-.fi-ta-layouts-heading {
+.fi-ta-views-heading {
     @apply flex items-center justify-between gap-2 px-2 pt-2 pb-1 text-xs font-medium text-gray-500 dark:text-gray-400;
 }
 
-.fi-ta-layouts-pill {
+.fi-ta-views-pill {
     @apply shrink-0 rounded-md bg-gray-100 px-1.5 text-xs font-medium text-gray-600 dark:bg-white/10 dark:text-gray-300;
 }
 
 /* An outline, not a border, so the dashed row is exactly as tall as the rows above it. */
-.fi-ta-layouts-save-current {
+.fi-ta-views-save-current {
     @apply justify-center text-gray-500 outline-1 -outline-offset-1 outline-gray-300 outline-dashed hover:text-gray-700 hover:outline-gray-400 dark:text-gray-400 dark:outline-white/15 dark:hover:text-gray-200 dark:hover:outline-white/25;
 
     & .fi-icon {
@@ -141,13 +141,13 @@
     }
 }
 
-.fi-ta-layouts-trigger-label {
+.fi-ta-views-trigger-label {
     @apply block max-w-56 truncate;
 }
 
 /* On a phone the trigger is icon only, like the filter and column buttons beside it, and keeps its name for screen readers. */
-.fi-ta-layouts-trigger {
-    & :is(.fi-ta-layouts-trigger-label, .fi-ta-layouts-trigger-modified) {
+.fi-ta-views-trigger {
+    & :is(.fi-ta-views-trigger-label, .fi-ta-views-trigger-modified) {
         @apply max-sm:sr-only;
     }
 
@@ -156,6 +156,6 @@
     }
 }
 
-.fi-ta-layouts-save .fi-icon {
+.fi-ta-views-save .fi-icon {
     @apply text-primary-600 dark:text-primary-400;
 }

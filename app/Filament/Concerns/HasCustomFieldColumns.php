@@ -7,7 +7,7 @@ namespace App\Filament\Concerns;
 use App\Filament\Components\Tables\ColumnHeaderLabel;
 use App\Filament\Tables\Concerns\HasColumnMenu;
 use App\Filament\Tables\Concerns\HasResizableColumns;
-use App\Filament\Tables\Concerns\HasTableLayouts;
+use App\Filament\Tables\Concerns\HasSavedViews;
 use App\Filament\Tables\Concerns\PersistsTableState;
 use App\Models\CustomField;
 use BackedEnum;
@@ -21,7 +21,7 @@ trait HasCustomFieldColumns
 {
     use HasColumnMenu;
     use HasResizableColumns;
-    use HasTableLayouts;
+    use HasSavedViews;
     use PersistsTableState;
 
     /** @var array<string, Htmlable> */

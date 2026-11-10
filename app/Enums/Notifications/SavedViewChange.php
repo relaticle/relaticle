@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Enums\Notifications;
 
-enum TableLayoutChange: string
+enum SavedViewChange: string
 {
     case Deleted = 'deleted';
     case Unshared = 'unshared';

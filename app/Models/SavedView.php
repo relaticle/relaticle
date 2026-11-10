@@ -6,9 +6,10 @@ namespace App\Models;
 
 use App\Data\TableStateData;
 use App\Enums\CrmEntity;
+use App\Enums\SavedViewType;
 use App\Models\Concerns\HasWorkspace;
 use App\Models\Scopes\WorkspaceScope;
-use Database\Factories\TableLayoutFactory;
+use Database\Factories\SavedViewFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
@@ -20,16 +21,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property CrmEntity $entity
+ * @property SavedViewType $type
  * @property string $name
  * @property bool $is_shared
  * @property TableStateData $state
  * @property string $user_id
  */
 #[ScopedBy(WorkspaceScope::class)]
-#[Fillable(['workspace_id', 'user_id', 'entity', 'name', 'is_shared', 'state'])]
-final class TableLayout extends Model
+#[Fillable(['workspace_id', 'user_id', 'entity', 'type', 'name', 'is_shared', 'state'])]
+final class SavedView extends Model
 {
-    /** @use HasFactory<TableLayoutFactory> */
+    /** @use HasFactory<SavedViewFactory> */
     use HasFactory;
 
     use HasUlids;
@@ -42,6 +44,7 @@ final class TableLayout extends Model
     {
         return [
             'entity' => CrmEntity::class,
+            'type' => SavedViewType::class,
             'is_shared' => 'boolean',
             'state' => TableStateData::class,
         ];
@@ -58,8 +61,8 @@ final class TableLayout extends Model
     public function nameTakenMessage(User $actor): string
     {
         return $this->user_id === $actor->getKey()
-            ? __('filament/panel.tables.layouts.name_taken')
-            : __('filament/panel.tables.layouts.name_taken_by_owner', ['owner' => $this->user->name]);
+            ? __('filament/panel.tables.views.name_taken')
+            : __('filament/panel.tables.views.name_taken_by_owner', ['owner' => $this->user->name]);
     }
 
     /**

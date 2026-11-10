@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Actions\TableLayouts\SaveTablePreference;
+use App\Actions\Views\SaveTablePreference;
 use App\Data\TableStateData;
 use App\Enums\CrmEntity;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
@@ -12,7 +12,7 @@ use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Tables\Concerns\PersistsTableState;
 use App\Models\Company;
-use App\Models\TableLayout;
+use App\Models\SavedView;
 use App\Models\TablePreference;
 use App\Models\User;
 use App\Models\Workspace;
@@ -249,10 +249,10 @@ it('drops a saved width for a column the table no longer has', function (): void
     expect(livewire(ListCompanies::class)->instance()->tableColumnWidths)->toBe(['created_at' => 250]);
 });
 
-it('saves the table without its layout when the layout is deleted just before the save', function (): void {
-    $layout = TableLayout::factory()->for($this->user)->for($this->user->currentWorkspace)->create(['entity' => CrmEntity::Company]);
-    $staleCopy = TableLayout::query()->withoutGlobalScopes()->findOrFail($layout->getKey());
-    $layout->delete();
+it('saves the table without its view when the view is deleted just before the save', function (): void {
+    $view = SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create(['entity' => CrmEntity::Company]);
+    $staleCopy = SavedView::query()->withoutGlobalScopes()->findOrFail($view->getKey());
+    $view->delete();
 
     $preference = resolve(SaveTablePreference::class)->execute(
         $this->user,
@@ -263,7 +263,7 @@ it('saves the table without its layout when the layout is deleted just before th
         'hash',
     );
 
-    expect($preference->active_layout_id)->toBeNull()
-        ->and($preference->applied_layout_hash)->toBeNull()
+    expect($preference->active_view_id)->toBeNull()
+        ->and($preference->applied_view_hash)->toBeNull()
         ->and($preference->state->sort)->toBe('name:asc');
 });

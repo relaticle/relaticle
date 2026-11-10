@@ -20,12 +20,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CrmEntity $entity
  * @property TableStateData $state
  * @property string $user_id
- * @property ?string $active_layout_id
- * @property ?string $default_layout_id
- * @property ?string $applied_layout_hash
+ * @property ?string $active_view_id
+ * @property ?string $default_view_id
+ * @property ?string $applied_view_hash
  */
 #[ScopedBy(WorkspaceScope::class)]
-#[Fillable(['workspace_id', 'user_id', 'entity', 'state', 'active_layout_id', 'default_layout_id', 'applied_layout_hash'])]
+#[Fillable(['workspace_id', 'user_id', 'entity', 'state', 'active_view_id', 'default_view_id', 'applied_view_hash'])]
 final class TablePreference extends Model
 {
     /** @use HasFactory<TablePreferenceFactory> */

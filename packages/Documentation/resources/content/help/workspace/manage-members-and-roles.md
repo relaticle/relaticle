@@ -40,12 +40,12 @@ API or MCP.
 | Manage billing | Yes | No | No | No |
 | Rename or delete the workspace | Yes | No | No | No |
 | View the activity log | Yes | Yes | No | No |
-| Edit and delete table layouts shared with the workspace | Yes | Yes | No | No |
+| Edit and delete views shared with the workspace | Yes | Yes | No | No |
 
-A shared table layout stays with the member who shared it. Admins can also
-rename it, save over its contents, stop sharing it, or delete it, and the layout's
+A shared view stays with the member who shared it. Admins can also
+rename it, save over its contents, stop sharing it, or delete it, and the view's
 owner is told. A rename or a save shows for everyone on their next visit. Stopping
-the share or deleting it removes the layout, and members keep the table as it is.
+the share or deleting it removes the view, and members keep the table as it is.
 
 Admins manage members, custom fields, and workspace email settings alongside working with records. A
 few things stay with the **workspace owner** alone, whatever anyone's role:

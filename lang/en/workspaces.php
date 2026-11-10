@@ -312,8 +312,8 @@ return [
         'activity' => [
             'view' => ['label' => 'View the activity log'],
         ],
-        'layouts' => [
-            'manage' => ['label' => 'Edit and delete table layouts shared with the workspace'],
+        'views' => [
+            'manage' => ['label' => 'Edit and delete views shared with the workspace'],
         ],
     ],
 

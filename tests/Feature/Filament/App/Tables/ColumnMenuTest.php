@@ -11,7 +11,7 @@ use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Tables\Concerns\HasColumnMenu;
 use App\Filament\Tables\ResizableColumns;
-use App\Models\TableLayout;
+use App\Models\SavedView;
 use App\Models\TablePreference;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -87,12 +87,12 @@ it('moves a column before another and keeps the order on a new visit', function 
     expect(columnOrder(livewire($page)))->toBe($order);
 })->with('column menu pages');
 
-it('puts the columns back in their declared order with the standard layout', function (string $page, CrmEntity $entity): void {
+it('puts the columns back in their declared order with the standard view', function (string $page, CrmEntity $entity): void {
     $component = livewire($page);
     $declared = columnOrder($component);
     $movable = columnsBesideTitle($component, $entity);
 
-    $component->call('moveTableColumn', end($movable), $movable[0])->call('useStandardTableLayout');
+    $component->call('moveTableColumn', end($movable), $movable[0])->call('useStandardTable');
 
     expect(columnOrder($component))->toBe($declared);
 
@@ -179,19 +179,19 @@ it('keeps the title column where the column manager puts it', function (string $
     expect(last(columnOrder($component)))->toBe($entity->titleColumn());
 })->with('column menu pages');
 
-it('marks the applied layout modified after a move', function (): void {
-    $layout = TableLayout::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+it('marks the applied view modified after a move', function (): void {
+    $view = SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
         'entity' => CrmEntity::Company,
         'state' => new TableStateData(sort: 'name:desc'),
     ]);
-    $component = livewire(ListCompanies::class)->call('applySavedLayout', $layout->getKey());
+    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey());
     $movable = columnsBesideTitle($component, CrmEntity::Company);
 
-    expect($component->instance()->isTableLayoutModified())->toBeFalse();
+    expect($component->instance()->isSavedViewModified())->toBeFalse();
 
     $component->call('moveTableColumn', end($movable), $movable[0]);
 
-    expect($component->instance()->isTableLayoutModified())->toBeTrue();
+    expect($component->instance()->isSavedViewModified())->toBeTrue();
 });
 
 it('tells the browser which headers hide', function (string $page, CrmEntity $entity): void {
@@ -204,19 +204,19 @@ it('tells the browser which headers hide', function (string $page, CrmEntity $en
         ->and($toggleable)->toMatchArray(['data-column-hideable' => '1']);
 })->with('column menu pages');
 
-it('applies a layout that stored the title column elsewhere as stored and unmodified', function (string $page, CrmEntity $entity): void {
+it('applies a view that stored the title column elsewhere as stored and unmodified', function (string $page, CrmEntity $entity): void {
     $columns = collect(withTitleLast(livewire($page), $entity))
         ->map(fn (array $item): array => ['type' => $item['type'], 'name' => $item['name'], 'isToggled' => $item['isToggled']])
         ->all();
-    $layout = TableLayout::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+    $view = SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
         'entity' => $entity,
         'state' => new TableStateData(columns: $columns),
     ]);
 
-    $component = livewire($page)->call('applySavedLayout', $layout->getKey());
+    $component = livewire($page)->call('applySavedView', $view->getKey());
 
     expect(last(columnOrder($component)))->toBe($entity->titleColumn())
-        ->and($component->instance()->isTableLayoutModified())->toBeFalse();
+        ->and($component->instance()->isSavedViewModified())->toBeFalse();
 })->with('column menu pages');
 
 /**
@@ -378,37 +378,37 @@ it('drops a pin for a column the table no longer has', function (string $page, C
         ->and(columnMenuPreferences())->toBe(0);
 })->with('column menu pages');
 
-it('restores the pins a layout was saved with and marks the layout modified when they change', function (): void {
-    $layout = TableLayout::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+it('restores the pins a view was saved with and marks the view modified when they change', function (): void {
+    $view = SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
         'entity' => CrmEntity::Company,
         'state' => new TableStateData(pinned: ['name', 'creator.name']),
     ]);
 
-    $component = livewire(ListCompanies::class)->call('applySavedLayout', $layout->getKey());
+    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey());
 
     expect(pinnedColumns($component))->toBe(['name', 'creator.name'])
         ->and(array_slice(columnOrder($component), 0, 2))->toBe(['name', 'creator.name'])
-        ->and($component->instance()->isTableLayoutModified())->toBeFalse();
+        ->and($component->instance()->isSavedViewModified())->toBeFalse();
 
     $component->call('unpinTableColumn', 'creator.name');
 
-    expect($component->instance()->isTableLayoutModified())->toBeTrue();
+    expect($component->instance()->isSavedViewModified())->toBeTrue();
 });
 
-it('marks the pins of a layout in the render that applied it and clears them in the render that left it', function (): void {
-    $layout = TableLayout::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+it('marks the pins of a view in the render that applied it and clears them in the render that left it', function (): void {
+    $view = SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
         'entity' => CrmEntity::Company,
         'state' => new TableStateData(pinned: ['name', 'creator.name']),
     ]);
     $component = livewire(ListCompanies::class);
     $pinned = fn (string $column): string => $component->instance()->getTable()->getColumn($column)->getExtraHeaderAttributes()['data-column-pinned'];
 
-    $component->call('applySavedLayout', $layout->getKey());
+    $component->call('applySavedView', $view->getKey());
 
     expect($pinned('name'))->toBe('1')
         ->and($pinned('creator.name'))->toBe('1');
 
-    $component->call('useStandardTableLayout');
+    $component->call('useStandardTable');
 
     expect($pinned('name'))->toBe('0')
         ->and($pinned('creator.name'))->toBe('0');
@@ -505,22 +505,22 @@ it('never renames a column the table does not have', function (): void {
     expect(columnMenuPreferences())->toBe(0);
 });
 
-it('carries labels in a saved layout and marks the layout modified when one changes', function (): void {
-    $layout = TableLayout::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+it('carries labels in a saved view and marks the view modified when one changes', function (): void {
+    $view = SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
         'entity' => CrmEntity::Company,
         'state' => new TableStateData(labels: ['created_at' => 'Added']),
     ]);
 
-    $component = livewire(ListCompanies::class)->call('applySavedLayout', $layout->getKey());
+    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey());
 
     expect(columnLabelText($component, 'created_at'))->toBe('Added')
-        ->and($component->instance()->isTableLayoutModified())->toBeFalse();
+        ->and($component->instance()->isSavedViewModified())->toBeFalse();
 
     $component->callAction('editTableColumnLabel', data: ['label' => 'Joined'], arguments: ['column' => 'created_at']);
 
-    expect($component->instance()->isTableLayoutModified())->toBeTrue();
+    expect($component->instance()->isSavedViewModified())->toBeTrue();
 
-    $component->call('revertTableLayout');
+    $component->call('revertSavedView');
 
     expect(columnLabelText($component, 'created_at'))->toBe('Added');
 });

@@ -660,7 +660,7 @@ it('shows each row as a card on a phone, headed by its name, without the pins an
 
     $page = companiesTable($this->user, $this->workspace->slug)->resize(390, 844)->wait(0.5);
 
-    waitUntil($page, 'document.querySelector("table.fi-ta-table").style.tableLayout === ""')
+    waitUntil($page, 'document.querySelector("table.fi-ta-table").style.savedView === ""')
         ->assertScript('document.querySelector("table.fi-ta-table").classList.contains("fi-ta-has-pinned")', false)
         ->assertScript(sprintf('Math.round(%s.getBoundingClientRect().width) > 300', firstCell('updated_at')), true)
         ->assertScript(sprintf('%s.getBoundingClientRect().right <= window.innerWidth', firstCell('updated_at')), true)

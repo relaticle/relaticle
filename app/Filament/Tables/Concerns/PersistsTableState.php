@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Filament\Tables\Concerns;
 
-use App\Actions\TableLayouts\SaveTablePreference;
+use App\Actions\Views\SaveTablePreference;
 use App\Data\TableStateData;
 use App\Enums\CrmEntity;
+use App\Models\SavedView;
 use App\Models\Scopes\WorkspaceScope;
-use App\Models\TableLayout;
 use App\Models\TablePreference;
 use App\Providers\Filament\AppPanelProvider;
 use Illuminate\Support\Arr;
@@ -21,13 +21,13 @@ trait PersistsTableState
     public ?string $tableStateHash = null;
 
     #[Locked]
-    public ?string $activeTableLayoutId = null;
+    public ?string $activeSavedViewId = null;
 
     #[Locked]
-    public ?string $appliedTableLayoutHash = null;
+    public ?string $appliedSavedViewHash = null;
 
     #[Locked]
-    public ?string $defaultTableLayoutId = null;
+    public ?string $defaultSavedViewId = null;
 
     private ?TableStateData $initialTableState = null;
 
@@ -35,7 +35,7 @@ trait PersistsTableState
 
     private bool $hasLoadedTablePreference = false;
 
-    private bool $seededFromTableLayout = false;
+    private bool $seededFromSavedView = false;
 
     private bool $savesTableStateOnOpen = false;
 
@@ -73,24 +73,24 @@ trait PersistsTableState
             $this->tableRecordsPerPage = $this->getDefaultTableRecordsPerPageSelectOption();
         }
 
-        if ($this->seededFromTableLayout) {
-            $this->markTableLayoutApplied();
+        if ($this->seededFromSavedView) {
+            $this->markSavedViewApplied();
         }
     }
 
     public function dehydratePersistsTableState(): void
     {
         $state = $this->currentTableState();
-        $hash = hash('xxh128', "{$state->hash()}|{$this->activeTableLayoutId}|{$this->appliedTableLayoutHash}");
+        $hash = hash('xxh128', "{$state->hash()}|{$this->activeSavedViewId}|{$this->appliedSavedViewHash}");
 
         if ($this->savesTableStateOnOpen || ($this->tableStateHash !== null && $this->tableStateHash !== $hash)) {
             resolve(SaveTablePreference::class)->execute(
-                $this->tableLayoutUser(),
-                $this->tableLayoutWorkspace(),
+                $this->savedViewUser(),
+                $this->savedViewWorkspace(),
                 $this->tableEntity(),
                 $state,
-                $this->getActiveTableLayout(),
-                $this->appliedTableLayoutHash,
+                $this->getActiveSavedView(),
+                $this->appliedSavedViewHash,
             );
         }
 
@@ -205,8 +205,8 @@ trait PersistsTableState
             $this->hasLoadedTablePreference = true;
             $this->storedTablePreference = TablePreference::query()
                 ->withoutGlobalScope(WorkspaceScope::class)
-                ->where('workspace_id', $this->tableLayoutWorkspace()->getKey())
-                ->whereBelongsTo($this->tableLayoutUser())
+                ->where('workspace_id', $this->savedViewWorkspace()->getKey())
+                ->whereBelongsTo($this->savedViewUser())
                 ->where('entity', $this->tableEntity())
                 ->first();
         }
@@ -221,35 +221,35 @@ trait PersistsTableState
         }
 
         $preference = $this->storedTablePreference();
-        $active = $this->getVisibleTableLayouts()->find($preference?->active_layout_id);
-        $default = $this->getVisibleTableLayouts()->find($preference?->default_layout_id);
+        $active = $this->getVisibleSavedViews()->find($preference?->active_view_id);
+        $default = $this->getVisibleSavedViews()->find($preference?->default_view_id);
 
-        $this->defaultTableLayoutId = $default?->getKey();
+        $this->defaultSavedViewId = $default?->getKey();
 
         $hasSavedState = $preference !== null && $preference->state->columns !== [];
-        $isCleanCopy = $hasSavedState && $active instanceof TableLayout && $preference->state->withoutWidths()->hash() === $preference->applied_layout_hash;
+        $isCleanCopy = $hasSavedState && $active instanceof SavedView && $preference->state->withoutWidths()->hash() === $preference->applied_view_hash;
 
         // A default starts each session over the last state, which is saved so the rest of the session keeps it.
-        if ($this->opensTableFirstThisSession() && $default instanceof TableLayout) {
+        if ($this->opensTableFirstThisSession() && $default instanceof SavedView) {
             $this->savesTableStateOnOpen = $hasSavedState && (! $isCleanCopy || ! $active->is($default));
 
-            return $this->initialTableState = $this->seedFromTableLayout($default);
+            return $this->initialTableState = $this->seedFromSavedView($default);
         }
 
         if ($hasSavedState) {
             return $this->initialTableState = $isCleanCopy
-                ? $this->seedFromTableLayout($active)
+                ? $this->seedFromSavedView($active)
                 : $this->seedFromPreference($preference, $active);
         }
 
-        return $this->initialTableState = $default instanceof TableLayout
-            ? $this->seedFromTableLayout($default)
+        return $this->initialTableState = $default instanceof SavedView
+            ? $this->seedFromSavedView($default)
             : new TableStateData;
     }
 
     private function opensTableFirstThisSession(): bool
     {
-        $key = 'tables.opened.'.$this->tableLayoutWorkspace()->getKey().'.'.$this->tableEntity()->value;
+        $key = 'tables.opened.'.$this->savedViewWorkspace()->getKey().'.'.$this->tableEntity()->value;
         $isFirst = ! session()->has($key);
 
         session()->put($key, true);
@@ -257,25 +257,25 @@ trait PersistsTableState
         return $isFirst;
     }
 
-    private function seedFromTableLayout(TableLayout $layout): TableStateData
+    private function seedFromSavedView(SavedView $view): TableStateData
     {
-        $this->activeTableLayoutId = $layout->getKey();
-        $this->seededFromTableLayout = true;
+        $this->activeSavedViewId = $view->getKey();
+        $this->seededFromSavedView = true;
 
-        return $layout->state;
+        return $view->state;
     }
 
-    private function seedFromPreference(TablePreference $preference, ?TableLayout $active): TableStateData
+    private function seedFromPreference(TablePreference $preference, ?SavedView $active): TableStateData
     {
-        $this->activeTableLayoutId = $active?->getKey();
-        $this->appliedTableLayoutHash = $active instanceof TableLayout ? $preference->applied_layout_hash : null;
+        $this->activeSavedViewId = $active?->getKey();
+        $this->appliedSavedViewHash = $active instanceof SavedView ? $preference->applied_view_hash : null;
 
         return $preference->state;
     }
 
-    private function markTableLayoutApplied(): void
+    private function markSavedViewApplied(): void
     {
-        $this->appliedTableLayoutHash = $this->currentTableState()->withoutWidths()->hash();
+        $this->appliedSavedViewHash = $this->currentTableState()->withoutWidths()->hash();
     }
 
     private function currentTableState(): TableStateData

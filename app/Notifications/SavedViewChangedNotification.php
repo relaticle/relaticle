@@ -6,9 +6,9 @@ namespace App\Notifications;
 
 use App\Enums\CrmEntity;
 use App\Enums\Notifications\NotificationReason;
-use App\Enums\Notifications\TableLayoutChange;
+use App\Enums\Notifications\SavedViewChange;
 use App\Models\Notification as NotificationRow;
-use App\Models\TableLayout;
+use App\Models\SavedView;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CanonicalRecordUrl;
@@ -17,41 +17,41 @@ use Filament\Facades\Filament;
 use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Support\Str;
 
-final class TableLayoutChangedNotification extends InboxNotification
+final class SavedViewChangedNotification extends InboxNotification
 {
     private function __construct(
         private readonly Workspace $workspace,
         private readonly User $actor,
-        private readonly string $layoutName,
+        private readonly string $viewName,
         private readonly CrmEntity $entity,
-        private readonly TableLayoutChange $change,
+        private readonly SavedViewChange $change,
         private readonly ?string $previousName = null,
     ) {}
 
-    public static function deleted(TableLayout $layout, User $actor): self
+    public static function deleted(SavedView $view, User $actor): self
     {
-        return self::about($layout, $actor, TableLayoutChange::Deleted);
+        return self::about($view, $actor, SavedViewChange::Deleted);
     }
 
-    public static function unshared(TableLayout $layout, User $actor): self
+    public static function unshared(SavedView $view, User $actor): self
     {
-        return self::about($layout, $actor, TableLayoutChange::Unshared);
+        return self::about($view, $actor, SavedViewChange::Unshared);
     }
 
-    public static function renamed(TableLayout $layout, User $actor, string $previousName): self
+    public static function renamed(SavedView $view, User $actor, string $previousName): self
     {
-        return self::about($layout, $actor, TableLayoutChange::Renamed, $previousName);
+        return self::about($view, $actor, SavedViewChange::Renamed, $previousName);
     }
 
-    public static function updated(TableLayout $layout, User $actor): self
+    public static function updated(SavedView $view, User $actor): self
     {
-        return self::about($layout, $actor, TableLayoutChange::Updated);
+        return self::about($view, $actor, SavedViewChange::Updated);
     }
 
-    // Copies the layout's values: the queued notice runs after a deleted layout's row is gone.
-    private static function about(TableLayout $layout, User $actor, TableLayoutChange $change, ?string $previousName = null): self
+    // Copies the view's values: the queued notice runs after a deleted view's row is gone.
+    private static function about(SavedView $view, User $actor, SavedViewChange $change, ?string $previousName = null): self
     {
-        return new self($layout->loadMissing('workspace')->workspace, $actor, $layout->name, $layout->entity, $change, $previousName);
+        return new self($view->loadMissing('workspace')->workspace, $actor, $view->name, $view->entity, $change, $previousName);
     }
 
     public function workspace(): Workspace
@@ -77,14 +77,14 @@ final class TableLayoutChangedNotification extends InboxNotification
     /** @return array<string, mixed> */
     public function facts(): array
     {
-        $facts = ['layout_name' => $this->layoutName, 'entity' => $this->entity->value, 'change' => $this->change->value];
+        $facts = ['view_name' => $this->viewName, 'entity' => $this->entity->value, 'change' => $this->change->value];
 
         return $this->previousName === null ? $facts : $facts + ['previous_name' => $this->previousName];
     }
 
     public static function present(NotificationRow $row): FilamentNotification
     {
-        $change = TableLayoutChange::from((string) data_get($row->data, 'change'));
+        $change = SavedViewChange::from((string) data_get($row->data, 'change'));
 
         $entity = CrmEntity::from((string) data_get($row->data, 'entity'));
         $urls = resolve(CanonicalRecordUrl::class);
@@ -92,19 +92,19 @@ final class TableLayoutChangedNotification extends InboxNotification
         $url = $row->workspace instanceof Workspace ? $urls->listPageUrl($entity, $row->workspace) : null;
         $actorName = $row->actor?->name;
         // The panel renders a title as HTML, and a member types the names.
-        $replace = ['name' => e((string) data_get($row->data, 'layout_name')), 'previous' => e((string) data_get($row->data, 'previous_name'))];
+        $replace = ['name' => e((string) data_get($row->data, 'view_name')), 'previous' => e((string) data_get($row->data, 'previous_name'))];
 
         return FilamentNotification::make((string) $row->getKey())
             ->title($actorName === null
-                ? __("notifications.events.table_layout_changed.{$change->value}_title_without_actor", $replace)
-                : __("notifications.events.table_layout_changed.{$change->value}_title", ['actor' => e($actorName), ...$replace]))
-            ->body(__("notifications.events.table_layout_changed.{$change->value}_body", ['table' => $table]))
+                ? __("notifications.events.saved_view_changed.{$change->value}_title_without_actor", $replace)
+                : __("notifications.events.saved_view_changed.{$change->value}_title", ['actor' => e($actorName), ...$replace]))
+            ->body(__("notifications.events.saved_view_changed.{$change->value}_body", ['table' => $table]))
             ->icon($change->icon())
             ->iconColor('gray')
             ->actions($url === null ? [] : [
                 Action::make('view')
                     ->button()
-                    ->label(__('notifications.events.table_layout_changed.action', ['table' => Str::ucfirst($table)]))
+                    ->label(__('notifications.events.saved_view_changed.action', ['table' => Str::ucfirst($table)]))
                     ->url($url)
                     ->markAsRead(),
             ]);
