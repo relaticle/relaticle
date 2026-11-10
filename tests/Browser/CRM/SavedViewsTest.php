@@ -64,7 +64,7 @@ it('offers save as new view from the arrow beside save for everyone on a shared 
         ->assertNoJavaScriptErrors();
 });
 
-it('wraps the save controls under the search field on a phone without overflowing', function (): void {
+it('keeps the save controls in the filter row on a phone without overflowing', function (): void {
     SavedView::factory()->for($this->user)->for($this->workspace)->create([
         'name' => 'Hot leads',
         'state' => new TableStateData(sort: 'name:desc'),
@@ -78,7 +78,8 @@ it('wraps the save controls under the search field on a phone without overflowin
         ->click('Hot leads')
         ->type('.fi-ta-search-field input', 'zzz')
         ->assertSee('Discard changes')
-        ->assertScript('document.querySelector("[data-view-save]").getBoundingClientRect().top >= document.querySelector(".fi-ta-search-field").getBoundingClientRect().bottom', true)
+        ->assertPresent('[data-filter-bar] [data-view-save]')
+        ->assertScript('document.querySelector("[data-view-save]").getBoundingClientRect().bottom <= document.querySelector(".fi-ta-search-field").getBoundingClientRect().top', true)
         ->assertScript('document.documentElement.scrollWidth <= window.innerWidth', true)
         ->assertNoJavaScriptErrors();
 });

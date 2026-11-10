@@ -7,6 +7,7 @@
 
 @import './resizable-columns.css';
 @import './saved-views.css';
+@import './filter-bar.css';
 
 @plugin "@tailwindcss/typography";
 

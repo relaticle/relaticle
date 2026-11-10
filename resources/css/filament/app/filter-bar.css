@@ -1,0 +1,15 @@
+.fi-filter-bar {
+    @apply flex min-h-11 items-center gap-2 px-3 py-1.5 sm:px-4;
+}
+
+.fi-filter-bar-start {
+    @apply flex min-w-0 flex-1 flex-wrap items-center gap-2;
+}
+
+.fi-filter-bar-end {
+    @apply ms-auto flex shrink-0 items-center gap-2;
+}
+
+.fi-filter-bar-end .fi-view-save {
+    @apply ms-0;
+}

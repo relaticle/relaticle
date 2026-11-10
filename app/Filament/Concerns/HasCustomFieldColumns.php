@@ -6,12 +6,14 @@ namespace App\Filament\Concerns;
 
 use App\Filament\Components\Tables\ColumnHeaderLabel;
 use App\Filament\Tables\Concerns\HasColumnMenu;
+use App\Filament\Tables\Concerns\HasFilterBar;
 use App\Filament\Tables\Concerns\HasResizableColumns;
 use App\Filament\Tables\Concerns\HasSavedViews;
 use App\Filament\Tables\Concerns\PersistsTableState;
 use App\Models\CustomField;
 use BackedEnum;
 use Filament\Tables\Columns\Column;
+use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,6 +22,7 @@ use Relaticle\CustomFields\Facades\CustomFields;
 trait HasCustomFieldColumns
 {
     use HasColumnMenu;
+    use HasFilterBar;
     use HasResizableColumns;
     use HasSavedViews;
     use PersistsTableState;
@@ -63,6 +66,7 @@ trait HasCustomFieldColumns
                     $query->with('customFieldValues.customField');
                 })
                 ->deferFilters(false)
+                ->filtersLayout(FiltersLayout::Hidden)
                 ->columnManager(false)
                 ->pushColumns($columns)
                 ->pushFilters($builder->filters()->all()),
