@@ -107,6 +107,22 @@ it('applies a partial match on a multi-value field through the list tool', funct
     expect(Arr::pluck($rows, 'attributes.name'))->toBe(['Two Inboxes']);
 });
 
+it('filters a list tool by a record custom field', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+    $partner = resolve(CreateCustomField::class)->execute($user, ['entity_type' => 'opportunity', 'name' => 'Partner', 'code' => 'partner', 'type' => 'record', 'lookup_type' => 'company']);
+    $acme = Company::factory()->for($user->currentWorkspace)->create(['name' => 'Acme']);
+    $globex = Company::factory()->for($user->currentWorkspace)->create(['name' => 'Globex']);
+
+    foreach (['With Acme' => $acme, 'With Globex' => $globex] as $name => $company) {
+        Opportunity::factory()->for($user->currentWorkspace)->create(['name' => $name])->saveCustomFieldValue($partner, [$company->getKey()]);
+    }
+
+    $rows = listToolRows(new ListOpportunitiesTool()->handle(new Request(['filter' => ['custom_fields' => ['partner' => ['$has_any' => [$globex->getKey()]]]]])));
+
+    expect(Arr::pluck($rows, 'attributes.name'))->toBe(['With Globex']);
+});
+
 it('serves an empty page for a page number no list can reach', function (mixed $page): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);

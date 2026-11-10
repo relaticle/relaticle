@@ -82,6 +82,7 @@ const FILTER_OPERATORS_BY_TYPE = [
     'phone' => TEXT_LIST_OPERATORS,
     'link' => TEXT_LIST_OPERATORS,
     'domain' => TEXT_LIST_OPERATORS,
+    'record' => LIST_OPERATORS,
 ];
 
 const EVERY_FILTER_OPERATOR = ['$eq', '$contains', '$starts_with', '$ends_with', '$gt', '$gte', '$lt', '$lte', '$in', '$not_in', '$has_any', '$has_none', '$is_empty'];
@@ -689,6 +690,28 @@ it('rejects a computed filter outside its one shape on the api and mcp', functio
     'assigned_to_me other operator' => ['tasks', ['assigned_to_me' => ['$in' => [true]]], 'filter.assigned_to_me', 'assigned_to_me takes'],
     'assigned_to_me on another entity' => ['notes', ['assigned_to_me' => ['$eq' => true]], 'filter.assigned_to_me', 'Unknown filter assigned_to_me.'],
 ]);
+
+it('filters a record custom field by linked record id alike on the api and mcp', function (): void {
+    $partner = resolve(CreateCustomField::class)->execute($this->user, ['entity_type' => 'opportunity', 'name' => 'Partner', 'code' => 'partner', 'type' => 'record', 'lookup_type' => 'company']);
+    $acme = unlinkedRecord($this->user, 'companies', 'Acme');
+    $globex = unlinkedRecord($this->user, 'companies', 'Globex');
+    $stranger = User::factory()->withPersonalWorkspace()->create();
+    $foreign = Company::factory()->for($stranger->personalWorkspace())->create(['name' => 'Foreign']);
+    unlinkedRecord($this->user, 'opportunities', 'Low')->saveCustomFieldValue($partner, [$acme->getKey()]);
+    unlinkedRecord($this->user, 'opportunities', 'High')->saveCustomFieldValue($partner, [$acme->getKey(), $globex->getKey()]);
+    unlinkedRecord($this->user, 'opportunities', 'Unset');
+    $on = fn (array $condition): array => ['custom_fields' => ['partner' => $condition]];
+
+    expectTitlesOnEverySurface($this, $this->user, 'opportunities', [
+        [$on(['$has_any' => [$globex->getKey()]]), ['High']],
+        [$on(['$has_any' => [$acme->getKey()]]), ['Low', 'High']],
+        [$on(['$has_none' => [$globex->getKey()]]), ['Low', 'Unset']],
+        [$on(['$is_empty' => true]), ['Unset']],
+        [$on(['$is_empty' => false]), ['Low', 'High']],
+        [$on(['$has_any' => [$foreign->getKey()]]), []],
+        [$on(['$has_none' => [$foreign->getKey()]]), ['Low', 'High', 'Unset']],
+    ]);
+});
 
 it('publishes exactly the operators of each custom field type', function (): void {
     $published = [];

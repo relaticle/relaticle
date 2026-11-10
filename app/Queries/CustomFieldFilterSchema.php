@@ -94,7 +94,7 @@ final readonly class CustomFieldFilterSchema
                 ...self::buildOperators(['$has_any', '$has_none'], 'array'),
                 ...self::buildOperators(self::PARTIAL_OPERATORS, 'string'),
             ],
-            CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST, CustomFieldType::TAGS_INPUT => self::buildOperators(['$has_any', '$has_none'], 'array'),
+            CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST, CustomFieldType::TAGS_INPUT, CustomFieldType::RECORD => self::buildOperators(['$has_any', '$has_none'], 'array'),
             CustomFieldType::CURRENCY => self::buildOperators(array_keys(self::COMPARISONS), 'number'),
             CustomFieldType::NUMBER => self::buildOperators(array_keys(self::COMPARISONS), 'integer'),
             CustomFieldType::DATE => self::buildOperators(array_keys(self::COMPARISONS), 'string', 'date'),
