@@ -120,7 +120,14 @@ trait HasSavedViews
             return;
         }
 
-        $copy = resolve(DuplicateSavedView::class)->execute($this->savedViewUser(), $view);
+        try {
+            $copy = resolve(DuplicateSavedView::class)->execute($this->savedViewUser(), $view);
+        } catch (ValidationException $exception) {
+            Notification::make()->warning()->title(Arr::first(Arr::flatten($exception->errors())))->send();
+
+            return;
+        }
+
         $this->visibleSavedViews = null;
 
         Notification::make()->success()->title(__('filament/panel.tables.views.duplicated', ['name' => e($copy->name)]))->send();
@@ -386,7 +393,7 @@ trait HasSavedViews
         return TextInput::make('name')
             ->label(__('filament/panel.tables.views.name'))
             ->required()
-            ->maxLength(255)
+            ->maxLength(SavedView::NAME_MAX_LENGTH)
             ->autofocus();
     }
 

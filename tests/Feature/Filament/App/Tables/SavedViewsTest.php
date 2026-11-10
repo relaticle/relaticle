@@ -968,3 +968,50 @@ it('duplicates a view another member shared, and never their private one', funct
     livewire(ListCompanies::class)->call('duplicateSavedView', $private->getKey())->assertNotified('That view is no longer available.');
     expect(SavedView::query()->withoutGlobalScopes()->where('name', 'Mine only copy')->exists())->toBeFalse();
 });
+
+it('duplicates a view whose name is already at the length limit', function (): void {
+    $view = viewFor($this->user, ['name' => str_repeat('a', 255)]);
+
+    livewire(ListCompanies::class)->call('duplicateSavedView', $view->getKey())->assertOk();
+
+    $copy = SavedView::query()->withoutGlobalScopes()->where('user_id', $this->user->getKey())->whereKeyNot($view->getKey())->sole();
+    expect(mb_strlen($copy->name))->toBeLessThanOrEqual(255)
+        ->and($copy->name)->toEndWith(' copy')
+        ->and($copy->name)->toStartWith(str_repeat('a', 200));
+});
+
+it('numbers the second copy of a view at the length limit', function (): void {
+    $view = viewFor($this->user, ['name' => str_repeat('a', 255)]);
+
+    livewire(ListCompanies::class)
+        ->call('duplicateSavedView', $view->getKey())
+        ->call('duplicateSavedView', $view->getKey());
+
+    $names = SavedView::query()->withoutGlobalScopes()->whereKeyNot($view->getKey())->pluck('name');
+    expect($names)->toHaveCount(2)
+        ->and($names->every(fn (string $name): bool => mb_strlen($name) <= 255))->toBeTrue()
+        ->and($names->filter(fn (string $name): bool => str_ends_with($name, ' copy 2')))->toHaveCount(1);
+});
+
+it('tells the member when the copy name is taken between the check and the write', function (): void {
+    $view = viewFor($this->user, ['name' => 'Hot leads']);
+    SavedView::creating(function (SavedView $copy): void {
+        if ($copy->name === 'Hot leads copy') {
+            SavedView::withoutEvents(fn () => viewFor($this->user, ['name' => 'Hot leads copy']));
+        }
+    });
+
+    livewire(ListCompanies::class)->call('duplicateSavedView', $view->getKey())->assertNotified('You already have a view with this name.');
+});
+
+it('lets a read-only member duplicate a shared view into a private copy of their own', function (): void {
+    $owner = savedViewMember(WorkspaceRole::Member);
+    $shared = viewFor($owner, ['name' => 'Team pipeline', 'is_shared' => true]);
+    $viewer = savedViewMember(WorkspaceRole::Viewer);
+    $this->actingAs($viewer);
+
+    livewire(ListCompanies::class)->call('duplicateSavedView', $shared->getKey());
+
+    $copy = SavedView::query()->withoutGlobalScopes()->where('name', 'Team pipeline copy')->sole();
+    expect($copy->user_id)->toBe($viewer->getKey())->and($copy->is_shared)->toBeFalse();
+});

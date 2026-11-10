@@ -37,6 +37,8 @@ final class SavedView extends Model
     use HasUlids;
     use HasWorkspace;
 
+    public const int NAME_MAX_LENGTH = 255;
+
     /**
      * @return array<string, string>
      */
