@@ -64,7 +64,7 @@ const SINGLE_CHOICE_OPERATORS = ['$eq', '$in', '$not_in', '$is_empty'];
 const LIST_OPERATORS = ['$has_any', '$has_none', '$is_empty'];
 
 const FILTER_OPERATORS_BY_TYPE = [
-    'text' => ['$eq', '$contains', '$is_empty'],
+    'text' => ['$eq', '$contains', '$starts_with', '$ends_with', '$is_empty'],
     'number' => COMPARISON_OPERATORS,
     'currency' => COMPARISON_OPERATORS,
     'date' => COMPARISON_OPERATORS,
@@ -83,7 +83,7 @@ const FILTER_OPERATORS_BY_TYPE = [
     'domain' => LIST_OPERATORS,
 ];
 
-const EVERY_FILTER_OPERATOR = ['$eq', '$contains', '$gt', '$gte', '$lt', '$lte', '$in', '$not_in', '$has_any', '$has_none', '$is_empty'];
+const EVERY_FILTER_OPERATOR = ['$eq', '$contains', '$starts_with', '$ends_with', '$gt', '$gte', '$lt', '$lte', '$in', '$not_in', '$has_any', '$has_none', '$is_empty'];
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();
@@ -209,6 +209,10 @@ it('filters every native field of every entity alike on the api and mcp', functi
         [[$title => ['$eq' => 'Acme Renewal']], ['Acme Renewal']],
         [[$title => ['$eq' => 'acme renewal']], []],
         [[$title => ['$contains' => 'RENEW']], ['Acme Renewal']],
+        [[$title => ['$starts_with' => 'acme']], ['Acme Renewal']],
+        [[$title => ['$starts_with' => 'Renewal']], []],
+        [[$title => ['$ends_with' => 'PILOT']], ['Globex Pilot']],
+        [[$title => ['$ends_with' => 'Globex']], []],
         [[$title => ['$is_empty' => false]], ['Acme Renewal', 'Globex Pilot', 'Initech Upsell']],
         [[$title => ['$is_empty' => true]], []],
         [['created_at' => ['$eq' => '2026-06-15']], ['Globex Pilot']],
@@ -282,12 +286,25 @@ it('reads a padded operand as its trimmed value on the api and mcp', function ()
     ]);
 });
 
+it('reads a wildcard character in a partial match as a plain character on the api and mcp', function (): void {
+    unlinkedRecord($this->user, 'companies', 'Acme');
+    unlinkedRecord($this->user, 'companies', '%off Promo');
+
+    expectTitlesOnEverySurface($this, $this->user, 'companies', [
+        [['name' => ['$starts_with' => '%']], ['%off Promo']],
+        [['name' => ['$ends_with' => 'm_']], []],
+        [['name' => ['$contains' => 'c_e']], []],
+    ]);
+});
+
 it('rejects a blank operand on the api and mcp', function (array $filter, string $key): void {
     unlinkedRecord($this->user, 'companies', 'Acme');
 
     expectErrorOnEverySurface($this, $this->user, 'companies', $filter, $key, 'must be a non-empty string, or use $is_empty for records without a value.');
 })->with([
     'empty' => [['name' => ['$contains' => '']], 'filter.name.$contains'],
+    'blank prefix' => [['name' => ['$starts_with' => '  ']], 'filter.name.$starts_with'],
+    'blank suffix' => [['name' => ['$ends_with' => '']], 'filter.name.$ends_with'],
     'spaces' => [['name' => ['$eq' => '   ']], 'filter.name.$eq'],
 ]);
 
@@ -317,7 +334,7 @@ it('rejects a native operand of the wrong type on the api and mcp', function (ar
     'emptiness that is not a boolean' => [['name' => ['$is_empty' => 'maybe']], 'filter.name.$is_empty', 'must be true or false'],
     'text given a list' => [['name' => ['Acme', 'Globex']], 'filter.name', '{"$eq": ...}'],
     'text given an empty object' => [['name' => []], 'filter.name', '{"$eq": ...}'],
-    'operator of another kind' => [['name' => ['$gt' => 'a']], 'filter.name.$gt', 'Use $eq, $contains, $is_empty.'],
+    'operator of another kind' => [['name' => ['$gt' => 'a']], 'filter.name.$gt', 'Use $eq, $contains, $starts_with, $ends_with, $is_empty.'],
     'enum $eq given a list' => [['creation_source' => ['$eq' => ['api', 'web']]], 'filter.creation_source.$eq', 'must be one of: web, sample, import, api, mcp, chat, mailbox'],
     'enum $eq given a comma list' => [['creation_source' => ['$eq' => 'api,web']], 'filter.creation_source.$eq', 'must be one of: web, sample, import, api, mcp, chat, mailbox'],
     'unknown enum value' => [['creation_source' => ['$eq' => 'fax']], 'filter.creation_source.$eq', 'fax is not one of: web, sample, import, api, mcp, chat, mailbox'],
@@ -675,6 +692,9 @@ it('applies every operator of every custom field type alike on the api and mcp',
         [['$eq' => 'Alpha Corp'], ['Low']],
         [['$contains' => 'beta'], ['High']],
         [['$contains' => 'a'], ['Low', 'High']],
+        [['$starts_with' => 'alpha'], ['Low']],
+        [['$starts_with' => 'Corp'], []],
+        [['$ends_with' => 'LTD'], ['High']],
         [['$is_empty' => false, '$contains' => 'Corp'], ['Low']],
     ], 'x'],
     'number' => ['number', [], 10, 50, [

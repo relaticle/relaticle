@@ -35,7 +35,9 @@ final readonly class CustomFieldFilterSchema
     public const array COMPARISONS = ['$eq' => '=', '$gt' => '>', '$gte' => '>=', '$lt' => '<', '$lte' => '<='];
 
     /** @var array<int, string> */
-    private const array STRING_OPERATORS = ['$eq', '$contains'];
+    public const array PARTIAL_OPERATORS = ['$contains', '$starts_with', '$ends_with'];
+
+    private const array STRING_OPERATORS = ['$eq', ...self::PARTIAL_OPERATORS];
 
     /** @var array<int, string> */
     private const array BOOLEAN_OPERATORS = ['$eq'];

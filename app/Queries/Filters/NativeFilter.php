@@ -66,9 +66,12 @@ final readonly class NativeFilter implements Filter
     {
         $text = Operand::string($operand) ?? throw FilterErrors::operand($property, $operator, __('validation.filter.expected.string'));
 
-        $operator === '$contains'
-            ? $query->where($column, 'ILIKE', '%'.LikePattern::escape($text).'%')
-            : $query->where($column, '=', $text);
+        match ($operator) {
+            '$eq' => $query->where($column, '=', $text),
+            '$contains' => $query->where($column, 'ILIKE', '%'.LikePattern::escape($text).'%'),
+            '$starts_with' => $query->where($column, 'ILIKE', LikePattern::escape($text).'%'),
+            '$ends_with' => $query->where($column, 'ILIKE', '%'.LikePattern::escape($text)),
+        };
     }
 
     /**

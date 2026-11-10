@@ -328,7 +328,7 @@ Native fields take the operators of the field type they match. `$is_empty` takes
 |---|---|
 | Single choice (select, radio, toggle buttons), `creation_source` | `$eq`, `$in`, `$not_in`, `$is_empty` |
 | Multi choice (multi select, checkbox list), tags, email, phone, link, domain | `$has_any`, `$has_none`, `$is_empty` |
-| Text | `$eq`, `$contains`, `$is_empty` |
+| Text | `$eq`, `$contains`, `$starts_with`, `$ends_with`, `$is_empty` |
 | Number, currency, date, date and time | `$eq`, `$gt`, `$gte`, `$lt`, `$lte`, `$is_empty` |
 | Checkbox, toggle | `$eq`, `$is_empty` |
 
