@@ -85,6 +85,23 @@ trait HasViewSwitcher
         ])->render());
     }
 
+    public function getViewSettings(): ?Htmlable
+    {
+        $isList = $this->viewSwitcherPages()['list']['active'] ?? false;
+
+        if (! $isList || ! method_exists($this, 'viewSettingsColumns')) {
+            return null;
+        }
+
+        $columns = $this->viewSettingsColumns();
+
+        return new HtmlString(view('filament.app.tables.view-settings', [
+            'shown' => array_values(array_filter($columns, fn (array $column): bool => $column['isShown'])),
+            'hidden' => array_values(array_filter($columns, fn (array $column): bool => ! $column['isShown'] && ! $column['isLocked'])),
+            'canReset' => property_exists($this, 'activeSavedViewId') && $this->activeSavedViewId === null,
+        ])->render());
+    }
+
     /**
      * @return array<string, array{name: string, url: string, active: bool}>
      */

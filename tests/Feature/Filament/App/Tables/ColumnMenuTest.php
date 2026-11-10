@@ -561,3 +561,100 @@ it('names the column menu for assistive technology', function (): void {
 
     livewire(ListCompanies::class)->assertSeeHtmlInOrder(['role="menu"', 'aria-label="Column options"']);
 });
+
+function columnIsShown(Testable $component, string $column): bool
+{
+    return collect($component->get('tableColumns'))->firstWhere('name', $column)['isToggled'];
+}
+
+it('hides and shows a column from view settings', function (): void {
+    $component = livewire(ListCompanies::class)->call('toggleTableColumn', 'created_at');
+    $before = columnIsShown($component, 'created_at');
+
+    $component->call('toggleTableColumn', 'created_at');
+
+    expect(columnIsShown($component, 'created_at'))->toBe(! $before);
+});
+
+it('never hides the title column from view settings', function (string $page, CrmEntity $entity): void {
+    $component = livewire($page)->call('toggleTableColumn', $entity->titleColumn());
+
+    expect(columnIsShown($component, $entity->titleColumn()))->toBeTrue();
+})->with('column menu pages');
+
+it('ignores a column the table does not have in view settings', function (): void {
+    $component = livewire(ListCompanies::class);
+    $before = $component->get('tableColumns');
+
+    $component->call('toggleTableColumn', 'custom_fields.gone');
+
+    expect($component->get('tableColumns'))->toBe($before);
+});
+
+it('lists a hidden column under add column and shows it again at the end', function (): void {
+    Filament::bootCurrentPanel();
+    $component = livewire(ListCompanies::class);
+    $first = columnsBesideTitle($component, CrmEntity::Company)[0];
+
+    $component->call('toggleTableColumn', $first);
+
+    expect($component->html())->toContain('Show '.columnLabelText($component, $first));
+
+    $component->call('toggleTableColumn', $first);
+
+    expect(columnIsShown($component, $first))->toBeTrue()
+        ->and(last(columnOrder($component)))->toBe($first);
+});
+
+it('draws no column manager trigger in the toolbar', function (): void {
+    expect(livewire(ListCompanies::class)->instance()->getTable()->hasColumnManager())->toBeFalse();
+});
+
+it('offers a reset only on the built-in list', function (): void {
+    Filament::bootCurrentPanel();
+    $view = SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create(['entity' => CrmEntity::Company]);
+
+    livewire(ListCompanies::class)->assertSeeText('Reset to default')
+        ->call('applySavedView', $view->getKey())
+        ->assertDontSeeText('Reset to default');
+});
+
+it('shows a renamed column with its new label in view settings', function (): void {
+    Filament::bootCurrentPanel();
+    $component = livewire(ListCompanies::class);
+    $column = columnsBesideTitle($component, CrmEntity::Company)[0];
+
+    $component->callAction('editTableColumnLabel', data: ['label' => 'Owner of record'], arguments: ['column' => $column]);
+
+    expect($component->html())->toContain('aria-label="Hide Owner of record"');
+});
+
+it('escapes markup in a column label in view settings', function (): void {
+    Filament::bootCurrentPanel();
+    $component = livewire(ListCompanies::class);
+
+    $component->callAction('editTableColumnLabel', data: ['label' => '<img src=x onerror=alert(1)>'], arguments: ['column' => 'created_at']);
+
+    $settings = str($component->html())->after('fi-view-settings-panel')->toString();
+
+    expect($settings)->toContain('&lt;img src=x onerror=alert(1)&gt;')->not->toContain('<img src=x');
+});
+
+it('lists the pinned columns first in view settings and marks them', function (): void {
+    Filament::bootCurrentPanel();
+    $component = livewire(ListCompanies::class)->call('pinTableColumn', 'created_at');
+
+    $component->assertSeeHtmlInOrder(['data-column="created_at"', 'data-column-pinned', 'data-column="name"']);
+});
+
+it('keeps the member\'s widths when the table goes back to its default', function (): void {
+    $component = livewire(ListCompanies::class)
+        ->set('tableSort', 'name:asc')
+        ->call('updateResizableColumnWidth', 'created_at', '300')
+        ->call('pinTableColumn', 'created_at')
+        ->call('useStandardTable');
+
+    expect($component->get('tableColumnWidths'))->toBe(['created_at' => 300])
+        ->and($component->get('tableSort'))->toBeNull()
+        ->and(pinnedColumns($component))->toBe([]);
+});

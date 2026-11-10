@@ -63,6 +63,7 @@ trait HasCustomFieldColumns
                     $query->with('customFieldValues.customField');
                 })
                 ->deferFilters(false)
+                ->columnManager(false)
                 ->pushColumns($columns)
                 ->pushFilters($builder->filters()->all()),
         );

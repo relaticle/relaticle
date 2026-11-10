@@ -7,6 +7,8 @@ namespace App\Filament\Tables\Concerns;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
 use Filament\Support\Components\Attributes\Unexposed;
+use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\HtmlString;
 use Livewire\Attributes\Locked;
 
 trait HasColumnMenu
@@ -98,6 +100,55 @@ trait HasColumnMenu
             fn (array $item): array => $item['name'] === $columnName ? [...$item, 'isToggled' => false] : $item,
             $this->tableColumns,
         ), wasReordered: true);
+    }
+
+    public function toggleTableColumn(string $columnName): void
+    {
+        $item = collect($this->tableColumns)->first(fn (array $item): bool => $item['type'] === self::TABLE_COLUMN_MANAGER_COLUMN_TYPE && $item['name'] === $columnName);
+
+        if ($item === null || ! $this->getTable()->getColumn($columnName)?->isToggleable()) {
+            return;
+        }
+
+        if ($item['isToggled']) {
+            $this->hideTableColumn($columnName);
+
+            return;
+        }
+
+        $others = array_values(array_filter($this->tableColumns, fn (array $other): bool => $other['name'] !== $columnName));
+
+        $this->applyTableColumnManager([...$others, [...$item, 'isToggled' => true]], wasReordered: true);
+    }
+
+    /**
+     * @return list<array{name: string, label: Htmlable, text: string, isShown: bool, isPinned: bool, isLocked: bool}>
+     */
+    protected function viewSettingsColumns(): array
+    {
+        $columns = [];
+
+        foreach ($this->tableColumns as $item) {
+            $column = $item['type'] === self::TABLE_COLUMN_MANAGER_COLUMN_TYPE && ! $item['isHidden'] ? $this->getTable()->getColumn($item['name']) : null;
+
+            if ($column === null) {
+                continue;
+            }
+
+            $label = $column->getLabel();
+            $label = $label instanceof Htmlable ? $label : new HtmlString(e((string) $label));
+
+            $columns[] = [
+                'name' => $item['name'],
+                'label' => $label,
+                'text' => trim((string) preg_replace('/\s+/', ' ', html_entity_decode(strip_tags($label->toHtml()), ENT_QUOTES))),
+                'isShown' => $item['isToggled'],
+                'isPinned' => in_array($item['name'], $this->tablePinnedColumns, true),
+                'isLocked' => ! $column->isToggleable(),
+            ];
+        }
+
+        return $columns;
     }
 
     /**

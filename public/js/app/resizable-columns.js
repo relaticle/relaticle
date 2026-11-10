@@ -251,18 +251,6 @@
             })
         })
         markScrolledSideways(table)
-        keepPinsInColumnManager(table, pinned.map(headerName))
-    }
-
-    // Filament's column manager has no per-item lock, so its sortable list leaves the pins where they are.
-    function keepPinsInColumnManager(table, pinned) {
-        const list = table.closest('.fi-ta')?.querySelector('.fi-ta-col-manager-items')
-        if (!list?.sortable) return
-
-        const isPinned = (item) => pinned.includes(item?.getAttribute('x-sortable-item')?.replace(/^column::/, ''))
-
-        list.sortable.option('onMove', (event) => !isPinned(event.related))
-        list.querySelectorAll(':scope > [x-sortable-item]').forEach((item) => item.toggleAttribute('data-column-pinned', isPinned(item)))
     }
 
     function lockTable(table) {
@@ -737,6 +725,43 @@
         }))
     }
 
+    function registerViewSettings() {
+        window.Alpine.data('viewSettingsColumns', () => {
+            let panel
+
+            return {
+                adding: false,
+
+                init() {
+                    panel = this.$el
+
+                    // A pinned column keeps its place, so nothing is dropped across one.
+                    this.$nextTick(() => panel.querySelector('.fi-view-settings-list')?.sortable?.option('onMove', (event) => !event.related.hasAttribute('data-column-pinned')))
+                },
+
+                reorder(event) {
+                    if (event.oldDraggableIndex === event.newDraggableIndex) return
+
+                    this.$wire.moveTableColumn(event.item.dataset.column, event.item.nextElementSibling?.dataset.column ?? null)
+                },
+
+                async toggle(row) {
+                    const neighbour = row.nextElementSibling ?? row.previousElementSibling
+
+                    await this.$wire.toggleTableColumn(row.dataset.column)
+
+                    this.$nextTick(() => (neighbour?.isConnected ? neighbour.querySelector('[data-view-settings-toggle]') : null)?.focus())
+                },
+
+                async show(name) {
+                    await this.$wire.toggleTableColumn(name)
+
+                    this.$nextTick(() => panel.querySelector('[data-view-settings-add]:not([aria-disabled="true"]), [data-view-settings-toggle]')?.focus())
+                },
+            }
+        })
+    }
+
     function registerResizableColumn() {
         wireStickyHeaders()
         window.Alpine.data('resizableColumn', (columnName, columnId, min, max) => ({
@@ -945,8 +970,10 @@
     if (window.Alpine && window.Alpine.version) {
         registerResizableColumn()
         registerColumnMenu()
+        registerViewSettings()
     } else {
         document.addEventListener('alpine:init', registerResizableColumn)
         document.addEventListener('alpine:init', registerColumnMenu)
+        document.addEventListener('alpine:init', registerViewSettings)
     }
 })()

@@ -242,11 +242,6 @@ th[data-column-pinned="1"] > .fi-ta-column-handle {
     @apply shadow-[6px_0_8px_-4px] shadow-black/12 dark:shadow-black/50;
 }
 
-/* A pinned column keeps its place, so the column manager offers no way to move it. */
-.fi-ta-col-manager-items > [data-column-pinned] :is(.fi-ta-col-manager-reorder-handle, .fi-ta-col-manager-reorder-controls) {
-    @apply hidden;
-}
-
 /* Filament's text item is a line-clamp box, which never draws an ellipsis, so a value cut by a fixed width needs a block. */
 .fi-ta-resizable-table td .fi-ta-text-item:not(.fi-wrapped, .fi-ta-text-has-line-clamp, :is(.fi-wrapped, .fi-ta-text-has-line-clamp) *) {
     @apply sm:block sm:truncate;

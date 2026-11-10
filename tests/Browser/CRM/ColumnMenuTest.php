@@ -257,18 +257,90 @@ it('starts no drag from the options button or from a touch', function (): void {
         ->assertNoJavaScriptErrors();
 });
 
-it('keeps the column manager order in step with the headers', function (): void {
+function openViewSettings(AwaitableWebpage $page): AwaitableWebpage
+{
+    $page->click('.fi-view-settings-trigger');
+
+    return $page->assertVisible('.fi-view-settings-panel');
+}
+
+function settingsRow(string $column, string $control = ''): string
+{
+    return trim(sprintf('.fi-view-settings-row[data-column="%s"] %s', $column, $control));
+}
+
+function settingsOrder(): string
+{
+    return '[...document.querySelectorAll(".fi-view-settings-row")].map((row) => row.dataset.column)';
+}
+
+it('keeps the view settings order in step with the headers', function (): void {
     $page = companiesTable($this->user, $this->workspace->slug);
 
     $page->script(openColumnMenu('created_at'));
     $page->click(columnMenuItem('moveLeft'));
     $page->wait(1);
+    openViewSettings($page);
 
     $headers = $page->script(headerOrder());
-    $manager = $page->script('[...document.querySelectorAll(".fi-ta-col-manager-items [x-sortable-item]")].map((item) => item.getAttribute("x-sortable-item").replace(/^column::/, ""))');
 
-    expect(array_values(array_intersect($manager, $headers)))->toBe($headers);
+    expect($page->script(settingsOrder()))->toBe($headers);
     $page->assertNoJavaScriptErrors();
+});
+
+it('hides a column from view settings and shows it again from add column', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+
+    $page->click(settingsRow('accountOwner.name', '[data-view-settings-toggle]'))
+        ->assertMissing(columnHeader('accountOwner.name'))
+        ->assertMissing(settingsRow('accountOwner.name'))
+        ->assertVisible('.fi-view-settings-panel');
+
+    $page->click('[data-view-settings-add]')
+        ->click('[aria-label="Show Account Owner"]')
+        ->assertVisible(columnHeader('accountOwner.name'));
+
+    waitUntil($page, headerOrder().'.at(-1) === "accountOwner.name"')
+        ->assertScript(settingsOrder().'.at(-1)', 'accountOwner.name')
+        ->assertNoJavaScriptErrors();
+});
+
+it('reorders a column by dragging it in view settings and keeps the order after a reload', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+    $order = $page->script(headerOrder());
+    $moved = $order[3];
+    $target = $order[1];
+
+    $page->drag(settingsRow($moved, '.fi-view-settings-grip'), settingsRow($target, '.fi-view-settings-grip'));
+
+    waitUntil($page, headerOrder().'.indexOf('.json_encode($moved).') < '.headerOrder().'.indexOf('.json_encode($target).')')
+        ->assertScript(settingsOrder(), $page->script(headerOrder()))
+        ->wait(1)
+        ->refresh()
+        ->assertPresent(columnHeader('created_at').' .fi-ta-column-handle')
+        ->assertScript(headerOrder().'.indexOf('.json_encode($moved).') < '.headerOrder().'.indexOf('.json_encode($target).')', true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('never hides the title column from view settings', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+
+    $page->assertPresent(settingsRow('name', '.fi-view-settings-lock'))
+        ->assertMissing(settingsRow('name', '[data-view-settings-toggle]'))
+        ->assertNoJavaScriptErrors();
+});
+
+it('opens view settings as a sheet on a phone without overflowing the header', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug)->resize(390, 844)->wait(0.5);
+
+    $page->assertScript('document.documentElement.scrollWidth <= document.documentElement.clientWidth', true)
+        ->assertScript('document.querySelector(".fi-header").scrollWidth <= document.querySelector(".fi-header").clientWidth', true)
+        ->assertScript('document.querySelector(".fi-view-settings-trigger").getBoundingClientRect().right <= document.documentElement.clientWidth', true);
+
+    openViewSettings($page)
+        ->assertScript('getComputedStyle(document.querySelector(".fi-view-settings-panel").closest(".fi-dropdown-panel")).position', 'fixed')
+        ->assertScript('Math.round(document.querySelector(".fi-view-settings-panel").closest(".fi-dropdown-panel").getBoundingClientRect().bottom) === window.innerHeight', true)
+        ->assertNoJavaScriptErrors();
 });
 
 function dragHeader(string $column, string $overColumn, string $side = 'left', string $finish = 'drop', int $dropBelow = 0): string
@@ -536,13 +608,14 @@ it('never drags a pinned column or drops another among the pins', function (): v
         ->assertNoJavaScriptErrors();
 });
 
-it('offers no way to move a pinned column from the column manager or its header', function (): void {
+it('offers no way to move a pinned column from view settings or its header', function (): void {
     $page = pinFromMenu(companiesTable($this->user, $this->workspace->slug), 'created_at');
-    $display = fn (string $column, string $control): string => sprintf('getComputedStyle(document.querySelector(`.fi-ta-col-manager-items > [x-sortable-item="column::%s"] %s`)).display', $column, $control);
 
-    waitUntil($page, '('.$display('created_at', '.fi-ta-col-manager-reorder-handle').') === "none"')
-        ->assertScript($display('created_at', '.fi-ta-col-manager-reorder-controls'), 'none')
-        ->assertScript('('.$display('name', '.fi-ta-col-manager-reorder-handle').') !== "none"', true)
+    openViewSettings($page)
+        ->assertMissing(settingsRow('created_at', '.fi-view-settings-grip'))
+        ->assertPresent(settingsRow('created_at', '.fi-view-settings-pin'))
+        ->assertPresent(settingsRow('name', '.fi-view-settings-grip'))
+        ->assertScript(settingsOrder().'.slice(0, 2)', ['created_at', 'name'])
         ->assertScript(sprintf('getComputedStyle(document.querySelector(`%s`)).cursor !== "move"', columnHeader('created_at')), true)
         ->assertNoJavaScriptErrors();
 });

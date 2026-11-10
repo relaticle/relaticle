@@ -167,3 +167,98 @@
 .fi-ta-views-save .fi-icon {
     @apply text-primary-600 dark:text-primary-400;
 }
+
+.fi-view-controls {
+    @apply flex min-w-0 items-center gap-2;
+}
+
+.fi-view-settings-trigger .fi-view-settings-icon {
+    @apply size-4 text-gray-500 dark:text-gray-400;
+}
+
+@media (width < 40rem) {
+    .fi-view-settings-trigger .fi-view-settings-text {
+        @apply sr-only;
+    }
+}
+
+.fi-view-settings-panel {
+    @apply flex max-h-[min(40rem,calc(100dvh-8rem))] flex-col overflow-y-auto p-1;
+
+    & .fi-dropdown-list {
+        @apply gap-1;
+    }
+
+    & .fi-dropdown-list-item {
+        @apply p-2;
+    }
+
+    & > .fi-dropdown-list {
+        @apply mt-1 shrink-0 border-t border-gray-100 pt-1 dark:border-white/10;
+    }
+}
+
+.fi-view-settings-list {
+    @apply flex shrink-0 flex-col gap-0.5;
+}
+
+.fi-view-settings-row {
+    @apply flex items-center gap-1 rounded-md py-1 pe-1 ps-0.5 text-sm text-gray-950 dark:text-white;
+
+    &:hover,
+    &:has(:focus-visible) {
+        @apply bg-gray-50 dark:bg-white/5;
+    }
+}
+
+.fi-view-settings-handle {
+    @apply flex size-6 shrink-0 items-center justify-center text-gray-400 dark:text-gray-500;
+
+    & .fi-icon {
+        @apply size-4;
+    }
+}
+
+.fi-view-settings-grip {
+    @apply cursor-grab touch-none;
+}
+
+.fi-view-settings-label {
+    @apply flex min-w-0 flex-1 items-center;
+}
+
+.fi-view-settings-lock {
+    @apply flex size-6 shrink-0 items-center justify-center text-gray-400 dark:text-gray-500;
+
+    & .fi-icon {
+        @apply size-4;
+    }
+}
+
+.fi-view-settings-row .fi-icon-btn {
+    @apply m-0 size-6;
+
+    & .fi-icon {
+        @apply size-4!;
+    }
+}
+
+.fi-view-settings-add {
+    @apply flex flex-1 items-center justify-between gap-2;
+}
+
+.fi-view-settings-add-chevron {
+    @apply size-4 text-gray-400 transition-transform dark:text-gray-500;
+
+    &.fi-expanded {
+        @apply rotate-90;
+    }
+}
+
+.fi-view-settings-hidden {
+    @apply flex flex-col gap-1 ps-4;
+}
+
+.fi-view-settings-reset .fi-icon {
+    @apply size-4!;
+}
