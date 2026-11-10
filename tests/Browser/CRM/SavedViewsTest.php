@@ -112,6 +112,53 @@ it('joins the save halves into one chip-height control that stays pinned beside 
     $page->assertNoJavaScriptErrors();
 });
 
+it('leaves the chip strip room on a phone with an icon discard beside save for everyone', function (): void {
+    SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'name' => 'Team pipeline',
+        'is_shared' => true,
+        'state' => new TableStateData(sort: 'name:desc'),
+    ]);
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(390, 844)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->click('Team pipeline');
+    $page->script("Livewire.all().find((component) => component.name.includes('ListCompanies')).\$wire.\$call('setFilterRules', Array.from({ length: 3 }, (_, index) => ({ field: 'name', condition: 'contains', value: 'chip' + index })))");
+    $page->assertSeeIn('[data-view-save]', 'Save for everyone')
+        ->assertScript('document.querySelectorAll("[data-filter-chip]").length === 3', true)
+        ->assertScript('document.querySelector(".fi-filter-bar-start").getBoundingClientRect().width >= 120', true)
+        ->assertScript('document.querySelectorAll("[data-view-save-action=discard]").length === 1', true)
+        ->assertScript('(() => { const discard = document.querySelector("[data-view-save-action=discard]"); const icon = discard.querySelector(".fi-view-save-discard-icon"); return discard.textContent.trim() === "Discard changes" && icon.checkVisibility() && discard.querySelector(".fi-view-save-discard-text").getBoundingClientRect().width <= 1 && discard.getBoundingClientRect().height === document.querySelector("[data-filter-chip]").getBoundingClientRect().height; })()', true);
+
+    $page->script('document.querySelector(".fi-filter-bar-start").scrollLeft = 99999');
+    $page->script('[...document.querySelectorAll("[data-filter-chip] [data-filter-more]")].at(-1).click()');
+    $page->assertScript('document.querySelector("[data-pop][data-open=true]") !== null', true)
+        ->keys('[data-pop][data-open=true] [data-pop-item]', 'Escape')
+        ->assertMissing('[data-pop]:not([style*="display: none"])')
+        ->click('[data-view-save-action="discard"]')
+        ->assertScript('(async () => { for (let attempt = 0; attempt < 50; attempt++) { if (document.querySelectorAll("[data-filter-chip]").length === 0) { return true; } await new Promise((resolve) => setTimeout(resolve, 100)); } return false; })()', true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('keeps the text discard button at desktop width', function (): void {
+    SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'name' => 'Hot leads',
+        'state' => new TableStateData(sort: 'name:desc'),
+    ]);
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->click('Hot leads');
+    changeViewByRule($page);
+    $page->assertSeeIn('[data-view-save-action="discard"]', 'Discard changes')
+        ->assertScript('!document.querySelector(".fi-view-save-discard-icon").checkVisibility() && document.querySelector(".fi-view-save-discard-text").checkVisibility()', true);
+});
+
 it('keeps the save controls in the filter row on a phone without overflowing', function (): void {
     SavedView::factory()->for($this->user)->for($this->workspace)->create([
         'name' => 'Hot leads',

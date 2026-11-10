@@ -10,6 +10,20 @@
     @apply bg-transparent text-gray-500 shadow-none ring-0 hover:bg-gray-50 dark:bg-transparent dark:text-gray-400 dark:hover:bg-white/5;
 }
 
+.fi-view-save-discard-icon {
+    @apply size-4 sm:hidden;
+}
+
+.fi-view-save-discard-text {
+    @apply max-sm:sr-only;
+}
+
+@media (width < 40rem) {
+    .fi-view-save .fi-view-save-discard {
+        @apply px-2;
+    }
+}
+
 .fi-view-save-split {
     @apply flex items-stretch;
 
