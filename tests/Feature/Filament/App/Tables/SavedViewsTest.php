@@ -10,6 +10,7 @@ use App\Actions\Views\UpdateSavedView;
 use App\Data\TableStateData;
 use App\Enums\CrmEntity;
 use App\Enums\Notifications\SavedViewChange;
+use App\Enums\SavedViewType;
 use App\Enums\WorkspaceRole;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\NoteResource\Pages\ManageNotes;
@@ -129,6 +130,7 @@ it('saves the current table as a new view without widths and applies it', functi
     $view = SavedView::query()->withoutGlobalScopes()->sole();
 
     expect($view->name)->toBe('Hot leads')
+        ->and($view->type)->toBe(SavedViewType::Table)
         ->and($view->is_shared)->toBeFalse()
         ->and($view->state->sort)->toBe('created_at:desc')
         ->and($view->state->widths)->toBe([])

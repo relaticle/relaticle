@@ -6,6 +6,7 @@ namespace App\Actions\Views;
 
 use App\Data\TableStateData;
 use App\Enums\CrmEntity;
+use App\Enums\SavedViewType;
 use App\Models\SavedView;
 use App\Models\User;
 use App\Models\Workspace;
@@ -24,6 +25,7 @@ final readonly class CreateSavedView
             'workspace_id' => $workspace->getKey(),
             'user_id' => $user->getKey(),
             'entity' => $entity,
+            'type' => SavedViewType::Table,
             'state' => $state->withoutWidths(),
         ]);
         $view->name = $this->ensureNameIsFree->execute($user, $view, $name);
