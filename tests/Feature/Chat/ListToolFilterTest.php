@@ -75,6 +75,24 @@ it('applies a filter when searching for the literal term "0" instead of returnin
     expect($rows)->toHaveCount(1);
 });
 
+it('applies a partial text match through the list tool', function (string $operator, string $operand, array $expected): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+
+    foreach (['Acme Renewal', 'Globex Pilot'] as $name) {
+        Company::factory()->for($user->currentWorkspace)->create(['name' => $name]);
+    }
+
+    $rows = listToolRows(new ListCompaniesTool()->handle(new Request(['filter' => ['name' => [$operator => $operand]]])));
+
+    expect(Arr::pluck($rows, 'attributes.name'))->toBe($expected);
+})->with([
+    'starts with' => ['$starts_with', 'acme', ['Acme Renewal']],
+    'starts with nothing' => ['$starts_with', 'Pilot', []],
+    'ends with' => ['$ends_with', 'PILOT', ['Globex Pilot']],
+    'ends with nothing' => ['$ends_with', 'Globex', []],
+]);
+
 it('serves an empty page for a page number no list can reach', function (mixed $page): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);

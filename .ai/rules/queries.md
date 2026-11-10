@@ -152,8 +152,8 @@ the REST guide. Update those by hand.
   without that guard, so read them by hand.
 - **An operator.** Add it to `operatorsForType()` and compile it in
   `CustomFieldFilter::applyCondition()`. A native field shares the type's operators, so
-  compile it in `NativeFilter` too: its `text()` treats every operator but `$contains` as
-  equality. `ListFilterSurfacesTest` fails until its operator table lists it ("publishes
+  compile it in `NativeFilter::text()` too: its `match` throws on an operator it does not
+  compile. `ListFilterSurfacesTest` fails until its operator table lists it ("publishes
   exactly the operators of each custom field type"), and then until a case runs it on every
   surface ("applies every operator of every custom field type alike on the api and mcp").
   A native field that shares the type fails the same way until a case runs the operator on

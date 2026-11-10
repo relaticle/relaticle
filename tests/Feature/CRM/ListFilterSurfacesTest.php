@@ -289,11 +289,28 @@ it('reads a padded operand as its trimmed value on the api and mcp', function ()
 it('reads a wildcard character in a partial match as a plain character on the api and mcp', function (): void {
     unlinkedRecord($this->user, 'companies', 'Acme');
     unlinkedRecord($this->user, 'companies', '%off Promo');
+    unlinkedRecord($this->user, 'companies', 'Back\\slash');
 
     expectTitlesOnEverySurface($this, $this->user, 'companies', [
         [['name' => ['$starts_with' => '%']], ['%off Promo']],
         [['name' => ['$ends_with' => 'm_']], []],
         [['name' => ['$contains' => 'c_e']], []],
+        [['name' => ['$contains' => '\\']], ['Back\\slash']],
+        [['name' => ['$starts_with' => '\\']], []],
+    ]);
+});
+
+it('reads a wildcard character in a partial match on a custom text field as a plain character on the api and mcp', function (): void {
+    $field = resolve(CreateCustomField::class)->execute($this->user, ['entity_type' => 'opportunity', 'name' => 'Probe', 'code' => 'probe', 'type' => 'text']);
+    unlinkedRecord($this->user, 'opportunities', 'Plain')->saveCustomFieldValue($field, 'Acme');
+    unlinkedRecord($this->user, 'opportunities', 'Marked')->saveCustomFieldValue($field, '%off\\promo');
+    $on = fn (array $condition): array => ['custom_fields' => ['probe' => $condition]];
+
+    expectTitlesOnEverySurface($this, $this->user, 'opportunities', [
+        [$on(['$starts_with' => '%']), ['Marked']],
+        [$on(['$ends_with' => 'm_']), []],
+        [$on(['$ends_with' => '\\promo']), ['Marked']],
+        [$on(['$starts_with' => '\\']), []],
     ]);
 });
 
