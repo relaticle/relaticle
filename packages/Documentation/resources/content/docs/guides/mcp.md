@@ -327,7 +327,8 @@ Native fields take the operators of the field type they match. `$is_empty` takes
 | Field type | Operators |
 |---|---|
 | Single choice (select, radio, toggle buttons), `creation_source` | `$eq`, `$in`, `$not_in`, `$is_empty` |
-| Multi choice (multi select, checkbox list), tags, email, phone, link, domain | `$has_any`, `$has_none`, `$is_empty` |
+| Multi choice (multi select, checkbox list), tags | `$has_any`, `$has_none`, `$is_empty` |
+| Email, phone, link, domain | `$has_any`, `$has_none`, `$contains`, `$starts_with`, `$ends_with`, `$is_empty` |
 | Text | `$eq`, `$contains`, `$starts_with`, `$ends_with`, `$is_empty` |
 | Number, currency, date, date and time | `$eq`, `$gt`, `$gte`, `$lt`, `$lte`, `$is_empty` |
 | Checkbox, toggle | `$eq`, `$is_empty` |
@@ -343,6 +344,7 @@ Record, text area, rich text and color fields take no filter. Neither does an en
 - Domain values match as a bare host or a full URL, with or without `www.`, so `https://www.acme.com/about` finds `acme.com`.
 - Phone values match in any format. A phone operand needs a country code, such as `+1 415 555 0100`. An operand without one returns the error `phone_number needs a country code, for example +1 415 555 0100.`
 - Tags match the exact stored value.
+- `$contains`, `$starts_with` and `$ends_with` ignore letter case. On a field that holds several values, they match when any value matches. They compare the value as stored, so a partial phone number is matched against `+14155550100`.
 - `$not_in` and `$has_none` also match records where the field is empty.
 
 #### Limits

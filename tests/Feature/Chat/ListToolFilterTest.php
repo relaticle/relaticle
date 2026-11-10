@@ -93,6 +93,20 @@ it('applies a partial text match through the list tool', function (string $opera
     'ends with nothing' => ['$ends_with', 'Globex', []],
 ]);
 
+it('applies a partial match on a multi-value field through the list tool', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+    $emails = WorkspaceCustomField::byCode($user->currentWorkspace->getKey(), 'people', 'emails');
+
+    foreach (['Two Inboxes' => ['first@acme.com', 'second@globex.com'], 'One Inbox' => ['only@initech.com']] as $name => $addresses) {
+        People::factory()->for($user->currentWorkspace)->create(['name' => $name])->saveCustomFieldValue($emails, $addresses);
+    }
+
+    $rows = listToolRows(new ListPeopleTool()->handle(new Request(['filter' => ['custom_fields' => ['emails' => ['$contains' => 'GLOBEX']]]])));
+
+    expect(Arr::pluck($rows, 'attributes.name'))->toBe(['Two Inboxes']);
+});
+
 it('serves an empty page for a page number no list can reach', function (mixed $page): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);

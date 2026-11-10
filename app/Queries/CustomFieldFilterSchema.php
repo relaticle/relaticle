@@ -26,6 +26,8 @@ final readonly class CustomFieldFilterSchema
 
     public const string EMPTINESS_RULE = '$is_empty takes true or false.';
 
+    public const string PARTIAL_MATCH_RULE = '$contains, $starts_with and $ends_with ignore letter case. On a field that holds several values they match when any value matches, compared as stored.';
+
     public const string EMPTY_MATCH_RULE = '$not_in and $has_none also match records where the field is empty.';
 
     /** @var array<string, array<string, list<string>>> */
@@ -85,9 +87,13 @@ final readonly class CustomFieldFilterSchema
             CustomFieldType::TEXT => self::buildOperators(self::STRING_OPERATORS, 'string'),
             CustomFieldType::EMAIL, CustomFieldType::LINK => [
                 ...self::buildOperators(['$has_any', '$has_none'], 'array'),
+                ...self::buildOperators(self::PARTIAL_OPERATORS, 'string'),
                 'domain' => ['type' => 'object', 'properties' => self::buildOperators(self::DOMAIN_OPERATORS, 'array')],
             ],
-            CustomFieldType::PHONE, CustomFieldType::DOMAIN,
+            CustomFieldType::PHONE, CustomFieldType::DOMAIN => [
+                ...self::buildOperators(['$has_any', '$has_none'], 'array'),
+                ...self::buildOperators(self::PARTIAL_OPERATORS, 'string'),
+            ],
             CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST, CustomFieldType::TAGS_INPUT => self::buildOperators(['$has_any', '$has_none'], 'array'),
             CustomFieldType::CURRENCY => self::buildOperators(array_keys(self::COMPARISONS), 'number'),
             CustomFieldType::NUMBER => self::buildOperators(array_keys(self::COMPARISONS), 'integer'),
@@ -135,7 +141,7 @@ final readonly class CustomFieldFilterSchema
 
     public static function generalRules(): string
     {
-        return self::EMPTY_MATCH_RULE.' '.self::EMPTINESS_RULE;
+        return self::EMPTY_MATCH_RULE.' '.self::EMPTINESS_RULE.' '.self::PARTIAL_MATCH_RULE;
     }
 
     /**

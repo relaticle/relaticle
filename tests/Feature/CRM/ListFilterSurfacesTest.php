@@ -62,6 +62,7 @@ const LIST_SURFACES = [
 const COMPARISON_OPERATORS = ['$eq', '$gt', '$gte', '$lt', '$lte', '$is_empty'];
 const SINGLE_CHOICE_OPERATORS = ['$eq', '$in', '$not_in', '$is_empty'];
 const LIST_OPERATORS = ['$has_any', '$has_none', '$is_empty'];
+const TEXT_LIST_OPERATORS = ['$has_any', '$has_none', '$contains', '$starts_with', '$ends_with', '$is_empty'];
 
 const FILTER_OPERATORS_BY_TYPE = [
     'text' => ['$eq', '$contains', '$starts_with', '$ends_with', '$is_empty'],
@@ -77,10 +78,10 @@ const FILTER_OPERATORS_BY_TYPE = [
     'multi-select' => LIST_OPERATORS,
     'checkbox-list' => LIST_OPERATORS,
     'tags-input' => LIST_OPERATORS,
-    'email' => LIST_OPERATORS,
-    'phone' => LIST_OPERATORS,
-    'link' => LIST_OPERATORS,
-    'domain' => LIST_OPERATORS,
+    'email' => TEXT_LIST_OPERATORS,
+    'phone' => TEXT_LIST_OPERATORS,
+    'link' => TEXT_LIST_OPERATORS,
+    'domain' => TEXT_LIST_OPERATORS,
 ];
 
 const EVERY_FILTER_OPERATOR = ['$eq', '$contains', '$starts_with', '$ends_with', '$gt', '$gte', '$lt', '$lte', '$in', '$not_in', '$has_any', '$has_none', '$is_empty'];
@@ -814,12 +815,18 @@ it('applies every operator of every custom field type alike on the api and mcp',
         [['domain' => ['$in' => ['acme.com', 'globex.com']], '$is_empty' => false], ['Low', 'High']],
         [['domain' => ['$in' => ['acme.com', 'globex.com']], '$has_none' => ['low@acme.com']], ['High']],
         [['domain' => ['$in' => [' acme.com ']]], ['Low']],
+        [['$contains' => 'ACME'], ['Low']],
+        [['$starts_with' => 'high@'], ['High']],
+        [['$ends_with' => 'globex.com'], ['High']],
     ], ['a@acme.com']],
     'phone' => ['phone', [], '+14155550100', '+442071838750', [
         [['$has_any' => ['+1 415 555 0100']], ['Low']],
         [['$has_any' => ['+14155550100', '+44 20 7183 8750']], ['Low', 'High']],
         [['$has_none' => ['+1 (415) 555-0100']], ['High', 'Unset']],
         [['$has_none' => ['+14155550100'], '$is_empty' => false], ['High']],
+        [['$contains' => '4155550'], ['Low']],
+        [['$starts_with' => '+44'], ['High']],
+        [['$ends_with' => '0100'], ['Low']],
     ], ['+14155550100']],
     'link' => ['link', [], 'acme.com/about', 'globex.com', [
         [['$has_any' => ['https://acme.com/about']], ['Low']],
@@ -828,6 +835,9 @@ it('applies every operator of every custom field type alike on the api and mcp',
         [['domain' => ['$in' => ['acme.com']]], ['Low']],
         [['domain' => ['$not_in' => ['acme.com']]], ['High', 'Unset']],
         [['domain' => ['$in' => ['globex.com']], '$is_empty' => false], ['High']],
+        [['$contains' => 'ABOUT'], ['Low']],
+        [['$starts_with' => 'globex'], ['High']],
+        [['$ends_with' => '/about'], ['Low']],
     ], ['acme.com']],
 ]);
 
@@ -844,9 +854,30 @@ it('filters company domains by any spelling on the api and mcp', function (): vo
         [$on(['$has_none' => ['https://acme.com/']]), ['Globex', 'Unset']],
         [$on(['$is_empty' => true]), ['Unset']],
         [$on(['$is_empty' => false]), ['Acme', 'Globex']],
+        [$on(['$contains' => 'CME']), ['Acme']],
+        [$on(['$starts_with' => 'glob']), ['Globex']],
+        [$on(['$ends_with' => '.com']), ['Acme', 'Globex']],
     ]);
 
     expectErrorOnEverySurface($this, $this->user, 'companies', $on(['domain' => ['$in' => ['acme.com']]]), 'filter.custom_fields.domains.domain', 'domains does not support domain.');
+});
+
+it('matches a partial operator against any value of a field and keeps an empty field under $not on the api and mcp', function (): void {
+    $emails = WorkspaceCustomField::byCode($this->workspace->getKey(), 'people', 'emails');
+    unlinkedRecord($this->user, 'people', 'Two Inboxes')->saveCustomFieldValue($emails, ['first@acme.com', 'second@globex.com']);
+    unlinkedRecord($this->user, 'people', 'One Inbox')->saveCustomFieldValue($emails, ['only@initech.com']);
+    unlinkedRecord($this->user, 'people', 'Odd Inbox')->saveCustomFieldValue($emails, ['100%@acme.com']);
+    unlinkedRecord($this->user, 'people', 'No Inbox');
+    $on = fn (array $condition): array => ['custom_fields' => ['emails' => $condition]];
+
+    expectTitlesOnEverySurface($this, $this->user, 'people', [
+        [$on(['$ends_with' => 'globex.com']), ['Two Inboxes']],
+        [$on(['$starts_with' => 'second@']), ['Two Inboxes']],
+        [$on(['$contains' => 'initech']), ['One Inbox']],
+        [$on(['$contains' => '%@']), ['Odd Inbox']],
+        [$on(['$starts_with' => '_irst']), []],
+        [['$not' => $on(['$contains' => 'acme'])], ['One Inbox', 'No Inbox']],
+    ]);
 });
 
 it('rejects a custom field that takes no filter on the api and mcp', function (string $type): void {
