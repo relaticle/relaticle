@@ -7,12 +7,22 @@ namespace App\Filament\Tables\FilterBar;
 use App\Enums\CustomFieldType;
 use App\Enums\FilterCondition;
 use App\Enums\FilterFieldKind;
+use App\Enums\PeriodUnit;
+use App\Models\CustomField;
 use App\Models\User;
 use App\Queries\CustomFieldFilterSchema;
 use App\Queries\Filters\StaleDaysFilter;
+use App\Queries\Operand;
+use App\Support\CustomFields\CanonicalValue;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Str;
 
 final readonly class FilterRuleCompiler
 {
+    private const int MAX_PERIOD_AMOUNT = 3650;
+
+    private const string ME = '@me';
+
     /**
      * @param  array<array-key, mixed>  $rules
      * @param  array<string, FilterField>  $catalog
@@ -23,7 +33,7 @@ final readonly class FilterRuleCompiler
         $nodes = [];
 
         foreach ($rules as $rule) {
-            $node = is_array($rule) ? $this->node($rule, $catalog) : null;
+            $node = is_array($rule) ? $this->node($rule, $catalog, $user, $zone) : null;
 
             if ($node !== null) {
                 $nodes[] = $node;
@@ -38,7 +48,7 @@ final readonly class FilterRuleCompiler
      * @param  array<string, FilterField>  $catalog
      * @return array<string, mixed>|null
      */
-    private function node(array $rule, array $catalog): ?array
+    private function node(array $rule, array $catalog, User $user, string $zone): ?array
     {
         $key = $rule['field'] ?? null;
         $condition = FilterCondition::tryFrom(is_string($rule['condition'] ?? null) ? $rule['condition'] : '');
@@ -48,13 +58,15 @@ final readonly class FilterRuleCompiler
             return null;
         }
 
-        $operand = $condition->fixedOperand() ?? $this->valued($condition, $field, $rule['value'] ?? null);
+        $operand = $condition->fixedOperand() ?? $this->valued($condition, $field, $rule['value'] ?? null, $user, $zone);
 
         if ($operand === null) {
             return null;
         }
 
-        $operators = [$condition->operators($field->kind)[0] => $operand];
+        $operators = $condition->isPeriod() && is_array($operand)
+            ? array_combine($condition->operators($field->kind), $operand)
+            : [$condition->operators($field->kind)[0] => $operand];
         $node = str_starts_with($field->key, FilterFieldCatalog::CUSTOM_FIELD_PREFIX)
             ? ['custom_fields' => [substr($field->key, strlen(FilterFieldCatalog::CUSTOM_FIELD_PREFIX)) => $operators]]
             : [$field->key => $operators];
@@ -63,7 +75,7 @@ final readonly class FilterRuleCompiler
     }
 
     /** @return string|int|float|list<string>|null */
-    private function valued(FilterCondition $condition, FilterField $field, mixed $value): string|int|float|array|null
+    private function valued(FilterCondition $condition, FilterField $field, mixed $value, User $user, string $zone): string|int|float|array|null
     {
         return match ($field->kind) {
             FilterFieldKind::Text => $this->text($value),
@@ -71,8 +83,57 @@ final readonly class FilterRuleCompiler
             FilterFieldKind::Number => $this->number($value, $this->isIntegral($field), null, null),
             FilterFieldKind::Inactivity => $this->number($value, true, 1, StaleDaysFilter::MAX_DAYS),
             FilterFieldKind::Choice, FilterFieldKind::MultiChoice => $this->list($value),
-            FilterFieldKind::Checkbox, FilterFieldKind::Date, FilterFieldKind::Member, FilterFieldKind::Relation, FilterFieldKind::Record => null,
+            FilterFieldKind::Date => $condition->isPeriod() ? $this->period($condition, $value, $zone) : $this->day($value, $zone),
+            FilterFieldKind::Member, FilterFieldKind::Relation, FilterFieldKind::Record => $this->recordIds($field, $value, $user),
+            FilterFieldKind::Checkbox => null,
         };
+    }
+
+    private function day(mixed $value, string $zone): ?string
+    {
+        if ($value === '@today') {
+            return now($zone)->toDateString();
+        }
+
+        $date = is_string($value) && Operand::isBareDate($value) ? Operand::date($value) : null;
+
+        return $date instanceof CarbonImmutable && $date->toDateString() === $value ? $value : null;
+    }
+
+    /** @return list<string>|null */
+    private function period(FilterCondition $condition, mixed $value, string $zone): ?array
+    {
+        $unit = is_array($value) && is_string($value['unit'] ?? null) ? PeriodUnit::tryFrom($value['unit']) : null;
+        $amount = is_array($value) ? Operand::integer($value['amount'] ?? null) : null;
+        $today = now($zone)->startOfDay();
+
+        if (! $unit instanceof PeriodUnit) {
+            return null;
+        }
+
+        if ($condition === FilterCondition::This) {
+            return [$unit->startOf($today)->toDateString(), $unit->endOf($today)->toDateString()];
+        }
+
+        if ($amount === null || $amount < 1 || $amount > self::MAX_PERIOD_AMOUNT) {
+            return null;
+        }
+
+        return $condition === FilterCondition::InThePast
+            ? [$unit->minus($today, $amount)->toDateString(), $today->toDateString()]
+            : [$today->toDateString(), $unit->plus($today, $amount)->toDateString()];
+    }
+
+    /** @return list<string>|null */
+    private function recordIds(FilterField $field, mixed $value, User $user): ?array
+    {
+        $ids = array_map(
+            fn (string $id): string => $field->kind === FilterFieldKind::Member && $id === self::ME ? (string) $user->getKey() : $id,
+            $this->list($value) ?? [],
+        );
+        $ids = array_values(array_unique(array_filter($ids, Str::isUlid(...))));
+
+        return $ids === [] ? null : $ids;
     }
 
     private function isIntegral(FilterField $field): bool
@@ -101,7 +162,12 @@ final readonly class FilterRuleCompiler
             return $text;
         }
 
-        return $field->type === CustomFieldType::PHONE && ! str_starts_with($text, '+') ? null : [$text];
+        return $field->type === CustomFieldType::PHONE && ! $this->isDialable($field, $text) ? null : [$text];
+    }
+
+    private function isDialable(FilterField $field, string $text): bool
+    {
+        return $field->definition instanceof CustomField && CanonicalValue::isPhone($field->definition, $text);
     }
 
     private function number(mixed $value, bool $integral, ?int $min, ?int $max): int|float|null
@@ -126,7 +192,7 @@ final readonly class FilterRuleCompiler
     /** @return list<string>|null */
     private function list(mixed $value): ?array
     {
-        if (! is_array($value) || $value === []) {
+        if (! is_array($value) || $value === [] || count($value) > CustomFieldFilterSchema::MAX_LIST_VALUES) {
             return null;
         }
 

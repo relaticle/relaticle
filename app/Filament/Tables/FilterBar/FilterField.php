@@ -8,6 +8,7 @@ use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
 use App\Enums\FilterCondition;
 use App\Enums\FilterFieldKind;
+use App\Models\CustomField;
 
 final readonly class FilterField
 {
@@ -24,6 +25,7 @@ final readonly class FilterField
         public array $options = [],
         public array $operators = [],
         public ?CustomFieldType $type = null,
+        public ?CustomField $definition = null,
     ) {}
 
     /** @return list<FilterCondition> */

@@ -47,6 +47,21 @@ return [
         ],
         'filters' => [
             'fields' => [
+                'title' => 'Title',
+                'created_at' => 'Created At',
+                'updated_at' => 'Updated At',
+                'creator' => 'Created By',
+                'accountOwner' => 'Account Owner',
+                'assignees' => 'Assignees',
+                'entity' => [
+                    'company' => [
+                        'name' => 'Company',
+                        'created_at' => 'Creation Date',
+                        'updated_at' => 'Last Update',
+                    ],
+                    'people' => ['name' => 'Person'],
+                    'opportunity' => ['name' => 'Opportunity'],
+                ],
                 'creation_source' => 'Creation source',
                 'people' => 'People',
                 'opportunities' => 'Opportunities',

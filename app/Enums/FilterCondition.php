@@ -96,6 +96,19 @@ enum FilterCondition: string
         };
     }
 
+    public function isPeriod(): bool
+    {
+        return match ($this) {
+            self::InThePast, self::InTheNext, self::This => true,
+            self::Contains, self::DoesNotContain, self::StartsWith, self::EndsWith,
+            self::Is, self::IsNot, self::IsEmpty, self::IsNotEmpty,
+            self::GreaterThan, self::GreaterOrEqual, self::LessThan, self::LessOrEqual,
+            self::Before, self::AtOrBefore, self::After, self::AtOrAfter,
+            self::IsAnyOf, self::IsNoneOf, self::HasAnyOf, self::HasNoneOf,
+            self::IsChecked, self::IsNotChecked, self::NoActivityFor => false,
+        };
+    }
+
     /** @return list<string> */
     public function operators(FilterFieldKind $kind): array
     {

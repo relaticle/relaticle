@@ -17,6 +17,7 @@ use App\Support\CustomFields\WorkspaceCustomFields;
 use BackedEnum;
 use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasLabel;
+use Illuminate\Support\Facades\Lang;
 
 final readonly class FilterFieldCatalog
 {
@@ -77,7 +78,7 @@ final readonly class FilterFieldCatalog
 
             $fields[$key] = new FilterField(
                 key: $key,
-                label: $columnLabels[self::columnFor($key)] ?? __("filament/panel.tables.filters.fields.{$key}"),
+                label: $columnLabels[self::columnFor($key)] ?? self::fallbackLabel($entity, $key),
                 icon: self::nativeIcon($key, $definition),
                 kind: $kind,
                 related: $definition->related,
@@ -87,6 +88,13 @@ final readonly class FilterFieldCatalog
         }
 
         return $fields;
+    }
+
+    private static function fallbackLabel(CrmEntity $entity, string $key): string
+    {
+        $scoped = "filament/panel.tables.filters.fields.entity.{$entity->value}.{$key}";
+
+        return Lang::has($scoped) ? __($scoped) : __("filament/panel.tables.filters.fields.{$key}");
     }
 
     private static function nativeIcon(string $key, FilterDefinition $definition): string
@@ -140,6 +148,7 @@ final readonly class FilterFieldCatalog
                 options: self::customOptions($field, $kind),
                 operators: CustomFieldFilterSchema::operatorKeys($field->type),
                 type: CustomFieldType::tryFrom($field->type),
+                definition: $field,
             );
         }
 

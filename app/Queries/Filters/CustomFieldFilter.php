@@ -426,7 +426,7 @@ final readonly class CustomFieldFilter implements Filter
             throw FilterErrors::at($path, __('validation.filter.phone_country_code', ['name' => $field->code]));
         }
 
-        if (preg_match('/^\+\d{1,15}(;ext=\d+)?$/', $canonical) !== 1) {
+        if (! CanonicalValue::isPhone($field, $value)) {
             throw FilterErrors::at($path, __('validation.filter.phone_invalid', ['name' => $field->code, 'value' => $value]));
         }
     }

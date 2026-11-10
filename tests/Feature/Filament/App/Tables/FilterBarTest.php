@@ -470,3 +470,418 @@ it('gives every condition a label and every kind at least one condition', functi
         expect($kind->conditions())->not->toBeEmpty();
     }
 });
+
+function filterBarCreatedAtRecords(User $user): array
+{
+    $stamps = [
+        'Dec31' => '2025-12-31 23:30:00',
+        'Jan01' => '2026-01-01 00:30:00',
+        'Feb15' => '2026-02-15 10:00:00',
+        'Feb16' => '2026-02-16 00:30:00',
+        'Mar01' => '2026-03-01 10:00:00',
+        'Mar15' => '2026-03-15 10:00:00',
+        'Mar16' => '2026-03-16 00:30:00',
+        'Mar18' => '2026-03-18 18:00:00',
+        'Mar19' => '2026-03-19 00:30:00',
+        'Mar22' => '2026-03-22 23:30:00',
+        'Mar23' => '2026-03-23 00:30:00',
+        'Mar31' => '2026-03-31 23:30:00',
+        'Apr01' => '2026-04-01 00:30:00',
+        'Apr17' => '2026-04-17 10:00:00',
+        'Apr18' => '2026-04-18 00:30:00',
+    ];
+
+    return array_map(fn (string $stamp, string $name): Model => filterBarRecord($user, Company::class, $name, ['created_at' => $stamp]), $stamps, array_keys($stamps));
+}
+
+function filterBarShownNames(mixed $component): array
+{
+    return $component->instance()->getTableRecords()->pluck('name')->sort()->values()->all();
+}
+
+dataset('created at conditions', [
+    'is a day' => ['is', '2026-03-18', ['Mar18']],
+    'is today token' => ['is', '@today', ['Mar18']],
+    'before' => ['before', '2026-03-16', ['Dec31', 'Jan01', 'Feb15', 'Feb16', 'Mar01', 'Mar15']],
+    'at or before' => ['at_or_before', '2026-03-16', ['Dec31', 'Jan01', 'Feb15', 'Feb16', 'Mar01', 'Mar15', 'Mar16']],
+    'after' => ['after', '2026-03-22', ['Mar23', 'Mar31', 'Apr01', 'Apr17', 'Apr18']],
+    'at or after' => ['at_or_after', '2026-03-22', ['Mar22', 'Mar23', 'Mar31', 'Apr01', 'Apr17', 'Apr18']],
+    'in the past 30 days' => ['in_the_past', ['amount' => 30, 'unit' => 'days'], ['Feb16', 'Mar01', 'Mar15', 'Mar16', 'Mar18']],
+    'in the past 29 days' => ['in_the_past', ['amount' => 29, 'unit' => 'days'], ['Mar01', 'Mar15', 'Mar16', 'Mar18']],
+    'in the past 2 weeks' => ['in_the_past', ['amount' => 2, 'unit' => 'weeks'], ['Mar15', 'Mar16', 'Mar18']],
+    'in the past 1 month' => ['in_the_past', ['amount' => 1, 'unit' => 'months'], ['Mar01', 'Mar15', 'Mar16', 'Mar18']],
+    'in the past 1 quarter' => ['in_the_past', ['amount' => 1, 'unit' => 'quarters'], ['Dec31', 'Jan01', 'Feb15', 'Feb16', 'Mar01', 'Mar15', 'Mar16', 'Mar18']],
+    'in the next 30 days' => ['in_the_next', ['amount' => 30, 'unit' => 'days'], ['Mar18', 'Mar19', 'Mar22', 'Mar23', 'Mar31', 'Apr01', 'Apr17']],
+    'in the next 1 week' => ['in_the_next', ['amount' => 1, 'unit' => 'weeks'], ['Mar18', 'Mar19', 'Mar22', 'Mar23']],
+    'this week' => ['this', ['unit' => 'weeks'], ['Mar16', 'Mar18', 'Mar19', 'Mar22']],
+    'this month' => ['this', ['unit' => 'months'], ['Mar01', 'Mar15', 'Mar16', 'Mar18', 'Mar19', 'Mar22', 'Mar23', 'Mar31']],
+    'this quarter' => ['this', ['unit' => 'quarters'], ['Jan01', 'Feb15', 'Feb16', 'Mar01', 'Mar15', 'Mar16', 'Mar18', 'Mar19', 'Mar22', 'Mar23', 'Mar31']],
+    'this year' => ['this', ['unit' => 'years'], ['Jan01', 'Feb15', 'Feb16', 'Mar01', 'Mar15', 'Mar16', 'Mar18', 'Mar19', 'Mar22', 'Mar23', 'Mar31', 'Apr01', 'Apr17', 'Apr18']],
+    'this day' => ['this', ['unit' => 'days'], ['Mar18']],
+]);
+
+it('compiles each date condition against a fixed clock, as the api reads the same tree', function (string $condition, mixed $value, array $expected): void {
+    $this->travelTo('2026-03-18 12:00:00');
+    $records = filterBarCreatedAtRecords($this->user);
+    $rules = [['field' => 'created_at', 'condition' => $condition, 'value' => $value]];
+    $tree = (new FilterRuleCompiler)->compile($rules, FilterFieldCatalog::for(CrmEntity::Company, $this->user), $this->user, 'UTC');
+    $expectedIds = collect($records)->filter(fn (Model $record): bool => in_array($record->name, $expected, true))->map->getKey()->sort()->values()->all();
+
+    $shown = livewire(ListCompanies::class)->set('tableFilters.conditions.rules', $rules);
+
+    Sanctum::actingAs($this->user);
+
+    expect(filterBarShownNames($shown))->toBe(collect($expected)->sort()->values()->all())
+        ->and(filterBarApiIds($this, 'companies', $tree))->toBe($expectedIds);
+})->with('created at conditions');
+
+it('puts this week on the monday six days before a sunday', function (): void {
+    $this->travelTo('2026-03-22 12:00:00');
+    filterBarCreatedAtRecords($this->user);
+
+    $component = livewire(ListCompanies::class)->set('tableFilters.conditions.rules', [['field' => 'created_at', 'condition' => 'this', 'value' => ['unit' => 'weeks']]]);
+
+    expect(filterBarShownNames($component))->toBe(['Mar16', 'Mar18', 'Mar19', 'Mar22']);
+});
+
+it('reads today in the viewer zone and not in utc', function (): void {
+    $this->user->update(['timezone' => 'Pacific/Auckland']);
+    $this->travelTo('2026-03-18 12:00:00');
+    filterBarRecord($this->user, Company::class, 'Evening in Auckland', ['created_at' => '2026-03-18 10:00:00']);
+    filterBarRecord($this->user, Company::class, 'Morning in Auckland', ['created_at' => '2026-03-18 20:00:00']);
+
+    $today = livewire(ListCompanies::class)->set('tableFilters.conditions.rules', [['field' => 'created_at', 'condition' => 'is', 'value' => '@today']]);
+
+    expect(filterBarShownNames($today))->toBe(['Morning in Auckland']);
+});
+
+it('moves a relative period with the clock while the stored rule stays the same', function (): void {
+    $this->travelTo('2026-03-18 12:00:00');
+    filterBarRecord($this->user, Company::class, 'Far', ['created_at' => '2026-04-20 10:00:00']);
+    filterBarRecord($this->user, Company::class, 'Near', ['created_at' => '2026-04-01 10:00:00']);
+    $rules = [['field' => 'created_at', 'condition' => 'in_the_next', 'value' => ['amount' => 30, 'unit' => 'days']]];
+    $view = SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'entity' => CrmEntity::Company,
+        'state' => new TableStateData(filters: ['conditions' => ['match' => 'all', 'rules' => $rules]]),
+    ]);
+
+    $before = filterBarShownNames(livewire(ListCompanies::class)->call('applySavedView', $view->getKey()));
+    $this->travelTo('2026-03-28 12:00:00');
+    $after = filterBarShownNames(livewire(ListCompanies::class)->call('applySavedView', $view->getKey()));
+
+    expect($before)->toBe(['Near'])->and($after)->toBe(['Far', 'Near'])
+        ->and($view->refresh()->state->filters['conditions']['rules'])->toEqual($rules);
+});
+
+it('shows every record for a date rule that compiles to nothing', function (mixed $condition, mixed $value): void {
+    $this->travelTo('2026-03-18 12:00:00');
+    $records = filterBarCreatedAtRecords($this->user);
+
+    livewire(ListCompanies::class)
+        ->set('tableFilters.conditions.rules', [['field' => 'created_at', 'condition' => $condition, 'value' => $value]])
+        ->assertCountTableRecords(count($records));
+})->with([
+    'a time of day' => ['is', '2026-03-18T10:00:00Z'],
+    'text' => ['before', 'yesterday'],
+    'a day that does not exist' => ['after', '2026-02-30'],
+    'no value' => ['before', null],
+    'a list' => ['is', ['2026-03-18']],
+    'no amount' => ['in_the_past', ['unit' => 'days']],
+    'a zero amount' => ['in_the_past', ['amount' => 0, 'unit' => 'days']],
+    'an amount past the maximum' => ['in_the_next', ['amount' => 3651, 'unit' => 'days']],
+    'a fractional amount' => ['in_the_next', ['amount' => 1.5, 'unit' => 'days']],
+    'an unknown unit' => ['in_the_past', ['amount' => 3, 'unit' => 'fortnights']],
+    'no unit' => ['this', []],
+    'a scalar period' => ['in_the_past', '30'],
+]);
+
+it('keeps a month end from overflowing when it counts months back', function (): void {
+    $this->travelTo('2026-03-31 12:00:00');
+    filterBarRecord($this->user, Company::class, 'Feb28', ['created_at' => '2026-02-28 10:00:00']);
+    filterBarRecord($this->user, Company::class, 'Feb27', ['created_at' => '2026-02-27 10:00:00']);
+
+    $component = livewire(ListCompanies::class)->set('tableFilters.conditions.rules', [['field' => 'created_at', 'condition' => 'in_the_past', 'value' => ['amount' => 1, 'unit' => 'months']]]);
+
+    expect(filterBarShownNames($component))->toBe(['Feb28']);
+});
+
+it('filters a date custom field by a day and by a period as the api does', function (): void {
+    $this->travelTo('2026-03-18 12:00:00');
+    $soon = filterBarRecord($this->user, Opportunity::class, 'Soon', values: ['close_date' => '2026-03-25']);
+    $later = filterBarRecord($this->user, Opportunity::class, 'Later', values: ['close_date' => '2026-06-25']);
+    $unset = filterBarRecord($this->user, Opportunity::class, 'Unset');
+    $compile = fn (array $rules): array => (new FilterRuleCompiler)->compile($rules, FilterFieldCatalog::for(CrmEntity::Opportunity, $this->user), $this->user, 'UTC');
+    $next = [['field' => 'custom_fields.close_date', 'condition' => 'in_the_next', 'value' => ['amount' => 14, 'unit' => 'days']]];
+    $exact = [['field' => 'custom_fields.close_date', 'condition' => 'is', 'value' => '2026-06-25']];
+
+    $nextShown = livewire(ListOpportunities::class)->set('tableFilters.conditions.rules', $next);
+    $exactShown = livewire(ListOpportunities::class)->set('tableFilters.conditions.rules', $exact);
+
+    Sanctum::actingAs($this->user);
+
+    expect(filterBarShownNames($nextShown))->toBe(['Soon'])
+        ->and(filterBarApiIds($this, 'opportunities', $compile($next)))->toBe([$soon->getKey()])
+        ->and(filterBarShownNames($exactShown))->toBe(['Later'])
+        ->and(filterBarApiIds($this, 'opportunities', $compile($exact)))->toBe([$later->getKey()])
+        ->and($unset->getKey())->not->toBeIn([$soon->getKey(), $later->getKey()]);
+});
+
+function filterBarMember(User $owner): User
+{
+    $member = User::factory()->create(['current_workspace_id' => $owner->currentWorkspace->getKey()]);
+    $owner->currentWorkspace->users()->attach($member, ['role' => 'member']);
+
+    return $member;
+}
+
+function filterBarLinkedPeople(User $user): array
+{
+    $acme = filterBarRecord($user, Company::class, 'Acme');
+    $globex = filterBarRecord($user, Company::class, 'Globex');
+
+    return [
+        $acme,
+        $globex,
+        filterBarRecord($user, People::class, 'At Acme', ['company_id' => $acme->getKey()]),
+        filterBarRecord($user, People::class, 'At Globex', ['company_id' => $globex->getKey()]),
+        filterBarRecord($user, People::class, 'Freelance'),
+    ];
+}
+
+it('filters a relation by record ids as the api does', function (string $condition, array $expected): void {
+    [$acme] = $records = filterBarLinkedPeople($this->user);
+    $rules = [['field' => 'company', 'condition' => $condition, 'value' => [$acme->getKey()]]];
+    $tree = (new FilterRuleCompiler)->compile($rules, FilterFieldCatalog::for(CrmEntity::People, $this->user), $this->user, 'UTC');
+    $expectedIds = collect($records)->filter(fn (Model $record): bool => in_array($record->name, $expected, true))->map->getKey()->sort()->values()->all();
+
+    $shown = livewire(ListPeople::class)->set('tableFilters.conditions.rules', $rules);
+
+    Sanctum::actingAs($this->user);
+
+    expect(filterBarShownNames($shown))->toBe(collect($expected)->sort()->values()->all())
+        ->and(filterBarApiIds($this, 'people', $tree))->toBe($expectedIds);
+})->with([
+    'is any of' => ['is_any_of', ['At Acme']],
+    'is none of keeps the unlinked' => ['is_none_of', ['At Globex', 'Freelance']],
+]);
+
+it('filters assignees by member ids and by me, as the api does', function (): void {
+    $colleague = filterBarMember($this->user);
+    $mine = filterBarRecord($this->user, Task::class, 'Mine');
+    $theirs = filterBarRecord($this->user, Task::class, 'Theirs');
+    $nobodys = filterBarRecord($this->user, Task::class, 'Nobodys');
+    $mine->assignees()->attach($this->user);
+    $theirs->assignees()->attach($colleague);
+    $compile = fn (array $rules): array => (new FilterRuleCompiler)->compile($rules, FilterFieldCatalog::for(CrmEntity::Task, $this->user), $this->user, 'UTC');
+    $me = [['field' => 'assignees', 'condition' => 'is_any_of', 'value' => ['@me']]];
+    $notThem = [['field' => 'assignees', 'condition' => 'is_none_of', 'value' => [$colleague->getKey()]]];
+
+    $meShown = livewire(ManageTasks::class)->set('tableFilters.conditions.rules', $me);
+    $notThemShown = livewire(ManageTasks::class)->set('tableFilters.conditions.rules', $notThem);
+
+    Sanctum::actingAs($this->user);
+
+    expect($meShown->instance()->getTableRecords()->pluck('title')->all())->toBe(['Mine'])
+        ->and($notThemShown->instance()->getTableRecords()->pluck('title')->sort()->values()->all())->toBe(['Mine', 'Nobodys'])
+        ->and(filterBarApiIds($this, 'tasks', $compile($me)))->toBe([$mine->getKey()])
+        ->and(filterBarApiIds($this, 'tasks', $compile($notThem)))->toBe(collect([$mine, $nobodys])->map->getKey()->sort()->values()->all());
+});
+
+it('gives each member their own records when two members apply one shared me rule', function (): void {
+    $colleague = filterBarMember($this->user);
+    filterBarRecord($this->user, Company::class, 'By owner');
+    filterBarRecord($this->user, Company::class, 'By colleague', ['creator_id' => $colleague->getKey()]);
+    $rules = [['field' => 'creator', 'condition' => 'is_any_of', 'value' => ['@me']]];
+
+    $owner = filterBarShownNames(livewire(ListCompanies::class)->set('tableFilters.conditions.rules', $rules));
+
+    $this->actingAs($colleague);
+    $other = filterBarShownNames(livewire(ListCompanies::class)->set('tableFilters.conditions.rules', $rules));
+
+    expect($owner)->toBe(['By owner'])->and($other)->toBe(['By colleague']);
+});
+
+it('filters a record custom field by record ids as the api does', function (string $condition, array $expected): void {
+    filterBarField($this->user, 'opportunity', 'partner', CustomFieldType::RECORD->value, lookup: 'company');
+    $acme = filterBarRecord($this->user, Company::class, 'Acme');
+    $globex = filterBarRecord($this->user, Company::class, 'Globex');
+    $records = [
+        filterBarRecord($this->user, Opportunity::class, 'With Acme', values: ['partner' => [$acme->getKey()]]),
+        filterBarRecord($this->user, Opportunity::class, 'With Globex', values: ['partner' => [$globex->getKey()]]),
+        filterBarRecord($this->user, Opportunity::class, 'Alone'),
+    ];
+    $rules = [['field' => 'custom_fields.partner', 'condition' => $condition, 'value' => [$acme->getKey()]]];
+    $tree = (new FilterRuleCompiler)->compile($rules, FilterFieldCatalog::for(CrmEntity::Opportunity, $this->user), $this->user, 'UTC');
+    $expectedIds = collect($records)->filter(fn (Model $record): bool => in_array($record->name, $expected, true))->map->getKey()->sort()->values()->all();
+
+    $shown = livewire(ListOpportunities::class)->set('tableFilters.conditions.rules', $rules);
+
+    Sanctum::actingAs($this->user);
+
+    expect(filterBarShownNames($shown))->toBe(collect($expected)->sort()->values()->all())
+        ->and(filterBarApiIds($this, 'opportunities', $tree))->toBe($expectedIds);
+})->with([
+    'has any of' => ['has_any_of', ['With Acme']],
+    'has none of keeps the empty' => ['has_none_of', ['With Globex', 'Alone']],
+]);
+
+it('shows every record for a link rule whose ids are not usable', function (string $field, mixed $value): void {
+    filterBarLinkedPeople($this->user);
+
+    livewire(ListPeople::class)
+        ->set('tableFilters.conditions.rules', [['field' => $field, 'condition' => 'is_any_of', 'value' => $value]])
+        ->assertCountTableRecords(3);
+})->with([
+    'a string' => ['company', 'x'],
+    'an empty list' => ['company', []],
+    'not a record id' => ['company', ['nope']],
+    'me on a relation' => ['company', ['@me']],
+    'too many ids' => ['company', array_fill(0, 101, '01J8Z4Y6T5Q2M9N3B7K1W0X8VD')],
+    'nested lists' => ['company', [['01J8Z4Y6T5Q2M9N3B7K1W0X8VD']]],
+]);
+
+it('bounds a relation filter by the workspace the member opened', function (): void {
+    $first = filterBarLinkedPeople($this->user);
+    $second = Workspace::factory()->create(['personal_workspace' => false, 'user_id' => $this->user->id]);
+    $this->user->ownedWorkspaces()->save($second);
+    $this->user->switchWorkspace($second);
+    Filament::setTenant($second);
+    $user = $this->user->refresh();
+    $inSecond = Company::factory()->recycle([$user, $second])->create(['name' => 'Second Co']);
+    People::factory()->recycle([$user, $second])->create(['name' => 'At Second', 'company_id' => $inSecond->getKey()]);
+    People::factory()->recycle([$user, $second])->create(['name' => 'Lone Second']);
+
+    $none = livewire(ListPeople::class)->set('tableFilters.conditions.rules', [['field' => 'company', 'condition' => 'is_none_of', 'value' => [$inSecond->getKey()]]]);
+    $foreign = livewire(ListPeople::class)->set('tableFilters.conditions.rules', [['field' => 'company', 'condition' => 'is_any_of', 'value' => [$first[0]->getKey()]]]);
+
+    expect(filterBarShownNames($none))->toBe(['Lone Second'])
+        ->and(filterBarShownNames($foreign))->toBe([]);
+});
+
+function filterBarForeignCompany(string $name): Company
+{
+    $stranger = User::factory()->withWorkspace()->create();
+
+    return Company::withoutEvents(fn (): Company => Company::factory()->create([
+        'name' => $name,
+        'workspace_id' => $stranger->currentWorkspace->getKey(),
+        'account_owner_id' => $stranger->getKey(),
+    ]));
+}
+
+function filterBarSearch(mixed $test, string $page, string $field, string $search = ''): array
+{
+    return livewire($page)->instance()->searchFilterOptions($field, $search);
+}
+
+it('searches the records of a relation field by name inside the workspace', function (): void {
+    filterBarRecord($this->user, Company::class, 'Acme Local');
+    filterBarRecord($this->user, Company::class, 'Globex');
+    filterBarForeignCompany('Acme Foreign');
+
+    $found = filterBarSearch($this, ListPeople::class, 'company', 'acme');
+
+    expect(array_column($found, 'label'))->toBe(['Acme Local'])
+        ->and(array_keys($found[0]))->toBe(['id', 'label'])
+        ->and(array_column(filterBarSearch($this, ListPeople::class, 'company'), 'label'))->toBe(['Acme Local', 'Globex']);
+});
+
+it('searches members of this workspace and no one else', function (): void {
+    $colleague = filterBarMember($this->user);
+    $colleague->update(['name' => 'Casey Colleague']);
+    User::factory()->withWorkspace()->create(['name' => 'Casey Stranger']);
+
+    $found = filterBarSearch($this, ListCompanies::class, 'creator', 'casey');
+
+    expect($found)->toBe([['id' => $colleague->getKey(), 'label' => 'Casey Colleague']]);
+});
+
+it('searches the lookup records of a record custom field', function (): void {
+    filterBarField($this->user, 'opportunity', 'partner', CustomFieldType::RECORD->value, lookup: 'company');
+    filterBarRecord($this->user, Company::class, 'Acme Local');
+    filterBarForeignCompany('Acme Foreign');
+
+    expect(array_column(filterBarSearch($this, ListOpportunities::class, 'custom_fields.partner', 'acme'), 'label'))->toBe(['Acme Local']);
+});
+
+it('caps a search at twenty options', function (): void {
+    Company::factory()->count(25)->recycle([$this->user, $this->workspace])->create();
+
+    expect(filterBarSearch($this, ListPeople::class, 'company'))->toHaveCount(20);
+});
+
+it('treats a search term as text and not as a pattern', function (string $term, array $expected): void {
+    foreach (['A_B', 'AXB', '100%', 'Plain'] as $name) {
+        filterBarRecord($this->user, Company::class, $name);
+    }
+
+    expect(array_column(filterBarSearch($this, ListPeople::class, 'company', $term), 'label'))->toBe($expected);
+})->with([
+    'an underscore' => ['A_B', ['A_B']],
+    'a percent sign' => ['%', ['100%']],
+    'a backslash' => ['\\', []],
+    'a null byte' => ["A\0B", []],
+]);
+
+it('returns nothing for a field that holds no records', function (string $field): void {
+    filterBarRecord($this->user, Company::class, 'Acme');
+
+    expect(filterBarSearch($this, ListPeople::class, $field, 'a'))->toBe([]);
+})->with([
+    'unknown' => ['nope'],
+    'text' => ['name'],
+    'date' => ['created_at'],
+    'choice' => ['creation_source'],
+    'a field of another entity' => ['stale_days'],
+    'a custom field prefix alone' => ['custom_fields.'],
+]);
+
+it('returns nothing for a viewer the policy keeps out of the related records', function (): void {
+    filterBarRecord($this->user, Company::class, 'Acme');
+    $component = livewire(ListPeople::class);
+    $this->user->forceFill(['email_verified_at' => null])->save();
+
+    expect($component->instance()->searchFilterOptions('company', ''))->toBe([]);
+});
+
+it('drops a phone value the shared filter would reject', function (string $value): void {
+    [$page, , , $records] = filterBarScenario('phones', $this->user);
+
+    livewire($page)
+        ->set('tableFilters.conditions.rules', [['field' => 'custom_fields.mobile', 'condition' => 'is', 'value' => $value]])
+        ->assertCountTableRecords(count($records));
+})->with(['+abc', '+1 (555)', '+', '++1415', '+1415555019x', '+1234567890123456789']);
+
+it('still narrows by a full phone number', function (): void {
+    [$page, , , $records] = filterBarScenario('phones', $this->user);
+
+    livewire($page)
+        ->set('tableFilters.conditions.rules', [['field' => 'custom_fields.mobile', 'condition' => 'is', 'value' => '+1 415 555 0100']])
+        ->assertCanSeeTableRecords([$records[0]])
+        ->assertCountTableRecords(1);
+});
+
+it('never gives a native field a raw lang key for a label', function (string $page, string $model): void {
+    $entity = CrmEntity::tryFromModel(new $model);
+    $labelled = livewire($page)->instance()->filterFieldCatalog();
+
+    foreach ([FilterFieldCatalog::for($entity, $this->user), $labelled] as $catalog) {
+        foreach ($catalog as $field) {
+            expect($field->label)->not->toStartWith('filament/')->not->toBeEmpty();
+        }
+    }
+})->with('filter bar pages');
+
+it('words a fallback label as the column header', function (): void {
+    $company = FilterFieldCatalog::for(CrmEntity::Company, $this->user);
+    $task = FilterFieldCatalog::for(CrmEntity::Task, $this->user);
+
+    expect($company['name']->label)->toBe('Company')
+        ->and($company['created_at']->label)->toBe('Creation Date')
+        ->and($company['updated_at']->label)->toBe('Last Update')
+        ->and($company['creator']->label)->toBe('Created By')
+        ->and($company['accountOwner']->label)->toBe('Account Owner')
+        ->and($task['title']->label)->toBe('Title')
+        ->and($task['created_at']->label)->toBe('Created At')
+        ->and($task['assignees']->label)->toBe('Assignees');
+});
