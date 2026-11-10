@@ -14,6 +14,7 @@ use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Filament\Resources\PeopleResource\RelationManagers\NotesRelationManager as PeopleNotesRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\TasksRelationManager as PeopleTasksRelationManager;
 use App\Models\Company;
+use App\Models\CustomField;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -269,3 +270,52 @@ it('shows a lone assignee without a count and an unassigned task as empty', func
     'one' => [1, false, false],
     'two' => [2, true, false],
 ]);
+
+function setStoredSearchable(object $workspace, string $entityType, string $code, bool $searchable): void
+{
+    CustomField::query()
+        ->where('tenant_id', $workspace->getKey())
+        ->where('entity_type', $entityType)
+        ->where('code', $code)
+        ->firstOrFail()
+        ->update(['settings->searchable' => $searchable]);
+}
+
+it('finds a person by :dataset in the company people tab whatever the stored setting says', function (string $search): void {
+    setStoredSearchable($this->workspace, 'people', 'emails', false);
+    setStoredSearchable($this->workspace, 'people', 'job_title', false);
+
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $match = People::factory()->recycle([$this->user, $this->workspace])->create([
+        'company_id' => $company->getKey(),
+        'name' => 'Brian Chesky',
+        'custom_fields' => ['emails' => ['brian@airbnb.example'], 'job_title' => 'Head of Partnerships'],
+    ]);
+    $other = People::factory()->recycle([$this->user, $this->workspace])->create([
+        'company_id' => $company->getKey(),
+        'name' => 'Nathan Blecharczyk',
+        'custom_fields' => ['emails' => ['nathan@globex.example'], 'job_title' => 'Engineer'],
+    ]);
+
+    livewire(PeopleRelationManager::class, ['ownerRecord' => $company, 'pageClass' => ViewCompany::class])
+        ->searchTable($search)
+        ->assertCanSeeTableRecords([$match])
+        ->assertCanNotSeeTableRecords([$other]);
+})->with([
+    'email' => 'brian@airbnb',
+    'job title' => 'Partnerships',
+]);
+
+it('does not search a task due date in the company tasks tab even when the stored setting is on', function (): void {
+    setStoredSearchable($this->workspace, 'task', 'due_date', true);
+
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $task = $company->tasks()->save(Task::factory()->recycle([$this->user, $this->workspace])->make([
+        'title' => 'Renewal call',
+        'custom_fields' => ['due_date' => '2031-05-17 09:00:00'],
+    ]));
+
+    livewire(CompanyTasksRelationManager::class, ['ownerRecord' => $company, 'pageClass' => ViewCompany::class])
+        ->searchTable('2031-05-17')
+        ->assertCanNotSeeTableRecords([$task]);
+});

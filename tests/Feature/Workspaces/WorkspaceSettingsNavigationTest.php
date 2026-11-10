@@ -23,6 +23,7 @@ use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Features\SupportTesting\Testable;
 use Relaticle\Cloud\Billing\StripeBilling;
+use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Livewire\ManageFieldsTable;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountSettingsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
@@ -208,12 +209,36 @@ test('the custom fields form refuses the domain type and still creates a text fi
     expect($created->all())->toBe(['Plain probe' => 'text']);
 });
 
-test('the custom fields form offers no searchable toggle', function (): void {
+test('the custom fields create form offers no searchable toggle', function (): void {
     livewire(ManageFieldsTable::class, ['entityType' => 'company'])
         ->mountAction('createField')
         ->fillForm(['type' => 'text'])
         ->assertSchemaComponentExists('settings.visible_in_list', 'mountedActionSchema0')
         ->assertSchemaComponentHidden('settings.searchable', 'mountedActionSchema0');
+});
+
+test('the custom fields edit form offers no searchable toggle and keeps a stored value', function (): void {
+    $field = CustomField::factory()->create([
+        'tenant_id' => $this->workspace->getKey(),
+        'entity_type' => 'company',
+        'type' => 'text',
+        'code' => 'edit_probe',
+        'name' => 'Edit probe',
+        'settings' => new CustomFieldSettingsData(searchable: true),
+    ]);
+
+    livewire(ManageFieldsTable::class, ['entityType' => 'company'])
+        ->mountAction('editField', ['fieldId' => $field->getKey()])
+        ->assertSchemaComponentExists('settings.visible_in_list', 'mountedActionSchema0')
+        ->assertSchemaComponentHidden('settings.searchable', 'mountedActionSchema0')
+        ->fillForm(['settings.visible_in_list' => false])
+        ->callMountedAction()
+        ->assertHasNoActionErrors();
+
+    $settings = $field->fresh()->settings;
+
+    expect($settings->visible_in_list)->toBeFalse()
+        ->and($settings->searchable)->toBeTrue();
 });
 
 function mountFieldsTableThenDemoteAdmin(object $test): array

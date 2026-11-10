@@ -2,7 +2,7 @@
 title: Add, edit, and archive fields
 description: Create fields on the Custom Fields page, reorder them, retire them safely, and understand system fields.
 order: 2
-updated: "2026-10-05"
+updated: "2026-11-10"
 related: [help/custom-fields/field-types-you-can-add, help/custom-fields/control-where-a-field-appears, help/getting-started/use-custom-fields]
 ---
 

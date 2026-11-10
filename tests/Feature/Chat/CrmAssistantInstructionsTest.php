@@ -1097,6 +1097,12 @@ it('tells the assistant that the options tool takes the complete option list', f
         ->not->toContain('AddCustomFieldOptionsTool');
 });
 
+it('does not offer the retired search setting among the field settings it can change', function (): void {
+    expect(resolve(CrmAssistant::class)->staticInstructions())
+        ->toContain('list or view visibility, option colors')
+        ->not->toContain('visibility, search,');
+});
+
 it('declines general tasks the same way every time while keeping product questions in scope', function (): void {
     $instructions = resolve(CrmAssistant::class)->staticInstructions();
 

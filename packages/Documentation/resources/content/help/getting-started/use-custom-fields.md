@@ -2,7 +2,7 @@
 title: Use custom fields
 description: Add, edit, or reuse the fields that capture the data your team tracks.
 order: 5
-updated: "2026-10-01"
+updated: "2026-11-10"
 related: [help/getting-started/track-a-deal-through-the-pipeline, help/getting-started/import-your-existing-data]
 ---
 

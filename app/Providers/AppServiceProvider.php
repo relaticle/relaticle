@@ -48,6 +48,7 @@ use App\Support\CustomFields\CustomFieldSchemaCache;
 use App\Support\CustomFields\RecordNameResolver;
 use App\Support\CustomFields\RestoreConflictMessage;
 use App\Support\CustomFields\WorkspaceCustomFields;
+use App\Support\CustomFieldSettingsSchema;
 use App\Support\Http\RequestAbility;
 use App\Support\Impersonation\ImpersonationSessionHandler;
 use App\Support\Impersonation\Impersonator;
@@ -742,7 +743,9 @@ final class AppServiceProvider extends ServiceProvider
 
     private function hideRetiredCustomFieldSettings(): void
     {
-        Toggle::configureUsing(fn (Toggle $toggle): Toggle => $toggle->getName() === 'settings.searchable' ? $toggle->hidden() : $toggle);
+        $retired = array_map(fn (string $key): string => 'settings.'.$key, CustomFieldSettingsSchema::RETIRED);
+
+        Toggle::configureUsing(fn (Toggle $toggle): Toggle => in_array($toggle->getName(), $retired, true) ? $toggle->hidden() : $toggle);
     }
 
     /**

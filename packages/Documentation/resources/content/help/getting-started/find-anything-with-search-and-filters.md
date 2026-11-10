@@ -2,7 +2,7 @@
 title: Find anything with search and filters
 description: Find instructions for searching Relaticle records and filtering lists of companies, people, opportunities, tasks and notes.
 order: 7
-updated: "2026-10-04"
+updated: "2026-11-10"
 related: [help/getting-started/use-custom-fields, help/getting-started/import-your-existing-data]
 ---
 

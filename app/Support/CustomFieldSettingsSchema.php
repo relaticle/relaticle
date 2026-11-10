@@ -19,6 +19,8 @@ use Relaticle\CustomFields\Support\CurrencyProvider;
 
 final readonly class CustomFieldSettingsSchema
 {
+    public const array RETIRED = ['searchable'];
+
     private const array OPTION_COLOR_TYPES = ['select', 'multi_select', 'tags-input'];
 
     private const array CURRENCY_DISPLAY_TYPES = ['symbol', 'code'];
@@ -88,7 +90,7 @@ final readonly class CustomFieldSettingsSchema
             }
         }
 
-        return [...$rules, ...self::typeRules($type)];
+        return Arr::except([...$rules, ...self::typeRules($type)], self::RETIRED);
     }
 
     /**
