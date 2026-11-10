@@ -11,6 +11,7 @@ use App\Models\SavedView;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 final readonly class CreateSavedView
@@ -31,7 +32,7 @@ final readonly class CreateSavedView
         $view->name = $this->ensureNameIsFree->execute($user, $view, $name);
 
         try {
-            $view->save();
+            DB::transaction(fn (): bool => $view->save());
         } catch (UniqueConstraintViolationException) {
             throw ValidationException::withMessages(['name' => $view->nameTakenMessage($user)]);
         }

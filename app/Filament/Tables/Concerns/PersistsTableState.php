@@ -41,7 +41,9 @@ trait PersistsTableState
 
     private ?TableStateData $ownTableState = null;
 
-    private bool $ownTableStateChanged = false;
+    private bool $ownTableStateKnown = false;
+
+    private bool $ownTableStateDirty = false;
 
     public function mountInteractsWithTable(): void
     {
@@ -89,7 +91,7 @@ trait PersistsTableState
         $state = $this->currentTableState();
         $hash = hash('xxh128', "{$state->hash()}|{$this->activeSavedViewId}|{$this->appliedSavedViewHash}");
 
-        if ($this->savesTableStateOnOpen || ($this->tableStateHash !== null && $this->tableStateHash !== $hash)) {
+        if ($this->savesTableStateOnOpen || $this->ownTableStateDirty || ($this->tableStateHash !== null && $this->tableStateHash !== $hash)) {
             resolve(SaveTablePreference::class)->execute(
                 $this->savedViewUser(),
                 $this->savedViewWorkspace(),
@@ -103,6 +105,7 @@ trait PersistsTableState
 
         $this->tableStateHash = $hash;
         $this->savesTableStateOnOpen = false;
+        $this->ownTableStateDirty = false;
     }
 
     /**
@@ -261,12 +264,29 @@ trait PersistsTableState
     private function rememberOwnTableState(?TableStateData $state): void
     {
         $this->ownTableState = $state;
-        $this->ownTableStateChanged = true;
+        $this->ownTableStateKnown = true;
+        $this->ownTableStateDirty = true;
     }
 
     private function ownTableStateToStore(): ?TableStateData
     {
-        return $this->ownTableStateChanged ? $this->ownTableState : $this->storedTablePreference()?->own_state;
+        if ($this->ownTableStateKnown) {
+            return $this->ownTableState;
+        }
+
+        return $this->getActiveSavedView() instanceof SavedView ? $this->storedTablePreference()?->own_state : null;
+    }
+
+    private function parkedOwnTable(): ?TableStateData
+    {
+        $this->hasLoadedTablePreference = false;
+        $preference = $this->storedTablePreference();
+
+        if (! $preference instanceof TablePreference) {
+            return null;
+        }
+
+        return $preference->active_view_id === null ? $preference->state->withoutWidths() : $preference->own_state;
     }
 
     private function opensTableFirstThisSession(): bool

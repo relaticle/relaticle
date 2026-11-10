@@ -193,13 +193,16 @@ trait HasSavedViews
 
     public function applyOwnTable(): void
     {
-        $this->applyTableState($this->ownTableStateToStore() ?? new TableStateData);
+        if (! $this->getActiveSavedView() instanceof SavedView) {
+            return;
+        }
+
+        $this->applyTableState($this->parkedOwnTable() ?? new TableStateData);
         $this->clearActiveSavedView();
     }
 
     public function useStandardTable(): void
     {
-        $this->rememberOwnTableState(null);
         $this->applyTableState(new TableStateData);
         $this->clearActiveSavedView();
     }
@@ -209,7 +212,7 @@ trait HasSavedViews
         $viewId = $this->requestedSavedViewId;
         $this->requestedSavedViewId = null;
 
-        if ($viewId === null || ! $this->getVisibleSavedViews()->contains('id', $viewId)) {
+        if ($viewId === null || $viewId === $this->activeSavedViewId || ! $this->getVisibleSavedViews()->contains('id', $viewId)) {
             return;
         }
 
@@ -415,6 +418,7 @@ trait HasSavedViews
     {
         $this->activeSavedViewId = null;
         $this->appliedSavedViewHash = null;
+        $this->rememberOwnTableState(null);
     }
 
     private function savedViewNameInput(): TextInput
