@@ -81,7 +81,7 @@
                                 wire:click="applySavedLayout('{{ $layoutId }}')"
                             >
                                 <span class="flex items-center justify-between gap-3">
-                                    <span class="truncate" title="{{ $layout->name }}">{{ $layout->name }}</span>
+                                    <span class="min-w-0 truncate" title="{{ $layout->name }}">{{ $layout->name }}</span>
 
                                     <span class="fi-ta-layouts-row-meta">
                                         @if ($isDefault)

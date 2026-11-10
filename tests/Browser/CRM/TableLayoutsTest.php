@@ -82,3 +82,22 @@ it('closes a layout confirmation from its close button on a phone, where the lay
 
     expect(TableLayout::query()->whereKey($layout->getKey())->exists())->toBeTrue();
 });
+
+it('keeps a shared layout name readable beside a long owner name', function (): void {
+    $owner = User::factory()->create(['name' => 'Maximiliana Alexandrova-Konstantinopoulou']);
+    $this->workspace->users()->attach($owner, ['role' => 'member']);
+    TableLayout::factory()->for($owner)->for($this->workspace)->shared()->create(['name' => 'Enterprise renewals']);
+
+    $nameBox = 'document.querySelector(".fi-ta-layouts-row [title=\"Enterprise renewals\"]").getBoundingClientRect()';
+    $panelBox = 'document.querySelector(".fi-ta-layouts-row").closest(".fi-dropdown-panel").getBoundingClientRect()';
+    $ownerBox = 'document.querySelector(".fi-ta-layouts-row-meta").getBoundingClientRect()';
+
+    loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-ta-layouts-trigger')
+        ->assertScript("{$nameBox}.width >= 80", true)
+        ->assertScript("{$ownerBox}.right <= {$panelBox}.right", true)
+        ->assertNoJavaScriptErrors();
+});
