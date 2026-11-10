@@ -74,6 +74,7 @@ trait HasCustomFieldColumns
                 ->deferFilters(false)
                 ->filtersLayout(FiltersLayout::Hidden)
                 ->columnManager(false)
+                ->groupingSettingsHidden()
                 ->pushColumns($columns)
                 ->filters([ConditionsFilter::make($this->healedFilterRules(...)), TrashedFilter::make()->indicateUsing(fn (): array => [])]),
         );

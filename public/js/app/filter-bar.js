@@ -8,6 +8,8 @@
     const FADE_WIDTH = 32
     const LOOKUP_KINDS = ['member', 'relation', 'record']
     const LIST_KINDS = ['choice', 'multi_choice', ...LOOKUP_KINDS]
+    const NUMERIC_KINDS = ['number', 'inactivity']
+    const DEFAULT_PERIOD_UNIT = 'days'
 
     const strip = (rule) => ({ field: rule.field, condition: rule.condition, ...('value' in rule ? { value: rule.value } : {}) })
 
@@ -18,6 +20,13 @@
 
             return {
                 fields: [],
+                units: [],
+                sort: null,
+                sortable: [],
+                grouping: null,
+                groups: [],
+                deleted: null,
+                deletable: false,
                 view: null,
                 server: [],
                 chips: [],
@@ -71,6 +80,13 @@
                     const state = JSON.parse(root.dataset.state)
 
                     this.fields = state.fields
+                    this.units = state.periodUnits
+                    this.sort = state.sort
+                    this.sortable = state.sortable
+                    this.grouping = state.grouping
+                    this.groups = state.groups
+                    this.deleted = state.deleted
+                    this.deletable = state.deletable
                     this.view = state.view
                     this.server = state.rules
                 },
@@ -115,21 +131,62 @@
 
                     const value = chip.value
 
+                    if (condition.shape === 'period' || condition.shape === 'unit') {
+                        return this.periodComplete(value, condition.shape === 'period')
+                    }
+
                     if (typeof value === 'string') {
-                        return value.trim() !== '' && (this.fieldOf(chip).kind !== 'number' || Number.isFinite(Number(value)))
+                        return value.trim() !== '' && this.numberComplete(chip, value)
                     }
 
                     return Array.isArray(value) ? value.length > 0 : value !== null && value !== undefined
                 },
 
+                numberComplete(chip, value) {
+                    const field = this.fieldOf(chip)
+
+                    if (field.kind === 'inactivity') {
+                        const days = Number(value)
+
+                        return Number.isInteger(days) && days >= 1 && days <= field.limit
+                    }
+
+                    return field.kind !== 'number' || Number.isFinite(Number(value))
+                },
+
+                unitOf(name) {
+                    return this.units.find((unit) => unit.value === name)
+                },
+
+                periodComplete(value, needsAmount) {
+                    const unit = this.unitOf(value?.unit)
+
+                    if (!unit) {
+                        return false
+                    }
+
+                    const amount = Number(value.amount)
+
+                    return !needsAmount || (String(value.amount ?? '').trim() !== '' && Number.isInteger(amount) && amount >= 1 && amount <= unit.max)
+                },
+
                 toRule(chip) {
                     const rule = { field: chip.field, condition: chip.condition }
+                    const shape = this.conditionOf(chip).shape
 
-                    if (!this.conditionOf(chip).takesValue) {
+                    if (shape === 'none') {
                         return rule
                     }
 
-                    const numeric = this.fieldOf(chip).kind === 'number' && typeof chip.value === 'string'
+                    if (shape === 'unit') {
+                        return { ...rule, value: { unit: chip.value.unit } }
+                    }
+
+                    if (shape === 'period') {
+                        return { ...rule, value: { amount: Number(chip.value.amount), unit: chip.value.unit } }
+                    }
+
+                    const numeric = NUMERIC_KINDS.includes(this.fieldOf(chip).kind) && typeof chip.value === 'string'
 
                     return { ...rule, value: numeric ? Number(chip.value) : chip.value }
                 },
@@ -150,6 +207,10 @@
                     return this.fields
                         .filter((field) => field.editable && field.label.toLowerCase().includes(term))
                         .slice(0, MAX_FIELD_RESULTS)
+                },
+
+                canAddDeleted(label) {
+                    return this.deletable && !this.deleted && label.toLowerCase().includes(this.find.trim().toLowerCase())
                 },
 
                 reconcile() {
@@ -325,7 +386,7 @@
                     }
 
                     const target =
-                        pop.querySelector('input') ?? pop.querySelector('[aria-selected="true"]') ?? pop.querySelector('[data-pop-item]')
+                        pop.querySelector('input') ?? pop.querySelector('[aria-selected="true"], [aria-checked="true"]') ?? pop.querySelector('[data-pop-item]')
 
                     target?.focus()
                 },
@@ -355,6 +416,63 @@
                     if (first) {
                         this.addChip(first)
                     }
+                },
+
+                async addDeleted() {
+                    this.close(false)
+                    await this.$wire.setDeletedRecordsFilter('included')
+                    this.read()
+                    this.open = { id: 'deleted', part: 'val' }
+                    this.opener = null
+                    this.$nextTick(() => {
+                        this.opener = root.querySelector('[data-deleted-mode-trigger]')
+                        this.focusPop()
+                    })
+                },
+
+                async setDeleted(mode) {
+                    this.close(true)
+                    await this.$wire.setDeletedRecordsFilter(mode)
+                },
+
+                async removeDeleted() {
+                    this.close(false)
+                    await this.$wire.setDeletedRecordsFilter(null)
+                    this.$nextTick(() => root.querySelector('[data-filter-add]')?.focus())
+                },
+
+                async orderBy(column) {
+                    const flipped = this.sort?.column === column.key && this.sort.direction === 'asc' ? 'desc' : 'asc'
+
+                    this.close(true)
+                    await this.$wire.setFilterBarSort(column.key, flipped)
+                },
+
+                async flipSort() {
+                    this.close(true)
+                    await this.$wire.setFilterBarSort(this.sort.column, this.sort.direction === 'asc' ? 'desc' : 'asc')
+                },
+
+                async clearSort() {
+                    this.close(true)
+                    await this.$wire.setFilterBarSort(null, null)
+                },
+
+                async groupBy(group) {
+                    const flipped = this.grouping?.id === group.id && this.grouping.direction === 'asc' ? 'desc' : 'asc'
+
+                    this.close(true)
+                    await this.$wire.setFilterBarGrouping(group.id, flipped)
+                },
+
+                async flipGrouping() {
+                    this.close(true)
+                    await this.$wire.setFilterBarGrouping(this.grouping.id, this.grouping.direction === 'asc' ? 'desc' : 'asc')
+                },
+
+                async clearGrouping() {
+                    this.close(true)
+                    await this.$wire.setFilterBarGrouping(null, null)
                 },
 
                 addChip(field) {
@@ -490,6 +608,67 @@
                     chip.value = value
                     chip.display = value
                     this.schedulePush()
+                },
+
+                isDateEditor(chip) {
+                    return this.fieldOf(chip)?.kind === 'date' && this.conditionOf(chip)?.shape === 'text'
+                },
+
+                isPeriodEditor(chip) {
+                    return this.conditionOf(chip)?.shape === 'period'
+                },
+
+                isUnitEditor(chip) {
+                    return this.conditionOf(chip)?.shape === 'unit'
+                },
+
+                inputType(chip) {
+                    return NUMERIC_KINDS.includes(this.fieldOf(chip).kind) ? 'number' : 'text'
+                },
+
+                dateText(value) {
+                    const [year, month, day] = value.split('-').map(Number)
+                    const date = new Date(year, month - 1, day)
+
+                    return Number.isNaN(date.getTime())
+                        ? value
+                        : new Intl.DateTimeFormat(document.documentElement.lang || undefined, { dateStyle: 'medium' }).format(date)
+                },
+
+                setDate(chip, value) {
+                    chip.value = value
+                    chip.display = value ? this.dateText(value) : ''
+                    this.schedulePush()
+                },
+
+                setToday(chip, label) {
+                    chip.value = '@today'
+                    chip.display = label
+                    this.push()
+                    this.close(true)
+                },
+
+                periodText(value) {
+                    const unit = this.unitOf(value.unit)
+
+                    return `${value.amount} ${Number(value.amount) === 1 ? unit.singular : unit.label}`
+                },
+
+                periodUnit(chip) {
+                    return chip.value?.unit ?? DEFAULT_PERIOD_UNIT
+                },
+
+                setPeriod(chip, change) {
+                    chip.value = { amount: '', unit: DEFAULT_PERIOD_UNIT, ...chip.value, ...change }
+                    chip.display = this.complete(chip) ? this.periodText(chip.value) : ''
+                    this.schedulePush()
+                },
+
+                pickUnit(chip, unit) {
+                    chip.value = { unit: unit.value }
+                    chip.display = unit.singular
+                    this.push()
+                    this.close(true)
                 },
 
                 remove(chip) {

@@ -7,6 +7,7 @@ namespace App\Filament\Tables\Concerns;
 use App\Enums\CrmEntity;
 use App\Enums\FilterCondition;
 use App\Enums\FilterFieldKind;
+use App\Enums\PeriodUnit;
 use App\Filament\Tables\FilterBar\ConditionsFilter;
 use App\Filament\Tables\FilterBar\FilterField;
 use App\Filament\Tables\FilterBar\FilterFieldCatalog;
@@ -14,9 +15,12 @@ use App\Filament\Tables\FilterBar\FilterRuleDisplay;
 use App\Filament\Tables\FilterBar\FilterRules;
 use App\Models\User;
 use App\Queries\Crm\LinkOptionsQuery;
+use App\Queries\Filters\StaleDaysFilter;
 use App\Support\IconPath;
 use Filament\Facades\Filament;
 use Filament\Support\Components\Attributes\Unexposed;
+use Filament\Tables\Grouping\Group;
+use Illuminate\Contracts\Support\Htmlable;
 use Livewire\Attributes\Renderless;
 use RuntimeException;
 
@@ -66,7 +70,7 @@ trait HasFilterBar
     }
 
     /**
-     * @return array{view: ?string, fields: list<array<string, mixed>>, rules: list<array<string, mixed>>, deleted: ?string}
+     * @return array<string, mixed>
      */
     #[Unexposed]
     public function getFilterBarData(): array
@@ -75,7 +79,7 @@ trait HasFilterBar
         $catalog = $this->filterFieldCatalog();
 
         if (! $user instanceof User || $catalog === []) {
-            return ['view' => null, 'fields' => [], 'rules' => [], 'deleted' => null];
+            return ['view' => null, 'fields' => [], 'rules' => [], 'deleted' => null, 'deletable' => false, ...$this->filterBarOrdering(), 'periodUnits' => []];
         }
 
         $state = $this->canonicalTableFilters($this->tableFilters);
@@ -90,6 +94,7 @@ trait HasFilterBar
                 'icon' => $this->filterFieldIconPath($field->icon),
                 'kind' => $field->kind->value,
                 'editable' => $field->kind->hasValueEditor(),
+                'limit' => $field->kind === FilterFieldKind::Inactivity ? StaleDaysFilter::MAX_DAYS : null,
                 'options' => $this->filterFieldOptions($field),
                 'conditions' => array_map(fn (FilterCondition $condition): array => [
                     'value' => $condition->value,
@@ -104,7 +109,56 @@ trait HasFilterBar
                 $described,
             ),
             'deleted' => FilterRules::deletedMode($state['trashed']['value']),
+            'deletable' => $this->getTable()->getFilter('trashed')?->isVisible() ?? false,
+            ...$this->filterBarOrdering(),
+            'periodUnits' => array_map(fn (PeriodUnit $unit): array => [
+                'value' => $unit->value,
+                'label' => __("filament/panel.tables.filters.units.{$unit->value}"),
+                'singular' => __("filament/panel.tables.filters.this_unit.{$unit->value}"),
+                'max' => $unit->maxAmount(),
+            ], PeriodUnit::cases()),
         ];
+    }
+
+    /**
+     * @return array{sort: ?array{column: string, direction: string, label: string}, sortable: list<array{key: string, label: string}>, groups: list<array{id: string, label: string}>, grouping: ?array{id: string, direction: string, label: string}}
+     */
+    private function filterBarOrdering(): array
+    {
+        $sortable = $this->sortableTableColumns();
+        $column = $this->getTableSortColumn();
+        $group = $this->getTableGrouping();
+        $groups = array_map(fn (Group $group): string => $this->plainLabel($group->getLabel()), $this->getTable()->getGroups());
+
+        return [
+            'sort' => isset($sortable[$column]) ? ['column' => $column, 'direction' => $this->getTableSortDirection() ?? 'asc', 'label' => $sortable[$column]] : null,
+            'sortable' => array_map(fn (string $key, string $label): array => ['key' => $key, 'label' => $label], array_keys($sortable), $sortable),
+            'groups' => array_map(fn (string $id, string $label): array => ['id' => $id, 'label' => $label], array_keys($groups), $groups),
+            'grouping' => $group instanceof Group
+                ? ['id' => $group->getId(), 'direction' => $this->getTableGroupingDirection() ?? 'asc', 'label' => $groups[$group->getId()]]
+                : null,
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function sortableTableColumns(): array
+    {
+        $columns = [];
+
+        foreach ($this->getTable()->getVisibleColumns() as $column) {
+            if ($column->isSortable()) {
+                $columns[$column->getName()] = $this->plainLabel($column->getLabel());
+            }
+        }
+
+        return $columns;
+    }
+
+    private function plainLabel(string|Htmlable|null $label): string
+    {
+        return trim(html_entity_decode(strip_tags($label instanceof Htmlable ? $label->toHtml() : (string) $label)));
     }
 
     /**
@@ -167,6 +221,32 @@ trait HasFilterBar
         ];
 
         $this->updatedTableFilters();
+    }
+
+    public function setFilterBarSort(mixed $column = null, mixed $direction = null): void
+    {
+        if (! is_string($column)) {
+            $this->tableSort = null;
+        } elseif (array_key_exists($column, $this->sortableTableColumns()) && in_array($direction ??= 'asc', ['asc', 'desc'], true)) {
+            $this->tableSort = "{$column}:{$direction}";
+        } else {
+            return;
+        }
+
+        $this->updatedTableSort();
+    }
+
+    public function setFilterBarGrouping(mixed $group = null, mixed $direction = null): void
+    {
+        if (! is_string($group)) {
+            $this->tableGrouping = null;
+        } elseif (array_key_exists($group, $this->getTable()->getGroups()) && in_array($direction ??= 'asc', ['asc', 'desc'], true)) {
+            $this->tableGrouping = "{$group}:{$direction}";
+        } else {
+            return;
+        }
+
+        $this->updatedTableGrouping();
     }
 
     public function clearFilterBar(): void

@@ -10,6 +10,7 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\SavedView;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Support\CurrentWorkspace;
 use Pest\Browser\Api\AwaitableWebpage;
 use Tests\Helpers\WorkspaceCustomField;
@@ -106,7 +107,8 @@ it('draws a dashed sort and a dashed filter button when no filter is set', funct
     ($this->open)()
         ->assertSeeIn('[data-filter-bar]', 'Sort')
         ->assertSeeIn('[data-filter-add]', 'Filter')
-        ->assertPresent('[data-filter-sort][disabled]')
+        ->assertMissing('[data-filter-sort][disabled]')
+        ->assertScript('getComputedStyle(document.querySelector("[data-filter-sort]")).borderStyle === "dashed"', true)
         ->assertScript('getComputedStyle(document.querySelector("[data-filter-add]")).borderStyle === "dashed"', true)
         ->assertNoJavaScriptErrors();
 });
@@ -452,7 +454,7 @@ it('completes a condition that takes no value at once and narrows the list', fun
     $page->assertSee('No companies match this view');
 });
 
-it('does not let a stored chip the picker does not offer change its condition', function (): void {
+it('lets a stored date chip change its condition and clears the value when the shape changes', function (): void {
     SavedView::factory()->for($this->user)->for($this->workspace)->create([
         'name' => 'Made today',
         'state' => new TableStateData(filters: ['conditions' => ['match' => 'all', 'rules' => [['field' => 'created_at', 'condition' => 'is', 'value' => '@today']]]]),
@@ -463,8 +465,8 @@ it('does not let a stored chip the picker does not offer change its condition', 
         ->click('Made today')
         ->assertSeeIn('[data-filter-chip]', 'today');
 
-    $page->assertScript('document.querySelector("[data-filter-chip] [data-filter-segment=condition]").tagName === "SPAN"', true)
-        ->assertScript('document.querySelector("[data-filter-chip] [data-filter-segment=value]").tagName === "SPAN"', true);
+    $page->assertScript('document.querySelector("[data-filter-chip] [data-filter-segment=condition]").tagName === "BUTTON"', true)
+        ->assertScript('document.querySelector("[data-filter-chip] [data-filter-segment=value]").tagName === "BUTTON"', true);
 
     $shapeCrossing = <<<'JS'
         (() => {
@@ -702,4 +704,218 @@ it('picks tags from a tags chip and narrows the list', function (): void {
         ->assertSeeIn('[data-filter-segment="value"]', 'lead, vip');
     expect(companyRows($page, 2))->toBeTrue();
     $page->assertNoJavaScriptErrors();
+});
+
+function popVisible(): string
+{
+    return filterBarWaitFor('document.querySelector("[data-pop][data-open=true]")?.checkVisibility()');
+}
+
+function amountInput(): string
+{
+    return '[data-pop][data-open="true"] [data-filter-amount]';
+}
+
+function openOn(User $user, Workspace $workspace, string $list, int $width = 1440): AwaitableWebpage
+{
+    return loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize($width, 900)
+        ->navigate("/app/{$workspace->slug}/{$list}")
+        ->assertPresent('[data-filter-add]');
+}
+
+it('keeps a date in the next 30 days with a saved view and reads the same after a reload', function (): void {
+    customFieldOn($this->user, 'company', 'renewal', 'date');
+    foreach (['Soon' => 10, 'Later' => 90] as $name => $days) {
+        setCustomValue($this->user, Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => $name]), 'company', 'renewal', now()->addDays($days)->toDateString());
+    }
+    SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => 'Renewals']);
+
+    $page = ($this->open)()
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->click('Renewals');
+    expect(companyRows($page, 5))->toBeTrue();
+
+    addChip($page, 'custom_fields.renewal', 'in_the_next');
+    $page->assertScript(popVisible(), true)
+        ->assertPresent('[data-pop] [data-filter-unit]')
+        ->assertSeeIn('[data-pop]', 'Stays relative when this view is saved.')
+        ->type(amountInput(), '30');
+    expect(companyRows($page, 1))->toBeTrue();
+    $page->assertSeeIn('[data-filter-chip]', '30 days')
+        ->assertSee('Discard changes')
+        ->click('[data-view-save-action="save"]')
+        ->assertDontSee('Discard changes')
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->assertSeeIn('[data-filter-chip]', 'in the next')
+        ->assertSeeIn('[data-filter-chip]', '30 days')
+        ->assertDontSee('Discard changes');
+    expect(companyRows($page, 1))->toBeTrue();
+    $page->assertNoJavaScriptErrors();
+});
+
+it('keeps a period chip unfinished until its amount fits the unit', function (): void {
+    customFieldOn($this->user, 'company', 'renewal', 'date');
+
+    $page = ($this->open)();
+    addChip($page, 'custom_fields.renewal', 'in_the_past');
+    $page->assertScript(popVisible(), true)->type(amountInput(), '0');
+    $page->assertPresent('[data-filter-chip].fi-pending')
+        ->type(amountInput(), '4000')
+        ->assertPresent('[data-filter-chip].fi-pending')
+        ->type(amountInput(), '12')
+        ->assertScript(filterBarWaitFor('document.querySelector("[data-filter-chip]").dataset.complete === "true"'), true)
+        ->assertSeeIn('[data-filter-chip]', '12 days')
+        ->assertNoJavaScriptErrors();
+});
+
+it('narrows by created at this unit and says the choice stays relative', function (): void {
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Old one', 'created_at' => now()->subDays(3)]);
+
+    $page = ($this->open)();
+    expect(companyRows($page, 4))->toBeTrue();
+
+    addChip($page, 'created_at', 'this');
+    $page->assertScript(popVisible(), true)
+        ->assertSeeIn('[data-pop]', 'Stays relative when this view is saved.')
+        ->click('[data-pop][data-open="true"] [data-unit="days"]');
+    expect(companyRows($page, 3))->toBeTrue();
+    $page->assertSeeIn('[data-filter-chip]', 'day')
+        ->assertDontSee('Old one')
+        ->assertNoJavaScriptErrors();
+});
+
+it('narrows by created at today with the Today shortcut', function (): void {
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Old one', 'created_at' => now()->subDays(3)]);
+
+    $page = ($this->open)();
+    expect(companyRows($page, 4))->toBeTrue();
+
+    addChip($page, 'created_at', 'is');
+    $page->assertScript(popVisible(), true)
+        ->assertPresent('[data-pop][data-open="true"] input[type="date"]')
+        ->click('[data-filter-today]');
+    expect(companyRows($page, 3))->toBeTrue();
+    $page->assertSeeIn('[data-filter-chip]', 'today')
+        ->assertDontSee('Old one')
+        ->assertNoJavaScriptErrors();
+});
+
+it('reads a picked date in the viewer locale and filters by it', function (): void {
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Old one', 'created_at' => '2026-03-04 10:00:00']);
+
+    $page = ($this->open)();
+    expect(companyRows($page, 4))->toBeTrue();
+
+    addChip($page, 'created_at', 'is');
+    $page->assertScript(popVisible(), true)
+        ->type('[data-pop][data-open="true"] input[type="date"]', '2026-03-04');
+    expect(companyRows($page, 1))->toBeTrue();
+    $page->assertSeeIn('[data-filter-chip]', 'Mar 4, 2026')
+        ->assertSee('Old one')
+        ->assertNoJavaScriptErrors();
+});
+
+it('narrows opportunities by days without activity', function (): void {
+    $page = openOn($this->user, $this->workspace, 'opportunities');
+
+    addChip($page, 'stale_days', 'no_activity_for');
+    $page->assertScript(popVisible(), true)
+        ->assertAttribute(valueInput(), 'type', 'number')
+        ->type(valueInput(), '0')
+        ->assertPresent('[data-filter-chip].fi-pending')
+        ->type(valueInput(), '30')
+        ->assertScript(filterBarWaitFor('document.querySelector("[data-filter-chip]").dataset.complete === "true"'), true)
+        ->assertSeeIn('[data-filter-chip]', 'No activity for at least')
+        ->assertScript(filterBarWaitFor('document.querySelector("[data-filter-chip]").textContent.includes("30 days")'), true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('adds a deleted records chip last in the field list and switches it between included and only', function (): void {
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Gone'])->delete();
+
+    $page = ($this->open)();
+    expect(companyRows($page, 3))->toBeTrue();
+
+    $page->click('[data-filter-add]')
+        ->assertScript(popVisible(), true)
+        ->assertScript('(() => { const items = [...document.querySelectorAll("[data-pop][data-open=true] [data-pop-item]")]; return items.at(-1).hasAttribute("data-filter-add-deleted") && items.length > 1; })()', true)
+        ->click('[data-filter-add-deleted]');
+    expect(companyRows($page, 4))->toBeTrue();
+    $page->assertScript(filterBarWaitFor('document.querySelector("[data-filter-deleted] [data-filter-segment=value]")?.textContent.trim() === "included"'), true)
+        ->assertScript(popVisible(), true)
+        ->click('[data-deleted-mode="only"]');
+    expect(companyRows($page, 1))->toBeTrue();
+    $page->assertSee('Gone')
+        ->assertSeeIn('[data-filter-deleted]', 'only')
+        ->assertMissing('[data-filter-add-deleted]')
+        ->click('[data-deleted-remove]')
+        ->assertMissing('[data-filter-deleted]');
+    expect(companyRows($page, 3))->toBeTrue();
+    $page->assertDontSee('Gone')->assertNoJavaScriptErrors();
+});
+
+it('sets the sort from the control and shows it in the column header, then flips and clears it', function (): void {
+    $page = ($this->open)()
+        ->click('[data-filter-sort]')
+        ->assertScript(popVisible(), true)
+        ->click('[data-sort-column][data-column="name"]');
+
+    $page->assertScript(filterBarWaitFor('document.querySelector(".fi-ta-header-cell-name")?.getAttribute("aria-sort") === "ascending"'), true)
+        ->assertScript(filterBarWaitFor('document.querySelector("[data-filter-sort]").classList.contains("fi-set")'), true)
+        ->assertSeeIn('[data-filter-sort]', 'Company')
+        ->click('[data-filter-sort]')
+        ->assertScript(popVisible(), true)
+        ->click('[data-sort-flip]')
+        ->assertScript(filterBarWaitFor('document.querySelector(".fi-ta-header-cell-name")?.getAttribute("aria-sort") === "descending"'), true)
+        ->click('[data-filter-sort]')
+        ->assertScript(popVisible(), true)
+        ->click('[data-sort-clear]')
+        ->assertScript(filterBarWaitFor('document.querySelector(".fi-ta-header-cell-name")?.getAttribute("aria-sort") === "none"'), true)
+        ->assertScript('! document.querySelector("[data-filter-sort]").classList.contains("fi-set")', true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('shows a header click in the sort control', function (): void {
+    $page = ($this->open)();
+
+    $page->script('document.querySelector(".fi-ta-header-cell-name .fi-ta-header-cell-sort-btn").click()');
+    $page->assertScript(filterBarWaitFor('document.querySelector("[data-filter-sort]").classList.contains("fi-set") && document.querySelector("[data-filter-sort]").textContent.includes("Company")'), true);
+
+    $page->script('document.querySelector(".fi-ta-header-cell-name .fi-ta-header-cell-sort-btn").click()');
+    $page->assertScript(filterBarWaitFor('document.querySelector(".fi-ta-header-cell-name").getAttribute("aria-sort") === "descending" && document.querySelector("[data-filter-sort]").getAttribute("aria-label").includes("descending")'), true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('draws no Filament sort row under the filter row on a phone', function (): void {
+    $page = ($this->open)(390, 844);
+
+    $page->assertScript('document.querySelectorAll(".fi-ta-table-stacked-sorting").length > 0', true)
+        ->assertScript('[...document.querySelectorAll(".fi-ta-table-stacked-sorting")].every((row) => ! row.checkVisibility())', true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('groups tasks from the group control and leaves Filament no toolbar row at rest', function (): void {
+    $page = openOn($this->user, $this->workspace, 'tasks');
+
+    $page->assertPresent('[data-filter-group]')
+        ->assertMissing('.fi-ta-header-toolbar')
+        ->click('[data-filter-group]')
+        ->assertScript(popVisible(), true)
+        ->click('[data-group="priority_group"]')
+        ->assertScript(filterBarWaitFor('document.querySelector("[data-filter-group]").classList.contains("fi-set") && document.querySelector("[data-filter-group]").textContent.includes("Priority")'), true)
+        ->assertScript("Livewire.all().find((component) => component.name.includes('ManageTasks')).\$wire.tableGrouping === 'priority_group:asc'", true)
+        ->assertMissing('.fi-ta-grouping-settings')
+        ->click('[data-filter-group]')
+        ->assertScript(popVisible(), true)
+        ->click('[data-group-clear]')
+        ->assertScript("Livewire.all().find((component) => component.name.includes('ManageTasks')).\$wire.tableGrouping === null", true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('offers no group control on a list that groups nothing', function (): void {
+    ($this->open)()
+        ->assertMissing('[data-filter-group]')
+        ->assertNoJavaScriptErrors();
 });

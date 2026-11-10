@@ -76,8 +76,7 @@ enum FilterFieldKind: string
     {
         return match ($this) {
             self::Text, self::MultiText, self::Number, self::Checkbox, self::Choice, self::MultiChoice,
-            self::Member, self::Relation, self::Record => true,
-            self::Date, self::Inactivity => false,
+            self::Member, self::Relation, self::Record, self::Date, self::Inactivity => true,
         };
     }
 }

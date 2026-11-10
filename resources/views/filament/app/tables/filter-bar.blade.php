@@ -10,10 +10,121 @@
 >
     <div class="fi-filter-bar-scroll" data-filter-scroll>
     <div class="fi-filter-bar-start" x-ref="strip" x-on:scroll.passive="fade()" x-on:focusin="$event.target.matches(':focus-visible') && revealFocus($event.target)" wire:ignore role="group" aria-label="{{ __('filament/panel.tables.filters.bar') }}">
-        <button type="button" tabindex="0" disabled class="fi-filter-ghost" data-filter-sort>
-            <x-filament::icon icon="lucide-arrow-up-down" />
-            {{ __('filament/panel.tables.filters.sort') }}
-        </button>
+        <div class="fi-filter-part">
+            <button
+                type="button"
+                tabindex="0"
+                class="fi-filter-ghost"
+                data-filter-sort
+                data-pop-trigger
+                x-bind:class="{ 'fi-set': sort, 'fi-open': isOpen('sort', 'main') }"
+                x-bind:aria-expanded="isOpen('sort', 'main').toString()"
+                x-bind:aria-label="sort ? @js(__('filament/panel.tables.filters.sort_set')).replace(':column', sort.label).replace(':direction', sort.direction === 'asc' ? @js(__('filament/panel.tables.filters.sort_ascending')) : @js(__('filament/panel.tables.filters.sort_descending'))) : @js(__('filament/panel.tables.filters.sort'))"
+                aria-haspopup="menu"
+                x-on:click="toggle('sort', 'main', $event)"
+            >
+                <x-filament::icon icon="lucide-arrow-up-down" x-show="! sort" />
+                <x-filament::icon icon="lucide-arrow-up" x-show="sort?.direction === 'asc'" />
+                <x-filament::icon icon="lucide-arrow-down" x-show="sort?.direction === 'desc'" />
+                <span x-text="sort ? sort.label : @js(__('filament/panel.tables.filters.sort'))"></span>
+            </button>
+
+            <template x-if="isOpen('sort', 'main')">
+            <div class="fi-filter-pop" x-anchor.bottom-start.offset.6.fixed="$el.parentElement" data-pop data-sheet x-bind:data-open="isOpen('sort', 'main')" role="menu" aria-label="{{ __('filament/panel.tables.filters.sort_by') }}" x-on:keydown="navigate($event)">
+                <div class="fi-filter-options">
+                    <template x-for="column in sortable" x-bind:key="column.key">
+                        <button
+                            type="button"
+                            tabindex="0"
+                            role="menuitemradio"
+                            class="fi-filter-item"
+                            data-pop-item
+                            data-sort-column
+                            x-bind:data-column="column.key"
+                            x-bind:class="{ 'fi-on': sort?.column === column.key }"
+                            x-bind:aria-checked="(sort?.column === column.key).toString()"
+                            x-on:click="orderBy(column)"
+                        >
+                            <span class="fi-filter-label" x-text="column.label"></span>
+                            <x-filament::icon icon="lucide-arrow-up" class="fi-filter-tick" x-show="sort?.column === column.key && sort.direction === 'asc'" />
+                            <x-filament::icon icon="lucide-arrow-down" class="fi-filter-tick" x-show="sort?.column === column.key && sort.direction === 'desc'" />
+                        </button>
+                    </template>
+                </div>
+                <template x-if="sort">
+                    <div>
+                        <div class="fi-filter-rule" aria-hidden="true"></div>
+                        <button type="button" tabindex="0" role="menuitem" class="fi-filter-item" data-pop-item data-sort-flip x-on:click="flipSort()">
+                            <x-filament::icon icon="lucide-arrow-up-down" />
+                            <span x-text="sort.direction === 'asc' ? @js(__('filament/panel.tables.filters.sort_flip_to_descending')) : @js(__('filament/panel.tables.filters.sort_flip_to_ascending'))"></span>
+                        </button>
+                        <button type="button" tabindex="0" role="menuitem" class="fi-filter-item fi-danger" data-pop-item data-sort-clear x-on:click="clearSort()">
+                            <x-filament::icon icon="lucide-x" />
+                            {{ __('filament/panel.tables.filters.sort_clear') }}
+                        </button>
+                    </div>
+                </template>
+            </div>
+            </template>
+        </div>
+
+        <template x-if="groups.length > 0">
+        <div class="fi-filter-part">
+            <button
+                type="button"
+                tabindex="0"
+                class="fi-filter-ghost"
+                data-filter-group
+                data-pop-trigger
+                x-bind:class="{ 'fi-set': grouping, 'fi-open': isOpen('group', 'main') }"
+                x-bind:aria-expanded="isOpen('group', 'main').toString()"
+                x-bind:aria-label="grouping ? @js(__('filament/panel.tables.filters.group_set')).replace(':group', grouping.label).replace(':direction', grouping.direction === 'asc' ? @js(__('filament/panel.tables.filters.sort_ascending')) : @js(__('filament/panel.tables.filters.sort_descending'))) : @js(__('filament/panel.tables.filters.group'))"
+                aria-haspopup="menu"
+                x-on:click="toggle('group', 'main', $event)"
+            >
+                <x-filament::icon icon="lucide-layers" />
+                <span x-text="grouping ? grouping.label : @js(__('filament/panel.tables.filters.group'))"></span>
+            </button>
+
+            <template x-if="isOpen('group', 'main')">
+            <div class="fi-filter-pop" x-anchor.bottom-start.offset.6.fixed="$el.parentElement" data-pop data-sheet x-bind:data-open="isOpen('group', 'main')" role="menu" aria-label="{{ __('filament/panel.tables.filters.group_by') }}" x-on:keydown="navigate($event)">
+                <div class="fi-filter-options">
+                    <template x-for="group in groups" x-bind:key="group.id">
+                        <button
+                            type="button"
+                            tabindex="0"
+                            role="menuitemradio"
+                            class="fi-filter-item"
+                            data-pop-item
+                            data-group-option
+                            x-bind:data-group="group.id"
+                            x-bind:class="{ 'fi-on': grouping?.id === group.id }"
+                            x-bind:aria-checked="(grouping?.id === group.id).toString()"
+                            x-on:click="groupBy(group)"
+                        >
+                            <span class="fi-filter-label" x-text="group.label"></span>
+                            <x-filament::icon icon="lucide-arrow-up" class="fi-filter-tick" x-show="grouping?.id === group.id && grouping.direction === 'asc'" />
+                            <x-filament::icon icon="lucide-arrow-down" class="fi-filter-tick" x-show="grouping?.id === group.id && grouping.direction === 'desc'" />
+                        </button>
+                    </template>
+                </div>
+                <template x-if="grouping">
+                    <div>
+                        <div class="fi-filter-rule" aria-hidden="true"></div>
+                        <button type="button" tabindex="0" role="menuitem" class="fi-filter-item" data-pop-item data-group-flip x-on:click="flipGrouping()">
+                            <x-filament::icon icon="lucide-arrow-up-down" />
+                            <span x-text="grouping.direction === 'asc' ? @js(__('filament/panel.tables.filters.sort_flip_to_descending')) : @js(__('filament/panel.tables.filters.sort_flip_to_ascending'))"></span>
+                        </button>
+                        <button type="button" tabindex="0" role="menuitem" class="fi-filter-item fi-danger" data-pop-item data-group-clear x-on:click="clearGrouping()">
+                            <x-filament::icon icon="lucide-x" />
+                            {{ __('filament/panel.tables.filters.group_clear') }}
+                        </button>
+                    </div>
+                </template>
+            </div>
+            </template>
+        </div>
+        </template>
 
         <span class="fi-filter-sep" aria-hidden="true"></span>
 
@@ -146,19 +257,86 @@
                                 </div>
                             </template>
 
-                            <template x-if="! isListEditor(chip)">
+                            <template x-if="isDateEditor(chip)">
                                 <div class="fi-filter-editor">
                                     <input
-                                        x-bind:type="fieldOf(chip).kind === 'number' ? 'number' : 'text'"
-                                        x-bind:step="fieldOf(chip).kind === 'number' ? 'any' : null"
+                                        type="date"
+                                        x-bind:value="chip.value === '@today' ? '' : (chip.value ?? '')"
+                                        x-bind:aria-label="label(chip)"
+                                        data-filter-value
+                                        x-on:input="setDate(chip, $event.target.value)"
+                                        x-on:keydown.enter.prevent="finish()"
+                                    />
+                                    <button type="button" class="fi-filter-today" data-filter-today x-on:click="setToday(chip, @js(__('filament/panel.tables.filters.today')))">{{ __('filament/panel.tables.filters.today_shortcut') }}</button>
+                                </div>
+                            </template>
+
+                            <template x-if="isPeriodEditor(chip)">
+                                <div>
+                                    <div class="fi-filter-editor">
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            step="1"
+                                            inputmode="numeric"
+                                            x-bind:max="unitOf(periodUnit(chip))?.max"
+                                            x-bind:value="chip.value?.amount ?? ''"
+                                            placeholder="{{ __('filament/panel.tables.filters.number_value') }}"
+                                            aria-label="{{ __('filament/panel.tables.filters.amount') }}"
+                                            data-filter-amount
+                                            x-on:input="setPeriod(chip, { amount: $event.target.value })"
+                                            x-on:keydown.enter.prevent="finish()"
+                                        />
+                                        <select data-filter-unit aria-label="{{ __('filament/panel.tables.filters.unit') }}" x-on:change="setPeriod(chip, { unit: $event.target.value })">
+                                            <template x-for="unit in units" x-bind:key="unit.value">
+                                                <option x-bind:value="unit.value" x-bind:selected="periodUnit(chip) === unit.value" x-text="unit.label"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                    <p class="fi-filter-hint">{{ __('filament/panel.tables.filters.stays_relative') }}</p>
+                                </div>
+                            </template>
+
+                            <template x-if="isUnitEditor(chip)">
+                                <div>
+                                    <div role="listbox" x-bind:aria-label="label(chip)">
+                                        <template x-for="unit in units" x-bind:key="unit.value">
+                                            <button
+                                                type="button"
+                                                tabindex="0"
+                                                role="option"
+                                                class="fi-filter-item"
+                                                data-pop-item
+                                                x-bind:data-unit="unit.value"
+                                                x-bind:class="{ 'fi-on': chip.value?.unit === unit.value }"
+                                                x-bind:aria-selected="(chip.value?.unit === unit.value).toString()"
+                                                x-on:click="pickUnit(chip, unit)"
+                                            >
+                                                <span x-text="unit.singular"></span>
+                                                <x-filament::icon icon="lucide-check" class="fi-filter-tick" x-show="chip.value?.unit === unit.value" />
+                                            </button>
+                                        </template>
+                                    </div>
+                                    <p class="fi-filter-hint">{{ __('filament/panel.tables.filters.stays_relative') }}</p>
+                                </div>
+                            </template>
+
+                            <template x-if="! isListEditor(chip) && ! isDateEditor(chip) && ! isPeriodEditor(chip) && ! isUnitEditor(chip)">
+                                <div class="fi-filter-editor">
+                                    <input
+                                        x-bind:type="inputType(chip)"
+                                        x-bind:step="fieldOf(chip).kind === 'number' ? 'any' : (fieldOf(chip).kind === 'inactivity' ? '1' : null)"
+                                        x-bind:min="fieldOf(chip).kind === 'inactivity' ? '1' : null"
+                                        x-bind:max="fieldOf(chip).kind === 'inactivity' ? fieldOf(chip).limit : null"
                                         x-bind:value="chip.value ?? ''"
                                         maxlength="255"
-                                        x-bind:placeholder="fieldOf(chip).kind === 'number' ? @js(__('filament/panel.tables.filters.number_value')) : @js(__('filament/panel.tables.filters.type_value'))"
+                                        x-bind:placeholder="inputType(chip) === 'number' ? @js(__('filament/panel.tables.filters.number_value')) : @js(__('filament/panel.tables.filters.type_value'))"
                                         x-bind:aria-label="label(chip)"
                                         data-filter-value
                                         x-on:input="setValue(chip, $event.target.value)"
                                         x-on:keydown.enter.prevent="finish()"
                                     />
+                                    <span class="fi-filter-suffix" x-show="fieldOf(chip).kind === 'inactivity'" x-text="unitOf('days')?.label"></span>
                                 </div>
                             </template>
                         </div>
@@ -190,6 +368,51 @@
                         </button>
                     </div>
                     </template>
+                </div>
+            </div>
+        </template>
+
+        <template x-if="deleted">
+            <div class="fi-filter-chip" role="group" data-filter-chip data-filter-deleted x-bind:aria-label="@js(__('filament/panel.tables.filters.deleted_mode_for')).replace(':mode', deleted === 'only' ? @js(__('filament/panel.tables.filters.deleted_only')) : @js(__('filament/panel.tables.filters.deleted_included')))">
+                <span class="fi-filter-seg fi-filter-field">
+                    <x-filament::icon icon="lucide-trash-2" />
+                    <span>{{ __('filament/panel.tables.filters.deleted_records') }}</span>
+                </span>
+
+                <div class="fi-filter-part">
+                    <button
+                        type="button"
+                        tabindex="0"
+                        class="fi-filter-seg fi-filter-val"
+                        data-filter-segment="value"
+                        data-deleted-mode-trigger
+                        data-pop-trigger
+                        x-bind:class="{ 'fi-open': isOpen('deleted', 'val') }"
+                        x-bind:aria-expanded="isOpen('deleted', 'val').toString()"
+                        aria-haspopup="menu"
+                        x-on:click="toggle('deleted', 'val', $event)"
+                    >
+                        <span x-text="deleted === 'only' ? @js(__('filament/panel.tables.filters.deleted_only')) : @js(__('filament/panel.tables.filters.deleted_included'))"></span>
+                    </button>
+
+                    <template x-if="isOpen('deleted', 'val')">
+                    <div class="fi-filter-pop" x-anchor.bottom-start.offset.6.fixed="$el.closest('.fi-filter-chip')" data-pop data-sheet x-bind:data-open="isOpen('deleted', 'val')" role="menu" aria-label="{{ __('filament/panel.tables.filters.deleted_records') }}" x-on:keydown="navigate($event)">
+                        <button type="button" tabindex="0" role="menuitemradio" class="fi-filter-item" data-pop-item data-deleted-mode="included" x-bind:class="{ 'fi-on': deleted === 'included' }" x-bind:aria-checked="(deleted === 'included').toString()" x-on:click="setDeleted('included')">
+                            <span>{{ __('filament/panel.tables.filters.deleted_included') }}</span>
+                            <x-filament::icon icon="lucide-check" class="fi-filter-tick" x-show="deleted === 'included'" />
+                        </button>
+                        <button type="button" tabindex="0" role="menuitemradio" class="fi-filter-item" data-pop-item data-deleted-mode="only" x-bind:class="{ 'fi-on': deleted === 'only' }" x-bind:aria-checked="(deleted === 'only').toString()" x-on:click="setDeleted('only')">
+                            <span>{{ __('filament/panel.tables.filters.deleted_only') }}</span>
+                            <x-filament::icon icon="lucide-check" class="fi-filter-tick" x-show="deleted === 'only'" />
+                        </button>
+                    </div>
+                    </template>
+                </div>
+
+                <div class="fi-filter-part">
+                    <button type="button" tabindex="0" class="fi-filter-seg fi-filter-more" data-deleted-remove aria-label="{{ __('filament/panel.tables.filters.deleted_remove') }}" x-on:click="removeDeleted()">
+                        <x-filament::icon icon="lucide-x" />
+                    </button>
                 </div>
             </div>
         </template>
@@ -231,7 +454,16 @@
                             <span x-text="field.label"></span>
                         </button>
                     </template>
-                    <p class="fi-filter-hint" x-show="matchingFields().length === 0">{{ __('filament/panel.tables.filters.no_field') }}</p>
+                    <template x-if="canAddDeleted(@js(__('filament/panel.tables.filters.deleted_records')))">
+                        <div>
+                            <div class="fi-filter-rule" aria-hidden="true"></div>
+                            <button type="button" tabindex="0" role="option" class="fi-filter-item" data-pop-item data-filter-add-deleted x-on:click="addDeleted()">
+                                <x-filament::icon icon="lucide-trash-2" />
+                                <span>{{ __('filament/panel.tables.filters.deleted_records') }}</span>
+                            </button>
+                        </div>
+                    </template>
+                    <p class="fi-filter-hint" x-show="matchingFields().length === 0 && ! canAddDeleted(@js(__('filament/panel.tables.filters.deleted_records')))">{{ __('filament/panel.tables.filters.no_field') }}</p>
                 </div>
             </div>
             </template>

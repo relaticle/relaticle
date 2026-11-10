@@ -55,10 +55,14 @@
 }
 
 .fi-filter-ghost {
-    @apply inline-flex h-7 items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-2 text-sm font-medium whitespace-nowrap text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-gray-500 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200 dark:disabled:hover:text-gray-400;
+    @apply inline-flex h-7 items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-2 text-sm font-medium whitespace-nowrap text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200;
 
     &.fi-open {
         @apply bg-gray-100 dark:bg-white/5;
+    }
+
+    &.fi-set {
+        @apply border-transparent bg-white font-medium text-gray-700 ring-1 ring-gray-950/10 hover:bg-gray-100 dark:bg-gray-900 dark:text-gray-200 dark:ring-white/15 dark:hover:bg-white/5;
     }
 
     & svg {
@@ -177,6 +181,26 @@ button.fi-filter-seg {
     & input[type='number'] {
         @apply w-28;
     }
+
+    & input[type='date'] {
+        @apply w-40;
+    }
+
+    & select {
+        @apply h-8 min-w-0 rounded-lg border-0 bg-white py-0 ps-2 pe-8 text-sm text-gray-950 ring-1 ring-gray-950/10 outline-0 focus:ring-2 focus:ring-primary-600 dark:bg-gray-900 dark:text-white dark:ring-white/15 dark:focus:ring-primary-400;
+    }
+}
+
+.fi-filter-today {
+    @apply h-8 shrink-0 rounded-lg px-2.5 text-sm font-medium text-gray-700 ring-1 ring-gray-950/10 hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-0 dark:text-gray-200 dark:ring-white/15 dark:hover:bg-white/5 dark:focus-visible:bg-white/5;
+}
+
+.fi-filter-suffix {
+    @apply self-center pe-1 text-sm text-gray-500 dark:text-gray-400;
+}
+
+.fi-filter-rule {
+    @apply -mx-1 my-1 h-px bg-gray-200/75 dark:bg-white/10;
 }
 
 .fi-filter-options {
@@ -222,12 +246,22 @@ button.fi-filter-seg {
         @apply h-10 w-full text-base;
     }
 
-    .fi-filter-editor input[type='number'] {
+    .fi-filter-editor :is(input[type='number'], input[type='date']) {
         @apply w-full;
+    }
+
+    .fi-filter-editor :is(select, .fi-filter-today) {
+        @apply h-10 text-base;
     }
 
     .fi-filter-item {
         @apply h-11 text-base;
+    }
+}
+
+@media (width < 40rem) {
+    .fi-ta-ctn:has([data-filter-bar]) .fi-ta-table-stacked-sorting {
+        @apply hidden;
     }
 }
 

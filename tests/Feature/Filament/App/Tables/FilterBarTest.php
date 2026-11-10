@@ -1710,7 +1710,7 @@ it('hands the chip bar every field with its conditions and says which have a val
         ->and($fields['name']['conditions'][0])->toBe(['value' => 'contains', 'label' => 'contains', 'takesValue' => true, 'shape' => 'text'])
         ->and($fields['name']['icon'])->not->toBeEmpty()
         ->and($fields['creator']['editable'])->toBeTrue()
-        ->and($fields['created_at']['editable'])->toBeFalse();
+        ->and($fields['created_at']['editable'])->toBeTrue();
 });
 
 it('hands the chip bar a choice field options and pins Me as the only member option', function (): void {
@@ -1896,3 +1896,88 @@ it('reads a saved number rule as unchanged when the number comes back as text', 
     'decimal' => [1000.5, '1000.5'],
     'negative' => [-5, '-5'],
 ]);
+
+it('sets the sort from the filter bar the way a header click does', function (string $page): void {
+    $component = livewire($page);
+    $column = collect($component->instance()->getTable()->getVisibleColumns())->first(fn ($column): bool => $column->isSortable())->getName();
+
+    $component->call('setFilterBarSort', $column, 'desc')
+        ->assertSet('tableSort', "{$column}:desc");
+
+    expect($component->instance()->getFilterBarData()['sort'])->toMatchArray(['column' => $column, 'direction' => 'desc']);
+
+    $component->call('setFilterBarSort', $column, 'asc')->assertSet('tableSort', "{$column}:asc")
+        ->call('setFilterBarSort', null, null)->assertSet('tableSort', null);
+
+    expect($component->instance()->getFilterBarData()['sort'])->toBeNull();
+})->with('filter bar pages');
+
+it('ignores a sort the table does not hold or cannot sort', function (string $page): void {
+    $component = livewire($page);
+    $plain = collect($component->instance()->getTable()->getVisibleColumns())->first(fn ($column): bool => ! $column->isSortable());
+    $sortable = collect($component->instance()->getTable()->getVisibleColumns())->first(fn ($column): bool => $column->isSortable())->getName();
+
+    $component->call('setFilterBarSort', $sortable, 'asc');
+
+    foreach (array_filter(['no_such_column', 'id', '', $plain?->getName()]) as $name) {
+        $component->call('setFilterBarSort', $name, 'desc')->assertSet('tableSort', "{$sortable}:asc");
+    }
+
+    $component->call('setFilterBarSort', $sortable, 'sideways')->assertSet('tableSort', "{$sortable}:asc");
+})->with('filter bar pages');
+
+it('offers the sort control only columns the member can see and sort', function (): void {
+    $component = livewire(ListCompanies::class);
+    $sortable = array_column($component->instance()->getFilterBarData()['sortable'], 'key');
+
+    expect($sortable)->toContain('name')->and($sortable)->not->toContain('no_such_column');
+
+    $component->call('setFilterBarSort', 'name', 'asc');
+    $component->set('tableSort', 'no_such_column:asc');
+
+    expect($component->instance()->getFilterBarData()['sort'])->toBeNull();
+});
+
+it('lists the groups a table declares and writes the grouping a toolbar change writes', function (): void {
+    $component = livewire(ManageTasks::class);
+    $data = $component->instance()->getFilterBarData();
+
+    expect(array_column($data['groups'], 'id'))->toBe(['status_group', 'priority_group'])
+        ->and($data['grouping'])->toBeNull();
+
+    $component->call('setFilterBarGrouping', 'priority_group', 'desc')->assertSet('tableGrouping', 'priority_group:desc');
+
+    expect($component->instance()->getFilterBarData()['grouping'])->toMatchArray(['id' => 'priority_group', 'direction' => 'desc']);
+
+    $component->call('setFilterBarGrouping', 'nonsense', 'asc')->assertSet('tableGrouping', 'priority_group:desc')
+        ->call('setFilterBarGrouping', 'status_group', 'sideways')->assertSet('tableGrouping', 'priority_group:desc')
+        ->call('setFilterBarGrouping', null, null)->assertSet('tableGrouping', null);
+});
+
+it('declares no groups on the lists that group nothing', function (string $page): void {
+    expect(livewire($page)->instance()->getFilterBarData()['groups'])->toBe([]);
+})->with([
+    'companies' => [ListCompanies::class],
+    'people' => [ListPeople::class],
+    'opportunities' => [ListOpportunities::class],
+    'notes' => [ManageNotes::class],
+]);
+
+it('draws no grouping settings of its own on any list', function (string $page): void {
+    expect(livewire($page)->html())->not->toContain('fi-ta-grouping-settings');
+})->with('filter bar pages');
+
+it('says whether the member may include deleted records', function (string $page): void {
+    expect(livewire($page)->instance()->getFilterBarData()['deletable'])->toBeTrue();
+})->with('filter bar pages');
+
+it('hands the chip bar the period units with their limits and says every field has an editor', function (): void {
+    $data = livewire(ListOpportunities::class)->instance()->getFilterBarData();
+    $units = collect($data['periodUnits'])->keyBy('value');
+
+    expect(array_keys($units->all()))->toBe(['days', 'weeks', 'months', 'quarters', 'years'])
+        ->and($units['days'])->toMatchArray(['label' => 'days', 'singular' => 'day', 'max' => 3650])
+        ->and($units['years']['max'])->toBe(100)
+        ->and(collect($data['fields'])->every(fn (array $field): bool => $field['editable']))->toBeTrue()
+        ->and(collect($data['fields'])->firstWhere('key', 'stale_days')['limit'])->toBe(StaleDaysFilter::MAX_DAYS);
+});
