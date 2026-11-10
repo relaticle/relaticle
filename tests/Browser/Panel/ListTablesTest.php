@@ -276,3 +276,51 @@ it('keeps the toolbar with the bulk actions in view on a phone while rows are ti
     expect($page->script($toolbarGap))->toBe(0)
         ->and($page->script($bulkTriggerHit))->toBeTrue();
 });
+
+it('keeps the last option of a long choice list inside the phone filter sheet', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    Company::factory()->recycle([$user, $workspace])->create();
+
+    resolve(CreateCustomField::class)->execute($user, [
+        'entity_type' => 'company',
+        'name' => 'Tier',
+        'code' => 'tier',
+        'type' => CustomFieldType::SELECT->value,
+        'options' => array_map(static fn (int $number): array => ['name' => "Tier {$number}"], range(1, 14)),
+    ]);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(390, 664)
+        ->navigate("/app/{$workspace->slug}/companies")
+        ->assertVisible('.fi-ta-row')
+        ->click('[data-filter-add]')
+        ->click('[data-pop-item][data-field="custom_fields.tier"]')
+        ->click('[data-pop]:not([style*="display: none"]) [data-condition="is_any_of"]')
+        ->assertVisible('[data-filter-option] >> nth=0')
+        ->assertNoJavaScriptErrors();
+
+    $lastOptionReachable = <<<'JS'
+        (() => {
+            const sheet = [...document.querySelectorAll('[data-filter-bar] [data-pop]')].find((pop) => pop.checkVisibility());
+            const options = [...sheet.querySelectorAll('[data-filter-option]')];
+            const last = options.at(-1);
+
+            last.scrollIntoView({ block: 'nearest' });
+
+            const box = last.getBoundingClientRect();
+            const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+
+            return {
+                listsEveryOption: options.length === 14,
+                insideScreen: box.bottom <= innerHeight && box.top >= 0,
+                reachable: last.contains(hit),
+            };
+        })();
+    JS;
+
+    expect($page->script($lastOptionReachable))->toBe(['listsEveryOption' => true, 'insideScreen' => true, 'reachable' => true]);
+});

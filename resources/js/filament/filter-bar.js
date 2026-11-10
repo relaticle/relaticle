@@ -3,6 +3,10 @@
 ;(() => {
     const TYPING_DELAY = 300
     const MAX_FIELD_RESULTS = 200
+    const SEARCH_THRESHOLD = 8
+    const SHOWN_VALUES = 2
+    const LOOKUP_KINDS = ['member', 'relation', 'record']
+    const LIST_KINDS = ['choice', 'multi_choice', ...LOOKUP_KINDS]
 
     const strip = (rule) => ({ field: rule.field, condition: rule.condition, ...('value' in rule ? { value: rule.value } : {}) })
 
@@ -23,6 +27,11 @@
                 timer: null,
                 opener: null,
                 observer: null,
+                results: [],
+                pinned: [],
+                searching: false,
+                ticket: 0,
+                searchTimer: null,
 
                 init() {
                     root = this.$root
@@ -47,6 +56,7 @@
                 destroy() {
                     this.observer?.disconnect()
                     clearTimeout(this.timer)
+                    clearTimeout(this.searchTimer)
                 },
 
                 read() {
@@ -80,6 +90,7 @@
                         condition: rule.condition,
                         value: rule.value ?? null,
                         display: rule.display ?? '',
+                        labels: Object.fromEntries((rule.labels ?? []).map((label) => [label.id, label.label])),
                     }
                 },
 
@@ -190,7 +201,21 @@
                     this.open = { id, part }
                     this.opener = event.currentTarget
                     this.find = ''
+                    this.opened()
                     this.focusPop()
+                },
+
+                opened() {
+                    const chip = this.chips.find((other) => other.id === this.open?.id)
+
+                    this.results = []
+                    this.pinned = Array.isArray(chip?.value) ? [...chip.value] : []
+                    this.ticket++
+                    this.searching = false
+
+                    if (this.open?.part === 'val' && this.isLookup(chip)) {
+                        this.lookup(chip)
+                    }
                 },
 
                 close(restoreFocus = true) {
@@ -262,7 +287,7 @@
                 },
 
                 items(pop) {
-                    return [...pop.querySelectorAll('input[data-filter-find], [data-pop-item]')].filter((item) => item.checkVisibility())
+                    return [...pop.querySelectorAll('input[data-filter-find], input[data-filter-search], [data-pop-item]')].filter((item) => item.checkVisibility())
                 },
 
                 navigate(event) {
@@ -289,7 +314,7 @@
                 },
 
                 addChip(field) {
-                    const chip = { id: this.nextId++, field: field.key, condition: null, value: null, display: '' }
+                    const chip = { id: this.nextId++, field: field.key, condition: null, value: null, display: '', labels: {} }
 
                     this.chips.push(chip)
                     this.open = { id: chip.id, part: 'cond' }
@@ -316,6 +341,8 @@
                     this.open = needsValue ? { id: chip.id, part: 'val' } : null
 
                     if (needsValue) {
+                        this.find = ''
+                        this.opened()
                         this.$nextTick(() => {
                             this.opener = this.segment(chip, 'value')
                             this.focusPop()
@@ -325,6 +352,96 @@
                     }
 
                     this.push()
+                },
+
+                isListEditor(chip) {
+                    return this.conditionOf(chip)?.shape === 'list' && LIST_KINDS.includes(this.fieldOf(chip)?.kind)
+                },
+
+                isLookup(chip) {
+                    return chip !== undefined && this.isListEditor(chip) && LOOKUP_KINDS.includes(this.fieldOf(chip).kind)
+                },
+
+                showSearch(chip) {
+                    return this.isLookup(chip) || this.fieldOf(chip).options.length > SEARCH_THRESHOLD
+                },
+
+                labelFor(chip, id) {
+                    const option = this.fieldOf(chip).options.find((candidate) => candidate.id === id)
+
+                    return option?.label ?? chip.labels[id] ?? id
+                },
+
+                isChecked(chip, id) {
+                    return Array.isArray(chip.value) && chip.value.includes(id)
+                },
+
+                optionColor(option) {
+                    const color = option.color ?? ''
+
+                    if (/^#[0-9a-f]{3,8}$/i.test(color)) {
+                        return color
+                    }
+
+                    return /^[a-z]+$/.test(color) ? `var(--color-${color}-500, currentColor)` : null
+                },
+
+                listItems(chip) {
+                    const field = this.fieldOf(chip)
+                    const term = this.find.trim().toLowerCase()
+                    const known = (id) => field.options.find((option) => option.id === id)
+                    const pinned = this.pinned
+                        .map((id) => ({ id, label: this.labelFor(chip, id), color: known(id)?.color ?? null }))
+                        .sort((a, b) => Number(b.id === '@me') - Number(a.id === '@me'))
+                    const pool = this.isLookup(chip)
+                        ? [...field.options.filter((option) => option.label.toLowerCase().includes(term)), ...this.results]
+                        : field.options.filter((option) => option.label.toLowerCase().includes(term))
+                    const seen = new Set(pinned.map((item) => item.id))
+
+                    return [...pinned, ...pool.filter((option) => !seen.has(option.id) && seen.add(option.id))]
+                },
+
+                toggleOption(chip, option) {
+                    const current = Array.isArray(chip.value) ? chip.value : []
+
+                    chip.labels[option.id] = option.label
+                    chip.value = current.includes(option.id) ? current.filter((id) => id !== option.id) : [...current, option.id]
+                    chip.display = this.summary(chip)
+                    this.schedulePush()
+                },
+
+                summary(chip) {
+                    const labels = (chip.value ?? []).map((id) => this.labelFor(chip, id))
+                    const shown = labels.slice(0, SHOWN_VALUES).join(', ')
+
+                    return labels.length > SHOWN_VALUES ? `${shown} +${labels.length - SHOWN_VALUES}` : shown
+                },
+
+                typed(chip) {
+                    clearTimeout(this.searchTimer)
+                    this.pinned = Array.isArray(chip.value) ? [...chip.value] : []
+
+                    if (this.isLookup(chip)) {
+                        this.searchTimer = setTimeout(() => this.lookup(chip), TYPING_DELAY)
+                    }
+                },
+
+                async lookup(chip) {
+                    const ticket = ++this.ticket
+
+                    this.searching = true
+
+                    try {
+                        const results = await this.$wire.searchFilterOptions(chip.field, this.find.trim())
+
+                        if (ticket === this.ticket) {
+                            this.results = Array.isArray(results) ? results : []
+                        }
+                    } finally {
+                        if (ticket === this.ticket) {
+                            this.searching = false
+                        }
+                    }
                 },
 
                 setValue(chip, value) {

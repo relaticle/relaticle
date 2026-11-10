@@ -100,19 +100,63 @@
                         </template>
 
                         <div class="fi-filter-pop" data-pop data-sheet x-cloak x-show="isOpen(chip.id, 'val')" x-bind:data-open="isOpen(chip.id, 'val')" role="dialog" x-bind:aria-label="@js(__('filament/panel.tables.filters.value_for')).replace(':chip', label(chip))" x-on:keydown="navigate($event)">
-                            <div class="fi-filter-editor">
-                                <input
-                                    x-bind:type="fieldOf(chip).kind === 'number' ? 'number' : 'text'"
-                                    x-bind:step="fieldOf(chip).kind === 'number' ? 'any' : null"
-                                    x-bind:value="chip.value ?? ''"
-                                    maxlength="255"
-                                    x-bind:placeholder="fieldOf(chip).kind === 'number' ? @js(__('filament/panel.tables.filters.number_value')) : @js(__('filament/panel.tables.filters.type_value'))"
-                                    x-bind:aria-label="label(chip)"
-                                    data-filter-value
-                                    x-on:input="setValue(chip, $event.target.value)"
-                                    x-on:keydown.enter.prevent="finish()"
-                                />
-                            </div>
+                            <template x-if="isListEditor(chip)">
+                                <div class="fi-filter-checklist">
+                                    <template x-if="showSearch(chip)">
+                                        <label class="fi-filter-find">
+                                            <x-filament::icon icon="lucide-search" />
+                                            <input
+                                                type="text"
+                                                x-model="find"
+                                                maxlength="100"
+                                                data-filter-search
+                                                placeholder="{{ __('filament/panel.tables.filters.search_options') }}"
+                                                aria-label="{{ __('filament/panel.tables.filters.search_options') }}"
+                                                x-on:input="typed(chip)"
+                                                x-on:keydown.enter.prevent="finish()"
+                                            />
+                                        </label>
+                                    </template>
+                                    <div class="fi-filter-options" role="listbox" aria-multiselectable="true" x-bind:aria-label="@js(__('filament/panel.tables.filters.value_for')).replace(':chip', label(chip))">
+                                        <template x-for="option in listItems(chip)" x-bind:key="option.id">
+                                            <button
+                                                type="button"
+                                                tabindex="0"
+                                                role="option"
+                                                class="fi-filter-item"
+                                                data-pop-item
+                                                data-filter-option
+                                                x-bind:data-option="option.id"
+                                                x-bind:aria-selected="isChecked(chip, option.id).toString()"
+                                                x-on:click="toggleOption(chip, option)"
+                                            >
+                                                <span class="fi-filter-box" x-bind:class="{ 'fi-on': isChecked(chip, option.id) }">
+                                                    <x-filament::icon icon="lucide-check" x-show="isChecked(chip, option.id)" />
+                                                </span>
+                                                <span class="fi-filter-dot" x-show="optionColor(option)" x-bind:style="{ '--option-color': optionColor(option) }"></span>
+                                                <span class="fi-filter-label" x-text="option.label"></span>
+                                            </button>
+                                        </template>
+                                        <p class="fi-filter-hint" x-show="listItems(chip).length === 0 && ! searching" x-text="@js(__('filament/panel.tables.filters.no_options'))"></p>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <template x-if="! isListEditor(chip)">
+                                <div class="fi-filter-editor">
+                                    <input
+                                        x-bind:type="fieldOf(chip).kind === 'number' ? 'number' : 'text'"
+                                        x-bind:step="fieldOf(chip).kind === 'number' ? 'any' : null"
+                                        x-bind:value="chip.value ?? ''"
+                                        maxlength="255"
+                                        x-bind:placeholder="fieldOf(chip).kind === 'number' ? @js(__('filament/panel.tables.filters.number_value')) : @js(__('filament/panel.tables.filters.type_value'))"
+                                        x-bind:aria-label="label(chip)"
+                                        data-filter-value
+                                        x-on:input="setValue(chip, $event.target.value)"
+                                        x-on:keydown.enter.prevent="finish()"
+                                    />
+                                </div>
+                            </template>
                         </div>
                     </div>
                 </template>

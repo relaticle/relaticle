@@ -151,7 +151,41 @@ button.fi-filter-seg {
     }
 }
 
+.fi-filter-options {
+    @apply max-h-64 overflow-y-auto overscroll-contain;
+}
+
+.fi-filter-label {
+    @apply truncate;
+}
+
+.fi-filter-box {
+    @apply grid size-3.5 shrink-0 place-items-center rounded-[4px] ring-1 ring-gray-300 ring-inset dark:ring-gray-600;
+
+    &.fi-on {
+        @apply bg-primary-600 text-white ring-0 dark:bg-primary-500;
+    }
+
+    & svg {
+        @apply size-2.5 stroke-[3] text-inherit;
+    }
+}
+
+.fi-filter-item .fi-filter-box svg {
+    @apply text-white;
+}
+
+.fi-filter-dot {
+    @apply size-2 shrink-0 rounded-full;
+
+    background-color: var(--option-color);
+}
+
 @media (width < 40rem) {
+    .fi-filter-options {
+        max-height: min(16rem, 45dvh);
+    }
+
     .fi-filter-pop {
         @apply min-w-full;
     }

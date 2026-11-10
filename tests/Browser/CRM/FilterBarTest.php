@@ -7,6 +7,7 @@ use App\Data\TableStateData;
 use App\Filament\Tables\Concerns\HasFilterBar;
 use App\Models\Company;
 use App\Models\Opportunity;
+use App\Models\People;
 use App\Models\SavedView;
 use App\Models\User;
 use App\Support\CurrentWorkspace;
@@ -42,6 +43,32 @@ function setCustomValue(User $user, object $record, string $entity, string $code
     $workspace = $user->currentWorkspace;
 
     resolve(CurrentWorkspace::class)->within($workspace, fn () => $record->saveCustomFieldValue(WorkspaceCustomField::byCode($workspace->getKey(), $entity, $code), $value));
+}
+
+function selectFieldOn(User $user, string $entity, string $code, array $options): void
+{
+    resolve(CreateCustomField::class)->execute($user, [
+        'entity_type' => $entity,
+        'name' => ucfirst($code),
+        'code' => $code,
+        'type' => 'select',
+        'options' => array_map(static fn (string $name): array => ['name' => $name], $options),
+    ]);
+}
+
+function optionIdOf(User $user, string $entity, string $code, string $name): string
+{
+    return (string) WorkspaceCustomField::byCode($user->currentWorkspace->getKey(), $entity, $code)->options->firstWhere('name', $name)->getKey();
+}
+
+function optionButton(string $id): string
+{
+    return "[data-pop]:not([style*=\"display: none\"]) [data-option=\"{$id}\"]";
+}
+
+function searchInput(): string
+{
+    return '[data-pop]:not([style*="display: none"]) [data-filter-search]';
 }
 
 function chipFocus(string $selector): string
@@ -406,4 +433,117 @@ it('names every popover and every chip menu button after its chip', function ():
         'Options for Company contains acme',
         'More options for Company contains acme',
     ]);
+});
+
+it('narrows opportunities with a pipeline checklist and summarises the picks', function (): void {
+    selectFieldOn($this->user, 'opportunity', 'pipeline', ['Won', 'Lost', 'Open', 'Stalled']);
+
+    foreach (['Won', 'Lost', 'Open', 'Stalled'] as $stage) {
+        setCustomValue($this->user, Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => "Deal {$stage}"]), 'opportunity', 'pipeline', optionIdOf($this->user, 'opportunity', 'pipeline', $stage));
+    }
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/opportunities")
+        ->assertPresent('[data-filter-add]');
+    expect(companyRows($page, 4))->toBeTrue();
+
+    addChip($page, 'custom_fields.pipeline', 'is_none_of')
+        ->assertMissing('[data-filter-search]')
+        ->click(optionButton(optionIdOf($this->user, 'opportunity', 'pipeline', 'Won')));
+    expect(companyRows($page, 3))->toBeTrue();
+    $page->assertDontSee('Deal Won')->assertSeeIn('[data-filter-segment="value"]', 'Won');
+
+    $page->click(optionButton(optionIdOf($this->user, 'opportunity', 'pipeline', 'Lost')))
+        ->click(optionButton(optionIdOf($this->user, 'opportunity', 'pipeline', 'Open')))
+        ->assertSeeIn('[data-filter-segment="value"]', 'Won, Lost +1')
+        ->click(optionButton(optionIdOf($this->user, 'opportunity', 'pipeline', 'Stalled')))
+        ->assertSeeIn('[data-filter-segment="value"]', 'Won, Lost +2')
+        ->assertNoJavaScriptErrors();
+    expect(companyRows($page, 0))->toBeTrue();
+});
+
+it('lists a long choice with a search field and keeps the checked option on top while searching', function (): void {
+    $names = array_map(fn (int $number): string => "Tier {$number}", range(1, 10));
+    selectFieldOn($this->user, 'company', 'tier', $names);
+    $page = ($this->open)();
+
+    addChip($page, 'custom_fields.tier', 'is_any_of')
+        ->assertPresent(searchInput())
+        ->click(optionButton(optionIdOf($this->user, 'company', 'tier', 'Tier 7')))
+        ->type(searchInput(), 'Tier 2');
+
+    $order = <<<'JS'
+        [...document.querySelectorAll('[data-pop][data-open="true"] [data-option]')].map((option) => option.textContent.trim())
+    JS;
+
+    expect($page->script($order))->toBe(['Tier 7', 'Tier 2']);
+    $page->assertNoJavaScriptErrors();
+});
+
+it('narrows opportunities by creator with Me pinned first and a teammate after it', function (): void {
+    $teammate = User::factory()->create(['name' => 'Priya Shah']);
+    $this->workspace->users()->attach($teammate, ['role' => 'member']);
+    Opportunity::factory()->recycle([$this->user, $this->workspace])->count(2)->create(['creator_id' => $this->user->getKey()]);
+    Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Priya deal', 'creator_id' => $teammate->getKey()]);
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/opportunities")
+        ->assertPresent('[data-filter-add]');
+    expect(companyRows($page, 3))->toBeTrue();
+
+    addChip($page, 'creator', 'is_any_of')
+        ->assertScript('document.querySelector("[data-pop][data-open=true] [data-option]").dataset.option === "@me"', true)
+        ->click(optionButton('@me'));
+    expect(companyRows($page, 2))->toBeTrue();
+    $page->assertDontSee('Priya deal')
+        ->click(optionButton((string) $teammate->getKey()))
+        ->assertSeeIn('[data-filter-segment="value"]', 'Me, Priya Shah');
+    expect(companyRows($page, 3))->toBeTrue();
+    $page->assertNoJavaScriptErrors();
+});
+
+it('searches the workspace as the member types a company and keeps the pick listed', function (): void {
+    $companies = Company::query()->withoutGlobalScopes()->where('workspace_id', $this->workspace->getKey())->pluck('id', 'name');
+    foreach ($companies as $name => $id) {
+        People::factory()->recycle([$this->user, $this->workspace])->create(['name' => "Person of {$name}", 'company_id' => $id]);
+    }
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/people")
+        ->assertPresent('[data-filter-add]');
+    expect(companyRows($page, 3))->toBeTrue();
+
+    addChip($page, 'company', 'is_any_of')
+        ->type(searchInput(), 'glo')
+        ->click(optionButton((string) $companies['Globex']));
+    expect(companyRows($page, 1))->toBeTrue();
+    $page->assertSee('Person of Globex')->assertSeeIn('[data-filter-segment="value"]', 'Globex');
+
+    $page->type(searchInput(), 'zzqx')
+        ->assertPresent(optionButton((string) $companies['Globex']).'[aria-selected="true"]')
+        ->assertNoJavaScriptErrors();
+});
+
+it('picks tags from a tags chip and narrows the list', function (): void {
+    customFieldOn($this->user, 'company', 'labels', 'tags-input');
+    $companies = Company::query()->withoutGlobalScopes()->where('workspace_id', $this->workspace->getKey())->pluck('id', 'name');
+    setCustomValue($this->user, Company::query()->withoutGlobalScopes()->findOrFail($companies['Acme Robotics']), 'company', 'labels', ['vip', 'lead']);
+    setCustomValue($this->user, Company::query()->withoutGlobalScopes()->findOrFail($companies['Globex']), 'company', 'labels', ['vip']);
+    $page = ($this->open)();
+    expect(companyRows($page, 3))->toBeTrue();
+
+    addChip($page, 'custom_fields.labels', 'has_any_of')
+        ->click(optionButton('lead'));
+    expect(companyRows($page, 1))->toBeTrue();
+    $page->assertSee('Acme Robotics')
+        ->click(optionButton('vip'))
+        ->assertSeeIn('[data-filter-segment="value"]', 'lead, vip');
+    expect(companyRows($page, 2))->toBeTrue();
+    $page->assertNoJavaScriptErrors();
 });

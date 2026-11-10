@@ -165,8 +165,10 @@ final readonly class FilterFieldCatalog
             return [];
         }
 
+        $storesText = $field->type === CustomFieldType::TAGS_INPUT->value;
+
         return array_values($field->options
-            ->map(static fn ($option): array => ['id' => (string) $option->getKey(), 'label' => (string) $option->name, 'color' => $option->settings->color])
+            ->map(static fn ($option): array => ['id' => $storesText ? (string) $option->name : (string) $option->getKey(), 'label' => (string) $option->name, 'color' => $option->settings->color])
             ->all());
     }
 }

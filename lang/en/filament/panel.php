@@ -54,6 +54,8 @@ return [
             'select_condition' => 'Select condition',
             'select_value' => 'Select value',
             'type_value' => 'Type a value',
+            'search_options' => 'Search',
+            'no_options' => 'Nothing found',
             'number_value' => '0',
             'more_for' => 'More options for :chip',
             'menu_for' => 'Options for :chip',

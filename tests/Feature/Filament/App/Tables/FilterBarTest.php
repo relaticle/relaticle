@@ -1704,7 +1704,47 @@ it('hands the chip bar every field with its conditions and says which have a val
         ->and(array_column($fields['name']['conditions'], 'value'))->toBe(['contains', 'does_not_contain', 'starts_with', 'ends_with', 'is', 'is_not', 'is_empty', 'is_not_empty'])
         ->and($fields['name']['conditions'][0])->toBe(['value' => 'contains', 'label' => 'contains', 'takesValue' => true, 'shape' => 'text'])
         ->and($fields['name']['icon'])->not->toBeEmpty()
-        ->and($fields['creator']['editable'])->toBeFalse();
+        ->and($fields['creator']['editable'])->toBeTrue()
+        ->and($fields['created_at']['editable'])->toBeFalse();
+});
+
+it('hands the chip bar a choice field options and pins Me as the only member option', function (): void {
+    filterBarField($this->user, 'opportunity', 'stage_pick', 'select', ['Won', 'Lost']);
+
+    $fields = collect(livewire(ListOpportunities::class)->instance()->getFilterBarData()['fields'])->keyBy('key');
+
+    expect(array_column($fields['custom_fields.stage_pick']['options'], 'label'))->toBe(['Won', 'Lost'])
+        ->and($fields['custom_fields.stage_pick']['options'][0])->toHaveKeys(['id', 'label', 'color'])
+        ->and($fields['creator']['options'])->toBe([['id' => '@me', 'label' => 'Me', 'color' => null]])
+        ->and($fields['company']['options'])->toBe([]);
+});
+
+it('hands the chip bar a tags field known tags as the text a rule stores', function (): void {
+    filterBarField($this->user, 'company', 'labels', CustomFieldType::TAGS_INPUT->value);
+    filterBarRecord($this->user, Company::class, 'Vip', values: ['labels' => ['vip', 'lead']]);
+
+    $fields = collect(livewire(ListCompanies::class)->instance()->getFilterBarData()['fields'])->keyBy('key');
+
+    expect(array_column($fields['custom_fields.labels']['options'], 'id'))->toEqualCanonicalizing(['vip', 'lead'])
+        ->and(array_column($fields['custom_fields.labels']['options'], 'label'))->toEqualCanonicalizing(['vip', 'lead']);
+});
+
+it('hands the chip bar a label for every stored id, naming a deleted record', function (): void {
+    $companies = collect(['Aa', 'Bb', 'Cc'])->map(fn (string $name): Model => filterBarRecord($this->user, Company::class, $name));
+    $companies->last()->delete();
+
+    $shown = livewire(ListOpportunities::class)
+        ->call('setFilterRules', [
+            ['field' => 'company', 'condition' => 'is_any_of', 'value' => $companies->map->getKey()->all()],
+            ['field' => 'creator', 'condition' => 'is_any_of', 'value' => ['@me', (string) $this->user->getKey()]],
+            ['field' => 'name', 'condition' => 'contains', 'value' => 'x'],
+        ])
+        ->instance()->getFilterBarData()['rules'];
+
+    expect(array_column($shown[0]['labels'], 'label'))->toBe(['Aa', 'Bb', 'Cc (deleted)'])
+        ->and(array_column($shown[0]['labels'], 'id'))->toBe($companies->map(fn (Model $company): string => (string) $company->getKey())->all())
+        ->and(array_column($shown[1]['labels'], 'label'))->toBe(['Me', $this->user->name])
+        ->and($shown[2]['labels'])->toBe([]);
 });
 
 it('reads a rule as the chip shows it', function (): void {

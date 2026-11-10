@@ -23,16 +23,25 @@ final readonly class FilterRuleDisplay
     /**
      * @param  list<array<string, mixed>>  $rules
      * @param  array<string, FilterField>  $catalog
-     * @return list<string>
+     * @return list<array{display: string, labels: list<array{id: string, label: string}>}>
      */
-    public static function for(array $rules, array $catalog, User $user): array
+    public static function describe(array $rules, array $catalog, User $user): array
     {
         $names = self::names($rules, $catalog, $user);
 
-        return array_map(
-            fn (array $rule): string => self::one($rule, $catalog[$rule['field']], $names[$rule['field']] ?? []),
-            $rules,
-        );
+        return array_map(function (array $rule) use ($catalog, $names): array {
+            $field = $catalog[$rule['field']];
+            $known = $names[$field->key] ?? [];
+            $ids = $field->kind->holdsRecordIds() && is_array($rule['value'] ?? null) ? $rule['value'] : [];
+
+            return [
+                'display' => self::one($rule, $field, $known),
+                'labels' => array_values(array_map(
+                    fn (mixed $id): array => ['id' => (string) $id, 'label' => self::label($field, (string) $id, $known)],
+                    $ids,
+                )),
+            ];
+        }, $rules);
     }
 
     /**
@@ -131,7 +140,7 @@ final readonly class FilterRuleDisplay
             $field = $catalog[$rule['field']];
 
             if ($field->kind->holdsRecordIds() && is_array($rule['value'] ?? null)) {
-                $ids = array_slice(array_filter($rule['value'], fn (mixed $id): bool => $id !== self::ME), 0, self::SHOWN_VALUES);
+                $ids = array_filter($rule['value'], fn (mixed $id): bool => $id !== self::ME);
                 $wanted[$field->key] = [...($wanted[$field->key] ?? []), ...$ids];
             }
         }

@@ -80,7 +80,7 @@ trait HasFilterBar
 
         $state = $this->canonicalTableFilters($this->tableFilters);
         $rules = $state['conditions']['rules'];
-        $displays = FilterRuleDisplay::for($rules, $catalog, $user);
+        $described = FilterRuleDisplay::describe($rules, $catalog, $user);
 
         return [
             'view' => $this->activeSavedViewId === null ? null : (string) $this->activeSavedViewId,
@@ -90,6 +90,7 @@ trait HasFilterBar
                 'icon' => $this->filterFieldIconPath($field->icon),
                 'kind' => $field->kind->value,
                 'editable' => $field->kind->hasValueEditor(),
+                'options' => $this->filterFieldOptions($field),
                 'conditions' => array_map(fn (FilterCondition $condition): array => [
                     'value' => $condition->value,
                     'label' => $condition->label(),
@@ -98,12 +99,25 @@ trait HasFilterBar
                 ], $field->conditions()),
             ], $catalog)),
             'rules' => array_map(
-                fn (array $rule, string $display): array => [...$rule, 'display' => $display],
+                fn (array $rule, array $described): array => [...$rule, ...$described],
                 $rules,
-                $displays,
+                $described,
             ),
             'deleted' => FilterRules::deletedMode($state['trashed']['value']),
         ];
+    }
+
+    /**
+     * @return list<array{id: string, label: string, color: ?string}>
+     */
+    private function filterFieldOptions(FilterField $field): array
+    {
+        return match ($field->kind) {
+            FilterFieldKind::Choice, FilterFieldKind::MultiChoice => $field->options,
+            FilterFieldKind::Member => [['id' => '@me', 'label' => __('filament/panel.tables.filters.me'), 'color' => null]],
+            FilterFieldKind::Text, FilterFieldKind::Number, FilterFieldKind::Date, FilterFieldKind::Checkbox,
+            FilterFieldKind::MultiText, FilterFieldKind::Relation, FilterFieldKind::Record, FilterFieldKind::Inactivity => [],
+        };
     }
 
     private function filterFieldIconPath(string $icon): string
