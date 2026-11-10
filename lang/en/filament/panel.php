@@ -48,7 +48,6 @@ return [
         'views' => [
             'label' => 'Views',
             'switch' => ':name, switch view',
-            'modified' => '(modified)',
             'mine' => 'My views',
             'shared_with_workspace' => 'Shared with workspace',
             'default' => 'Default',
@@ -82,7 +81,9 @@ return [
             'save_current' => 'Create new view',
             'set_default' => 'Set as my default',
             'unset_default' => 'Remove as my default',
-            'revert' => 'Revert',
+            'discard' => 'Discard changes',
+            'save_for_everyone' => 'Save for everyone',
+            'more_ways_to_save' => 'More ways to save',
             'duplicate' => 'Duplicate',
             'copy_name' => ':name copy',
             'duplicated' => '":name" created',

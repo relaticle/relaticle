@@ -20,7 +20,7 @@ beforeEach(function (): void {
     Company::factory()->recycle([$this->user, $this->workspace])->count(3)->create();
 });
 
-it('applies a view from the switcher and marks a change as modified', function (): void {
+it('applies a view from the switcher and offers to discard or save a change', function (): void {
     SavedView::factory()->for($this->user)->for($this->workspace)->create([
         'name' => 'Hot leads',
         'state' => new TableStateData(sort: 'name:desc'),
@@ -33,12 +33,53 @@ it('applies a view from the switcher and marks a change as modified', function (
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->click('Hot leads')
         ->assertSeeIn('.fi-view-switcher-trigger', 'Hot leads')
-        ->assertDontSee('(modified)');
+        ->assertDontSee('Discard changes');
 
     $page->type('.fi-ta-search-field input', 'zzz')
-        ->assertSee('(modified)')
-        ->click('.fi-ta-views [wire\:click="revertSavedView"]')
-        ->assertDontSee('(modified)')
+        ->assertSee('Discard changes')
+        ->assertScript('(() => { const bar = document.querySelector(".fi-ta-header-toolbar"); const save = document.querySelector("[data-view-save-action=save]").getBoundingClientRect(); return save.bottom <= bar.getBoundingClientRect().bottom && save.right <= bar.getBoundingClientRect().right; })()', true)
+        ->click('[data-view-save-action="discard"]')
+        ->assertDontSee('Discard changes')
+        ->assertNoJavaScriptErrors();
+});
+
+it('offers save as new view from the arrow beside save for everyone on a shared view', function (): void {
+    SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'name' => 'Team pipeline',
+        'is_shared' => true,
+        'state' => new TableStateData(sort: 'name:desc'),
+    ]);
+
+    loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->click('Team pipeline')
+        ->type('.fi-ta-search-field input', 'zzz')
+        ->assertSeeIn('[data-view-save]', 'Save for everyone')
+        ->click('[aria-label="More ways to save"]')
+        ->click('[data-view-save] .fi-dropdown-list-item[data-view-save-action="save-as"]')
+        ->assertSee('Share with workspace')
+        ->assertNoJavaScriptErrors();
+});
+
+it('wraps the save controls under the search field on a phone without overflowing', function (): void {
+    SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'name' => 'Hot leads',
+        'state' => new TableStateData(sort: 'name:desc'),
+    ]);
+
+    loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(390, 844)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->click('Hot leads')
+        ->type('.fi-ta-search-field input', 'zzz')
+        ->assertSee('Discard changes')
+        ->assertScript('document.querySelector("[data-view-save]").getBoundingClientRect().top >= document.querySelector(".fi-ta-search-field").getBoundingClientRect().bottom', true)
+        ->assertScript('document.documentElement.scrollWidth <= window.innerWidth', true)
         ->assertNoJavaScriptErrors();
 });
 

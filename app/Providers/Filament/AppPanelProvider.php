@@ -398,8 +398,8 @@ final class AppPanelProvider extends PanelProvider
 
         $panel
             ->renderHook(
-                TablesRenderHook::TOOLBAR_SEARCH_AFTER,
-                fn (): View|Factory => view('filament.app.tables.views'),
+                TablesRenderHook::TOOLBAR_END,
+                fn (): View|Factory => view('filament.app.tables.view-save'),
                 scopes: $listPages,
             )
             ->renderHook(

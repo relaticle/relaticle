@@ -141,7 +141,7 @@ it('saves the current table as a new view without widths and applies it', functi
         ->and($view->state->widths)->toBe([])
         ->and($component->get('activeSavedViewId'))->toBe($view->getKey());
 
-    $component->assertSeeText('Hot leads')->assertDontSeeText('(modified)');
+    $component->assertSeeText('Hot leads')->assertDontSeeText('Discard changes');
 });
 
 it('refuses a view name the member already uses, ignoring case', function (): void {
@@ -191,7 +191,7 @@ it('marks a changed view as modified, reverts it and saves over it', function ()
     $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->set('tableSort', 'name:asc');
 
     expect($component->instance()->isSavedViewModified())->toBeTrue();
-    $component->assertSeeText('(modified)')->assertSeeHtml('wire:click="revertSavedView"');
+    $component->assertSeeText('Discard changes')->assertSeeHtml('wire:click="revertSavedView"');
 
     $component->call('revertSavedView');
     expect($component->get('tableSort'))->toBe('created_at:desc')
@@ -551,7 +551,7 @@ it('lets an admin who stops sharing someone else\'s view keep working on the tab
         ->set('tableSort', 'name:asc')
         ->call('revertSavedView')
         ->assertOk()
-        ->assertDontSeeText('(modified)');
+        ->assertDontSeeText('Discard changes');
 
     expect($component->get('tableSort'))->toBe('name:asc')
         ->and($view->refresh()->is_shared)->toBeFalse();
@@ -643,14 +643,88 @@ it('offers save as new beside a modified view, even one the member cannot save',
 
     $component = livewire(ListCompanies::class)
         ->call('applySavedView', $view->getKey())
-        ->assertDontSeeHtml('fi-ta-views-save-as')
+        ->assertDontSeeHtml('data-view-save-action="save-as"')
         ->set('tableSort', 'name:asc')
-        ->assertSeeHtml('fi-ta-views-save-as')
+        ->assertSeeHtml('data-view-save="copy-only"')
+        ->assertSeeHtml('data-view-save-action="save-as"')
         ->assertDontSeeHtml("mountAction('saveSavedView')")
         ->callAction('saveSavedViewAs', ['name' => 'My team copy']);
 
     expect($component->get('activeSavedViewId'))->not->toBe($view->getKey())
         ->and($component->instance()->isSavedViewModified())->toBeFalse()
+        ->and($view->refresh()->state->sort)->toBe('created_at:desc');
+});
+
+it('labels the save control by who owns the view and who may edit it', function (WorkspaceRole $role, bool $own, bool $shared, string $mode, array $shown, array $hidden): void {
+    $actor = savedViewMember($role);
+    $owner = $own ? $actor : savedViewMember(WorkspaceRole::Member);
+    $view = viewFor($owner, ['is_shared' => $shared, 'state' => hotLeads()]);
+    $this->actingAs($actor);
+
+    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->set('tableSort', 'name:asc')
+        ->assertSeeHtml("data-view-save=\"{$mode}\"")
+        ->assertSeeText(['Discard changes', ...$shown])
+        ->assertDontSeeText($hidden);
+})->with([
+    'own private view' => [WorkspaceRole::Member, true, false, 'private', ['Save as new view'], ['Save for everyone']],
+    'own shared view' => [WorkspaceRole::Member, true, true, 'shared', ['Save for everyone', 'Save as new view'], []],
+    'admin on another member\'s shared view' => [WorkspaceRole::Admin, false, true, 'shared', ['Save for everyone', 'Save as new view'], []],
+    'member on another member\'s shared view' => [WorkspaceRole::Member, false, true, 'copy-only', ['Save as new view'], ['Save for everyone']],
+    'viewer on another member\'s shared view' => [WorkspaceRole::Viewer, false, true, 'copy-only', ['Save as new view'], ['Save for everyone']],
+]);
+
+it('offers a plain save and a save as new view on the member\'s own private view', function (): void {
+    $view = viewFor($this->user, ['state' => hotLeads()]);
+
+    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->set('tableSort', 'name:asc')
+        ->assertSeeHtml('data-view-save="private"')
+        ->assertSeeHtml('data-view-save-action="save"')
+        ->assertSeeHtml('data-view-save-action="save-as"')
+        ->assertSeeHtml('More ways to save');
+});
+
+it('shows no save control on an unchanged view or on the built-in list', function (): void {
+    $view = viewFor($this->user, ['state' => hotLeads()]);
+
+    livewire(ListCompanies::class)->set('tableSort', 'name:asc')
+        ->assertDontSeeHtml('data-view-save=')
+        ->call('applySavedView', $view->getKey())
+        ->assertDontSeeHtml('data-view-save=');
+});
+
+it('shows no save control for a view that vanished while the tab still holds its id', function (): void {
+    $view = viewFor($this->user, ['state' => hotLeads()]);
+    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->set('tableSort', 'name:asc')
+        ->assertSeeHtml('data-view-save="private"');
+
+    $view->delete();
+
+    $component->call('$refresh')->assertDontSeeHtml('data-view-save=');
+    expect($component->instance()->isSavedViewModified())->toBeFalse();
+});
+
+it('restores the view when the member discards their changes', function (): void {
+    $view = viewFor($this->user, ['state' => hotLeads()]);
+
+    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->set('tableSort', 'name:asc')
+        ->call('revertSavedView')
+        ->assertDontSeeHtml('data-view-save=');
+
+    expect($component->get('tableSort'))->toBe('created_at:desc');
+});
+
+it('saves a copy as a private view when the member may not edit the shared one', function (): void {
+    $view = viewFor(savedViewMember(WorkspaceRole::Member), ['name' => 'Team', 'is_shared' => true, 'state' => hotLeads()]);
+    $this->actingAs($member = savedViewMember(WorkspaceRole::Member));
+
+    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->set('tableSort', 'name:asc')
+        ->callAction('saveSavedViewAs', ['name' => 'My copy']);
+
+    $copy = SavedView::query()->withoutGlobalScopes()->where('name', 'My copy')->sole();
+
+    expect($copy->is_shared)->toBeFalse()
+        ->and($copy->user_id)->toBe($member->getKey())
+        ->and($copy->state->sort)->toBe('name:asc')
         ->and($view->refresh()->state->sort)->toBe('created_at:desc');
 });
 

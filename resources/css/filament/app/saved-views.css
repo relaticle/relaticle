@@ -1,29 +1,21 @@
-/* Revert, Save and Save as read as one control, like Filament's button group. */
-.fi-ta-views {
-    @apply flex items-center gap-2;
+/* Discard and Save close the toolbar row. On a phone they drop under the search field, aligned right. */
+.fi-view-save {
+    @apply ms-3 flex items-center gap-2 max-sm:ms-0 max-sm:mt-2 max-sm:basis-full max-sm:justify-end;
 }
 
-.fi-ta-views-modified {
-    @apply text-sm text-gray-500 max-sm:sr-only dark:text-gray-400;
+.fi-view-save-discard {
+    @apply bg-transparent text-gray-500 shadow-none ring-0 hover:bg-gray-50 dark:bg-transparent dark:text-gray-400 dark:hover:bg-white/5;
 }
 
-.fi-ta-views-group {
-    @apply flex items-center rounded-lg ring-1 ring-gray-950/10 dark:ring-white/20;
+.fi-view-save-split {
+    @apply flex items-center;
 
-    & .fi-btn {
-        @apply rounded-none shadow-none ring-0;
+    & > .fi-btn {
+        @apply rounded-e-none;
     }
 
-    & .fi-btn + .fi-btn {
-        @apply border-s border-gray-200 dark:border-white/10;
-    }
-
-    & > :first-child {
-        @apply rounded-s-lg;
-    }
-
-    & > :last-child {
-        @apply rounded-e-lg;
+    & .fi-view-save-more {
+        @apply rounded-s-none border-s border-white/25 px-2;
     }
 }
 
@@ -162,10 +154,6 @@
 
 .fi-ta-views-save-current .fi-icon {
     @apply size-4!;
-}
-
-.fi-ta-views-save .fi-icon {
-    @apply text-primary-600 dark:text-primary-400;
 }
 
 .fi-view-controls {

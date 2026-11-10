@@ -83,15 +83,8 @@ trait HasSavedViews
 
     public function isSavedViewModified(): bool
     {
-        return $this->activeSavedViewId !== null
+        return $this->getActiveSavedView() instanceof SavedView
             && $this->currentTableState()->withoutWidths()->hash() !== $this->appliedSavedViewHash;
-    }
-
-    protected function canUpdateActiveSavedView(): bool
-    {
-        $view = $this->getActiveSavedView();
-
-        return $view instanceof SavedView && $this->canUpdateSavedView($view);
     }
 
     protected function canUpdateSavedView(SavedView $view): bool
