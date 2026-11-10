@@ -11,6 +11,7 @@ use App\Models\TableLayout;
 use App\Models\TablePreference;
 use App\Models\User;
 use App\Models\Workspace;
+use Illuminate\Support\Facades\DB;
 
 final readonly class SaveTablePreference
 {
@@ -23,15 +24,25 @@ final readonly class SaveTablePreference
             abort_unless($user->can('view', $activeLayout), 403);
         }
 
-        return TablePreference::query()
-            ->withoutGlobalScope(WorkspaceScope::class)
-            ->updateOrCreate(
-                ['user_id' => $user->getKey(), 'workspace_id' => $workspace->getKey(), 'entity' => $entity],
-                [
-                    'state' => $state,
-                    'active_layout_id' => $activeLayout?->getKey(),
-                    'applied_layout_hash' => $activeLayout instanceof TableLayout ? $appliedLayoutHash : null,
-                ],
-            );
+        return DB::transaction(function () use ($user, $workspace, $entity, $state, $activeLayout, $appliedLayoutHash): TablePreference {
+            $activeLayout = $this->stillExists($activeLayout) ? $activeLayout : null;
+
+            return TablePreference::query()
+                ->withoutGlobalScope(WorkspaceScope::class)
+                ->updateOrCreate(
+                    ['user_id' => $user->getKey(), 'workspace_id' => $workspace->getKey(), 'entity' => $entity],
+                    [
+                        'state' => $state,
+                        'active_layout_id' => $activeLayout?->getKey(),
+                        'applied_layout_hash' => $activeLayout instanceof TableLayout ? $appliedLayoutHash : null,
+                    ],
+                );
+        });
+    }
+
+    private function stillExists(?TableLayout $layout): bool
+    {
+        return $layout instanceof TableLayout
+            && TableLayout::query()->withoutGlobalScope(WorkspaceScope::class)->whereKey($layout->getKey())->sharedLock()->exists();
     }
 }
