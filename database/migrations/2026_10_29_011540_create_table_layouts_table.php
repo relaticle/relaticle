@@ -27,8 +27,8 @@ return new class extends Migration
         DB::statement('create unique index table_layouts_owner_name_unique on table_layouts (user_id, workspace_id, entity, lower(name))');
 
         Schema::table('table_preferences', function (Blueprint $table): void {
-            $table->foreignUlid('active_layout_id')->nullable()->constrained('table_layouts')->nullOnDelete();
-            $table->foreignUlid('default_layout_id')->nullable()->constrained('table_layouts')->nullOnDelete();
+            $table->foreignUlid('active_layout_id')->nullable()->index()->constrained('table_layouts')->nullOnDelete();
+            $table->foreignUlid('default_layout_id')->nullable()->index()->constrained('table_layouts')->nullOnDelete();
             $table->string('applied_layout_hash')->nullable();
         });
     }
