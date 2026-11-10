@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace App\Filament\Tables\FilterBar;
 
 use App\Enums\CrmEntity;
+use App\Enums\CustomFieldType;
 use App\Enums\FilterFieldKind;
 use App\Enums\PeriodUnit;
+use App\Models\CustomField;
 use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Number;
 use Throwable;
 
 final readonly class FilterRuleDisplay
@@ -19,6 +22,8 @@ final readonly class FilterRuleDisplay
     private const string ME = '@me';
 
     private const int SHOWN_VALUES = 2;
+
+    private const int MAX_DECIMALS = 10;
 
     /**
      * @param  list<array<string, mixed>>  $rules
@@ -68,7 +73,26 @@ final readonly class FilterRuleDisplay
             return self::date($value);
         }
 
+        if ($field->kind === FilterFieldKind::Number && is_numeric($value)) {
+            return self::number((float) $value, $field);
+        }
+
         return is_scalar($value) ? (string) $value : '';
+    }
+
+    private static function number(float $value, FilterField $field): string
+    {
+        $definition = $field->definition;
+
+        if ($field->type !== CustomFieldType::CURRENCY || ! $definition instanceof CustomField) {
+            return (string) Number::format($value, maxPrecision: self::MAX_DECIMALS);
+        }
+
+        $decimals = $definition->getDecimalPlaces();
+
+        return $definition->getCurrencyDisplayType() === 'code'
+            ? $definition->getCurrencyCode().' '.Number::format($value, $decimals)
+            : (string) Number::currency($value, $definition->getCurrencyCode(), precision: $decimals);
     }
 
     /** @param  array<string, string>  $names */

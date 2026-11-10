@@ -419,7 +419,7 @@ it('narrows opportunities with a number chip', function (): void {
         ->type(valueInput(), '1000');
     expect(companyRows($page, 1))->toBeTrue();
     $page->assertSee('Big')
-        ->assertSeeIn('[data-filter-chip]', '1000')
+        ->assertSeeIn('[data-filter-chip]', '1,000')
         ->assertNoJavaScriptErrors();
 });
 
@@ -912,6 +912,21 @@ it('groups tasks from the group control and leaves Filament no toolbar row at re
         ->assertScript('document.querySelector("[data-pop][data-open=true]")?.checkVisibility()', true)
         ->click('[data-group-clear]')
         ->assertScript("Livewire.all().find((component) => component.name.includes('ManageTasks')).\$wire.tableGrouping === null", true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('shows the group direction arrow on the group control and swaps it when the direction flips', function (): void {
+    $visibleIcon = 'JSON.stringify([...document.querySelectorAll("[data-filter-group] svg")].filter((icon) => icon.checkVisibility()).map((icon) => icon.innerHTML))';
+
+    $page = openOn($this->user, $this->workspace, 'tasks');
+    $page->script("window.probeIcons = [JSON.parse({$visibleIcon})]");
+    $page->click('[data-filter-group]')
+        ->click('[data-group="priority_group"]')
+        ->assertScript(filterBarWaitFor("JSON.parse({$visibleIcon}).length === 1 && JSON.parse({$visibleIcon})[0] !== window.probeIcons[0][0]"), true);
+    $page->script("window.probeIcons.push(JSON.parse({$visibleIcon})[0])");
+    $page->click('[data-group-flip]')
+        ->assertScript(filterBarWaitFor("JSON.parse({$visibleIcon}).length === 1 && JSON.parse({$visibleIcon})[0] !== window.probeIcons[1]"), true)
+        ->assertScript(filterBarWaitFor("JSON.parse({$visibleIcon})[0] !== window.probeIcons[0][0]"), true)
         ->assertNoJavaScriptErrors();
 });
 

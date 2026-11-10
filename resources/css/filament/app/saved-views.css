@@ -18,10 +18,16 @@
     @apply max-sm:sr-only;
 }
 
+.fi-view-save-primary-icon {
+    @apply size-4 sm:hidden;
+}
+
 @media (width < 40rem) {
     .fi-view-save .fi-view-save-discard {
         @apply px-2;
+    }
 
+    .fi-view-save :is(.fi-view-save-discard, .fi-view-save-primary) {
         &:is(:hover, :focus-visible)::after {
             @apply pointer-events-none absolute top-full left-1/2 z-50 mt-1.5 -translate-x-1/2 rounded-md bg-gray-900 px-2 py-1 text-xs font-medium whitespace-nowrap text-white content-[attr(data-tooltip)] dark:bg-white dark:text-gray-900;
         }

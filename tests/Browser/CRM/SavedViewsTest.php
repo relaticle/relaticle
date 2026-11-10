@@ -180,6 +180,41 @@ it('leaves the chip strip room on a phone with an icon discard beside save for e
         ->assertNoJavaScriptErrors();
 });
 
+it('compacts sort and save for everyone on a 360 px phone and shows both in full on a desktop', function (): void {
+    SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'name' => 'Team pipeline',
+        'is_shared' => true,
+        'state' => new TableStateData(sort: 'name:desc'),
+    ]);
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(360, 740)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->click('Team pipeline');
+    $page->script("Livewire.all().find((component) => component.name.includes('ListCompanies')).\$wire.\$call('setFilterRules', Array.from({ length: 3 }, (_, index) => ({ field: 'name', condition: 'contains', value: 'chip' + index })))");
+
+    $save = 'document.querySelector("[data-view-save-action=save]")';
+    $sort = 'document.querySelector("[data-filter-sort]")';
+
+    $page->assertScript('document.querySelectorAll("[data-filter-chip]").length === 3', true)
+        ->assertScript('document.querySelector(".fi-filter-bar-start").getBoundingClientRect().width >= 170', true)
+        ->assertScript("{$save}.textContent.replace(/\\s+/g, ' ').trim() === 'Save Save for everyone'", true)
+        ->assertScript("{$save}.getAttribute('data-tooltip') === 'Save for everyone' && {$save}.querySelector('.fi-view-save-primary-icon').checkVisibility() && {$save}.querySelector('span[aria-hidden=true]').checkVisibility()", true)
+        ->assertScript("{$save}.querySelector('.max-sm\\\\:sr-only').getBoundingClientRect().width <= 1", true)
+        ->assertScript("{$sort}.classList.contains('fi-set')", true)
+        ->assertScript("/^Sorted by Company, (ascending|descending)$/.test({$sort}.getAttribute('aria-label'))", true)
+        ->assertScript("{$sort}.querySelector('span').getBoundingClientRect().width <= 1", true);
+
+    $page->resize(1440, 900)
+        ->assertScript("{$sort}.querySelector('span').getBoundingClientRect().width > 0", true)
+        ->assertScript("! {$save}.querySelector('.fi-view-save-primary-icon').checkVisibility()", true)
+        ->assertSeeIn('[data-view-save-action=save]', 'Save for everyone')
+        ->assertSeeIn('[data-filter-sort]', 'Company')
+        ->assertNoJavaScriptErrors();
+});
+
 it('keeps a tabbed-to chip control inside the strip on a phone', function (): void {
     SavedView::factory()->for($this->user)->for($this->workspace)->create([
         'name' => 'Team pipeline',

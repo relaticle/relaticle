@@ -1841,6 +1841,35 @@ it('summarises a long list of values with a count of the rest', function (): voi
     expect($shown[0]['display'])->toBe('Aa, Bb +2');
 });
 
+it('writes a currency value with its symbol and decimals and a plain number with grouping, and keeps the stored value raw', function (): void {
+    resolve(CreateCustomField::class)->execute($this->user, [
+        'entity_type' => 'opportunity',
+        'name' => 'Budget',
+        'code' => 'budget',
+        'type' => 'currency',
+        'settings' => ['currency_code' => 'USD', 'display_type' => 'symbol', 'decimal_places' => 0],
+    ]);
+    filterBarField($this->user, 'opportunity', 'seats', 'number');
+    resolve(CreateCustomField::class)->execute($this->user, [
+        'entity_type' => 'opportunity',
+        'name' => 'Fee',
+        'code' => 'fee',
+        'type' => 'currency',
+        'settings' => ['currency_code' => 'EUR', 'display_type' => 'symbol', 'decimal_places' => 2],
+    ]);
+
+    $shown = livewire(ListOpportunities::class)
+        ->call('setFilterRules', [
+            ['field' => 'custom_fields.budget', 'condition' => 'greater_than', 'value' => 20000],
+            ['field' => 'custom_fields.seats', 'condition' => 'greater_than', 'value' => 10000],
+            ['field' => 'custom_fields.fee', 'condition' => 'less_than', 'value' => 1234.5],
+        ])
+        ->instance()->getFilterBarData()['rules'];
+
+    expect(array_column($shown, 'display'))->toBe(['$20,000', '10,000', '€1,234.50'])
+        ->and(array_column($shown, 'value'))->toBe([20000, 10000, 1234.5]);
+});
+
 it('writes the relative period of a date rule in words', function (): void {
     filterBarField($this->user, 'opportunity', 'closes', 'date');
 

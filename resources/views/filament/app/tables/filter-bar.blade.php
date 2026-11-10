@@ -26,7 +26,7 @@
                 <x-filament::icon icon="lucide-arrow-up-down" x-show="! sort" />
                 <x-filament::icon icon="lucide-arrow-up" x-show="sort?.direction === 'asc'" />
                 <x-filament::icon icon="lucide-arrow-down" x-show="sort?.direction === 'desc'" />
-                <span x-text="sort ? sort.label : @js(__('filament/panel.tables.filters.sort'))"></span>
+                <span class="max-sm:hidden" x-text="sort ? sort.label : @js(__('filament/panel.tables.filters.sort'))"></span>
             </button>
 
             <template x-if="isOpen('sort', 'main')">
@@ -83,7 +83,9 @@
                 aria-haspopup="menu"
                 x-on:click="toggle('group', 'main', $event)"
             >
-                <x-filament::icon icon="lucide-layers" />
+                <x-filament::icon icon="lucide-layers" x-show="! grouping" />
+                <x-filament::icon icon="lucide-arrow-up" x-show="grouping?.direction === 'asc'" />
+                <x-filament::icon icon="lucide-arrow-down" x-show="grouping?.direction === 'desc'" />
                 <span x-text="grouping ? grouping.label : @js(__('filament/panel.tables.filters.group'))"></span>
             </button>
 

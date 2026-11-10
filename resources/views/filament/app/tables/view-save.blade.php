@@ -21,9 +21,17 @@
             </x-filament::button>
         @else
             <div class="fi-view-save-split">
-                <x-filament::button size="sm" data-view-save-action="save" wire:click="mountAction('saveSavedView')">
-                    {{ $mode === 'shared' ? __('filament/panel.tables.views.save_for_everyone') : __('filament/panel.tables.views.save') }}
-                </x-filament::button>
+                @if ($mode === 'shared')
+                    <x-filament::button size="sm" class="fi-view-save-primary" data-view-save-action="save" wire:click="mountAction('saveSavedView')" data-tooltip="{{ __('filament/panel.tables.views.save_for_everyone') }}">
+                        <x-filament::icon icon="lucide-users" class="fi-view-save-primary-icon" />
+                        <span class="sm:hidden" aria-hidden="true">{{ __('filament/panel.tables.views.save') }}</span>
+                        <span class="max-sm:sr-only">{{ __('filament/panel.tables.views.save_for_everyone') }}</span>
+                    </x-filament::button>
+                @else
+                    <x-filament::button size="sm" data-view-save-action="save" wire:click="mountAction('saveSavedView')">
+                        {{ __('filament/panel.tables.views.save') }}
+                    </x-filament::button>
+                @endif
 
                 <x-filament::dropdown placement="bottom-end" shift>
                     <x-slot name="trigger">
