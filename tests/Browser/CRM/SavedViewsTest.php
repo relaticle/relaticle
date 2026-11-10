@@ -37,7 +37,7 @@ it('applies a view from the switcher and offers to discard or save a change', fu
 
     $page->type('.fi-ta-search-field input', 'zzz')
         ->assertSee('Discard changes')
-        ->assertScript('(() => { const bar = document.querySelector(".fi-ta-header-toolbar"); const save = document.querySelector("[data-view-save-action=save]").getBoundingClientRect(); return save.bottom <= bar.getBoundingClientRect().bottom && save.right <= bar.getBoundingClientRect().right; })()', true)
+        ->assertScript('(() => { const bar = document.querySelector("[data-filter-bar]"); const row = bar.getBoundingClientRect(); const save = document.querySelector("[data-view-save]").getBoundingClientRect(); const padding = parseFloat(getComputedStyle(bar).paddingRight); return save.top >= row.top && save.bottom <= row.bottom && Math.abs(save.right - (row.right - padding)) <= 1; })()', true)
         ->click('[data-view-save-action="discard"]')
         ->assertDontSee('Discard changes')
         ->assertNoJavaScriptErrors();
@@ -80,6 +80,7 @@ it('keeps the save controls in the filter row on a phone without overflowing', f
         ->assertSee('Discard changes')
         ->assertPresent('[data-filter-bar] [data-view-save]')
         ->assertScript('document.querySelector("[data-view-save]").getBoundingClientRect().bottom <= document.querySelector(".fi-ta-search-field").getBoundingClientRect().top', true)
+        ->assertScript('(() => { const bar = document.querySelector("[data-filter-bar]"); const row = bar.getBoundingClientRect(); const save = document.querySelector("[data-view-save]").getBoundingClientRect(); const padding = parseFloat(getComputedStyle(bar).paddingRight); return Math.abs((save.top + save.bottom) / 2 - (row.top + row.bottom) / 2) <= 1 && Math.abs(save.right - (row.right - padding)) <= 1; })()', true)
         ->assertScript('document.documentElement.scrollWidth <= window.innerWidth', true)
         ->assertNoJavaScriptErrors();
 });

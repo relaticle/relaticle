@@ -1,6 +1,5 @@
-/* Discard and Save close the toolbar row. On a phone they drop under the search field, aligned right. */
 .fi-view-save {
-    @apply ms-3 flex items-center gap-2 max-sm:ms-0 max-sm:mt-2 max-sm:basis-full max-sm:justify-end;
+    @apply flex items-center gap-2;
 }
 
 .fi-view-save-discard {
