@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Models\Scopes\WorkspaceScope;
 use App\Observers\CustomFieldValueObserver;
+use App\Support\LikePattern;
 use Database\Factories\CustomFieldValueFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -88,5 +89,23 @@ final class CustomFieldValue extends BaseCustomFieldValue
         }
 
         $query->where($column, $optionId);
+    }
+
+    /** @param Builder<self> $query */
+    #[Scope]
+    protected function containingText(Builder $query, CustomField $field, string $search): void
+    {
+        $query->where('custom_field_id', $field->getKey());
+
+        $pattern = '%'.LikePattern::escape($search).'%';
+        $column = $field->getValueColumn();
+
+        if ($column === 'json_value') {
+            $query->whereRaw("exists (select 1 from jsonb_array_elements_text(case when jsonb_typeof(json_value::jsonb) = 'array' then json_value::jsonb else '[]'::jsonb end) as element where element ilike ?)", [$pattern]);
+
+            return;
+        }
+
+        $query->where($column, 'ilike', $pattern);
     }
 }

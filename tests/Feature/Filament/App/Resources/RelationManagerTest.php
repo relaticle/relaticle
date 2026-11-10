@@ -303,7 +303,26 @@ it('finds a person by :dataset in the company people tab whatever the stored set
         ->assertCanNotSeeTableRecords([$other]);
 })->with([
     'email' => 'brian@airbnb',
+    'email in another case' => 'BRIAN@Airbnb',
     'job title' => 'Partnerships',
+    'job title in lower case' => 'partnerships',
+]);
+
+it('treats wildcards and json punctuation as text when searching the company people tab', function (string $search): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create([
+        'company_id' => $company->getKey(),
+        'name' => 'Brian Chesky',
+        'custom_fields' => ['emails' => ['brian@airbnb.example'], 'job_title' => 'Head of Partnerships'],
+    ]);
+
+    livewire(PeopleRelationManager::class, ['ownerRecord' => $company, 'pageClass' => ViewCompany::class])
+        ->searchTable($search)
+        ->assertCanNotSeeTableRecords([$person]);
+})->with([
+    'a bracket' => '[',
+    'a percent sign' => '%',
+    'an underscore' => '_',
 ]);
 
 it('does not search a task due date in the company tasks tab even when the stored setting is on', function (): void {
@@ -315,7 +334,11 @@ it('does not search a task due date in the company tasks tab even when the store
         'custom_fields' => ['due_date' => '2031-05-17 09:00:00'],
     ]));
 
+    expect($task->customFieldValues()->whereRelation('customField', 'code', 'due_date')->exists())->toBeTrue();
+
     livewire(CompanyTasksRelationManager::class, ['ownerRecord' => $company, 'pageClass' => ViewCompany::class])
+        ->searchTable('Renewal')
+        ->assertCanSeeTableRecords([$task])
         ->searchTable('2031-05-17')
         ->assertCanNotSeeTableRecords([$task]);
 });

@@ -47,7 +47,7 @@ final class SearchTool extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'query' => $schema->string()->description('Search query (case-insensitive substring match across names, titles, and the values of text, long text, email, phone, and link custom fields). Max 255 chars.')->required(),
+            'query' => $schema->string()->description('Search query (case-insensitive substring match across names, titles, and the values of text, long text, email, phone, link, domain, and color custom fields). Max 255 chars.')->required(),
             'limit' => $schema->integer()->description('Max results per entity (default 5, max 20). Total payload up to 5×limit across companies, people, opportunities, tasks, and notes.')->default(5),
         ];
     }

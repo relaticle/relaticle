@@ -7,6 +7,7 @@ namespace App\Filament\Components\Tables;
 use App\Enums\CustomFields\PeopleField;
 use App\Enums\CustomFields\TaskField;
 use App\Models\CustomField;
+use App\Models\CustomFieldValue;
 use App\Models\People;
 use App\Models\Task;
 use Filament\Tables\Columns\Column;
@@ -16,11 +17,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Relaticle\CustomFields\Facades\CustomFields;
-use Relaticle\CustomFields\QueryBuilders\ColumnSearchableQuery;
 
 final class RelatedRecordColumns
 {
-    private const array SEARCHABLE_CODES = ['job_title', 'emails'];
+    private const array SEARCHABLE_FIELDS = [PeopleField::JOB_TITLE, PeopleField::EMAILS];
 
     /**
      * @return array<int, Column>
@@ -73,12 +73,10 @@ final class RelatedRecordColumns
     private static function customFields(string $model, array $fields): array
     {
         $codes = array_map(fn (PeopleField|TaskField $field): string => $field->value, $fields);
-        $definitions = CustomField::query()->forEntity($model)->whereIn('code', $codes)->get()->keyBy('code');
+        $builder = CustomFields::table()->forModel($model)->only($codes);
+        $definitions = $builder->getFields()->keyBy('code');
 
-        return CustomFields::table()
-            ->forModel($model)
-            ->only($codes)
-            ->columns()
+        return $builder->columns()
             ->map(fn (Column $column): Column => self::withFixedSearch($column->toggleable(false), $definitions))
             ->all();
     }
@@ -91,13 +89,18 @@ final class RelatedRecordColumns
         $code = Str::after($column->getName(), 'custom_fields.');
         $definition = $definitions->get($code);
 
-        if ($definition === null) {
+        if (! $definition instanceof CustomField) {
             return $column;
         }
 
+        $searchableCodes = array_map(fn (PeopleField $field): string => $field->value, self::SEARCHABLE_FIELDS);
+
         return $column->searchable(
-            in_array($code, self::SEARCHABLE_CODES, true),
-            fn (Builder $query, string $search): Builder => (new ColumnSearchableQuery)->builder($query, $definition, $search),
+            in_array($code, $searchableCodes, true),
+            fn (Builder $query, string $search): Builder => $query->whereHas('customFieldValues', static function (Builder $values) use ($definition, $search): void {
+                /** @var Builder<CustomFieldValue> $values */
+                $values->containingText($definition, $search);
+            }),
         );
     }
 }

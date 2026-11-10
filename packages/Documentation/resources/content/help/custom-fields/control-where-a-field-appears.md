@@ -25,12 +25,14 @@ this for data you capture but don't need to see day-to-day.
 
 ## Filters and sorting
 
-- **Filters** need no setting. Every field except an encrypted one can be
-  filtered from the filter row above the list. See
+- **Filters** need no setting. You can filter a list by most fields from the
+  filter row above it. Textarea, Rich Editor, and Color Picker fields have no
+  filter, and neither does an encrypted field. See
   [Find anything with search and filters](/help/getting-started/find-anything-with-search-and-filters).
 - **Search** needs no setting. Rela and the MCP server match the values of
-  Text, Textarea, Email, Phone, and Link fields. They skip choice fields, Rich
-  Editor, numbers, dates, and currency. The sidebar search matches names and titles.
+  Text, Textarea, Email, Phone, Link, Domain, and Color Picker fields. They
+  skip choice, record, Rich Editor, number, date, and currency fields. The
+  sidebar search matches names and titles.
 - **Sorting** works on text, number, currency, and date columns. Multi-value
   and contact-type columns (emails, phones, links) don't sort.
 
