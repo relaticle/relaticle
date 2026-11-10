@@ -263,7 +263,7 @@ final readonly class CustomFieldFilter implements Filter
     {
         $query->whereHas('customFieldValues', fn (Builder $q): Builder => $q
             ->where('custom_field_id', $field->getKey())
-            ->where($valueColumn, 'ILIKE', self::likePattern($operator, $operand)));
+            ->where($valueColumn, 'ILIKE', $this->likePattern($operator, $operand)));
     }
 
     /**
@@ -273,10 +273,10 @@ final readonly class CustomFieldFilter implements Filter
     {
         $query->whereHas('customFieldValues', fn (Builder $q): Builder => $q
             ->where('custom_field_id', $field->getKey())
-            ->whereRaw('exists (select 1 from '.self::LIST_ELEMENTS.' as element where element ilike ?)', [self::likePattern($operator, $operand)]));
+            ->whereRaw('exists (select 1 from '.self::LIST_ELEMENTS.' as element where element ilike ?)', [$this->likePattern($operator, $operand)]));
     }
 
-    private static function likePattern(string $operator, string $operand): string
+    private function likePattern(string $operator, string $operand): string
     {
         $escaped = LikePattern::escape($operand);
 
