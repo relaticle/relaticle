@@ -32,6 +32,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Queries\EntityFilters;
+use App\Queries\Filters\LogicFilter;
 use App\Queries\Filters\StaleDaysFilter;
 use App\Queries\Filters\TreeFilter;
 use App\Queries\FilterTree;
@@ -50,6 +51,7 @@ mutates(
     FilterRules::class,
     HasCustomFieldColumns::class,
     HasFilterBar::class,
+    LogicFilter::class,
     PersistsTableState::class,
     TreeFilter::class,
 );
@@ -1130,6 +1132,20 @@ it('survives a client that sets a filter to a string', function (string $page): 
         ->assertSet('tableFilters.trashed.value', null)
         ->assertSet('tableFilters.conditions.rules', []);
 })->with('filter bar pages');
+
+it('survives a client that calls the filter setters with nothing or the wrong type', function (string $page, string $model, string $method, array $arguments, ?int $trashed): void {
+    livewire($page)
+        ->call('setDeletedRecordsFilter', 'included')
+        ->call($method, ...$arguments)
+        ->assertOk()
+        ->assertSet('tableFilters.trashed.value', $trashed)
+        ->assertSet('tableFilters.conditions.rules', []);
+})->with('filter bar pages')->with([
+    'deleted mode missing' => ['setDeletedRecordsFilter', [], null],
+    'deleted mode an array' => ['setDeletedRecordsFilter', [['x']], null],
+    'rules missing' => ['setFilterRules', [], 1],
+    'rules a string' => ['setFilterRules', ['x'], 1],
+]);
 
 function filterBarLegacyCase(string $case, User $user): array
 {

@@ -77,11 +77,10 @@ trait HasFilterBar
         parent::updatedTableFilters();
     }
 
-    /**
-     * @param  array<array-key, mixed>  $rules
-     */
-    public function setFilterRules(array $rules): void
+    public function setFilterRules(mixed $rules = []): void
     {
+        $rules = is_array($rules) ? $rules : [];
+
         $this->tableFilters = [
             ...$this->canonicalTableFilters($this->tableFilters),
             ConditionsFilter::NAME => ['match' => 'all', 'rules' => array_values($rules)],
@@ -90,8 +89,10 @@ trait HasFilterBar
         $this->updatedTableFilters();
     }
 
-    public function setDeletedRecordsFilter(?string $mode): void
+    public function setDeletedRecordsFilter(mixed $mode = null): void
     {
+        $mode = is_string($mode) ? $mode : null;
+
         $this->tableFilters = [
             ...$this->canonicalTableFilters($this->tableFilters),
             'trashed' => ['value' => FilterRules::deletedValue($mode)],

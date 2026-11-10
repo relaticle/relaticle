@@ -191,6 +191,8 @@ the REST guide. Update those by hand.
 - `$not` is a set complement: `NOT EXISTS` over the matching keys. It never compiles as SQL
   `NOT (...)`, which drops a row whose column is null. `ListFilterTest` is the gate ("returns
   records with an empty value under $not").
+  The inner matched set reads deleted rows when the model soft-deletes. The outer query alone
+  decides which rows are listed.
 - `$not_in` and `$has_none` keep a record whose value is empty too. A relation and a custom
   field compile them as `NOT EXISTS`. A native column compiles `$not_in` as `whereNotIn` with
   `orWhereNull`.
