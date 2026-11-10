@@ -81,6 +81,7 @@ return [
             'saved' => '":name" saved',
             'created' => '":name" saved as a new layout',
             'deleted' => '":name" deleted',
+            'renamed' => 'Renamed to ":name"',
             'shared' => '":name" is shared with the workspace',
             'unshared' => '":name" is no longer shared',
             'name_required' => 'Give the layout a name.',

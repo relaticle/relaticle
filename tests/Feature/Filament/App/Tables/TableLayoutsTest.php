@@ -382,6 +382,14 @@ it('keeps the table and clears the pointers when a layout is deleted', function 
         ->and(preferenceRow()->active_layout_id)->toBeNull();
 });
 
+it('confirms a rename the way it confirms every other layout change', function (): void {
+    $layout = layoutFor($this->user, ['name' => 'Renewals']);
+
+    livewire(ListCompanies::class)
+        ->callAction('renameTableLayout', ['name' => 'Renewals due'], ['layout' => $layout->getKey()])
+        ->assertNotified('Renamed to "Renewals due"');
+});
+
 it('manages a layout from its own row without switching to it', function (): void {
     $active = layoutFor($this->user, ['name' => 'Hot leads', 'state' => hotLeads()]);
     $other = layoutFor($this->user, ['name' => 'Renewals']);

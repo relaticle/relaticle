@@ -212,13 +212,15 @@ trait HasTableLayouts
             ->action(function (array $arguments, array $data, Schema $schema): void {
                 $layout = $this->requireArgumentTableLayout($arguments);
 
-                $this->withLayoutNameErrors($schema, fn (): TableLayout => resolve(UpdateTableLayout::class)->execute(
+                $layout = $this->withLayoutNameErrors($schema, fn (): TableLayout => resolve(UpdateTableLayout::class)->execute(
                     $this->tableLayoutUser(),
                     $layout,
                     ['name' => $data['name']],
                 ));
 
                 $this->visibleTableLayouts = null;
+
+                Notification::make()->success()->title(__('filament/panel.tables.layouts.renamed', ['name' => e($layout->name)]))->send();
             });
     }
 
