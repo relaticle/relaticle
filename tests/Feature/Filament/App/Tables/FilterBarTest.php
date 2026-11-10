@@ -38,10 +38,15 @@ use App\Queries\Filters\TreeFilter;
 use App\Queries\FilterTree;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Support\Colors\Color;
+use Filament\Support\Facades\FilamentColor;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Once;
 use Laravel\Sanctum\Sanctum;
 use Livewire\Livewire;
+use Relaticle\CustomFields\Data\CustomFieldOptionSettingsData;
+use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Tests\Helpers\WorkspaceCustomField;
 
 mutates(
@@ -1714,7 +1719,7 @@ it('hands the chip bar a choice field options and pins Me as the only member opt
     $fields = collect(livewire(ListOpportunities::class)->instance()->getFilterBarData()['fields'])->keyBy('key');
 
     expect(array_column($fields['custom_fields.stage_pick']['options'], 'label'))->toBe(['Won', 'Lost'])
-        ->and($fields['custom_fields.stage_pick']['options'][0])->toHaveKeys(['id', 'label', 'color'])
+        ->and(array_column($fields['custom_fields.stage_pick']['options'], 'color'))->toBe([null, null])
         ->and($fields['creator']['options'])->toBe([['id' => '@me', 'label' => 'Me', 'color' => null]])
         ->and($fields['company']['options'])->toBe([]);
 });
@@ -1727,6 +1732,60 @@ it('hands the chip bar a tags field known tags as the text a rule stores', funct
 
     expect(array_column($fields['custom_fields.labels']['options'], 'id'))->toEqualCanonicalizing(['vip', 'lead'])
         ->and(array_column($fields['custom_fields.labels']['options'], 'label'))->toEqualCanonicalizing(['vip', 'lead']);
+});
+
+it('hands the chip bar option colours as real colours only when the field shows them', function (): void {
+    filterBarField($this->user, 'opportunity', 'stage_pick', 'select', ['Won', 'Lost']);
+    $field = WorkspaceCustomField::byCode($this->user->currentWorkspace->getKey(), 'opportunity', 'stage_pick');
+    $field->options->each(fn ($option) => $option->update(['settings' => new CustomFieldOptionSettingsData(color: '#ff0000')]));
+    $colors = fn (): array => array_column(collect(livewire(ListOpportunities::class)->instance()->getFilterBarData()['fields'])->keyBy('key')['custom_fields.stage_pick']['options'], 'color');
+
+    expect($colors())->toBe([null, null]);
+
+    $field->update(['settings' => new CustomFieldSettingsData(enable_option_colors: true)]);
+    Once::flush();
+
+    expect($colors())->toBe(['#ff0000', '#ff0000']);
+});
+
+it('resolves a named colour of a native option to the colour the theme draws', function (): void {
+    $options = collect(livewire(ListCompanies::class)->instance()->getFilterBarData()['fields'])->keyBy('key')['creation_source']['options'];
+    $colors = array_column($options, 'color', 'id');
+
+    expect($colors['web'])->toBe(FilamentColor::getColors()['info'][500])
+        ->and($colors['api'])->toBe(Color::Purple[500])
+        ->and($colors['chat'])->toBe(Color::Indigo[500])
+        ->and(array_filter($colors, is_null(...)))->toBe([]);
+});
+
+it('offers every tag once whatever its case, including one whose option is gone', function (): void {
+    filterBarField($this->user, 'company', 'labels', CustomFieldType::TAGS_INPUT->value);
+    $vip = filterBarRecord($this->user, Company::class, 'Vip', values: ['labels' => ['VIP', 'old']]);
+    filterBarRecord($this->user, Company::class, 'Vip lower', values: ['labels' => ['vip']]);
+    filterBarRecord($this->user, Company::class, 'Plain');
+    WorkspaceCustomField::byCode($this->user->currentWorkspace->getKey(), 'company', 'labels')->options()->where('name', 'old')->delete();
+
+    $options = collect(livewire(ListCompanies::class)->instance()->getFilterBarData()['fields'])->keyBy('key')['custom_fields.labels']['options'];
+
+    expect(array_column($options, 'id'))->toEqualCanonicalizing(['VIP', 'old'])
+        ->and(livewire(ListCompanies::class)
+            ->call('setFilterRules', [['field' => 'custom_fields.labels', 'condition' => 'has_any_of', 'value' => ['old']]])
+            ->assertCanSeeTableRecords([$vip])->assertCountTableRecords(1))->not->toBeNull();
+});
+
+it('narrows the list by a tag whatever the case it was stored in', function (): void {
+    filterBarField($this->user, 'company', 'labels', CustomFieldType::TAGS_INPUT->value);
+    $upper = filterBarRecord($this->user, Company::class, 'Upper', values: ['labels' => ['VIP']]);
+    $lower = filterBarRecord($this->user, Company::class, 'Lower', values: ['labels' => ['vip']]);
+    $other = filterBarRecord($this->user, Company::class, 'Other', values: ['labels' => ['lead']]);
+
+    livewire(ListCompanies::class)
+        ->call('setFilterRules', [['field' => 'custom_fields.labels', 'condition' => 'has_any_of', 'value' => ['VIP']]])
+        ->assertCanSeeTableRecords([$upper, $lower])
+        ->assertCanNotSeeTableRecords([$other])
+        ->call('setFilterRules', [['field' => 'custom_fields.labels', 'condition' => 'has_none_of', 'value' => ['vip']]])
+        ->assertCanSeeTableRecords([$other])
+        ->assertCanNotSeeTableRecords([$upper, $lower]);
 });
 
 it('hands the chip bar a label for every stored id, naming a deleted record', function (): void {

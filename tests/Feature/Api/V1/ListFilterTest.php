@@ -742,6 +742,22 @@ it('keeps a lone true in a list operand as text over the query string', function
     expect($ids)->toBe([$tagged->id]);
 });
 
+it('matches tags without regard to case or surrounding spaces', function (): void {
+    $labels = app(CreateCustomField::class)->execute($this->user, ['entity_type' => 'company', 'name' => 'Labels', 'code' => 'labels', 'type' => 'tags-input']);
+    $variants = collect(['VIP', 'vip', ' vip '])->map(function (string $tag) use ($labels): string {
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+        $company->saveCustomFieldValue($labels, [$tag]);
+
+        return $company->id;
+    })->sort()->values()->all();
+    $other = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $other->saveCustomFieldValue($labels, ['lead']);
+
+    expect(listIds($this, 'companies', ['custom_fields' => ['labels' => ['$has_any' => ['vip']]]]))->toBe($variants)
+        ->and(listIds($this, 'companies', ['custom_fields' => ['labels' => ['$has_any' => [' Vip ']]]]))->toBe($variants)
+        ->and(listIds($this, 'companies', ['custom_fields' => ['labels' => ['$has_none' => ['VIP']]]]))->toBe([$other->id]);
+});
+
 it('keeps a boolean true boolean and a text true text in a query body', function (): void {
     $toggle = WorkspaceCustomField::byCode($this->workspace->getKey(), 'company', 'icp');
     $motto = app(CreateCustomField::class)->execute($this->user, ['entity_type' => 'company', 'name' => 'Motto', 'code' => 'motto', 'type' => 'text']);

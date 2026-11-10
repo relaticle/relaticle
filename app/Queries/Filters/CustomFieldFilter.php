@@ -37,6 +37,8 @@ final readonly class CustomFieldFilter implements Filter
 
     private const string RECORD_ELEMENTS = "jsonb_array_elements_text(case jsonb_typeof(json_value::jsonb) when 'array' then json_value::jsonb when 'string' then jsonb_build_array(json_value::jsonb) else '[]'::jsonb end)";
 
+    private const string TRIMMED_LOWERED_OPERANDS = 'array(select lower(btrim(operand)) from unnest(?::text[]) as operand)';
+
     private const string LOWERED_OPERANDS = 'array(select lower(operand) from unnest(?::text[]) as operand)';
 
     private const array LIST_STORED_TYPES = [
@@ -347,9 +349,11 @@ final readonly class CustomFieldFilter implements Filter
             }
         }
 
-        $matches = in_array($field->type, [CustomFieldType::EMAIL->value, CustomFieldType::LINK->value, CustomFieldType::DOMAIN->value, CustomFieldType::RECORD->value], true)
-            ? 'lower(element) = any('.self::LOWERED_OPERANDS.')'
-            : 'element = any(?::text[])';
+        $matches = match (true) {
+            $field->type === CustomFieldType::TAGS_INPUT->value => 'lower(btrim(element)) = any('.self::TRIMMED_LOWERED_OPERANDS.')',
+            in_array($field->type, [CustomFieldType::EMAIL->value, CustomFieldType::LINK->value, CustomFieldType::DOMAIN->value, CustomFieldType::RECORD->value], true) => 'lower(element) = any('.self::LOWERED_OPERANDS.')',
+            default => 'element = any(?::text[])',
+        };
 
         $elements = $isRecord ? self::RECORD_ELEMENTS : self::LIST_ELEMENTS;
 

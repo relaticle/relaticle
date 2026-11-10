@@ -506,10 +506,14 @@ it('narrows opportunities by creator with Me pinned first and a teammate after i
     $page->assertNoJavaScriptErrors();
 });
 
-it('searches the workspace as the member types a company and keeps the pick listed', function (): void {
+it('searches the workspace as the member types a company beyond the first page and keeps the pick listed', function (): void {
+    foreach (range(1, 22) as $number) {
+        Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => sprintf('Filler %02d', $number)]);
+    }
+
     $companies = Company::query()->withoutGlobalScopes()->where('workspace_id', $this->workspace->getKey())->pluck('id', 'name');
-    foreach ($companies as $name => $id) {
-        People::factory()->recycle([$this->user, $this->workspace])->create(['name' => "Person of {$name}", 'company_id' => $id]);
+    foreach (['Acme Robotics', 'Globex', 'Initech'] as $name) {
+        People::factory()->recycle([$this->user, $this->workspace])->create(['name' => "Person of {$name}", 'company_id' => $companies[$name]]);
     }
 
     $page = loginViaBrowser($this->user)
@@ -520,13 +524,62 @@ it('searches the workspace as the member types a company and keeps the pick list
     expect(companyRows($page, 3))->toBeTrue();
 
     addChip($page, 'company', 'is_any_of')
+        ->assertPresent(optionButton((string) $companies['Acme Robotics']))
+        ->assertMissing(optionButton((string) $companies['Globex']))
         ->type(searchInput(), 'glo')
+        ->assertPresent(optionButton((string) $companies['Globex']))
+        ->assertMissing(optionButton((string) $companies['Acme Robotics']))
         ->click(optionButton((string) $companies['Globex']));
     expect(companyRows($page, 1))->toBeTrue();
     $page->assertSee('Person of Globex')->assertSeeIn('[data-filter-segment="value"]', 'Globex');
 
     $page->type(searchInput(), 'zzqx')
         ->assertPresent(optionButton((string) $companies['Globex']).'[aria-selected="true"]')
+        ->assertNoJavaScriptErrors();
+});
+
+it('never shows one chip lookup results in another chip list', function (): void {
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/opportunities")
+        ->assertPresent('[data-filter-add]');
+
+    addChip($page, 'creator', 'is_any_of')
+        ->click(optionButton('@me'))
+        ->keys(searchInput(), 'Escape');
+    addChip($page, 'company', 'is_any_of')
+        ->type(searchInput(), 'glo')
+        ->click('[data-field="creator"] [data-filter-segment="value"]')
+        ->assertPresent(optionButton('@me'));
+
+    $options = <<<'JS'
+        new Promise((resolve) => setTimeout(() => resolve([...document.querySelectorAll('[data-pop][data-open=true] [data-option]')].map((option) => option.textContent.trim())), 1200))
+    JS;
+
+    expect($page->script($options))->not->toContain('Globex')->toContain('Me');
+    $page->assertNoJavaScriptErrors();
+});
+
+it('works the checklist with the keyboard alone', function (): void {
+    selectFieldOn($this->user, 'company', 'tier', array_map(fn (int $number): string => "Tier {$number}", range(1, 10)));
+    $first = optionIdOf($this->user, 'company', 'tier', 'Tier 1');
+    $second = optionIdOf($this->user, 'company', 'tier', 'Tier 2');
+    $page = ($this->open)();
+
+    addChip($page, 'custom_fields.tier', 'is_any_of')
+        ->assertScript(chipFocus('[data-filter-search]'), true)
+        ->keys(searchInput(), 'ArrowDown')
+        ->assertScript(chipFocus('[data-option="'.$first.'"]'), true)
+        ->keys('[data-option="'.$first.'"]', 'Space')
+        ->assertPresent(optionButton($first).'[aria-selected="true"]')
+        ->keys('[data-option="'.$first.'"]', 'ArrowDown')
+        ->assertScript(chipFocus('[data-option="'.$second.'"]'), true)
+        ->keys('[data-option="'.$second.'"]', 'Enter')
+        ->assertPresent(optionButton($second).'[aria-selected="true"]')
+        ->assertSeeIn('[data-filter-segment="value"]', 'Tier 1, Tier 2')
+        ->keys('[data-option="'.$second.'"]', 'Escape')
+        ->assertScript(chipFocus('[data-filter-segment="value"]'), true)
         ->assertNoJavaScriptErrors();
 });
 

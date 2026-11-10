@@ -208,19 +208,25 @@
                 opened() {
                     const chip = this.chips.find((other) => other.id === this.open?.id)
 
-                    this.results = []
+                    this.resetLookup()
                     this.pinned = Array.isArray(chip?.value) ? [...chip.value] : []
-                    this.ticket++
-                    this.searching = false
 
                     if (this.open?.part === 'val' && this.isLookup(chip)) {
                         this.lookup(chip)
                     }
                 },
 
+                resetLookup() {
+                    clearTimeout(this.searchTimer)
+                    this.results = []
+                    this.ticket++
+                    this.searching = false
+                },
+
                 close(restoreFocus = true) {
                     const opener = this.opener
 
+                    this.resetLookup()
                     this.open = null
                     this.opener = null
                     this.flush()
@@ -317,6 +323,7 @@
                     const chip = { id: this.nextId++, field: field.key, condition: null, value: null, display: '', labels: {} }
 
                     this.chips.push(chip)
+                    this.resetLookup()
                     this.open = { id: chip.id, part: 'cond' }
                     this.find = ''
                     this.opener = null
@@ -379,11 +386,7 @@
                 optionColor(option) {
                     const color = option.color ?? ''
 
-                    if (/^#[0-9a-f]{3,8}$/i.test(color)) {
-                        return color
-                    }
-
-                    return /^[a-z]+$/.test(color) ? `var(--color-${color}-500, currentColor)` : null
+                    return /^(#[0-9a-f]{3,8}|oklch\([0-9. %]+\))$/i.test(color) ? color : null
                 },
 
                 listItems(chip) {
@@ -418,10 +421,11 @@
                 },
 
                 typed(chip) {
-                    clearTimeout(this.searchTimer)
+                    this.resetLookup()
                     this.pinned = Array.isArray(chip.value) ? [...chip.value] : []
 
                     if (this.isLookup(chip)) {
+                        this.searching = true
                         this.searchTimer = setTimeout(() => this.lookup(chip), TYPING_DELAY)
                     }
                 },

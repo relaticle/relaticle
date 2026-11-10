@@ -199,6 +199,9 @@ the REST guide. Update those by hand.
   field's workspace. A link to a deleted record is no link. Restoring the record brings the link back.
   `ListFilterTest` "treats a record custom field link to a deleted record as no link" and "does not
   count a record custom field link to another workspace record" are the gates.
+- A tags field compares `lower(btrim(element))` with the operands lowered and trimmed, for `$has_any`
+  and `$has_none`, so `VIP`, `vip` and ` vip ` are one tag on every surface. `ListFilterTest` "matches
+  tags without regard to case or surrounding spaces" is the gate.
 - `$not_in` and `$has_none` keep a record whose value is empty too. A relation and a custom
   field compile them as `NOT EXISTS`. A native column compiles `$not_in` as `whereNotIn` with
   `orWhereNull`.

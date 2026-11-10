@@ -10,18 +10,25 @@ use App\Enums\FilterFieldKind;
 use App\Enums\FilterKind;
 use App\Models\CustomField;
 use App\Models\User;
+use App\Queries\Crm\StoredTagsQuery;
 use App\Queries\CustomFieldFilterSchema;
 use App\Queries\EntityFilters;
 use App\Queries\FilterDefinition;
 use App\Support\CustomFields\WorkspaceCustomFields;
 use BackedEnum;
+use Filament\Support\Colors\Color;
 use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasLabel;
+use Filament\Support\Facades\FilamentColor;
 use Illuminate\Support\Facades\Lang;
+use Relaticle\CustomFields\Enums\CustomFieldsFeature;
+use Relaticle\CustomFields\FeatureSystem\FeatureManager;
 
 final readonly class FilterFieldCatalog
 {
     public const string CUSTOM_FIELD_PREFIX = 'custom_fields.';
+
+    public const int MAX_TAG_OPTIONS = 200;
 
     /**
      * @param  array<string, string>  $columnLabels
@@ -123,7 +130,7 @@ final readonly class FilterFieldCatalog
             return [
                 'id' => (string) $case->value,
                 'label' => $case instanceof HasLabel && is_string($case->getLabel()) ? $case->getLabel() : $case->name,
-                'color' => is_string($color) ? $color : null,
+                'color' => self::cssColor($color),
             ];
         }, $definition->enumClass::cases());
     }
@@ -165,10 +172,52 @@ final readonly class FilterFieldCatalog
             return [];
         }
 
-        $storesText = $field->type === CustomFieldType::TAGS_INPUT->value;
+        if ($field->type === CustomFieldType::TAGS_INPUT->value) {
+            return self::tagOptions($field);
+        }
+
+        $colored = self::showsOptionColors($field);
 
         return array_values($field->options
-            ->map(static fn ($option): array => ['id' => $storesText ? (string) $option->name : (string) $option->getKey(), 'label' => (string) $option->name, 'color' => $option->settings->color])
+            ->map(static fn ($option): array => ['id' => (string) $option->getKey(), 'label' => (string) $option->name, 'color' => $colored ? self::cssColor($option->settings->color) : null])
             ->all());
+    }
+
+    /** @return list<array{id: string, label: string, color: ?string}> */
+    private static function tagOptions(CustomField $field): array
+    {
+        $colored = self::showsOptionColors($field);
+        $tags = [];
+
+        foreach ($field->options as $option) {
+            $name = trim((string) $option->name);
+            $tags[mb_strtolower($name)] ??= ['id' => $name, 'label' => $name, 'color' => $colored ? self::cssColor($option->settings->color) : null];
+        }
+
+        foreach (resolve(StoredTagsQuery::class)->forField($field, self::MAX_TAG_OPTIONS) as $name) {
+            $tags[mb_strtolower($name)] ??= ['id' => $name, 'label' => $name, 'color' => null];
+        }
+
+        return array_slice(array_values($tags), 0, self::MAX_TAG_OPTIONS);
+    }
+
+    private static function showsOptionColors(CustomField $field): bool
+    {
+        return FeatureManager::isEnabled(CustomFieldsFeature::FIELD_OPTION_COLORS) && $field->settings->enable_option_colors;
+    }
+
+    private static function cssColor(mixed $color): ?string
+    {
+        if (! is_string($color) || $color === '') {
+            return null;
+        }
+
+        if (preg_match('/^#[0-9a-f]{3,8}$/i', $color) === 1) {
+            return $color;
+        }
+
+        $palette = FilamentColor::getColors()[$color] ?? Color::all()[$color] ?? null;
+
+        return is_array($palette) && is_string($palette[500] ?? null) ? $palette[500] : null;
     }
 }
