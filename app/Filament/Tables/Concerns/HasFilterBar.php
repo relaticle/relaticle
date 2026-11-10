@@ -35,6 +35,10 @@ trait HasFilterBar
     /** @var array{match: string, rules: list<array<string, mixed>>}|null */
     private ?array $healedOutput = null;
 
+    private ?string $sortBeforeClientWrite = null;
+
+    private bool $clientWroteSort = false;
+
     /**
      * @return array<string, FilterField>
      */
@@ -216,6 +220,28 @@ trait HasFilterBar
         $this->tableFilters = $this->canonicalTableFilters($this->tableFilters);
 
         parent::updatedTableFilters();
+    }
+
+    #[Unexposed]
+    public function updatingTableSort(): void
+    {
+        $this->sortBeforeClientWrite = $this->tableSort;
+        $this->clientWroteSort = true;
+    }
+
+    #[Unexposed]
+    public function updatedTableSort(): void
+    {
+        // Filament's hidden sort settings write tableSort back from Alpine and force ascending on a new column.
+        // Here only a header click (sortTable) and the Sort control may change the sort.
+        if ($this->clientWroteSort) {
+            $this->clientWroteSort = false;
+            $this->tableSort = $this->sortBeforeClientWrite;
+
+            return;
+        }
+
+        parent::updatedTableSort();
     }
 
     public function setFilterRules(mixed $rules = []): void

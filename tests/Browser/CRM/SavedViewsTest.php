@@ -204,7 +204,7 @@ it('compacts sort and save for everyone on a 360 px phone and shows both in full
         ->assertScript("{$save}.getAttribute('data-tooltip') === 'Save for everyone' && {$save}.querySelector('.fi-view-save-primary-icon').checkVisibility() && {$save}.querySelector('span[aria-hidden=true]').checkVisibility()", true)
         ->assertScript("{$save}.querySelector('.max-sm\\\\:sr-only').getBoundingClientRect().width <= 1", true)
         ->assertScript("{$sort}.classList.contains('fi-set')", true)
-        ->assertScript("/^Sorted by Company, (ascending|descending)$/.test({$sort}.getAttribute('aria-label'))", true)
+        ->assertScript("/^Sorted by Company, descending$/.test({$sort}.getAttribute('aria-label'))", true)
         ->assertScript("{$sort}.querySelector('span').getBoundingClientRect().width <= 1", true);
 
     $page->resize(1440, 900)
@@ -562,5 +562,23 @@ it('returns focus to the view switcher once the confirmation for saving over a s
     $page->click('.fi-modal-footer-actions .fi-color-primary')
         ->assertDontSee('Save over "Team pipeline"?')
         ->assertScript('document.activeElement === document.querySelector(".fi-view-switcher-trigger")', true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('keeps a descending sort when a view sorted that way is picked from an unsorted list', function (): void {
+    SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'name' => 'Newest names',
+        'state' => new TableStateData(sort: 'name:desc'),
+    ]);
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->click('Newest names');
+
+    $page->assertScript("document.querySelector('[data-filter-sort]')?.getAttribute('aria-label') === 'Sorted by Company, descending'", true)
+        ->assertScript("Livewire.all().find((component) => component.name.includes('ListCompanies')).\$wire.tableSort", 'name:desc')
+        ->assertDontSee('Discard changes')
         ->assertNoJavaScriptErrors();
 });

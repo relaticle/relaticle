@@ -653,7 +653,7 @@ it('lists the pinned columns first in view settings and marks them', function ()
 
 it('keeps the member\'s widths when the table goes back to its default', function (): void {
     $component = livewire(ListCompanies::class)
-        ->set('tableSort', 'name:asc')
+        ->call('sortTable', 'name', 'asc')
         ->call('updateResizableColumnWidth', 'created_at', '300')
         ->call('pinTableColumn', 'created_at')
         ->call('useStandardTable');
@@ -675,7 +675,7 @@ it('offers the reset again once the applied view is deleted elsewhere', function
 
 it('resets the table to its default from the confirmation and keeps the widths', function (): void {
     $component = livewire(ListCompanies::class)
-        ->set('tableSort', 'name:asc')
+        ->call('sortTable', 'name', 'asc')
         ->call('updateResizableColumnWidth', 'created_at', '300')
         ->call('toggleTableColumn', 'accountOwner.name')
         ->callAction('resetTableToDefault')

@@ -151,14 +151,14 @@ it('falls back to the default page size when a view holds one the table does not
 it('applies a sort through the grouping a view names', function (): void {
     $view = viewFor($this->user, ['state' => new TableStateData(sort: 'name:asc')]);
 
-    $component = livewire(ListCompanies::class)->set('tableSort', 'created_at:desc')->call('applySavedView', $view->getKey());
+    $component = livewire(ListCompanies::class)->call('sortTable', 'created_at', 'desc')->call('applySavedView', $view->getKey());
 
     expect($component->get('tableSort'))->toBe('name:asc');
 });
 
 it('saves the current table as a new view without widths and applies it', function (): void {
     $component = livewire(ListCompanies::class)
-        ->set('tableSort', 'created_at:desc')
+        ->call('sortTable', 'created_at', 'desc')
         ->call('updateResizableColumnWidth', 'created_at', '300')
         ->callAction('saveSavedViewAs', ['name' => 'Hot leads'])
         ->assertHasNoActionErrors()
@@ -220,7 +220,7 @@ it('lets two members use the same view name', function (): void {
 
 it('marks a changed view as modified, reverts it and saves over it', function (): void {
     $view = viewFor($this->user, ['name' => 'Hot leads', 'state' => hotLeads()]);
-    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->set('tableSort', 'name:asc');
+    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('sortTable', 'name', 'asc');
 
     expect($component->instance()->isSavedViewModified())->toBeTrue();
     $component->assertSeeText('Discard changes')->assertSeeHtml('wire:click="revertSavedView"');
@@ -229,7 +229,7 @@ it('marks a changed view as modified, reverts it and saves over it', function ()
     expect($component->get('tableSort'))->toBe('created_at:desc')
         ->and($component->instance()->isSavedViewModified())->toBeFalse();
 
-    $component->set('tableSort', 'name:asc')->callAction('saveSavedView');
+    $component->call('sortTable', 'name', 'asc')->callAction('saveSavedView');
     expect($view->refresh()->state->sort)->toBe('name:asc')
         ->and($component->instance()->isSavedViewModified())->toBeFalse();
 });
@@ -276,7 +276,7 @@ it('sets a default when another request writes the member\'s first preference ro
 
 it('brings back the last state within a session, and the default view at the start of the next one', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
-    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('toggleDefaultSavedView', $view->getKey())->set('tableSort', 'name:asc');
+    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('toggleDefaultSavedView', $view->getKey())->call('sortTable', 'name', 'asc');
 
     $revisit = livewire(ListCompanies::class);
 
@@ -310,7 +310,7 @@ it('opens a new session on the default view over another applied one, and keeps 
 
 it('keeps the last state across sessions for a member with no default view', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
-    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->set('tableSort', 'name:asc');
+    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('sortTable', 'name', 'asc');
 
     session()->flush();
 
@@ -383,7 +383,7 @@ it('gives a member the new version of a shared view they had not changed', funct
 it('keeps a member\'s changed copy when the shared view changes under it', function (): void {
     $owner = savedViewMember(WorkspaceRole::Member);
     $view = viewFor($owner, ['is_shared' => true, 'state' => hotLeads()]);
-    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->set('tableSort', 'updated_at:desc');
+    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('sortTable', 'updated_at', 'desc');
 
     resolve(UpdateSavedView::class)->execute($owner, $view, ['state' => new TableStateData(sort: 'name:asc')]);
     session()->flush();
@@ -587,7 +587,7 @@ it('lets an admin who stops sharing someone else\'s view keep working on the tab
         ->call('applySavedView', $view->getKey())
         ->callAction('stopSharingSavedView', arguments: ['view' => $view->getKey()])
         ->assertSet('activeSavedViewId', null)
-        ->set('tableSort', 'name:asc')
+        ->call('sortTable', 'name', 'asc')
         ->call('revertSavedView')
         ->assertOk()
         ->assertDontSeeText('Discard changes');
@@ -683,7 +683,7 @@ it('offers save as new beside a modified view, even one the member cannot save',
     $component = livewire(ListCompanies::class)
         ->call('applySavedView', $view->getKey())
         ->assertDontSeeHtml('data-view-save-action="save-as"')
-        ->set('tableSort', 'name:asc')
+        ->call('sortTable', 'name', 'asc')
         ->assertSeeHtml('data-view-save="copy-only"')
         ->assertSeeHtml('data-view-save-action="save-as"')
         ->assertDontSeeHtml("mountAction('saveSavedView')")
@@ -700,7 +700,7 @@ it('labels the save control by who owns the view and who may edit it', function 
     $view = viewFor($owner, ['is_shared' => $shared, 'state' => hotLeads()]);
     $this->actingAs($actor);
 
-    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->set('tableSort', 'name:asc')
+    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('sortTable', 'name', 'asc')
         ->assertSeeHtml("data-view-save=\"{$mode}\"")
         ->assertSeeText(['Discard changes', ...$shown])
         ->assertDontSeeText($hidden);
@@ -717,7 +717,7 @@ it('labels the save control by who owns the view and who may edit it', function 
 it('labels the save control for the workspace owner on another member\'s shared view', function (): void {
     $view = viewFor(savedViewMember(WorkspaceRole::Member), ['name' => 'Team', 'is_shared' => true, 'state' => hotLeads()]);
 
-    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->set('tableSort', 'name:asc')
+    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('sortTable', 'name', 'asc')
         ->assertSeeHtml('data-view-save="shared"')
         ->assertSeeText(['Discard changes', 'Save for everyone', 'Save as new view']);
 });
@@ -728,7 +728,7 @@ it('lets the workspace owner save over another member\'s shared view after confi
 
     livewire(ListCompanies::class)
         ->call('applySavedView', $view->getKey())
-        ->set('tableSort', 'name:asc')
+        ->call('sortTable', 'name', 'asc')
         ->mountAction('saveSavedView')
         ->assertMountedActionModalSee('Save over "Team"?')
         ->callMountedAction()
@@ -741,7 +741,7 @@ it('lets the workspace owner save over another member\'s shared view after confi
 it('offers a plain save and a save as new view on the member\'s own private view', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
 
-    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->set('tableSort', 'name:asc')
+    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('sortTable', 'name', 'asc')
         ->assertSeeHtml('data-view-save="private"')
         ->assertSeeHtml('data-view-save-action="save"')
         ->assertSeeHtml('data-view-save-action="save-as"')
@@ -751,7 +751,7 @@ it('offers a plain save and a save as new view on the member\'s own private view
 it('shows no save control on an unchanged view or on the built-in list', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
 
-    livewire(ListCompanies::class)->set('tableSort', 'name:asc')
+    livewire(ListCompanies::class)->call('sortTable', 'name', 'asc')
         ->assertDontSeeHtml('data-view-save=')
         ->call('applySavedView', $view->getKey())
         ->assertDontSeeHtml('data-view-save=');
@@ -759,7 +759,7 @@ it('shows no save control on an unchanged view or on the built-in list', functio
 
 it('shows no save control for a view that vanished while the tab still holds its id', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
-    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->set('tableSort', 'name:asc')
+    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('sortTable', 'name', 'asc')
         ->assertSeeHtml('data-view-save="private"');
 
     $view->delete();
@@ -771,7 +771,7 @@ it('shows no save control for a view that vanished while the tab still holds its
 it('restores the view when the member discards their changes', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
 
-    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->set('tableSort', 'name:asc')
+    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('sortTable', 'name', 'asc')
         ->call('revertSavedView')
         ->assertDontSeeHtml('data-view-save=');
 
@@ -782,7 +782,7 @@ it('saves a copy as a private view when the member may not edit the shared one',
     $view = viewFor(savedViewMember(WorkspaceRole::Member), ['name' => 'Team', 'is_shared' => true, 'state' => hotLeads()]);
     $this->actingAs($member = savedViewMember(WorkspaceRole::Member));
 
-    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->set('tableSort', 'name:asc')
+    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('sortTable', 'name', 'asc')
         ->callAction('saveSavedViewAs', ['name' => 'My copy']);
 
     $copy = SavedView::query()->withoutGlobalScopes()->where('name', 'My copy')->sole();
@@ -959,7 +959,7 @@ it('asks an admin before saving over someone else\'s view, then tells the owner'
 
     livewire(ListCompanies::class)
         ->call('applySavedView', $view->getKey())
-        ->set('tableSort', 'name:asc')
+        ->call('sortTable', 'name', 'asc')
         ->mountAction('saveSavedView')
         ->assertMountedActionModalSee('Save over "Team"?')
         ->assertMountedActionModalSee("It belongs to {$owner->name}, who will be told you changed it.")
@@ -975,7 +975,7 @@ it('saves over your own view without asking and tells no one', function (): void
 
     livewire(ListCompanies::class)
         ->call('applySavedView', $view->getKey())
-        ->set('tableSort', 'name:asc')
+        ->call('sortTable', 'name', 'asc')
         ->mountAction('saveSavedView')
         ->assertActionNotMounted()
         ->callAction('renameSavedView', ['name' => 'Still mine'], ['view' => $view->getKey()]);
@@ -991,7 +991,7 @@ it('tells the owner once when a second save changes nothing', function (): void 
 
     livewire(ListCompanies::class)
         ->call('applySavedView', $view->getKey())
-        ->set('tableSort', 'name:asc')
+        ->call('sortTable', 'name', 'asc')
         ->callAction('saveSavedView')
         ->callAction('saveSavedView');
 
@@ -1000,7 +1000,7 @@ it('tells the owner once when a second save changes nothing', function (): void 
 
 it('tells the member instead of failing when the view they revert was deleted elsewhere', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
-    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->set('tableSort', 'name:asc');
+    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('sortTable', 'name', 'asc');
 
     $view->delete();
 
@@ -1014,7 +1014,7 @@ it('tells the member instead of failing when the view they revert was deleted el
 
 it('tells the member instead of failing when the view they save over was deleted elsewhere', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
-    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->set('tableSort', 'name:asc');
+    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('sortTable', 'name', 'asc');
 
     $view->delete();
 
@@ -1160,7 +1160,7 @@ it('lets a read-only member duplicate a shared view into a private copy of their
 
 it('brings back the member\'s own table after a saved view', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
-    $component = livewire(ListCompanies::class)->set('tableSort', 'name:asc');
+    $component = livewire(ListCompanies::class)->call('sortTable', 'name', 'asc');
 
     $component->call('applySavedView', $view->getKey());
     expect($component->get('tableSort'))->toBe('created_at:desc');
@@ -1174,7 +1174,7 @@ it('brings back the member\'s own table after a saved view', function (): void {
 
 it('keeps the member\'s own table across sessions while a view is applied', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
-    livewire(ListCompanies::class)->set('tableSort', 'name:asc')->call('applySavedView', $view->getKey());
+    livewire(ListCompanies::class)->call('sortTable', 'name', 'asc')->call('applySavedView', $view->getKey());
 
     session()->flush();
 
@@ -1183,7 +1183,7 @@ it('keeps the member\'s own table across sessions while a view is applied', func
 
 it('forgets the member\'s own table on a reset to the default', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
-    $component = livewire(ListCompanies::class)->set('tableSort', 'name:asc')->call('applySavedView', $view->getKey());
+    $component = livewire(ListCompanies::class)->call('sortTable', 'name', 'asc')->call('applySavedView', $view->getKey());
 
     $component->call('useStandardTable');
     expect(preferenceRow()->own_state)->toBeNull();
@@ -1198,7 +1198,7 @@ it('never marks the member\'s own table as modified', function (): void {
     $component = livewire(ListCompanies::class)
         ->call('applySavedView', $view->getKey())
         ->call('applyOwnTable')
-        ->set('tableSort', 'name:asc');
+        ->call('sortTable', 'name', 'asc');
 
     expect($component->instance()->isSavedViewModified())->toBeFalse()
         ->and($component->get('activeSavedViewId'))->toBeNull()
@@ -1209,7 +1209,7 @@ it('never marks the member\'s own table as modified', function (): void {
 it('stores the member\'s own table without widths and keeps their widths when it comes back', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
     $component = livewire(ListCompanies::class)
-        ->set('tableSort', 'name:asc')
+        ->call('sortTable', 'name', 'asc')
         ->call('updateResizableColumnWidth', 'created_at', '300')
         ->call('applySavedView', $view->getKey());
 
@@ -1225,7 +1225,7 @@ it('stores the member\'s own table without widths and keeps their widths when it
 it('leaves the member\'s own table alone when another view replaces the active one', function (): void {
     $first = viewFor($this->user, ['name' => 'Hot leads', 'state' => hotLeads()]);
     $second = viewFor($this->user, ['name' => 'By name', 'state' => new TableStateData(sort: 'name:desc')]);
-    $component = livewire(ListCompanies::class)->set('tableSort', 'name:asc')->call('applySavedView', $first->getKey());
+    $component = livewire(ListCompanies::class)->call('sortTable', 'name', 'asc')->call('applySavedView', $first->getKey());
 
     $component->call('applySavedView', $second->getKey());
 
@@ -1238,7 +1238,7 @@ it('leaves the member\'s own table alone when another view replaces the active o
 
 it('keeps the member\'s own table when a new session opens on their default view', function (): void {
     $default = viewFor($this->user, ['state' => hotLeads()]);
-    livewire(ListCompanies::class)->call('toggleDefaultSavedView', $default->getKey())->set('tableSort', 'name:asc');
+    livewire(ListCompanies::class)->call('toggleDefaultSavedView', $default->getKey())->call('sortTable', 'name', 'asc');
     expect(preferenceRow()->active_view_id)->toBeNull();
 
     session()->flush();
@@ -1255,10 +1255,10 @@ it('keeps the member\'s own table when a new session opens on a default over a c
     $default = viewFor($this->user, ['name' => 'Hot leads', 'state' => hotLeads()]);
     $other = viewFor($this->user, ['name' => 'By name', 'state' => new TableStateData(sort: 'name:desc')]);
     livewire(ListCompanies::class)
-        ->set('tableSort', 'name:asc')
+        ->call('sortTable', 'name', 'asc')
         ->call('applySavedView', $other->getKey())
         ->call('toggleDefaultSavedView', $default->getKey())
-        ->set('tableSort', 'created_at:asc');
+        ->call('sortTable', 'created_at', 'asc');
 
     session()->flush();
     livewire(ListCompanies::class);
@@ -1277,7 +1277,7 @@ function removeActiveViewElsewhere(string $change, User $owner, SavedView $view)
 it('makes what the table shows the member\'s own table when the active view is deleted or stops being shared elsewhere', function (string $change): void {
     $owner = savedViewMember(WorkspaceRole::Member);
     $view = viewFor($owner, ['is_shared' => true, 'state' => hotLeads()]);
-    $component = livewire(ListCompanies::class)->set('tableSort', 'name:asc')->call('applySavedView', $view->getKey());
+    $component = livewire(ListCompanies::class)->call('sortTable', 'name', 'asc')->call('applySavedView', $view->getKey());
     expect(preferenceRow()->own_state->sort)->toBe('name:asc');
 
     removeActiveViewElsewhere($change, $owner, $view);
@@ -1297,7 +1297,7 @@ it('returns to the table shown after the active view went away, not to the older
     $owner = savedViewMember(WorkspaceRole::Member);
     $view = viewFor($owner, ['is_shared' => true, 'state' => hotLeads()]);
     $other = viewFor($this->user, ['name' => 'By name', 'state' => new TableStateData(sort: 'name:desc')]);
-    $component = livewire(ListCompanies::class)->set('tableSort', 'name:asc')->call('applySavedView', $view->getKey());
+    $component = livewire(ListCompanies::class)->call('sortTable', 'name', 'asc')->call('applySavedView', $view->getKey());
 
     removeActiveViewElsewhere($change, $owner, $view);
     $component->call('applySavedView', $other->getKey());
@@ -1314,7 +1314,7 @@ it('opens a new session without a parked table once the active view went away, e
     $view = viewFor($owner, ['is_shared' => true, 'state' => hotLeads()]);
     $default = viewFor($this->user, ['name' => 'By name', 'state' => new TableStateData(sort: 'name:desc')]);
     $component = livewire(ListCompanies::class)
-        ->set('tableSort', 'name:asc')
+        ->call('sortTable', 'name', 'asc')
         ->call('toggleDefaultSavedView', $default->getKey())
         ->call('applySavedView', $view->getKey());
 
@@ -1332,10 +1332,10 @@ it('does not bring back an older own table on a second return to the built-in li
     $view = viewFor($this->user, ['state' => hotLeads()]);
 
     $component = livewire(ListCompanies::class)
-        ->set('tableSort', 'name:asc')
+        ->call('sortTable', 'name', 'asc')
         ->call('applySavedView', $view->getKey())
         ->call('applyOwnTable')
-        ->set('tableSort', 'name:desc')
+        ->call('sortTable', 'name', 'desc')
         ->call('applyOwnTable');
 
     expect($component->get('tableSort'))->toBe('name:desc')
@@ -1344,11 +1344,11 @@ it('does not bring back an older own table on a second return to the built-in li
 
 it('gives a second tab the table the first tab returned to', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
-    $first = livewire(ListCompanies::class)->set('tableSort', 'name:asc')->call('applySavedView', $view->getKey());
+    $first = livewire(ListCompanies::class)->call('sortTable', 'name', 'asc')->call('applySavedView', $view->getKey());
     $second = livewire(ListCompanies::class);
     expect($second->get('activeSavedViewId'))->toBe($view->getKey());
 
-    $first->call('applyOwnTable')->set('tableSort', 'name:desc');
+    $first->call('applyOwnTable')->call('sortTable', 'name', 'desc');
     $second->call('applyOwnTable');
 
     expect($second->get('tableSort'))->toBe('name:desc');
@@ -1366,7 +1366,7 @@ it('clears a parked table left on a row with no view when the member resets to t
 it('clears a view that vanished elsewhere when the member returns to their own table, and leaves the table as it is', function (string $change): void {
     $owner = savedViewMember(WorkspaceRole::Member);
     $view = viewFor($owner, ['is_shared' => true, 'state' => hotLeads()]);
-    $component = livewire(ListCompanies::class)->set('tableSort', 'name:asc')->call('applySavedView', $view->getKey());
+    $component = livewire(ListCompanies::class)->call('sortTable', 'name', 'asc')->call('applySavedView', $view->getKey());
     expect(preferenceRow()->own_state)->not->toBeNull();
 
     removeActiveViewElsewhere($change, $owner, $view);
@@ -1382,7 +1382,7 @@ it('clears a view that vanished elsewhere when the member returns to their own t
 })->with(['unshared', 'deleted']);
 
 it('does nothing when the built-in list is picked and no view is applied', function (): void {
-    $component = livewire(ListCompanies::class)->set('tableSort', 'name:asc')->call('applyOwnTable');
+    $component = livewire(ListCompanies::class)->call('sortTable', 'name', 'asc')->call('applyOwnTable');
 
     expect($component->get('tableSort'))->toBe('name:asc');
 });
@@ -1401,7 +1401,7 @@ it('opens a view named in the link', function (): void {
 
 it('keeps the member\'s own table when a link opens a view', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
-    livewire(ListCompanies::class)->set('tableSort', 'name:asc');
+    livewire(ListCompanies::class)->call('sortTable', 'name', 'asc');
 
     $component = Livewire::withQueryParams(['view' => $view->getKey()])->test(ListCompanies::class);
 
@@ -1429,7 +1429,7 @@ it('warns that a view named in the link is unavailable, and opens nothing and wr
 
 it('writes nothing when a link names the view that is already active and unchanged', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
-    livewire(ListCompanies::class)->set('tableSort', 'name:asc')->call('applySavedView', $view->getKey());
+    livewire(ListCompanies::class)->call('sortTable', 'name', 'asc')->call('applySavedView', $view->getKey());
     $updatedAt = preferenceRow()->updated_at;
 
     $this->travelTo(now()->addHour());
@@ -1442,7 +1442,7 @@ it('writes nothing when a link names the view that is already active and unchang
 
 it('keeps a member\'s changes when a link names the view they already changed', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
-    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->set('tableSort', 'name:asc');
+    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('sortTable', 'name', 'asc');
 
     $component = Livewire::withQueryParams(['view' => $view->getKey()])->test(ListCompanies::class);
 
@@ -1452,7 +1452,7 @@ it('keeps a member\'s changes when a link names the view they already changed', 
 
 it('writes nothing when a table opens without a link', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
-    livewire(ListCompanies::class)->set('tableSort', 'name:asc')->call('applySavedView', $view->getKey());
+    livewire(ListCompanies::class)->call('sortTable', 'name', 'asc')->call('applySavedView', $view->getKey());
     $updatedAt = preferenceRow()->updated_at;
 
     $this->travelTo(now()->addHour());
@@ -1562,7 +1562,7 @@ it('opens the built-in list from a link and leaves the applied view behind', fun
 });
 
 it('writes nothing when a link names the built-in list and no view is applied', function (): void {
-    livewire(ListCompanies::class)->set('tableSort', 'name:asc');
+    livewire(ListCompanies::class)->call('sortTable', 'name', 'asc');
     $updatedAt = preferenceRow()->updated_at;
 
     $this->travelTo(now()->addHour());
@@ -1618,3 +1618,15 @@ it('keeps the save as new view dialog when it opens from the save controls', fun
     expect($action->getModalHeading())->toBe('Save as new view')
         ->and($action->getModalSubmitAction()->getLabel())->toBe('Save');
 });
+
+it('hands the sort control the direction a saved view sorts by', function (string $sort, string $direction): void {
+    $view = viewFor($this->user, ['entity' => CrmEntity::Company, 'state' => new TableStateData(sort: $sort)]);
+
+    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey());
+
+    expect($component->get('tableSort'))->toBe($sort)
+        ->and($component->instance()->getFilterBarData()['sort'])->toMatchArray(['column' => 'name', 'direction' => $direction]);
+})->with([
+    'descending' => ['name:desc', 'desc'],
+    'ascending' => ['name:asc', 'asc'],
+]);

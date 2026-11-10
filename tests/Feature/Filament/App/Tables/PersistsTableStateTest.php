@@ -54,7 +54,7 @@ function createdAtHiddenAndFirst(array $columns): array
 it('brings back hidden columns, order, sort, filters and page size on a new visit', function (string $page): void {
     $component = livewire($page);
     $component->call('applyTableColumnManager', createdAtHiddenAndFirst($component->get('tableColumns')), true)
-        ->set('tableSort', 'created_at:desc')
+        ->call('sortTable', 'created_at', 'desc')
         ->set('tableRecordsPerPage', 50)
         ->set('tableFilters', ['trashed' => ['value' => 0]]);
 
@@ -73,7 +73,7 @@ it('writes nothing when a table is opened', function (string $page): void {
 
     expect(savedPreferences())->toBe(0);
 
-    livewire($page)->set('tableSort', 'created_at:desc');
+    livewire($page)->call('sortTable', 'created_at', 'desc');
     $updatedAt = TablePreference::query()->withoutGlobalScopes()->value('updated_at');
 
     $this->travelTo(now()->addHour());
@@ -84,15 +84,15 @@ it('writes nothing when a table is opened', function (string $page): void {
 })->with('remembered list pages');
 
 it('writes one row per member, workspace and table', function (): void {
-    livewire(ListCompanies::class)->set('tableSort', 'created_at:asc')->set('tableSort', 'created_at:desc');
-    livewire(ListPeople::class)->set('tableSort', 'created_at:desc');
+    livewire(ListCompanies::class)->call('sortTable', 'created_at', 'asc')->call('sortTable', 'created_at', 'desc');
+    livewire(ListPeople::class)->call('sortTable', 'created_at', 'desc');
 
     expect(savedPreferences())->toBe(2);
 });
 
 it('keeps state apart per workspace', function (): void {
     $first = $this->user->currentWorkspace;
-    livewire(ListCompanies::class)->set('tableSort', 'created_at:desc');
+    livewire(ListCompanies::class)->call('sortTable', 'created_at', 'desc');
 
     $other = Workspace::factory()->create();
     $this->user->workspaces()->attach($other, ['role' => 'admin']);
@@ -101,7 +101,7 @@ it('keeps state apart per workspace', function (): void {
 
     expect(livewire(ListCompanies::class)->get('tableSort'))->toBeNull();
 
-    livewire(ListCompanies::class)->set('tableSort', 'created_at:asc');
+    livewire(ListCompanies::class)->call('sortTable', 'created_at', 'asc');
     Filament::setTenant($first);
     session()->flush();
 
@@ -110,7 +110,7 @@ it('keeps state apart per workspace', function (): void {
 });
 
 it('keeps one member\'s sort from showing for another member of the workspace', function (): void {
-    livewire(ListCompanies::class)->set('tableSort', 'created_at:desc');
+    livewire(ListCompanies::class)->call('sortTable', 'created_at', 'desc');
 
     $colleague = User::factory()->create(['current_workspace_id' => $this->user->currentWorkspace->getKey()]);
     $this->user->currentWorkspace->users()->attach($colleague, ['role' => 'member']);
@@ -136,7 +136,7 @@ it('writes nothing on a follow-up request that changes nothing', function (strin
 it('writes nothing on follow-up requests when a saved state is open', function (string $page): void {
     $component = livewire($page);
     $component->call('applyTableColumnManager', createdAtHiddenAndFirst($component->get('tableColumns')), true)
-        ->set('tableSort', 'created_at:desc')
+        ->call('sortTable', 'created_at', 'desc')
         ->set('tableRecordsPerPage', 50)
         ->set('tableFilters', ['trashed' => ['value' => 0]])
         ->call('updateResizableColumnWidth', 'created_at', '300');
@@ -150,7 +150,7 @@ it('writes nothing on follow-up requests when a saved state is open', function (
 })->with('remembered list pages');
 
 it('lets a query string sort win over saved state and writes nothing', function (): void {
-    livewire(ListCompanies::class)->set('tableSort', 'created_at:desc');
+    livewire(ListCompanies::class)->call('sortTable', 'created_at', 'desc');
     $updatedAt = TablePreference::query()->withoutGlobalScopes()->value('updated_at');
 
     $this->travelTo(now()->addHour());
@@ -216,7 +216,7 @@ it('loads a filter saved for a deleted custom field', function (): void {
 });
 
 it('stops writing table state to the session', function (): void {
-    $component = livewire(ListCompanies::class)->set('tableSort', 'created_at:desc');
+    $component = livewire(ListCompanies::class)->call('sortTable', 'created_at', 'desc');
     $component->call('applyTableColumnManager', createdAtHiddenAndFirst($component->get('tableColumns')));
 
     expect(session()->has($component->instance()->getTableSortSessionKey()))->toBeFalse()

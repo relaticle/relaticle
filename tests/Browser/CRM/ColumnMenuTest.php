@@ -330,7 +330,7 @@ function companiesTableSort(): string
 function sortedCompaniesTable(object $test): AwaitableWebpage
 {
     $page = openViewSettings(companiesTable($test->user, $test->workspace->slug));
-    $page->script('Livewire.all().find((component) => component.name.includes("ListCompanies")).$wire.set("tableSort", "name:asc")');
+    $page->script('Livewire.all().find((component) => component.name.includes("ListCompanies")).$wire.sortTable("name", "asc")');
     waitUntil($page, '('.companiesTableSort().') === "name:asc"');
     $page->click(settingsRow('accountOwner.name', '[data-view-settings-toggle]'))->assertMissing(columnHeader('accountOwner.name'));
 

@@ -1962,7 +1962,7 @@ it('offers the sort control only columns the member can see and sort', function 
     expect($sortable)->toContain('name')->and($sortable)->not->toContain('no_such_column');
 
     $component->call('setFilterBarSort', 'name', 'asc');
-    $component->set('tableSort', 'no_such_column:asc');
+    $component->call('sortTable', 'no_such_column', 'asc');
 
     expect($component->instance()->getFilterBarData()['sort'])->toBeNull();
 });
@@ -2065,4 +2065,13 @@ it('hands the chip bar the period units with their limits ', function (): void {
         ->and($units['days'])->toMatchArray(['label' => 'days', 'singular' => 'day', 'max' => 3650])
         ->and($units['years']['max'])->toBe(100)
         ->and(collect($data['fields'])->firstWhere('key', 'stale_days')['limit'])->toBe(StaleDaysFilter::MAX_DAYS);
+});
+
+it('ignores a sort written straight from the browser and keeps the one a header click set', function (): void {
+    livewire(ListCompanies::class)
+        ->call('sortTable', 'name', 'desc')
+        ->set('tableSort', 'name:asc')
+        ->assertSet('tableSort', 'name:desc')
+        ->call('setFilterBarSort', 'name', 'asc')
+        ->assertSet('tableSort', 'name:asc');
 });
