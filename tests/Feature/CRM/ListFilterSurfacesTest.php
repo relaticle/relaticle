@@ -311,6 +311,7 @@ it('reads a wildcard character in a partial match on a custom text field as a pl
         [$on(['$starts_with' => '%']), ['Marked']],
         [$on(['$ends_with' => 'm_']), []],
         [$on(['$ends_with' => '\\promo']), ['Marked']],
+        [$on(['$contains' => '\\']), ['Marked']],
         [$on(['$starts_with' => '\\']), []],
     ]);
 });
@@ -325,6 +326,35 @@ it('rejects a blank operand on the api and mcp', function (array $filter, string
     'blank suffix' => [['name' => ['$ends_with' => '']], 'filter.name.$ends_with'],
     'spaces' => [['name' => ['$eq' => '   ']], 'filter.name.$eq'],
 ]);
+
+it('rejects a blank operand on a list custom field on the api and mcp', function (): void {
+    unlinkedRecord($this->user, 'people', 'Ada');
+
+    expectErrorOnEverySurface($this, $this->user, 'people', ['custom_fields' => ['emails' => ['$contains' => '']]], 'filter.custom_fields.emails.$contains', 'must be a non-empty string, or use $is_empty for records without a value.');
+});
+
+it('compares a partial operand as typed against the stored phone and link on the api and mcp', function (): void {
+    foreach ([['Line', 'line', 'phone'], ['Site', 'site', 'link']] as [$name, $code, $type]) {
+        resolve(CreateCustomField::class)->execute($this->user, ['entity_type' => 'opportunity', 'name' => $name, 'code' => $code, 'type' => $type]);
+    }
+    $line = WorkspaceCustomField::byCode($this->workspace->getKey(), 'opportunity', 'line');
+    $site = WorkspaceCustomField::byCode($this->workspace->getKey(), 'opportunity', 'site');
+    $first = unlinkedRecord($this->user, 'opportunities', 'First');
+    $first->saveCustomFieldValue($line, '+14155550100');
+    $first->saveCustomFieldValue($site, 'https://acme.com/team');
+    unlinkedRecord($this->user, 'opportunities', 'Second')->saveCustomFieldValue($site, 'globex.com');
+    $on = fn (string $code, array $condition): array => ['custom_fields' => [$code => $condition]];
+
+    expectTitlesOnEverySurface($this, $this->user, 'opportunities', [
+        [$on('line', ['$contains' => '+1 415']), []],
+        [$on('line', ['$contains' => '+1415']), ['First']],
+        [$on('line', ['$contains' => '+1_15']), []],
+        [$on('site', ['$starts_with' => 'acme']), []],
+        [$on('site', ['$starts_with' => 'https://acme']), ['First']],
+        [$on('site', ['$starts_with' => 'globex']), ['Second']],
+        [$on('site', ['$contains' => '%']), []],
+    ]);
+});
 
 it('rejects an operator a native field does not take on the api and mcp', function (string $route, string $name, string $operator, mixed $operand): void {
     $name = $name === 'title' ? LIST_SURFACES[$route][0]->titleColumn() : $name;

@@ -95,6 +95,7 @@ final readonly class CustomFieldsFilterDescriber
             $line = "- {$type}: operators ".implode(', ', $entry['operators']);
             $line .= isset($entry['sub_fields']) ? '; sub-field domain takes '.implode(', ', $entry['sub_fields']['domain']['operators'])." and matches {$entry['sub_fields']['domain']['matches']}, example ".$this->exampleJson($entry['sub_fields']['domain']['example']) : '';
             $line .= isset($entry['matching']) ? "; values match {$entry['matching']}" : '';
+            $line .= isset($entry['partial_matching']) ? "; partial matches compare against {$entry['partial_matching']}" : '';
             $lines[] = $line.(isset($entry['example']) ? '; example '.$this->exampleJson($entry['example']) : '');
         }
 

@@ -344,7 +344,7 @@ Record, text area, rich text and color fields take no filter. Neither does an en
 - Domain values match as a bare host or a full URL, with or without `www.`, so `https://www.acme.com/about` finds `acme.com`.
 - Phone values match in any format. A phone operand needs a country code, such as `+1 415 555 0100`. An operand without one returns the error `phone_number needs a country code, for example +1 415 555 0100.`
 - Tags match the exact stored value.
-- `$contains`, `$starts_with` and `$ends_with` ignore letter case. On a field that holds several values, they match when any value matches. They compare the value as stored, so a partial phone number is matched against `+14155550100`.
+- `$contains`, `$starts_with` and `$ends_with` ignore letter case. On a field that holds several values, they match when any value matches. They compare the operand as typed against the value as stored. A phone is stored as `+14155550100`, with no spaces or punctuation, so `+1415` matches and `+1 415` does not. A link keeps a scheme only when one was typed, so `https://acme` matches `https://acme.com/team` and `acme` does not. A domain is stored as a bare host, without a scheme or `www.`.
 - `$not_in` and `$has_none` also match records where the field is empty.
 
 #### Limits
@@ -384,7 +384,7 @@ Stage labels and field codes belong to your workspace. Call `get-crm-schema-tool
 `get-crm-schema-tool` returns `filterable_fields` for one entity type. It holds three parts:
 
 - Each native field and relation by name, with its `type`, `operators` and an `example`. Relations add the related `entity`. `creation_source` adds its `values`. Relations, member relations, `stale_days` and `assigned_to_me` add an `operand` that states what they accept.
-- `types` maps each custom field type present in your workspace to its `operators`, its `matching` rule and any `sub_fields`. A type whose values you type freely also carries an `example`, and a choice type carries it on the field instead.
+- `types` maps each custom field type present in your workspace to its `operators`, its `matching` rule, its `partial_matching` rule where it has one, and any `sub_fields`. A type whose values you type freely also carries an `example`, and a choice type carries it on the field instead.
 - `custom_fields` lists each filterable custom field by code, with its `name` and `type`. A choice field also carries its `options` and an `example` built from them.
 
 #### Filter errors

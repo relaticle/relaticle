@@ -314,8 +314,8 @@ it('names the domain sub-field operators and the matching rule once per email an
     $field = $lines->first(fn (string $line): bool => str_starts_with($line, '- emails ('));
     $filterDescription = (new ListPeopleTool)->schema(new JsonSchemaTypeFactory)['filter']->toArray()['description'];
 
-    expect($email)->toContain('operators $has_any, $has_none, $is_empty;', 'sub-field domain takes $in, $not_in', CustomFieldType::EMAIL->filterMatching())
-        ->and($phone)->toContain(CustomFieldType::PHONE->filterMatching())
+    expect($email)->toContain('operators $has_any, $has_none, $contains, $starts_with, $ends_with, $is_empty;', 'sub-field domain takes $in, $not_in', CustomFieldType::EMAIL->filterMatching(), CustomFieldType::EMAIL->partialMatching())
+        ->and($phone)->toContain(CustomFieldType::PHONE->filterMatching(), CustomFieldType::PHONE->partialMatching())
         ->and($phone)->not->toContain('sub-field')
         ->and($field)->toBe('- emails (Emails, email)')
         ->and($filterDescription)->toStartWith('Names for this entity type:')
@@ -402,6 +402,10 @@ it('words each name, type and field as the vocabulary publishes it', function (C
 
         if (isset($entry['matching'])) {
             expect($lines['types'][$type])->toContain("values match {$entry['matching']}");
+        }
+
+        if (isset($entry['partial_matching'])) {
+            expect($lines['types'][$type])->toContain("partial matches compare against {$entry['partial_matching']}");
         }
     }
 

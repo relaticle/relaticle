@@ -502,7 +502,7 @@ it('rejects a list operand longer than one hundred values', function (): void {
 });
 
 it('publishes list and emptiness operators for email, phone, and link types', function (): void {
-    $operators = ['$has_any', '$has_none', '$is_empty'];
+    $operators = ['$has_any', '$has_none', '$contains', '$starts_with', '$ends_with', '$is_empty'];
     $domain = [
         'operators' => ['$in', '$not_in'],
         'matches' => 'the host of each value',
@@ -516,12 +516,15 @@ it('publishes list and emptiness operators for email, phone, and link types', fu
             ->where('filterable_fields.types.email.operators', $operators)
             ->where('filterable_fields.types.email.sub_fields.domain', $domain)
             ->where('filterable_fields.types.email.matching', CustomFieldType::EMAIL->filterMatching())
+            ->where('filterable_fields.types.email.partial_matching', CustomFieldType::EMAIL->partialMatching())
             ->where('filterable_fields.types.phone.operators', $operators)
             ->where('filterable_fields.types.phone.matching', CustomFieldType::PHONE->filterMatching())
+            ->where('filterable_fields.types.phone.partial_matching', CustomFieldType::PHONE->partialMatching())
             ->missing('filterable_fields.types.phone.sub_fields')
             ->where('filterable_fields.types.link.operators', $operators)
             ->where('filterable_fields.types.link.sub_fields.domain', $domain)
             ->where('filterable_fields.types.link.matching', CustomFieldType::LINK->filterMatching())
+            ->where('filterable_fields.types.link.partial_matching', CustomFieldType::LINK->partialMatching())
             ->where('filterable_fields.custom_fields.emails', ['name' => 'Emails', 'type' => 'email'])
             ->where('filterable_fields.custom_fields.phone_number.type', 'phone')
             ->where('filterable_fields.custom_fields.linkedin.type', 'link')
@@ -1033,7 +1036,7 @@ it('publishes fields that share a sort order by id', function (): void {
 });
 
 it('offers a domain field the list operators and no domain sub-field', function (): void {
-    expect(array_keys(CustomFieldFilterSchema::operatorsForType('domain')))->toBe(['$has_any', '$has_none', '$is_empty']);
+    expect(array_keys(CustomFieldFilterSchema::operatorsForType('domain')))->toBe(['$has_any', '$has_none', '$contains', '$starts_with', '$ends_with', '$is_empty']);
 });
 
 it('finds a company by any spelling of its domain', function (string $operand): void {
