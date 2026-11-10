@@ -71,6 +71,7 @@ final readonly class NativeFilter implements Filter
             '$contains' => $query->where($column, 'ILIKE', '%'.LikePattern::escape($text).'%'),
             '$starts_with' => $query->where($column, 'ILIKE', LikePattern::escape($text).'%'),
             '$ends_with' => $query->where($column, 'ILIKE', '%'.LikePattern::escape($text)),
+            default => throw new \LogicException("Unsupported text filter operator [{$operator}]."),
         };
     }
 
