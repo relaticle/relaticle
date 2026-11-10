@@ -7,6 +7,7 @@ use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\MeetingsRelationManager;
+use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\People;
 use App\Models\User;
@@ -91,16 +92,38 @@ it('can sort `:dataset` column', function (string $column): void {
         ->assertCanSeeTableRecords($records->sortByDesc($sortingKey), inOrder: true);
 })->with(['company.name', 'creator.name', 'created_at', 'updated_at', 'deleted_at']);
 
-it('narrows the list with a `:dataset` rule', function (string $field, string $condition, string $attribute): void {
+it('narrows the list with a contains rule on its name', function (): void {
     $records = People::factory(3)->recycle([$this->user, $this->workspace])->create();
-    $value = $records->first()->{$attribute};
-    $matches = $records->filter(fn (Model $record): bool => $record->{$attribute} === $value);
+    $value = $records->first()->name;
 
     livewire(ListPeople::class)
-        ->call('setFilterRules', [['field' => $field, 'condition' => $condition, 'value' => $condition === 'contains' ? $value : [$value]]])
-        ->assertCanSeeTableRecords($matches)
-        ->assertCountTableRecords($matches->count());
-})->with(['name' => ['name', 'contains', 'name'], 'company.name' => ['company', 'is_any_of', 'company_id'], 'creator.name' => ['creator', 'is_any_of', 'creator_id']]);
+        ->call('setFilterRules', [['field' => 'name', 'condition' => 'contains', 'value' => $value]])
+        ->assertCanSeeTableRecords($records->filter(fn (Model $record): bool => $record->name === $value))
+        ->assertCanNotSeeTableRecords($records->filter(fn (Model $record): bool => $record->name !== $value));
+});
+
+it('narrows the list to the people of a company', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $inside = People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $company->getKey()]);
+    $outside = People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => null]);
+
+    livewire(ListPeople::class)
+        ->call('setFilterRules', [['field' => 'company', 'condition' => 'is_any_of', 'value' => [$company->getKey()]]])
+        ->assertCanSeeTableRecords([$inside])
+        ->assertCanNotSeeTableRecords([$outside]);
+});
+
+it('narrows the list by creator to the records one member holds', function (): void {
+    $colleague = User::factory()->create(['current_workspace_id' => $this->workspace->getKey()]);
+    $this->workspace->users()->attach($colleague, ['role' => 'member']);
+    $mine = People::factory()->recycle([$this->user, $this->workspace])->create(['creator_id' => $this->user->getKey()]);
+    $theirs = People::factory()->recycle([$this->user, $this->workspace])->create(['creator_id' => $colleague->getKey()]);
+
+    livewire(ListPeople::class)
+        ->call('setFilterRules', [['field' => 'creator', 'condition' => 'is_any_of', 'value' => [$colleague->getKey()]]])
+        ->assertCanSeeTableRecords([$theirs])
+        ->assertCanNotSeeTableRecords([$mine]);
+});
 
 it('cannot display trashed records by default', function (): void {
     $records = People::factory()->count(4)->recycle([$this->user, $this->workspace])->create();

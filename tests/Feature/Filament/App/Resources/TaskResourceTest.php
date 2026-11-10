@@ -115,16 +115,27 @@ it('can sort `:dataset` column', function (string $column): void {
         ->assertCanSeeTableRecords($records->sortByDesc($sortingKey), inOrder: true);
 })->with(['creator.name', 'created_at', 'updated_at', 'deleted_at']);
 
-it('narrows the list with a `:dataset` rule', function (string $field, string $condition, string $attribute): void {
+it('narrows the list with a contains rule on its title', function (): void {
     $records = Task::factory(3)->recycle([$this->user, $this->workspace])->create();
-    $value = $records->first()->{$attribute};
-    $matches = $records->filter(fn (Model $record): bool => $record->{$attribute} === $value);
+    $value = $records->first()->title;
 
     livewire(ManageTasks::class)
-        ->call('setFilterRules', [['field' => $field, 'condition' => $condition, 'value' => $condition === 'contains' ? $value : [$value]]])
-        ->assertCanSeeTableRecords($matches)
-        ->assertCountTableRecords($matches->count());
-})->with(['title' => ['title', 'contains', 'title'], 'creator.name' => ['creator', 'is_any_of', 'creator_id']]);
+        ->call('setFilterRules', [['field' => 'title', 'condition' => 'contains', 'value' => $value]])
+        ->assertCanSeeTableRecords($records->filter(fn (Model $record): bool => $record->title === $value))
+        ->assertCanNotSeeTableRecords($records->filter(fn (Model $record): bool => $record->title !== $value));
+});
+
+it('narrows the list by creator to the records one member holds', function (): void {
+    $colleague = User::factory()->create(['current_workspace_id' => $this->workspace->getKey()]);
+    $this->workspace->users()->attach($colleague, ['role' => 'member']);
+    $mine = Task::factory()->recycle([$this->user, $this->workspace])->create(['creator_id' => $this->user->getKey()]);
+    $theirs = Task::factory()->recycle([$this->user, $this->workspace])->create(['creator_id' => $colleague->getKey()]);
+
+    livewire(ManageTasks::class)
+        ->call('setFilterRules', [['field' => 'creator', 'condition' => 'is_any_of', 'value' => [$colleague->getKey()]]])
+        ->assertCanSeeTableRecords([$theirs])
+        ->assertCanNotSeeTableRecords([$mine]);
+});
 
 it('narrows the list to the tasks assigned to a member', function (): void {
     $assigned = Task::factory()->recycle([$this->user, $this->workspace])->create();

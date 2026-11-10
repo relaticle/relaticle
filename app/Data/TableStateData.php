@@ -39,7 +39,10 @@ final class TableStateData extends Data
     // jsonb reorders object keys, so a stored state only hashes like the live one with keys sorted.
     public function hash(): string
     {
-        return hash('xxh128', json_encode(self::sortKeys($this->toArray()), JSON_THROW_ON_ERROR));
+        // Stored hashes include the retired search keys, so dropping them would unmatch every saved view's baseline.
+        $state = [...$this->toArray(), 'search' => null, 'columnSearches' => []];
+
+        return hash('xxh128', json_encode(self::sortKeys($state), JSON_THROW_ON_ERROR));
     }
 
     /**

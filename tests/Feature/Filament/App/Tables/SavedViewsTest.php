@@ -107,6 +107,30 @@ it('applies columns, sort, filters and page size in one call', function (string 
         ->and(preferenceRow()->active_view_id)->toBe($view->getKey());
 })->with('view list pages');
 
+function sortedKeys(array $value): array
+{
+    if (! array_is_list($value)) {
+        ksort($value);
+    }
+
+    return array_map(fn (mixed $item): mixed => is_array($item) ? sortedKeys($item) : $item, $value);
+}
+
+it('reads an unchanged view as unchanged against a hash stored before search left', function (): void {
+    $state = new TableStateData(columns: [['type' => 'column', 'name' => 'created_at', 'isToggled' => true]], sort: 'name:asc');
+    $view = viewFor($this->user, ['state' => $state]);
+    TablePreference::factory()->for($this->user)->for($this->workspace)->create([
+        'entity' => CrmEntity::Company,
+        'state' => $state,
+        'active_view_id' => $view->getKey(),
+        'default_view_id' => null,
+        'applied_view_hash' => hash('xxh128', json_encode(sortedKeys([...$state->toArray(), 'search' => null, 'columnSearches' => []]), JSON_THROW_ON_ERROR)),
+    ]);
+    session()->put("tables.opened.{$this->workspace->getKey()}.company", true);
+
+    expect(livewire(ListCompanies::class)->instance()->isSavedViewModified())->toBeFalse();
+});
+
 it('opens a view stored with a search unchanged and applies no search', function (string $page, CrmEntity $entity): void {
     $view = viewFor($this->user, ['entity' => $entity, 'state' => hotLeads()]);
     DB::table('saved_views')->where('id', $view->getKey())->update(['state' => json_encode([...$view->state->toArray(), 'search' => 'acme', 'columnSearches' => ['name' => 'acme']])]);

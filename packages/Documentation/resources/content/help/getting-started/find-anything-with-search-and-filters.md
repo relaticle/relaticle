@@ -17,11 +17,11 @@ already in front of you.
 
 ![The global search dropdown showing results for "Acme" grouped under Companies and Opportunities](/help-assets/getting-started/find-anything-with-search-and-filters-1.png)
 
-## Search within a list
+## Find a record in a list
 
 The lists (Companies, People, Opportunities, Tasks, Notes) have no search box.
-To find a record by name in a list, add a filter on its name field with the
-**contains** condition. The filter row above the table shows it, and you can
+To find a record by name in a list, add a filter on its name or title field with
+the **contains** condition. The filter row above the table shows it, and you can
 remove it from there.
 
 ## Filter a list

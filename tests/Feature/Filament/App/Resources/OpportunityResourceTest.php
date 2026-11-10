@@ -88,16 +88,27 @@ it('can sort `:dataset` column', function (string $column): void {
         ->assertCanSeeTableRecords($records->sortByDesc($sortingKey), inOrder: true);
 })->with(['creator.name', 'deleted_at', 'created_at', 'updated_at']);
 
-it('narrows the list with a `:dataset` rule', function (string $field, string $condition, string $attribute): void {
+it('narrows the list with a contains rule on its name', function (): void {
     $records = Opportunity::factory(3)->recycle([$this->user, $this->workspace])->create();
-    $value = $records->first()->{$attribute};
-    $matches = $records->filter(fn (Model $record): bool => $record->{$attribute} === $value);
+    $value = $records->first()->name;
 
     livewire(ListOpportunities::class)
-        ->call('setFilterRules', [['field' => $field, 'condition' => $condition, 'value' => $condition === 'contains' ? $value : [$value]]])
-        ->assertCanSeeTableRecords($matches)
-        ->assertCountTableRecords($matches->count());
-})->with(['name' => ['name', 'contains', 'name'], 'creator.name' => ['creator', 'is_any_of', 'creator_id']]);
+        ->call('setFilterRules', [['field' => 'name', 'condition' => 'contains', 'value' => $value]])
+        ->assertCanSeeTableRecords($records->filter(fn (Model $record): bool => $record->name === $value))
+        ->assertCanNotSeeTableRecords($records->filter(fn (Model $record): bool => $record->name !== $value));
+});
+
+it('narrows the list by creator to the records one member holds', function (): void {
+    $colleague = User::factory()->create(['current_workspace_id' => $this->workspace->getKey()]);
+    $this->workspace->users()->attach($colleague, ['role' => 'member']);
+    $mine = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['creator_id' => $this->user->getKey()]);
+    $theirs = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['creator_id' => $colleague->getKey()]);
+
+    livewire(ListOpportunities::class)
+        ->call('setFilterRules', [['field' => 'creator', 'condition' => 'is_any_of', 'value' => [$colleague->getKey()]]])
+        ->assertCanSeeTableRecords([$theirs])
+        ->assertCanNotSeeTableRecords([$mine]);
+});
 
 it('cannot display trashed records by default', function (): void {
     $records = Opportunity::factory()->count(4)->recycle([$this->user, $this->workspace])->create();
