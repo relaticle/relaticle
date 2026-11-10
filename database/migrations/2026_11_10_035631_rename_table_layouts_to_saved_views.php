@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Notifications\SavedViewChangedNotification;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Collection;
@@ -12,7 +13,7 @@ return new class extends Migration
 {
     private const string OLD_NOTIFICATION = 'App\Notifications\TableLayoutChangedNotification';
 
-    private const string NEW_NOTIFICATION = 'App\Notifications\SavedViewChangedNotification';
+    private const string NEW_NOTIFICATION = SavedViewChangedNotification::class;
 
     public function up(): void
     {
