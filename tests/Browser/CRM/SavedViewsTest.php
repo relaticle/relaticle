@@ -69,6 +69,49 @@ it('offers save as new view from the arrow beside save for everyone on a shared 
         ->assertNoJavaScriptErrors();
 });
 
+it('joins the save halves into one chip-height control that stays pinned beside a long row of chips', function (): void {
+    SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'name' => 'Hot leads',
+        'state' => new TableStateData(sort: 'name:desc'),
+    ]);
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->click('Hot leads');
+    changeViewByRule($page);
+    $page->assertSee('Discard changes');
+
+    $measure = <<<'JS'
+        (() => {
+            const box = (selector) => document.querySelector(selector).getBoundingClientRect();
+            const save = box('.fi-view-save-split > .fi-btn');
+            const more = box('.fi-view-save-more');
+            const discard = box('.fi-view-save-discard');
+            const chip = box('[data-filter-chip]');
+
+            return {
+                sameHeight: save.height === more.height && more.height === chip.height && discard.height === chip.height,
+                sameTop: save.top === more.top,
+                touching: Math.abs(save.right - more.left) <= 0.5,
+                square: getComputedStyle(document.querySelector('.fi-view-save-more')).borderStartStartRadius === '0px',
+                right: Math.round(more.right),
+            };
+        })();
+    JS;
+
+    $before = $page->script($measure);
+    $page->script("Livewire.all().find((component) => component.name.includes('ListCompanies')).\$wire.\$call('setFilterRules', Array.from({ length: 8 }, (_, index) => ({ field: 'name', condition: 'contains', value: 'chip' + index })))");
+    $page->assertScript('document.querySelectorAll("[data-filter-chip]").length === 8', true);
+    $after = $page->script($measure);
+
+    expect($before)->toMatchArray(['sameHeight' => true, 'sameTop' => true, 'touching' => true, 'square' => true])
+        ->and($after)->toBe($before);
+    $page->assertNoJavaScriptErrors();
+});
+
 it('keeps the save controls in the filter row on a phone without overflowing', function (): void {
     SavedView::factory()->for($this->user)->for($this->workspace)->create([
         'name' => 'Hot leads',

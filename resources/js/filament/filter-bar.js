@@ -5,6 +5,7 @@
     const MAX_FIELD_RESULTS = 200
     const SEARCH_THRESHOLD = 8
     const SHOWN_VALUES = 2
+    const FADE_WIDTH = 32
     const LOOKUP_KINDS = ['member', 'relation', 'record']
     const LIST_KINDS = ['choice', 'multi_choice', ...LOOKUP_KINDS]
 
@@ -27,6 +28,7 @@
                 timer: null,
                 opener: null,
                 observer: null,
+                sizeObserver: null,
                 results: [],
                 pinned: [],
                 searching: false,
@@ -51,10 +53,14 @@
                         this.reconcile()
                     })
                     this.observer.observe(root, { attributes: true, attributeFilter: ['data-state'] })
+                    this.sizeObserver = new ResizeObserver(() => this.fade())
+                    this.sizeObserver.observe(this.$refs.strip)
+                    this.$watch('chips', () => this.$nextTick(() => this.fade()))
                 },
 
                 destroy() {
                     this.observer?.disconnect()
+                    this.sizeObserver?.disconnect()
                     clearTimeout(this.timer)
                     clearTimeout(this.searchTimer)
                 },
@@ -267,6 +273,28 @@
                     }
                 },
 
+                fade() {
+                    const strip = this.$refs.strip
+                    const edge = strip.scrollWidth - strip.clientWidth - Math.abs(strip.scrollLeft)
+
+                    strip.parentElement.toggleAttribute('data-fade-start', strip.scrollLeft > 1)
+                    strip.parentElement.toggleAttribute('data-fade-end', edge > 1)
+                },
+
+                reveal(element) {
+                    const strip = this.$refs.strip
+                    const bounds = strip.getBoundingClientRect()
+                    const box = element.getBoundingClientRect()
+
+                    if (box.right > bounds.right - FADE_WIDTH) {
+                        strip.scrollLeft += box.right - (bounds.right - FADE_WIDTH)
+                    }
+
+                    if (box.left < bounds.left + FADE_WIDTH) {
+                        strip.scrollLeft -= bounds.left + FADE_WIDTH - box.left
+                    }
+                },
+
                 visiblePop() {
                     return [...root.querySelectorAll('[data-pop][data-open="true"]')].find((pop) => pop.checkVisibility())
                 },
@@ -281,6 +309,9 @@
 
                         return
                     }
+
+
+                    this.reveal(pop.closest('.fi-filter-chip') ?? pop.parentElement)
 
                     if (pop.contains(document.activeElement)) {
                         return

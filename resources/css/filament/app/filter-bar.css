@@ -1,9 +1,41 @@
 .fi-filter-bar {
-    @apply flex min-h-11 items-start gap-3 border-b border-gray-200/60 px-4 py-2 lg:px-6 dark:border-white/10;
+    @apply flex min-h-11 items-center gap-3 border-b border-gray-200/60 px-4 py-2 lg:px-6 dark:border-white/10;
+}
+
+.fi-filter-bar-scroll {
+    @apply relative min-w-0 flex-1;
+
+    --fade-edge: var(--color-white);
+
+    .dark & {
+        --fade-edge: var(--gray-900);
+    }
+
+    &::before,
+    &::after {
+        @apply pointer-events-none absolute inset-y-0 z-10 w-8 opacity-0 transition-opacity content-[''];
+    }
+
+    &::before {
+        @apply start-0 bg-linear-to-r from-(--fade-edge) to-transparent;
+    }
+
+    &::after {
+        @apply end-0 bg-linear-to-l from-(--fade-edge) to-transparent;
+    }
+
+    &[data-fade-start]::before,
+    &[data-fade-end]::after {
+        @apply opacity-100;
+    }
 }
 
 .fi-filter-bar-start {
-    @apply flex min-w-0 flex-1 flex-wrap items-center gap-1.5;
+    @apply -m-0.5 flex flex-nowrap items-center gap-1.5 overflow-x-auto overscroll-x-contain p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden;
+
+    & > * {
+        @apply shrink-0;
+    }
 }
 
 .fi-filter-bar-end {
@@ -91,11 +123,7 @@ button.fi-filter-seg {
 }
 
 .fi-filter-pop {
-    @apply absolute start-0 top-[calc(100%+0.375rem)] z-30 min-w-52 cursor-default rounded-[10px] bg-white p-1 font-normal text-gray-950 shadow-lg ring-1 ring-gray-950/10 dark:bg-gray-900 dark:text-white dark:ring-white/15;
-
-    &.fi-filter-pop-end {
-        @apply start-auto end-0;
-    }
+    @apply fixed z-30 min-w-52 cursor-default rounded-[10px] bg-white p-1 font-normal text-gray-950 shadow-lg ring-1 ring-gray-950/10 dark:bg-gray-900 dark:text-white dark:ring-white/15;
 
     &.fi-filter-pop-picker {
         @apply min-w-70;

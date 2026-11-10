@@ -1,5 +1,9 @@
 .fi-view-save {
-    @apply flex items-center gap-2;
+    @apply flex shrink-0 items-center gap-2;
+
+    & .fi-btn {
+        @apply h-7 py-0;
+    }
 }
 
 .fi-view-save-discard {
@@ -7,14 +11,19 @@
 }
 
 .fi-view-save-split {
-    @apply flex items-center;
+    @apply flex items-stretch;
 
     & > .fi-btn {
         @apply rounded-e-none;
     }
 
+    & > .fi-dropdown,
+    & .fi-dropdown-trigger {
+        @apply flex;
+    }
+
     & .fi-view-save-more {
-        @apply rounded-s-none border-s border-white/25 px-2;
+        @apply rounded-s-none border-s border-primary-800 px-2 dark:border-primary-700;
     }
 }
 

@@ -28,6 +28,11 @@ function addChip(AwaitableWebpage $page, string $field, string $condition): Awai
         ->click("[data-pop]:not([style*=\"display: none\"]) [data-condition=\"{$condition}\"]");
 }
 
+function setRules(AwaitableWebpage $page, int $count): void
+{
+    $page->script("Livewire.all().find((component) => component.name.includes('ListCompanies')).\$wire.\$call('setFilterRules', Array.from({ length: {$count} }, (_, index) => ({ field: 'name', condition: 'contains', value: 'chip' + index })))");
+}
+
 function valueInput(): string
 {
     return '[data-pop]:not([style*="display: none"]) [data-filter-value]';
@@ -289,6 +294,43 @@ it('keeps the filter row inside a phone viewport with several chips', function (
     addChip($page, 'name', 'does_not_contain')->type(valueInput(), 'zz');
     $page->keys(valueInput(), 'Enter')
         ->assertScript('document.documentElement.scrollWidth <= window.innerWidth', true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('keeps the filter row on one scrolling line however many chips it holds', function (int $width, int $height): void {
+    $page = ($this->open)($width, $height);
+    setRules($page, 1);
+    $page->assertPresent('[data-filter-chip]');
+    $single = $page->script('document.querySelector("[data-filter-bar]").getBoundingClientRect().height');
+
+    setRules($page, 8);
+    $page->assertScript('document.querySelectorAll("[data-filter-chip]").length === 8', true)
+        ->assertScript("document.querySelector('[data-filter-bar]').getBoundingClientRect().height === {$single}", true)
+        ->assertScript('(() => { const strip = document.querySelector(".fi-filter-bar-start"); return strip.scrollWidth > strip.clientWidth && strip.offsetHeight === strip.clientHeight && [...strip.querySelectorAll("[data-filter-chip]")].every((chip) => Math.abs(chip.getBoundingClientRect().top - strip.querySelector("[data-filter-sort]").getBoundingClientRect().top) < 2); })()', true)
+        ->assertNoJavaScriptErrors();
+})->with([[1440, 900], [390, 844]]);
+
+it('scrolls a new chip and its list into view', function (): void {
+    $page = ($this->open)();
+    setRules($page, 8);
+    $page->assertScript('document.querySelectorAll("[data-filter-chip]").length === 8', true);
+
+    addChip($page, 'name', 'contains');
+
+    $page->assertScript('(() => { const strip = document.querySelector(".fi-filter-bar-start").getBoundingClientRect(); const chip = [...document.querySelectorAll("[data-filter-chip]")].at(-1).getBoundingClientRect(); return chip.left >= strip.left && chip.right <= strip.right; })()', true)
+        ->assertScript('(() => { const pop = document.querySelector("[data-pop][data-open=true]").getBoundingClientRect(); return pop.left >= 0 && pop.right <= innerWidth && pop.bottom <= innerHeight; })()', true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('opens a chip menu from the right edge of the scrolled row without clipping it', function (): void {
+    $page = ($this->open)();
+    setRules($page, 8);
+    $page->assertScript('document.querySelectorAll("[data-filter-chip]").length === 8', true)
+        ->script('document.querySelector(".fi-filter-bar-start").scrollLeft = 99999');
+
+    $page->script('[...document.querySelectorAll("[data-filter-more]")].at(-1).click()');
+
+    $page->assertScript('(async () => { await new Promise((resolve) => setTimeout(resolve, 500)); const pop = document.querySelector("[data-pop][data-open=true][role=menu]"); const box = pop.getBoundingClientRect(); const item = pop.querySelector("[data-pop-item]").getBoundingClientRect(); const hit = document.elementFromPoint(item.left + item.width / 2, item.top + item.height / 2); const chip = [...document.querySelectorAll("[data-filter-chip]")].at(-1).getBoundingClientRect(); return box.left >= 0 && box.right <= innerWidth && box.top >= chip.bottom && pop.offsetParent === null && pop.contains(hit); })()', true)
         ->assertNoJavaScriptErrors();
 });
 
