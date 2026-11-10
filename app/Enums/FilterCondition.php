@@ -52,10 +52,11 @@ enum FilterCondition: string
         };
     }
 
-    public function isNegated(): bool
+    public function isNegated(FilterFieldKind $kind): bool
     {
         return match ($this) {
-            self::DoesNotContain, self::IsNot, self::IsNotChecked => true,
+            self::DoesNotContain, self::IsNotChecked => true,
+            self::IsNot => $kind !== FilterFieldKind::MultiText,
             self::Contains, self::StartsWith, self::EndsWith, self::Is,
             self::IsEmpty, self::IsNotEmpty,
             self::GreaterThan, self::GreaterOrEqual, self::LessThan, self::LessOrEqual,
@@ -66,6 +67,35 @@ enum FilterCondition: string
         };
     }
 
+    public function fixedOperand(): ?bool
+    {
+        return match ($this) {
+            self::IsEmpty, self::IsChecked, self::IsNotChecked => true,
+            self::IsNotEmpty => false,
+            self::Contains, self::DoesNotContain, self::StartsWith, self::EndsWith,
+            self::Is, self::IsNot,
+            self::GreaterThan, self::GreaterOrEqual, self::LessThan, self::LessOrEqual,
+            self::Before, self::AtOrBefore, self::After, self::AtOrAfter,
+            self::InThePast, self::InTheNext, self::This,
+            self::IsAnyOf, self::IsNoneOf, self::HasAnyOf, self::HasNoneOf,
+            self::NoActivityFor => null,
+        };
+    }
+
+    public function takesList(FilterFieldKind $kind): bool
+    {
+        return match ($this) {
+            self::IsAnyOf, self::IsNoneOf, self::HasAnyOf, self::HasNoneOf => true,
+            self::Is, self::IsNot => $kind === FilterFieldKind::MultiText,
+            self::Contains, self::DoesNotContain, self::StartsWith, self::EndsWith,
+            self::IsEmpty, self::IsNotEmpty,
+            self::GreaterThan, self::GreaterOrEqual, self::LessThan, self::LessOrEqual,
+            self::Before, self::AtOrBefore, self::After, self::AtOrAfter,
+            self::InThePast, self::InTheNext, self::This,
+            self::IsChecked, self::IsNotChecked, self::NoActivityFor => false,
+        };
+    }
+
     /** @return list<string> */
     public function operators(FilterFieldKind $kind): array
     {
@@ -73,7 +103,8 @@ enum FilterCondition: string
             self::Contains, self::DoesNotContain => ['$contains'],
             self::StartsWith => ['$starts_with'],
             self::EndsWith => ['$ends_with'],
-            self::Is, self::IsNot => $kind === FilterFieldKind::MultiText ? ['$has_any'] : ['$eq'],
+            self::Is => $kind === FilterFieldKind::MultiText ? ['$has_any'] : ['$eq'],
+            self::IsNot => $kind === FilterFieldKind::MultiText ? ['$has_none'] : ['$eq'],
             self::IsEmpty, self::IsNotEmpty => ['$is_empty'],
             self::GreaterThan, self::After => ['$gt'],
             self::GreaterOrEqual, self::AtOrAfter, self::NoActivityFor => ['$gte'],

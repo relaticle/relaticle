@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Filament\Tables\FilterBar;
 
-use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
 use App\Enums\FilterFieldKind;
@@ -14,17 +13,36 @@ use App\Models\User;
 use App\Queries\CustomFieldFilterSchema;
 use App\Queries\EntityFilters;
 use App\Queries\FilterDefinition;
-use App\Queries\Filters\AssignedToMeFilter;
 use App\Support\CustomFields\WorkspaceCustomFields;
+use BackedEnum;
+use Filament\Support\Contracts\HasColor;
+use Filament\Support\Contracts\HasLabel;
 
 final readonly class FilterFieldCatalog
 {
     public const string CUSTOM_FIELD_PREFIX = 'custom_fields.';
 
-    /** @return array<string, FilterField> */
-    public static function for(CrmEntity $entity, User $user): array
+    /**
+     * @param  array<string, string>  $columnLabels
+     * @return array<string, FilterField>
+     */
+    public static function for(CrmEntity $entity, User $user, array $columnLabels = []): array
     {
-        return once(fn (): array => [...self::nativeFields($entity), ...self::customFields($entity, $user)]);
+        $workspaceId = $user->currentWorkspace->getKey();
+
+        // once() keys on its used variables, and one user object can switch workspace within a request.
+        return once(fn (): array => [
+            ...self::nativeFields($entity, $columnLabels),
+            ...self::customFields($entity, $user, $workspaceId),
+        ]);
+    }
+
+    public static function columnFor(string $key): string
+    {
+        return match ($key) {
+            'creator', 'accountOwner', 'assignees', 'company' => "{$key}.name",
+            default => $key,
+        };
     }
 
     public static function columnIcon(string $column): string
@@ -42,21 +60,26 @@ final readonly class FilterFieldCatalog
         };
     }
 
-    /** @return array<string, FilterField> */
-    private static function nativeFields(CrmEntity $entity): array
+    /**
+     * @param  array<string, string>  $columnLabels
+     * @return array<string, FilterField>
+     */
+    private static function nativeFields(CrmEntity $entity, array $columnLabels): array
     {
         $fields = [];
 
         foreach (EntityFilters::definitions($entity) as $key => $definition) {
-            if ($definition->filterClass === AssignedToMeFilter::class) {
+            $kind = $definition->fieldKind();
+
+            if ($kind === null) {
                 continue;
             }
 
             $fields[$key] = new FilterField(
                 key: $key,
-                label: __("filament/panel.tables.filters.fields.{$key}"),
+                label: $columnLabels[self::columnFor($key)] ?? __("filament/panel.tables.filters.fields.{$key}"),
                 icon: self::nativeIcon($key, $definition),
-                kind: $definition->kind->filterFieldKind(),
+                kind: $kind,
                 related: $definition->related,
                 options: self::nativeOptions($definition),
                 operators: $definition->operators(),
@@ -80,25 +103,30 @@ final readonly class FilterFieldCatalog
     /** @return list<array{id: string, label: string, color: ?string}> */
     private static function nativeOptions(FilterDefinition $definition): array
     {
-        if ($definition->enumClass !== CreationSource::class) {
+        if ($definition->enumClass === null) {
             return [];
         }
 
-        return array_map(
-            static fn (CreationSource $source): array => ['id' => $source->value, 'label' => (string) $source->getLabel(), 'color' => $source->getColor()],
-            CreationSource::cases(),
-        );
+        return array_map(static function (BackedEnum $case): array {
+            $color = $case instanceof HasColor ? $case->getColor() : null;
+
+            return [
+                'id' => (string) $case->value,
+                'label' => $case instanceof HasLabel && is_string($case->getLabel()) ? $case->getLabel() : $case->name,
+                'color' => is_string($color) ? $color : null,
+            ];
+        }, $definition->enumClass::cases());
     }
 
     /** @return array<string, FilterField> */
-    private static function customFields(CrmEntity $entity, User $user): array
+    private static function customFields(CrmEntity $entity, User $user, int|string $workspaceId): array
     {
         $fields = [];
 
         foreach (resolve(WorkspaceCustomFields::class)->forEntity($user->currentWorkspace, $entity->value) as $field) {
             $kind = CustomFieldType::tryFrom($field->type)?->filterFieldKind();
 
-            if ($kind === null || ! CustomFieldFilterSchema::isFilterable($field)) {
+            if ($kind === null || (string) $field->tenant_id !== (string) $workspaceId || ! CustomFieldFilterSchema::isFilterable($field)) {
                 continue;
             }
 
@@ -111,6 +139,7 @@ final readonly class FilterFieldCatalog
                 related: $kind === FilterFieldKind::Record ? CrmEntity::tryFrom((string) $field->lookup_type) : null,
                 options: self::customOptions($field, $kind),
                 operators: CustomFieldFilterSchema::operatorKeys($field->type),
+                type: CustomFieldType::tryFrom($field->type),
             );
         }
 

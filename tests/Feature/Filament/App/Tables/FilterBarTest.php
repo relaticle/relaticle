@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\CustomFields\CreateCustomField;
+use App\Data\TableStateData;
 use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
@@ -21,10 +22,12 @@ use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\SavedView;
 use App\Models\Task;
 use App\Models\User;
-use App\Queries\CustomFieldFilterSchema;
+use App\Models\Workspace;
 use App\Queries\EntityFilters;
+use App\Queries\Filters\StaleDaysFilter;
 use App\Queries\Filters\TreeFilter;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Model;
@@ -165,6 +168,25 @@ function filterBarScenario(string $scenario, User $user): array
                 $record(Company::class, 'Plain'),
             ];
         })()],
+        'merge' => [ListCompanies::class, 'companies', ['Acme Corp', 'Acme Robotics', 'Corp Holdings'], array_map(fn (string $name): Model => $record(Company::class, $name), ['Acme Corp', 'Acme Robotics', 'Corp Holdings'])],
+        'seats' => [ListOpportunities::class, 'opportunities', ['Few', 'Many', 'Unset'], (function () use ($user, $record): array {
+            filterBarField($user, 'opportunity', 'seats', CustomFieldType::NUMBER->value);
+
+            return [
+                $record(Opportunity::class, 'Few', values: ['seats' => 10]),
+                $record(Opportunity::class, 'Many', values: ['seats' => 5000]),
+                $record(Opportunity::class, 'Unset'),
+            ];
+        })()],
+        'phones' => [ListPeople::class, 'people', ['Cell', 'Desk', 'Silent'], (function () use ($user, $record): array {
+            filterBarField($user, 'people', 'mobile', CustomFieldType::PHONE->value);
+
+            return [
+                $record(People::class, 'Cell', values: ['mobile' => ['+14155550100']]),
+                $record(People::class, 'Desk', values: ['mobile' => ['+14155550199']]),
+                $record(People::class, 'Silent'),
+            ];
+        })()],
         'icp' => [ListCompanies::class, 'companies', ['Marked', 'Unmarked', 'Never'], [
             $record(Company::class, 'Marked', values: ['icp' => true]),
             $record(Company::class, 'Unmarked', values: ['icp' => false]),
@@ -255,6 +277,16 @@ dataset('compiled conditions', [
     'multi text is' => ['emails', [['field' => 'custom_fields.emails', 'condition' => 'is', 'value' => 'ann@acme.com']], ['Ann']],
     'multi text is not' => ['emails', [['field' => 'custom_fields.emails', 'condition' => 'is_not', 'value' => 'ann@acme.com']], ['Bob', 'Cy']],
     'multi text is empty' => ['emails', [['field' => 'custom_fields.emails', 'condition' => 'is_empty']], ['Cy']],
+    'name with a trailing space' => ['companies', [['field' => 'name', 'condition' => 'is', 'value' => 'Globex ']], ['Globex']],
+    'two rules on one text field' => ['merge', [
+        ['field' => 'name', 'condition' => 'contains', 'value' => 'Acme'],
+        ['field' => 'name', 'condition' => 'contains', 'value' => 'Corp'],
+    ], ['Acme Corp']],
+    'integer field with exponent' => ['seats', [['field' => 'custom_fields.seats', 'condition' => 'greater_than', 'value' => '1e3']], ['Many']],
+    'integer field with a decimal point' => ['seats', [['field' => 'custom_fields.seats', 'condition' => 'greater_than', 'value' => '1000.0']], ['Many']],
+    'integer field with spaces' => ['seats', [['field' => 'custom_fields.seats', 'condition' => 'greater_than', 'value' => ' 12 ']], ['Many']],
+    'phone is' => ['phones', [['field' => 'custom_fields.mobile', 'condition' => 'is', 'value' => '+14155550100']], ['Cell']],
+    'phone is not' => ['phones', [['field' => 'custom_fields.mobile', 'condition' => 'is_not', 'value' => '+14155550100']], ['Desk', 'Silent']],
     'inactivity' => ['stale', [['field' => 'stale_days', 'condition' => 'no_activity_for', 'value' => 30]], ['Old']],
 ]);
 
@@ -273,17 +305,29 @@ it('compiles every condition to the records the api lists for the same tree', fu
     expect($shown)->toBe($expectedIds)->and(filterBarApiIds($this, $path, $tree))->toBe($expectedIds);
 })->with('compiled conditions');
 
-it('compiles no node for a rule that is incomplete, unknown or not offered', function (array $rule): void {
-    $catalog = FilterFieldCatalog::for(CrmEntity::Company, $this->user);
+it('shows every record for a rule that compiles to nothing', function (string $scenario, array $rule): void {
+    [$page, , , $records] = filterBarScenario($scenario, $this->user);
 
-    expect((new FilterRuleCompiler)->compile([$rule], $catalog, $this->user, 'UTC'))->toBe([]);
+    livewire($page)
+        ->set('tableFilters.conditions.rules', [$rule])
+        ->assertCanSeeTableRecords($records)
+        ->assertCountTableRecords(count($records));
 })->with([
-    'no value' => [['field' => 'name', 'condition' => 'contains']],
-    'empty value' => [['field' => 'name', 'condition' => 'contains', 'value' => '']],
-    'unknown field' => [['field' => 'nope', 'condition' => 'is_empty']],
-    'unknown condition' => [['field' => 'name', 'condition' => 'nope']],
-    'condition the field does not offer' => [['field' => 'name', 'condition' => 'is_checked']],
-    'not a rule' => [['field' => ['x'], 'condition' => ['y']]],
+    'no value' => ['companies', ['field' => 'name', 'condition' => 'contains']],
+    'empty value' => ['companies', ['field' => 'name', 'condition' => 'contains', 'value' => '']],
+    'blank value' => ['companies', ['field' => 'name', 'condition' => 'contains', 'value' => '   ']],
+    'unknown field' => ['companies', ['field' => 'nope', 'condition' => 'is_empty']],
+    'unknown condition' => ['companies', ['field' => 'name', 'condition' => 'nope']],
+    'condition the field does not offer' => ['companies', ['field' => 'name', 'condition' => 'is_checked']],
+    'not a rule' => ['companies', ['field' => ['x'], 'condition' => ['y']]],
+    'fraction on an integer field' => ['seats', ['field' => 'custom_fields.seats', 'condition' => 'greater_than', 'value' => '1.5']],
+    'text on an integer field' => ['seats', ['field' => 'custom_fields.seats', 'condition' => 'greater_than', 'value' => 'many']],
+    'phone without a country code' => ['phones', ['field' => 'custom_fields.mobile', 'condition' => 'is', 'value' => '555 0100']],
+    'phone is not without a country code' => ['phones', ['field' => 'custom_fields.mobile', 'condition' => 'is_not', 'value' => '555 0100']],
+    'inactivity of zero' => ['stale', ['field' => 'stale_days', 'condition' => 'no_activity_for', 'value' => 0]],
+    'inactivity of a negative' => ['stale', ['field' => 'stale_days', 'condition' => 'no_activity_for', 'value' => -3]],
+    'inactivity with a fraction' => ['stale', ['field' => 'stale_days', 'condition' => 'no_activity_for', 'value' => 30.5]],
+    'inactivity past the maximum' => ['stale', ['field' => 'stale_days', 'condition' => 'no_activity_for', 'value' => StaleDaysFilter::MAX_DAYS + 1]],
 ]);
 
 it('lists every native filter in definition order before the custom fields', function (string $page, string $model): void {
@@ -295,49 +339,127 @@ it('lists every native filter in definition order before the custom fields', fun
         ->and(array_slice($keys, count($native)))->each->toStartWith('custom_fields.');
 })->with('filter bar pages');
 
-it('offers only conditions that compile to operators the field supports', function (string $type): void {
-    $kind = CustomFieldType::from($type)->filterFieldKind();
+const TEXT_CONDITIONS = ['contains', 'does_not_contain', 'starts_with', 'ends_with', 'is', 'is_not', 'is_empty', 'is_not_empty'];
+const NUMBER_CONDITIONS = ['is', 'is_not', 'greater_than', 'greater_or_equal', 'less_than', 'less_or_equal', 'is_empty', 'is_not_empty'];
+const DATE_CONDITIONS = ['is', 'before', 'at_or_before', 'after', 'at_or_after', 'in_the_past', 'in_the_next', 'this', 'is_empty', 'is_not_empty'];
+const CHOICE_CONDITIONS = ['is_any_of', 'is_none_of', 'is_empty', 'is_not_empty'];
+const MULTI_CHOICE_CONDITIONS = ['has_any_of', 'has_none_of', 'is_empty', 'is_not_empty'];
+const CHECKBOX_CONDITIONS = ['is_checked', 'is_not_checked'];
+
+function offeredConditions(?object $field): ?array
+{
+    return $field === null ? null : array_map(static fn (FilterCondition $condition): string => $condition->value, $field->conditions());
+}
+
+it('offers each custom field type exactly its conditions', function (string $type, ?array $expected): void {
     $options = CustomFieldType::from($type)->isChoice() && $type !== CustomFieldType::TAGS_INPUT->value ? ['One', 'Two'] : [];
     filterBarField($this->user, 'company', 'probe', $type, $options, $type === CustomFieldType::RECORD->value ? 'company' : null);
 
-    $field = FilterFieldCatalog::for(CrmEntity::Company, $this->user)['custom_fields.probe'] ?? null;
+    $catalog = livewire(ListCompanies::class)->instance()->filterFieldCatalog();
 
-    if ($kind === null) {
-        expect($field)->toBeNull();
+    expect(offeredConditions($catalog['custom_fields.probe'] ?? null))->toBe($expected);
+})->with([
+    'text' => ['text', TEXT_CONDITIONS],
+    'number' => ['number', NUMBER_CONDITIONS],
+    'currency' => ['currency', NUMBER_CONDITIONS],
+    'date' => ['date', DATE_CONDITIONS],
+    'date-time' => ['date-time', DATE_CONDITIONS],
+    'select' => ['select', CHOICE_CONDITIONS],
+    'radio' => ['radio', CHOICE_CONDITIONS],
+    'toggle-buttons' => ['toggle-buttons', CHOICE_CONDITIONS],
+    'multi-select' => ['multi-select', MULTI_CHOICE_CONDITIONS],
+    'checkbox-list' => ['checkbox-list', MULTI_CHOICE_CONDITIONS],
+    'tags-input' => ['tags-input', MULTI_CHOICE_CONDITIONS],
+    'checkbox' => ['checkbox', CHECKBOX_CONDITIONS],
+    'toggle' => ['toggle', CHECKBOX_CONDITIONS],
+    'email' => ['email', TEXT_CONDITIONS],
+    'phone' => ['phone', TEXT_CONDITIONS],
+    'link' => ['link', TEXT_CONDITIONS],
+    'record' => ['record', MULTI_CHOICE_CONDITIONS],
+    'textarea' => ['textarea', null],
+    'rich-editor' => ['rich-editor', null],
+    'color-picker' => ['color-picker', null],
+]);
 
-        return;
-    }
+it('offers the default domain field the conditions of a text field', function (): void {
+    $catalog = livewire(ListCompanies::class)->instance()->filterFieldCatalog();
 
-    expect($field->kind)->toBe($kind)->and($field->conditions())->not->toBeEmpty();
-
-    foreach ($field->conditions() as $condition) {
-        expect(array_diff($condition->operators($kind), CustomFieldFilterSchema::operatorKeys($type)))->toBe([]);
-    }
-})->with(array_map(fn (CustomFieldType $type): string => $type->value, array_filter(CustomFieldType::cases(), fn (CustomFieldType $type): bool => ! in_array($type, [CustomFieldType::FILE_UPLOAD, CustomFieldType::DOMAIN], true))));
-
-it('offers the domain field the conditions of a multi text field', function (): void {
-    $field = FilterFieldCatalog::for(CrmEntity::Company, $this->user)['custom_fields.domains'];
-
-    expect($field->kind)->toBe(FilterFieldKind::MultiText)->and($field->conditions())->toBe(FilterFieldKind::MultiText->conditions());
+    expect(offeredConditions($catalog['custom_fields.domains']))->toBe(TEXT_CONDITIONS);
 });
 
-it('offers only conditions that compile to operators a native field supports', function (string $page, string $model): void {
-    $entity = CrmEntity::tryFromModel(new $model);
+it('offers each native field exactly its conditions', function (string $page, string $key, array $expected): void {
+    expect(offeredConditions(livewire($page)->instance()->filterFieldCatalog()[$key] ?? null))->toBe($expected);
+})->with([
+    'created at' => [ListCompanies::class, 'created_at', DATE_CONDITIONS],
+    'creation source' => [ListCompanies::class, 'creation_source', CHOICE_CONDITIONS],
+    'creator' => [ListPeople::class, 'creator', CHOICE_CONDITIONS],
+    'company' => [ListPeople::class, 'company', CHOICE_CONDITIONS],
+    'name' => [ListCompanies::class, 'name', TEXT_CONDITIONS],
+    'inactivity' => [ListOpportunities::class, 'stale_days', ['no_activity_for']],
+]);
 
-    foreach (EntityFilters::definitions($entity) as $key => $definition) {
-        $field = FilterFieldCatalog::for($entity, $this->user)[$key] ?? null;
+it('keeps assigned to me out of the catalog', function (): void {
+    expect(livewire(ManageTasks::class)->instance()->filterFieldCatalog())->not->toHaveKey('assigned_to_me');
+});
 
-        if ($field === null) {
-            expect($key)->toBe('assigned_to_me');
+it('labels a native field with the header the member sees', function (string $page): void {
+    $component = livewire($page);
+    $matched = 0;
 
+    foreach ($component->instance()->filterFieldCatalog() as $key => $field) {
+        $column = FilterFieldCatalog::columnFor($key);
+
+        if ($component->instance()->getTable()->getColumn($column) === null) {
             continue;
         }
 
-        foreach ($field->conditions() as $condition) {
-            expect(array_diff($condition->operators($field->kind), $definition->operators()))->toBe([]);
-        }
+        $matched++;
+        $component->assertSeeHtml('<span class="truncate">'.e($field->label).'</span>');
     }
+
+    expect($matched)->toBeGreaterThanOrEqual(3);
 })->with('filter bar pages');
+
+it('reuses the lang labels of the company columns', function (): void {
+    $catalog = livewire(ListCompanies::class)->instance()->filterFieldCatalog();
+
+    expect($catalog['creator']->label)->toBe(__('filament/resources/company.fields.created_by.label'))
+        ->and($catalog['accountOwner']->label)->toBe(__('filament/resources/company.fields.account_owner.label'))
+        ->and($catalog['created_at']->label)->toBe(__('filament/resources/company.fields.created_at.label'));
+});
+
+it('follows the tenant when the workspace changes', function (): void {
+    filterBarField($this->user, 'company', 'first_only', CustomFieldType::SELECT->value, ['One']);
+    $second = Workspace::factory()->create(['personal_workspace' => false, 'user_id' => $this->user->id]);
+    $this->user->ownedWorkspaces()->save($second);
+    $component = livewire(ListCompanies::class);
+    $before = array_keys($component->instance()->filterFieldCatalog());
+
+    $this->user->switchWorkspace($second);
+    Filament::setTenant($second);
+    filterBarField($this->user->refresh(), 'company', 'second_only', CustomFieldType::SELECT->value, ['One']);
+    $after = array_keys(livewire(ListCompanies::class)->instance()->filterFieldCatalog());
+
+    expect($before)->toContain('custom_fields.first_only')->not->toContain('custom_fields.second_only')
+        ->and($after)->toContain('custom_fields.second_only')->not->toContain('custom_fields.first_only');
+});
+
+it('reads a view saved before the conditions filter existed as unchanged', function (string $page, CrmEntity $entity): void {
+    $view = SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'entity' => $entity,
+        'state' => new TableStateData(filters: ['trashed' => ['value' => 0]]),
+    ]);
+
+    $component = livewire($page)->call('applySavedView', $view->getKey());
+
+    expect($component->instance()->isSavedViewModified())->toBeFalse();
+})->with([
+    'companies' => [ListCompanies::class, CrmEntity::Company],
+    'people' => [ListPeople::class, CrmEntity::People],
+    'opportunities' => [ListOpportunities::class, CrmEntity::Opportunity],
+    'tasks' => [ManageTasks::class, CrmEntity::Task],
+    'notes' => [ManageNotes::class, CrmEntity::Note],
+]);
 
 it('gives every condition a label and every kind at least one condition', function (): void {
     foreach (FilterCondition::cases() as $condition) {

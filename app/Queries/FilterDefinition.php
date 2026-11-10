@@ -6,6 +6,7 @@ namespace App\Queries;
 
 use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
+use App\Enums\FilterFieldKind;
 use App\Enums\FilterKind;
 use App\Queries\Filters\AssignedToMeFilter;
 use App\Queries\Filters\StaleDaysFilter;
@@ -68,6 +69,18 @@ final readonly class FilterDefinition
     public static function computed(string $filterClass): self
     {
         return new self(FilterKind::Computed, filterClass: $filterClass, computedExample: $filterClass::EXAMPLE, computedOperand: $filterClass::OPERAND);
+    }
+
+    public function fieldKind(): ?FilterFieldKind
+    {
+        return match ($this->kind) {
+            FilterKind::Text => FilterFieldKind::Text,
+            FilterKind::DateTime => FilterFieldKind::Date,
+            FilterKind::Enum => FilterFieldKind::Choice,
+            FilterKind::Members => FilterFieldKind::Member,
+            FilterKind::Relation => FilterFieldKind::Relation,
+            FilterKind::Computed => $this->filterClass === StaleDaysFilter::class ? FilterFieldKind::Inactivity : null,
+        };
     }
 
     /** @return list<string> */

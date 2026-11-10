@@ -178,7 +178,6 @@ enum CustomFieldType: string
         };
     }
 
-    /** The kind of filter chip this field type offers, or null when it has no filter. */
     public function filterFieldKind(): ?FilterFieldKind
     {
         return match ($this) {

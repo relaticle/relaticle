@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Tables\FilterBar;
 
 use App\Enums\CrmEntity;
+use App\Enums\CustomFieldType;
 use App\Enums\FilterCondition;
 use App\Enums\FilterFieldKind;
 
@@ -22,6 +23,7 @@ final readonly class FilterField
         public ?CrmEntity $related = null,
         public array $options = [],
         public array $operators = [],
+        public ?CustomFieldType $type = null,
     ) {}
 
     /** @return list<FilterCondition> */

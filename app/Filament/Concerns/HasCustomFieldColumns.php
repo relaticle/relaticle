@@ -57,6 +57,8 @@ trait HasCustomFieldColumns
                 continue;
             }
 
+            $this->nativeColumnLabels[$column->getName()] = (string) $label;
+
             $icon = $column->getName() === $titleColumn ? null : FilterFieldCatalog::columnIcon($column->getName());
 
             $column->label(fn (): Htmlable => $this->columnHeaderLabel($column->getName(), $label, $icon));

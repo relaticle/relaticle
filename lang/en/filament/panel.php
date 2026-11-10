@@ -47,19 +47,12 @@ return [
         ],
         'filters' => [
             'fields' => [
-                'name' => 'Name',
-                'title' => 'Title',
-                'created_at' => 'Creation date',
-                'updated_at' => 'Last update',
                 'creation_source' => 'Creation source',
-                'creator' => 'Created by',
-                'accountOwner' => 'Account owner',
                 'people' => 'People',
                 'opportunities' => 'Opportunities',
                 'companies' => 'Companies',
                 'company' => 'Company',
                 'contact' => 'Point of contact',
-                'assignees' => 'Assignees',
                 'stale_days' => 'Inactivity',
             ],
             'conditions' => [

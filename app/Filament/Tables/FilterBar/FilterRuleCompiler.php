@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Filament\Tables\FilterBar;
 
+use App\Enums\CustomFieldType;
 use App\Enums\FilterCondition;
 use App\Enums\FilterFieldKind;
 use App\Models\User;
+use App\Queries\CustomFieldFilterSchema;
+use App\Queries\Filters\StaleDaysFilter;
 
 final readonly class FilterRuleCompiler
 {
@@ -45,7 +48,7 @@ final readonly class FilterRuleCompiler
             return null;
         }
 
-        $operand = $this->operand($condition, $field->kind, $rule['value'] ?? null);
+        $operand = $condition->fixedOperand() ?? $this->valued($condition, $field, $rule['value'] ?? null);
 
         if ($operand === null) {
             return null;
@@ -56,38 +59,37 @@ final readonly class FilterRuleCompiler
             ? ['custom_fields' => [substr($field->key, strlen(FilterFieldCatalog::CUSTOM_FIELD_PREFIX)) => $operators]]
             : [$field->key => $operators];
 
-        return $condition->isNegated() ? ['$not' => $node] : $node;
-    }
-
-    /** @return bool|string|int|float|list<string>|null */
-    private function operand(FilterCondition $condition, FilterFieldKind $kind, mixed $value): bool|string|int|float|array|null
-    {
-        return match ($condition) {
-            FilterCondition::IsEmpty, FilterCondition::IsChecked, FilterCondition::IsNotChecked => true,
-            FilterCondition::IsNotEmpty => false,
-            default => $this->valued($condition, $kind, $value),
-        };
+        return $condition->isNegated($field->kind) ? ['$not' => $node] : $node;
     }
 
     /** @return string|int|float|list<string>|null */
-    private function valued(FilterCondition $condition, FilterFieldKind $kind, mixed $value): string|int|float|array|null
+    private function valued(FilterCondition $condition, FilterField $field, mixed $value): string|int|float|array|null
     {
-        return match ($kind) {
+        return match ($field->kind) {
             FilterFieldKind::Text => $this->text($value),
-            FilterFieldKind::MultiText => $this->multiText($condition, $value),
-            FilterFieldKind::Number, FilterFieldKind::Inactivity => $this->number($value),
+            FilterFieldKind::MultiText => $this->multiText($condition, $field, $value),
+            FilterFieldKind::Number => $this->number($value, $this->isIntegral($field), null, null),
+            FilterFieldKind::Inactivity => $this->number($value, true, 1, StaleDaysFilter::MAX_DAYS),
             FilterFieldKind::Choice, FilterFieldKind::MultiChoice => $this->list($value),
             FilterFieldKind::Checkbox, FilterFieldKind::Date, FilterFieldKind::Member, FilterFieldKind::Relation, FilterFieldKind::Record => null,
         };
     }
 
+    private function isIntegral(FilterField $field): bool
+    {
+        return $field->type instanceof CustomFieldType
+            && (CustomFieldFilterSchema::operatorsForType($field->type->value)['$eq']['type'] ?? null) === 'integer';
+    }
+
     private function text(mixed $value): ?string
     {
-        return is_string($value) && $value !== '' ? $value : null;
+        $text = is_string($value) ? trim($value) : '';
+
+        return $text === '' ? null : $text;
     }
 
     /** @return string|list<string>|null */
-    private function multiText(FilterCondition $condition, mixed $value): string|array|null
+    private function multiText(FilterCondition $condition, FilterField $field, mixed $value): string|array|null
     {
         $text = $this->text($value);
 
@@ -95,12 +97,30 @@ final readonly class FilterRuleCompiler
             return null;
         }
 
-        return in_array($condition, [FilterCondition::Is, FilterCondition::IsNot], true) ? [$text] : $text;
+        if (! $condition->takesList($field->kind)) {
+            return $text;
+        }
+
+        return $field->type === CustomFieldType::PHONE && ! str_starts_with($text, '+') ? null : [$text];
     }
 
-    private function number(mixed $value): int|float|null
+    private function number(mixed $value, bool $integral, ?int $min, ?int $max): int|float|null
     {
-        return is_numeric($value) ? $value + 0 : null;
+        $number = is_string($value) ? trim($value) : $value;
+
+        if (! is_int($number) && ! is_float($number) && ! (is_string($number) && is_numeric($number))) {
+            return null;
+        }
+
+        $number += 0;
+
+        if (is_float($number) && is_finite($number) && floor($number) === $number && abs($number) < PHP_INT_MAX) {
+            $number = (int) $number;
+        }
+
+        $valid = is_int($number) ? true : (! $integral && is_finite($number));
+
+        return $valid && ($min === null || $number >= $min) && ($max === null || $number <= $max) ? $number : null;
     }
 
     /** @return list<string>|null */
