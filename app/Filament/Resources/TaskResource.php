@@ -4,13 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources;
 
-use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
 use App\Filament\Actions\CopyToClipboardAction;
 use App\Filament\Actions\EditTaskAction;
-use App\Filament\Components\Forms\WorkspaceMemberSelect;
 use App\Filament\Components\Tables\EmptyListDescription;
-use App\Filament\Components\Tables\Filters\RecordSelectFilter;
 use App\Filament\Components\Tables\LinkedRecordsColumn;
 use App\Filament\Components\Tables\RecordChipColumn;
 use App\Filament\Concerns\RemembersViewMode;
@@ -35,8 +32,6 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\Filter;
-use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
@@ -98,22 +93,7 @@ final class TaskResource extends Resource
             ->defaultSort('created_at', 'desc')
             ->searchable()
             ->filters([
-                Filter::make('assigned_to_me')
-                    ->label(__('filament/resources/task.filters.assigned_to_me.label'))
-                    ->query(fn (Builder $query): Builder => $query->whereHas('assignees', function (Builder $query): void {
-                        $query->where('users.id', auth()->id());
-                    }))
-                    ->toggle(),
-                RecordSelectFilter::make('assignees')
-                    ->multiple()
-                    ->relationship('assignees', 'name', WorkspaceMemberSelect::currentWorkspaceMembers())
-                    ->searchable()
-                    ->preload(),
-                SelectFilter::make('creation_source')
-                    ->label(__('filament/resources/task.filters.creation_source.label'))
-                    ->options(CreationSource::class)
-                    ->multiple(),
-                TrashedFilter::make(),
+                TrashedFilter::make()->indicateUsing(fn (): array => []),
             ])
             ->groups(array_filter([
                 ...collect(['status', 'priority'])->map(fn (string $fieldCode): ?\Filament\Tables\Grouping\Group => $customFields->has($fieldCode) ? self::makeCustomFieldGroup($fieldCode, $customFields, $valueResolver) : null

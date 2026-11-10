@@ -7,6 +7,7 @@ namespace App\Filament\Tables\FilterBar;
 use App\Enums\CrmEntity;
 use App\Models\User;
 use App\Queries\Filters\TreeFilter;
+use Closure;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Hidden;
 use Filament\Support\Facades\FilamentTimezone;
@@ -18,17 +19,20 @@ final readonly class ConditionsFilter
 {
     public const string NAME = 'conditions';
 
-    public static function make(): Filter
+    /**
+     * @param  Closure(mixed): array{match: string, rules: list<array<string, mixed>>}  $heal
+     */
+    public static function make(Closure $heal): Filter
     {
         return Filter::make(self::NAME)
             ->form([
                 Hidden::make('match')->default('all'),
                 Hidden::make('rules')->default([]),
             ])
-            ->query(function (Builder $query, array $data): Builder {
+            ->query(function (Builder $query, array $data) use ($heal): Builder {
                 $user = Filament::auth()->user();
                 $entity = CrmEntity::tryFromModel($query->getModel());
-                $rules = is_array($data['rules'] ?? null) ? $data['rules'] : [];
+                $rules = $heal($data)['rules'];
 
                 if (! $user instanceof User || ! $entity instanceof CrmEntity || $rules === []) {
                     return $query;
@@ -41,7 +45,7 @@ final readonly class ConditionsFilter
 
     /**
      * @param  Builder<Model>  $query
-     * @param  array<array-key, mixed>  $rules
+     * @param  list<array<string, mixed>>  $rules
      * @return Builder<Model>
      */
     private static function apply(Builder $query, CrmEntity $entity, User $user, array $rules): Builder

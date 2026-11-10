@@ -14,7 +14,7 @@ use App\Filament\Resources\NoteResource\Pages\ManageNotes;
 use App\Filament\Resources\PeopleResource;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
-use App\Filament\Resources\TaskResource\Pages\ManageTasks;
+use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\People;
@@ -56,7 +56,7 @@ function peoplePicker(string $name): Select
     throw new RuntimeException("No `{$name}` picker on the people form.");
 }
 
-function assigneesFilterField(ManageTasks $page): Select
+function assigneesFilterField(TasksBoard $page): Select
 {
     foreach ($page->getTableFiltersForm()->getComponents(withHidden: true) as $component) {
         foreach ($component->getChildComponentContainers() as $container) {
@@ -68,7 +68,7 @@ function assigneesFilterField(ManageTasks $page): Select
         }
     }
 
-    throw new RuntimeException('No assignees filter field on the tasks table.');
+    throw new RuntimeException('No assignees filter field on the tasks board.');
 }
 
 /**
@@ -194,7 +194,7 @@ it('renders member chips in the assignees filter and lets the caller order win',
     $mate = User::factory()->create(['name' => 'Aaron Ant']);
     $this->workspace->users()->attach($mate, ['role' => 'member']);
 
-    $page = livewire(ManageTasks::class)->instance();
+    $page = livewire(TasksBoard::class)->instance();
     $field = assigneesFilterField($page);
 
     expect($field->isHtmlAllowed())->toBeTrue()

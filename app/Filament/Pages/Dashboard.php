@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Filament\Pages;
 
 use App\Actions\Task\CompleteTask;
+use App\Enums\FilterCondition;
 use App\Enums\WorkspaceCapability;
 use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Actions\EditTaskAction;
 use App\Filament\Concerns\KeepsOpenTaskInUrl;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
+use App\Filament\Tables\FilterBar\ConditionsFilter;
 use App\Models\Task;
 use App\Models\User;
 use BackedEnum;
@@ -157,7 +159,10 @@ final class Dashboard extends Page
     public function getTasksIndexUrl(): string
     {
         return TaskResource::getUrl('index', [
-            'tableFilters' => ['assigned_to_me' => ['isActive' => true]],
+            'filters' => [ConditionsFilter::NAME => [
+                'match' => 'all',
+                'rules' => [['field' => 'assignees', 'condition' => FilterCondition::IsAnyOf->value, 'value' => ['@me']]],
+            ]],
         ]);
     }
 

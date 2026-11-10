@@ -78,6 +78,7 @@ final readonly class FilterFieldCatalog
 
             $fields[$key] = new FilterField(
                 key: $key,
+                entity: $entity,
                 label: $columnLabels[self::columnFor($key)] ?? self::fallbackLabel($entity, $key),
                 icon: self::nativeIcon($key, $definition),
                 kind: $kind,
@@ -141,6 +142,7 @@ final readonly class FilterFieldCatalog
             $key = self::CUSTOM_FIELD_PREFIX.$field->code;
             $fields[$key] = new FilterField(
                 key: $key,
+                entity: $entity,
                 label: $field->name,
                 icon: $field->typeData->icon,
                 kind: $kind,

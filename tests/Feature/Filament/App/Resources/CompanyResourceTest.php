@@ -51,7 +51,7 @@ it('leaves the empty list description off a search or filter that finds nothing'
         ->assertDontSee('Companies you add or import appear here.');
 
     livewire(ListCompanies::class)
-        ->filterTable('creation_source', [CreationSource::IMPORT->value])
+        ->set('tableFilters.conditions.rules', [['field' => 'creation_source', 'condition' => 'is_any_of', 'value' => [CreationSource::IMPORT->value]]])
         ->assertCountTableRecords(0)
         ->assertDontSee('Companies you add or import appear here.');
 });
@@ -218,7 +218,7 @@ it('validates name is required on create', function (): void {
 it('has `:dataset` filter', function (string $filter): void {
     livewire(ListCompanies::class)
         ->assertTableFilterExists($filter);
-})->with(['creation_source', 'trashed']);
+})->with(['conditions', 'trashed']);
 
 it('sets creator_id and workspace_id via observer when creating a company', function (): void {
     livewire(ListCompanies::class)

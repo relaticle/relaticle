@@ -245,7 +245,7 @@ it('validates name is required on create', function (): void {
 it('has `:dataset` filter', function (string $filter): void {
     livewire(ListPeople::class)
         ->assertTableFilterExists($filter);
-})->with(['creation_source', 'trashed']);
+})->with(['conditions', 'trashed']);
 
 it('sets creator_id and workspace_id via observer when creating a person', function (): void {
     livewire(ListPeople::class)

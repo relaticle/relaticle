@@ -15,22 +15,28 @@ use App\Filament\Resources\NoteResource\Pages\ManageNotes;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
+use App\Filament\Tables\Concerns\HasFilterBar;
+use App\Filament\Tables\Concerns\PersistsTableState;
 use App\Filament\Tables\FilterBar\ConditionsFilter;
 use App\Filament\Tables\FilterBar\FilterFieldCatalog;
 use App\Filament\Tables\FilterBar\FilterRuleCompiler;
+use App\Filament\Tables\FilterBar\FilterRules;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\SavedView;
+use App\Models\TablePreference;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Queries\EntityFilters;
 use App\Queries\Filters\StaleDaysFilter;
 use App\Queries\Filters\TreeFilter;
+use App\Queries\FilterTree;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use Livewire\Livewire;
 use Tests\Helpers\WorkspaceCustomField;
@@ -40,7 +46,10 @@ mutates(
     FilterCondition::class,
     FilterFieldCatalog::class,
     FilterRuleCompiler::class,
+    FilterRules::class,
     HasCustomFieldColumns::class,
+    HasFilterBar::class,
+    PersistsTableState::class,
     TreeFilter::class,
 );
 
@@ -80,12 +89,14 @@ it('still runs a filter whose form is never drawn', function (string $page, stri
     $web = $model::factory()->recycle([$this->user, $this->workspace])->create(['creation_source' => CreationSource::WEB]);
     $api = $model::factory()->recycle([$this->user, $this->workspace])->create(['creation_source' => CreationSource::API]);
 
+    $rules = [['field' => 'creation_source', 'condition' => 'is_any_of', 'value' => [CreationSource::API->value]]];
+
     livewire($page)
         ->assertCanSeeTableRecords([$web, $api])
-        ->set('tableFilters.creation_source.values', [CreationSource::API->value])
+        ->set('tableFilters.conditions.rules', $rules)
         ->assertCanSeeTableRecords([$api])
         ->assertCanNotSeeTableRecords([$web])
-        ->assertSet('tableFilters.creation_source.values', [CreationSource::API->value]);
+        ->assertSet('tableFilters.conditions.rules', $rules);
 })->with('filter bar pages');
 
 it('narrows the list from the filters key in the url', function (string $page, string $model): void {
@@ -444,23 +455,6 @@ it('follows the tenant when the workspace changes', function (): void {
         ->and($after)->toContain('custom_fields.second_only')->not->toContain('custom_fields.first_only');
 });
 
-it('reads a view saved before the conditions filter existed as unchanged', function (string $page, CrmEntity $entity): void {
-    $view = SavedView::factory()->for($this->user)->for($this->workspace)->create([
-        'entity' => $entity,
-        'state' => new TableStateData(filters: ['trashed' => ['value' => 0]]),
-    ]);
-
-    $component = livewire($page)->call('applySavedView', $view->getKey());
-
-    expect($component->instance()->isSavedViewModified())->toBeFalse();
-})->with([
-    'companies' => [ListCompanies::class, CrmEntity::Company],
-    'people' => [ListPeople::class, CrmEntity::People],
-    'opportunities' => [ListOpportunities::class, CrmEntity::Opportunity],
-    'tasks' => [ManageTasks::class, CrmEntity::Task],
-    'notes' => [ManageNotes::class, CrmEntity::Note],
-]);
-
 it('gives every condition a label and every kind at least one condition', function (): void {
     foreach (FilterCondition::cases() as $condition) {
         expect($condition->label())->not->toStartWith('filament/panel');
@@ -755,7 +749,7 @@ it('bounds a relation filter by the workspace the member opened', function (): v
     $foreign = livewire(ListPeople::class)->set('tableFilters.conditions.rules', [['field' => 'company', 'condition' => 'is_any_of', 'value' => [$first[0]->getKey()]]]);
 
     expect(filterBarShownNames($none))->toBe(['Lone Second'])
-        ->and(filterBarShownNames($foreign))->toBe([]);
+        ->and(filterBarShownNames($foreign))->toBe(['At Second', 'Lone Second']);
 });
 
 function filterBarForeignCompany(string $name): Company
@@ -885,3 +879,405 @@ it('words a fallback label as the column header', function (): void {
         ->and($task['created_at']->label)->toBe('Created At')
         ->and($task['assignees']->label)->toBe('Assignees');
 });
+
+function filterBarOpen(mixed $test, string $how, string $page, CrmEntity $entity, array $filters): mixed
+{
+    return match ($how) {
+        'view' => livewire($page)->call('applySavedView', SavedView::factory()->for($test->user)->for($test->workspace)->create([
+            'entity' => $entity,
+            'state' => new TableStateData(filters: $filters),
+        ])->getKey()),
+        'url' => Livewire::withQueryParams(['filters' => $filters])->test($page),
+        'set' => livewire($page)->set('tableFilters', $filters),
+    };
+}
+
+function filterBarShownTitles(mixed $component): array
+{
+    return $component->instance()->getTableRecords()->pluck('title')->sort()->values()->all();
+}
+
+function filterBarRulesState(array $rules): array
+{
+    return ['conditions' => ['match' => 'all', 'rules' => $rules]];
+}
+
+dataset('unusable rules', [
+    'unknown field' => [['field' => 'nope', 'condition' => 'is_empty']],
+    'unknown condition' => [['field' => 'name', 'condition' => 'nope', 'value' => 'x']],
+    'condition the field does not offer' => [['field' => 'name', 'condition' => 'is_checked']],
+    'value of the wrong shape' => [['field' => 'name', 'condition' => 'contains', 'value' => ['x']]],
+    'unknown creation source' => [['field' => 'creation_source', 'condition' => 'is_any_of', 'value' => ['bogus']]],
+    'one hundred and one values' => [['field' => 'creation_source', 'condition' => 'is_any_of', 'value' => array_map(fn (int $i): string => "v{$i}", range(1, 101))]],
+    'empty string in a list' => [['field' => 'creation_source', 'condition' => 'is_any_of', 'value' => ['', 'api']]],
+    'three thousand characters' => [['field' => 'name', 'condition' => 'contains', 'value' => str_repeat('a', 3000)]],
+    'not a rule' => ['x'],
+]);
+
+it('drops a rule that cannot apply and keeps the others, from a view, the url and a direct set', function (mixed $unusable, string $how): void {
+    filterBarScenario('companies', $this->user);
+    $good = ['field' => 'name', 'condition' => 'contains', 'value' => 'glo'];
+
+    $component = filterBarOpen($this, $how, ListCompanies::class, CrmEntity::Company, filterBarRulesState([$unusable, $good]));
+
+    expect(filterBarShownNames($component))->toBe(['Globex'])
+        ->and($component->get('tableFilters.conditions.rules'))->toBe([$good]);
+})->with('unusable rules')->with(['view', 'url', 'set']);
+
+it('drops text that holds a nul byte', function (string $how): void {
+    filterBarScenario('companies', $this->user);
+    $good = ['field' => 'name', 'condition' => 'contains', 'value' => 'glo'];
+    $nul = ['field' => 'name', 'condition' => 'contains', 'value' => "a\0b"];
+
+    $component = filterBarOpen($this, $how, ListCompanies::class, CrmEntity::Company, filterBarRulesState([$nul, $good]));
+
+    expect(filterBarShownNames($component))->toBe(['Globex'])
+        ->and($component->get('tableFilters.conditions.rules'))->toBe([$good]);
+})->with(['url', 'set']);
+
+it('drops a stale option id from a list and the rule when none remain', function (string $how): void {
+    [$page] = filterBarScenario('stages', $this->user);
+    $first = filterBarOptionId($this->user, 'opportunity', 'stage', 0);
+    $stale = '01J8Z4Y6T5Q2M9N3B7K1W0X8VD';
+    $rules = [
+        ['field' => 'custom_fields.stage', 'condition' => 'is_none_of', 'value' => [$stale]],
+        ['field' => 'custom_fields.stage', 'condition' => 'is_any_of', 'value' => [$stale, $first]],
+    ];
+
+    $component = filterBarOpen($this, $how, $page, CrmEntity::Opportunity, filterBarRulesState($rules));
+
+    expect(filterBarShownNames($component))->toBe(['First'])
+        ->and($component->get('tableFilters.conditions.rules'))->toBe([['field' => 'custom_fields.stage', 'condition' => 'is_any_of', 'value' => [$first]]]);
+})->with(['view', 'url', 'set']);
+
+it('drops a member who left the workspace and keeps me', function (string $how): void {
+    $stranger = User::factory()->create();
+    $mine = filterBarRecord($this->user, Task::class, 'Mine');
+    $mine->assignees()->attach($this->user);
+    filterBarRecord($this->user, Task::class, 'Nobodys');
+    $rules = [['field' => 'assignees', 'condition' => 'is_any_of', 'value' => [$stranger->getKey(), '@me']]];
+
+    $component = filterBarOpen($this, $how, ManageTasks::class, CrmEntity::Task, filterBarRulesState($rules));
+
+    expect(filterBarShownTitles($component))->toBe(['Mine'])
+        ->and($component->get('tableFilters.conditions.rules.0.value'))->toBe(['@me']);
+})->with(['view', 'url', 'set']);
+
+it('drops a record of another workspace and never prints its name', function (string $how): void {
+    $foreign = filterBarForeignCompany('Hostile Holdings');
+    filterBarRecord($this->user, People::class, 'Local Lead');
+    $rules = [['field' => 'company', 'condition' => 'is_any_of', 'value' => [$foreign->getKey()]]];
+
+    $component = filterBarOpen($this, $how, ListPeople::class, CrmEntity::People, filterBarRulesState($rules));
+
+    expect(filterBarShownNames($component))->toBe(['Local Lead'])
+        ->and($component->get('tableFilters.conditions.rules'))->toBe([])
+        ->and($component->html())->not->toContain('Hostile Holdings');
+})->with(['view', 'url', 'set']);
+
+it('keeps the same rule on a free text tags field without looking its values up', function (): void {
+    filterBarField($this->user, 'company', 'labels', CustomFieldType::TAGS_INPUT->value);
+    filterBarRecord($this->user, Company::class, 'Vip', values: ['labels' => ['vip']]);
+    filterBarRecord($this->user, Company::class, 'Plain');
+    $rules = [['field' => 'custom_fields.labels', 'condition' => 'has_any_of', 'value' => ['vip']]];
+
+    $component = livewire(ListCompanies::class)->set('tableFilters.conditions.rules', $rules);
+
+    expect(filterBarShownNames($component))->toBe(['Vip'])
+        ->and($component->get('tableFilters.conditions.rules'))->toBe($rules);
+});
+
+it('keeps the first twenty conditions and drops the rest', function (): void {
+    filterBarScenario('companies', $this->user);
+    $rule = ['field' => 'name', 'condition' => 'contains', 'value' => 'o'];
+
+    $component = livewire(ListCompanies::class)->set('tableFilters.conditions.rules', array_fill(0, 500, $rule));
+
+    expect($component->get('tableFilters.conditions.rules'))->toHaveCount(FilterTree::MAX_CONDITIONS)
+        ->and(filterBarShownNames($component))->toBe(['Acme Robotics', 'Globex']);
+});
+
+it('counts a relative period as two conditions', function (): void {
+    $rules = array_map(
+        fn (int $amount): array => ['field' => 'created_at', 'condition' => 'in_the_past', 'value' => ['amount' => $amount, 'unit' => 'days']],
+        range(1, 11),
+    );
+    filterBarRecord($this->user, Company::class, 'Today');
+
+    $component = livewire(ListCompanies::class)->set('tableFilters.conditions.rules', $rules);
+
+    expect(array_column(array_column($component->get('tableFilters.conditions.rules'), 'value'), 'amount'))->toBe(range(1, 10))
+        ->and(filterBarShownNames($component))->toBe(['Today']);
+});
+
+it('renders a page for a hostile query string or direct state', function (string $query): void {
+    $this->get(ListCompanies::getUrl(['tenant' => $this->workspace]).'?'.$query)->assertSuccessful();
+})->with([
+    'conditions a string' => 'filters[conditions]=x',
+    'rules a string' => 'filters[conditions][rules]=x',
+    'a rule a string' => 'filters[conditions][rules][0]=x',
+    'a value as a deep array' => 'filters[conditions][rules][0][field]=name&filters[conditions][rules][0][condition]=contains&filters[conditions][rules][0][value][a][b][c]=x',
+]);
+
+it('survives a client that sets a filter to a string', function (string $page): void {
+    livewire($page)
+        ->set('tableFilters', ['trashed' => 'x', 'conditions' => 'y'])
+        ->assertOk()
+        ->assertSet('tableFilters.trashed.value', null)
+        ->assertSet('tableFilters.conditions.rules', []);
+})->with('filter bar pages');
+
+function filterBarLegacyCase(string $case, User $user): array
+{
+    $rule = fn (string $field, string $condition, array $value): array => ['field' => $field, 'condition' => $condition, 'value' => $value];
+
+    switch ($case) {
+        case 'creation source':
+            filterBarScenario('sources', $user);
+
+            return [ListCompanies::class, CrmEntity::Company, ['creation_source' => ['values' => ['api']]], [$rule('creation_source', 'is_any_of', ['api'])], ['Called']];
+        case 'assigned to me':
+            filterBarRecord($user, Task::class, 'Mine')->assignees()->attach($user);
+            filterBarRecord($user, Task::class, 'Theirs');
+
+            return [ManageTasks::class, CrmEntity::Task, ['assigned_to_me' => ['isActive' => true]], [$rule('assignees', 'is_any_of', ['@me'])], ['Mine']];
+        case 'assignees':
+            $mate = filterBarMember($user);
+            filterBarRecord($user, Task::class, 'Mine')->assignees()->attach($user);
+            filterBarRecord($user, Task::class, 'Theirs')->assignees()->attach($mate);
+
+            return [ManageTasks::class, CrmEntity::Task, ['assignees' => ['values' => [$mate->getKey()]]], [$rule('assignees', 'is_any_of', [$mate->getKey()])], ['Theirs']];
+        case 'single choice':
+            filterBarScenario('stages', $user);
+            $first = filterBarOptionId($user, 'opportunity', 'stage', 0);
+
+            return [ListOpportunities::class, CrmEntity::Opportunity, ['custom_fields' => ['stage' => ['values' => [$first]]]], [$rule('custom_fields.stage', 'is_any_of', [$first])], ['First']];
+        case 'flat custom field key':
+            filterBarScenario('stages', $user);
+            $first = filterBarOptionId($user, 'opportunity', 'stage', 0);
+
+            return [ListOpportunities::class, CrmEntity::Opportunity, ['custom_fields.stage' => ['values' => [$first]]], [$rule('custom_fields.stage', 'is_any_of', [$first])], ['First']];
+        case 'multi choice':
+            filterBarScenario('tags', $user);
+            $blue = filterBarOptionId($user, 'company', 'palette', 1);
+
+            return [ListCompanies::class, CrmEntity::Company, ['custom_fields' => ['palette' => ['values' => [$blue]]]], [$rule('custom_fields.palette', 'has_any_of', [$blue])], ['Blue']];
+        case 'tags':
+            filterBarField($user, 'company', 'labels', CustomFieldType::TAGS_INPUT->value);
+            filterBarRecord($user, Company::class, 'Vip', values: ['labels' => ['vip']]);
+            filterBarRecord($user, Company::class, 'Plain');
+
+            return [ListCompanies::class, CrmEntity::Company, ['custom_fields' => ['labels' => ['values' => ['vip']]]], [$rule('custom_fields.labels', 'has_any_of', ['vip'])], ['Vip']];
+        default:
+            filterBarField($user, 'opportunity', 'partner', CustomFieldType::RECORD->value, lookup: 'company');
+            $acme = filterBarRecord($user, Company::class, 'Acme');
+            filterBarRecord($user, Opportunity::class, 'With Acme', values: ['partner' => [$acme->getKey()]]);
+            filterBarRecord($user, Opportunity::class, 'Alone');
+
+            return [ListOpportunities::class, CrmEntity::Opportunity, ['custom_fields' => ['partner' => ['values' => [$acme->getKey()]]]], [$rule('custom_fields.partner', 'has_any_of', [$acme->getKey()])], ['With Acme']];
+    }
+}
+
+dataset('legacy filters', ['creation source', 'assigned to me', 'assignees', 'single choice', 'flat custom field key', 'multi choice', 'tags', 'record']);
+
+it('opens each filter of the old popover as the rule it becomes', function (string $case, string $how): void {
+    [$page, $entity, $legacy, $rules, $names] = filterBarLegacyCase($case, $this->user);
+
+    $component = filterBarOpen($this, $how, $page, $entity, $legacy);
+    $shown = $entity === CrmEntity::Task ? filterBarShownTitles($component) : filterBarShownNames($component);
+
+    expect($component->get('tableFilters.conditions.rules'))->toBe($rules)
+        ->and($shown)->toBe($names)
+        ->and(array_keys($component->get('tableFilters')))->toBe(['conditions', 'trashed']);
+})->with('legacy filters')->with(['view', 'url', 'set']);
+
+it('drops an old filter that is switched off, empty or unknown', function (): void {
+    $legacy = [
+        'assigned_to_me' => ['isActive' => false],
+        'assignees' => ['values' => []],
+        'creation_source' => ['values' => 'api'],
+        'something_gone' => ['values' => ['x']],
+        'custom_fields' => ['gone' => ['values' => ['x']]],
+        'company' => ['values' => ['x']],
+    ];
+
+    $component = livewire(ManageTasks::class)->set('tableFilters', $legacy);
+
+    expect($component->get('tableFilters'))->toBe(['conditions' => ['match' => 'all', 'rules' => []], 'trashed' => ['value' => null]]);
+});
+
+it('reaches one canonical state however the keys are ordered, and heals it to itself', function (): void {
+    $rules = [['field' => 'name', 'condition' => 'contains', 'value' => 'glo']];
+    $ordered = livewire(ListCompanies::class)->set('tableFilters', ['conditions' => ['match' => 'all', 'rules' => $rules], 'trashed' => ['value' => 0]]);
+    $reversed = livewire(ListCompanies::class)->set('tableFilters', ['trashed' => ['value' => 0], 'conditions' => ['rules' => [['value' => 'glo', 'condition' => 'contains', 'field' => 'name']], 'match' => 'all']]);
+
+    $healedAgain = livewire(ListCompanies::class)->call('setFilterRules', $ordered->get('tableFilters.conditions.rules'))->set('tableFilters.trashed.value', 0);
+
+    expect(json_encode($reversed->get('tableFilters')))->toBe(json_encode($ordered->get('tableFilters')))
+        ->and(json_encode($healedAgain->get('tableFilters')))->toBe(json_encode($ordered->get('tableFilters')));
+});
+
+it('stores only the fields of a rule and the value its condition takes', function (): void {
+    $rules = [
+        ['field' => 'name', 'condition' => 'is_empty', 'value' => 'ignored', 'extra' => 1],
+        ['field' => 'created_at', 'condition' => 'this', 'value' => ['unit' => 'weeks', 'amount' => 3, 'extra' => 1], 'id' => 'x'],
+    ];
+
+    $component = livewire(ListCompanies::class)->call('setFilterRules', $rules);
+
+    expect($component->get('tableFilters.conditions.rules'))->toBe([
+        ['field' => 'name', 'condition' => 'is_empty'],
+        ['field' => 'created_at', 'condition' => 'this', 'value' => ['unit' => 'weeks']],
+    ]);
+});
+
+it('writes healed rules through setFilterRules and clears the bar with clearFilterBar', function (): void {
+    $good = ['field' => 'name', 'condition' => 'contains', 'value' => 'glo'];
+    filterBarScenario('companies', $this->user);
+
+    $component = livewire(ListCompanies::class)
+        ->call('setFilterRules', [['field' => 'nope', 'condition' => 'is_empty'], $good])
+        ->set('tableFilters.trashed.value', 0);
+
+    expect($component->get('tableFilters.conditions.rules'))->toBe([$good])
+        ->and(filterBarShownNames($component))->toBe([]);
+
+    $component->call('clearFilterBar');
+
+    expect($component->get('tableFilters'))->toBe(['conditions' => ['match' => 'all', 'rules' => []], 'trashed' => ['value' => null]])
+        ->and(filterBarShownNames($component))->toBe(['Acme Robotics', 'Globex', 'Initech']);
+});
+
+dataset('stored filter shapes', [
+    'legacy keys only' => [['creation_source' => ['values' => ['api']]]],
+    'the old popover filled with its defaults' => [['assigned_to_me' => ['isActive' => false], 'assignees' => ['values' => []], 'creation_source' => ['values' => ['api']], 'trashed' => ['value' => null], 'custom_fields' => []]],
+    'a stale rule next to a good one' => [filterBarRulesState([['field' => 'creation_source', 'condition' => 'is_any_of', 'value' => ['bogus']], ['field' => 'name', 'condition' => 'contains', 'value' => 'a']])],
+    'keys in another order' => [['trashed' => ['value' => null], 'conditions' => ['rules' => [['value' => 'a', 'condition' => 'contains', 'field' => 'name']], 'match' => 'all']]],
+]);
+
+it('reads a view as unchanged however its filters were stored, also on the next request', function (array $filters, string $how): void {
+    filterBarScenario('companies', $this->user);
+    $view = SavedView::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Company, 'state' => new TableStateData(filters: $filters)]);
+
+    if ($how === 'default') {
+        TablePreference::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Company, 'default_view_id' => $view->getKey()]);
+    }
+
+    $component = $how === 'apply'
+        ? livewire(ListCompanies::class)->call('applySavedView', $view->getKey())
+        : livewire(ListCompanies::class);
+
+    expect($component->get('activeSavedViewId'))->toBe($view->getKey())
+        ->and($component->instance()->isSavedViewModified())->toBeFalse();
+
+    $component->call('$refresh');
+
+    expect($component->instance()->isSavedViewModified())->toBeFalse();
+})->with('stored filter shapes')->with(['apply', 'default']);
+
+it('reads a view as unchanged when a stored preference predates the conditions filter', function (bool $changed): void {
+    filterBarScenario('companies', $this->user);
+    $before = new TableStateData(
+        columns: [['type' => 'column', 'name' => 'created_at', 'isToggled' => true]],
+        sort: 'created_at:desc',
+        filters: ['assigned_to_me' => ['isActive' => false], 'creation_source' => ['values' => ['api']], 'trashed' => ['value' => null]],
+    );
+    $view = SavedView::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Company, 'state' => $before]);
+    TablePreference::factory()->for($this->user)->for($this->workspace)->create([
+        'entity' => CrmEntity::Company,
+        'active_view_id' => $view->getKey(),
+        'applied_view_hash' => $before->withoutWidths()->hash(),
+        'state' => $changed ? new TableStateData(columns: $before->columns, sort: 'created_at:asc', filters: $before->filters) : $before,
+    ]);
+
+    $component = livewire(ListCompanies::class);
+    $component->call('$refresh');
+
+    expect($component->get('activeSavedViewId'))->toBe($view->getKey())
+        ->and($component->instance()->isSavedViewModified())->toBe($changed)
+        ->and($component->get('tableFilters.conditions.rules'))->toBe([['field' => 'creation_source', 'condition' => 'is_any_of', 'value' => ['api']]]);
+})->with([
+    'a clean copy' => [false],
+    'a changed copy' => [true],
+]);
+
+it('keeps a relative period unchanged when a day passes, and moves its records', function (): void {
+    $this->travelTo('2026-03-18 12:00:00');
+    filterBarRecord($this->user, Company::class, 'Far', ['created_at' => '2026-04-20 10:00:00']);
+    filterBarRecord($this->user, Company::class, 'Near', ['created_at' => '2026-04-01 10:00:00']);
+    $view = SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'entity' => CrmEntity::Company,
+        'state' => new TableStateData(filters: filterBarRulesState([['field' => 'created_at', 'condition' => 'in_the_next', 'value' => ['amount' => 30, 'unit' => 'days']]])),
+    ]);
+    livewire(ListCompanies::class)->call('applySavedView', $view->getKey());
+
+    $this->travelTo('2026-03-28 12:00:00');
+    $next = livewire(ListCompanies::class);
+
+    expect($next->instance()->isSavedViewModified())->toBeFalse()
+        ->and(filterBarShownNames($next))->toBe(['Far', 'Near']);
+});
+
+it('reads a shared me view as unchanged for a second member, who sees their own records', function (): void {
+    $colleague = filterBarMember($this->user);
+    filterBarRecord($this->user, Company::class, 'By owner');
+    filterBarRecord($this->user, Company::class, 'By colleague', ['creator_id' => $colleague->getKey()]);
+    $view = SavedView::factory()->for($this->user)->for($this->workspace)->shared()->create([
+        'entity' => CrmEntity::Company,
+        'state' => new TableStateData(filters: filterBarRulesState([['field' => 'creator', 'condition' => 'is_any_of', 'value' => ['@me']]])),
+    ]);
+
+    $this->actingAs($colleague);
+    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('$refresh');
+
+    expect($component->instance()->isSavedViewModified())->toBeFalse()
+        ->and(filterBarShownNames($component))->toBe(['By colleague'])
+        ->and($component->get('tableFilters.conditions.rules.0.value'))->toBe(['@me']);
+});
+
+it('reads a view as changed after a rule is added, and as unchanged after discarding it', function (): void {
+    $view = SavedView::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Company, 'state' => new TableStateData(filters: filterBarRulesState([]))]);
+
+    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey());
+    expect($component->instance()->isSavedViewModified())->toBeFalse();
+
+    $component->call('setFilterRules', [['field' => 'name', 'condition' => 'contains', 'value' => 'a']]);
+    expect($component->instance()->isSavedViewModified())->toBeTrue();
+
+    $component->call('revertSavedView');
+    expect($component->instance()->isSavedViewModified())->toBeFalse()
+        ->and($component->get('tableFilters.conditions.rules'))->toBe([]);
+});
+
+it('resolves the records of a field with one query however many rules name them', function (): void {
+    $companies = [filterBarRecord($this->user, Company::class, 'One'), filterBarRecord($this->user, Company::class, 'Two'), filterBarRecord($this->user, Company::class, 'Three')];
+    $component = livewire(ListPeople::class);
+    $rules = array_map(fn (Company $company): array => ['field' => 'company', 'condition' => 'is_any_of', 'value' => [$company->getKey()]], $companies);
+
+    DB::enableQueryLog();
+    $component->set('tableFilters.conditions.rules', $rules);
+    $lookups = collect(DB::getQueryLog())->filter(fn (array $query): bool => str_starts_with((string) $query['query'], 'select "id" from "companies"'));
+    DB::disableQueryLog();
+
+    expect($lookups)->toHaveCount(1)->and($component->get('tableFilters.conditions.rules'))->toHaveCount(3);
+});
+
+it('leaves the empty list description off a list that a rule or the deleted records view empties', function (string $page, string $description): void {
+    livewire($page)->assertSee(__($description));
+
+    livewire($page)
+        ->set('tableFilters.conditions.rules', [['field' => 'creation_source', 'condition' => 'is_any_of', 'value' => ['import']]])
+        ->assertCountTableRecords(0)
+        ->assertDontSee(__($description));
+
+    livewire($page)
+        ->set('tableFilters.trashed.value', 0)
+        ->assertCountTableRecords(0)
+        ->assertDontSee(__($description));
+})->with([
+    'companies' => [ListCompanies::class, 'filament/resources/company.empty_state.description'],
+    'people' => [ListPeople::class, 'filament/resources/person.empty_state.description'],
+    'opportunities' => [ListOpportunities::class, 'filament/resources/opportunity.empty_state.description'],
+    'tasks' => [ManageTasks::class, 'filament/resources/task.empty_state.description'],
+    'notes' => [ManageNotes::class, 'filament/resources/note.empty_state.description'],
+]);

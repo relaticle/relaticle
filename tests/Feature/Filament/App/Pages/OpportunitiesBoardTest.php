@@ -135,8 +135,7 @@ it('keeps the board clear button off the opportunity list table', function (): v
     Filament::bootCurrentPanel();
 
     livewire(ListOpportunities::class)
-        ->filterTable('creation_source', CreationSource::WEB->value)
-        ->assertSeeHtml('fi-ta-filter-indicators')
+        ->set('tableFilters.conditions.rules', [['field' => 'creation_source', 'condition' => 'is_any_of', 'value' => [CreationSource::WEB->value]]])
         ->assertDontSeeHtml('fi-board-filter-clear');
 });
 

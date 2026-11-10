@@ -220,7 +220,7 @@ it('validates title is required on create', function (): void {
 it('has `:dataset` filter', function (string $filter): void {
     livewire(ManageNotes::class)
         ->assertTableFilterExists($filter);
-})->with(['creation_source', 'trashed']);
+})->with(['conditions', 'trashed']);
 
 it('sets creator_id and workspace_id via observer when creating a note', function (): void {
     livewire(ManageNotes::class)

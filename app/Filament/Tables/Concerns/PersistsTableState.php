@@ -52,7 +52,7 @@ trait PersistsTableState
         $initial = $this->initialTableState();
 
         $this->tableSort = blank($this->tableSort) ? $initial->sort : $this->tableSort;
-        $this->tableFilters = blank($this->tableFilters) ? ($initial->filters ?: null) : $this->tableFilters;
+        $this->tableFilters = $this->canonicalTableFilters(blank($this->tableFilters) ? $initial->filters : $this->tableFilters);
         $this->tableSearch = blank($this->tableSearch) ? $initial->search : $this->tableSearch;
         $this->tableColumnSearches = blank($this->tableColumnSearches) ? $initial->columnSearches : $this->tableColumnSearches;
         $this->tableGrouping = blank($this->tableGrouping) ? $initial->grouping : $this->tableGrouping;
@@ -160,7 +160,7 @@ trait PersistsTableState
             : $this->getDefaultTableRecordsPerPageSelectOption();
         $this->updatedTableRecordsPerPage();
 
-        $this->getTableFiltersForm()->fill($state->filters);
+        $this->getTableFiltersForm()->fill($this->canonicalTableFilters($state->filters));
         $this->updatedTableFilters();
 
         $this->flushCachedTableRecords();
@@ -321,7 +321,7 @@ trait PersistsTableState
         return new TableStateData(
             columns: array_values(array_map(fn (array $item): array => Arr::only($item, ['type', 'name', 'isToggled']), $this->tableColumns)),
             sort: filled($this->tableSort) ? $this->tableSort : null,
-            filters: $this->tableFilters ?? [],
+            filters: $this->canonicalTableFilters($this->tableFilters),
             search: filled($this->tableSearch) ? $this->tableSearch : null,
             columnSearches: array_filter($this->tableColumnSearches, filled(...)),
             grouping: filled($this->tableGrouping) ? $this->tableGrouping : null,

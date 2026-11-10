@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources;
 
-use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
 use App\Filament\Actions\PreviewRecordAction;
 use App\Filament\Components\Forms\RecordSelect;
@@ -42,7 +41,6 @@ use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
@@ -117,11 +115,7 @@ final class PeopleResource extends Resource
             ->columns(self::columns())
             ->defaultSort('created_at', 'desc')
             ->filters([
-                SelectFilter::make('creation_source')
-                    ->label(__('filament/resources/person.fields.creation_source.label'))
-                    ->options(CreationSource::class)
-                    ->multiple(),
-                TrashedFilter::make(),
+                TrashedFilter::make()->indicateUsing(fn (): array => []),
             ])
             ->recordActions([
                 ActionGroup::make([

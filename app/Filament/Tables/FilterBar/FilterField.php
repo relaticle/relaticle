@@ -9,6 +9,7 @@ use App\Enums\CustomFieldType;
 use App\Enums\FilterCondition;
 use App\Enums\FilterFieldKind;
 use App\Models\CustomField;
+use App\Support\CustomFields\CustomFieldOptionMap;
 
 final readonly class FilterField
 {
@@ -18,6 +19,7 @@ final readonly class FilterField
      */
     public function __construct(
         public string $key,
+        public CrmEntity $entity,
         public string $label,
         public string $icon,
         public FilterFieldKind $kind,
@@ -27,6 +29,13 @@ final readonly class FilterField
         public ?CustomFieldType $type = null,
         public ?CustomField $definition = null,
     ) {}
+
+    public function picksFromOptions(): bool
+    {
+        return $this->definition instanceof CustomField
+            ? (new CustomFieldOptionMap)->translates($this->definition)
+            : $this->kind === FilterFieldKind::Choice && $this->options !== [];
+    }
 
     /** @return list<FilterCondition> */
     public function conditions(): array

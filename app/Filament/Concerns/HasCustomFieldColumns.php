@@ -73,7 +73,7 @@ trait HasCustomFieldColumns
                 ->filtersLayout(FiltersLayout::Hidden)
                 ->columnManager(false)
                 ->pushColumns($columns)
-                ->pushFilters([...$builder->filters()->all(), ConditionsFilter::make()]),
+                ->pushFilters([ConditionsFilter::make($this->healedFilterRules(...))]),
         );
     }
 
