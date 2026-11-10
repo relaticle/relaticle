@@ -8,6 +8,7 @@ use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Queries\CustomFieldFilterSchema;
 use App\Queries\FilterErrors;
@@ -33,6 +34,8 @@ final readonly class CustomFieldFilter implements Filter
     private const int MAX_OPERAND_LENGTH = 2048;
 
     private const string LIST_ELEMENTS = "jsonb_array_elements_text(case when jsonb_typeof(json_value::jsonb) = 'array' then json_value::jsonb else '[]'::jsonb end)";
+
+    private const string RECORD_ELEMENTS = "jsonb_array_elements_text(case jsonb_typeof(json_value::jsonb) when 'array' then json_value::jsonb when 'string' then jsonb_build_array(json_value::jsonb) else '[]'::jsonb end)";
 
     private const string LOWERED_OPERANDS = 'array(select lower(operand) from unnest(?::text[]) as operand)';
 
@@ -314,7 +317,7 @@ final readonly class CustomFieldFilter implements Filter
             /** @var Builder<CustomFieldValue> $values */
             $values->holdingAValue($field);
 
-            $liveRecords = $this->liveRecordElements($field);
+            $liveRecords = $this->liveRecordLinks($field);
 
             if ($liveRecords instanceof QueryBuilder) {
                 $values->whereExists($liveRecords);
@@ -332,22 +335,51 @@ final readonly class CustomFieldFilter implements Filter
      */
     private function containsAny(Builder $query, CustomField $field, array $values): void
     {
+        $isRecord = $field->type === CustomFieldType::RECORD->value;
+
+        if ($isRecord) {
+            $values = $this->liveRecordIds($field, $values);
+
+            if ($values === []) {
+                $query->whereRaw('false');
+
+                return;
+            }
+        }
+
         $matches = in_array($field->type, [CustomFieldType::EMAIL->value, CustomFieldType::LINK->value, CustomFieldType::DOMAIN->value, CustomFieldType::RECORD->value], true)
             ? 'lower(element) = any('.self::LOWERED_OPERANDS.')'
             : 'element = any(?::text[])';
 
-        $liveRecords = $this->liveRecordElements($field);
+        $elements = $isRecord ? self::RECORD_ELEMENTS : self::LIST_ELEMENTS;
 
-        if ($liveRecords instanceof QueryBuilder) {
-            $query->whereExists($liveRecords->whereRaw($matches, [$this->textArray($values)]));
-
-            return;
-        }
-
-        $query->whereRaw('exists (select 1 from '.self::LIST_ELEMENTS." as element where {$matches})", [$this->textArray($values)]);
+        $query->whereRaw("exists (select 1 from {$elements} as element where {$matches})", [$this->textArray($values)]);
     }
 
-    private function liveRecordElements(CustomField $field): ?QueryBuilder
+    /**
+     * @param  array<int, string>  $ids
+     * @return array<int, string>
+     */
+    private function liveRecordIds(CustomField $field, array $ids): array
+    {
+        $entity = CrmEntity::tryFrom((string) $field->lookup_type);
+
+        if ($entity === null) {
+            return [];
+        }
+
+        $model = $entity->model();
+
+        return $model::query()
+            ->withoutGlobalScope(WorkspaceScope::class)
+            ->where('workspace_id', $field->tenant_id)
+            ->whereKey(array_map(Str::lower(...), $ids))
+            ->pluck('id')
+            ->map(static fn (mixed $id): string => (string) $id)
+            ->all();
+    }
+
+    private function liveRecordLinks(CustomField $field): ?QueryBuilder
     {
         $entity = $field->type === CustomFieldType::RECORD->value ? CrmEntity::tryFrom((string) $field->lookup_type) : null;
 
@@ -355,12 +387,16 @@ final readonly class CustomFieldFilter implements Filter
             return null;
         }
 
-        $liveRecord = DB::table($entity->table(), 'record')
-            ->whereRaw('record.id = lower(element)')
-            ->where('record.workspace_id', $field->tenant_id)
-            ->whereNull('record.deleted_at');
+        $model = $entity->model();
 
-        return DB::query()->fromRaw(self::LIST_ELEMENTS.' as element')->selectRaw('1')->whereExists($liveRecord->selectRaw('1'));
+        $liveRecord = $model::query()
+            ->withoutGlobalScope(WorkspaceScope::class)
+            ->where('workspace_id', $field->tenant_id)
+            ->where((new $model)->getQualifiedKeyName(), DB::raw('element::bpchar'))
+            ->selectRaw('1')
+            ->toBase();
+
+        return DB::query()->fromRaw(self::RECORD_ELEMENTS.' as element')->selectRaw('1')->whereExists($liveRecord);
     }
 
     /**

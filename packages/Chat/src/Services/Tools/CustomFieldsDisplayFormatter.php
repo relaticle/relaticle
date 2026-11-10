@@ -280,10 +280,10 @@ final readonly class CustomFieldsDisplayFormatter
     /** @return list<string> */
     private function recordNames(CustomField $field, mixed $value): array
     {
-        return array_map(
-            fn (array $record): string => $record['name'] ?? $record['id'],
+        return array_values(array_filter(array_column(
             resolve(RecordNameResolver::class)->resolve((string) $field->lookup_type, $value),
-        );
+            'name',
+        ), is_string(...)));
     }
 
     private function renderMultiChoice(CustomField $field, mixed $value): string

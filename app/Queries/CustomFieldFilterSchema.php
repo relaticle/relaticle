@@ -30,6 +30,8 @@ final readonly class CustomFieldFilterSchema
 
     public const string EMPTY_MATCH_RULE = '$not_in and $has_none also match records where the field is empty.';
 
+    public const string RECORD_LINK_RULE = 'A record field link to a deleted record counts as no link.';
+
     /** @var array<string, array<string, list<string>>> */
     public const array DOMAIN_EXAMPLE = ['domain' => ['$in' => ['acme.com']]];
 
@@ -148,7 +150,7 @@ final readonly class CustomFieldFilterSchema
 
     public static function generalRules(): string
     {
-        return self::EMPTY_MATCH_RULE.' '.self::EMPTINESS_RULE.' '.self::PARTIAL_MATCH_RULE;
+        return self::EMPTY_MATCH_RULE.' '.self::EMPTINESS_RULE.' '.self::RECORD_LINK_RULE.' '.self::PARTIAL_MATCH_RULE;
     }
 
     /**

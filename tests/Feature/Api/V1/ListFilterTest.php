@@ -7,6 +7,7 @@ use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
 use App\Http\Requests\Api\V1\IndexRequest;
 use App\Models\Company;
+use App\Models\CustomFieldValue;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
@@ -467,6 +468,25 @@ it('treats a record custom field link to a deleted record as no link', function 
     $gone->restore();
 
     expect($partner(['$has_any' => [$gone->id]]))->toEqualCanonicalizing([$orphaned->id, $mixed->id]);
+});
+
+it('reads a record custom field holding a bare id as one link', function (): void {
+    $field = app(CreateCustomField::class)->execute($this->user, ['entity_type' => 'company', 'name' => 'Partner', 'code' => 'partner', 'type' => 'record', 'lookup_type' => 'people']);
+    $live = People::factory()->recycle([$this->user, $this->workspace])->create();
+    $gone = People::factory()->recycle([$this->user, $this->workspace])->create();
+    $linked = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $orphaned = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $linked->saveCustomFieldValue($field, [$live->id]);
+    $orphaned->saveCustomFieldValue($field, [$gone->id]);
+    CustomFieldValue::query()->withoutGlobalScopes()->where('custom_field_id', $field->getKey())->where('entity_id', $linked->id)->update(['json_value' => json_encode($live->id)]);
+    CustomFieldValue::query()->withoutGlobalScopes()->where('custom_field_id', $field->getKey())->where('entity_id', $orphaned->id)->update(['json_value' => json_encode($gone->id)]);
+    $gone->delete();
+
+    $partner = fn (array $condition): array => listIds($this, 'companies', ['custom_fields' => ['partner' => $condition]]);
+
+    expect($partner(['$is_empty' => false]))->toBe([$linked->id])
+        ->and($partner(['$is_empty' => true]))->toBe([$orphaned->id])
+        ->and($partner(['$has_any' => [$live->id]]))->toBe([$linked->id]);
 });
 
 it('does not count a record custom field link to another workspace record', function (): void {

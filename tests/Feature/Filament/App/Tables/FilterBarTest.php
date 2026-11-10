@@ -793,7 +793,7 @@ it('filters a record custom field by record ids as the api does', function (stri
     'has none of keeps the empty' => ['has_none_of', ['With Globex', 'Alone']],
 ]);
 
-it('treats a record custom field link to a deleted record as no link in the bar', function (): void {
+it('treats a record custom field link to a deleted record as no link in the bar', function (string $condition, string $values, array $expected): void {
     filterBarField($this->user, 'opportunity', 'partner', CustomFieldType::RECORD->value, lookup: 'company');
     $live = filterBarRecord($this->user, Company::class, 'Live');
     $gone = filterBarRecord($this->user, Company::class, 'Gone');
@@ -801,17 +801,19 @@ it('treats a record custom field link to a deleted record as no link in the bar'
     filterBarRecord($this->user, Opportunity::class, 'Mixed', values: ['partner' => [$live->getKey(), $gone->getKey()]]);
     filterBarRecord($this->user, Opportunity::class, 'Alone');
     $gone->delete();
+    $ids = ['none' => [], 'live' => [$live->getKey()], 'gone' => [$gone->getKey()], 'gone and live' => [$gone->getKey(), $live->getKey()]][$values];
 
-    $shown = fn (string $condition, array $value = []): array => filterBarShownNames(
-        livewire(ListOpportunities::class)->call('setFilterRules', [['field' => 'custom_fields.partner', 'condition' => $condition, 'value' => $value]]),
-    );
+    $shown = livewire(ListOpportunities::class)->call('setFilterRules', [['field' => 'custom_fields.partner', 'condition' => $condition, 'value' => $ids]]);
 
-    expect($shown('is_empty'))->toBe(['Alone', 'Orphaned'])
-        ->and($shown('is_not_empty'))->toBe(['Mixed'])
-        ->and($shown('has_any_of', [$live->getKey()]))->toBe(['Mixed'])
-        ->and($shown('has_any_of', [$gone->getKey()]))->toBe([])
-        ->and($shown('has_none_of', [$gone->getKey()]))->toBe(['Alone', 'Mixed', 'Orphaned']);
-});
+    expect(filterBarShownNames($shown))->toBe($expected);
+})->with([
+    'is empty' => ['is_empty', 'none', ['Alone', 'Orphaned']],
+    'is not empty' => ['is_not_empty', 'none', ['Mixed']],
+    'has any of a live record' => ['has_any_of', 'live', ['Mixed']],
+    'has any of a deleted record' => ['has_any_of', 'gone', []],
+    'has none of a deleted record' => ['has_none_of', 'gone', ['Alone', 'Mixed', 'Orphaned']],
+    'has none of a deleted and a live record' => ['has_none_of', 'gone and live', ['Alone', 'Orphaned']],
+]);
 
 it('shows every record for a link rule whose ids are not usable', function (string $field, mixed $value): void {
     filterBarLinkedPeople($this->user);

@@ -367,6 +367,7 @@ it('states the matching, emptiness and operand rules on every surface', function
     $rules = [
         CustomFieldFilterSchema::EMPTINESS_RULE,
         CustomFieldFilterSchema::EMPTY_MATCH_RULE,
+        CustomFieldFilterSchema::RECORD_LINK_RULE,
         CustomFieldFilterSchema::PARTIAL_MATCH_RULE,
         CustomFieldType::TAGS_INPUT->filterMatching(),
         CustomFieldType::PHONE->filterMatching(),

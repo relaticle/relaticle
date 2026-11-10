@@ -347,6 +347,7 @@ Text area, rich text and color fields take no filter. Neither does an encrypted 
 - A record field takes the IDs of the records it links to.
 - `$contains`, `$starts_with` and `$ends_with` ignore letter case. On a field that holds several values, they match when any value matches. They compare the operand as typed against the value as stored. A phone is stored as `+14155550100`, with an extension as `;ext=12` and no spaces, so `+1415` matches and `+1 415` does not. A link keeps a scheme only when one was typed, so `https://acme` matches `https://acme.com/team` and `acme` does not. A domain is stored as a bare host, without a scheme or `www.`.
 - `$not_in` and `$has_none` also match records where the field is empty.
+- A record field link to a deleted record counts as no link.
 
 #### Limits
 
