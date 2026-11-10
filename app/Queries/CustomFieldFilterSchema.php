@@ -113,6 +113,7 @@ final readonly class CustomFieldFilterSchema
     public static function valueRules(): string
     {
         $typesByMatching = [];
+        $partialSentences = [];
         $domainTypes = [];
 
         foreach (CustomFieldType::cases() as $type) {
@@ -120,6 +121,11 @@ final readonly class CustomFieldFilterSchema
 
             if ($matching !== null) {
                 $typesByMatching[$matching][] = $type->value;
+            }
+
+            if ($type->partialMatching() !== null) {
+                $article = str_starts_with($type->value, 'e') ? 'an' : 'a';
+                $partialSentences[] = "On {$article} {$type->value} field, ".Arr::join(self::PARTIAL_OPERATORS, ', ', ' and ')." match against {$type->partialMatching()}.";
             }
 
             if (isset(self::operatorsForType($type->value)['domain'])) {
@@ -133,6 +139,7 @@ final readonly class CustomFieldFilterSchema
             $sentences[] = ucfirst(Arr::join($types, ', ', ' and '))." values match {$matching}.";
         }
 
+        array_push($sentences, ...$partialSentences);
         $sentences[] = ucfirst(Arr::join($domainTypes, ', ', ' and ')).' fields also take a domain sub-field with '.implode(' or ', self::DOMAIN_OPERATORS).', such as '.self::json(self::DOMAIN_EXAMPLE).', which matches '.self::DOMAIN_MEANING.'.';
         $sentences[] = self::generalRules();
 
