@@ -19,7 +19,7 @@ final class FilteredEmptyState
     public static function heading(): Closure
     {
         return fn (HasTable $livewire, Table $table): ?string => self::isFilteredByBar($livewire)
-            ? Lang::string('filament/panel.tables.filters.empty_heading', ['records' => Str::lower((string) $table->getPluralModelLabel())])
+            ? Lang::string('filament/panel.tables.filters.empty_heading', ['records' => Str::lower($table->getPluralModelLabel())])
             : null;
     }
 
