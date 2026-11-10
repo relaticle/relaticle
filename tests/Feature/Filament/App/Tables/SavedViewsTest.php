@@ -1143,7 +1143,8 @@ it('makes what the table shows the member\'s own table when the active view is d
     removeActiveViewElsewhere($change, $owner, $view);
     $component->call('applyOwnTable');
 
-    expect($component->get('tableSort'))->toBe('created_at:desc');
+    expect($component->get('tableSort'))->toBe('created_at:desc')
+        ->and($component->get('activeSavedViewId'))->toBeNull();
 
     session()->flush();
     $revisit = livewire(ListCompanies::class);
@@ -1213,14 +1214,33 @@ it('gives a second tab the table the first tab returned to', function (): void {
     expect($second->get('tableSort'))->toBe('name:desc');
 });
 
-it('clears the parked table on a reset even when the table already was the standard one', function (): void {
-    $view = viewFor($this->user, ['state' => hotLeads()]);
+it('clears a parked table left on a row with no view when the member resets to the default', function (): void {
+    TablePreference::factory()->for($this->user)->for($this->workspace)->create(['own_state' => new TableStateData(sort: 'name:asc')]);
 
-    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('useStandardTable');
+    livewire(ListCompanies::class)->call('useStandardTable');
 
     expect(preferenceRow()->own_state)->toBeNull()
         ->and(preferenceRow()->active_view_id)->toBeNull();
 });
+
+it('clears a view that vanished elsewhere when the member returns to their own table, and leaves the table as it is', function (string $change): void {
+    $owner = savedViewMember(WorkspaceRole::Member);
+    $view = viewFor($owner, ['is_shared' => true, 'state' => hotLeads()]);
+    $component = livewire(ListCompanies::class)->set('tableSort', 'name:asc')->call('applySavedView', $view->getKey());
+    expect(preferenceRow()->own_state)->not->toBeNull();
+
+    removeActiveViewElsewhere($change, $owner, $view);
+    $component->call('applyOwnTable');
+
+    expect($component->get('activeSavedViewId'))->toBeNull()
+        ->and($component->get('appliedSavedViewHash'))->toBeNull()
+        ->and($component->instance()->isSavedViewModified())->toBeFalse()
+        ->and($component->get('tableSort'))->toBe('created_at:desc')
+        ->and($component->get('tableSearch'))->toBe('acme')
+        ->and(preferenceRow()->own_state)->toBeNull()
+        ->and(preferenceRow()->active_view_id)->toBeNull();
+    $component->assertNotNotified();
+})->with(['unshared', 'deleted']);
 
 it('does nothing when the built-in list is picked and no view is applied', function (): void {
     $component = livewire(ListCompanies::class)->set('tableSort', 'name:asc')->call('applyOwnTable');

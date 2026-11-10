@@ -192,7 +192,13 @@ trait HasSavedViews
 
     public function applyOwnTable(): void
     {
+        if ($this->activeSavedViewId === null) {
+            return;
+        }
+
         if (! $this->getActiveSavedView() instanceof SavedView) {
+            $this->clearActiveSavedView();
+
             return;
         }
 
