@@ -1,0 +1,73 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Filament\Tables\FilterBar;
+
+use App\Enums\FilterCondition;
+use App\Enums\FilterFieldKind;
+use App\Enums\PeriodUnit;
+use App\Queries\Operand;
+
+final readonly class FilterValueShape
+{
+    public const int MAX_VALUES = 100;
+
+    public const int MAX_TEXT_LENGTH = 255;
+
+    /** @return string|int|float|list<string>|array{amount?: int, unit: string}|null */
+    public static function of(FilterCondition $condition, FilterFieldKind $kind, mixed $value): string|int|float|array|null
+    {
+        if ($kind->holdsList()) {
+            return self::list($value);
+        }
+
+        return match ($kind) {
+            FilterFieldKind::Number, FilterFieldKind::Inactivity => is_int($value) || (is_float($value) && is_finite($value)) ? $value : self::text($value),
+            FilterFieldKind::Date => $condition->isPeriod() ? self::period($condition, $value) : self::text($value),
+            FilterFieldKind::Text, FilterFieldKind::MultiText => self::text($value),
+            FilterFieldKind::Choice, FilterFieldKind::MultiChoice, FilterFieldKind::Member,
+            FilterFieldKind::Relation, FilterFieldKind::Record, FilterFieldKind::Checkbox => null,
+        };
+    }
+
+    public static function text(mixed $value): ?string
+    {
+        $isSafe = is_string($value) && trim($value) !== '' && mb_strlen($value) <= self::MAX_TEXT_LENGTH
+            && ! str_contains($value, "\0") && mb_check_encoding($value, 'UTF-8');
+
+        return $isSafe ? $value : null;
+    }
+
+    /** @return list<string>|null */
+    public static function list(mixed $value): ?array
+    {
+        if (! is_array($value) || $value === [] || count($value) > self::MAX_VALUES) {
+            return null;
+        }
+
+        $items = array_map(self::text(...), array_values($value));
+
+        return in_array(null, $items, true) ? null : array_values(array_unique($items));
+    }
+
+    /** @return array{amount?: int, unit: string}|null */
+    private static function period(FilterCondition $condition, mixed $value): ?array
+    {
+        $unit = is_array($value) && is_string($value['unit'] ?? null) ? PeriodUnit::tryFrom($value['unit']) : null;
+
+        if (! $unit instanceof PeriodUnit) {
+            return null;
+        }
+
+        if ($condition === FilterCondition::This) {
+            return ['unit' => $unit->value];
+        }
+
+        $amount = Operand::integer($value['amount'] ?? null);
+
+        return $amount !== null && $amount >= 1 && $amount <= $unit->maxAmount()
+            ? ['amount' => $amount, 'unit' => $unit->value]
+            : null;
+    }
+}

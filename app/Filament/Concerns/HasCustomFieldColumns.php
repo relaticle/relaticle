@@ -16,6 +16,7 @@ use App\Models\CustomField;
 use BackedEnum;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Enums\FiltersLayout;
+use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
@@ -73,7 +74,7 @@ trait HasCustomFieldColumns
                 ->filtersLayout(FiltersLayout::Hidden)
                 ->columnManager(false)
                 ->pushColumns($columns)
-                ->pushFilters([ConditionsFilter::make($this->healedFilterRules(...))]),
+                ->filters([ConditionsFilter::make($this->healedFilterRules(...)), TrashedFilter::make()->indicateUsing(fn (): array => [])]),
         );
     }
 

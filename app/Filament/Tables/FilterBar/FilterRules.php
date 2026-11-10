@@ -20,10 +20,6 @@ final readonly class FilterRules
 {
     public const int MAX_EXAMINED_RULES = 50;
 
-    public const int MAX_VALUES = 100;
-
-    public const int MAX_TEXT_LENGTH = 255;
-
     private const string ME = '@me';
 
     /**
@@ -58,9 +54,17 @@ final readonly class FilterRules
         }
 
         $trashed = $tableFilters['trashed'] ?? null;
-        $value = is_array($trashed) && (is_scalar($trashed['value'] ?? null)) ? $trashed['value'] : null;
 
-        return ['conditions' => ['match' => 'all', 'rules' => $rules], 'trashed' => ['value' => $value]];
+        return ['conditions' => ['match' => 'all', 'rules' => $rules], 'trashed' => ['value' => self::deleted(is_array($trashed) ? ($trashed['value'] ?? null) : null)]];
+    }
+
+    private static function deleted(mixed $value): ?int
+    {
+        return match (true) {
+            $value === true, $value === 1, $value === '1', $value === 'true' => 1,
+            $value === false, $value === 0, $value === '0', $value === 'false' => 0,
+            default => null,
+        };
     }
 
     /**
@@ -88,21 +92,11 @@ final readonly class FilterRules
         $isLegacyKey = $key === 'creation_source' || $key === 'assignees' || str_starts_with($key, FilterFieldCatalog::CUSTOM_FIELD_PREFIX);
         $field = $isLegacyKey ? ($catalog[$key] ?? null) : null;
         $values = is_array($state) && is_array($state['values'] ?? null) ? array_values($state['values']) : [];
-        $condition = $field instanceof FilterField ? self::legacyCondition($field->kind) : null;
+        $condition = $field instanceof FilterField ? $field->kind->legacyCondition() : null;
 
         return $values === [] || ! $condition instanceof FilterCondition
             ? []
             : [['field' => $key, 'condition' => $condition->value, 'value' => $values]];
-    }
-
-    private static function legacyCondition(FilterFieldKind $kind): ?FilterCondition
-    {
-        return match ($kind) {
-            FilterFieldKind::Choice, FilterFieldKind::Member => FilterCondition::IsAnyOf,
-            FilterFieldKind::MultiChoice, FilterFieldKind::Record => FilterCondition::HasAnyOf,
-            FilterFieldKind::Text, FilterFieldKind::Number, FilterFieldKind::Date, FilterFieldKind::Checkbox,
-            FilterFieldKind::MultiText, FilterFieldKind::Relation, FilterFieldKind::Inactivity => null,
-        };
     }
 
     /**
@@ -124,61 +118,9 @@ final readonly class FilterRules
             return $canonical;
         }
 
-        $value = self::shapedValue($condition, $field, $rule['value'] ?? null);
+        $value = FilterValueShape::of($condition, $field->kind, $rule['value'] ?? null);
 
         return $value === null ? null : [...$canonical, 'value' => $value];
-    }
-
-    /** @return string|int|float|list<string>|array{amount?: int|float|string, unit: string}|null */
-    private static function shapedValue(FilterCondition $condition, FilterField $field, mixed $value): string|int|float|array|null
-    {
-        return match ($field->kind) {
-            FilterFieldKind::Text, FilterFieldKind::MultiText => self::text($value),
-            FilterFieldKind::Number, FilterFieldKind::Inactivity => is_int($value) || (is_float($value) && is_finite($value)) ? $value : self::text($value),
-            FilterFieldKind::Date => $condition->isPeriod() ? self::period($condition, $value) : self::text($value),
-            FilterFieldKind::Choice, FilterFieldKind::MultiChoice, FilterFieldKind::Member,
-            FilterFieldKind::Relation, FilterFieldKind::Record => self::list($value),
-            FilterFieldKind::Checkbox => null,
-        };
-    }
-
-    private static function text(mixed $value): ?string
-    {
-        $isSafe = is_string($value) && $value !== '' && mb_strlen($value) <= self::MAX_TEXT_LENGTH
-            && ! str_contains($value, "\0") && mb_check_encoding($value, 'UTF-8');
-
-        return $isSafe ? $value : null;
-    }
-
-    /** @return array{amount?: int|float|string, unit: string}|null */
-    private static function period(FilterCondition $condition, mixed $value): ?array
-    {
-        $unit = is_array($value) ? self::text($value['unit'] ?? null) : null;
-        $amount = is_array($value) ? ($value['amount'] ?? null) : null;
-
-        if ($unit === null) {
-            return null;
-        }
-
-        if ($condition === FilterCondition::This) {
-            return ['unit' => $unit];
-        }
-
-        $isAmount = is_int($amount) || (is_float($amount) && is_finite($amount)) || self::text($amount) !== null;
-
-        return $isAmount ? ['amount' => $amount, 'unit' => $unit] : null;
-    }
-
-    /** @return list<string>|null */
-    private static function list(mixed $value): ?array
-    {
-        if (! is_array($value) || $value === [] || count($value) > self::MAX_VALUES) {
-            return null;
-        }
-
-        $items = array_map(self::text(...), array_values($value));
-
-        return in_array(null, $items, true) ? null : array_values(array_unique($items));
     }
 
     /**
@@ -230,7 +172,7 @@ final readonly class FilterRules
         }
 
         $lookup = match (true) {
-            $field->kind === FilterFieldKind::Member, $field->kind === FilterFieldKind::Relation, $field->kind === FilterFieldKind::Record => 'records',
+            $field->kind->holdsRecordIds() => 'records',
             $field->picksFromOptions() => 'options',
             default => null,
         };

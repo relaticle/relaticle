@@ -36,7 +36,6 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
@@ -80,9 +79,6 @@ final class CompanyResource extends Resource
             ->emptyStateDescription(EmptyListDescription::unlessFiltered(__('filament/resources/company.empty_state.description')))
             ->columns(self::columns())
             ->defaultSort('created_at', 'desc')
-            ->filters([
-                TrashedFilter::make()->indicateUsing(fn (): array => []),
-            ])
             ->recordActions([
                 ActionGroup::make([
                     PreviewRecordAction::make()->page(ViewCompany::class),

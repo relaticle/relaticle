@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources;
 
 use App\Enums\CrmEntity;
+use App\Enums\FilterCondition;
 use App\Filament\Actions\CopyToClipboardAction;
 use App\Filament\Actions\EditTaskAction;
 use App\Filament\Components\Tables\EmptyListDescription;
@@ -14,6 +15,7 @@ use App\Filament\Concerns\RemembersViewMode;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
+use App\Filament\Tables\FilterBar\ConditionsFilter;
 use App\Models\CustomField;
 use App\Models\Task;
 use App\Models\Workspace;
@@ -32,7 +34,6 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -75,6 +76,16 @@ final class TaskResource extends Resource
         return CrmEntity::Task->icon();
     }
 
+    public static function assignedToMeUrl(?Workspace $tenant = null): string
+    {
+        return self::getUrl('index', [
+            'filters' => [ConditionsFilter::NAME => [
+                'match' => 'all',
+                'rules' => [['field' => 'assignees', 'condition' => FilterCondition::IsAnyOf->value, 'value' => ['@me']]],
+            ]],
+        ], panel: 'app', tenant: $tenant);
+    }
+
     public static function form(Schema $schema): Schema
     {
         return TaskForm::get($schema);
@@ -92,9 +103,6 @@ final class TaskResource extends Resource
             ->columns(self::columns())
             ->defaultSort('created_at', 'desc')
             ->searchable()
-            ->filters([
-                TrashedFilter::make()->indicateUsing(fn (): array => []),
-            ])
             ->groups(array_filter([
                 ...collect(['status', 'priority'])->map(fn (string $fieldCode): ?\Filament\Tables\Grouping\Group => $customFields->has($fieldCode) ? self::makeCustomFieldGroup($fieldCode, $customFields, $valueResolver) : null
                 )->filter()->toArray(),

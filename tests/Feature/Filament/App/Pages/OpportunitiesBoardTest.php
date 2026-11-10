@@ -134,8 +134,15 @@ it('keeps the board clear button off the opportunity list table', function (): v
     Filament::setCurrentPanel(Filament::getPanel('app'));
     Filament::bootCurrentPanel();
 
+    $web = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['creation_source' => CreationSource::WEB]);
+    $api = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['creation_source' => CreationSource::API]);
+    $rules = [['field' => 'creation_source', 'condition' => 'is_any_of', 'value' => [CreationSource::WEB->value]]];
+
     livewire(ListOpportunities::class)
-        ->set('tableFilters.conditions.rules', [['field' => 'creation_source', 'condition' => 'is_any_of', 'value' => [CreationSource::WEB->value]]])
+        ->set('tableFilters.conditions.rules', $rules)
+        ->assertSet('tableFilters.conditions.rules', $rules)
+        ->assertCanSeeTableRecords([$web])
+        ->assertCanNotSeeTableRecords([$api])
         ->assertDontSeeHtml('fi-board-filter-clear');
 });
 

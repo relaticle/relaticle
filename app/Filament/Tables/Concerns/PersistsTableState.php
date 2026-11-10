@@ -306,9 +306,21 @@ trait PersistsTableState
     private function seedFromPreference(TablePreference $preference, ?SavedView $active): TableStateData
     {
         $this->activeSavedViewId = $active?->getKey();
-        $this->appliedSavedViewHash = $active instanceof SavedView ? $preference->applied_view_hash : null;
+        $this->appliedSavedViewHash = $active instanceof SavedView ? $this->canonicalAppliedHash($active, $preference->applied_view_hash) : null;
 
         return $preference->state;
+    }
+
+    private function canonicalAppliedHash(SavedView $view, ?string $stored): ?string
+    {
+        if ($stored === null || $stored !== $view->state->withoutWidths()->hash()) {
+            return $stored;
+        }
+
+        $canonical = $view->state->withoutWidths();
+        $canonical->filters = $this->canonicalTableFilters($canonical->filters);
+
+        return $canonical->hash();
     }
 
     private function markSavedViewApplied(): void

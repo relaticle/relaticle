@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources;
 
+use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
 use App\Filament\Components\Tables\EmptyListDescription;
 use App\Filament\Components\Tables\LinkedRecordsColumn;
@@ -27,6 +28,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -77,7 +79,11 @@ final class NoteResource extends Resource
             ->columns(self::columns())
             ->defaultSort('created_at', 'desc')
             ->filters([
-                TrashedFilter::make()->indicateUsing(fn (): array => []),
+                SelectFilter::make('creation_source')
+                    ->label(__('filament/resources/note.filters.creation_source.label'))
+                    ->options(CreationSource::class)
+                    ->multiple(),
+                TrashedFilter::make(),
             ])
             ->recordActions([
                 ActionGroup::make([

@@ -12,6 +12,7 @@ use App\Enums\FilterFieldKind;
 use App\Filament\Concerns\HasCustomFieldColumns;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\NoteResource\Pages\ManageNotes;
+use App\Filament\Resources\NoteResource\Pages\NotesCards;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
@@ -565,39 +566,56 @@ it('counts a period from the viewer day and not the utc day', function (): void 
         ->and(filterBarShownNames($custom))->toBe(['Morning']);
 });
 
-it('shows every record for a period whose bounds leave the calendar', function (string $condition, int $amount, string $unit): void {
+it('shows every record for a period above the maximum of its unit', function (int $amount, string $unit): void {
     $this->travelTo('2026-03-18 12:00:00');
     $records = filterBarCreatedAtRecords($this->user);
     filterBarRecord($this->user, Opportunity::class, 'Soon', values: ['close_date' => '2026-03-25']);
+    $value = ['amount' => $amount, 'unit' => $unit];
 
-    $native = livewire(ListCompanies::class)
-        ->set('tableFilters.conditions.rules', [['field' => 'created_at', 'condition' => $condition, 'value' => ['amount' => $amount, 'unit' => $unit]]]);
-    $custom = livewire(ListOpportunities::class)
-        ->set('tableFilters.conditions.rules', [['field' => 'custom_fields.close_date', 'condition' => $condition, 'value' => ['amount' => $amount, 'unit' => $unit]]]);
+    $native = livewire(ListCompanies::class)->set('tableFilters.conditions.rules', [['field' => 'created_at', 'condition' => 'in_the_past', 'value' => $value]]);
+    $custom = livewire(ListOpportunities::class)->set('tableFilters.conditions.rules', [['field' => 'custom_fields.close_date', 'condition' => 'in_the_past', 'value' => $value]]);
 
-    $rule = [['field' => 'created_at', 'condition' => $condition, 'value' => ['amount' => $amount, 'unit' => $unit]]];
-
-    expect((new FilterRuleCompiler)->compile($rule, FilterFieldCatalog::for(CrmEntity::Company, $this->user), $this->user, 'UTC'))->toBe([])
+    expect($native->get('tableFilters.conditions.rules'))->toBe([])
         ->and($native->instance()->getTableRecords())->toHaveCount(count($records))
         ->and($custom->instance()->getTableRecords())->toHaveCount(1);
 })->with([
-    'past 2026 years' => ['in_the_past', 2026, 'years'],
-    'past 3650 years' => ['in_the_past', 3650, 'years'],
+    'years' => [101, 'years'],
+    'quarters' => [41, 'quarters'],
+    'months' => [121, 'months'],
+    'weeks' => [521, 'weeks'],
+    'days' => [3651, 'days'],
 ]);
 
-it('still filters a period that stays inside the calendar', function (): void {
+it('still filters a period at the maximum of its unit', function (int $amount, string $unit): void {
     $this->travelTo('2026-03-18 12:00:00');
     filterBarRecord($this->user, Company::class, 'Recent', ['created_at' => '2026-01-10 10:00:00']);
     filterBarRecord($this->user, Company::class, 'Ancient', ['created_at' => '1900-01-10 10:00:00']);
+    $value = ['amount' => $amount, 'unit' => $unit];
+
+    $past = livewire(ListCompanies::class)->set('tableFilters.conditions.rules', [['field' => 'created_at', 'condition' => 'in_the_past', 'value' => $value]]);
+    $next = livewire(ListCompanies::class)->set('tableFilters.conditions.rules', [['field' => 'created_at', 'condition' => 'in_the_next', 'value' => $value]]);
+
+    expect(filterBarShownNames($past))->toBe(['Recent'])
+        ->and($past->get('tableFilters.conditions.rules.0.value.amount'))->toBe($amount)
+        ->and(filterBarShownNames($next))->toBe([]);
+})->with([
+    'years' => [100, 'years'],
+    'quarters' => [40, 'quarters'],
+    'months' => [120, 'months'],
+    'weeks' => [520, 'weeks'],
+    'days' => [3650, 'days'],
+]);
+
+it('renders a hundred years back for a viewer ahead of utc on the first of january', function (): void {
+    $this->user->update(['timezone' => 'Pacific/Auckland']);
+    $this->travelTo('2026-01-01 00:00:00');
+    filterBarRecord($this->user, Company::class, 'Recent', ['created_at' => '2025-12-01 10:00:00']);
 
     $component = livewire(ListCompanies::class)
-        ->set('tableFilters.conditions.rules', [['field' => 'created_at', 'condition' => 'in_the_past', 'value' => ['amount' => 100, 'unit' => 'years']]]);
+        ->set('tableFilters.conditions.rules', [['field' => 'created_at', 'condition' => 'in_the_past', 'value' => ['amount' => 100, 'unit' => 'years']]])
+        ->assertOk();
 
-    $far = livewire(ListCompanies::class)
-        ->set('tableFilters.conditions.rules', [['field' => 'created_at', 'condition' => 'in_the_next', 'value' => ['amount' => 3650, 'unit' => 'years']]]);
-
-    expect(filterBarShownNames($component))->toBe(['Recent'])
-        ->and(filterBarShownNames($far))->toBe([]);
+    expect(filterBarShownNames($component))->toBe(['Recent']);
 });
 
 it('moves a relative period with the clock while the stored rule stays the same', function (): void {
@@ -799,10 +817,14 @@ it('bounds a relation filter by the workspace the member opened', function (): v
     $none = livewire(ListPeople::class)->set('tableFilters.conditions.rules', [['field' => 'company', 'condition' => 'is_none_of', 'value' => [$inSecond->getKey()]]]);
     $foreign = livewire(ListPeople::class)->set('tableFilters.conditions.rules', [['field' => 'company', 'condition' => 'is_any_of', 'value' => [$first[0]->getKey()]]]);
 
+    $mixed = livewire(ListPeople::class)->set('tableFilters.conditions.rules', [['field' => 'company', 'condition' => 'is_any_of', 'value' => [$first[0]->getKey(), $inSecond->getKey()]]]);
+
     expect(filterBarShownNames($none))->toBe(['Lone Second'])
         ->and(filterBarShownNames($foreign))->toBe(['At Second', 'Lone Second'])
         ->and($foreign->get('tableFilters.conditions.rules'))->toBe([])
-        ->and($foreign->html())->not->toContain($first[0]->name);
+        ->and($foreign->html())->not->toContain($first[0]->name)
+        ->and($mixed->get('tableFilters.conditions.rules.0.value'))->toBe([$inSecond->getKey()])
+        ->and(filterBarShownNames($mixed))->toBe(['At Second']);
 });
 
 function filterBarForeignCompany(string $name): Company
@@ -991,6 +1013,17 @@ it('drops a rule that cannot apply and keeps the others, from a view, the url an
     expect(filterBarShownNames($component))->toBe(['Globex'])
         ->and($component->get('tableFilters.conditions.rules'))->toBe([$good]);
 })->with('unusable rules')->with(['view', 'url', 'set']);
+
+it('drops a text value past the cap on a multi text field and still renders', function (string $how): void {
+    filterBarRecord($this->user, People::class, 'Ann', values: ['emails' => ['ann@acme.com']]);
+    $long = ['field' => 'custom_fields.emails', 'condition' => 'contains', 'value' => str_repeat('a', 300)];
+    $good = ['field' => 'custom_fields.emails', 'condition' => 'contains', 'value' => 'acme'];
+
+    $component = filterBarOpen($this, $how, ListPeople::class, CrmEntity::People, filterBarRulesState([$long, $good]))->assertOk();
+
+    expect($component->get('tableFilters.conditions.rules'))->toBe([$good])
+        ->and(filterBarShownNames($component))->toBe(['Ann']);
+})->with(['view', 'url', 'set']);
 
 it('drops text that holds a nul byte', function (string $how): void {
     filterBarScenario('companies', $this->user);
@@ -1223,25 +1256,65 @@ dataset('stored filter shapes', [
     'keys in another order' => [['trashed' => ['value' => null], 'conditions' => ['rules' => [['value' => 'a', 'condition' => 'contains', 'field' => 'name']], 'match' => 'all']]],
 ]);
 
-it('reads a view as unchanged however its filters were stored, also on the next request', function (array $filters, string $how): void {
-    filterBarScenario('companies', $this->user);
-    $view = SavedView::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Company, 'state' => new TableStateData(filters: $filters)]);
+function filterBarStateWith(mixed $component, array $filters): TableStateData
+{
+    $page = $component->instance();
+    $state = (new ReflectionMethod($page, 'currentTableState'))->invoke($page)->withoutWidths();
+    $state->filters = $filters;
 
-    if ($how === 'default') {
-        TablePreference::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Company, 'default_view_id' => $view->getKey()]);
+    return $state;
+}
+
+it('reads a view as unchanged however its filters were stored, on the next request and on a fresh mount', function (array $filters, string $how): void {
+    filterBarScenario('companies', $this->user);
+    $fresh = livewire(ListCompanies::class);
+    $stored = filterBarStateWith($fresh, $filters);
+    $view = SavedView::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Company, 'state' => $stored]);
+
+    if ($how === 'stored') {
+        TablePreference::factory()->for($this->user)->for($this->workspace)->create([
+            'entity' => CrmEntity::Company,
+            'active_view_id' => $view->getKey(),
+            'applied_view_hash' => $stored->withoutWidths()->hash(),
+            'state' => filterBarStateWith($fresh, [...$filters, 'custom_fields.gone' => ['values' => ['x']]]),
+        ]);
     }
 
     $component = $how === 'apply'
         ? livewire(ListCompanies::class)->call('applySavedView', $view->getKey())
         : livewire(ListCompanies::class);
 
-    expect($component->get('activeSavedViewId'))->toBe($view->getKey())
-        ->and($component->instance()->isSavedViewModified())->toBeFalse();
+    if ($how === 'stored') {
+        expect($component->get('activeSavedViewId'))->toBe($view->getKey())
+            ->and($component->instance()->isSavedViewModified())->toBeFalse();
+    }
 
     $component->call('$refresh');
 
     expect($component->instance()->isSavedViewModified())->toBeFalse();
-})->with('stored filter shapes')->with(['apply', 'default']);
+})->with('stored filter shapes')->with(['apply', 'stored']);
+
+it('reads a copy of a view as unchanged when only its old filter shape differs, and as changed when it really differs', function (string $source, bool $changed): void {
+    $fresh = livewire(ListCompanies::class);
+    $view = SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'entity' => CrmEntity::Company,
+        'state' => filterBarStateWith($fresh, ['creation_source' => ['values' => ['api']]]),
+    ]);
+    TablePreference::factory()->for($this->user)->for($this->workspace)->create([
+        'entity' => CrmEntity::Company,
+        'active_view_id' => $view->getKey(),
+        'applied_view_hash' => $view->state->withoutWidths()->hash(),
+        'state' => filterBarStateWith($fresh, ['creation_source' => ['values' => [$source]], 'custom_fields.gone' => ['values' => ['x']]]),
+    ]);
+
+    $component = livewire(ListCompanies::class);
+
+    expect($component->get('activeSavedViewId'))->toBe($view->getKey())
+        ->and($component->instance()->isSavedViewModified())->toBe($changed);
+})->with([
+    'the copy equals the view' => ['api', false],
+    'the copy differs' => ['import', true],
+]);
 
 it('reads a view as unchanged when a stored preference predates the conditions filter', function (bool $changed): void {
     filterBarScenario('companies', $this->user);
@@ -1277,13 +1350,15 @@ it('keeps a relative period unchanged when a day passes, and moves its records',
         'entity' => CrmEntity::Company,
         'state' => new TableStateData(filters: filterBarRulesState([['field' => 'created_at', 'condition' => 'in_the_next', 'value' => ['amount' => 30, 'unit' => 'days']]])),
     ]);
-    livewire(ListCompanies::class)->call('applySavedView', $view->getKey());
+    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey());
+    $before = filterBarShownNames($component);
 
     $this->travelTo('2026-03-28 12:00:00');
-    $next = livewire(ListCompanies::class);
+    $component->call('$refresh');
 
-    expect($next->instance()->isSavedViewModified())->toBeFalse()
-        ->and(filterBarShownNames($next))->toBe(['Far', 'Near']);
+    expect($before)->toBe(['Near'])
+        ->and($component->instance()->isSavedViewModified())->toBeFalse()
+        ->and(filterBarShownNames($component))->toBe(['Far', 'Near']);
 });
 
 it('reads a shared me view as unchanged for a second member, who sees their own records', function (): void {
@@ -1349,3 +1424,77 @@ it('leaves the empty list description off a list that a rule or the deleted reco
     'tasks' => [ManageTasks::class, 'filament/resources/task.empty_state.description'],
     'notes' => [ManageNotes::class, 'filament/resources/note.empty_state.description'],
 ]);
+
+it('holds exactly the conditions and trashed filters on the five lists', function (string $page): void {
+    expect(array_keys(livewire($page)->instance()->getTable()->getFilters()))->toBe(['conditions', 'trashed']);
+})->with('filter bar pages');
+
+it('keeps the creation source filter on the notes cards', function (): void {
+    livewire(NotesCards::class)->assertTableFilterExists('creation_source');
+});
+
+it('treats the deleted notes view on the cards as filtered', function (): void {
+    $cards = livewire(NotesCards::class)
+        ->filterTable('trashed', false)
+        ->assertCountTableRecords(0)
+        ->assertDontSee(__('filament/resources/note.empty_state.description'));
+
+    expect($cards->instance()->getTable()->getFilter('trashed')->getIndicators())->not->toBeEmpty();
+});
+
+it('reads a deleted state as one value however it is written', function (mixed $written, bool $modified, ?int $stored): void {
+    $view = SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'entity' => CrmEntity::Company,
+        'state' => new TableStateData(filters: ['trashed' => ['value' => 1]]),
+    ]);
+
+    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->set('tableFilters.trashed.value', $written);
+
+    expect($component->get('tableFilters.trashed.value'))->toBe($stored)
+        ->and($component->instance()->isSavedViewModified())->toBe($modified);
+})->with([
+    'true' => [true, false, 1],
+    'the string one' => ['1', false, 1],
+    'the word true' => ['true', false, 1],
+    'false' => [false, true, 0],
+    'the string zero' => ['0', true, 0],
+    'junk' => ['x', true, null],
+    'an array' => [['x'], true, null],
+]);
+
+it('hides deleted records for a junk deleted state and shows only them for the only state', function (): void {
+    filterBarRecord($this->user, Company::class, 'Live');
+    filterBarRecord($this->user, Company::class, 'Gone')->delete();
+
+    $junk = livewire(ListCompanies::class)->set('tableFilters.trashed.value', 'x');
+    $only = livewire(ListCompanies::class)->set('tableFilters.trashed.value', '0');
+    $with = livewire(ListCompanies::class)->set('tableFilters.trashed.value', 'true');
+
+    expect(filterBarShownNames($junk))->toBe(['Live'])
+        ->and(filterBarShownNames($only))->toBe(['Gone'])
+        ->and(filterBarShownNames($with))->toBe(['Gone', 'Live']);
+});
+
+it('keeps a text value that filament would read as a boolean or null', function (string $word, string $how): void {
+    filterBarRecord($this->user, Company::class, "The {$word} company");
+    filterBarRecord($this->user, Company::class, 'Other');
+    $rules = [['field' => 'name', 'condition' => 'contains', 'value' => $word]];
+    $columns = [['type' => 'column', 'name' => 'created_at', 'isToggled' => true]];
+    $state = new TableStateData(columns: $columns, filters: filterBarRulesState($rules));
+
+    if ($how === 'default') {
+        $view = SavedView::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Company, 'state' => $state]);
+        TablePreference::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Company, 'default_view_id' => $view->getKey()]);
+    }
+
+    if ($how === 'own table') {
+        TablePreference::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Company, 'state' => $state]);
+    }
+
+    $component = $how === 'url'
+        ? Livewire::withQueryParams(['filters' => filterBarRulesState($rules)])->test(ListCompanies::class)
+        : livewire(ListCompanies::class);
+
+    expect($component->get('tableFilters.conditions.rules'))->toBe($rules)
+        ->and(filterBarShownNames($component))->toBe(["The {$word} company"]);
+})->with(['true', 'false', 'null'])->with(['default', 'own table', 'url']);

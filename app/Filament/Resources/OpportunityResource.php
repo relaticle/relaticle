@@ -33,7 +33,6 @@ use Filament\Actions\ViewAction;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -89,9 +88,6 @@ final class OpportunityResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('created_at', 'desc')
-            ->filters([
-                TrashedFilter::make()->indicateUsing(fn (): array => []),
-            ])
             ->recordActions([
                 ActionGroup::make([
                     PreviewRecordAction::make()->page(ViewOpportunity::class),

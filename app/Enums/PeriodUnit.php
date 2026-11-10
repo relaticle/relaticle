@@ -15,6 +15,17 @@ enum PeriodUnit: string
     case Quarters = 'quarters';
     case Years = 'years';
 
+    public function maxAmount(): int
+    {
+        return match ($this) {
+            self::Days => 3650,
+            self::Weeks => 520,
+            self::Months => 120,
+            self::Quarters => 40,
+            self::Years => 100,
+        };
+    }
+
     public function plus(CarbonImmutable $day, int $amount): CarbonImmutable
     {
         return match ($this) {

@@ -19,8 +19,6 @@ use Illuminate\Support\Str;
 
 final readonly class FilterRuleCompiler
 {
-    private const int MAX_PERIOD_AMOUNT = 3650;
-
     private const string ME = '@me';
 
     /**
@@ -77,12 +75,18 @@ final readonly class FilterRuleCompiler
     /** @return string|int|float|list<string>|null */
     private function valued(FilterCondition $condition, FilterField $field, mixed $value, User $user, string $zone): string|int|float|array|null
     {
+        $value = FilterValueShape::of($condition, $field->kind, $value);
+
+        if ($value === null) {
+            return null;
+        }
+
         return match ($field->kind) {
             FilterFieldKind::Text => $this->text($value),
             FilterFieldKind::MultiText => $this->multiText($condition, $field, $value),
             FilterFieldKind::Number => $this->number($value, $this->isIntegral($field), null, null),
             FilterFieldKind::Inactivity => $this->number($value, true, 1, StaleDaysFilter::MAX_DAYS),
-            FilterFieldKind::Choice, FilterFieldKind::MultiChoice => $this->list($value),
+            FilterFieldKind::Choice, FilterFieldKind::MultiChoice => FilterValueShape::list($value),
             FilterFieldKind::Date => $condition->isPeriod() ? $this->period($condition, $value, $zone) : $this->day($value, $zone),
             FilterFieldKind::Member, FilterFieldKind::Relation, FilterFieldKind::Record => $this->recordIds($field, $value, $user),
             FilterFieldKind::Checkbox => null,
@@ -115,7 +119,7 @@ final readonly class FilterRuleCompiler
             return [$unit->startOf($today)->toDateString(), $unit->endOf($today)->toDateString()];
         }
 
-        if ($amount === null || $amount < 1 || $amount > self::MAX_PERIOD_AMOUNT) {
+        if ($amount === null) {
             return null;
         }
 
@@ -123,9 +127,7 @@ final readonly class FilterRuleCompiler
             ? [$unit->minus($today, $amount), $today]
             : [$today, $unit->plus($today, $amount)];
 
-        return array_all($bounds, static fn (CarbonImmutable $bound): bool => $bound->year >= 1 && $bound->year <= 9999)
-            ? array_map(static fn (CarbonImmutable $bound): string => $bound->toDateString(), $bounds)
-            : null;
+        return array_map(static fn (CarbonImmutable $bound): string => $bound->toDateString(), $bounds);
     }
 
     /** @return list<string>|null */
@@ -133,7 +135,7 @@ final readonly class FilterRuleCompiler
     {
         $ids = array_map(
             fn (string $id): string => $field->kind === FilterFieldKind::Member && $id === self::ME ? (string) $user->getKey() : $id,
-            $this->list($value) ?? [],
+            is_array($value) ? $value : [],
         );
         $ids = array_values(array_unique(array_filter($ids, Str::isUlid(...))));
 
@@ -191,17 +193,5 @@ final readonly class FilterRuleCompiler
         $valid = is_int($number) ? true : (! $integral && is_finite($number));
 
         return $valid && ($min === null || $number >= $min) && ($max === null || $number <= $max) ? $number : null;
-    }
-
-    /** @return list<string>|null */
-    private function list(mixed $value): ?array
-    {
-        if (! is_array($value) || $value === [] || count($value) > CustomFieldFilterSchema::MAX_LIST_VALUES) {
-            return null;
-        }
-
-        $strings = array_values(array_filter($value, is_string(...)));
-
-        return $strings === [] ? null : $strings;
     }
 }

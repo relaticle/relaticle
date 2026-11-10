@@ -46,4 +46,29 @@ enum FilterFieldKind: string
             self::Inactivity => [FilterCondition::NoActivityFor],
         };
     }
+
+    public function legacyCondition(): ?FilterCondition
+    {
+        return match ($this) {
+            self::Choice, self::Member => FilterCondition::IsAnyOf,
+            self::MultiChoice, self::Record => FilterCondition::HasAnyOf,
+            self::Text, self::Number, self::Date, self::Checkbox, self::MultiText, self::Relation, self::Inactivity => null,
+        };
+    }
+
+    public function holdsRecordIds(): bool
+    {
+        return match ($this) {
+            self::Member, self::Relation, self::Record => true,
+            self::Text, self::Number, self::Date, self::Choice, self::MultiChoice, self::Checkbox, self::MultiText, self::Inactivity => false,
+        };
+    }
+
+    public function holdsList(): bool
+    {
+        return match ($this) {
+            self::Choice, self::MultiChoice, self::Member, self::Relation, self::Record => true,
+            self::Text, self::Number, self::Date, self::Checkbox, self::MultiText, self::Inactivity => false,
+        };
+    }
 }

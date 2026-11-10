@@ -61,6 +61,14 @@ trait HasFilterBar
         };
     }
 
+    /**
+     * @param  array<array-key, mixed>  $data
+     */
+    protected function normalizeTableFilterValuesFromQueryString(array &$data): void
+    {
+        // Filament turns the words true, false and null into values, and a rule's text can be any of them.
+    }
+
     #[Unexposed]
     public function updatedTableFilters(): void
     {
