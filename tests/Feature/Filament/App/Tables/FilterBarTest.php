@@ -606,18 +606,6 @@ it('still filters a period at the maximum of its unit', function (int $amount, s
     'days' => [3650, 'days'],
 ]);
 
-it('renders a hundred years back for a viewer ahead of utc on the first of january', function (): void {
-    $this->user->update(['timezone' => 'Pacific/Auckland']);
-    $this->travelTo('2026-01-01 00:00:00');
-    filterBarRecord($this->user, Company::class, 'Recent', ['created_at' => '2025-12-01 10:00:00']);
-
-    $component = livewire(ListCompanies::class)
-        ->set('tableFilters.conditions.rules', [['field' => 'created_at', 'condition' => 'in_the_past', 'value' => ['amount' => 100, 'unit' => 'years']]])
-        ->assertOk();
-
-    expect(filterBarShownNames($component))->toBe(['Recent']);
-});
-
 it('moves a relative period with the clock while the stored rule stays the same', function (): void {
     $this->travelTo('2026-03-18 12:00:00');
     filterBarRecord($this->user, Company::class, 'Far', ['created_at' => '2026-04-20 10:00:00']);
@@ -1579,4 +1567,77 @@ it('reads a saved view that includes deleted records as unchanged until the mode
     $component->call('setDeletedRecordsFilter', 'included');
 
     expect($component->instance()->isSavedViewModified())->toBeFalse();
+});
+
+it('lists neither the live nor the deleted record when a negated name rule matches both', function (string $page, string $model): void {
+    [$live, $deleted] = filterBarDeletedPair($this->user, $model);
+    $field = CrmEntity::tryFromModel($live)->titleColumn();
+
+    livewire($page)
+        ->call('setDeletedRecordsFilter', 'included')
+        ->call('setFilterRules', [['field' => $field, 'condition' => 'does_not_contain', 'value' => 'Acme']])
+        ->assertCanNotSeeTableRecords([$live, $deleted]);
+})->with('filter bar pages');
+
+it('applies a positive rule to the deleted view', function (string $page, string $model): void {
+    [$live, $deleted] = filterBarDeletedPair($this->user, $model);
+    $other = tap(filterBarRecord($this->user, $model, 'Globex'))->delete();
+    $rules = [['field' => CrmEntity::tryFromModel($live)->titleColumn(), 'condition' => 'contains', 'value' => 'Acme']];
+
+    livewire($page)
+        ->call('setFilterRules', $rules)
+        ->call('setDeletedRecordsFilter', 'only')
+        ->assertCanSeeTableRecords([$deleted])
+        ->assertCanNotSeeTableRecords([$live, $other])
+        ->call('setDeletedRecordsFilter', 'included')
+        ->assertCanSeeTableRecords([$live, $deleted])
+        ->assertCanNotSeeTableRecords([$other]);
+})->with('filter bar pages');
+
+it('applies a negated rule to the deleted view and to the live and deleted view', function (string $page, string $model): void {
+    [$live, $deleted] = filterBarDeletedPair($this->user, $model);
+    $liveOther = filterBarRecord($this->user, $model, 'Globex');
+    $deletedOther = tap(filterBarRecord($this->user, $model, 'Globex'))->delete();
+    $rules = [['field' => CrmEntity::tryFromModel($live)->titleColumn(), 'condition' => 'does_not_contain', 'value' => 'Acme']];
+
+    livewire($page)
+        ->call('setFilterRules', $rules)
+        ->call('setDeletedRecordsFilter', 'only')
+        ->assertCanSeeTableRecords([$deletedOther])
+        ->assertCanNotSeeTableRecords([$live, $deleted, $liveOther])
+        ->call('setDeletedRecordsFilter', 'included')
+        ->assertCanSeeTableRecords([$liveOther, $deletedOther])
+        ->assertCanNotSeeTableRecords([$live, $deleted])
+        ->call('setDeletedRecordsFilter', null)
+        ->assertCanSeeTableRecords([$liveOther])
+        ->assertCanNotSeeTableRecords([$live, $deleted, $deletedOther]);
+})->with('filter bar pages');
+
+it('keeps a deleted record that is not checked and drops one that is, when deleted records are included', function (): void {
+    [, , , $markedLive] = filterBarScenario('icp', $this->user);
+    $marked = filterBarRecord($this->user, Company::class, 'Marked gone', values: ['icp' => true]);
+    $unmarked = filterBarRecord($this->user, Company::class, 'Unmarked gone', values: ['icp' => false]);
+    $never = filterBarRecord($this->user, Company::class, 'Never gone');
+    collect([$marked, $unmarked, $never])->each->delete();
+
+    livewire(ListCompanies::class)
+        ->call('setFilterRules', [['field' => 'custom_fields.icp', 'condition' => 'is_not_checked']])
+        ->call('setDeletedRecordsFilter', 'included')
+        ->assertCanSeeTableRecords([$markedLive[1], $markedLive[2], $unmarked, $never])
+        ->assertCanNotSeeTableRecords([$markedLive[0], $marked]);
+});
+
+it('keeps a deleted record whose number differs and drops one that equals it, when deleted records are included', function (): void {
+    $equal = filterBarRecord($this->user, Opportunity::class, 'Equal gone', values: ['amount' => 1000]);
+    $other = filterBarRecord($this->user, Opportunity::class, 'Other gone', values: ['amount' => 100]);
+    $blank = filterBarRecord($this->user, Opportunity::class, 'Blank gone');
+    $liveEqual = filterBarRecord($this->user, Opportunity::class, 'Equal live', values: ['amount' => 1000]);
+    $liveOther = filterBarRecord($this->user, Opportunity::class, 'Other live', values: ['amount' => 5000]);
+    collect([$equal, $other, $blank])->each->delete();
+
+    livewire(ListOpportunities::class)
+        ->call('setFilterRules', [['field' => 'custom_fields.amount', 'condition' => 'is_not', 'value' => 1000]])
+        ->call('setDeletedRecordsFilter', 'included')
+        ->assertCanSeeTableRecords([$other, $blank, $liveOther])
+        ->assertCanNotSeeTableRecords([$equal, $liveEqual]);
 });

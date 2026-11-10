@@ -11,6 +11,7 @@ use App\Queries\EntityFilters;
 use App\Queries\FilterErrors;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Validation\ValidationException;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -73,6 +74,11 @@ final readonly class LogicFilter implements Filter
         $matching = $model->newQuery()
             ->select($model->getQualifiedKeyName())
             ->whereBelongsTo($this->user->currentWorkspace);
+
+        // The outer query decides which rows are listed, so the matched set reads deleted rows too.
+        if ($model::isSoftDeletable()) {
+            $matching->withoutGlobalScope(SoftDeletingScope::class);
+        }
 
         $this->applyNode($matching, $registry, is_array($node) ? $node : []);
 
