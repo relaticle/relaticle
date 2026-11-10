@@ -6,6 +6,7 @@ use App\Filament\Tables\Concerns\HasResizableColumns;
 use App\Filament\Tables\ResizableColumns;
 use App\Models\Company;
 use App\Models\People;
+use App\Models\Task;
 use App\Models\User;
 
 mutates(HasResizableColumns::class, ResizableColumns::class);
@@ -403,5 +404,19 @@ it('releases a column at the last pointer position when several moves land in on
     $page->assertScript(headerWidth('created_at'), $before + 90)
         ->wait(1)
         ->assertScript(headerWidth('created_at'), $before + 90)
+        ->assertNoJavaScriptErrors();
+});
+
+it('ends a text value cut by its column width with an ellipsis', function (): void {
+    Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Send the updated proposal to the procurement team before Friday']);
+
+    $title = 'document.querySelector("td.fi-ta-cell-title .fi-ta-text-item")';
+
+    loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/tasks")
+        ->assertScript("getComputedStyle({$title}).textOverflow === 'ellipsis' && getComputedStyle({$title}).display === 'block'", true)
+        ->assertScript("{$title}.scrollWidth > {$title}.clientWidth", true)
         ->assertNoJavaScriptErrors();
 });
