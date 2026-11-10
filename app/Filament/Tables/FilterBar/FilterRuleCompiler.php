@@ -105,7 +105,7 @@ final readonly class FilterRuleCompiler
     {
         $unit = is_array($value) && is_string($value['unit'] ?? null) ? PeriodUnit::tryFrom($value['unit']) : null;
         $amount = is_array($value) ? Operand::integer($value['amount'] ?? null) : null;
-        $today = now($zone)->startOfDay();
+        $today = today($zone);
 
         if (! $unit instanceof PeriodUnit) {
             return null;
@@ -119,9 +119,13 @@ final readonly class FilterRuleCompiler
             return null;
         }
 
-        return $condition === FilterCondition::InThePast
-            ? [$unit->minus($today, $amount)->toDateString(), $today->toDateString()]
-            : [$today->toDateString(), $unit->plus($today, $amount)->toDateString()];
+        $bounds = $condition === FilterCondition::InThePast
+            ? [$unit->minus($today, $amount), $today]
+            : [$today, $unit->plus($today, $amount)];
+
+        return array_all($bounds, static fn (CarbonImmutable $bound): bool => $bound->year >= 1 && $bound->year <= 9999)
+            ? array_map(static fn (CarbonImmutable $bound): string => $bound->toDateString(), $bounds)
+            : null;
     }
 
     /** @return list<string>|null */
@@ -174,7 +178,7 @@ final readonly class FilterRuleCompiler
     {
         $number = is_string($value) ? trim($value) : $value;
 
-        if (! is_int($number) && ! is_float($number) && ! (is_string($number) && is_numeric($number))) {
+        if (! is_int($number) && ! is_float($number) && (! is_string($number) || ! is_numeric($number))) {
             return null;
         }
 

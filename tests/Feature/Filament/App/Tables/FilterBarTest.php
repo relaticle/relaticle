@@ -549,6 +549,57 @@ it('reads today in the viewer zone and not in utc', function (): void {
     expect(filterBarShownNames($today))->toBe(['Morning in Auckland']);
 });
 
+it('counts a period from the viewer day and not the utc day', function (): void {
+    $this->user->update(['timezone' => 'Pacific/Auckland']);
+    $this->travelTo('2026-03-18 12:00:00');
+    filterBarField($this->user, 'company', 'signed_at', CustomFieldType::DATE_TIME->value);
+    foreach (['Evening' => '2026-03-18 10:00:00', 'Morning' => '2026-03-18 20:00:00'] as $name => $stamp) {
+        filterBarRecord($this->user, Company::class, $name, ['created_at' => $stamp], ['signed_at' => $stamp]);
+    }
+    $today = fn (string $field): array => [['field' => $field, 'condition' => 'this', 'value' => ['unit' => 'days']]];
+
+    $native = livewire(ListCompanies::class)->set('tableFilters.conditions.rules', $today('created_at'));
+    $custom = livewire(ListCompanies::class)->set('tableFilters.conditions.rules', $today('custom_fields.signed_at'));
+
+    expect(filterBarShownNames($native))->toBe(['Morning'])
+        ->and(filterBarShownNames($custom))->toBe(['Morning']);
+});
+
+it('shows every record for a period whose bounds leave the calendar', function (string $condition, int $amount, string $unit): void {
+    $this->travelTo('2026-03-18 12:00:00');
+    $records = filterBarCreatedAtRecords($this->user);
+    filterBarRecord($this->user, Opportunity::class, 'Soon', values: ['close_date' => '2026-03-25']);
+
+    $native = livewire(ListCompanies::class)
+        ->set('tableFilters.conditions.rules', [['field' => 'created_at', 'condition' => $condition, 'value' => ['amount' => $amount, 'unit' => $unit]]]);
+    $custom = livewire(ListOpportunities::class)
+        ->set('tableFilters.conditions.rules', [['field' => 'custom_fields.close_date', 'condition' => $condition, 'value' => ['amount' => $amount, 'unit' => $unit]]]);
+
+    $rule = [['field' => 'created_at', 'condition' => $condition, 'value' => ['amount' => $amount, 'unit' => $unit]]];
+
+    expect((new FilterRuleCompiler)->compile($rule, FilterFieldCatalog::for(CrmEntity::Company, $this->user), $this->user, 'UTC'))->toBe([])
+        ->and($native->instance()->getTableRecords())->toHaveCount(count($records))
+        ->and($custom->instance()->getTableRecords())->toHaveCount(1);
+})->with([
+    'past 2026 years' => ['in_the_past', 2026, 'years'],
+    'past 3650 years' => ['in_the_past', 3650, 'years'],
+]);
+
+it('still filters a period that stays inside the calendar', function (): void {
+    $this->travelTo('2026-03-18 12:00:00');
+    filterBarRecord($this->user, Company::class, 'Recent', ['created_at' => '2026-01-10 10:00:00']);
+    filterBarRecord($this->user, Company::class, 'Ancient', ['created_at' => '1900-01-10 10:00:00']);
+
+    $component = livewire(ListCompanies::class)
+        ->set('tableFilters.conditions.rules', [['field' => 'created_at', 'condition' => 'in_the_past', 'value' => ['amount' => 100, 'unit' => 'years']]]);
+
+    $far = livewire(ListCompanies::class)
+        ->set('tableFilters.conditions.rules', [['field' => 'created_at', 'condition' => 'in_the_next', 'value' => ['amount' => 3650, 'unit' => 'years']]]);
+
+    expect(filterBarShownNames($component))->toBe(['Recent'])
+        ->and(filterBarShownNames($far))->toBe([]);
+});
+
 it('moves a relative period with the clock while the stored rule stays the same', function (): void {
     $this->travelTo('2026-03-18 12:00:00');
     filterBarRecord($this->user, Company::class, 'Far', ['created_at' => '2026-04-20 10:00:00']);
@@ -749,7 +800,9 @@ it('bounds a relation filter by the workspace the member opened', function (): v
     $foreign = livewire(ListPeople::class)->set('tableFilters.conditions.rules', [['field' => 'company', 'condition' => 'is_any_of', 'value' => [$first[0]->getKey()]]]);
 
     expect(filterBarShownNames($none))->toBe(['Lone Second'])
-        ->and(filterBarShownNames($foreign))->toBe(['At Second', 'Lone Second']);
+        ->and(filterBarShownNames($foreign))->toBe(['At Second', 'Lone Second'])
+        ->and($foreign->get('tableFilters.conditions.rules'))->toBe([])
+        ->and($foreign->html())->not->toContain($first[0]->name);
 });
 
 function filterBarForeignCompany(string $name): Company
@@ -779,6 +832,21 @@ it('searches the records of a relation field by name inside the workspace', func
         ->and(array_keys($found[0]))->toBe(['id', 'label'])
         ->and(array_column(filterBarSearch($this, ListPeople::class, 'company'), 'label'))->toBe(['Acme Local', 'Globex']);
 });
+
+it('keeps a lookup inside the user workspace even when the panel tenant is another', function (string $page, string $field): void {
+    filterBarField($this->user, 'opportunity', 'partner', CustomFieldType::RECORD->value, lookup: 'company');
+    $other = Workspace::factory()->create(['personal_workspace' => false]);
+    $foreign = Company::withoutEvents(fn (): Company => Company::factory()->create(['name' => 'Zeta Foreign', 'workspace_id' => $other->getKey()]));
+    $component = livewire($page);
+
+    Filament::setTenant($other);
+
+    expect($foreign->workspace_id)->toBe($other->getKey())
+        ->and($component->instance()->searchFilterOptions($field, 'zeta'))->toBe([]);
+})->with([
+    'a relation field' => [ListPeople::class, 'company'],
+    'a record custom field' => [ListOpportunities::class, 'custom_fields.partner'],
+]);
 
 it('searches members of this workspace and no one else', function (): void {
     $colleague = filterBarMember($this->user);

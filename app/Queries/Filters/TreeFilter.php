@@ -37,6 +37,6 @@ final readonly class TreeFilter implements Filter
             return;
         }
 
-        $this->applyNode($query, (new EntityFilters($this->user, $this->viewerZone))->for($this->entity), $value);
+        $this->applyNode($query, new EntityFilters($this->user, $this->viewerZone)->for($this->entity), $value);
     }
 }
