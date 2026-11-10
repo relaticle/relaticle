@@ -79,7 +79,7 @@
 
         @foreach ([__('filament/panel.tables.layouts.mine') => $own, __('filament/panel.tables.layouts.shared_with_workspace') => $shared] as $heading => $group)
             @if ($group->isNotEmpty())
-                <x-filament::dropdown.list>
+                <x-filament::dropdown.list x-show="! query || {{ Js::from($group->map(fn (\App\Models\TableLayout $layout): string => mb_strtolower($layout->name))->values()) }}.some((name) => name.includes(query.toLowerCase()))">
                     <p class="fi-ta-layouts-heading">
                         <span>{{ $heading }}</span>
                         <span class="fi-ta-layouts-pill">{{ __('filament/panel.tables.layouts.available', ['count' => $group->count()]) }}</span>

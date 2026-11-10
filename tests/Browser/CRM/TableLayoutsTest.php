@@ -143,3 +143,27 @@ it('opens each layout row menu with that layout own options and acts on that lay
         ->keys('[aria-label="Actions for Mine"]', 'Enter')
         ->assertScript('document.activeElement?.closest(".fi-ta-layouts-row-menu") !== null && document.activeElement.textContent.trim() === "Rename"', true);
 });
+
+it('hides a layout group heading when the search matches none of its layouts', function (): void {
+    foreach (range(1, 7) as $number) {
+        TableLayout::factory()->for($this->user)->for($this->workspace)->create(['name' => "Alpha {$number}"]);
+    }
+
+    $colleague = User::factory()->create();
+    $this->workspace->users()->attach($colleague, ['role' => 'member']);
+    TableLayout::factory()->for($colleague)->for($this->workspace)->shared()->create(['name' => 'Zeta']);
+
+    $visibleHeadings = '[...document.querySelectorAll(".fi-ta-layouts-heading")].filter((heading) => heading.offsetParent !== null).length';
+
+    loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-ta-layouts-trigger')
+        ->assertScript($visibleHeadings, 2)
+        ->type('.fi-ta-layouts-search input', 'Alpha')
+        ->assertScript($visibleHeadings, 1)
+        ->type('.fi-ta-layouts-search input', 'Zeta')
+        ->assertScript($visibleHeadings, 1)
+        ->assertNoJavaScriptErrors();
+});
