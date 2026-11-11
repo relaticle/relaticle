@@ -19,6 +19,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\HtmlString;
+use Illuminate\Validation\ClosureValidationRule;
 use Illuminate\Validation\ValidationException;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\CustomFields\Facades\Entities;
@@ -34,13 +35,10 @@ trait CreatesTableAttribute
             ->modalHeading(__('filament/panel.tables.views.create_attribute'))
             ->modalWidth('md')
             ->modalSubmitActionLabel(__('filament/panel.tables.views.create_attribute_submit'))
-            ->mountUsing(function (Schema $schema): void {
-                abort_unless($this->canCreateTableAttribute(), 403);
-
-                $schema->fill();
-            })
+            ->authorize(fn (): bool => $this->canCreateTableAttribute())
+            ->mountUsing(fn (Schema $schema): Schema => $schema->fill())
             ->schema(fn (): array => $this->tableAttributeFields())
-            ->action(fn (array $data, Schema $schema) => $this->createTableAttribute($data, $schema->getStatePath()));
+            ->action(fn (array $data, Schema $schema) => $this->createTableAttribute($data, $schema));
     }
 
     protected function canCreateTableAttribute(): bool
@@ -117,7 +115,7 @@ trait CreatesTableAttribute
     /**
      * @param  array<string, mixed>  $data
      */
-    private function createTableAttribute(array $data, string $statePath): void
+    private function createTableAttribute(array $data, Schema $schema): void
     {
         try {
             $field = resolve(CreateCustomField::class)->execute($this->attributeCreator(), [
@@ -125,7 +123,7 @@ trait CreatesTableAttribute
                 'entity_type' => $this->tableEntity()->value,
             ]);
         } catch (ValidationException $exception) {
-            throw ValidationException::withMessages($this->tableAttributeErrors($exception, $statePath));
+            throw ValidationException::withMessages($this->tableAttributeErrors($exception, $schema, $data));
         }
 
         $this->showCreatedTableAttribute($field);
@@ -154,20 +152,54 @@ trait CreatesTableAttribute
     }
 
     /**
+     * @param  array<string, mixed>  $data
      * @return array<string, array<int, string>>
      */
-    private function tableAttributeErrors(ValidationException $exception, string $statePath): array
+    private function tableAttributeErrors(ValidationException $exception, Schema $schema, array $data): array
     {
-        $fields = ['name', 'type', 'options', 'lookup_type'];
+        $statePath = $schema->getStatePath();
+        $rowKeys = array_keys((array) data_get($schema->getRawState(), 'options', []));
+        $failed = $exception->validator->failed();
         $errors = [];
 
         foreach ($exception->errors() as $key => $messages) {
-            $path = in_array(explode('.', $key)[0], $fields, true) ? $key : 'name';
+            [$path, $messages] = $this->tableAttributeError($key, $messages, $failed, $data, $rowKeys);
 
             $errors["{$statePath}.{$path}"] = [...($errors["{$statePath}.{$path}"] ?? []), ...$messages];
         }
 
         return $errors;
+    }
+
+    /**
+     * @param  array<int, string>  $messages
+     * @param  array<string, array<string, mixed>>  $failed
+     * @param  array<string, mixed>  $data
+     * @param  list<int|string>  $rowKeys
+     * @return array{0: string, 1: array<int, string>}
+     */
+    private function tableAttributeError(string $key, array $messages, array $failed, array $data, array $rowKeys): array
+    {
+        $segments = explode('.', $key);
+
+        return match (true) {
+            $key === 'name' && isset($failed['name'][ClosureValidationRule::class]) => ['name', [__('filament/panel.tables.views.attribute_name_taken', ['name' => (string) ($data['name'] ?? '')])]],
+            $key === 'entity_type' && isset($failed['entity_type'][ClosureValidationRule::class]) => ['name', [__('filament/panel.tables.views.attribute_limit_reached', ['max' => (int) config('chat.max_custom_fields_per_entity', 50)])]],
+            $segments[0] === 'options' && isset($segments[1]) => [$this->tableAttributeOptionPath($segments, $rowKeys), isset($failed[$key]['Distinct']) ? [__('filament/panel.tables.views.attribute_option_repeated')] : $messages],
+            in_array($segments[0], ['name', 'type', 'options', 'lookup_type'], true) => [$key, $messages],
+            default => ['name', $messages],
+        };
+    }
+
+    /**
+     * @param  list<string>  $segments
+     * @param  list<int|string>  $rowKeys
+     */
+    private function tableAttributeOptionPath(array $segments, array $rowKeys): string
+    {
+        $segments[1] = (string) ($rowKeys[(int) $segments[1]] ?? $segments[1]);
+
+        return implode('.', $segments);
     }
 
     private function showCreatedTableAttribute(CustomField $field): void

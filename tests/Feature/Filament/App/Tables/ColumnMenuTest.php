@@ -10,6 +10,7 @@ use App\Filament\Resources\NoteResource\Pages\ManageNotes;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
+use App\Filament\Tables\Concerns\CreatesTableAttribute;
 use App\Filament\Tables\Concerns\HasColumnMenu;
 use App\Filament\Tables\ResizableColumns;
 use App\Models\CustomField;
@@ -20,7 +21,7 @@ use Filament\Facades\Filament;
 use Livewire\Features\SupportTesting\Testable;
 use Symfony\Component\DomCrawler\Crawler;
 
-mutates(HasColumnMenu::class, ResizableColumns::class);
+mutates(HasColumnMenu::class, ResizableColumns::class, CreatesTableAttribute::class);
 
 dataset('column menu pages', [
     'companies' => [ListCompanies::class, CrmEntity::Company],
@@ -807,7 +808,7 @@ it('adds a text attribute as a shown column at the end of the view, on the same 
 
     $component->callAction('createTableAttribute', data: ['name' => 'Lead score', 'type' => 'text'])
         ->assertHasNoActionErrors()
-        ->assertNotified();
+        ->assertNotified('Lead score added to this view');
 
     $added = newAttributeColumns($component, $before);
 
@@ -823,23 +824,24 @@ it('adds a text attribute as a shown column at the end of the view, on the same 
         ->and(columnIsShown($fresh, $added[0]))->toBeTrue();
 })->with('column menu pages');
 
-it('leaves another saved view unmodified after an attribute is added', function (): void {
+it('marks the active saved view modified once an attribute is added and reads another applied view as unmodified', function (): void {
     $stored = storedColumns(livewire(ListCompanies::class));
-    $view = SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+    [$viewA, $viewB] = collect(['A view', 'B view'])->map(fn (string $name): SavedView => SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+        'name' => $name,
         'entity' => CrmEntity::Company,
         'state' => new TableStateData(columns: $stored),
-    ]);
-    $component = livewire(ListCompanies::class);
-
-    $component->callAction('createTableAttribute', data: ['name' => 'Lead score', 'type' => 'text'])
-        ->call('applySavedView', $view->getKey());
+    ]))->all();
+    $component = livewire(ListCompanies::class)->call('applySavedView', $viewA->getKey());
 
     expect($component->instance()->isSavedViewModified())->toBeFalse();
 
-    $fresh = livewire(ListCompanies::class);
+    $component->callAction('createTableAttribute', data: ['name' => 'Lead score', 'type' => 'text']);
 
-    expect($fresh->get('activeSavedViewId'))->toBe($view->getKey())
-        ->and($fresh->instance()->isSavedViewModified())->toBeFalse();
+    expect($component->instance()->isSavedViewModified())->toBeTrue();
+
+    $component->call('applySavedView', $viewB->getKey());
+
+    expect($component->instance()->isSavedViewModified())->toBeFalse();
 });
 
 it('adds a select attribute with its three options', function (): void {
@@ -878,7 +880,7 @@ it('shows the validator error on the name and creates nothing for a duplicate', 
     $columns = columnOrder($component);
 
     $component->callAction('createTableAttribute', data: ['name' => 'lead score', 'type' => 'text'])
-        ->assertHasActionErrors(['name']);
+        ->assertHasActionErrors(['name' => 'An attribute named lead score already exists.']);
 
     expect(customFieldCount())->toBe($count)
         ->and(columnOrder($component))->toBe($columns);
@@ -899,8 +901,22 @@ it('shows a repeated option on its own row', function (): void {
     $count = customFieldCount();
 
     livewire(ListCompanies::class)
-        ->callAction('createTableAttribute', data: ['name' => 'Tier', 'type' => 'select', 'options' => [['name' => 'Gold'], ['name' => 'gold']]])
-        ->assertHasActionErrors(['options.1.name']);
+        ->mountAction('createTableAttribute')
+        ->set('mountedActions.0.data', ['name' => 'Tier', 'type' => 'select', 'options' => ['a' => ['name' => 'Gold'], 'b' => ['name' => 'gold']]])
+        ->callMountedAction()
+        ->assertHasActionErrors(['options.b.name' => 'This option is already listed.']);
+
+    expect(customFieldCount())->toBe($count);
+});
+
+it('tells the member the attribute limit is reached on the name', function (): void {
+    $limit = CustomField::query()->where('entity_type', 'company')->count();
+    config(['chat.max_custom_fields_per_entity' => $limit]);
+    $count = customFieldCount();
+
+    livewire(ListCompanies::class)
+        ->callAction('createTableAttribute', data: ['name' => 'Tier', 'type' => 'text'])
+        ->assertHasActionErrors(['name' => "The attribute limit for this list is {$limit}."]);
 
     expect(customFieldCount())->toBe($count);
 });
@@ -914,11 +930,24 @@ function actAsMember(object $test): void
     Filament::setTenant($test->user->currentWorkspace);
 }
 
-it('refuses a member who calls the create attribute action directly', function (): void {
+it('does not open the create attribute modal for a member who calls the action directly', function (): void {
     actAsMember($this);
     $count = customFieldCount();
 
-    livewire(ListCompanies::class)->mountAction('createTableAttribute')->assertForbidden();
+    $component = livewire(ListCompanies::class)->call('mountAction', 'createTableAttribute');
+
+    expect($component->get('mountedActions'))->toBeEmpty()
+        ->and(customFieldCount())->toBe($count);
+});
+
+it('creates nothing when a member forges a submit of the create attribute action', function (): void {
+    actAsMember($this);
+    $count = customFieldCount();
+
+    livewire(ListCompanies::class)
+        ->call('mountAction', 'createTableAttribute')
+        ->set('mountedActions.0.data', ['name' => 'Lead score', 'type' => 'text'])
+        ->call('callMountedAction');
 
     expect(customFieldCount())->toBe($count);
 });
