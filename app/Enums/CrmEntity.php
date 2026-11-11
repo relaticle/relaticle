@@ -137,7 +137,7 @@ enum CrmEntity: string
         return match ($this) {
             self::Opportunity => ['board', 'list'],
             self::Task => ['list', 'board'],
-            self::Note => ['list', 'cards'],
+            self::Note => ['cards', 'list'],
             self::Company, self::People => ['list'],
         };
     }

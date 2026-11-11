@@ -1309,11 +1309,15 @@ it('leaves a link that carries any query parameter on the page it names', functi
     'assigned to me' => [TaskResource::class, CrmEntity::Task, ['board', 'list'], ['filters' => ['assigned_to_me' => ['isActive' => true]]]],
 ]);
 
-it('leaves a note edit link and the cards page alone when the cards are first', function (): void {
+it('leaves a note edit link on the cards page when the list is first', function (): void {
     $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
-    resolve(ReorderViews::class)->execute($this->user, $this->workspace, CrmEntity::Note, ['cards', 'list']);
+    resolve(ReorderViews::class)->execute($this->user, $this->workspace, CrmEntity::Note, ['list', 'cards']);
 
-    $this->get(NoteResource::getUrl('list').'?'.http_build_query(['tableAction' => 'edit', 'tableActionRecord' => $note->getKey()]))->assertOk();
+    $this->get(NoteResource::getUrl('index').'?'.http_build_query(['tableAction' => 'edit', 'tableActionRecord' => $note->getKey()]))->assertOk();
+    $this->get(NoteResource::getUrl('index'))->assertRedirect(NoteResource::getUrl('list'));
+});
+
+it('opens notes on the cards for a member with no stored order', function (): void {
     $this->get(NoteResource::getUrl('index'))->assertOk();
 });
 
@@ -1345,6 +1349,8 @@ it('points the sidebar at the index whatever page the member opened last', funct
 ]);
 
 it('opens the notes list from the cards page on a bare visit when the list comes first', function (): void {
+    resolve(ReorderViews::class)->execute($this->user, $this->workspace, CrmEntity::Note, ['list', 'cards']);
+
     $this->get(NoteResource::getUrl('index'))->assertRedirect(NoteResource::getUrl('list'));
 
     resolve(ReorderViews::class)->execute($this->user, $this->workspace, CrmEntity::Note, ['cards', 'list']);
