@@ -207,6 +207,34 @@ it('drops scripts and event handlers inside a checklist item', function (): void
         ->toContain('Bob');
 });
 
+it('drops scripts and event handlers from a note body sent as html', function (): void {
+    $stored = $this->postJson('/api/v1/notes', [
+        'title' => 'Hostile note',
+        'custom_fields' => ['body' => '<p>Call <img src="x" onerror="alert(1)"> <a href="javascript:alert(3)">Bob</a></p><script>alert(2)</script><svg onload="alert(4)"></svg><iframe src="https://evil.test"></iframe>'],
+    ])->assertCreated()->json('data.attributes.custom_fields.body');
+
+    expect($stored)->not->toContain('onerror')
+        ->not->toContain('<script')
+        ->not->toContain('javascript:')
+        ->not->toContain('onload')
+        ->not->toContain('<iframe')
+        ->toContain('Call')
+        ->toContain('Bob');
+});
+
+it('keeps every editor block of a note body sent as html', function (): void {
+    $html = '<h2>Plan</h2><blockquote><p>Quote</p></blockquote><ul><li><p>Bullet</p></li></ul><ol><li><p>Step</p></li></ol><pre><code>code</code></pre><table><tbody><tr><td><p>Cell</p></td></tr></tbody></table><details><summary>Toggle</summary><div data-type="detailsContent"><p>Hidden</p></div></details><hr><p><a href="https://relaticle.com">link</a> <strong>bold</strong></p>';
+
+    $stored = $this->postJson('/api/v1/notes', [
+        'title' => 'Blocks',
+        'custom_fields' => ['body' => $html],
+    ])->assertCreated()->json('data.attributes.custom_fields.body');
+
+    foreach (['<h2>Plan</h2>', '<blockquote>', '<ol>', '<pre>', '<table', '<details', '<summary>Toggle</summary>', '<div data-type="detailsContent"><p>Hidden</p></div>', '<hr>', 'href="https://relaticle.com"', '<strong>bold</strong>'] as $fragment) {
+        expect($stored)->toContain($fragment);
+    }
+});
+
 it('returns a record field as id and name pairs for an own-workspace company', function (): void {
     $field = CustomField::query()->create([
         'tenant_id' => $this->workspace->getKey(),
