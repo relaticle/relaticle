@@ -7,6 +7,7 @@ namespace App\Filament\Tables;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Support\Enums\IconPosition;
+use Filament\Support\Enums\Size;
 
 final class BulkBar
 {
@@ -22,6 +23,7 @@ final class BulkBar
                 ->label(__('filament/panel.tables.bulk_bar.more'))
                 ->button()
                 ->labeledFrom()
+                ->size(Size::Small)
                 ->color('gray')
                 ->icon('lucide-chevron-down')
                 ->iconPosition(IconPosition::After)

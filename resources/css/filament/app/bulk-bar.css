@@ -1,7 +1,7 @@
 /* Centred with auto margins, not a translate: a transformed box would anchor the More menu to itself.
    The margins win over the toolbar slot rule in theme.css that spaces its children. */
 .fi-bulk-bar {
-    @apply fixed inset-x-4 bottom-6 z-30 mx-auto! flex w-fit max-w-[calc(100vw-2rem)] items-center gap-1 rounded-xl bg-white p-1.5 shadow-lg ring-1 ring-gray-950/10 dark:bg-gray-900 dark:ring-white/15;
+    @apply fixed inset-x-4 bottom-6 z-30 mx-auto! flex w-fit max-w-[calc(100vw-2rem)] items-center gap-1.5 rounded-xl bg-white p-1.5 shadow-lg ring-1 ring-gray-950/10 dark:bg-gray-900 dark:ring-white/15;
     @apply max-sm:bottom-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom)+0.75rem)] max-sm:flex-wrap max-sm:justify-center;
 
     @media (width >= 64rem) {
@@ -14,7 +14,7 @@
 }
 
 .fi-bulk-bar-selection {
-    @apply flex shrink-0 items-center gap-1 rounded-lg bg-primary-50 py-1 ps-2.5 pe-1 text-sm font-medium text-primary-700 dark:bg-primary-400/10 dark:text-primary-300;
+    @apply flex h-8 shrink-0 items-center gap-1 rounded-lg bg-primary-50 ps-2.5 pe-1 text-sm font-medium text-primary-700 dark:bg-primary-400/10 dark:text-primary-300;
 }
 
 .fi-bulk-bar-count {
@@ -30,14 +30,18 @@
 }
 
 .fi-bulk-bar-select-all {
-    @apply shrink-0 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm font-medium text-primary-600 hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-primary-600 dark:text-primary-400 dark:hover:bg-white/5;
+    @apply flex h-8 shrink-0 items-center whitespace-nowrap rounded-lg px-2.5 text-sm font-medium text-primary-600 hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-primary-600 dark:text-primary-400 dark:hover:bg-white/5;
 }
 
 .fi-bulk-bar-actions {
-    @apply flex shrink-0 items-center gap-1 border-s border-gray-200 ps-1.5 max-sm:border-s-0 max-sm:ps-0 dark:border-white/10;
+    @apply flex shrink-0 items-center gap-1.5 border-s border-gray-200 ps-1.5 max-sm:border-s-0 max-sm:ps-0 dark:border-white/10;
 
     & .fi-btn {
-        @apply whitespace-nowrap;
+        @apply h-8 whitespace-nowrap;
+
+        & .fi-icon {
+            @apply size-4;
+        }
     }
 }
 
