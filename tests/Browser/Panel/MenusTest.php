@@ -3,9 +3,17 @@
 declare(strict_types=1);
 
 use App\Data\TableStateData;
+use App\Enums\CustomFields\TaskField;
 use App\Models\Company;
+use App\Models\CustomField;
+use App\Models\Note;
+use App\Models\People;
 use App\Models\SavedView;
+use App\Models\Task;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Pest\Browser\Api\AwaitableWebpage;
+use Relaticle\CustomFields\Services\TenantContextService;
 
 function menuMetrics(string $panel, string $rows, string $icons): string
 {
@@ -116,3 +124,145 @@ it('keeps a long menu above the window edge and scrolls only its list', function
     'view settings' => ['.fi-view-settings-trigger', '.fi-view-settings-panel', '.fi-view-settings-scroll'],
     'filter field picker' => ['[data-filter-add]', '.fi-filter-pop-picker', '[role=listbox]'],
 ]);
+
+function holdLook(array $targets): string
+{
+    $selectors = json_encode($targets);
+
+    return <<<JS
+        (async () => {
+            await new Promise((resolve) => setTimeout(resolve, 400));
+
+            return Object.fromEntries({$selectors}.map((selector) => {
+                const element = [...document.querySelectorAll(selector.replace(':visible', ''))].find((candidate) => candidate.getClientRects().length > 0);
+                const style = getComputedStyle(element);
+
+                return [selector, [style.backgroundColor, style.color, style.boxShadow, style.borderRightColor].join(' | ')];
+            }));
+        })()
+        JS;
+}
+
+function expectHoverHeldWhileOpen(AwaitableWebpage $page, string $item, string $trigger): void
+{
+    $away = '.fi-sidebar-nav .fi-sidebar-item-btn >> nth=0';
+    $targets = array_values(array_unique([$item, $trigger]));
+
+    $page->hover($item)->hover($trigger);
+    $hoveredTrigger = $page->script(holdLook([$trigger]))[$trigger];
+    $page->hover($item);
+    $hovered = $page->script(holdLook($targets));
+    $hovered[$trigger] = $hoveredTrigger;
+
+    $page->hover($away);
+    $resting = $page->script(holdLook($targets));
+    expect($resting)->not->toBe($hovered);
+
+    $page->click($trigger)->assertAttribute($trigger, 'aria-expanded', 'true');
+    $page->script('document.activeElement.blur()');
+    $page->hover($away);
+
+    expect($page->script(holdLook($targets)))->toBe($hovered);
+}
+
+it('keeps an item looking hovered while the menu opened from it is open', function (string $surface): void {
+    $user = $this->user;
+    $workspace = $this->workspace;
+    $company = Company::query()->withoutGlobalScopes()->first();
+    $company->tasks()->attach(Task::factory()->recycle([$user, $workspace])->create());
+
+    $chip = "js:Livewire.all().find((component) => component.name.includes('ListCompanies')).\$wire.\$call('setFilterRules', [{ field: 'name', condition: 'contains', value: 'chip' }])";
+
+    [$path, $prepare, $item, $trigger] = match ($surface) {
+        'relation row' => ["companies/{$company->getKey()}", ['.fi-record-pane .fi-tabs-item:nth-child(4)'], '.fi-ta-row', '.fi-ta-row .fi-dropdown-trigger > button'],
+        'column header' => ['companies', [], 'th[x-data^="resizableColumn(\'created_at\'"]', 'th[x-data^="resizableColumn(\'created_at\'"] [data-column-menu-trigger]'],
+        'bulk bar more' => ['companies', ['.fi-ta-record-checkbox >> nth=0'], '.fi-bulk-bar .fi-dropdown-trigger > button', '.fi-bulk-bar .fi-dropdown-trigger > button'],
+        'import and export' => ['companies', [], '.fi-header button.fi-ac-btn-group:visible', '.fi-header button.fi-ac-btn-group:visible'],
+        'view switcher' => ['companies', [], '.fi-view-switcher .fi-dropdown-trigger button', '.fi-view-switcher .fi-dropdown-trigger button'],
+        'view settings' => ['companies', [], '.fi-view-settings-trigger', '.fi-view-settings-trigger'],
+        'filter add' => ['companies', [], '[data-filter-add]', '[data-filter-add]'],
+        'filter sort' => ['companies', [], '[data-filter-sort]', '[data-filter-sort]'],
+        'filter field segment' => ['companies', [$chip], '[data-filter-chip] [data-filter-segment="field"]', '[data-filter-chip] [data-filter-segment="field"]'],
+        'filter condition segment' => ['companies', [$chip], '[data-filter-chip] [data-filter-segment="condition"]', '[data-filter-chip] [data-filter-segment="condition"]'],
+        'filter value segment' => ['companies', [$chip], '[data-filter-chip] [data-filter-segment="value"]', '[data-filter-chip] [data-filter-segment="value"]'],
+        'filter group' => ['tasks', [], '[data-filter-group]', '[data-filter-group]'],
+        'notifications' => ['companies', [], '.fi-sidebar-notifications-btn', '.fi-sidebar-notifications-btn'],
+        'record actions' => ["companies/{$company->getKey()}", [], '.fi-record-page .fi-ac-btn-group:visible', '.fi-record-page .fi-ac-btn-group:visible'],
+        'workspace menu' => ['companies', [], '.fi-tenant-menu-trigger', '.fi-tenant-menu-trigger'],
+        'filter more segment' => ['companies', [$chip], '[data-filter-chip] [data-filter-more]', '[data-filter-chip] [data-filter-more]'],
+    };
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/{$path}");
+
+    foreach ($prepare as $step) {
+        if (str_starts_with($step, 'js:')) {
+            $page->script(substr($step, 3));
+            $page->wait(0.5);
+
+            continue;
+        }
+
+        $page->click($step);
+    }
+
+    expectHoverHeldWhileOpen($page, $item, $trigger);
+
+    $page->assertNoJavaScriptErrors();
+})->with(['relation row', 'column header', 'bulk bar more', 'import and export', 'view switcher', 'view settings', 'filter add', 'filter sort', 'filter field segment', 'filter condition segment', 'filter value segment', 'filter more segment', 'filter group', 'notifications', 'record actions', 'workspace menu']);
+
+it('keeps a board card looking hovered while its menu is open', function (): void {
+    TenantContextService::setTenantId($this->workspace->getKey());
+    $statusField = CustomField::query()->forEntity(Task::class)->where('code', TaskField::STATUS->value)->firstOrFail();
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Send the renewal quote']);
+    $task->saveCustomFieldValue($statusField, $statusField->options->first()->getKey());
+    TenantContextService::setTenantId(null);
+
+    $card = "[data-card-id=\"{$task->getKey()}\"]";
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/tasks/board")
+        ->assertVisible($card);
+
+    expectHoverHeldWhileOpen($page, $card, "{$card} .ff-card-actions .fi-dropdown-trigger > button");
+    $page->assertNoJavaScriptErrors();
+});
+
+it('keeps a sidebar chat looking hovered while its menu is open', function (): void {
+    DB::table('agent_conversations')->insert([
+        'id' => 'cb1',
+        'participant_type' => 'user',
+        'participant_id' => $this->user->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
+        'title' => 'Acme onboarding',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->assertSee('Acme onboarding');
+
+    expectHoverHeldWhileOpen($page, '.fi-sidebar-item:has([aria-label="Chat actions"]) .fi-sidebar-item-btn', '.fi-sidebar-item [aria-label="Chat actions"]');
+    $page->assertNoJavaScriptErrors();
+});
+
+it('keeps a list row looking hovered while its relations menu is open', function (): void {
+    $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
+    $note->people()->attach(People::factory()->count(3)->recycle([$this->user, $this->workspace])->create());
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/notes/list")
+        ->assertVisible('.fi-linked-records-cell-more');
+
+    expectHoverHeldWhileOpen($page, '.fi-ta-row', '.fi-linked-records-cell-more');
+    $page->assertNoJavaScriptErrors();
+});

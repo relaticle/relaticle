@@ -136,7 +136,7 @@
 }
 
 :is(.fi-view-switcher, .fi-view-settings):has(> .fi-dropdown-panel:not([style*='display: none'])) .fi-dropdown-trigger button {
-    @apply bg-gray-100 dark:bg-white/10;
+    @apply bg-gray-50 dark:bg-white/10;
 }
 
 .fi-view-controls {

@@ -73,7 +73,7 @@
     @apply transition-[border-right-color] duration-120;
 }
 
-.fi-ta-resizable-table thead th.fi-ta-resizable-header:hover {
+.fi-ta-resizable-table thead th.fi-ta-resizable-header:is(:hover, :has([data-column-menu-trigger][aria-expanded='true'])) {
     @apply border-r-gray-400 dark:border-r-gray-500;
 }
 
@@ -87,7 +87,7 @@
     @apply pointer-events-none absolute inset-y-0 left-1/2 w-0 translate-x-[calc(-50%+0.5px)] bg-transparent transition-[width,background-color] duration-120 content-[''];
 }
 
-.fi-ta-resizable-table thead th.fi-ta-resizable-header:hover .column-resize-handle-bar::before {
+.fi-ta-resizable-table thead th.fi-ta-resizable-header:is(:hover, :has([data-column-menu-trigger][aria-expanded='true'])) .column-resize-handle-bar::before {
     @apply w-0.5 bg-gray-400 dark:bg-gray-500;
 }
 

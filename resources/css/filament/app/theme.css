@@ -158,7 +158,7 @@ html.fi:has(body.fi-panel-app :is(.fi-app-layout, .fi-settings-layout)),
 }
 
 .fi-sidebar-notifications-btn {
-    @apply relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-gray-500 shadow-xs ring-1 ring-gray-950/10 transition hover:bg-gray-50 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:bg-white/5 dark:text-gray-400 dark:ring-white/10 dark:hover:bg-white/10 dark:hover:text-gray-200;
+    @apply relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-gray-500 shadow-xs ring-1 ring-gray-950/10 transition hover:bg-gray-50 hover:text-gray-700 aria-expanded:bg-gray-50 aria-expanded:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:bg-white/5 dark:text-gray-400 dark:ring-white/10 dark:hover:bg-white/10 dark:hover:text-gray-200 dark:aria-expanded:bg-white/10 dark:aria-expanded:text-gray-200;
 
     .fi-icon {
         @apply h-4 w-4;
@@ -668,12 +668,24 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
 
     &:not(.fi-color) {
         @apply text-gray-700 shadow-none ring-gray-950/10 dark:text-gray-200 dark:ring-white/10;
+
+        &:not(.fi-outlined)[aria-expanded='true'] {
+            @apply bg-gray-50 dark:bg-white/10;
+        }
     }
 }
 
 /* Icon Buttons */
 .fi-icon-btn {
     @apply rounded-lg;
+
+    &:where(:not(.fi-disabled):not([disabled]))[aria-expanded='true'] {
+        @apply text-gray-600 dark:text-gray-400;
+    }
+
+    &:where(.fi-color:not(.fi-disabled):not([disabled]))[aria-expanded='true'] {
+        @apply text-(--hover-text) dark:text-(--dark-hover-text);
+    }
 }
 
 /* Cards & Sections */
@@ -913,7 +925,11 @@ a.fi-linked-records-chip {
 .fi-ta-row .fi-ac-icon-btn-group,
 .ff-card-actions .fi-ac-icon-btn-group,
 .ff-column-header .fi-icon-btn {
-    @apply text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200;
+    @apply text-gray-400 hover:text-gray-700 aria-expanded:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200 dark:aria-expanded:text-gray-200;
+}
+
+.fi-ta-row.fi-clickable:has([aria-expanded='true']) {
+    @apply bg-gray-50 dark:bg-white/5;
 }
 
 .fi-ta-text:not(.fi-inline),
@@ -1058,14 +1074,21 @@ a.fi-linked-records-chip {
     @apply absolute end-[calc(0.5rem+1.25rem+0.25rem)] top-[calc(0.5rem-0.125rem)] z-10 dark:bg-(--surface-block-bg);
 }
 
-.fi-ta-row:is(:hover, :focus-within) .fi-record-preview-trigger,
-.ff-card:is(:hover, :focus-within) .fi-board-card-preview-trigger {
+.fi-ta-row:is(:hover, :focus-within, :has([aria-expanded='true'])) .fi-record-preview-trigger,
+.ff-card:is(:hover, :focus-within, :has([aria-expanded='true'])) .fi-board-card-preview-trigger {
     @apply opacity-100;
 }
 
 /* The trigger sits beside the card menu, so its schema slot takes no room in the card body. */
 .ff-card-body :is(.fi-grid-col:has(> .fi-sc-component > .fi-board-card-preview-trigger), .fi-sc-component:has(> .fi-board-card-preview-trigger)) {
     @apply contents;
+}
+
+/* Flowforge lifts the card on :hover only. */
+.ff-card:has([aria-expanded='true']) {
+    box-shadow:
+        0 0 0 1px var(--_card-ring),
+        var(--_card-shadow-hover);
 }
 
 .fi-ta-row.fi-record-previewing {
@@ -2070,7 +2093,11 @@ html.fi-record-stacked .fi-record-layout {
 }
 
 .fi-tenant-menu-trigger {
-    @apply rounded-lg py-1;
+    @apply rounded-lg py-1 aria-expanded:bg-gray-100 dark:aria-expanded:bg-white/5;
+
+    &[aria-expanded='true'] .fi-icon {
+        @apply text-gray-500 dark:text-gray-400;
+    }
 
     .fi-tenant-avatar {
         @apply rounded-md w-6 h-6;
@@ -2496,6 +2523,10 @@ html.fi-record-stacked .fi-record-layout {
 
         &.fi-clickable {
             @apply hover:bg-white hover:ring-gray-300 dark:hover:bg-white/5 dark:hover:ring-white/20;
+
+            &:has([aria-expanded='true']) {
+                @apply bg-white ring-gray-300 dark:bg-white/5 dark:ring-white/20;
+            }
         }
 
         & .fi-ta-record-content-ctn {
