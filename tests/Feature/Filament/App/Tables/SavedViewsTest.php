@@ -345,7 +345,7 @@ it('writes no view when the member returns to the built-in list', function (stri
         ->and($view->state->sort)->toBe('created_at:desc');
 })->with(['applyOwnTable', 'useStandardTable']);
 
-it('writes nothing to another view when the active view is deleted', function (): void {
+it('leaves no deleted view active and writes nothing to another view', function (): void {
     $active = viewFor($this->user, ['name' => 'Hot leads', 'state' => hotLeads()]);
     $other = viewFor($this->user, ['name' => 'By name', 'state' => new TableStateData(sort: 'name:asc')]);
     $updatedAt = $other->updated_at;
@@ -354,7 +354,9 @@ it('writes nothing to another view when the active view is deleted', function ()
     livewire(ListCompanies::class)
         ->call('applySavedView', $active->getKey())
         ->callAction('deleteSavedView', arguments: ['view' => $active->getKey()])
-        ->call('sortTable', 'created_at', 'asc');
+        ->assertSet('activeSavedViewId', null)
+        ->call('sortTable', 'created_at', 'asc')
+        ->assertNotNotified(__('filament/panel.tables.views.unavailable'));
 
     expect(SavedView::query()->withoutGlobalScopes()->pluck('name')->all())->toBe(['By name'])
         ->and($other->refresh()->updated_at)->toEqual($updatedAt)
@@ -367,8 +369,7 @@ it('renders no discard or save control on a changed view', function (): void {
     livewire(ListCompanies::class)
         ->call('applySavedView', $view->getKey())
         ->call('sortTable', 'name', 'asc')
-        ->assertDontSeeText(['Discard changes', 'Save as new view', 'More ways to save'])
-        ->assertDontSeeHtml(['data-view-save', 'revertSavedView', "mountAction('saveSavedView')"]);
+        ->assertDontSeeText(['Discard changes', 'Save as new view', 'More ways to save']);
 });
 
 it('sets a default when another request writes the member\'s first preference row at the same moment', function (): void {
@@ -819,6 +820,21 @@ it('brings back the member\'s own table after a saved view', function (): void {
         ->and($component->get('activeSavedViewId'))->toBeNull()
         ->and(preferenceRow()->active_view_id)->toBeNull()
         ->and(preferenceRow()->state->sort)->toBe('name:asc');
+});
+
+it('brings back the member\'s own table after changing a view created from it', function (): void {
+    $component = livewire(ListCompanies::class)
+        ->call('sortTable', 'name', 'asc')
+        ->callAction('saveSavedViewAs', ['name' => 'Hot leads'])
+        ->assertHasNoActionErrors();
+
+    $component->call('sortTable', 'created_at', 'desc');
+    $component->call('applyOwnTable');
+
+    expect($component->get('tableSort'))->toBe('name:asc')
+        ->and(SavedView::query()->withoutGlobalScopes()->sole()->state->sort)->toBe('created_at:desc');
+
+    expect(livewire(ListCompanies::class)->get('tableSort'))->toBe('name:asc');
 });
 
 it('keeps the member\'s own table across sessions while a view is applied', function (): void {

@@ -263,6 +263,10 @@ trait HasSavedViews
                     $this->currentTableState(),
                 ));
 
+                if (! $this->getActiveSavedView() instanceof SavedView) {
+                    $this->rememberOwnTableState($this->currentTableState()->withoutWidths());
+                }
+
                 $this->activeSavedViewId = $view->getKey();
                 $this->markSavedViewApplied();
                 $this->visibleSavedViews = null;
