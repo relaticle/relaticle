@@ -86,6 +86,41 @@ trait HasSavedViews
             && $this->currentTableState()->withoutWidths()->hash() !== $this->appliedSavedViewHash;
     }
 
+    private function saveActiveSavedView(): void
+    {
+        if ($this->activeSavedViewId === null || $this->tableStateHash === null) {
+            return;
+        }
+
+        $state = $this->currentTableState();
+        $hash = $state->withoutWidths()->hash();
+
+        if ($this->tableStateSignature($state) === $this->tableStateHash || $hash === $this->appliedSavedViewHash) {
+            return;
+        }
+
+        $view = $this->getActiveSavedView();
+
+        if (! $view instanceof SavedView) {
+            $this->handleMissingSavedView($this->activeSavedViewId);
+
+            return;
+        }
+
+        try {
+            resolve(UpdateSavedView::class)->execute($this->savedViewUser(), $view, ['state' => $state]);
+        } catch (ModelNotFoundException $exception) {
+            throw_unless($exception->getModel() === SavedView::class, $exception);
+
+            $this->handleMissingSavedView($view->getKey());
+
+            return;
+        }
+
+        $this->appliedSavedViewHash = $hash;
+        $this->visibleSavedViews = null;
+    }
+
     protected function canUpdateSavedView(SavedView $view): bool
     {
         return $this->savedViewUser()->can('update', $view);
@@ -131,36 +166,6 @@ trait HasSavedViews
         $this->visibleSavedViews = null;
 
         Notification::make()->success()->title(__('filament/panel.tables.views.duplicated', ['name' => e($copy->name)]))->send();
-    }
-
-    public function revertSavedView(): void
-    {
-        if ($this->activeSavedViewId !== null) {
-            $this->applySavedView($this->activeSavedViewId);
-            $this->dispatch('view-save-settled');
-        }
-    }
-
-    public function saveSavedViewAction(): Action
-    {
-        return Action::make('saveSavedView')
-            ->label(__('filament/panel.tables.views.save'))
-            ->action(function (): void {
-                $view = $this->getActiveSavedView();
-
-                if (! $view instanceof SavedView) {
-                    $this->handleMissingSavedView($this->activeSavedViewId);
-
-                    return;
-                }
-
-                $view = resolve(UpdateSavedView::class)->execute($this->savedViewUser(), $view, ['state' => $this->currentTableState()]);
-                $this->markSavedViewApplied();
-                $this->visibleSavedViews = null;
-                $this->dispatch('view-save-settled');
-
-                Notification::make()->success()->title(__('filament/panel.tables.views.saved', ['name' => e($view->name)]))->send();
-            });
     }
 
     public function toggleDefaultSavedView(string $viewId): void
@@ -247,13 +252,13 @@ trait HasSavedViews
     public function saveSavedViewAsAction(): Action
     {
         return Action::make('saveSavedViewAs')
-            ->label(__('filament/panel.tables.views.save_as'))
-            ->modalHeading(fn (array $arguments): string => __($this->opensAsCreate($arguments) ? 'filament/panel.tables.views.create_heading' : 'filament/panel.tables.views.save_as'))
+            ->label(__('filament/panel.tables.views.save_current'))
+            ->modalHeading(__('filament/panel.tables.views.create_heading'))
             ->modalWidth('md')
-            ->modalSubmitActionLabel(fn (array $arguments): string => __($this->opensAsCreate($arguments) ? 'filament/panel.tables.views.create_submit' : 'filament/panel.tables.views.save'))
-            ->schema(fn (array $arguments): array => [
+            ->modalSubmitActionLabel(__('filament/panel.tables.views.create_submit'))
+            ->schema([
                 $this->savedViewNameInput(),
-                Text::make(__('filament/panel.tables.views.create_note'))->visible($this->opensAsCreate($arguments)),
+                Text::make(__('filament/panel.tables.views.create_note')),
             ])
             ->action(function (array $data, Schema $schema): void {
                 $view = $this->withViewNameErrors($schema, fn (): SavedView => resolve(CreateSavedView::class)->execute(
@@ -270,12 +275,6 @@ trait HasSavedViews
 
                 Notification::make()->success()->title(__('filament/panel.tables.views.created', ['name' => e($view->name)]))->send();
             });
-    }
-
-    /** @param  array<string, mixed>  $arguments */
-    private function opensAsCreate(array $arguments): bool
-    {
-        return ($arguments['create'] ?? false) === true;
     }
 
     public function renameSavedViewAction(): Action

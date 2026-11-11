@@ -183,7 +183,7 @@ it('keeps the title column where the column manager puts it', function (string $
     expect(last(columnOrder($component)))->toBe($entity->titleColumn());
 })->with('column menu pages');
 
-it('marks the applied view modified after a move', function (): void {
+it('stores a move on the applied view', function (): void {
     $view = SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
         'entity' => CrmEntity::Company,
         'state' => new TableStateData(sort: 'name:desc'),
@@ -195,7 +195,10 @@ it('marks the applied view modified after a move', function (): void {
 
     $component->call('moveTableColumn', end($movable), $movable[0]);
 
-    expect($component->instance()->isSavedViewModified())->toBeTrue();
+    $stored = array_column($view->refresh()->state->columns, 'name');
+
+    expect($stored)->toBe(columnOrder($component))
+        ->and($stored)->toContain(end($movable));
 });
 
 it('tells the browser which headers hide', function (string $page, CrmEntity $entity): void {
@@ -382,7 +385,7 @@ it('drops a pin for a column the table no longer has', function (string $page, C
         ->and(columnMenuPreferences())->toBe(0);
 })->with('column menu pages');
 
-it('restores the pins a view was saved with and marks the view modified when they change', function (): void {
+it('restores the pins a view was saved with and stores them when they change', function (): void {
     $view = SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
         'entity' => CrmEntity::Company,
         'state' => new TableStateData(pinned: ['name', 'creator.name']),
@@ -396,7 +399,7 @@ it('restores the pins a view was saved with and marks the view modified when the
 
     $component->call('unpinTableColumn', 'creator.name');
 
-    expect($component->instance()->isSavedViewModified())->toBeTrue();
+    expect($view->refresh()->state->pinned)->toBe(['name']);
 });
 
 it('marks the pins of a view in the render that applied it and clears them in the render that left it', function (): void {
@@ -509,7 +512,7 @@ it('never renames a column the table does not have', function (): void {
     expect(columnMenuPreferences())->toBe(0);
 });
 
-it('carries labels in a saved view and marks the view modified when one changes', function (): void {
+it('carries labels in a saved view and stores a changed one', function (): void {
     $view = SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
         'entity' => CrmEntity::Company,
         'state' => new TableStateData(labels: ['created_at' => 'Added']),
@@ -522,11 +525,7 @@ it('carries labels in a saved view and marks the view modified when one changes'
 
     $component->callAction('editTableColumnLabel', data: ['label' => 'Joined'], arguments: ['column' => 'created_at']);
 
-    expect($component->instance()->isSavedViewModified())->toBeTrue();
-
-    $component->call('revertSavedView');
-
-    expect(columnLabelText($component, 'created_at'))->toBe('Added');
+    expect($view->refresh()->state->labels)->toBe(['created_at' => 'Joined']);
 });
 
 it('ignores a saved label for a column the table no longer has', function (): void {
@@ -824,7 +823,7 @@ it('adds a text attribute as a shown column at the end of the view, on the same 
         ->and(columnIsShown($fresh, $added[0]))->toBeTrue();
 })->with('column menu pages');
 
-it('marks the active saved view modified once an attribute is added and reads another applied view as unmodified', function (): void {
+it('stores an added attribute on the active saved view and leaves another view as it was', function (): void {
     $stored = storedColumns(livewire(ListCompanies::class));
     [$viewA, $viewB] = collect(['A view', 'B view'])->map(fn (string $name): SavedView => SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
         'name' => $name,
@@ -837,7 +836,8 @@ it('marks the active saved view modified once an attribute is added and reads an
 
     $component->callAction('createTableAttribute', data: ['name' => 'Lead score', 'type' => 'text']);
 
-    expect($component->instance()->isSavedViewModified())->toBeTrue();
+    expect(array_column($viewA->refresh()->state->columns, 'name'))->toHaveCount(count($stored) + 1)
+        ->and($viewB->refresh()->state->columns)->toHaveCount(count($stored));
 
     $component->call('applySavedView', $viewB->getKey());
 

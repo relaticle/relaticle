@@ -87,7 +87,6 @@ it('draws the filter row and no filament filter form', function (string $page): 
     expect($html)
         ->toContain('data-filter-bar')
         ->toContain('fi-filter-bar-start')
-        ->toContain('fi-filter-bar-end')
         ->not->toContain('fi-ta-filters-dropdown')
         ->not->toContain('class="fi-ta-filters"');
 })->with('filter bar pages');
@@ -1506,18 +1505,16 @@ it('keeps a relative period unchanged when a day passes, and moves its records',
         ->and(filterBarShownNames($component))->toBe(['Far', 'Near']);
 });
 
-it('reads a view as changed after a rule is added, and as unchanged after discarding it', function (): void {
+it('stores a rule added to a view on the view', function (): void {
     $view = SavedView::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Company, 'state' => new TableStateData(filters: filterBarRulesState([]))]);
 
     $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey());
     expect($component->instance()->isSavedViewModified())->toBeFalse();
 
     $component->call('setFilterRules', [['field' => 'name', 'condition' => 'contains', 'value' => 'a']]);
-    expect($component->instance()->isSavedViewModified())->toBeTrue();
 
-    $component->call('revertSavedView');
     expect($component->instance()->isSavedViewModified())->toBeFalse()
-        ->and($component->get('tableFilters.conditions.rules'))->toBe([]);
+        ->and($view->refresh()->state->filters['conditions']['rules'][0])->toMatchArray(['field' => 'name', 'condition' => 'contains', 'value' => 'a']);
 });
 
 it('resolves the records of a field with one query however many rules name them', function (): void {
@@ -1570,7 +1567,7 @@ it('treats the deleted notes view on the cards as filtered', function (): void {
     expect($cards->instance()->getTable()->getFilter('trashed')->getIndicators())->not->toBeEmpty();
 });
 
-it('reads a deleted state as one value however it is written', function (mixed $written, bool $modified, ?int $stored): void {
+it('reads a deleted state as one value however it is written, and stores that value on the view', function (mixed $written, ?int $stored): void {
     $view = SavedView::factory()->for($this->user)->for($this->workspace)->create([
         'entity' => CrmEntity::Company,
         'state' => new TableStateData(filters: ['trashed' => ['value' => 1]]),
@@ -1579,15 +1576,15 @@ it('reads a deleted state as one value however it is written', function (mixed $
     $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->set('tableFilters.trashed.value', $written);
 
     expect($component->get('tableFilters.trashed.value'))->toBe($stored)
-        ->and($component->instance()->isSavedViewModified())->toBe($modified);
+        ->and($view->refresh()->state->filters['trashed']['value'])->toBe($stored);
 })->with([
-    'true' => [true, false, 1],
-    'the string one' => ['1', false, 1],
-    'the word true' => ['true', false, 1],
-    'false' => [false, true, 0],
-    'the string zero' => ['0', true, 0],
-    'junk' => ['x', true, null],
-    'an array' => [['x'], true, null],
+    'true' => [true, 1],
+    'the string one' => ['1', 1],
+    'the word true' => ['true', 1],
+    'false' => [false, 0],
+    'the string zero' => ['0', 0],
+    'junk' => ['x', null],
+    'an array' => [['x'], null],
 ]);
 
 it('hides deleted records for a junk deleted state and shows only them for the only state', function (): void {
@@ -1685,7 +1682,7 @@ it('returns to the default when the filter bar is cleared', function (string $pa
         ->assertCanNotSeeTableRecords([$deleted]);
 })->with('filter bar pages')->with(['included', 'only']);
 
-it('reads a saved view that includes deleted records as unchanged until the mode switches', function (): void {
+it('reads a saved view that includes deleted records as unchanged and stores the mode when it switches', function (): void {
     $view = SavedView::factory()->for($this->user)->for($this->workspace)->create([
         'entity' => CrmEntity::Company,
         'state' => new TableStateData(filters: ['trashed' => ['value' => 1]]),
@@ -1702,11 +1699,12 @@ it('reads a saved view that includes deleted records as unchanged until the mode
 
     $component->call('setDeletedRecordsFilter', 'only');
 
-    expect($component->instance()->isSavedViewModified())->toBeTrue();
+    expect($view->refresh()->state->filters['trashed']['value'])->toBe(0);
 
     $component->call('setDeletedRecordsFilter', 'included');
 
-    expect($component->instance()->isSavedViewModified())->toBeFalse();
+    expect($view->refresh()->state->filters['trashed']['value'])->toBe(1)
+        ->and($component->instance()->isSavedViewModified())->toBeFalse();
 });
 
 it('lists neither the live nor the deleted record when a negated name rule matches both', function (string $page, string $model): void {
@@ -2161,7 +2159,7 @@ it('offers deleted records to nobody once the member is signed out', function ()
     expect($component->instance()->getFilterBarData()['deletable'])->toBeFalse();
 });
 
-it('saves a grouping set from the group control with a view and reads the view as unchanged on return', function (): void {
+it('stores a grouping set from the group control on the view and reads the view as unchanged on return', function (): void {
     $view = SavedView::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Task, 'state' => new TableStateData]);
 
     $component = livewire(ManageTasks::class)->call('applySavedView', $view->getKey());
@@ -2169,10 +2167,6 @@ it('saves a grouping set from the group control with a view and reads the view a
     expect($component->instance()->isSavedViewModified())->toBeFalse();
 
     $component->call('setFilterBarGrouping', 'status_group', 'desc');
-
-    expect($component->instance()->isSavedViewModified())->toBeTrue();
-
-    $component->callAction('saveSavedView');
 
     expect($view->refresh()->state->grouping)->toBe('status_group:desc');
 

@@ -14,7 +14,6 @@
     width="xs"
     shift
     class="fi-view-switcher"
-    x-on:view-save-settled.window="setTimeout(() => (document.activeElement === document.body || document.activeElement.closest('[data-view-save]')) && $el.querySelector('.fi-view-switcher-trigger')?.focus())"
 >
     <x-slot name="trigger">
         <x-filament::button
@@ -175,7 +174,7 @@
 
         @if ($canApply)
             <x-filament::dropdown.list>
-                <x-filament::dropdown.list.item icon="lucide-plus" class="fi-ta-views-save-current" wire:click="mountAction('saveSavedViewAs', { create: true })">
+                <x-filament::dropdown.list.item icon="lucide-plus" class="fi-ta-views-save-current" wire:click="mountAction('saveSavedViewAs')">
                     {{ __('filament/panel.tables.views.save_current') }}
                 </x-filament::dropdown.list.item>
             </x-filament::dropdown.list>

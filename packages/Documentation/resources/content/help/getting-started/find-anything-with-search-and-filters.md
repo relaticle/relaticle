@@ -66,8 +66,10 @@ it. Once a column is set, the button reads **Sorted by** and the column
 name. On Tasks, **Group** groups the
 list by status or priority.
 
-Filters, sort, and grouping save with the view. When you change them,
-**Discard changes** and **Save** appear at the right of the row.
+A saved view is yours alone, and it saves itself. Change a filter, sort,
+grouping, column or column name while a view is open, and the view keeps the
+change. To start another view from what's on screen, open the view switcher
+and pick **Create new view**.
 
 ## If you can't find a field in the filter list
 

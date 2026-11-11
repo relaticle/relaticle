@@ -153,12 +153,12 @@ it('leaves the list and the view alone while a chip is unfinished', function ():
 
     addChip($page, 'name', 'contains')
         ->assertPresent('[data-filter-chip].fi-pending')
-        ->assertSeeIn('[data-filter-chip]', 'Select value')
-        ->assertDontSee('Discard changes');
-    expect(companyRows($page, 3))->toBeTrue();
+        ->assertSeeIn('[data-filter-chip]', 'Select value');
+    expect(companyRows($page, 3))->toBeTrue()
+        ->and(data_get(SavedView::query()->sole()->state->filters, 'conditions.rules', []))->toBe([]);
 });
 
-it('shows the save controls for a complete chip on a saved view and keeps the chip after save and reload', function (): void {
+it('saves a complete chip on a saved view as it completes and keeps the chip after a reload', function (): void {
     SavedView::factory()->for($this->user)->for($this->workspace)->create([
         'name' => 'Hot leads',
         'state' => new TableStateData(sort: 'created_at:asc'),
@@ -166,35 +166,17 @@ it('shows the save controls for a complete chip on a saved view and keeps the ch
 
     $page = ($this->open)()
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->click('Hot leads')
-        ->assertDontSee('Discard changes');
-
-    addChip($page, 'name', 'contains')->type(valueInput(), 'glo');
-    $page->assertSee('Discard changes')->assertSee('Save');
-    expect(companyRows($page, 1))->toBeTrue();
-
-    $page->click('[data-view-save-action="save"]')
-        ->assertDontSee('Discard changes')
-        ->navigate("/app/{$this->workspace->slug}/companies")
-        ->assertSeeIn('[data-filter-chip]', 'glo')
-        ->assertDontSee('Discard changes');
-    expect(companyRows($page, 1))->toBeTrue();
-    $page->assertNoJavaScriptErrors();
-});
-
-it('discards a chip with the view changes', function (): void {
-    SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => 'Hot leads']);
-
-    $page = ($this->open)()
-        ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->click('Hot leads');
 
     addChip($page, 'name', 'contains')->type(valueInput(), 'glo');
+    $page->assertMissing('[data-view-save]');
     expect(companyRows($page, 1))->toBeTrue();
 
-    $page->click('[data-view-save-action="discard"]')
-        ->assertMissing('[data-filter-chip]');
-    expect(companyRows($page, 3))->toBeTrue();
+    $page->navigate("/app/{$this->workspace->slug}/companies")
+        ->assertSeeIn('[data-filter-chip]', 'glo')
+        ->assertMissing('[data-view-save]');
+    expect(companyRows($page, 1))->toBeTrue();
+    $page->assertNoJavaScriptErrors();
 });
 
 it('tells an empty list which filters hid its records and clears them', function (): void {
@@ -774,13 +756,11 @@ it('keeps a date in the next 30 days with a saved view and reads the same after 
         ->type(amountInput(), '30');
     expect(companyRows($page, 1))->toBeTrue();
     $page->assertSeeIn('[data-filter-chip]', '30 days')
-        ->assertSee('Discard changes')
-        ->click('[data-view-save-action="save"]')
-        ->assertDontSee('Discard changes')
+        ->assertMissing('[data-view-save]')
         ->navigate("/app/{$this->workspace->slug}/companies")
         ->assertSeeIn('[data-filter-chip]', 'in the next')
         ->assertSeeIn('[data-filter-chip]', '30 days')
-        ->assertDontSee('Discard changes');
+        ->assertMissing('[data-view-save]');
     expect(companyRows($page, 1))->toBeTrue();
     $page->assertNoJavaScriptErrors();
 });
@@ -1019,7 +999,7 @@ it('changes the field of an unfinished chip in place and opens its conditions', 
         ->assertNoJavaScriptErrors();
 });
 
-it('widens the list when a complete chip of a saved view changes field and restores it on discard', function (): void {
+it('widens the list when a complete chip of a saved view changes field', function (): void {
     SavedView::factory()->for($this->user)->for($this->workspace)->create([
         'name' => 'Acme only',
         'state' => new TableStateData(filters: ['conditions' => ['match' => 'all', 'rules' => [['field' => 'name', 'condition' => 'contains', 'value' => 'acme']]]]),
@@ -1029,17 +1009,11 @@ it('widens the list when a complete chip of a saved view changes field and resto
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->click('Acme only');
     expect(companyRows($page, 1))->toBeTrue();
-    $page->assertDontSee('Discard changes')
-        ->click('[data-filter-segment="field"]')
+    $page->click('[data-filter-segment="field"]')
         ->click('[data-pop-item][data-field="creation_source"]');
     expect(companyRows($page, 3))->toBeTrue();
-    $page->assertSee('Discard changes')
-        ->assertPresent('[data-filter-chip][data-field="creation_source"].fi-pending')
-        ->click('[data-view-save-action="discard"]');
-    expect(companyRows($page, 1))->toBeTrue();
-    $page->assertDontSee('Discard changes')
-        ->assertPresent('[data-filter-chip][data-field="name"]')
-        ->assertSeeIn('[data-filter-chip]', 'acme')
+    $page->assertPresent('[data-filter-chip][data-field="creation_source"].fi-pending')
+        ->assertMissing('[data-view-save]')
         ->assertNoJavaScriptErrors();
 });
 

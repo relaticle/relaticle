@@ -90,12 +90,14 @@ trait PersistsTableState
     public function dehydratePersistsTableState(): void
     {
         $state = $this->currentTableState();
-        $hash = hash('xxh128', "{$state->hash()}|{$this->activeSavedViewId}|{$this->appliedSavedViewHash}");
+        $hash = $this->tableStateSignature($state);
 
         if ($this->savesTableStateOnOpen || $this->ownTableStateDirty || ($this->tableStateHash !== null && $this->tableStateHash !== $hash)) {
             resolve(SaveTablePreference::class)->execute(
                 $this->savedViewUser(),
                 $this->savedViewWorkspace(),
+        $this->saveActiveSavedView();
+
                 $this->tableEntity(),
                 $state,
                 $this->getActiveSavedView(),
@@ -116,6 +118,11 @@ trait PersistsTableState
     {
         return $this->tableColumnsFrom($this->initialTableState());
     }
+    private function tableStateSignature(TableStateData $state): string
+    {
+        return hash('xxh128', "{$state->hash()}|{$this->activeSavedViewId}|{$this->appliedSavedViewHash}");
+    }
+
 
     /**
      * @template TValue

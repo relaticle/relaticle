@@ -462,8 +462,4 @@
         </div>
     </div>
     </div>
-
-    <div class="fi-filter-bar-end">
-        @include('filament.app.tables.view-save')
-    </div>
 </div>

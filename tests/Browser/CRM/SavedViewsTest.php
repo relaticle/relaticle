@@ -30,7 +30,7 @@ beforeEach(function (): void {
     Company::factory()->recycle([$this->user, $this->workspace])->count(3)->create();
 });
 
-it('applies a view from the switcher and offers to discard or save a change', function (): void {
+it('applies a view from the switcher and shows no discard or save control after a change', function (int $width, int $height): void {
     SavedView::factory()->for($this->user)->for($this->workspace)->create([
         'name' => 'Hot leads',
         'state' => new TableStateData(sort: 'name:desc'),
@@ -38,23 +38,21 @@ it('applies a view from the switcher and offers to discard or save a change', fu
 
     $page = loginViaBrowser($this->user)
         ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
+        ->resize($width, $height)
         ->navigate("/app/{$this->workspace->slug}/companies")
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->click('Hot leads')
-        ->assertSeeIn('.fi-view-switcher-trigger', 'Hot leads')
-        ->assertDontSee('Discard changes');
+        ->assertSeeIn('.fi-view-switcher-trigger', 'Hot leads');
 
     changeViewByRule($page);
-    $page->assertSee('Discard changes')
-        ->assertScript('(() => { const bar = document.querySelector("[data-filter-bar]"); const row = bar.getBoundingClientRect(); const save = document.querySelector("[data-view-save]").getBoundingClientRect(); const padding = parseFloat(getComputedStyle(bar).paddingRight); return save.top >= row.top && save.bottom <= row.bottom && Math.abs(save.right - (row.right - padding)) <= 1; })()', true)
-        ->click('[data-view-save-action="discard"]')
+    $page->assertScript(savedViewsWaitFor('document.querySelectorAll("[data-filter-chip]").length === 1'), true)
         ->assertDontSee('Discard changes')
+        ->assertMissing('[data-filter-bar] [data-view-save]')
         ->assertNoJavaScriptErrors();
-});
+})->with([[1440, 900], [390, 844]]);
 
-it('joins the save halves into one chip-height control that stays pinned beside a long row of chips', function (): void {
-    SavedView::factory()->for($this->user)->for($this->workspace)->create([
+it('reads a view changed in one request back changed after a reload', function (): void {
+    $view = SavedView::factory()->for($this->user)->for($this->workspace)->create([
         'name' => 'Hot leads',
         'state' => new TableStateData(sort: 'name:desc'),
     ]);
@@ -65,35 +63,16 @@ it('joins the save halves into one chip-height control that stays pinned beside 
         ->navigate("/app/{$this->workspace->slug}/companies")
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->click('Hot leads');
-    changeViewByRule($page);
-    $page->assertSee('Discard changes');
 
-    $measure = <<<'JS'
-        (() => {
-            const box = (selector) => document.querySelector(selector).getBoundingClientRect();
-            const save = box('.fi-view-save-split > .fi-btn');
-            const more = box('.fi-view-save-more');
-            const discard = box('.fi-view-save-discard');
-            const chip = box('[data-filter-chip]');
+    changeViewByRule($page, 'acme');
+    $page->assertScript(savedViewsWaitFor('document.querySelectorAll("[data-filter-chip]").length === 1'), true);
 
-            return {
-                sameHeight: save.height === more.height && more.height === chip.height && discard.height === chip.height,
-                sameTop: save.top === more.top,
-                touching: Math.abs(save.right - more.left) <= 0.5,
-                square: getComputedStyle(document.querySelector('.fi-view-save-more')).borderStartStartRadius === '0px',
-                right: Math.round(more.right),
-            };
-        })();
-    JS;
+    expect(data_get($view->refresh()->state->filters, 'conditions.rules.0.value'))->toBe('acme');
 
-    $before = $page->script($measure);
-    $page->script("Livewire.all().find((component) => component.name.includes('ListCompanies')).\$wire.\$call('setFilterRules', Array.from({ length: 8 }, (_, index) => ({ field: 'name', condition: 'contains', value: 'chip' + index })))");
-    $page->assertScript('document.querySelectorAll("[data-filter-chip]").length === 8', true);
-    $after = $page->script($measure);
-
-    expect($before)->toMatchArray(['sameHeight' => true, 'sameTop' => true, 'touching' => true, 'square' => true])
-        ->and($after)->toBe($before);
-    $page->assertNoJavaScriptErrors();
+    $page->navigate("/app/{$this->workspace->slug}/companies?view={$view->getKey()}")
+        ->assertScript(savedViewsWaitFor('document.querySelectorAll("[data-filter-chip]").length === 1'), true)
+        ->assertSeeIn('.fi-view-switcher-trigger', 'Hot leads')
+        ->assertNoJavaScriptErrors();
 });
 
 it('keeps a tabbed-to chip control inside the strip on a phone', function (): void {
@@ -125,70 +104,6 @@ it('keeps a tabbed-to chip control inside the strip on a phone', function (): vo
         ->script('document.activeElement.setAttribute("data-probe-target", "")');
     $page->assertScript('document.activeElement === document.querySelector("[data-probe-more]")', true)
         ->assertScript(savedViewsWaitFor($inside), true)
-        ->assertNoJavaScriptErrors();
-});
-
-it('shows the discard tooltip only below the small breakpoint, following a resize', function (): void {
-    SavedView::factory()->for($this->user)->for($this->workspace)->create([
-        'name' => 'Hot leads',
-        'state' => new TableStateData(sort: 'name:desc'),
-    ]);
-
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
-        ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->click('Hot leads');
-    changeViewByRule($page);
-
-    $tooltip = 'getComputedStyle(document.querySelector("[data-view-save-action=discard]"), "::after").content';
-
-    $page->hover('[data-view-save-action="discard"]')
-        ->assertScript("{$tooltip} === 'none'", true)
-        ->resize(390, 844)
-        ->hover('[data-view-save-action="discard"]')
-        ->assertScript(savedViewsWaitFor("{$tooltip} === '\"Discard changes\"'"), true)
-        ->resize(1440, 900)
-        ->hover('[data-view-save-action="discard"]')
-        ->assertScript(savedViewsWaitFor("{$tooltip} === 'none'"), true);
-});
-
-it('keeps the text discard button at desktop width', function (): void {
-    SavedView::factory()->for($this->user)->for($this->workspace)->create([
-        'name' => 'Hot leads',
-        'state' => new TableStateData(sort: 'name:desc'),
-    ]);
-
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
-        ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->click('Hot leads');
-    changeViewByRule($page);
-    $page->assertSeeIn('[data-view-save-action="discard"]', 'Discard changes')
-        ->assertScript('!document.querySelector(".fi-view-save-discard-icon").checkVisibility() && document.querySelector(".fi-view-save-discard-text").checkVisibility()', true);
-});
-
-it('keeps the save controls in the filter row on a phone without overflowing', function (): void {
-    SavedView::factory()->for($this->user)->for($this->workspace)->create([
-        'name' => 'Hot leads',
-        'state' => new TableStateData(sort: 'name:desc'),
-    ]);
-
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(390, 844)
-        ->navigate("/app/{$this->workspace->slug}/companies")
-        ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->click('Hot leads');
-    changeViewByRule($page);
-    $page->assertSee('Discard changes')
-        ->assertPresent('[data-filter-bar] [data-view-save]')
-        ->assertScript('document.querySelector("[data-view-save]").getBoundingClientRect().bottom <= document.querySelector(".fi-ta-content-ctn").getBoundingClientRect().top', true)
-        ->assertScript('(() => { const bar = document.querySelector("[data-filter-bar]"); const row = bar.getBoundingClientRect(); const save = document.querySelector("[data-view-save]").getBoundingClientRect(); const sort = document.querySelector("[data-filter-sort]").getBoundingClientRect(); const padding = parseFloat(getComputedStyle(bar).paddingRight); return Math.abs((save.top + save.bottom) / 2 - (sort.top + sort.bottom) / 2) <= 1 && Math.abs(save.right - (row.right - padding)) <= 1; })()', true)
-        ->assertScript('document.documentElement.scrollWidth <= window.innerWidth', true)
         ->assertNoJavaScriptErrors();
 });
 
@@ -359,36 +274,6 @@ it('opens the built-in list from the board even when a view was last applied on 
         ->assertPathIs("/app/{$this->workspace->slug}/opportunities")
         ->assertSeeIn('.fi-view-switcher-trigger', 'All opportunities')
         ->assertScript('location.search', '')
-        ->assertNoJavaScriptErrors();
-});
-
-it('returns focus to the view switcher after discarding or saving from the keyboard', function (): void {
-    SavedView::factory()->for($this->user)->for($this->workspace)->create([
-        'name' => 'Hot leads',
-        'state' => new TableStateData(sort: 'name:desc'),
-    ]);
-    $onSwitcher = 'document.activeElement === document.querySelector(".fi-view-switcher-trigger") && document.activeElement !== document.body';
-
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
-        ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->click('Hot leads');
-    changeViewByRule($page);
-    $page->assertSee('Discard changes');
-
-    $page->script('document.querySelector("[data-view-save-action=discard]").focus()');
-    $page->keys('[data-view-save-action="discard"]', 'Enter')
-        ->assertDontSee('Discard changes')
-        ->assertScript($onSwitcher, true);
-
-    changeViewByRule($page, 'yyy');
-    $page->assertSee('Discard changes');
-    $page->script('document.querySelector("[data-view-save-action=save]").focus()');
-    $page->keys('[data-view-save-action="save"]', 'Enter')
-        ->assertDontSee('Discard changes')
-        ->assertScript($onSwitcher, true)
         ->assertNoJavaScriptErrors();
 });
 
