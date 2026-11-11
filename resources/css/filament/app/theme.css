@@ -8,6 +8,7 @@
 @import './resizable-columns.css';
 @import './saved-views.css';
 @import './filter-bar.css';
+@import './bulk-bar.css';
 
 @plugin "@tailwindcss/typography";
 
@@ -2690,11 +2691,6 @@ html.fi-record-stacked .fi-record-layout {
    level 0, so both bars stop sticking and leave the stacking order, keeping their space so nothing shifts. */
 .fi-app-main-wrapper:has(> .fi-layout :is(.fi-dropdown-panel[x-ref='panel'][style*='display: block'], .fi-modal.fi-modal-open)) > :is(.fi-topbar-ctn, .fi-bottom-nav) {
     @apply max-sm:static max-sm:z-auto;
-}
-
-/* With rows ticked, the toolbar holding the bulk actions trigger follows the scroll, as the rows are far from it. */
-.fi-ta-ctn:not(.fi-modal *):has(.fi-ta-record-checkbox:checked) .fi-ta-header-ctn {
-    @apply max-sm:sticky max-sm:top-[calc(var(--topbar-height)+env(safe-area-inset-top))] max-sm:border-b max-sm:border-gray-200/60 max-sm:bg-white dark:max-sm:border-white/10 dark:max-sm:bg-gray-900;
 }
 
 /* A stacked row's actions cell must outrank the table header. */

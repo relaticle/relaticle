@@ -211,8 +211,8 @@ it('can create a company', function (): void {
 it('can edit a company', function (): void {
     $record = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
-    livewire(ListCompanies::class)
-        ->callAction(TestAction::make('edit')->table($record), data: [
+    livewire(ViewCompany::class, ['record' => $record->getKey()])
+        ->callAction(TestAction::make('edit')->schemaComponent('recordActions', schema: 'infolist'), data: [
             'name' => 'Updated Company',
         ])
         ->assertHasNoActionErrors();
@@ -220,13 +220,12 @@ it('can edit a company', function (): void {
     expect($record->refresh()->name)->toBe('Updated Company');
 });
 
-it('can delete a company', function (): void {
+it('offers delete for a company in the bulk bar, not on its row', function (): void {
     $record = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
     livewire(ListCompanies::class)
-        ->callAction(TestAction::make('delete')->table($record));
-
-    $this->assertSoftDeleted($record);
+        ->assertActionDoesNotExist(TestAction::make('delete')->table($record))
+        ->assertActionExists(TestAction::make('delete')->table()->bulk());
 });
 
 it('validates name is required on create', function (): void {
@@ -300,9 +299,9 @@ it('adds a newly typed tags-input value to the option list when editing a compan
 
     $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
-    livewire(ListCompanies::class)
+    livewire(ViewCompany::class, ['record' => $company->getKey()])
         ->callAction(
-            TestAction::make('edit')->table($company),
+            TestAction::make('edit')->schemaComponent('recordActions', schema: 'infolist'),
             data: [
                 'name' => $company->name,
                 'custom_fields' => ['edit_labels282' => ['Existing', 'TypedDuringEdit']],

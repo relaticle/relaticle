@@ -63,7 +63,6 @@ use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Jobs\ExportCompletion;
-use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Auth\Notifications\NoticeOfEmailChangeRequest;
 use Filament\Auth\Notifications\ResetPassword;
@@ -793,22 +792,6 @@ final class AppServiceProvider extends ServiceProvider
         ExportColumn::configureUsing(fn (ExportColumn $column): ExportColumn => $column->preventFormulaInjection());
 
         Section::configureUsing(fn (Section $section): Section => $section->compact());
-
-        RestoreAction::configureUsing(fn (RestoreAction $action): RestoreAction => $action->before(function (RestoreAction $action, Model $record): void {
-            $conflict = resolve(RestoreConflictMessage::class)->for($record, $action->getRecordTitle(...));
-
-            if ($conflict === null) {
-                return;
-            }
-
-            Notification::make()
-                ->danger()
-                ->title(__('filament/panel.restore_blocked.title', ['record' => $action->getRecordTitle($record)]))
-                ->body(__('filament/panel.restore_blocked.fix', ['conflict' => $conflict]))
-                ->send();
-
-            $action->cancel();
-        }));
 
         RestoreBulkAction::configureUsing(fn (RestoreBulkAction $action): RestoreBulkAction => $action->before(function (RestoreBulkAction $action, Collection $records): void {
             $conflicts = $records

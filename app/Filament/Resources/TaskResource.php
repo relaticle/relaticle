@@ -16,18 +16,16 @@ use App\Filament\Concerns\RemembersViewMode;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
+use App\Filament\Tables\BulkBar;
 use App\Filament\Tables\FilterBar\ConditionsFilter;
+use App\Filament\Tables\RowActions;
 use App\Models\CustomField;
 use App\Models\Task;
 use App\Models\Workspace;
 use App\Support\CanonicalRecordUrl;
 use Filament\Actions\ActionGroup;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\ForceDeleteBulkAction;
-use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
@@ -110,21 +108,18 @@ final class TaskResource extends Resource
                 )->filter()->toArray(),
             ]))
             ->recordActions([
-                ActionGroup::make([
-                    self::copyActions(),
+                RowActions::withoutMenu([
                     EditTaskAction::make(),
-                    RestoreAction::make(),
-                    DeleteAction::make(),
-                    ForceDeleteAction::make(),
                     ViewAction::make()
                         ->visible(fn (Task $record): bool => Gate::denies('update', $record)),
                 ]),
             ])
             ->toolbarActions([
-                BulkActionGroup::make([
+                BulkBar::make([
+                    RestoreBulkAction::make(),
+                ], more: [
                     DeleteBulkAction::make(),
                     ForceDeleteBulkAction::make(),
-                    RestoreBulkAction::make(),
                 ]),
             ]);
     }

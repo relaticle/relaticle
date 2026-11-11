@@ -75,22 +75,63 @@ it('stacks each list row into a card so no column sits off a phone screen', func
     'import-history' => ['import-history', 'status', true],
 ]);
 
-it('shows filament\'s toolbar row only while a record is selected', function (): void {
+it('shows the bulk bar only while a record is selected, and the rows stay put', function (): void {
     $this->withVite();
 
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
     seedListRows($user);
 
-    loginViaBrowser($user)
+    $firstRowTop = 'Math.round(document.querySelector(".fi-ta-row").getBoundingClientRect().top)';
+
+    $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$workspace->slug}/companies")
         ->assertVisible('[data-filter-bar]')
-        ->assertScript('document.querySelector(".fi-ta-header-toolbar").offsetParent === null', true)
-        ->click('.fi-ta-record-checkbox')
-        ->assertVisible('.fi-ta-header-toolbar')
+        ->assertMissing('.fi-bulk-bar');
+
+    $before = $page->script($firstRowTop);
+
+    $page->click('.fi-ta-record-checkbox')
+        ->assertVisible('.fi-bulk-bar')
+        ->assertSeeIn('.fi-bulk-bar', '1 selected')
+        ->assertMissing('.fi-ta-selection-indicator')
+        ->assertScript($firstRowTop, $before)
+        ->click('.fi-bulk-bar-clear')
+        ->assertMissing('.fi-bulk-bar')
         ->assertNoJavaScriptErrors();
+});
+
+it('deletes a selected record from the bulk bar\'s More menu, which opens above the bar', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $company = Company::factory()->recycle([$user, $workspace])->create(['name' => 'Atlas Freight']);
+
+    $menuAboveBar = <<<'JS'
+        (() => {
+            const panel = [...document.querySelectorAll('.fi-dropdown-panel')].find((candidate) => candidate.style.display === 'block');
+
+            return Math.round(panel.getBoundingClientRect().bottom) <= Math.round(document.querySelector('.fi-bulk-bar').getBoundingClientRect().top);
+        })();
+    JS;
+
+    loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/companies")
+        ->click('.fi-ta-record-checkbox')
+        ->click('.fi-bulk-bar .fi-dropdown-trigger')
+        ->assertScript($menuAboveBar, true)
+        ->click('Delete selected')
+        ->click('.fi-modal-open .fi-modal-footer-actions button.fi-color-danger')
+        ->assertDontSee('Atlas Freight')
+        ->assertMissing('.fi-bulk-bar')
+        ->assertNoJavaScriptErrors();
+
+    expect($company->fresh()->trashed())->toBeTrue();
 });
 
 it('keeps the list table header row on desktop', function (): void {
@@ -123,20 +164,20 @@ it('keeps a linked company chip inside its cell link', function (): void {
         ->assertNoJavaScriptErrors();
 });
 
-it('keeps a long record name inside its phone card, clear of the row menu', function (): void {
+it('keeps a long record name inside its phone card, clear of its checkbox', function (): void {
     $this->withVite();
 
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
     Company::factory()->recycle([$user, $workspace])->create(['name' => 'Long Name Industries International Holdings Limited']);
 
-    $titleClearOfMenu = <<<'JS'
+    $titleClearOfCheckbox = <<<'JS'
         (() => {
             const row = document.querySelector('.fi-ta-row');
             const range = document.createRange();
             range.selectNodeContents(row.querySelector('.fi-ta-cell-content .fi-record-chip, .fi-ta-cell-content .fi-ta-text-item'));
 
-            return Math.ceil(range.getBoundingClientRect().right) <= Math.floor(row.querySelector('.fi-ta-actions button').getBoundingClientRect().left);
+            return Math.ceil(range.getBoundingClientRect().right) <= Math.floor(row.querySelector('.fi-ta-record-checkbox').getBoundingClientRect().left);
         })();
     JS;
 
@@ -145,7 +186,7 @@ it('keeps a long record name inside its phone card, clear of the row menu', func
         ->resize(320, 568)
         ->navigate("/app/{$workspace->slug}/companies")
         ->assertVisible('.fi-ta-row')
-        ->assertScript($titleClearOfMenu, true)
+        ->assertScript($titleClearOfCheckbox, true)
         ->assertNoJavaScriptErrors();
 });
 
@@ -235,29 +276,22 @@ it('keeps every filter field option inside the phone filter sheet', function ():
     expect($page->script($lastOptionReachable))->toBe(['listsEveryField' => true, 'insideScreen' => true, 'reachable' => true]);
 });
 
-it('keeps the toolbar with the bulk actions in view on a phone while rows are ticked', function (): void {
+it('keeps the bulk bar above the tab bar on a phone while rows are ticked', function (): void {
     $this->withVite();
 
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
     Company::factory()->count(15)->recycle([$user, $workspace])->create();
 
-    $toolbarGap = <<<'JS'
+    $barClearOfTabBar = <<<'JS'
         (() => {
-            const toolbar = document.querySelector('.fi-ta-header-ctn').getBoundingClientRect();
-            const topbar = document.querySelector('.fi-topbar-ctn').getBoundingClientRect();
+            const bar = document.querySelector('.fi-bulk-bar').getBoundingClientRect();
+            const tabBar = document.querySelector('.fi-bottom-nav').getBoundingClientRect();
+            const more = document.querySelector('.fi-bulk-bar .fi-dropdown-trigger button').getBoundingClientRect();
 
-            return Math.round(toolbar.top - topbar.bottom);
-        })();
-    JS;
-
-    $bulkTriggerHit = <<<'JS'
-        (() => {
-            const trigger = [...document.querySelectorAll('.fi-ta-header-ctn button')]
-                .find((button) => button.checkVisibility() && (button.getAttribute('title') ?? button.getAttribute('aria-label') ?? '').includes('Bulk'));
-            const box = trigger.getBoundingClientRect();
-
-            return trigger.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2));
+            return bar.bottom <= tabBar.top
+                && bar.left >= 0 && bar.right <= innerWidth
+                && document.querySelector('.fi-bulk-bar').contains(document.elementFromPoint(more.left + more.width / 2, more.top + more.height / 2));
         })();
     JS;
 
@@ -269,12 +303,10 @@ it('keeps the toolbar with the bulk actions in view on a phone while rows are ti
 
     $page->script('window.scrollTo(0, document.documentElement.scrollHeight)');
 
-    expect($page->script($toolbarGap))->toBeLessThan(0);
-
-    $page->click('.fi-ta-row >> nth=14 >> .fi-ta-record-checkbox');
-
-    expect($page->script($toolbarGap))->toBe(0)
-        ->and($page->script($bulkTriggerHit))->toBeTrue();
+    $page->click('.fi-ta-row >> nth=14 >> .fi-ta-record-checkbox')
+        ->assertVisible('.fi-bulk-bar')
+        ->assertScript($barClearOfTabBar, true)
+        ->assertNoJavaScriptErrors();
 });
 
 it('keeps the last option of a long choice list inside the phone filter sheet', function (): void {

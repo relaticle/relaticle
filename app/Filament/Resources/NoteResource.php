@@ -14,16 +14,13 @@ use App\Filament\Exports\NoteExporter;
 use App\Filament\Resources\NoteResource\Forms\NoteForm;
 use App\Filament\Resources\NoteResource\Pages\ManageNotes;
 use App\Filament\Resources\NoteResource\Pages\NotesCards;
+use App\Filament\Tables\BulkBar;
+use App\Filament\Tables\RowActions;
 use App\Models\Note;
-use Filament\Actions\ActionGroup;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ExportBulkAction;
-use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\ForceDeleteBulkAction;
-use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -89,21 +86,19 @@ final class NoteResource extends Resource
                 TrashedFilter::make(),
             ])
             ->recordActions([
-                ActionGroup::make([
+                RowActions::withoutMenu([
                     EditAction::make(),
-                    DeleteAction::make(),
-                    ForceDeleteAction::make(),
-                    RestoreAction::make(),
                 ]),
             ])
             ->toolbarActions([
-                BulkActionGroup::make([
+                BulkBar::make([
                     ExportBulkAction::make()
                         ->authorize('exportAny', Note::class)
                         ->exporter(NoteExporter::class),
+                    RestoreBulkAction::make(),
+                ], more: [
                     DeleteBulkAction::make(),
                     ForceDeleteBulkAction::make(),
-                    RestoreBulkAction::make(),
                 ]),
             ]);
     }

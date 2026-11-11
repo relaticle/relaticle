@@ -16,7 +16,9 @@ mutates(AppServiceProvider::class);
 
 const OPEN_SHEET = "[...document.querySelectorAll('.fi-dropdown-panel[x-ref=panel]')].find((panel) => panel.style.display === 'block')";
 
-const ROW_MENU_TRIGGER = '.fi-ta-row:first-of-type .fi-ta-actions .fi-dropdown-trigger';
+const BULK_MORE_TRIGGER = '.fi-bulk-bar .fi-dropdown-trigger';
+
+const FIRST_ROW_CHECKBOX = '.fi-ta-row:first-of-type .fi-ta-record-checkbox';
 
 const MODAL_SPANS_SCREEN = "(() => { const r = document.querySelector('.fi-modal-open .fi-modal-window').getBoundingClientRect(); return r.left === 0 && Math.round(r.right) === innerWidth; })()";
 
@@ -151,13 +153,14 @@ it('keeps the tab bar off desktop', function (): void {
         ->assertNoJavaScriptErrors();
 });
 
-it('opens a row menu as a sheet along the bottom edge of a phone', function (): void {
+it('opens the bulk bar\'s More menu as a sheet along the bottom edge of a phone', function (): void {
     $this->withVite();
 
     $user = User::factory()->withWorkspace()->create();
 
     phoneCompaniesPage($user)
-        ->click(ROW_MENU_TRIGGER)
+        ->click(FIRST_ROW_CHECKBOX)
+        ->click(BULK_MORE_TRIGGER)
         ->wait(0.5)
         ->assertScript('(() => { const r = '.OPEN_SHEET.'.getBoundingClientRect(); return r.left === 0 && r.right === innerWidth && Math.round(r.bottom) === innerHeight; })()', true)
         ->assertScript(SHEET_HOLDS_BOTTOM_EDGE, true)
@@ -191,7 +194,8 @@ it('closes the sheet on a tap outside it without opening the record underneath',
     $workspace = $user->ownedWorkspaces()->first();
 
     phoneCompaniesPage($user)
-        ->click(ROW_MENU_TRIGGER)
+        ->click(FIRST_ROW_CHECKBOX)
+        ->click(BULK_MORE_TRIGGER)
         ->assertScript(OPEN_SHEET.' !== undefined', true)
         ->click('.fi-ta-row:nth-of-type(2) a.fi-ta-col >> nth=0')
         ->wait(0.5)
@@ -207,7 +211,8 @@ it('docks a confirmation dialog to the bottom edge of a phone, edge to edge on a
 
     phoneCompaniesPage($user)
         ->resize(480, 852)
-        ->click(ROW_MENU_TRIGGER)
+        ->click(FIRST_ROW_CHECKBOX)
+        ->click(BULK_MORE_TRIGGER)
         ->click(".fi-dropdown-panel[style*='display: block'] .fi-dropdown-list-item:last-child")
         ->assertVisible('.fi-modal-open .fi-modal-window')
         ->wait(0.5)

@@ -212,13 +212,12 @@ it('rejects a record from another workspace in the relations picker', function (
     expect($note->companies()->count())->toBe(0);
 });
 
-it('can delete a note', function (): void {
+it('offers delete for a note in the bulk bar, not on its row', function (): void {
     $record = Note::factory()->recycle([$this->user, $this->workspace])->create();
 
     livewire(ManageNotes::class)
-        ->callAction(TestAction::make('delete')->table($record));
-
-    $this->assertSoftDeleted($record);
+        ->assertActionDoesNotExist(TestAction::make('delete')->table($record))
+        ->assertActionExists(TestAction::make('delete')->table()->bulk());
 });
 
 it('validates title is required on create', function (): void {

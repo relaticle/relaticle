@@ -162,8 +162,9 @@ it('can create an opportunity', function (): void {
 it('labels the contact select point of contact in the `:dataset` modal', function (string $action): void {
     $record = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
 
-    $page = livewire(ListOpportunities::class)
-        ->mountAction($action === 'edit' ? TestAction::make('edit')->table($record) : $action)
+    $page = ($action === 'edit'
+        ? livewire(ViewOpportunity::class, ['record' => $record->getKey()])->mountAction(TestAction::make('edit')->schemaComponent('recordActions', schema: 'infolist'))
+        : livewire(ListOpportunities::class)->mountAction($action))
         ->instance();
 
     expect($page->getSchema($page->getMountedActionSchemaName())->toHtml())->toContain('Point of Contact');
@@ -172,8 +173,8 @@ it('labels the contact select point of contact in the `:dataset` modal', functio
 it('can edit an opportunity', function (): void {
     $record = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
 
-    livewire(ListOpportunities::class)
-        ->callAction(TestAction::make('edit')->table($record), data: [
+    livewire(ViewOpportunity::class, ['record' => $record->getKey()])
+        ->callAction(TestAction::make('edit')->schemaComponent('recordActions', schema: 'infolist'), data: [
             'name' => 'Updated Opportunity',
         ])
         ->assertHasNoActionErrors();
@@ -192,8 +193,8 @@ it('saves an opportunity whose amount has more decimals than the amount field no
         ->sole();
     $amount->update(['settings' => [...$amount->settings->toArray(), 'additional' => [...$amount->settings->additional, 'decimal_places' => 0]]]);
 
-    livewire(ListOpportunities::class)
-        ->callAction(TestAction::make('edit')->table($record), data: [
+    livewire(ViewOpportunity::class, ['record' => $record->getKey()])
+        ->callAction(TestAction::make('edit')->schemaComponent('recordActions', schema: 'infolist'), data: [
             'name' => 'Renamed Opportunity',
         ])
         ->assertHasNoActionErrors();
@@ -204,13 +205,12 @@ it('saves an opportunity whose amount has more decimals than the amount field no
         ->and($record->getCustomFieldValue($amount))->toBe(999.75);
 });
 
-it('can delete an opportunity', function (): void {
+it('offers delete for a opportunity in the bulk bar, not on its row', function (): void {
     $record = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
 
     livewire(ListOpportunities::class)
-        ->callAction(TestAction::make('delete')->table($record));
-
-    $this->assertSoftDeleted($record);
+        ->assertActionDoesNotExist(TestAction::make('delete')->table($record))
+        ->assertActionExists(TestAction::make('delete')->table()->bulk());
 });
 
 it('validates name is required on create', function (): void {

@@ -20,20 +20,15 @@ use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager
 use App\Filament\Resources\PeopleResource\RelationManagers\MeetingsRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\NotesRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\TasksRelationManager;
+use App\Filament\Tables\BulkBar;
+use App\Filament\Tables\RowActions;
 use App\Models\Company;
 use App\Models\People;
 use Filament\Actions\Action;
-use Filament\Actions\ActionGroup;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\EditAction;
 use Filament\Actions\ExportBulkAction;
-use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\ForceDeleteBulkAction;
-use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
-use Filament\Actions\ViewAction;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Grid;
@@ -117,24 +112,20 @@ final class PeopleResource extends Resource
             ->columns(self::columns())
             ->defaultSort('created_at', 'desc')
             ->recordActions([
-                ActionGroup::make([
+                RowActions::withoutMenu([
                     PreviewRecordAction::make()->page(ViewPeople::class),
-                    ViewAction::make(),
-                    EditAction::make(),
-                    RestoreAction::make(),
-                    DeleteAction::make(),
-                    ForceDeleteAction::make(),
                 ]),
             ])
             ->toolbarActions([
-                BulkActionGroup::make([
+                BulkBar::make([
                     MassSendBulkAction::make(),
                     ExportBulkAction::make()
                         ->authorize('exportAny', People::class)
                         ->exporter(PeopleExporter::class),
+                    RestoreBulkAction::make(),
+                ], more: [
                     DeleteBulkAction::make(),
                     ForceDeleteBulkAction::make(),
-                    RestoreBulkAction::make(),
                 ]),
             ]);
     }

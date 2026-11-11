@@ -431,13 +431,12 @@ it('leaves a user from another workspace out of the assignee picker when the pay
         ->assertMountedActionModalDontSee('Otto Outsider');
 });
 
-it('can delete a task', function (): void {
+it('offers delete for a task in the bulk bar, not on its row', function (): void {
     $record = Task::factory()->recycle([$this->user, $this->workspace])->create();
 
     livewire(ManageTasks::class)
-        ->callAction(TestAction::make('delete')->table($record));
-
-    $this->assertSoftDeleted($record);
+        ->assertActionDoesNotExist(TestAction::make('delete')->table($record))
+        ->assertActionExists(TestAction::make('delete')->table()->bulk());
 });
 
 it('validates title is required on create', function (): void {

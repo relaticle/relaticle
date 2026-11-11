@@ -175,8 +175,8 @@ it('can create a person', function (): void {
 it('can edit a person', function (): void {
     $record = People::factory()->recycle([$this->user, $this->workspace])->create();
 
-    livewire(ListPeople::class)
-        ->callAction(TestAction::make('edit')->table($record), data: [
+    livewire(ViewPeople::class, ['record' => $record->getKey()])
+        ->callAction(TestAction::make('edit')->schemaComponent('recordActions', schema: 'infolist'), data: [
             'name' => 'Updated Person',
         ])
         ->assertHasNoActionErrors();
@@ -184,13 +184,12 @@ it('can edit a person', function (): void {
     expect($record->refresh()->name)->toBe('Updated Person');
 });
 
-it('can delete a person', function (): void {
+it('offers delete for a person in the bulk bar, not on its row', function (): void {
     $record = People::factory()->recycle([$this->user, $this->workspace])->create();
 
     livewire(ListPeople::class)
-        ->callAction(TestAction::make('delete')->table($record));
-
-    $this->assertSoftDeleted($record);
+        ->assertActionDoesNotExist(TestAction::make('delete')->table($record))
+        ->assertActionExists(TestAction::make('delete')->table()->bulk());
 });
 
 function personWithEmails(User $user, string $name, array $emails, bool $trashed = false): People
@@ -216,7 +215,8 @@ it('restores a deleted person whose email is still free', function (): void {
 
     livewire(ListPeople::class)
         ->filterTable('trashed', false)
-        ->callAction(TestAction::make('restore')->table($person));
+        ->selectTableRecords([$person])
+        ->callAction([['name' => 'restore', 'context' => ['table' => true, 'bulk' => true]]]);
 
     expect($person->fresh()->trashed())->toBeFalse();
 });
@@ -227,12 +227,13 @@ it('refuses to restore a deleted person whose email another person now holds', f
 
     livewire(ListPeople::class)
         ->filterTable('trashed', false)
-        ->callAction(TestAction::make('restore')->table($person))
+        ->selectTableRecords([$person])
+        ->callAction([['name' => 'restore', 'context' => ['table' => true, 'bulk' => true]]])
         ->assertNotified(
             Notification::make()
-                ->danger()
-                ->title('Grace Hopper can\'t be restored')
-                ->body('grace@navy.mil in Emails now belongs to Grace Returns. Change or remove it there, then restore.'),
+                ->warning()
+                ->title('1 record wasn\'t restored')
+                ->body('Grace Hopper: grace@navy.mil in Emails now belongs to Grace Returns.'),
         );
 
     expect($person->fresh()->trashed())->toBeTrue();

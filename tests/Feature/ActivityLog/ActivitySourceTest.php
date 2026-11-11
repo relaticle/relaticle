@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Company\UpdateCompany;
 use App\Enums\CreationSource;
-use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
+use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
 use App\Http\Middleware\SetCurrentSource;
 use App\Listeners\BindCommandSourceListener;
 use App\Mcp\Servers\RelaticleServer;
@@ -81,8 +81,8 @@ function approveCompanyRenameInChat(User $user, Company $company, string $name):
 }
 
 it('stamps each channel that edits one record with its own source', function (): void {
-    livewire(ListCompanies::class)
-        ->callAction(TestAction::make('edit')->table($this->company), data: ['name' => 'Via Panel'])
+    livewire(ViewCompany::class, ['record' => $this->company->getKey()])
+        ->callAction(TestAction::make('edit')->schemaComponent('recordActions', schema: 'infolist'), data: ['name' => 'Via Panel'])
         ->assertHasNoActionErrors();
 
     Sanctum::actingAs($this->user);
@@ -115,8 +115,8 @@ it('stamps a panel write after an api request in the same process as web', funct
     $this->putJson("/api/v1/companies/{$this->company->getKey()}", ['name' => 'Via Api'])->assertOk();
 
     $this->actingAs($this->user, 'web');
-    livewire(ListCompanies::class)
-        ->callAction(TestAction::make('edit')->table($this->company), data: ['name' => 'Via Panel'])
+    livewire(ViewCompany::class, ['record' => $this->company->getKey()])
+        ->callAction(TestAction::make('edit')->schemaComponent('recordActions', schema: 'infolist'), data: ['name' => 'Via Panel'])
         ->assertHasNoActionErrors();
 
     expect(sourcesOfCompanyUpdates($this->company))->toBe(['api', 'web']);
