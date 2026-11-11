@@ -1956,11 +1956,11 @@ html.fi-record-stacked .fi-record-layout {
 /* The table toolbar sits at z-index 21 (resizable-columns.css), above Filament's default panel at 20,
    so a page-header or row menu would open behind it. 22 clears the toolbar and stays under the topbar (30). */
 .fi-dropdown-panel {
-    @apply z-[22] rounded-xl p-1;
+    @apply z-[22] rounded-menu p-1;
 }
 
 .fi-dropdown-list {
-    @apply flex flex-col gap-0.5 p-0;
+    @apply flex flex-col gap-0 p-0;
 }
 
 /* The rule between lists is Filament's panel `divide-y`; a border here would draw a second one. */
@@ -1973,11 +1973,11 @@ html.fi-record-stacked .fi-record-layout {
 }
 
 .fi-dropdown-list-item {
-    @apply flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm;
+    @apply flex min-h-menu-row w-full items-center gap-2 rounded-menu-item px-2 py-1.5 text-sm;
 }
 
 .fi-dropdown-list-item .fi-icon {
-    @apply size-5 shrink-0;
+    @apply size-menu-icon shrink-0;
 }
 
 .fi-dropdown-list-item-label {

@@ -131,7 +131,7 @@ button.fi-filter-seg {
 }
 
 .fi-filter-pop {
-    @apply fixed z-30 min-w-52 cursor-default rounded-[10px] bg-white p-1 font-normal text-gray-950 shadow-lg ring-1 ring-gray-950/10 dark:bg-gray-900 dark:text-white dark:ring-white/15;
+    @apply fixed z-30 min-w-52 cursor-default rounded-menu bg-white p-1 font-normal text-gray-950 shadow-lg ring-1 ring-gray-950/10 dark:bg-gray-900 dark:text-white dark:ring-white/15;
 
     &.fi-filter-pop-picker {
         @apply min-w-70;
@@ -142,7 +142,7 @@ button.fi-filter-seg {
     @apply -mx-1 -mt-1 mb-1 flex items-center gap-2 border-b border-gray-200/75 px-2 py-1.5 text-gray-400 dark:border-white/10 dark:text-gray-500;
 
     & svg {
-        @apply size-4 shrink-0;
+        @apply size-menu-icon shrink-0;
     }
 
     & input {
@@ -151,14 +151,14 @@ button.fi-filter-seg {
 }
 
 .fi-filter-item {
-    @apply flex h-8 w-full items-center gap-2 rounded-md px-2 text-start text-sm whitespace-nowrap hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-0 dark:hover:bg-white/5 dark:focus-visible:bg-white/5;
+    @apply flex h-menu-row w-full items-center gap-2 rounded-menu-item px-2 text-start text-sm whitespace-nowrap hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-0 dark:hover:bg-white/5 dark:focus-visible:bg-white/5;
 
     &.fi-on {
         @apply bg-gray-100 dark:bg-white/5;
     }
 
     & svg {
-        @apply size-4 shrink-0 text-gray-500 dark:text-gray-400;
+        @apply size-menu-icon shrink-0 text-gray-500 dark:text-gray-400;
     }
 
     & .fi-filter-tick {

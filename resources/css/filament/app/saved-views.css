@@ -24,12 +24,12 @@
 }
 
 .fi-ta-views-row-created {
-    @apply px-3 py-2 text-xs text-gray-500 dark:text-gray-400;
+    @apply px-2 py-1.5 text-xs text-gray-500 dark:text-gray-400;
 }
 
 /* A saved view's row highlights as one, its buttons included. */
 .fi-ta-views-row {
-    @apply relative flex items-center rounded-lg;
+    @apply relative flex items-center rounded-menu-item;
 
     &:hover,
     &:has(:focus-visible),
@@ -58,7 +58,7 @@
 }
 
 .fi-ta-views-list {
-    @apply flex flex-col gap-1;
+    @apply flex flex-col;
 }
 
 .fi-ta-views-empty {
@@ -89,32 +89,24 @@
 .fi-ta-views-panel {
     @apply flex max-h-112 flex-col;
 
-    & .fi-dropdown-list {
-        @apply gap-1;
-    }
-
     & .fi-dropdown-list-item {
-        @apply h-9 rounded-lg px-2 py-0 hover:bg-gray-100 focus-visible:bg-gray-100 dark:hover:bg-white/5 dark:focus-visible:bg-white/5;
-
-        & .fi-icon {
-            @apply size-4;
-        }
+        @apply hover:bg-gray-100 focus-visible:bg-gray-100 dark:hover:bg-white/5 dark:focus-visible:bg-white/5;
     }
 
     & > .fi-dropdown-list {
-        @apply border-t border-gray-100 p-2 dark:border-white/10;
+        @apply mt-1 border-t border-gray-100 pt-1 dark:border-white/10;
     }
 }
 
 .fi-ta-views-scroll {
-    @apply min-h-0 flex-1 overflow-y-auto p-2;
+    @apply min-h-0 flex-1 overflow-y-auto;
 }
 
 .fi-ta-views-search {
-    @apply flex shrink-0 items-center gap-2 border-b border-gray-100 px-4 py-3 dark:border-white/10;
+    @apply -mx-1 -mt-1 mb-1 flex shrink-0 items-center gap-2 border-b border-gray-100 px-2 py-1.5 text-gray-400 dark:border-white/10 dark:text-gray-500;
 
     & .fi-icon {
-        @apply hidden;
+        @apply size-menu-icon shrink-0;
     }
 
     & input {
@@ -139,7 +131,7 @@
 }
 
 .fi-ta-views-save-current .fi-icon {
-    @apply size-4! text-gray-500 dark:text-gray-400;
+    @apply text-gray-500 dark:text-gray-400;
 }
 
 :is(.fi-view-switcher, .fi-view-settings):has(> .fi-dropdown-panel:not([style*='display: none'])) .fi-dropdown-trigger button {
@@ -161,23 +153,15 @@
 }
 
 .fi-view-settings-panel {
-    @apply flex max-h-[min(40rem,calc(100dvh-8rem))] flex-col p-1;
-
-    & .fi-dropdown-list {
-        @apply gap-1;
-    }
+    @apply flex max-h-[min(40rem,calc(100dvh-8rem))] flex-col;
 
     & .fi-dropdown-list-item {
-        @apply h-8 px-2 py-0 hover:bg-gray-100 focus-visible:bg-gray-100 dark:hover:bg-white/5 dark:focus-visible:bg-white/5;
-
-        & .fi-icon {
-            @apply size-4;
-        }
+        @apply hover:bg-gray-100 focus-visible:bg-gray-100 dark:hover:bg-white/5 dark:focus-visible:bg-white/5;
     }
+}
 
-    & .fi-view-settings-list ~ .fi-dropdown-list {
-        @apply mt-1 shrink-0 border-t border-gray-100 pt-1 dark:border-white/10;
-    }
+.fi-view-settings-footer {
+    @apply mt-1 shrink-0 border-t border-gray-100 pt-1 dark:border-white/10;
 }
 
 .fi-view-settings-view {
@@ -209,11 +193,11 @@
 }
 
 .fi-view-settings-list {
-    @apply flex shrink-0 flex-col gap-0.5;
+    @apply flex shrink-0 flex-col;
 }
 
 .fi-view-settings-row {
-    @apply flex items-center gap-1 rounded-md py-1 pe-1 ps-0.5 text-sm text-gray-950 dark:text-white;
+    @apply flex h-menu-row items-center gap-1 rounded-menu-item pe-1 ps-0.5 text-sm text-gray-950 dark:text-white;
 
     &:hover,
     &:has(:focus-visible),
@@ -226,7 +210,7 @@
     @apply flex size-6 shrink-0 items-center justify-center text-gray-400 dark:text-gray-500;
 
     & .fi-icon {
-        @apply size-4;
+        @apply size-menu-icon;
     }
 }
 
@@ -275,5 +259,5 @@
 }
 
 .fi-view-settings-add-chevron {
-    @apply size-4 text-gray-400 dark:text-gray-500;
+    @apply size-menu-icon text-gray-400 dark:text-gray-500;
 }

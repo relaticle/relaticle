@@ -806,6 +806,16 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
   of the core themes. Each imports its core theme and adds Cloud's `@source` directories. A class added to a Cloud billing view
   or sysadmin page reaches CSS only through them, and `packages/Cloud/tests/Feature/AppPanelThemeTest.php` pins the swap.
 
+## Menus
+
+- Every menu in the panels draws from four tokens in `resources/css/theme.css`: `menu-row` (32px rows),
+  `menu-icon` (16px icons), `menu` (10px panel corners) and `menu-item` (6px row corners). The stock Filament
+  dropdown takes them in `resources/css/filament/app/theme.css`, and the filter bar, Views and View settings use them
+  as `h-menu-row`, `size-menu-icon`, `rounded-menu` and `rounded-menu-item`.
+- A custom menu uses those utilities and never a raw height, icon size or radius. A phone sheet keeps its taller rows.
+  `tests/Browser/Panel/MenusTest.php` opens Views, View settings, the filter picker, Import / Export and a column menu,
+  and fails when a row, an icon or a corner leaves the spec. A new menu joins its dataset.
+
 ## Scripts
 
 - `vite.config.js` builds every script that imports a package. Never add a second bundler, a build script in `bin/`, or a
