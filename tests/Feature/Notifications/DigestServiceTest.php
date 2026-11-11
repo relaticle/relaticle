@@ -166,6 +166,24 @@ it('carries each digest task priority and its option color', function (): void {
         ->and($overdue['plain']->priority)->toBeNull();
 });
 
+it('leaves the priority uncolored when the workspace turned option colors off, as the board does', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+
+    $task = Task::factory()->for($workspace)->create(['title' => 'urgent']);
+    $task->assignees()->attach($user);
+    digestSetDue($task, digestDueField($workspace->id), now()->subDay());
+    digestSetOption($task, 'priority', 'High');
+
+    DB::table('custom_fields')->where('tenant_id', $workspace->id)->where('entity_type', 'task')->where('code', 'priority')
+        ->update(['settings' => DB::raw("jsonb_set(settings::jsonb, '{enable_option_colors}', 'false')")]);
+
+    $digest = resolve(DigestService::class)->forWorkspace($user, $workspace);
+
+    expect($digest->overdue[0]->priority)->toBe('High')
+        ->and($digest->overdue[0]->priorityColor)->toBeNull();
+});
+
 it('builds the digest without priorities when the workspace has no priority field', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;

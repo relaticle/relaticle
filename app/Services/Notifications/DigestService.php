@@ -49,7 +49,7 @@ final readonly class DigestService
         }
 
         $records = $this->linkedRecords($workspace, array_values($rows->map(fn (object $row): string => (string) $row->id)->all()));
-        $priorities = $this->priorityOptions($meta['priority_field_id']);
+        $priorities = $this->priorityOptions($meta['priority_field_id'], $meta['priority_colors']);
 
         $overdue = [];
         $upcoming = [];
@@ -78,7 +78,7 @@ final readonly class DigestService
     }
 
     /**
-     * @param  array{due_field_id: ?string, status_field_id: ?string, done_option_id: ?string, priority_field_id: ?string}  $meta
+     * @param  array{due_field_id: ?string, status_field_id: ?string, done_option_id: ?string, priority_field_id: ?string, priority_colors: bool}  $meta
      * @return Collection<int, stdClass>
      */
     private function dueTaskRows(User $user, Workspace $workspace, array $meta, CarbonImmutable $windowEnd): Collection
@@ -119,7 +119,7 @@ final readonly class DigestService
     /**
      * @return array<string, object{name: string, color: ?string}>
      */
-    private function priorityOptions(?string $priorityFieldId): array
+    private function priorityOptions(?string $priorityFieldId, bool $withColors): array
     {
         if ($priorityFieldId === null) {
             return [];
@@ -132,7 +132,7 @@ final readonly class DigestService
             ->select(['id', 'name'])
             ->selectRaw("settings->>'color' as color")
             ->get()
-            ->mapWithKeys(fn (object $option): array => [(string) $option->id => (object) ['name' => (string) $option->name, 'color' => $option->color]])
+            ->mapWithKeys(fn (object $option): array => [(string) $option->id => (object) ['name' => (string) $option->name, 'color' => $withColors ? $option->color : null]])
             ->all();
     }
 
@@ -167,7 +167,7 @@ final readonly class DigestService
     }
 
     /**
-     * @return array{due_field_id: ?string, status_field_id: ?string, done_option_id: ?string, priority_field_id: ?string}
+     * @return array{due_field_id: ?string, status_field_id: ?string, done_option_id: ?string, priority_field_id: ?string, priority_colors: bool}
      */
     private function resolveFieldMetadata(Workspace $workspace): array
     {
@@ -184,6 +184,7 @@ final readonly class DigestService
                 "MAX(CASE WHEN cf.code = 'status' THEN cf.id END) AS status_field_id",
                 "MAX(CASE WHEN cf.code = 'status' THEN opt.id END) AS done_option_id",
                 "MAX(CASE WHEN cf.code = 'priority' THEN cf.id END) AS priority_field_id",
+                "BOOL_OR(cf.code = 'priority' AND (cf.settings->>'enable_option_colors')::boolean) AS priority_colors",
             ]))
             ->first();
 
@@ -192,6 +193,7 @@ final readonly class DigestService
             'status_field_id' => $row?->status_field_id !== null ? (string) $row->status_field_id : null,
             'done_option_id' => $row?->done_option_id !== null ? (string) $row->done_option_id : null,
             'priority_field_id' => $row?->priority_field_id !== null ? (string) $row->priority_field_id : null,
+            'priority_colors' => (bool) $row?->priority_colors,
         ];
     }
 }
