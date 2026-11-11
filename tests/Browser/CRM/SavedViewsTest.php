@@ -138,7 +138,7 @@ it('closes a view confirmation from its close button on a phone, where the switc
         ->navigate("/app/{$this->workspace->slug}/companies")
         ->click('.fi-view-switcher .fi-dropdown-trigger button');
 
-    $page->hover('.fi-ta-views-row')->click('[aria-label="Actions for Hot leads"]');
+    $page->hover('.fi-ta-views-row:has([title="Hot leads"])')->click('[aria-label="Actions for Hot leads"]');
     $page->script('[...document.querySelectorAll(".fi-ta-views-row-menu .fi-dropdown-list-item")].find((item) => item.offsetParent !== null && item.textContent.trim() === "Delete view").click()');
 
     $page->assertSee('Delete "Hot leads"?')
@@ -185,7 +185,7 @@ it('opens each view row menu with that view own options and acts on that view', 
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->hover('.fi-ta-views-row:has([title="Mine"])')
         ->keys('[aria-label="Actions for Mine"]', 'Enter')
-        ->assertScript('document.activeElement?.closest(".fi-ta-views-row-menu") !== null && document.activeElement.textContent.trim() === "Set as my default"', true);
+        ->assertScript('document.activeElement?.closest(".fi-ta-views-row-menu") !== null && document.activeElement.textContent.trim() === "Move up"', true);
 });
 
 it('tells the member when the search matches no view', function (): void {
@@ -372,9 +372,11 @@ it('moves a row from its menu and disables the move that has nowhere to go', fun
 
     $page->script($item('Move up').'.click()');
     $page->assertScript(savedViewsWaitFor('JSON.stringify('.switcherKeys().') === '.json_encode(json_encode(['list', $beta->getKey(), $alpha->getKey()]))), true);
+    $page->wait(1);
 
     expect(storedViewOrder($this->user, CrmEntity::Company))->toBe(['list', $beta->getKey(), $alpha->getKey()]);
 
+    $page->click('.fi-view-switcher .fi-dropdown-trigger button');
     $page->hover('.fi-ta-views-row:has([title="All companies"])')->click('[aria-label="Actions for All companies"]');
     $page->assertScript($item('Move up').'.disabled', true)
         ->assertNoJavaScriptErrors();

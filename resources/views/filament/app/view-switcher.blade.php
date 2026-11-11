@@ -4,6 +4,7 @@
     placement="bottom-start"
     width="xs"
     shift
+    size
     class="fi-view-switcher"
 >
     <x-slot name="trigger">
@@ -22,6 +23,7 @@
 
     <div
         class="fi-ta-views-panel"
+        x-on:keydown.escape.window="focusTriggerOnEscape()"
         x-init="$el.closest('.fi-dropdown-panel')?.addEventListener('dropdown-opened', () => window.matchMedia('(width >= 40rem) and (pointer: fine)').matches && $refs.search.focus())"
         x-data="{
             query: '',
@@ -37,6 +39,13 @@
             },
             hasMatch() {
                 return this.rows().some((row) => this.matches(row))
+            },
+            focusTriggerOnEscape() {
+                const panel = this.$el.closest('.fi-dropdown-panel')
+
+                if (panel.offsetParent !== null) {
+                    this.$nextTick(() => panel.closest('.fi-dropdown').querySelector('.fi-dropdown-trigger button').focus())
+                }
             },
             reorder() {
                 this.$wire.reorderViews(this.keys())

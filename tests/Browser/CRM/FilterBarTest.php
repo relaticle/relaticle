@@ -376,7 +376,6 @@ it('titles the dialog opened from create new view and keeps the save as new view
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->click('.fi-ta-views-save-current')
         ->assertSee('Create view')
-        ->assertSee('Starts from the columns, sort and filters on screen now.')
         ->assertDontSee('Save as new view');
 });
 

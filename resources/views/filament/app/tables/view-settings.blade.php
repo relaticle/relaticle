@@ -1,6 +1,6 @@
 @use('Illuminate\Support\Js')
 
-<x-filament::dropdown :menu="false" placement="bottom-start" width="xs" shift class="fi-view-settings">
+<x-filament::dropdown :menu="false" placement="bottom-start" width="xs" shift size class="fi-view-settings">
     <x-slot name="trigger">
         <x-filament::button color="gray" size="sm" class="fi-view-settings-trigger">
             <x-filament::icon icon="lucide-sliders-horizontal" class="fi-view-settings-icon" />
@@ -12,8 +12,6 @@
     <div class="fi-view-settings-panel" x-data="viewSettingsColumns" x-on:resize.window="closeMenu(false)" x-on:scroll.window.capture="closeMenu(false)" x-on:livewire:navigating.window="closeMenu(false)" data-view-settings role="group" x-on:dropdown-escape="adding && ($event.preventDefault(), closeAdd())" aria-label="{{ __('filament/panel.tables.views.view_settings_panel') }}">
         <div class="fi-view-settings-view" x-show="! adding">
             <div class="fi-view-settings-scroll">
-                <p class="fi-ta-views-heading">{{ __('filament/panel.tables.views.columns') }}</p>
-
                 <div
                     x-sortable
                     x-on:end.stop="reorder($event)"

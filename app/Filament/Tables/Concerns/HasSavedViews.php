@@ -18,7 +18,6 @@ use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
-use Filament\Schemas\Components\Text;
 use Filament\Schemas\Schema;
 use Filament\Support\Components\Attributes\Exposed;
 use Illuminate\Database\Eloquent\Collection;
@@ -212,7 +211,6 @@ trait HasSavedViews
             ->modalSubmitActionLabel(__('filament/panel.tables.views.create_submit'))
             ->schema([
                 $this->savedViewNameInput(),
-                Text::make(__('filament/panel.tables.views.create_note')),
             ])
             ->action(function (array $data, Schema $schema): void {
                 $view = $this->withViewNameErrors($schema, fn (): SavedView => resolve(CreateSavedView::class)->execute(

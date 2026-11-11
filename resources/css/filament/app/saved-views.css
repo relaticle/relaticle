@@ -85,9 +85,14 @@
     @apply max-w-56!;
 }
 
+/* Filament's size option caps the panel at the room below the trigger. The menu inside shrinks to it. */
+:is(.fi-view-switcher, .fi-view-settings) > .fi-dropdown-panel {
+    @apply flex flex-col;
+}
+
 /* Search and Create stay in view; only the views between them scroll. */
 .fi-ta-views-panel {
-    @apply flex max-h-112 flex-col;
+    @apply flex max-h-menu-max min-h-0 flex-col;
 
     & .fi-dropdown-list-item {
         @apply hover:bg-gray-100 focus-visible:bg-gray-100 dark:hover:bg-white/5 dark:focus-visible:bg-white/5;
@@ -116,10 +121,6 @@
     & input::-webkit-search-cancel-button {
         @apply hidden appearance-none;
     }
-}
-
-.fi-ta-views-heading {
-    @apply flex items-center justify-between gap-2 px-2 pt-2 pb-1 text-xs font-medium text-gray-500 dark:text-gray-400;
 }
 
 .fi-ta-views-row-menu .fi-dropdown-list-item:disabled {
@@ -153,7 +154,7 @@
 }
 
 .fi-view-settings-panel {
-    @apply flex max-h-[min(40rem,calc(100dvh-8rem))] flex-col;
+    @apply flex max-h-menu-max min-h-0 flex-col;
 
     & .fi-dropdown-list-item {
         @apply hover:bg-gray-100 focus-visible:bg-gray-100 dark:hover:bg-white/5 dark:focus-visible:bg-white/5;
