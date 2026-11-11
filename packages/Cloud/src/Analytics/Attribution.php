@@ -11,7 +11,7 @@ final readonly class Attribution
     private const array SOURCES = [
         'google', 'bing', 'duckduckgo', 'github', 'producthunt', 'linkedin',
         'youtube', 'reddit', 'facebook', 'twitter', 'chatgpt', 'claude',
-        'gemini', 'perplexity', 'newsletter', 'discord',
+        'gemini', 'perplexity', 'newsletter', 'discord', 'hackernews',
     ];
 
     private const array REFERRERS = [
@@ -21,6 +21,7 @@ final readonly class Attribution
         'facebook.com' => 'facebook', 'twitter.com' => 'twitter', 'x.com' => 'twitter',
         'chatgpt.com' => 'chatgpt', 'chat.openai.com' => 'chatgpt', 'claude.ai' => 'claude',
         'gemini.google.com' => 'gemini', 'perplexity.ai' => 'perplexity', 'discord.com' => 'discord',
+        'news.ycombinator.com' => 'hackernews',
     ];
 
     public static function optedOut(Request $request): bool
@@ -70,6 +71,9 @@ final readonly class Attribution
             $request->is('blog', 'blog/*') => 'blog',
             $request->is('compare/*', 'alternatives/*') => 'comparison',
             $request->is('ai', 'ai-native-crm', 'crm-for-*') => 'assistant',
+            $request->is('self-hosted') => 'self-hosted',
+            $request->is('security') => 'security',
+            $request->is('email-and-calendar') => 'email-and-calendar',
             $request->routeIs('login', 'filament.app.auth.login') => 'login',
             default => 'other',
         };
