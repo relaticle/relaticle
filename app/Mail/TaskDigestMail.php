@@ -23,6 +23,7 @@ use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 
 #[Tries(3)]
@@ -110,18 +111,19 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
         );
     }
 
-    private function summary(): string
+    private function summary(): HtmlString
     {
         $overdue = $this->digest->overdueCount();
         $due = $this->digest->upcomingCount();
-        $overdueText = '**'.trans_choice('mail.task_digest.summary_overdue', $overdue).'**';
-        $dueText = '**'.trans_choice('mail.task_digest.summary_due', $due).'**';
+        $overdueText = '<strong>'.e(trans_choice('mail.task_digest.summary_overdue', $overdue)).'</strong>';
+        $dueText = '<strong>'.e(trans_choice('mail.task_digest.summary_due', $due)).'</strong>';
+        $workspace = e($this->workspace->name);
 
         if ($overdue > 0 && $due > 0) {
-            return __('mail.task_digest.summary_both', ['overdue' => $overdueText, 'due' => $dueText, 'workspace' => $this->workspace->name]);
+            return new HtmlString(__('mail.task_digest.summary_both', ['overdue' => $overdueText, 'due' => $dueText, 'workspace' => $workspace]));
         }
 
-        return __('mail.task_digest.summary', ['tasks' => $overdue > 0 ? $overdueText : $dueText, 'workspace' => $this->workspace->name]);
+        return new HtmlString(__('mail.task_digest.summary', ['tasks' => $overdue > 0 ? $overdueText : $dueText, 'workspace' => $workspace]));
     }
 
     private function preheader(): string

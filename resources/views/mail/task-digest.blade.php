@@ -2,7 +2,7 @@
 <x-slot:preheader>{{ $preheader }}</x-slot:preheader>
 # {{ __('mail.task_digest.heading', ['name' => $greetingName]) }}
 
-{{ $summary }}
+<p>{{ $summary }}</p>
 
 <p class="sub">{{ __('mail.task_digest.open_hint', ['workspace' => $workspaceName]) }}</p>
 

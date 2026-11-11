@@ -35,7 +35,7 @@ it('renders the digest with subject, preheader, summary, footer, and settings li
     $mail->assertHasSubject('[Acme] 1 overdue, 1 due today, '.now('UTC')->format('M j'));
     $mail->assertSeeInHtml('Call client, Send proposal');
     $mail->assertSeeInHtml(__('mail.task_digest.heading', ['name' => 'Ada']), escape: false);
-    $mail->assertSeeInText('You have **1 overdue task** and **1 task due today** in Acme.');
+    $mail->assertSeeInText('You have 1 overdue task and 1 task due today in Acme.');
     $mail->assertSeeInHtml('123 Test St');
     $mail->assertSeeInHtml(__('mail.footer.settings'));
     $mail->assertSeeInHtml(__('mail.footer.reason.digest'));
@@ -107,6 +107,17 @@ it('caps the preheader at three task titles', function (): void {
     ));
 
     (new TaskDigestMail($user, digestWorkspace($user), $digest))->assertSeeInHtml('One, Two, Three and 2 more');
+});
+
+it('renders a workspace name as text, never as markdown', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = digestWorkspace($user, '[Verify your account](https://phish.example) *now*');
+
+    $html = (new TaskDigestMail($user, $workspace, new TaskDigest([], [new DigestTaskItem('Send proposal', now(), 'https://app.test/tasks?b')])))->render();
+
+    expect($html)->not->toContain('href="https://phish.example"')
+        ->and($html)->not->toContain('<em')
+        ->and($html)->toContain('[Verify your account](https://phish.example) *now*');
 });
 
 it('never leaks a lang key into the rendered digest', function (): void {
