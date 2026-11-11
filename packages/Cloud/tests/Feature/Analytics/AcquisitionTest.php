@@ -85,6 +85,14 @@ it('attributes signups arriving on a product page to that page', function (strin
     'email and calendar' => ['/email-and-calendar', 'email-and-calendar'],
 ]);
 
+it('attributes a visit from Hacker News by referrer or by tag', function (string $referrer, string $query): void {
+    $this->withHeader('referer', $referrer)->get('/'.$query)
+        ->assertSessionHas('analytics.acquisition.source', 'hackernews');
+})->with([
+    'thread referrer' => ['https://news.ycombinator.com/', ''],
+    'tagged link' => ['', '?utm_source=hackernews'],
+]);
+
 it('drops unvetted campaign values and never stores raw referrers or landing paths', function (): void {
     $this->withHeader('referer', 'https://github.com.evil.test/private/person@example.com')
         ->get('/pricing?utm_source[]=github&utm_medium=person@example.com&utm_campaign=person@example.com')->assertOk();
