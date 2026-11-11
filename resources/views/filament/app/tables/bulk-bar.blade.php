@@ -9,31 +9,26 @@
     aria-label="{{ __('filament/panel.tables.bulk_bar.label') }}"
     class="fi-bulk-bar"
 >
-    <div class="fi-bulk-bar-selection">
-        <span
-            class="fi-bulk-bar-count"
-            role="status"
-            aria-live="polite"
-            x-text="window.pluralize(@js(__('filament/panel.tables.bulk_bar.selected')), getSelectedRecordsCount(), { count: new Intl.NumberFormat(@js(str_replace('_', '-', app()->getLocale()))).format(getSelectedRecordsCount()) })"
-        ></span>
-
-        <button
-            type="button"
-            class="fi-bulk-bar-clear"
-            aria-label="{{ __('filament/panel.tables.bulk_bar.clear') }}"
-            x-on:click="deselectAllRecords"
-        >
-            <x-filament::icon icon="lucide-x" />
-        </button>
-    </div>
-
     <button
         type="button"
-        class="fi-bulk-bar-select-all"
-        x-show="canSelectAllRecords()"
-        x-on:click="selectAllRecords"
-        x-text="window.pluralize(@js(__('filament/panel.tables.bulk_bar.select_all')), Number($refs.allSelectableRecordsCount.value), { count: new Intl.NumberFormat(@js(str_replace('_', '-', app()->getLocale()))).format($refs.allSelectableRecordsCount.value) })"
-    ></button>
+        class="fi-bulk-bar-selection"
+        x-bind:aria-label="window.pluralize(@js(__('filament/panel.tables.bulk_bar.selected_count')), getSelectedRecordsCount(), { count: getSelectedRecordsCount() }) + '. ' + @js(__('filament/panel.tables.bulk_bar.clear'))"
+        x-on:click="deselectAllRecords"
+    >
+        <span
+            class="fi-bulk-bar-count"
+            x-text="new Intl.NumberFormat(@js(str_replace('_', '-', app()->getLocale()))).format(getSelectedRecordsCount())"
+        ></span>
+        <span class="fi-bulk-bar-selected">{{ __('filament/panel.tables.bulk_bar.selected') }}</span>
+        <x-filament::icon icon="lucide-x" class="fi-bulk-bar-clear" />
+    </button>
+
+    <span
+        class="sr-only"
+        role="status"
+        aria-live="polite"
+        x-text="window.pluralize(@js(__('filament/panel.tables.bulk_bar.selected_count')), getSelectedRecordsCount(), { count: getSelectedRecordsCount() })"
+    ></span>
 
     @if ($actions !== [])
         <div class="fi-bulk-bar-actions">

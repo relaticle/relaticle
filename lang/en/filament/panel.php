@@ -32,9 +32,9 @@ return [
     'tables' => [
         'bulk_bar' => [
             'label' => 'Actions for the selected records',
-            'selected' => ':count selected',
+            'selected' => 'Selected',
+            'selected_count' => ':count selected',
             'clear' => 'Clear selection',
-            'select_all' => 'Select all :count',
             'more' => 'More',
         ],
         'resize_column' => 'Resize column',

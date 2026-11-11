@@ -14,23 +14,19 @@
 }
 
 .fi-bulk-bar-selection {
-    @apply flex h-8 shrink-0 items-center gap-1 rounded-lg bg-primary-50 ps-2.5 pe-1 text-sm font-medium text-primary-700 dark:bg-primary-400/10 dark:text-primary-300;
+    @apply flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-dashed border-gray-300 ps-1.5 pe-2 text-sm font-medium text-gray-600 hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-primary-600 dark:border-white/20 dark:text-gray-300 dark:hover:bg-white/5;
 }
 
 .fi-bulk-bar-count {
-    @apply whitespace-nowrap tabular-nums;
+    @apply rounded-md bg-primary-600 px-1.5 text-xs/5 font-semibold tabular-nums text-white dark:bg-primary-500;
+}
+
+.fi-bulk-bar-selected {
+    @apply whitespace-nowrap;
 }
 
 .fi-bulk-bar-clear {
-    @apply flex size-6 items-center justify-center rounded-md text-primary-600 hover:bg-primary-100 focus-visible:outline-2 focus-visible:outline-primary-600 dark:text-primary-300 dark:hover:bg-primary-400/15;
-
-    & .fi-icon {
-        @apply size-4;
-    }
-}
-
-.fi-bulk-bar-select-all {
-    @apply flex h-8 shrink-0 items-center whitespace-nowrap rounded-lg px-2.5 text-sm font-medium text-primary-600 hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-primary-600 dark:text-primary-400 dark:hover:bg-white/5;
+    @apply size-4 text-gray-400 dark:text-gray-500;
 }
 
 .fi-bulk-bar-actions {

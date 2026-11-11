@@ -95,10 +95,11 @@ it('shows the bulk bar only while a record is selected, and the rows stay put', 
 
     $page->click('.fi-ta-record-checkbox')
         ->assertVisible('.fi-bulk-bar')
-        ->assertSeeIn('.fi-bulk-bar', '1 selected')
+        ->assertSeeIn('.fi-bulk-bar-count', '1')
+        ->assertSeeIn('.fi-bulk-bar-selection', 'Selected')
         ->assertMissing('.fi-ta-selection-indicator')
         ->assertScript($firstRowTop, $before)
-        ->click('.fi-bulk-bar-clear')
+        ->click('.fi-bulk-bar-selection')
         ->assertMissing('.fi-bulk-bar')
         ->assertNoJavaScriptErrors();
 });
