@@ -9,6 +9,7 @@ use App\Enums\CustomFieldType;
 use App\Enums\FilterFieldKind;
 use App\Enums\FilterKind;
 use App\Models\CustomField;
+use App\Models\CustomFieldOption;
 use App\Models\User;
 use App\Queries\Crm\StoredTagsQuery;
 use App\Queries\CustomFieldFilterSchema;
@@ -180,7 +181,7 @@ final readonly class FilterFieldCatalog
         $colored = self::showsOptionColors($field);
 
         return array_values($field->options
-            ->map(static fn ($option): array => ['id' => (string) $option->getKey(), 'label' => (string) $option->name, 'color' => $colored ? self::cssColor($option->settings->color) : null])
+            ->map(static fn (CustomFieldOption $option): array => ['id' => (string) $option->getKey(), 'label' => (string) $option->name, 'color' => $colored ? self::cssColor($option->settings->color) : null])
             ->all());
     }
 

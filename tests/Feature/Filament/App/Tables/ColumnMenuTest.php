@@ -832,17 +832,17 @@ it('stores an added attribute on the active saved view and leaves another view a
     ]))->all();
     $component = livewire(ListCompanies::class)->call('applySavedView', $viewA->getKey());
 
-    expect($viewA->refresh()->state->columns)->toHaveCount(count($stored));
+    expect($viewA->refresh()->state->columns)->toHaveSameSize($stored);
 
     $component->callAction('createTableAttribute', data: ['name' => 'Lead score', 'type' => 'text']);
 
     expect(array_column($viewA->refresh()->state->columns, 'name'))->toHaveCount(count($stored) + 1)
-        ->and($viewB->refresh()->state->columns)->toHaveCount(count($stored));
+        ->and($viewB->refresh()->state->columns)->toHaveSameSize($stored);
 
     $component->call('applySavedView', $viewB->getKey());
 
     expect($viewA->refresh()->state->columns)->toHaveCount(count($stored) + 1)
-        ->and($viewB->refresh()->state->columns)->toHaveCount(count($stored));
+        ->and($viewB->refresh()->state->columns)->toHaveSameSize($stored);
 });
 
 it('adds a select attribute with its three options', function (): void {
