@@ -64,14 +64,14 @@
         </div>
         <div class="fi-dropdown-list">
             <x-filament::dropdown.list.item
-                icon="lucide-pencil"
+                icon="lucide-tag"
                 data-column-menu-item="editLabel"
                 x-on:click="choose(() => $wire.mountAction('editTableColumnLabel', { column }), null)"
             >
                 {{ __('filament/panel.tables.column_menu.edit_label') }}
             </x-filament::dropdown.list.item>
             <x-filament::dropdown.list.item
-                icon="lucide-eye-off"
+                icon="lucide-circle-x"
                 data-column-menu-item="hide"
                 x-show="hideable"
                 x-on:click="refresh() && choose(() => $wire.hideTableColumn(column), neighbour)"

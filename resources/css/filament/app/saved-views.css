@@ -264,20 +264,33 @@
     @apply flex min-w-0 flex-1 items-center;
 }
 
-.fi-view-settings-lock {
-    @apply flex size-6 shrink-0 items-center justify-center text-gray-400 dark:text-gray-500;
-
-    & .fi-icon {
-        @apply size-4;
-    }
-}
-
 .fi-view-settings-row .fi-icon-btn {
     @apply m-0 size-6;
 
     & .fi-icon {
         @apply size-4!;
     }
+}
+
+.fi-view-settings-row-menu-trigger {
+    @apply opacity-0 focus-visible:opacity-100 aria-expanded:bg-gray-100 aria-expanded:opacity-100 dark:aria-expanded:bg-white/10;
+
+    .fi-view-settings-row:hover &,
+    .fi-view-settings-row:focus-within & {
+        @apply opacity-100;
+    }
+
+    @media (hover: none) {
+        @apply opacity-100;
+    }
+}
+
+.fi-dropdown-panel.fi-view-settings-row-menu {
+    @apply fixed z-60 w-56 transition-none;
+}
+
+.fi-view-settings-row-menu .fi-dropdown-list + .fi-dropdown-list {
+    @apply mt-1 border-t border-gray-100 pt-1 dark:border-white/10;
 }
 
 .fi-view-settings-add {

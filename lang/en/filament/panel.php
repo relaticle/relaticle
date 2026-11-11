@@ -34,7 +34,7 @@ return [
         'resize_column_hint' => 'Drag to resize. Double-click to fit.',
         'column_menu' => [
             'options' => 'Column options',
-            'edit_label' => 'Edit column label',
+            'edit_label' => 'Change attribute label',
             'label' => 'Label',
             'label_hint' => 'Only you see this name until you save it in a view you share. Leave it empty to use the original.',
             'save_label' => 'Save',
@@ -42,7 +42,7 @@ return [
             'move_right' => 'Move right',
             'pin' => 'Pin to left',
             'unpin' => 'Unpin',
-            'hide' => 'Hide column',
+            'hide' => 'Remove column',
         ],
         'filters' => [
             'sort' => 'Sort',
@@ -196,9 +196,8 @@ return [
             'reset_description' => 'Your column order, hidden columns, renamed columns, pins, sort and filters are cleared. Column widths stay.',
             'reset_confirm' => 'Reset table',
             'view_settings_panel' => 'View settings',
-            'hide_column' => 'Hide :column',
+            'column_options' => 'Options for :column',
             'show_column' => 'Show :column',
-            'title_column_locked' => 'The title column always shows',
             'pinned_column' => 'Pinned',
             'save_current' => 'Create new view',
             'create_heading' => 'Create view',

@@ -25,6 +25,7 @@
                     x-sortable-item="{{ $column['name'] }}"
                     data-column="{{ $column['name'] }}"
                     @if ($column['isPinned']) data-column-pinned @endif
+                    @if ($column['isLocked']) data-column-locked @endif
                     wire:key="view-settings.{{ $column['name'] }}"
                 >
                     @if ($column['isPinned'])
@@ -40,22 +41,18 @@
 
                     <span class="fi-view-settings-label">{{ $column['label'] }}</span>
 
-                    @if ($column['isLocked'])
-                        <span class="fi-view-settings-lock" title="{{ __('filament/panel.tables.views.title_column_locked') }}">
-                            <x-filament::icon icon="lucide-lock" />
-                            <span class="sr-only">{{ __('filament/panel.tables.views.title_column_locked') }}</span>
-                        </span>
-                    @else
-                        <x-filament::icon-button
-                            icon="lucide-eye"
-                            color="gray"
-                            size="sm"
-                            :label="__('filament/panel.tables.views.hide_column', ['column' => $column['text']])"
-                            tabindex="0"
-                            data-view-settings-toggle
-                            x-on:click="toggle($el.closest('[data-column]'))"
-                        />
-                    @endif
+                    <x-filament::icon-button
+                        icon="lucide-ellipsis-vertical"
+                        color="gray"
+                        size="sm"
+                        :label="__('filament/panel.tables.views.column_options', ['column' => $column['text']])"
+                        aria-haspopup="menu"
+                        x-bind:aria-expanded="(menu === {{ Js::from($column['name']) }}).toString()"
+                        data-view-settings-menu
+                        class="fi-view-settings-row-menu-trigger"
+                        x-on:click="openMenu($el)"
+                        x-on:dropdown-escape="menu !== null && ($event.preventDefault(), closeMenu(true))"
+                    />
                 </div>
             @endforeach
         </div>
@@ -111,5 +108,40 @@
                 </x-filament::dropdown.list.item>
             </div>
         @endif
+
+        <div
+            x-ref="rowMenu"
+            role="menu"
+            aria-label="{{ __('filament/panel.tables.column_menu.options') }}"
+            x-cloak
+            x-show="menu !== null"
+            x-bind:class="{ 'invisible': ! placed }"
+            x-bind:style="{ top: `${top}px`, left: `${left}px` }"
+            x-on:dropdown-escape.prevent="closeMenu(true)"
+            x-on:keydown.arrow-down.prevent="step(1)"
+            x-on:keydown.arrow-up.prevent="step(-1)"
+            x-on:focusout="focusLeft($event)"
+            x-on:click.outside="$event.target.closest('[data-view-settings-menu]') || closeMenu(false)"
+            class="fi-dropdown-panel fi-view-settings-row-menu"
+        >
+            <div class="fi-dropdown-list">
+                <x-filament::dropdown.list.item
+                    icon="lucide-tag"
+                    data-view-settings-menu-item="label"
+                    x-on:click="editLabel(); close()"
+                >
+                    {{ __('filament/panel.tables.column_menu.edit_label') }}
+                </x-filament::dropdown.list.item>
+            </div>
+            <div class="fi-dropdown-list" x-show="! locked">
+                <x-filament::dropdown.list.item
+                    icon="lucide-circle-x"
+                    data-view-settings-menu-item="remove"
+                    x-on:click="remove()"
+                >
+                    {{ __('filament/panel.tables.column_menu.hide') }}
+                </x-filament::dropdown.list.item>
+            </div>
+        </div>
     </div>
 </x-filament::dropdown>

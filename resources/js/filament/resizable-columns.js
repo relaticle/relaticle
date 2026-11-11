@@ -765,6 +765,12 @@
 
             return {
                 adding: false,
+                menu: null,
+                locked: false,
+                placed: false,
+                trigger: null,
+                top: 0,
+                left: 0,
 
                 init() {
                     panel = this.$el
@@ -779,18 +785,89 @@
                     this.$wire.moveTableColumn(event.item.dataset.column, event.item.nextElementSibling?.dataset.column ?? null)
                 },
 
-                async toggle(row) {
-                    const neighbour = row.nextElementSibling ?? row.previousElementSibling
+                openMenu(button) {
+                    const row = button.closest('[data-column]')
 
-                    await this.$wire.toggleTableColumn(row.dataset.column)
+                    if (this.menu === row.dataset.column) {
+                        this.closeMenu(true)
 
-                    this.$nextTick(() => (neighbour?.isConnected ? neighbour.querySelector('[data-view-settings-toggle]') : null)?.focus())
+                        return
+                    }
+
+                    this.trigger = button
+                    this.menu = row.dataset.column
+                    this.locked = row.hasAttribute('data-column-locked')
+                    this.placed = false
+
+                    // Measured after Alpine reveals it, so the menu never shows at a guessed place.
+                    this.$nextTick(() => {
+                        if (this.menu === null) return
+
+                        this.placeMenu(button.getBoundingClientRect())
+                        this.placed = true
+                        this.$nextTick(() => requestAnimationFrame(() => this.menuItems()[0]?.focus()))
+                    })
+                },
+
+                placeMenu(rect) {
+                    const menu = this.$refs.rowMenu
+                    const viewportWidth = document.documentElement.clientWidth
+                    const viewportHeight = document.documentElement.clientHeight
+                    const below = rect.bottom + 4
+                    const above = rect.top - 4 - menu.offsetHeight
+
+                    this.left = Math.max(8, Math.min(rect.left, viewportWidth - menu.offsetWidth - 8))
+                    this.top = below + menu.offsetHeight <= viewportHeight - 8 || above < 8 ? Math.min(below, Math.max(8, viewportHeight - menu.offsetHeight - 8)) : above
+                },
+
+                menuItems() {
+                    return [...this.$refs.rowMenu.querySelectorAll('[role="menuitem"]')].filter((item) => item.offsetParent !== null)
+                },
+
+                step(delta) {
+                    const items = this.menuItems()
+                    const index = items.indexOf(document.activeElement)
+
+                    items[(index + delta + items.length) % items.length]?.focus()
+                },
+
+                focusLeft(event) {
+                    const next = event.relatedTarget
+
+                    if (next && !this.$refs.rowMenu.contains(next) && next !== this.trigger) this.closeMenu(false)
+                },
+
+                closeMenu(returnFocus) {
+                    if (this.menu === null) return
+
+                    const trigger = this.trigger
+                    this.menu = null
+
+                    if (returnFocus) trigger?.focus()
+                },
+
+                editLabel() {
+                    const column = this.menu
+
+                    this.closeMenu(false)
+                    this.$wire.mountAction('editTableColumnLabel', { column })
+                },
+
+                async remove() {
+                    const column = this.menu
+                    const row = panel.querySelector(`[data-column="${CSS.escape(column)}"]`)
+                    const neighbour = row?.nextElementSibling ?? row?.previousElementSibling
+
+                    this.closeMenu(false)
+                    await this.$wire.hideTableColumn(column)
+
+                    this.$nextTick(() => (neighbour?.isConnected ? neighbour.querySelector('[data-view-settings-menu]') : null)?.focus())
                 },
 
                 async show(name) {
                     await this.$wire.toggleTableColumn(name)
 
-                    this.$nextTick(() => panel.querySelector('[data-view-settings-add]:not([aria-disabled="true"]), [data-view-settings-toggle]')?.focus())
+                    this.$nextTick(() => panel.querySelector('[data-view-settings-add]:not([aria-disabled="true"]), [data-view-settings-menu]')?.focus())
                 },
             }
         })

@@ -110,7 +110,7 @@ it('opens the column menu from a header click and never sorts', function (): voi
     $page->script(sprintf('document.querySelector(`%s .fi-ta-header-cell-sort-btn`).click()', columnHeader('created_at')));
 
     waitUntil($page, menuItemFocused())
-        ->assertScript(visibleMenuItems(), ['Move left', 'Move right', 'Pin to left', 'Edit column label', 'Hide column'])
+        ->assertScript(visibleMenuItems(), ['Move left', 'Move right', 'Pin to left', 'Change attribute label', 'Remove column'])
         ->wait(0.5)
         ->assertScript($tableSort.' === null', true)
         ->assertScript(sprintf('document.querySelector(`%s`).getAttribute("aria-sort")', columnHeader('created_at')), 'none')
@@ -332,6 +332,17 @@ function settingsRow(string $column, string $control = ''): string
     return trim(sprintf('.fi-view-settings-row[data-column="%s"] %s', $column, $control));
 }
 
+function settingsMenuItem(string $key): string
+{
+    return ".fi-view-settings-row-menu [data-view-settings-menu-item=\"{$key}\"]";
+}
+
+function removeFromSettings(AwaitableWebpage $page, string $column): AwaitableWebpage
+{
+    return $page->click(settingsRow($column, '[data-view-settings-menu]'))
+        ->click(settingsMenuItem('remove'));
+}
+
 function settingsOrder(): string
 {
     return '[...document.querySelectorAll(".fi-view-settings-row")].map((row) => row.dataset.column)';
@@ -354,7 +365,7 @@ it('keeps the view settings order in step with the headers', function (): void {
 it('hides a column from view settings and shows it again from add column', function (): void {
     $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
 
-    $page->click(settingsRow('accountOwner.name', '[data-view-settings-toggle]'))
+    removeFromSettings($page, 'accountOwner.name')
         ->assertMissing(columnHeader('accountOwner.name'))
         ->assertMissing(settingsRow('accountOwner.name'))
         ->assertVisible('.fi-view-settings-panel');
@@ -395,19 +406,19 @@ function sortedCompaniesTable(object $test): AwaitableWebpage
     $page = openViewSettings(companiesTable($test->user, $test->workspace->slug));
     $page->script('Livewire.all().find((component) => component.name.includes("ListCompanies")).$wire.sortTable("name", "asc")');
     waitUntil($page, '('.companiesTableSort().') === "name:asc"');
-    $page->click(settingsRow('accountOwner.name', '[data-view-settings-toggle]'))->assertMissing(columnHeader('accountOwner.name'));
+    removeFromSettings($page, 'accountOwner.name')->assertMissing(columnHeader('accountOwner.name'));
 
     return $page;
 }
 
-it('reaches every hide button from the keyboard and returns focus to the trigger on Escape', function (): void {
+it('reaches every row menu from the keyboard and returns focus to the trigger on Escape', function (): void {
     $page = companiesTable($this->user, $this->workspace->slug);
 
     $page->keys('.fi-view-settings-trigger', 'Enter')->assertVisible('.fi-view-settings-panel');
     $page->keys('.fi-view-settings-trigger', 'Tab');
 
     foreach (range(1, 20) as $attempt) {
-        if ($page->script('document.activeElement.matches("[data-view-settings-toggle]")') === true) {
+        if ($page->script('document.activeElement.matches("[data-view-settings-menu]") && !document.activeElement.closest("[data-column-locked]")') === true) {
             break;
         }
 
@@ -418,7 +429,23 @@ it('reaches every hide button from the keyboard and returns focus to the trigger
 
     expect($column)->toBeString();
 
-    $page->keys(':focus', 'Enter')->assertMissing(columnHeader($column));
+    $page->keys(':focus', 'Enter');
+    waitUntil($page, 'document.activeElement.matches(`[data-view-settings-menu-item="label"]`)')
+        ->assertVisible('.fi-view-settings-row-menu');
+
+    $page->keys(':focus', 'ArrowDown');
+    waitUntil($page, 'document.activeElement.matches(`[data-view-settings-menu-item="remove"]`)');
+
+    $page->keys(':focus', 'Escape');
+    waitUntil($page, sprintf('document.activeElement === document.querySelector(`%s`)', settingsRow($column, '[data-view-settings-menu]')))
+        ->assertMissing('.fi-view-settings-row-menu')
+        ->assertVisible('.fi-view-settings-panel')
+        ->assertPresent(columnHeader($column));
+
+    $page->keys(':focus', 'Enter');
+    waitUntil($page, 'document.activeElement.matches(`[data-view-settings-menu-item="label"]`)');
+    $page->keys(':focus', 'ArrowDown')->keys(':focus', 'Enter');
+    waitUntil($page, sprintf('document.querySelector(`%s`) === null', columnHeader($column)));
 
     $page->keys(':focus', 'Escape');
 
@@ -475,11 +502,69 @@ it('keeps the table as it was when the reset is cancelled', function (): void {
         ->assertNoJavaScriptErrors();
 });
 
-it('never hides the title column from view settings', function (): void {
+it('offers only a label change in the title column menu of view settings', function (): void {
     $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
 
-    $page->assertPresent(settingsRow('name', '.fi-view-settings-lock'))
-        ->assertMissing(settingsRow('name', '[data-view-settings-toggle]'))
+    $page->click(settingsRow('name', '[data-view-settings-menu]'));
+    waitUntil($page, 'document.querySelector(".fi-view-settings-row-menu").checkVisibility()')
+        ->assertScript('[...document.querySelectorAll(".fi-view-settings-row-menu [role=menuitem]")].filter((item) => item.offsetParent !== null).map((item) => item.textContent.trim())', ['Change attribute label'])
+        ->assertNoJavaScriptErrors();
+});
+
+it('draws every view settings row with an icon and a menu button and no eye button', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+
+    $page->assertScript('[...document.querySelectorAll(".fi-view-settings-row")].every((row) => row.querySelector(".fi-view-settings-label svg") && row.querySelector("[data-view-settings-menu]"))', true)
+        ->assertMissing('[data-view-settings-toggle]')
+        ->assertNoJavaScriptErrors();
+});
+
+it('opens the row menu beside its button, aligned to its start edge and inside the viewport', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+    $trigger = settingsRow('created_at', '[data-view-settings-menu]');
+
+    $page->click($trigger);
+    waitUntil($page, 'document.querySelector(".fi-view-settings-row-menu").checkVisibility() && getComputedStyle(document.querySelector(".fi-view-settings-row-menu")).visibility === "visible"')
+        ->assertScript('[...document.querySelectorAll(".fi-view-settings-row-menu [role=menuitem]")].filter((item) => item.offsetParent !== null).map((item) => item.textContent.trim())', ['Change attribute label', 'Remove column'])
+        ->assertScript(sprintf('(() => { const t = document.querySelector(`%s`).getBoundingClientRect(); const m = document.querySelector(".fi-view-settings-row-menu").getBoundingClientRect(); return Math.abs(m.left - t.left) <= 1 && m.top >= t.bottom && m.right <= document.documentElement.clientWidth && m.bottom <= document.documentElement.clientHeight; })()', $trigger), true)
+        ->assertScript(sprintf('document.querySelector(`%s`).getAttribute("aria-expanded")', $trigger), 'true')
+        ->assertNoJavaScriptErrors();
+});
+
+it('removes a column from its row menu and offers it again in add column', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+
+    removeFromSettings($page, 'accountOwner.name')
+        ->assertMissing(columnHeader('accountOwner.name'))
+        ->assertMissing(settingsRow('accountOwner.name'))
+        ->assertVisible('.fi-view-settings-panel');
+
+    $page->click('[data-view-settings-add]')
+        ->assertPresent('[aria-label="Show Account Owner"]')
+        ->assertNoJavaScriptErrors();
+});
+
+it('changes a column label from its row menu and shows it in the row and the header', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+
+    $page->click(settingsRow('created_at', '[data-view-settings-menu]'))
+        ->click(settingsMenuItem('label'))
+        ->assertVisible('.fi-modal-window input')
+        ->type('.fi-modal-window input', 'Added on')
+        ->click('.fi-modal-window button[type="submit"]');
+
+    waitUntil($page, sprintf('document.querySelector(`%s .fi-ta-header-cell-field`).textContent.trim() === "Added on"', columnHeader('created_at')))
+        ->assertScript(sprintf('document.querySelector(`%s .fi-view-settings-label`).textContent.trim()', settingsRow('created_at')), 'Added on')
+        ->assertNoJavaScriptErrors();
+});
+
+it('never starts a drag from the row menu button', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+    $order = $page->script(settingsOrder());
+
+    $page->drag(settingsRow($order[3], '[data-view-settings-menu]'), settingsRow($order[1], '.fi-view-settings-grip'));
+    $page->wait(1)->assertScript(settingsOrder(), $order)
+        ->assertScript(headerOrder(), $order)
         ->assertNoJavaScriptErrors();
 });
 
@@ -733,7 +818,7 @@ it('pins a column from its menu and keeps the pin after a reload', function (): 
 
     $page->script(openColumnMenu('created_at'));
     waitUntil($page, menuItemFocused())
-        ->assertScript(visibleMenuItems(), ['Unpin', 'Edit column label', 'Hide column'])
+        ->assertScript(visibleMenuItems(), ['Unpin', 'Change attribute label', 'Remove column'])
         ->assertNoJavaScriptErrors();
 });
 
@@ -742,7 +827,7 @@ it('pins the title column like any other and unpins a column from its lock', fun
         ->assertScript(headerOrder().'.slice(0, 2)', ['name', 'created_at']);
 
     $page->script(openColumnMenu('created_at'));
-    waitUntil($page, visibleMenuItems().'.join() === "Unpin,Edit column label,Hide column"');
+    waitUntil($page, visibleMenuItems().'.join() === "Unpin,Change attribute label,Remove column"');
     $page->click(columnMenuItem('unpin'));
     waitUntil($page, sprintf('document.querySelector(`%s`).dataset.columnPinned === "0"', columnHeader('created_at')))
         ->assertScript(sprintf('document.querySelector(`%s`).dataset.columnPinned', columnHeader('name')), '1')

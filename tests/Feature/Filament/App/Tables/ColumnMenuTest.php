@@ -627,7 +627,30 @@ it('shows a renamed column with its new label in view settings', function (): vo
 
     $component->callAction('editTableColumnLabel', data: ['label' => 'Owner of record'], arguments: ['column' => $column]);
 
-    expect($component->html())->toContain('aria-label="Hide Owner of record"');
+    expect($component->html())->toContain('aria-label="Options for Owner of record"');
+});
+
+it('draws every view settings row with its icon and a menu button and no eye button', function (string $page, CrmEntity $entity): void {
+    Filament::bootCurrentPanel();
+    $rows = new Crawler(livewire($page)->html())->filter('[data-view-settings] .fi-view-settings-row');
+
+    expect($rows->count())->toBeGreaterThan(1);
+
+    $rows->each(function (Crawler $row) use ($entity): void {
+        expect($row->filter('.fi-view-settings-label .fi-icon')->count())->toBe(1)
+            ->and($row->filter('[data-view-settings-menu]')->count())->toBe(1)
+            ->and($row->filter('[data-view-settings-toggle]')->count())->toBe(0)
+            ->and($row->attr('data-column') !== $entity->titleColumn() || $row->attr('data-column-locked') !== null)->toBeTrue();
+    });
+})->with('column menu pages');
+
+it('words the row menu and the header menu from the same keys', function (): void {
+    Filament::bootCurrentPanel();
+    $html = livewire(ListCompanies::class)->html();
+
+    expect(substr_count($html, 'Change attribute label'))->toBe(2)
+        ->and(substr_count($html, 'Remove column'))->toBe(2)
+        ->and($html)->not->toContain('Edit column label')->not->toContain('Hide column');
 });
 
 it('escapes markup in a column label in view settings', function (): void {
