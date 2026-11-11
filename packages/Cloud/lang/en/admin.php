@@ -22,13 +22,13 @@ return [
         'pending' => 'Not mature',
         'funnel_help' => 'First value keeps the existing own-record definition and calendar-day window. Its denominator includes only signups with all seven follow-up days complete. Other columns count acquired owners or their first workspace. Paid requires a positive subscription invoice, not a checkout return or plan change.',
         'adoption' => 'What those first workspaces use',
-        'adoption_help' => 'Workspace counts from retained operational data, not immutable history. Rela means a typed message, not a successful answer. Connected includes error states; healthy sync requires an active mailbox, saved cursor, sync timestamp and no reported error. Imports require rows created or updated; partial imports also contain failed rows. MCP counts audited record changes, not calls or reads. Deletion and audit retention can change these counts.',
+        'adoption_help' => 'Workspace counts from retained operational data, not immutable history. Rela means a typed message, not a successful answer. Connected includes error states; healthy sync requires an active mailbox, saved cursor, sync timestamp and no reported error. Imports require rows created or updated; partial imports also contain failed rows. MCP record changes counts audited writes, not calls or reads. MCP connected counts workspaces per client that ever authorized over OAuth, including readers and revoked connectors. A personal access token carries no client name, so it is not counted. Deletion and audit retention can change these counts.',
         'columns' => [
             'source' => 'Source', 'campaign' => 'Campaign', 'landing' => 'Landing', 'signups' => 'Real signups',
             'workspaces' => 'Workspace created', 'setup' => 'Setup complete', 'first_value' => 'First value / mature',
             'trial' => 'Trial started', 'checkout' => 'Checkout created', 'paid' => 'Paid to date', 'renewal_failed' => 'Renewal failed',
             'chat' => 'Typed to Rela', 'mailbox' => 'Connected mailbox', 'healthy_sync' => 'Healthy sync now',
-            'import' => 'Imported rows', 'partial_import' => 'Partial import', 'mcp' => 'MCP record changes',
+            'import' => 'Imported rows', 'partial_import' => 'Partial import', 'mcp' => 'MCP record changes', 'mcp_clients' => 'MCP connected',
         ],
     ],
     'subscriptions' => [

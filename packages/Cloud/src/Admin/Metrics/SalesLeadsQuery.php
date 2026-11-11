@@ -39,6 +39,7 @@ final readonly class SalesLeadsQuery
             ->selectSub(self::activity()->selectRaw('count(distinct activity.day)')->where('activity.kind', 'message'), 'chat_days')
             ->selectSub(self::activity()->selectRaw('max(activity.day)'), 'last_active')
             ->selectSub(self::activity()->selectRaw("string_agg(distinct activity.source, ',')")->where('activity.kind', 'record'), 'sources')
+            ->selectSub(DB::query()->fromSub(McpConnectors::query(), 'mcp')->selectRaw("string_agg(mcp.client, ', ' order by mcp.client)")->whereColumn('mcp.workspace_id', 'workspaces.id'), 'mcp_clients')
             ->selectSub(DB::table('ai_credit_balances')->select('credits_used')->whereColumn('ai_credit_balances.workspace_id', 'workspaces.id')->limit(1), 'credits_used')
             ->withCount('users')
             ->with(['owner', 'subscriptions']);

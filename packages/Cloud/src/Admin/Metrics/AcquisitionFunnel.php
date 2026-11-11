@@ -23,7 +23,7 @@ final readonly class AcquisitionFunnel
     /**
      * @return list<array{source: string, campaign: ?string, landing: string, signups: int, eligible: int, first_value: int,
      *     workspaces: int, setup: int, trial: int, checkout: int, paid: int, renewal_failed: int,
-     *     chat: int, mailbox: int, healthy_sync: int, import: int, partial_import: int, mcp: int}>
+     *     chat: int, mailbox: int, healthy_sync: int, import: int, partial_import: int, mcp: int, mcp_clients: array<string, int>}>
      */
     public static function rows(): array
     {
@@ -39,11 +39,13 @@ final readonly class AcquisitionFunnel
             ->withGlobalScope(ReachedFirstValue::class, new ReachedFirstValue)
             ->whereKey($acquisitions->modelKeys())
             ->pluck('id')->all();
-        $facts = self::workspaceFacts($acquisitions->map(fn (Acquisition $acquisition): ?string => $acquisition->workspace_id)->filter()->all());
+        $workspaceIds = $acquisitions->map(fn (Acquisition $acquisition): ?string => $acquisition->workspace_id)->filter()->all();
+        $facts = self::workspaceFacts($workspaceIds);
+        $mcpClients = McpConnectors::workspacesByClient($workspaceIds);
 
         return array_values($acquisitions
             ->groupBy(fn (Acquisition $acquisition): string => "{$acquisition->source}/{$acquisition->campaign}/{$acquisition->landing}")
-            ->map(function (Collection $group) use ($firstValue, $facts): array {
+            ->map(function (Collection $group) use ($firstValue, $facts, $mcpClients): array {
                 $eligible = $group->filter(fn (Acquisition $acquisition): bool => $acquisition->user?->created_at?->toDateString() < now()->subDays(7)->toDateString());
                 $first = $group->first();
                 $row = [
@@ -58,13 +60,34 @@ final readonly class AcquisitionFunnel
                     'renewal_failed' => $group->whereNotNull('first_renewal_failed_at')->count(),
                 ];
 
-                return $row + array_map(
-                    fn (array $ids): int => $group->filter(fn (Acquisition $acquisition): bool => in_array($acquisition->workspace_id, $ids, true))->count(),
-                    $facts,
-                );
+                return $row
+                    + array_map(fn (array $ids): int => self::countIn($group, $ids), $facts)
+                    + ['mcp_clients' => self::clientCounts($group, $mcpClients)];
             })
             ->sortBy([['signups', 'desc'], ['source', 'asc'], ['campaign', 'asc'], ['landing', 'asc']])
             ->all());
+    }
+
+    /** @param Collection<int, Acquisition> $group
+     * @param  array<int, string>  $ids
+     */
+    private static function countIn(Collection $group, array $ids): int
+    {
+        return $group->filter(fn (Acquisition $acquisition): bool => in_array($acquisition->workspace_id, $ids, true))->count();
+    }
+
+    /** @param Collection<int, Acquisition> $group
+     * @param  array<string, array<int, string>>  $workspacesByClient
+     * @return array<string, int>
+     */
+    private static function clientCounts(Collection $group, array $workspacesByClient): array
+    {
+        return collect($workspacesByClient)
+            ->map(fn (array $ids): int => self::countIn($group, $ids))
+            ->filter()
+            ->sortKeys()
+            ->sortDesc()
+            ->all();
     }
 
     /** @param array<int, string> $ids

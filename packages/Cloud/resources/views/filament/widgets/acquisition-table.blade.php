@@ -38,7 +38,7 @@
                     <caption class="mb-3 text-left font-medium">{{ __('cloud::admin.acquisition.adoption') }}</caption>
                     <thead>
                         <tr class="text-left text-gray-500 dark:text-gray-400">
-                            @foreach(['source', 'campaign', 'landing', 'chat', ...($emailEnabled ? ['mailbox', 'healthy_sync'] : []), 'import', 'partial_import', 'mcp'] as $column)
+                            @foreach(['source', 'campaign', 'landing', 'chat', ...($emailEnabled ? ['mailbox', 'healthy_sync'] : []), 'import', 'partial_import', 'mcp', 'mcp_clients'] as $column)
                                 <th scope="col" class="px-3 py-2 whitespace-nowrap">{{ __('cloud::admin.acquisition.columns.'.$column) }}</th>
                             @endforeach
                         </tr>
@@ -52,6 +52,7 @@
                                 @foreach(['chat', ...($emailEnabled ? ['mailbox', 'healthy_sync'] : []), 'import', 'partial_import', 'mcp'] as $column)
                                     <td class="px-3 py-2 text-center">{{ $row[$column] }}</td>
                                 @endforeach
+                                <td class="px-3 py-2 text-center whitespace-nowrap">{{ collect($row['mcp_clients'])->map(fn (int $count, string $client): string => "{$client} {$count}")->implode(', ') ?: 0 }}</td>
                             </tr>
                         @endforeach
                     </tbody>

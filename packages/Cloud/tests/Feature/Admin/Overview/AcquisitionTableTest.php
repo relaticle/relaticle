@@ -99,6 +99,7 @@ it('separates stored conversion outcomes from retained product adoption', functi
         'eligible' => 0, 'first_value' => 0, 'workspaces' => 3, 'setup' => 1,
         'trial' => 1, 'checkout' => 1, 'paid' => 1, 'renewal_failed' => 1,
         'chat' => 1, 'mcp' => 1, 'import' => 1, 'partial_import' => 1, 'mailbox' => 2, 'healthy_sync' => 1,
+        'mcp_clients' => [],
     ])->assertSee('Not mature');
 });
 
@@ -112,4 +113,28 @@ it('keeps unknown sources and distinct campaign landing groups visible', functio
             && array_column($rows, 'signups') === [1, 1, 1]
             && array_column($rows, 'landing') === ['home', 'pricing', 'pricing'])
         ->assertSee('Unknown')->assertSee('autumn-launch');
+});
+
+it('counts workspaces per connected MCP client, readers included', function (): void {
+    $both = OverviewData::owner();
+    $claude = OverviewData::owner();
+    $unconnected = OverviewData::owner();
+    $outsider = OverviewData::owner();
+
+    foreach ([$both, $claude, $unconnected] as $user) {
+        captureOverviewAcquisition($user);
+    }
+
+    OverviewData::mcpConnector(OverviewData::workspaceOf($both), $both, 'Claude');
+    OverviewData::mcpConnector(OverviewData::workspaceOf($both), $both, 'Claude');
+    OverviewData::mcpConnector(OverviewData::workspaceOf($both), $both, 'ChatGPT');
+    OverviewData::mcpConnector(OverviewData::workspaceOf($claude), $claude, 'Claude Code (acme-crm)');
+    OverviewData::mcpConnector(OverviewData::workspaceOf($claude), $claude, 'Claude');
+    OverviewData::mcpConnector(OverviewData::workspaceOf($outsider), $outsider, 'Codex');
+
+    livewire(AcquisitionTable::class)->assertOk()
+        ->assertViewHas('rows', fn (array $rows): bool => count($rows) === 1
+            && $rows[0]['mcp'] === 0
+            && $rows[0]['mcp_clients'] === ['Claude' => 2, 'ChatGPT' => 1, 'Claude Code' => 1])
+        ->assertSee('Claude 2, ChatGPT 1, Claude Code 1');
 });
