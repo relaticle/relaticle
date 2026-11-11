@@ -146,6 +146,19 @@ it('names the company, person and opportunity linked to each digest task, skippi
         ->and($overdue['unlinked']->records)->toBe([]);
 });
 
+it('never names a linked record from another workspace', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $otherWorkspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+
+    $task = Task::factory()->for($workspace)->create(['title' => 'linked']);
+    $task->assignees()->attach($user);
+    digestSetDue($task, digestDueField($workspace->id), now()->subDay());
+    $task->companies()->attach(Company::factory()->for($otherWorkspace)->create(['name' => 'Other Tenant Inc']));
+
+    expect(resolve(DigestService::class)->forWorkspace($user, $workspace)->overdue[0]->records)->toBe([]);
+});
+
 it('carries each digest task priority and its option color', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;

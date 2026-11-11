@@ -86,6 +86,7 @@ it('shows priority with the board badge colors and one linked record plus a coun
     $mail->assertSeeInHtml('+2');
     $mail->assertSeeInText('Call client: https://app.test/tasks?b (Odd, Due Today, International Business M...)');
     $mail->assertDontSeeInHtml('not-a-color');
+    expect(substr_count($mail->render(), 'class="task-chip-dot"'))->toBe(1);
     $mail->assertSeeInHtml(asset('brand/email-icons/building.png'));
     $mail->assertSeeInHtml(asset('brand/email-icons/calendar.png'));
 });
@@ -109,15 +110,16 @@ it('caps the preheader at three task titles', function (): void {
     (new TaskDigestMail($user, digestWorkspace($user), $digest))->assertSeeInHtml('One, Two, Three and 2 more');
 });
 
-it('renders a workspace name as text, never as markdown', function (): void {
+it('renders a workspace name as text, never as markdown or html', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
-    $workspace = digestWorkspace($user, '[Verify your account](https://phish.example) *now*');
+    $workspace = digestWorkspace($user, '[Verify your account](https://phish.example) *now* <a href="https://phish.test">here</a>');
 
     $html = (new TaskDigestMail($user, $workspace, new TaskDigest([], [new DigestTaskItem('Send proposal', now(), 'https://app.test/tasks?b')])))->render();
 
     expect($html)->not->toContain('href="https://phish.example"')
+        ->and($html)->not->toContain('<a href="https://phish.test"')
         ->and($html)->not->toContain('<em')
-        ->and($html)->toContain('[Verify your account](https://phish.example) *now*');
+        ->and($html)->toContain('[Verify your account](https://phish.example) *now* &lt;a href="https://phish.test"&gt;here&lt;/a&gt;');
 });
 
 it('never leaks a lang key into the rendered digest', function (): void {
