@@ -891,7 +891,7 @@
                 },
 
                 focusAddStart() {
-                    // A phone keyboard would cover the list and iOS would zoom, so focus stays on the back arrow.
+                    // On a touch screen a keyboard would cover the list after every pick, so focus stays on the back arrow.
                     const compact = window.matchMedia('(width < 40rem), (pointer: coarse)').matches
 
                     ;(compact ? panel.querySelector('[data-view-settings-back]') : this.searchInput()).focus()
@@ -941,6 +941,8 @@
                 },
 
                 pickFirst() {
+                    if (this.pending.length > 0) return
+
                     const first = this.addItems()[0]
 
                     if (first) this.show(first.dataset.attribute)

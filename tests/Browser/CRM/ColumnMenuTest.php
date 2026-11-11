@@ -1622,6 +1622,25 @@ it('picks a column once however fast the member presses Enter', function (): voi
         ->assertNoJavaScriptErrors();
 });
 
+it('ignores a second Enter while the first pick is still landing', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+
+    hideColumns($page, ['accountOwner.name', 'created_at']);
+    openAddPanel($page);
+    waitUntil($page, addItems().'.length >= 2');
+    $count = $page->script(addItems().'.length');
+    $first = $page->script(addItems().'[0]');
+    $second = $page->script(addItems().'[1]');
+
+    $page->script('(async () => { const input = document.querySelector("[data-view-settings-search]"); for (let i = 0; i < 2; i++) { input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })); await new Promise((resolve) => setTimeout(resolve, 15)); } })()');
+
+    waitUntil($page, sprintf('document.querySelector(`%s`) !== null', columnHeader($first)));
+    $page->wait(1.5)
+        ->assertNotPresent(columnHeader($second))
+        ->assertScript(addItems().'.length', $count - 1)
+        ->assertNoJavaScriptErrors();
+});
+
 it('leaves the search unfocused on a phone, at 16px, and after a pick', function (): void {
     $page = companiesTable($this->user, $this->workspace->slug)->resize(390, 700)->wait(0.5);
 
