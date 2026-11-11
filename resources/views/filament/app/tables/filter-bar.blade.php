@@ -181,7 +181,7 @@
                     </button>
 
                     <template x-if="isOpen(chip.id, 'cond')">
-                    <div class="fi-filter-pop" x-anchor.bottom-start.offset.6.fixed="$el.closest('.fi-filter-chip')" data-pop data-sheet x-bind:data-open="isOpen(chip.id, 'cond')" role="listbox" x-bind:aria-label="@js(__('filament/panel.tables.filters.conditions_for')).replace(':chip', fieldOf(chip).label)" x-on:keydown="navigate($event)">
+                    <div class="fi-filter-pop" x-anchor.bottom-start.offset.6.fixed="$el.parentElement" data-pop data-sheet x-bind:data-open="isOpen(chip.id, 'cond')" role="listbox" x-bind:aria-label="@js(__('filament/panel.tables.filters.conditions_for')).replace(':chip', fieldOf(chip).label)" x-on:keydown="navigate($event)">
                         <template x-for="condition in fieldOf(chip)?.conditions ?? []" x-bind:key="condition.value">
                             <button
                                 type="button"
@@ -240,7 +240,7 @@
 
 
                         <template x-if="isOpen(chip.id, 'val')">
-                        <div class="fi-filter-pop" x-anchor.bottom-start.offset.6.fixed="$el.closest('.fi-filter-chip')" data-pop data-sheet x-bind:data-open="isOpen(chip.id, 'val')" role="dialog" x-bind:aria-label="@js(__('filament/panel.tables.filters.value_for')).replace(':chip', label(chip))" x-on:keydown="navigate($event)">
+                        <div class="fi-filter-pop" x-anchor.bottom-start.offset.6.fixed="$el.parentElement" data-pop data-sheet x-bind:data-open="isOpen(chip.id, 'val')" role="dialog" x-bind:aria-label="@js(__('filament/panel.tables.filters.value_for')).replace(':chip', label(chip))" x-on:keydown="navigate($event)">
                             <template x-if="isListEditor(chip)">
                                 <div class="fi-filter-checklist">
                                     <template x-if="showSearch(chip)">
@@ -395,7 +395,7 @@
                     </button>
 
                     <template x-if="isOpen(chip.id, 'more')">
-                    <div class="fi-filter-pop" x-anchor.bottom-end.offset.6.fixed="$el.closest('.fi-filter-chip')" data-pop data-sheet x-bind:data-open="isOpen(chip.id, 'more')" role="menu" x-bind:aria-label="@js(__('filament/panel.tables.filters.menu_for')).replace(':chip', label(chip))" x-on:keydown="navigate($event)">
+                    <div class="fi-filter-pop" x-anchor.bottom-end.offset.6.fixed="$el.parentElement" data-pop data-sheet x-bind:data-open="isOpen(chip.id, 'more')" role="menu" x-bind:aria-label="@js(__('filament/panel.tables.filters.menu_for')).replace(':chip', label(chip))" x-on:keydown="navigate($event)">
                         <button type="button" tabindex="0" role="menuitem" class="fi-filter-item fi-danger" data-pop-item data-filter-remove x-on:click="remove(chip)">
                             <x-filament::icon icon="lucide-trash-2" />
                             {{ __('filament/panel.tables.filters.remove') }}
@@ -430,7 +430,7 @@
                     </button>
 
                     <template x-if="isOpen('deleted', 'val')">
-                    <div class="fi-filter-pop" x-anchor.bottom-start.offset.6.fixed="$el.closest('.fi-filter-chip')" data-pop data-sheet x-bind:data-open="isOpen('deleted', 'val')" role="menu" aria-label="{{ __('filament/panel.tables.filters.deleted_records') }}" x-on:keydown="navigate($event)">
+                    <div class="fi-filter-pop" x-anchor.bottom-start.offset.6.fixed="$el.parentElement" data-pop data-sheet x-bind:data-open="isOpen('deleted', 'val')" role="menu" aria-label="{{ __('filament/panel.tables.filters.deleted_records') }}" x-on:keydown="navigate($event)">
                         <button type="button" tabindex="0" role="menuitemradio" class="fi-filter-item" data-pop-item data-deleted-mode="included" x-bind:class="{ 'fi-on': deleted === 'included' }" x-bind:aria-checked="(deleted === 'included').toString()" x-on:click="setDeleted('included')">
                             <span>{{ __('filament/panel.tables.filters.deleted_included') }}</span>
                             <x-filament::icon icon="lucide-check" class="fi-filter-tick" x-show="deleted === 'included'" />

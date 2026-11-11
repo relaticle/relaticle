@@ -1055,3 +1055,43 @@ it('shows the marks of the picked members and companies in the chips after a rel
         ->assertScript('(() => { const chip = document.querySelector("[data-filter-chip][data-field=creator]"); return chip.getBoundingClientRect().height <= 30 && chip.textContent.includes("(me)"); })()', true)
         ->assertNoJavaScriptErrors();
 });
+
+it('anchors the condition, value and more popovers to the segment that opened them', function (string $segment, string $edge): void {
+    $page = ($this->open)();
+    $page->script("Livewire.all().find((component) => component.name.includes('ListCompanies')).\$wire.\$call('setFilterRules', [{ field: 'name', condition: 'contains', value: 'a rather long value to widen the chip' }])");
+    $page->assertScript(filterBarWaitFor('document.querySelectorAll("[data-filter-chip]").length === 1'), true);
+    $page->script("document.querySelector('[data-filter-chip] {$segment}').click()");
+
+    $aligned = <<<JS
+        (() => {
+            const pop = document.querySelector('[data-pop][data-open=true]');
+            const trigger = document.querySelector('[data-filter-chip] {$segment}');
+
+            if (!pop?.checkVisibility()) {
+                return false;
+            }
+
+            const box = pop.getBoundingClientRect();
+            const anchor = trigger.getBoundingClientRect();
+
+            return Math.abs(box.{$edge} - anchor.{$edge}) <= 1 && Math.abs(box.top - anchor.bottom - 6) <= 1;
+        })()
+    JS;
+
+    $page->assertScript(filterBarWaitFor($aligned), true)->assertNoJavaScriptErrors();
+})->with([
+    'condition' => ['[data-filter-segment="condition"]', 'left'],
+    'value' => ['[data-filter-segment="value"]', 'left'],
+    'more' => ['[data-filter-more]', 'right'],
+]);
+
+it('shifts a value popover left instead of clipping it at the right edge', function (): void {
+    $page = ($this->open)(1100);
+    setRules($page, 8);
+    $page->assertScript('document.querySelectorAll("[data-filter-chip]").length === 8', true)
+        ->script('(() => { const strip = document.querySelector(".fi-filter-bar-start"); strip.scrollLeft = 99999; document.querySelectorAll("[data-filter-chip] [data-filter-segment=value]")[7].click(); })()');
+
+    $inside = 'document.querySelector("[data-pop][data-open=true]")?.checkVisibility() && document.querySelector("[data-pop][data-open=true]").getBoundingClientRect().right <= window.innerWidth && document.querySelector("[data-pop][data-open=true]").getBoundingClientRect().left >= 0';
+
+    $page->assertScript(filterBarWaitFor($inside), true)->assertNoJavaScriptErrors();
+});

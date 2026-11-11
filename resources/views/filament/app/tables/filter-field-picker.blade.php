@@ -1,4 +1,4 @@
-<div class="fi-filter-pop fi-filter-pop-picker" x-anchor.bottom-start.offset.6.fixed="$el.closest('.fi-filter-chip') ?? $el.parentElement" data-pop data-sheet x-bind:data-open="isOpen({{ $id }}, 'field')" x-on:keydown="navigate($event)">
+<div class="fi-filter-pop fi-filter-pop-picker" x-anchor.bottom-start.offset.6.fixed="$el.parentElement" data-pop data-sheet x-bind:data-open="isOpen({{ $id }}, 'field')" x-on:keydown="navigate($event)">
     <label class="fi-filter-find">
         <x-filament::icon icon="lucide-search" />
         <input
