@@ -12,7 +12,6 @@ use App\Queries\Operand;
 use App\Support\LikePattern;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Spatie\MediaLibrary\HasMedia;
 
 final readonly class LinkOptionsQuery
 {
@@ -56,11 +55,10 @@ final readonly class LinkOptionsQuery
      */
     private function labelled(Builder $query, string $column, string $term, ?CrmEntity $entity = null): array
     {
-        $options = $query
+        $options = LinkOption::selecting($query, $column)
             ->when($term !== '', fn (Builder $q): Builder => $q->where($column, 'ilike', '%'.LikePattern::escape($term).'%'))
             ->orderBy($column)
             ->orderBy($query->getModel()->getKeyName())
-            ->when($query->getModel() instanceof HasMedia, fn (Builder $q): Builder => $q->with('media'))
             ->limit(self::LIMIT)
             ->get()
             ->map(static fn (Model $record): array => LinkOption::forRecord($record, (string) $record->getAttribute($column), $entity)->toArray())

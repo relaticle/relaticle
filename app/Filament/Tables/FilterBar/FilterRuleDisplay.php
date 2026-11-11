@@ -12,12 +12,10 @@ use App\Enums\PeriodUnit;
 use App\Models\CustomField;
 use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Number;
-use Spatie\MediaLibrary\HasMedia;
 use Throwable;
 
 final readonly class FilterRuleDisplay
@@ -37,10 +35,11 @@ final readonly class FilterRuleDisplay
     {
         $names = self::names($rules, $catalog, $user);
 
-        return array_map(function (array $rule) use ($catalog, $names): array {
+        return array_map(function (array $rule) use ($catalog, $names, $user): array {
             $field = $catalog[$rule['field']];
             $known = $names[$field->key] ?? [];
-            $ids = $field->kind->holdsRecordIds() && is_array($rule['value'] ?? null) ? $rule['value'] : [];
+            $rule['value'] = self::withViewerOnce($rule['value'] ?? null, $field, $user);
+            $ids = $field->kind->holdsRecordIds() && is_array($rule['value']) ? $rule['value'] : [];
 
             return [
                 'display' => self::one($rule, $field, $known),
@@ -50,6 +49,15 @@ final readonly class FilterRuleDisplay
                 )),
             ];
         }, $rules);
+    }
+
+    private static function withViewerOnce(mixed $value, FilterField $field, User $user): mixed
+    {
+        if ($field->kind !== FilterFieldKind::Member || ! is_array($value) || ! in_array(self::ME, $value, true)) {
+            return $value;
+        }
+
+        return array_values(array_filter($value, fn (mixed $id): bool => (string) $id !== (string) $user->getKey()));
     }
 
     /**
@@ -177,18 +185,24 @@ final readonly class FilterRuleDisplay
         foreach ($rules as $rule) {
             $field = $catalog[$rule['field']];
 
-            if ($field->kind === FilterFieldKind::Member && is_array($rule['value'] ?? null) && in_array(self::ME, $rule['value'], true)) {
-                $names[$field->key][self::ME] = self::viewer($user);
+            if ($field->kind !== FilterFieldKind::Member || ! is_array($rule['value'] ?? null)) {
+                continue;
+            }
+
+            foreach ([self::ME, (string) $user->getKey()] as $id) {
+                if (in_array($id, array_map(strval(...), $rule['value']), true)) {
+                    $names[$field->key][$id] = self::viewer($user, $id);
+                }
             }
         }
 
         return $names;
     }
 
-    public static function viewer(User $user): LinkOption
+    public static function viewer(User $user, string $id = self::ME): LinkOption
     {
         return new LinkOption(
-            id: self::ME,
+            id: $id,
             label: __('filament/panel.tables.filters.me_named', ['name' => $user->name]),
             image: $user->getFilamentAvatarUrl(),
         );
@@ -203,7 +217,7 @@ final readonly class FilterRuleDisplay
         $workspace = $user->currentWorkspace;
 
         if ($field->kind === FilterFieldKind::Member) {
-            return User::query()->memberOf($workspace)->whereKey($ids)->get()
+            return LinkOption::selecting(User::query()->memberOf($workspace)->whereKey($ids), 'name')->get()
                 ->mapWithKeys(fn (User $member): array => [(string) $member->getKey() => LinkOption::forRecord($member, $member->name)])
                 ->all();
         }
@@ -218,12 +232,13 @@ final readonly class FilterRuleDisplay
         $softDeletes = in_array(SoftDeletes::class, class_uses_recursive($model), true);
         $names = [];
 
-        $records = $model::query()
-            ->withoutGlobalScopes([WorkspaceScope::class, SoftDeletingScope::class])
-            ->whereBelongsTo($workspace)
-            ->whereKey($ids)
-            ->when(is_subclass_of($model, HasMedia::class), fn (Builder $query): Builder => $query->with('media'))
-            ->get();
+        $records = LinkOption::selecting(
+            $model::query()
+                ->withoutGlobalScopes([WorkspaceScope::class, SoftDeletingScope::class])
+                ->whereBelongsTo($workspace)
+                ->whereKey($ids),
+            $column,
+        )->get();
 
         foreach ($records as $record) {
             $name = (string) $record->getAttribute($column);

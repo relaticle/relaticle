@@ -75,7 +75,7 @@ trait HasFilterBar
     }
 
     /**
-     * @return array{view: ?string, fields: list<array{key: string, label: string, icon: string, kind: string, limit: ?int, options: list<array{id: string, label: string, color: ?string, image?: ?string, icon?: ?string, circular?: bool}>, conditions: list<array{value: string, label: string, takesValue: bool, shape: string}>}>, rules: list<array<string, mixed>>, deleted: ?string, deletable: bool, sort: ?array{column: string, direction: string, label: string}, sortable: list<array{key: string, label: string, icon: string}>, groups: list<array{id: string, label: string, icon: ?string}>, grouping: ?array{id: string, direction: string, label: string}, periodUnits: list<array{value: string, label: string, singular: string, max: int}>}
+     * @return array{view: ?string, viewerId: ?string, fields: list<array{key: string, label: string, icon: string, kind: string, limit: ?int, options: list<array{id: string, label: string, color: ?string, image?: ?string, icon?: ?string, circular?: bool}>, conditions: list<array{value: string, label: string, takesValue: bool, shape: string}>}>, rules: list<array<string, mixed>>, deleted: ?string, deletable: bool, sort: ?array{column: string, direction: string, label: string}, sortable: list<array{key: string, label: string, icon: string}>, groups: list<array{id: string, label: string, icon: ?string}>, grouping: ?array{id: string, direction: string, label: string}, periodUnits: list<array{value: string, label: string, singular: string, max: int}>}
      */
     #[Unexposed]
     public function getFilterBarData(): array
@@ -84,7 +84,7 @@ trait HasFilterBar
         $catalog = $this->filterFieldCatalog();
 
         if (! $user instanceof User || $catalog === []) {
-            return ['view' => null, 'fields' => [], 'rules' => [], 'deleted' => null, 'deletable' => false, ...$this->filterBarOrdering($catalog), 'periodUnits' => []];
+            return ['view' => null, 'viewerId' => null, 'fields' => [], 'rules' => [], 'deleted' => null, 'deletable' => false, ...$this->filterBarOrdering($catalog), 'periodUnits' => []];
         }
 
         $state = $this->canonicalTableFilters($this->tableFilters);
@@ -93,6 +93,7 @@ trait HasFilterBar
 
         return [
             'view' => $this->activeSavedViewId === null ? null : (string) $this->activeSavedViewId,
+            'viewerId' => (string) $user->getKey(),
             'fields' => array_values(array_map(fn (FilterField $field): array => [
                 'key' => $field->key,
                 'label' => $field->label,
