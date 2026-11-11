@@ -39,4 +39,4 @@ it('keeps the list header actions inside the page padding on a phone', function 
         ->navigate("/app/{$workspace->slug}/{$page}")
         ->assertScript($actionsFit, true)
         ->assertNoJavaScriptErrors();
-})->with(['opportunities', 'notes']);
+})->with(['opportunities', 'notes?view=cards']);

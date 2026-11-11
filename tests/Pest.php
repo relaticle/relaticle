@@ -20,6 +20,7 @@ use App\Enums\WorkspaceSetupStep;
 use App\Features\Billing;
 use App\Filament\Pages\CreateWorkspace;
 use App\Filament\Pages\SetupWorkspace;
+use App\Filament\Resources\NoteResource\Pages\NotesCards;
 use App\Models\Notification as NotificationRow;
 use App\Models\SavedView;
 use App\Models\TablePreference;
@@ -132,6 +133,11 @@ function livewire(string $component, array $params = []): Testable
 function openList(string $page): Testable
 {
     return Livewire::withQueryParams(['view' => SavedView::BUILT_IN_LIST_LINK])->test($page);
+}
+
+function openCards(): Testable
+{
+    return Livewire::withQueryParams(['view' => 'cards'])->test(NotesCards::class);
 }
 
 function openOpportunitiesOnTheList(User $user, Workspace $workspace): void

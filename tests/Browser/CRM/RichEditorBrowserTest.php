@@ -25,7 +25,7 @@ it('hides the heading toolbar when the caret has no text selection', function ()
 
     $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/notes")
+        ->navigate("/app/{$workspace->slug}/notes?view=cards")
         ->press('New note')
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
         ->assertNoJavaScriptErrors();
@@ -62,7 +62,7 @@ it('converts selected body text to a heading from the floating toolbar', functio
 
     $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/notes")
+        ->navigate("/app/{$workspace->slug}/notes?view=cards")
         ->press('New note')
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
         ->assertNoJavaScriptErrors();
@@ -92,7 +92,7 @@ it('changes a selected heading to another level from the floating toolbar', func
 
     $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/notes")
+        ->navigate("/app/{$workspace->slug}/notes?view=cards")
         ->press('New note')
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
         ->assertNoJavaScriptErrors();
@@ -122,7 +122,7 @@ it('returns a selected heading to body text from the floating toolbar', function
 
     $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/notes")
+        ->navigate("/app/{$workspace->slug}/notes?view=cards")
         ->press('New note')
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
         ->assertNoJavaScriptErrors();
@@ -152,7 +152,7 @@ it('persists a heading created from selected body text', function (): void {
 
     $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/notes")
+        ->navigate("/app/{$workspace->slug}/notes?view=cards")
         ->press('New note')
         ->type('[id="mountedActionSchema0.title"]', 'Quarterly plan')
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
@@ -193,7 +193,7 @@ it('stops a detached text style dropdown from rewriting its trigger', function (
 
     $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/notes")
+        ->navigate("/app/{$workspace->slug}/notes?view=cards")
         ->press('New note')
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
         ->assertNoJavaScriptErrors();
@@ -246,7 +246,7 @@ it('stops positioning an open text style menu once the floating toolbar re-rende
 
     $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/notes")
+        ->navigate("/app/{$workspace->slug}/notes?view=cards")
         ->press('New note')
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
         ->assertNoJavaScriptErrors();
@@ -297,7 +297,7 @@ it('fits the selection toolbar inside a mobile viewport in both themes', functio
 
     $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/notes")
+        ->navigate("/app/{$workspace->slug}/notes?view=cards")
         ->press('New note')
         ->resize(1440, 900)
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
@@ -385,7 +385,7 @@ it('spaces paragraphs apart in the note editor', function (): void {
 
     $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/notes")
+        ->navigate("/app/{$workspace->slug}/notes?view=cards")
         ->press('New note')
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
         ->assertNoJavaScriptErrors();
@@ -533,7 +533,7 @@ it('shows the slash placeholder in an empty editor', function (): void {
 
     $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/notes")
+        ->navigate("/app/{$workspace->slug}/notes?view=cards")
         ->press('New note')
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
         ->assertNoJavaScriptErrors();
@@ -548,7 +548,7 @@ it('lets a slash menu item be chosen inside a modal', function (int $width, int 
     $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")
         ->resize($width, $height)
-        ->navigate("/app/{$workspace->slug}/notes")
+        ->navigate("/app/{$workspace->slug}/notes?view=cards")
         ->press('New note')
         ->assertVisible('.fi-modal-window .ProseMirror')
         ->click('.fi-modal-window .ProseMirror')

@@ -114,15 +114,17 @@ trait HasViewSwitcher
     private function redirectToFirstView(): void
     {
         $pages = $this->viewSwitcherPages();
+        $current = array_key_first(array_filter($pages, static fn (array $page): bool => $page['active']));
 
-        if (! ($pages['list']['active'] ?? false) || ! $this->isBareArrival() || ! $this->canSwitchViews()) {
+        if ($current === null || $pages[$current]['name'] !== 'index' || ! $this->isBareArrival() || ! $this->canSwitchViews()) {
             return;
         }
 
-        $first = $this->viewOrder()[0] ?? 'list';
+        $first = $this->viewOrder()[0] ?? $current;
+        $target = isset($pages[$first]) ? $first : 'list';
 
-        if ($first !== 'list' && isset($pages[$first])) {
-            $this->redirect($pages[$first]['url'], navigate: FilamentView::hasSpaMode($pages[$first]['url']));
+        if ($target !== $current) {
+            $this->redirect($pages[$target]['url'], navigate: FilamentView::hasSpaMode($pages[$target]['url']));
         }
     }
 
@@ -224,6 +226,18 @@ trait HasViewSwitcher
         return $pages;
     }
 
+    /**
+     * @param  array{name: string, url: string, active: bool, label: string}  $page
+     */
+    private function viewSwitcherEntryUrl(string $kind, array $page): string
+    {
+        return match (true) {
+            $kind === 'list' => static::getResource()::getUrl($page['name'], ['view' => SavedView::BUILT_IN_LIST_LINK]),
+            $page['name'] === 'index' => static::getResource()::getUrl($page['name'], ['view' => $kind]),
+            default => $page['url'],
+        };
+    }
+
     private function viewSwitcherLabel(string $kind): string
     {
         $records = str(static::getResource()::getPluralModelLabel())->lower()->toString();
@@ -253,7 +267,7 @@ trait HasViewSwitcher
                 'label' => $page['label'],
                 'icon' => self::VIEW_ICONS[$kind],
                 'tone' => self::VIEW_TONES[$kind],
-                'url' => $kind === 'list' ? static::getResource()::getUrl($page['name'], ['view' => SavedView::BUILT_IN_LIST_LINK]) : $page['url'],
+                'url' => $this->viewSwitcherEntryUrl($kind, $page),
                 'active' => $page['active'] && ($kind !== 'list' || $activeId === null || ! $views->contains('id', $activeId)),
                 'canUpdate' => false,
                 'createdLabel' => null,

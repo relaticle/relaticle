@@ -1343,3 +1343,24 @@ it('points the sidebar at the index whatever page the member opened last', funct
     'opportunities' => [OpportunityResource::class, 'board'],
     'tasks' => [TaskResource::class, 'board'],
 ]);
+
+it('opens the notes list from the cards page on a bare visit when the list comes first', function (): void {
+    $this->get(NoteResource::getUrl('index'))->assertRedirect(NoteResource::getUrl('list'));
+
+    resolve(ReorderViews::class)->execute($this->user, $this->workspace, CrmEntity::Note, ['cards', 'list']);
+
+    $this->get(NoteResource::getUrl('index'))->assertOk();
+});
+
+it('opens the notes list from the cards page when a saved view comes first', function (): void {
+    $view = viewFor($this->user, ['entity' => CrmEntity::Note, 'name' => 'Pinned']);
+    resolve(ReorderViews::class)->execute($this->user, $this->workspace, CrmEntity::Note, [$view->getKey()]);
+
+    $this->get(NoteResource::getUrl('index'))->assertRedirect(NoteResource::getUrl('list'));
+});
+
+it('leaves a cards link that names its page alone and links the cards from the list that way', function (): void {
+    $this->get(NoteResource::getUrl('index').'?view=cards')->assertOk();
+
+    openList(ManageNotes::class)->assertSeeHtml(e(NoteResource::getUrl('index', ['view' => 'cards'])));
+});

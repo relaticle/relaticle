@@ -1565,11 +1565,11 @@ it('holds exactly the conditions and trashed filters on the five lists', functio
 })->with('filter bar pages');
 
 it('keeps the creation source filter on the notes cards', function (): void {
-    livewire(NotesCards::class)->assertTableFilterExists('creation_source');
+    openCards()->assertTableFilterExists('creation_source');
 });
 
 it('treats the deleted notes view on the cards as filtered', function (): void {
-    $cards = livewire(NotesCards::class)
+    $cards = openCards()
         ->filterTable('trashed', false)
         ->assertCountTableRecords(0)
         ->assertDontSee(__('filament/resources/note.empty_state.description'));
