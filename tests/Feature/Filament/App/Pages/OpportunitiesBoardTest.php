@@ -20,6 +20,7 @@ use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
+use Livewire\Livewire;
 use Relaticle\Flowforge\Board;
 use Relaticle\Flowforge\Grouping;
 use Relaticle\Flowforge\Lane;
@@ -138,7 +139,7 @@ it('keeps the board clear button off the opportunity list table', function (): v
     $api = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['creation_source' => CreationSource::API]);
     $rules = [['field' => 'creation_source', 'condition' => 'is_any_of', 'value' => [CreationSource::WEB->value]]];
 
-    livewire(ListOpportunities::class)
+    Livewire::withQueryParams(['view' => 'all'])->test(ListOpportunities::class)
         ->set('tableFilters.conditions.rules', $rules)
         ->assertSet('tableFilters.conditions.rules', $rules)
         ->assertCanSeeTableRecords([$web])
@@ -527,7 +528,7 @@ it('points the navigation link at the view the user opened last', function (): v
 
     expect(OpportunityResource::getNavigationUrl())->toBe(OpportunityResource::getUrl('board'));
 
-    livewire(ListOpportunities::class)->assertOk();
+    Livewire::withQueryParams(['view' => 'all'])->test(ListOpportunities::class)->assertOk();
 
     expect(OpportunityResource::getNavigationUrl())->toBe(OpportunityResource::getUrl('index'));
 });

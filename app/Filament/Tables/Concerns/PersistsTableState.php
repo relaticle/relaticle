@@ -28,9 +28,6 @@ trait PersistsTableState
     #[Locked]
     public ?string $appliedSavedViewHash = null;
 
-    #[Locked]
-    public ?string $defaultSavedViewId = null;
-
     // Filament's phone sort control rewrites a `tableSort` that is not one `column:direction`, so later sorts live here.
     #[Url(as: 'then_sort')]
     public ?string $tableThenSorts = null;
@@ -232,9 +229,7 @@ trait PersistsTableState
 
         $preference = $this->storedTablePreference();
         $active = $this->getVisibleSavedViews()->find($preference?->active_view_id);
-        $default = $this->getVisibleSavedViews()->find($preference?->default_view_id);
-
-        $this->defaultSavedViewId = $default?->getKey();
+        $default = $this->getVisibleSavedViews()->find($this->viewOrder()[0] ?? null);
 
         $hasSavedState = $preference !== null && $preference->state->columns !== [];
         $isCleanCopy = $hasSavedState && $active instanceof SavedView && $preference->state->withoutWidths()->hash() === $preference->applied_view_hash;

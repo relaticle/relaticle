@@ -395,7 +395,7 @@ it('narrows opportunities with a number chip', function (): void {
     $page = loginViaBrowser($this->user)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/opportunities")
+        ->navigate("/app/{$this->workspace->slug}/opportunities?view=all")
         ->assertPresent('[data-filter-add]');
     expect(companyRows($page, 3))->toBeTrue();
 
@@ -537,7 +537,7 @@ it('narrows opportunities with a pipeline checklist and summarises the picks', f
     $page = loginViaBrowser($this->user)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/opportunities")
+        ->navigate("/app/{$this->workspace->slug}/opportunities?view=all")
         ->assertPresent('[data-filter-add]');
     expect(companyRows($page, 4))->toBeTrue();
 
@@ -584,7 +584,7 @@ it('narrows opportunities by creator with Me pinned first and a teammate after i
     $page = loginViaBrowser($this->user)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/opportunities")
+        ->navigate("/app/{$this->workspace->slug}/opportunities?view=all")
         ->assertPresent('[data-filter-add]');
     expect(companyRows($page, 3))->toBeTrue();
 
@@ -602,7 +602,7 @@ it('narrows opportunities by creator with Me pinned first and a teammate after i
 it('lists the viewer once and first as the me entry with their photo and keeps it when their name is typed', function (): void {
     $this->user->update(['name' => 'Dana Viewer']);
     $this->workspace->users()->attach(User::factory()->create(['name' => 'Priya Shah']), ['role' => 'member']);
-    $page = openOn($this->user, $this->workspace, 'opportunities');
+    $page = openOn($this->user, $this->workspace, 'opportunities?view=all');
     $entries = 'JSON.stringify([...document.querySelectorAll("[data-pop][data-open=true] [data-option]")].map((option) => [option.dataset.option, option.textContent.trim()]))';
     $settled = fn (): array => json_decode($page->script("new Promise((resolve) => setTimeout(() => resolve({$entries}), 1200))"), true);
 
@@ -663,7 +663,7 @@ it('never shows one chip lookup results in another chip list', function (): void
     $page = loginViaBrowser($this->user)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/opportunities")
+        ->navigate("/app/{$this->workspace->slug}/opportunities?view=all")
         ->assertPresent('[data-filter-add]');
 
     addChip($page, 'creator', 'is_any_of')
@@ -832,7 +832,7 @@ it('reads a picked date in the viewer locale and filters by it', function (): vo
 });
 
 it('narrows opportunities by days without activity', function (): void {
-    $page = openOn($this->user, $this->workspace, 'opportunities');
+    $page = openOn($this->user, $this->workspace, 'opportunities?view=all');
 
     addChip($page, 'stale_days', 'no_activity_for');
     $page->assertScript(popVisible(), true)
@@ -1272,7 +1272,7 @@ it('turns the sort control icon to the sort direction', function (string $direct
 })->with(['ascending' => ['asc', 'lucide-arrow-up-narrow-wide'], 'descending' => ['desc', 'lucide-arrow-down-wide-narrow']]);
 
 it('lists the viewer once whichever way the rule stores them, and unchecks both', function (): void {
-    $page = openOn($this->user, $this->workspace, 'opportunities');
+    $page = openOn($this->user, $this->workspace, 'opportunities?view=all');
     $viewer = (string) $this->user->getKey();
     $page->script("Livewire.all().find((component) => component.name.includes('ListOpportunities')).\$wire.\$call('setFilterRules', [{ field: 'creator', condition: 'is_any_of', value: ['@me', '{$viewer}'] }])");
     $page->assertScript(filterBarWaitFor('document.querySelectorAll("[data-filter-chip]").length === 1'), true)

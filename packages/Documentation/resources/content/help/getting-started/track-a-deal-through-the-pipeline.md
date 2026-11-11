@@ -2,7 +2,7 @@
 title: Track a deal through the pipeline
 description: Move an opportunity through your sales stages, from Prospecting to Closed Won or Lost.
 order: 3
-updated: "2026-11-08"
+updated: "2026-11-12"
 related: [help/getting-started/add-your-first-person, help/getting-started/use-custom-fields]
 ---
 
@@ -20,8 +20,8 @@ column as the deal advances, right through to Closed Won or Closed Lost.
 
 ## See your pipeline
 
-Open the view menu at the top left of the Opportunities page, which shows
-**List**, and choose **Board**. Every
+Open **Opportunities**. The page opens on **Pipeline**, the board. If it opens
+on another view, use the view menu at the top left and choose **Pipeline**. Every
 stage (Prospecting, Qualification, Needs Analysis, Value Proposition, Id.
 Decision Makers, Perception Analysis, Proposal/Price Quote,
 Negotiation/Review, Closed Won, and Closed Lost) appears as a column, with

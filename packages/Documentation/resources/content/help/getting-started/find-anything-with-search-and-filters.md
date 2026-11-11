@@ -2,7 +2,7 @@
 title: Find anything with search and filters
 description: Find instructions for searching Relaticle records and filtering lists of companies, people, opportunities, tasks and notes.
 order: 7
-updated: "2026-11-10"
+updated: "2026-11-12"
 related: [help/getting-started/use-custom-fields, help/getting-started/import-your-existing-data]
 ---
 
@@ -73,6 +73,11 @@ A saved view is yours alone, and it saves itself. Change a filter, sort,
 grouping, column or column name while a view is open, and the view keeps the
 change. To start another view from what's on screen, open the view switcher
 and pick **Create new view**.
+
+The switcher lists your views in one order, the built-in table among them. Drag
+a row by its handle to move it, or open its menu and choose **Move up** or
+**Move down**. The view at the top is the one a page opens on. Search narrows
+the list by name.
 
 ## If you can't find a field in the filter list
 

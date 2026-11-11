@@ -71,7 +71,7 @@ it('stacks each list row into a card so no column sits off a phone screen', func
     'tasks' => ['tasks', 'relations', false],
     'companies' => ['companies', 'updated-at', false],
     'people' => ['people', 'company.name', false],
-    'opportunities' => ['opportunities', 'custom-fields.amount', false],
+    'opportunities' => ['opportunities?view=all', 'custom-fields.amount', false],
     'import-history' => ['import-history', 'status', true],
 ]);
 

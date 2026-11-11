@@ -81,6 +81,8 @@ beforeEach(function (): void {
     Filament::setTenant($this->workspace);
     Filament::setCurrentPanel(Filament::getPanel('app'));
     Filament::bootCurrentPanel();
+
+    openOpportunitiesOnTheList($this->user, $this->workspace);
 });
 
 it('draws the filter row and no filament filter form', function (string $page): void {
@@ -1618,7 +1620,7 @@ it('keeps a text value that filament would read as a boolean or null', function 
 
     if ($how === 'default') {
         $view = SavedView::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Company, 'state' => $state]);
-        TablePreference::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Company, 'default_view_id' => $view->getKey()]);
+        TablePreference::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Company, 'view_order' => [$view->getKey()]]);
     }
 
     if ($how === 'own table') {

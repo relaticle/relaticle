@@ -19,6 +19,7 @@ use App\Models\TablePreference;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Livewire\Features\SupportTesting\Testable;
+use Livewire\Livewire;
 use Symfony\Component\DomCrawler\Crawler;
 
 mutates(HasColumnMenu::class, ResizableColumns::class, CreatesTableAttribute::class);
@@ -634,7 +635,7 @@ it('shows a renamed column with its new label in view settings', function (): vo
 
 it('draws every view settings row with its icon and a menu button and no eye button', function (string $page, CrmEntity $entity): void {
     Filament::bootCurrentPanel();
-    $rows = new Crawler(livewire($page)->html())->filter('[data-view-settings] .fi-view-settings-row');
+    $rows = new Crawler(Livewire::withQueryParams(['view' => 'all'])->test($page)->html())->filter('[data-view-settings] .fi-view-settings-row');
 
     expect($rows->count())->toBeGreaterThan(1);
 
@@ -722,7 +723,7 @@ it('hides the reset action while a saved view is applied', function (): void {
 it('words the add attribute search with the list page entity', function (string $page, CrmEntity $entity, string $label): void {
     Filament::bootCurrentPanel();
 
-    livewire($page)->assertSeeHtml('placeholder="Search '.$label.' attributes…"');
+    Livewire::withQueryParams(['view' => 'all'])->test($page)->assertSeeHtml('placeholder="Search '.$label.' attributes…"');
 })->with([
     'companies' => [ListCompanies::class, CrmEntity::Company, 'company'],
     'people' => [ListPeople::class, CrmEntity::People, 'person'],

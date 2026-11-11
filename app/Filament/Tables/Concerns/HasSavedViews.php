@@ -7,7 +7,6 @@ namespace App\Filament\Tables\Concerns;
 use App\Actions\Views\CreateSavedView;
 use App\Actions\Views\DeleteSavedView;
 use App\Actions\Views\DuplicateSavedView;
-use App\Actions\Views\SetDefaultSavedView;
 use App\Actions\Views\UpdateSavedView;
 use App\Data\TableStateData;
 use App\Models\SavedView;
@@ -160,22 +159,6 @@ trait HasSavedViews
         $this->visibleSavedViews = null;
 
         Notification::make()->success()->title(__('filament/panel.tables.views.duplicated', ['name' => e($copy->name)]))->send();
-    }
-
-    public function toggleDefaultSavedView(string $viewId): void
-    {
-        $view = $this->getVisibleSavedViews()->find($viewId);
-
-        if (! $view instanceof SavedView) {
-            $this->handleMissingSavedView($viewId);
-
-            return;
-        }
-
-        $default = $this->defaultSavedViewId === $view->getKey() ? null : $view;
-
-        resolve(SetDefaultSavedView::class)->execute($this->savedViewUser(), $this->savedViewWorkspace(), $this->tableEntity(), $default);
-        $this->defaultSavedViewId = $default?->getKey();
     }
 
     public function applyOwnTable(): void
@@ -375,10 +358,6 @@ trait HasSavedViews
     {
         if ($this->activeSavedViewId === $viewId) {
             $this->clearActiveSavedView();
-        }
-
-        if ($this->defaultSavedViewId === $viewId) {
-            $this->defaultSavedViewId = null;
         }
 
         $this->visibleSavedViews = null;

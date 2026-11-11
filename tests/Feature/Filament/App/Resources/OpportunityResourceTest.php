@@ -21,6 +21,8 @@ beforeEach(function () {
     $this->actingAs($this->user);
     $this->workspace = $this->user->currentWorkspace;
     Filament::setTenant($this->workspace);
+
+    openOpportunitiesOnTheList($this->user, $this->workspace);
 });
 
 it('can render the index page', function (): void {

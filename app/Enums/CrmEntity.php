@@ -127,6 +127,21 @@ enum CrmEntity: string
         return IconPath::for($this->icon());
     }
 
+    /**
+     * The built-in views a member can order, in the order a member who never ordered them sees.
+     *
+     * @return list<string>
+     */
+    public function builtInViews(): array
+    {
+        return match ($this) {
+            self::Opportunity => ['board', 'list'],
+            self::Task => ['list', 'board'],
+            self::Note => ['list', 'cards'],
+            self::Company, self::People => ['list'],
+        };
+    }
+
     /** @return list<self> */
     public static function linkable(): array
     {

@@ -125,7 +125,7 @@ it('keeps the view list in step with the search box after Escape', function (): 
     $page->keys('.fi-ta-views-search input', 'Escape')
         ->assertScript('document.querySelector(".fi-ta-views-search input").offsetParent === null', true)
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->assertScript("{$visibleRows} === (document.querySelector('.fi-ta-views-search input').value === '' ? 7 : 1)", true)
+        ->assertScript("{$visibleRows} === (document.querySelector('.fi-ta-views-search input').value === '' ? 8 : 1)", true)
         ->assertNoJavaScriptErrors();
 });
 
@@ -162,16 +162,16 @@ it('opens each view row menu with that view own options and acts on that view', 
         ->click('.fi-view-switcher .fi-dropdown-trigger button');
 
     $page->hover('.fi-ta-views-row:has([title="Mine"])')->click('[aria-label="Actions for Mine"]');
-    $page->assertScript($visibleRowMenuItems, ['Set as my default', 'Rename', 'Duplicate', 'Delete view']);
+    $page->assertScript($visibleRowMenuItems, ['Move up', 'Move down', 'Rename', 'Duplicate', 'Delete view']);
 
     $page->click('[aria-label="Actions for Mine"]');
     $page->hover('.fi-ta-views-row:has([title="Other"])')->click('[aria-label="Actions for Other"]');
-    $page->assertScript($visibleRowMenuItems, ['Set as my default', 'Rename', 'Duplicate', 'Delete view']);
+    $page->assertScript($visibleRowMenuItems, ['Move up', 'Move down', 'Rename', 'Duplicate', 'Delete view']);
 
-    $page->script('[...document.querySelectorAll(".fi-ta-views-row-menu .fi-dropdown-list-item")].find((item) => item.offsetParent !== null).click()');
+    $page->script('[...document.querySelectorAll(".fi-ta-views-row-menu .fi-dropdown-list-item")].find((item) => item.offsetParent !== null && item.textContent.trim() === "Move up").click()');
     $page->wait(1)->assertNoJavaScriptErrors();
 
-    expect(TablePreference::query()->withoutGlobalScopes()->whereBelongsTo($this->user)->value('default_view_id'))->toBe($other->getKey());
+    expect(TablePreference::query()->withoutGlobalScopes()->whereBelongsTo($this->user)->value('view_order'))->toBe(['list', $other->getKey(), $mine->getKey()]);
 
     $page->click('.fi-view-switcher .fi-dropdown-trigger button');
     $page->hover('.fi-ta-views-row:has([title="Mine"])')->click('[aria-label="Actions for Mine"]');
@@ -188,23 +188,21 @@ it('opens each view row menu with that view own options and acts on that view', 
         ->assertScript('document.activeElement?.closest(".fi-ta-views-row-menu") !== null && document.activeElement.textContent.trim() === "Set as my default"', true);
 });
 
-it('hides the view group heading when the search matches none of its views', function (): void {
-    foreach (range(1, 7) as $number) {
-        SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => "Alpha {$number}"]);
-    }
+it('tells the member when the search matches no view', function (): void {
+    SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => 'Alpha']);
 
-    $visibleHeadings = '[...document.querySelectorAll(".fi-ta-views-heading")].filter((heading) => heading.offsetParent !== null).length';
+    $empty = 'document.querySelector(".fi-ta-views-empty").offsetParent !== null';
 
     loginViaBrowser($this->user)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/companies")
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->assertScript($visibleHeadings, 1)
-        ->type('.fi-ta-views-search input', 'Alpha')
-        ->assertScript($visibleHeadings, 1)
+        ->assertScript($empty, false)
         ->type('.fi-ta-views-search input', 'Zeta')
-        ->assertScript($visibleHeadings, 0)
+        ->assertScript($empty, true)
+        ->type('.fi-ta-views-search input', 'Alpha')
+        ->assertScript($empty, false)
         ->assertNoJavaScriptErrors();
 });
 
@@ -212,9 +210,9 @@ it('keeps a long view name truncated and opens its row menu inside the viewport'
     $name = 'Quarterly enterprise renewals across every region with a signed order form and a named champion';
     SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => $name]);
 
-    $row = 'document.querySelector(".fi-ta-views-row")';
+    $row = 'document.querySelector(".fi-ta-views-row:has([title^=\\"Quarterly\\"])")';
     $viewportWidth = 'document.documentElement.clientWidth';
-    $kebab = 'document.querySelector(".fi-ta-views-row [aria-label^=\\"Actions for\\"]").getBoundingClientRect()';
+    $kebab = 'document.querySelector(".fi-ta-views-row [aria-label^=\\"Actions for Quarterly\\"]").getBoundingClientRect()';
 
     $page = loginViaBrowser($this->user)
         ->assertPathIs("/app/{$this->workspace->slug}")
@@ -223,8 +221,8 @@ it('keeps a long view name truncated and opens its row menu inside the viewport'
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->assertScript("{$row}.querySelector('[title]').scrollWidth > {$row}.querySelector('[title]').clientWidth", true);
 
-    $page->hover('.fi-ta-views-row')
-        ->click('.fi-ta-views-row [aria-label^="Actions for"]')
+    $page->hover('.fi-ta-views-row:has([title^="Quarterly"])')
+        ->click('.fi-ta-views-row [aria-label^="Actions for Quarterly"]')
         ->assertScript('(() => { const box = document.querySelector(".fi-ta-views-row-menu").getBoundingClientRect(); return box.left >= 0 && box.right <= '.$viewportWidth.' && box.bottom <= window.innerHeight; })()', true)
         ->assertScript('document.querySelector(".fi-ta-views-row-menu").getBoundingClientRect().left >= document.querySelector(".fi-ta-views-panel").closest(".fi-dropdown-panel").getBoundingClientRect().right', true)
         ->assertScript("{$kebab}.right <= {$viewportWidth}", true)
@@ -246,7 +244,7 @@ it('lands on the list with a saved view applied when it is picked from the board
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/opportunities/board")
-        ->assertSeeIn('.fi-view-switcher-trigger', 'Board')
+        ->assertSeeIn('.fi-view-switcher-trigger', 'Pipeline')
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->click('Open pipeline')
         ->assertPathIs("/app/{$this->workspace->slug}/opportunities")
@@ -264,7 +262,7 @@ it('opens the built-in list from the board even when a view was last applied on 
     loginViaBrowser($this->user)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/opportunities")
+        ->navigate("/app/{$this->workspace->slug}/opportunities?view=all")
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->click('Open pipeline')
         ->assertSeeIn('.fi-view-switcher-trigger', 'Open pipeline')
@@ -292,5 +290,179 @@ it('keeps a descending sort when a view sorted that way is picked from an unsort
     $page->assertScript("document.querySelector('[data-filter-sort]')?.getAttribute('aria-label') === 'Sorted by Company, descending'", true)
         ->assertScript("Livewire.all().find((component) => component.name.includes('ListCompanies')).\$wire.tableSort", 'name:desc')
         ->assertDontSee('Discard changes')
+        ->assertNoJavaScriptErrors();
+});
+
+function switcherKeys(): string
+{
+    return '[...document.querySelectorAll(".fi-ta-views-row")].map((row) => row.dataset.viewKey)';
+}
+
+function storedViewOrder(User $user, CrmEntity $entity): ?array
+{
+    return TablePreference::query()->withoutGlobalScopes()->whereBelongsTo($user)->where('entity', $entity)->value('view_order');
+}
+
+it('shows the search, a tile per kind and the rows in order with the pipeline first on opportunities', function (): void {
+    $view = SavedView::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Opportunity, 'name' => 'Open pipeline']);
+
+    loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/opportunities")
+        ->assertPathIs("/app/{$this->workspace->slug}/opportunities/board")
+        ->assertSeeIn('.fi-view-switcher-trigger', 'Pipeline')
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->assertVisible('.fi-ta-views-search input')
+        ->assertScript(switcherKeys(), ['board', 'list', $view->getKey()])
+        ->assertScript('[...document.querySelectorAll(".fi-ta-views-row .fi-view-tile")].map((tile) => tile.className.split(" ").pop())', ['fi-view-tile-orange', 'fi-view-tile-success', 'fi-view-tile-success'])
+        ->assertScript('[...document.querySelectorAll(".fi-ta-views-row")].map((row) => row.textContent.trim().replace(/\s+/g, " "))', ['Pipeline', 'All opportunities', 'Open pipeline'])
+        ->assertNoJavaScriptErrors();
+});
+
+it('opens the list when a member who put the table first visits opportunities', function (): void {
+    TablePreference::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Opportunity, 'view_order' => ['list', 'board']]);
+
+    loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/opportunities")
+        ->assertPathIs("/app/{$this->workspace->slug}/opportunities")
+        ->assertSeeIn('.fi-view-switcher-trigger', 'All opportunities')
+        ->assertNoJavaScriptErrors();
+});
+
+it('reorders by dragging a row and keeps the order after a reload', function (): void {
+    $alpha = SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => 'Alpha']);
+    $beta = SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => 'Beta']);
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->assertScript(switcherKeys(), ['list', $alpha->getKey(), $beta->getKey()]);
+
+    $page->drag("[data-view-key=\"{$beta->getKey()}\"] .fi-dropdown-list-item", '[data-view-key="list"] .fi-dropdown-list-item');
+    $page->assertScript(savedViewsWaitFor('JSON.stringify('.switcherKeys().') === '.json_encode(json_encode([$beta->getKey(), 'list', $alpha->getKey()]))), true);
+
+    expect(storedViewOrder($this->user, CrmEntity::Company))->toBe([$beta->getKey(), 'list', $alpha->getKey()]);
+
+    $page->navigate("/app/{$this->workspace->slug}/companies?view=all")
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->assertScript(switcherKeys(), [$beta->getKey(), 'list', $alpha->getKey()])
+        ->assertNoJavaScriptErrors();
+});
+
+it('moves a row from its menu and disables the move that has nowhere to go', function (): void {
+    $alpha = SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => 'Alpha']);
+    $beta = SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => 'Beta']);
+
+    $item = fn (string $label): string => '[...document.querySelectorAll(".fi-ta-views-row-menu .fi-dropdown-list-item")].find((item) => item.textContent.trim() === "'.$label.'")';
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-view-switcher .fi-dropdown-trigger button');
+
+    $page->hover('.fi-ta-views-row:has([title="Beta"])')->click('[aria-label="Actions for Beta"]');
+    $page->assertScript($item('Move down').'.disabled', true)
+        ->assertScript($item('Move up').'.disabled', false);
+
+    $page->script($item('Move up').'.click()');
+    $page->assertScript(savedViewsWaitFor('JSON.stringify('.switcherKeys().') === '.json_encode(json_encode(['list', $beta->getKey(), $alpha->getKey()]))), true);
+
+    expect(storedViewOrder($this->user, CrmEntity::Company))->toBe(['list', $beta->getKey(), $alpha->getKey()]);
+
+    $page->hover('.fi-ta-views-row:has([title="All companies"])')->click('[aria-label="Actions for All companies"]');
+    $page->assertScript($item('Move up').'.disabled', true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('narrows the rows by name and stops dragging while a query is typed', function (): void {
+    foreach (['Alpha', 'Beta'] as $name) {
+        SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => $name]);
+    }
+
+    $visible = '[...document.querySelectorAll(".fi-ta-views-row")].filter((row) => row.offsetParent !== null).map((row) => row.dataset.viewName)';
+    $draggable = 'document.querySelectorAll(".fi-ta-views-draggable").length';
+
+    loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->assertScript($draggable, 3)
+        ->type('.fi-ta-views-search input', 'alp')
+        ->assertScript($visible, ['alpha'])
+        ->assertScript($draggable, 0)
+        ->assertNoJavaScriptErrors();
+});
+
+it('returns focus to the trigger when Escape closes the switcher', function (): void {
+    loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->keys('.fi-ta-views-search input', 'Escape')
+        ->assertScript('document.activeElement === document.querySelector(".fi-view-switcher-trigger")', true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('keeps the switcher usable as a sheet on a phone', function (): void {
+    $alpha = SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => 'Alpha', 'state' => new TableStateData(sort: 'name:desc')]);
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(390, 844)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->assertVisible('.fi-ta-views-search input')
+        ->assertScript('(() => { const box = document.querySelector(".fi-ta-views-panel").getBoundingClientRect(); return box.left >= 0 && box.right <= document.documentElement.clientWidth && box.bottom <= window.innerHeight; })()', true)
+        ->assertScript(switcherKeys(), ['list', $alpha->getKey()]);
+
+    $page->click('Alpha')
+        ->assertSeeIn('.fi-view-switcher-trigger', 'Alpha')
+        ->assertNoJavaScriptErrors();
+});
+
+it('opens a view with a plain click on its row', function (): void {
+    SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => 'Alpha', 'state' => new TableStateData(sort: 'name:desc')]);
+
+    loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->click('.fi-ta-views-row:has([title="Alpha"]) .fi-dropdown-list-item')
+        ->assertSeeIn('.fi-view-switcher-trigger', 'Alpha')
+        ->assertNoJavaScriptErrors();
+});
+
+it('keeps a row in its hover look while its menu is open', function (): void {
+    foreach (['Alpha', 'Beta'] as $name) {
+        SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => $name]);
+    }
+
+    $background = fn (string $name): string => 'getComputedStyle(document.querySelector(\'.fi-ta-views-row:has([title="'.$name.'"])\')).backgroundColor';
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-view-switcher .fi-dropdown-trigger button');
+
+    $page->hover('.fi-ta-views-row:has([title="Beta"])');
+    $hoverBackground = $page->script($background('Beta'));
+    $hoverKebab = $page->script('getComputedStyle(document.querySelector(\'[aria-label="Actions for Beta"] .fi-icon\')).color');
+
+    $page->hover('.fi-ta-views-row:has([title="Alpha"])')->click('[aria-label="Actions for Alpha"]');
+    $page->hover('.fi-ta-views-search input');
+
+    $page->assertScript($background('Alpha'), $hoverBackground)
+        ->assertScript($background('Beta'), 'rgba(0, 0, 0, 0)')
+        ->assertScript('getComputedStyle(document.querySelector(\'[aria-label="Actions for Alpha"] .fi-icon\')).color', $hoverKebab)
         ->assertNoJavaScriptErrors();
 });

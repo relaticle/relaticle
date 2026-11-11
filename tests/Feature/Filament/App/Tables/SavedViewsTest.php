@@ -6,7 +6,7 @@ use App\Actions\Views\CreateSavedView;
 use App\Actions\Views\DeleteSavedView;
 use App\Actions\Views\DuplicateSavedView;
 use App\Actions\Views\EnsureSavedViewNameIsFree;
-use App\Actions\Views\SetDefaultSavedView;
+use App\Actions\Views\ReorderViews;
 use App\Actions\Views\UpdateSavedView;
 use App\Data\TableStateData;
 use App\Enums\CrmEntity;
@@ -40,7 +40,7 @@ mutates(
     UpdateSavedView::class,
     DeleteSavedView::class,
     DuplicateSavedView::class,
-    SetDefaultSavedView::class,
+    ReorderViews::class,
     EnsureSavedViewNameIsFree::class,
 );
 
@@ -94,7 +94,7 @@ it('applies columns, sort, filters and page size in one call', function (string 
     $updatedAt = $view->updated_at;
     $this->travelTo(now()->addHour());
 
-    $component = livewire($page)->call('applySavedView', $view->getKey());
+    $component = Livewire::withQueryParams(['view' => SavedView::BUILT_IN_LIST_LINK])->test($page)->call('applySavedView', $view->getKey());
 
     expect($component->get('tableSort'))->toBe('created_at:desc')
         ->and((int) $component->get('tableRecordsPerPage'))->toBe(50)
@@ -122,7 +122,7 @@ it('writes nothing to a view whose stored hash predates search leaving the state
         'entity' => CrmEntity::Company,
         'state' => $state,
         'active_view_id' => $view->getKey(),
-        'default_view_id' => null,
+        'view_order' => null,
         'applied_view_hash' => hash('xxh128', json_encode(sortedKeys([...$state->toArray(), 'search' => null, 'columnSearches' => []]), JSON_THROW_ON_ERROR)),
     ]);
     session()->put("tables.opened.{$this->workspace->getKey()}.company", true);
@@ -372,7 +372,7 @@ it('renders no discard or save control on a changed view', function (): void {
         ->assertDontSeeText(['Discard changes', 'Save as new view', 'More ways to save']);
 });
 
-it('sets a default when another request writes the member\'s first preference row at the same moment', function (): void {
+it('stores the view order when another request writes the member\'s first preference row at the same moment', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
     $component = livewire(ListCompanies::class);
     $raced = false;
@@ -385,15 +385,15 @@ it('sets a default when another request writes the member\'s first preference ro
         TablePreference::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Company]);
     });
 
-    $component->call('toggleDefaultSavedView', $view->getKey())->assertOk();
+    $component->call('reorderViews', [$view->getKey()])->assertOk();
 
     expect(TablePreference::query()->withoutGlobalScopes()->count())->toBe(1)
-        ->and(preferenceRow()->default_view_id)->toBe($view->getKey());
+        ->and(preferenceRow()->view_order)->toBe([$view->getKey()]);
 });
 
 it('brings back the last state within a session, and the view as it was left in the next one', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
-    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('toggleDefaultSavedView', $view->getKey())->call('sortTable', 'name', 'asc');
+    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('reorderViews', [$view->getKey()])->call('sortTable', 'name', 'asc');
 
     $revisit = livewire(ListCompanies::class);
 
@@ -411,7 +411,7 @@ it('brings back the last state within a session, and the view as it was left in 
 it('opens a new session on the default view over another applied one, and keeps it for that session', function (): void {
     $default = viewFor($this->user, ['name' => 'Hot leads', 'state' => hotLeads()]);
     $other = viewFor($this->user, ['name' => 'By name', 'state' => new TableStateData(sort: 'name:asc')]);
-    livewire(ListCompanies::class)->call('toggleDefaultSavedView', $default->getKey())->call('applySavedView', $other->getKey());
+    livewire(ListCompanies::class)->call('reorderViews', [$default->getKey()])->call('applySavedView', $other->getKey());
 
     $updatedAt = [$default->updated_at, $other->updated_at];
     $this->travelTo(now()->addHour());
@@ -437,7 +437,7 @@ it('keeps the last state across sessions for a member with no default view', fun
 
 it('opens on the default view when the member has no saved state, and writes nothing', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
-    TablePreference::factory()->for($this->user)->for($this->workspace)->create(['default_view_id' => $view->getKey()]);
+    TablePreference::factory()->for($this->user)->for($this->workspace)->create(['view_order' => [$view->getKey()]]);
     $updatedAt = preferenceRow()->updated_at;
     $viewUpdatedAt = $view->updated_at;
 
@@ -473,10 +473,9 @@ it('offers the standard view and nothing to manage when no view is saved', funct
 
 it('keeps the table and clears the pointers when a view is deleted', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
-    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('toggleDefaultSavedView', $view->getKey())
+    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('reorderViews', [$view->getKey()])
         ->callAction('deleteSavedView', arguments: ['view' => $view->getKey()])
         ->assertSet('activeSavedViewId', null)
-        ->assertSet('defaultSavedViewId', null)
         ->assertSet('tableSort', 'created_at:desc');
 
     expect(SavedView::query()->withoutGlobalScopes()->count())->toBe(0)
@@ -498,11 +497,9 @@ it('manages a view from its own row without switching to it', function (): void 
     livewire(ListCompanies::class)
         ->call('applySavedView', $active->getKey())
         ->callAction('renameSavedView', ['name' => 'Renewals due'], ['view' => $other->getKey()])
-        ->call('toggleDefaultSavedView', $other->getKey())
-        ->assertSet('defaultSavedViewId', $other->getKey())
+        ->call('reorderViews', [$other->getKey()])
         ->callAction('deleteSavedView', arguments: ['view' => $other->getKey()])
         ->assertSet('activeSavedViewId', $active->getKey())
-        ->assertSet('defaultSavedViewId', null)
         ->assertSet('tableSort', 'created_at:desc');
 
     expect(SavedView::query()->withoutGlobalScopes()->pluck('name')->all())->toBe(['Hot leads']);
@@ -512,23 +509,21 @@ it('marks the view the table is showing, and only that one', function (): void {
     $view = viewFor($this->user, ['name' => 'Team pipeline']);
 
     $component = livewire(ListCompanies::class)
-        ->assertSeeHtmlInOrder(['Team pipeline', 'aria-current="true"', 'All companies'])
+        ->assertSeeHtmlInOrder(['aria-current="true"', 'All companies', 'Team pipeline'])
         ->call('applySavedView', $view->getKey())
-        ->assertSeeHtmlInOrder(['aria-current="true"', 'Team pipeline', 'All companies']);
+        ->assertSeeHtmlInOrder(['All companies', 'aria-current="true"', 'Team pipeline']);
 
     expect(substr_count($component->html(), 'aria-current="true"'))->toBe(1);
 });
 
-it('labels the view that opens by default and no other row', function (): void {
-    $default = viewFor($this->user, ['name' => 'Team pipeline']);
-    viewFor($this->user, ['name' => 'Just me']);
+it('lists the built-in table and the saved views in the member\'s order', function (): void {
+    $alpha = viewFor($this->user, ['name' => 'Alpha']);
+    viewFor($this->user, ['name' => 'Beta']);
 
-    $component = livewire(ListCompanies::class)
-        ->assertDontSeeHtml('fi-ta-views-tag')
-        ->call('toggleDefaultSavedView', $default->getKey())
-        ->assertSeeHtmlInOrder(['Just me', 'Team pipeline', 'fi-ta-views-tag', 'Default']);
-
-    expect(substr_count($component->html(), 'fi-ta-views-tag'))->toBe(1);
+    livewire(ListCompanies::class)
+        ->assertSeeHtmlInOrder(['All companies', 'Alpha', 'Beta'])
+        ->call('reorderViews', [$alpha->getKey(), 'list'])
+        ->assertSeeHtmlInOrder(['Alpha', 'All companies', 'Beta']);
 });
 
 it('keeps views apart per table and per workspace', function (): void {
@@ -565,12 +560,11 @@ it('refuses a view id from another workspace at every entry point', function ():
         ->assertSet('activeSavedViewId', null)
         ->assertActionHidden('renameSavedView', ['view' => $foreign->getKey()])
         ->assertActionHidden('deleteSavedView', ['view' => $foreign->getKey()])
-        ->call('toggleDefaultSavedView', $foreign->getKey())
-        ->assertNotified('That view is no longer available.')
-        ->assertSet('defaultSavedViewId', null);
+        ->call('reorderViews', [$foreign->getKey()])
+        ->assertOk();
 
     expect($foreign->refresh()->name)->toBe('Elsewhere')
-        ->and(preferenceRow()?->default_view_id)->toBeNull();
+        ->and(preferenceRow()?->view_order)->toBeNull();
 });
 
 it('lets any member, a viewer too, save a view', function (): void {
@@ -614,14 +608,8 @@ it('refuses an update from a former member who still owns a view', function (): 
     expect($view->refresh()->name)->toBe('Team');
 });
 
-it('offers a search box only once a member has seven views to choose from', function (): void {
-    SavedView::factory()->for($this->user)->for($this->workspace)->count(6)->sequence(fn ($sequence): array => ['name' => "View {$sequence->index}"])->create();
-
-    livewire(ListCompanies::class)->assertDontSeeHtml('placeholder="Search views"');
-
-    viewFor($this->user, ['name' => 'Seventh']);
-
-    livewire(ListCompanies::class)->assertSeeHtml('placeholder="Search views"');
+it('always offers a search box', function (): void {
+    livewire(ListCompanies::class)->assertSeeHtml('placeholder="Search views…"');
 });
 
 it('asks for confirmation before deleting a view', function (): void {
@@ -703,20 +691,6 @@ it('tells the member instead of failing when the view they change was deleted el
 
     expect(SavedView::query()->withoutGlobalScopes()->count())->toBe(0)
         ->and($component->get('tableSort'))->toBe('name:asc');
-});
-
-it('tells the member instead of failing when the view they set as default was deleted elsewhere', function (): void {
-    $view = viewFor($this->user, ['state' => hotLeads()]);
-    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey());
-
-    $view->delete();
-
-    $component->call('toggleDefaultSavedView', $view->getKey())
-        ->assertNotified('That view is no longer available.')
-        ->assertSet('activeSavedViewId', null)
-        ->assertSet('defaultSavedViewId', null);
-
-    expect(preferenceRow()?->default_view_id)->toBeNull();
 });
 
 it('closes the modal and tells the member when the view it acts on was deleted elsewhere', function (string $action): void {
@@ -903,7 +877,7 @@ it('leaves the member\'s own table alone when another view replaces the active o
 
 it('keeps the member\'s own table when a new session opens on their default view', function (): void {
     $default = viewFor($this->user, ['state' => hotLeads()]);
-    livewire(ListCompanies::class)->call('toggleDefaultSavedView', $default->getKey())->call('sortTable', 'name', 'asc');
+    livewire(ListCompanies::class)->call('reorderViews', [$default->getKey()])->call('sortTable', 'name', 'asc');
     expect(preferenceRow()->active_view_id)->toBeNull();
 
     session()->flush();
@@ -922,7 +896,7 @@ it('keeps the member\'s own table when a new session opens on a default over a c
     livewire(ListCompanies::class)
         ->call('sortTable', 'name', 'asc')
         ->call('applySavedView', $other->getKey())
-        ->call('toggleDefaultSavedView', $default->getKey())
+        ->call('reorderViews', [$default->getKey()])
         ->call('sortTable', 'created_at', 'asc');
 
     session()->flush();
@@ -969,7 +943,7 @@ it('opens a new session without a parked table once the active view went away, e
     $default = viewFor($this->user, ['name' => 'By name', 'state' => new TableStateData(sort: 'name:desc')]);
     $component = livewire(ListCompanies::class)
         ->call('sortTable', 'name', 'asc')
-        ->call('toggleDefaultSavedView', $default->getKey())
+        ->call('reorderViews', [$default->getKey()])
         ->call('applySavedView', $view->getKey());
 
     resolve(DeleteSavedView::class)->execute($this->user, $view);
@@ -1125,11 +1099,11 @@ it('names the active view on the switcher and the built-in list when none is app
 });
 
 it('lists the fixed entries a resource has', function (string $page, array $shown, array $hidden): void {
-    livewire($page)->assertSeeText($shown)->assertDontSeeText($hidden);
+    Livewire::withQueryParams(['view' => SavedView::BUILT_IN_LIST_LINK])->test($page)->assertSeeText($shown)->assertDontSeeText($hidden);
 })->with([
-    'companies' => [ListCompanies::class, ['All companies'], ['Board', 'Cards']],
-    'opportunities' => [ListOpportunities::class, ['All opportunities', 'Board'], ['Cards']],
-    'notes' => [ManageNotes::class, ['All notes', 'Cards'], ['Board']],
+    'companies' => [ListCompanies::class, ['All companies'], ['Board', 'Cards', 'Pipeline']],
+    'opportunities' => [ListOpportunities::class, ['All opportunities', 'Pipeline'], ['Cards', 'Board']],
+    'notes' => [ManageNotes::class, ['All notes', 'Cards'], ['Board', 'Pipeline']],
 ]);
 
 it('offers duplicate and the row actions on every view', function (): void {
@@ -1138,8 +1112,8 @@ it('offers duplicate and the row actions on every view', function (): void {
 
     livewire(ListCompanies::class)
         ->assertSeeText('Duplicate')
-        ->assertSeeHtml('data-view-id="'.$first->getKey().'" data-can-update="true"')
-        ->assertSeeHtml('data-view-id="'.$second->getKey().'" data-can-update="true"');
+        ->assertSeeHtml('data-view-key="'.$first->getKey().'"')
+        ->assertSeeHtml('data-view-key="'.$second->getKey().'"');
 });
 
 it('dates a view in the member zone', function (): void {
@@ -1153,7 +1127,7 @@ it('links a saved view from the board to the list page', function (): void {
 
     livewire(OpportunitiesBoard::class)
         ->assertSeeHtml('view='.$view->getKey())
-        ->assertSeeHtml('data-active-view="Board"');
+        ->assertSeeHtml('data-active-view="Pipeline"');
 });
 
 it('lists no view of another record type on the board', function (): void {
@@ -1204,14 +1178,15 @@ it('links the built-in list from the board with the sentinel', function (): void
         ->assertSeeHtml('href="'.OpportunityResource::getUrl('index', ['view' => SavedView::BUILT_IN_LIST_LINK]).'"');
 });
 
-it('tags the member\'s default view on the board and no other row', function (): void {
+it('lists the board, the table and the views in the member\'s order on the board', function (): void {
     $alpha = viewFor($this->user, ['entity' => CrmEntity::Opportunity, 'name' => 'Alpha']);
     viewFor($this->user, ['entity' => CrmEntity::Opportunity, 'name' => 'Beta']);
-    livewire(ListOpportunities::class)->call('toggleDefaultSavedView', $alpha->getKey());
 
-    $component = livewire(OpportunitiesBoard::class)->assertSeeHtmlInOrder(['Alpha', 'fi-ta-views-tag', 'Beta']);
+    livewire(OpportunitiesBoard::class)->assertSeeHtmlInOrder(['Pipeline', 'All opportunities', 'Alpha', 'Beta']);
 
-    expect(substr_count($component->html(), 'fi-ta-views-tag'))->toBe(1);
+    Livewire::withQueryParams(['view' => 'all'])->test(ListOpportunities::class)->call('reorderViews', [$alpha->getKey()]);
+
+    livewire(OpportunitiesBoard::class)->assertSeeHtmlInOrder(['Alpha', 'Pipeline', 'All opportunities', 'Beta']);
 });
 
 it('opens the create dialog with its own title, button and note', function (): void {
@@ -1248,4 +1223,109 @@ it('opens a view sorted by several columns with every sort and unmodified', func
     $component->call('setFilterBarSorts', [['column' => 'created_at', 'direction' => 'asc'], ['column' => 'name', 'direction' => 'desc']]);
 
     expect($view->refresh()->state->sort)->toBe('created_at:asc,name:desc');
+});
+
+function orderFor(CrmEntity $entity): ?array
+{
+    return TablePreference::query()->withoutGlobalScopes()->where('entity', $entity)->value('view_order');
+}
+
+it('lists the pipeline before the table for opportunities and the table first elsewhere when nothing is ordered', function (): void {
+    viewFor($this->user, ['name' => 'Alpha']);
+    viewFor($this->user, ['entity' => CrmEntity::Opportunity, 'name' => 'Open']);
+
+    livewire(OpportunitiesBoard::class)->assertSeeHtmlInOrder(['Pipeline', 'All opportunities', 'Open']);
+    livewire(ListCompanies::class)->assertSeeHtmlInOrder(['All companies', 'Alpha']);
+    livewire(ManageTasks::class)->assertSeeHtmlInOrder(['All tasks', 'Board']);
+});
+
+it('stores the order the member gives and keeps it apart from another member', function (): void {
+    $first = viewFor($this->user, ['name' => 'First']);
+    $second = viewFor($this->user, ['name' => 'Second']);
+
+    resolve(ReorderViews::class)->execute($this->user, $this->workspace, CrmEntity::Company, [$second->getKey(), 'list', $first->getKey()]);
+
+    expect(orderFor(CrmEntity::Company))->toBe([$second->getKey(), 'list', $first->getKey()]);
+
+    $this->actingAs(savedViewMember(WorkspaceRole::Member));
+
+    livewire(ListCompanies::class)->assertSeeHtmlInOrder(['All companies']);
+    expect(orderFor(CrmEntity::Company))->toBe([$second->getKey(), 'list', $first->getKey()])
+        ->and(TablePreference::query()->withoutGlobalScopes()->whereBelongsTo(auth()->user())->count())->toBe(0);
+});
+
+it('refuses an order that holds a view the member may not use', function (string $case): void {
+    $stranger = User::factory()->withWorkspace()->create();
+    $own = viewFor($this->user, ['name' => 'Mine']);
+    $keys = match ($case) {
+        'another member' => viewFor(savedViewMember(WorkspaceRole::Member), ['name' => 'Theirs'])->getKey(),
+        'another workspace' => SavedView::factory()->for($stranger)->for($stranger->currentWorkspace)->create()->getKey(),
+        'another entity' => viewFor($this->user, ['entity' => CrmEntity::People])->getKey(),
+        'a page the entity lacks' => 'cards',
+        'an unknown key' => 'nonsense',
+    };
+
+    expect(fn () => resolve(ReorderViews::class)->execute($this->user, $this->workspace, CrmEntity::Company, [$own->getKey(), $keys]))
+        ->toThrow(HttpException::class)
+        ->and(orderFor(CrmEntity::Company))->toBeNull();
+})->with(['another member', 'another workspace', 'another entity', 'a page the entity lacks', 'an unknown key']);
+
+it('refuses to order views for a workspace the member does not belong to', function (): void {
+    $stranger = User::factory()->withWorkspace()->create();
+
+    expect(fn () => resolve(ReorderViews::class)->execute($this->user, $stranger->currentWorkspace, CrmEntity::Company, ['list']))
+        ->toThrow(HttpException::class);
+});
+
+it('drops a deleted view from the order and appends a new one at the end', function (): void {
+    $gone = viewFor($this->user, ['name' => 'Gone']);
+    $kept = viewFor($this->user, ['name' => 'Kept']);
+    resolve(ReorderViews::class)->execute($this->user, $this->workspace, CrmEntity::Company, [$gone->getKey(), $kept->getKey(), 'list']);
+    resolve(DeleteSavedView::class)->execute($this->user, $gone);
+    viewFor($this->user, ['name' => 'Fresh']);
+
+    livewire(ListCompanies::class)
+        ->assertDontSeeText('Gone')
+        ->assertSeeHtmlInOrder(['Kept', 'All companies', 'Fresh']);
+});
+
+it('reorders from the switcher and ignores a key that is no longer there', function (): void {
+    $view = viewFor($this->user, ['name' => 'Alpha']);
+    $gone = viewFor($this->user, ['name' => 'Gone']);
+    $gone->delete();
+
+    livewire(ListCompanies::class)->call('reorderViews', [$view->getKey(), $gone->getKey(), 'list'])->assertOk();
+
+    expect(orderFor(CrmEntity::Company))->toBe([$view->getKey(), 'list']);
+});
+
+it('opens the board from the opportunities list when the board is first and the list when it is not', function (): void {
+    livewire(ListOpportunities::class)->assertRedirect(OpportunityResource::getUrl('board'));
+
+    resolve(ReorderViews::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, ['list', 'board']);
+
+    livewire(ListOpportunities::class)->assertNoRedirect();
+});
+
+it('never redirects from the built-in list link, the board itself or a requested view', function (): void {
+    $view = viewFor($this->user, ['entity' => CrmEntity::Opportunity, 'name' => 'Open']);
+
+    Livewire::withQueryParams(['view' => SavedView::BUILT_IN_LIST_LINK])->test(ListOpportunities::class)->assertNoRedirect();
+    Livewire::withQueryParams(['view' => $view->getKey()])->test(ListOpportunities::class)->assertNoRedirect()->assertSet('activeSavedViewId', $view->getKey());
+    livewire(OpportunitiesBoard::class)->assertNoRedirect();
+});
+
+it('applies the first view when it is a saved one and does not redirect', function (): void {
+    $view = viewFor($this->user, ['entity' => CrmEntity::Opportunity, 'name' => 'Open', 'state' => hotLeads()]);
+    resolve(ReorderViews::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, [$view->getKey()]);
+
+    livewire(ListOpportunities::class)
+        ->assertNoRedirect()
+        ->assertSet('activeSavedViewId', $view->getKey())
+        ->assertSet('tableSort', 'created_at:desc');
+});
+
+it('names the board Pipeline for opportunities and Board for tasks', function (): void {
+    Livewire::withQueryParams(['view' => 'all'])->test(ListOpportunities::class)->assertSeeHtml('Pipeline')->assertDontSeeHtml('>Board<');
+    livewire(ManageTasks::class)->assertSeeHtml('Board')->assertDontSeeHtml('Pipeline');
 });

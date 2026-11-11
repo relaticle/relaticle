@@ -6,6 +6,7 @@ return [
     'view_switcher' => [
         'board' => 'Board',
         'cards' => 'Cards',
+        'opportunity_board' => 'Pipeline',
     ],
 
     'move_denied' => 'You do not have permission to move this card.',

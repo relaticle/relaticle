@@ -158,7 +158,7 @@ it('keeps the header row and its controls in place when switching between the li
     $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")
         ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/opportunities")
+        ->navigate("/app/{$workspace->slug}/opportunities?view=all")
         ->assertVisible('main .fi-header .fi-view-switcher');
 
     $list = $page->script($headerRow);

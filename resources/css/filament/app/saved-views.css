@@ -1,30 +1,26 @@
-/* The small tile in front of a view: primary for a saved view, gray for the built-in list, info for board and cards. */
+/* The small tile in front of a view: green for a table, orange for a board, blue for cards. */
 .fi-view-tile {
-    @apply flex size-5 shrink-0 items-center justify-center rounded-md;
+    @apply flex size-5 shrink-0 items-center justify-center rounded-md text-white;
 
     & .fi-icon {
         @apply size-3.5;
     }
 }
 
-.fi-view-tile-primary {
-    @apply bg-primary-100 text-primary-600 dark:bg-primary-400/15 dark:text-primary-400;
+.fi-view-tile-success {
+    @apply bg-success-500 dark:bg-success-600;
 }
 
-.fi-view-tile-gray {
-    @apply bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300;
+.fi-view-tile-orange {
+    @apply bg-orange-500 dark:bg-orange-600;
 }
 
 .fi-view-tile-info {
-    @apply bg-info-100 text-info-600 dark:bg-info-400/15 dark:text-info-400;
+    @apply bg-info-500 dark:bg-info-600;
 }
 
 .fi-view-switcher-label {
     @apply block max-w-56 truncate max-sm:max-w-32;
-}
-
-.fi-ta-views-tag {
-    @apply shrink-0 rounded-md px-1.5 text-xs font-medium text-gray-600 ring-1 ring-gray-950/10 dark:text-gray-300 dark:ring-white/20;
 }
 
 .fi-ta-views-row-created {
@@ -33,11 +29,16 @@
 
 /* A saved view's row highlights as one, its buttons included. */
 .fi-ta-views-row {
-    @apply relative flex items-center rounded-md;
+    @apply relative flex items-center rounded-lg;
 
     &:hover,
-    &:has(:focus-visible) {
+    &:has(:focus-visible),
+    &:has([aria-expanded='true']) {
         @apply bg-gray-50 dark:bg-white/5;
+
+        & .fi-ta-views-row-actions .fi-icon {
+            @apply text-gray-700 dark:text-gray-200;
+        }
     }
 
     & > .fi-dropdown-list-item {
@@ -45,13 +46,31 @@
     }
 }
 
-/* The view the table shows. A tint, unlike the gray hover, so the two never read alike. */
+/* The view the table shows. Darker than the hover, so the two never read alike. */
 .fi-ta-views-selected {
-    @apply bg-primary-50! dark:bg-primary-400/10!;
+    @apply bg-gray-100 dark:bg-white/10;
+
+    &:hover,
+    &:has(:focus-visible),
+    &:has([aria-expanded='true']) {
+        @apply bg-gray-100 dark:bg-white/10;
+    }
+}
+
+.fi-ta-views-list {
+    @apply flex flex-col gap-1;
+}
+
+.fi-ta-views-empty {
+    @apply px-2 py-3 text-sm text-gray-500 dark:text-gray-400;
 }
 
 .fi-ta-views-row-actions {
     @apply flex shrink-0 items-center gap-0.5 pe-1;
+
+    & .fi-icon-btn .fi-icon {
+        @apply text-gray-400 dark:text-gray-500;
+    }
 
     & .fi-icon-btn {
         @apply m-0 size-6;
@@ -66,60 +85,44 @@
     @apply max-w-56!;
 }
 
-/* A pointer swaps the row's status for its buttons. Touch has no hover, so both stay in view there. */
-@media (hover: hover) {
-    .fi-ta-views-row-actions {
-        @apply pointer-events-none absolute inset-y-0 end-0 opacity-0;
-    }
-
-    .fi-ta-views-row:hover,
-    .fi-ta-views-row:has(:focus-visible),
-    .fi-ta-views-row:has([aria-expanded='true']) {
-        & .fi-ta-views-row-actions {
-            @apply pointer-events-auto opacity-100;
-        }
-
-        & > .fi-dropdown-list-item {
-            @apply pe-16;
-        }
-    }
-}
-
-/* Search and Save stay in view; only the views between them scroll.
-   Spacing keeps a 4px grid: 4 between rows, 8 inside them and to the edge, 16 above a group. */
+/* Search and Create stay in view; only the views between them scroll. */
 .fi-ta-views-panel {
-    @apply flex max-h-112 flex-col p-1;
+    @apply flex max-h-112 flex-col;
 
     & .fi-dropdown-list {
         @apply gap-1;
     }
 
     & .fi-dropdown-list-item {
-        @apply h-8 px-2 py-0 hover:bg-gray-100 focus-visible:bg-gray-100 dark:hover:bg-white/5 dark:focus-visible:bg-white/5;
+        @apply h-9 rounded-lg px-2 py-0 hover:bg-gray-100 focus-visible:bg-gray-100 dark:hover:bg-white/5 dark:focus-visible:bg-white/5;
 
         & .fi-icon {
             @apply size-4;
         }
     }
-}
 
-.fi-ta-views-panel > :is(.fi-ta-views-scroll, .fi-dropdown-list) ~ .fi-dropdown-list {
-    @apply mt-1 border-t border-gray-100 pt-1 dark:border-white/10;
+    & > .fi-dropdown-list {
+        @apply border-t border-gray-100 p-2 dark:border-white/10;
+    }
 }
 
 .fi-ta-views-scroll {
-    @apply min-h-0 flex-1 overflow-y-auto;
+    @apply min-h-0 flex-1 overflow-y-auto p-2;
 }
 
 .fi-ta-views-search {
-    @apply m-1 flex items-center gap-2 rounded-lg p-2 text-gray-400 ring-1 ring-gray-950/10 dark:text-gray-500 dark:ring-white/10;
+    @apply flex shrink-0 items-center gap-2 border-b border-gray-100 px-4 py-3 dark:border-white/10;
 
     & .fi-icon {
-        @apply size-4!;
+        @apply hidden;
     }
 
     & input {
-        @apply min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-gray-950 outline-none placeholder:text-gray-400 focus:ring-0 dark:text-white dark:placeholder:text-gray-500;
+        @apply min-w-0 flex-1 border-0 bg-transparent p-0 text-base text-gray-950 shadow-none outline-none ring-0 placeholder:text-gray-400 focus:ring-0 focus:outline-none sm:text-sm dark:text-white dark:placeholder:text-gray-500;
+    }
+
+    & input::-webkit-search-cancel-button {
+        @apply hidden appearance-none;
     }
 }
 
@@ -127,8 +130,20 @@
     @apply flex items-center justify-between gap-2 px-2 pt-2 pb-1 text-xs font-medium text-gray-500 dark:text-gray-400;
 }
 
+.fi-ta-views-row-menu .fi-dropdown-list-item:disabled {
+    @apply pointer-events-none opacity-50;
+}
+
+.fi-ta-views-draggable {
+    @apply cursor-grab;
+}
+
 .fi-ta-views-save-current .fi-icon {
-    @apply size-4!;
+    @apply size-4! text-gray-500 dark:text-gray-400;
+}
+
+:is(.fi-view-switcher, .fi-view-settings):has(> .fi-dropdown-panel:not([style*='display: none'])) .fi-dropdown-trigger button {
+    @apply bg-gray-100 dark:bg-white/10;
 }
 
 .fi-view-controls {

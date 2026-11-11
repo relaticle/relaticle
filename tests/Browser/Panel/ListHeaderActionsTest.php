@@ -15,7 +15,7 @@ it('keeps the list Import / Export menu inside the viewport', function (int $wid
     loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")
         ->resize($width, $height)
-        ->navigate("/app/{$workspace->slug}/opportunities")
+        ->navigate("/app/{$workspace->slug}/opportunities?view=all")
         ->click('.fi-header button.fi-ac-btn-group:visible')
         ->assertSee(__('filament/resources/opportunity.pages.list.actions.import.label'))
         ->assertScript($panelFits, true)

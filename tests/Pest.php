@@ -14,12 +14,14 @@ declare(strict_types=1);
  * Conventions: see CLAUDE.md -> Testing section
  */
 
+use App\Enums\CrmEntity;
 use App\Enums\Notifications\NotificationReason;
 use App\Enums\WorkspaceSetupStep;
 use App\Features\Billing;
 use App\Filament\Pages\CreateWorkspace;
 use App\Filament\Pages\SetupWorkspace;
 use App\Models\Notification as NotificationRow;
+use App\Models\TablePreference;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Http\HostResolver;
@@ -126,6 +128,11 @@ function livewire(string $component, array $params = []): Testable
 /**
  * @return Collection<int, array<string, mixed>>
  */
+function openOpportunitiesOnTheList(User $user, Workspace $workspace): void
+{
+    TablePreference::factory()->for($user)->for($workspace)->create(['entity' => CrmEntity::Opportunity, 'view_order' => ['list', 'board']]);
+}
+
 function flashedNotifications(): Collection
 {
     $mailbox = resolve(NotificationMailbox::class);

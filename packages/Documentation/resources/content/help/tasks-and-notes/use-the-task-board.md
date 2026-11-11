@@ -2,13 +2,13 @@
 title: Use the task board
 description: A kanban view of your tasks. One column per status, drag to update, with priority and due-date badges.
 order: 2
-updated: "2026-11-08"
+updated: "2026-11-12"
 related: [help/tasks-and-notes/work-with-tasks, help/custom-fields/edit-the-options-in-a-select-field, help/getting-started/track-a-deal-through-the-pipeline]
 ---
 
 The task board is the same tasks as the list, laid out as a kanban: one
 column per status, a card per task. To open it, use the view menu at the
-top left of the Tasks page, which shows **List**, and choose **Board**.
+top left of the Tasks page, which shows **All tasks**, and choose **Board**.
 
 ## Reading the board
 
