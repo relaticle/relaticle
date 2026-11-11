@@ -61,6 +61,27 @@ it('queues a digest for a user at 08:00 local time', function (): void {
     Mail::assertQueued(TaskDigestMail::class, fn (TaskDigestMail $mail): bool => $mail->hasTo($user->email));
 });
 
+it('queues one digest per workspace that has due tasks', function (): void {
+    $this->travelTo(Date::parse('2026-06-29 08:00:00', 'UTC'));
+    $user = userWithDueTask('UTC');
+    $personal = $user->currentWorkspace;
+
+    $shared = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+    $shared->users()->attach($user, ['role' => 'member']);
+    $task = Task::factory()->for($shared)->create(['title' => 'Shared task']);
+    $task->assignees()->attach($user);
+    digestCmdSetDue($task, $shared->id, now());
+
+    $idle = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+    $idle->users()->attach($user, ['role' => 'member']);
+
+    $this->artisan('notifications:send-task-digest')->expectsOutput('Queued 2 task digest email(s).')->assertSuccessful();
+
+    Mail::assertQueuedCount(2);
+    Mail::assertQueued(TaskDigestMail::class, fn (TaskDigestMail $mail): bool => $mail->workspace->is($personal) && $mail->digest->overdueCount() === 1);
+    Mail::assertQueued(TaskDigestMail::class, fn (TaskDigestMail $mail): bool => $mail->workspace->is($shared) && $mail->digest->upcomingCount() === 1);
+});
+
 it('does not queue outside 08:00 local time', function (): void {
     $this->travelTo(Date::parse('2026-06-29 09:00:00', 'UTC'));
     userWithDueTask('UTC');

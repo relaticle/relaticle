@@ -32,9 +32,7 @@ final class SendTaskDigestCommand extends Command
             ->with(['ownedWorkspaces.subscriptions', 'workspaces.subscriptions'])
             ->chunkById(500, function (Collection $users) use ($digestService, &$sent): void {
                 foreach ($users as $user) {
-                    if ($this->sendForUser($user, $digestService)) {
-                        $sent++;
-                    }
+                    $sent += $this->sendForUser($user, $digestService);
                 }
             });
 
@@ -43,27 +41,29 @@ final class SendTaskDigestCommand extends Command
         return self::SUCCESS;
     }
 
-    private function sendForUser(User $user, DigestService $digestService): bool
+    private function sendForUser(User $user, DigestService $digestService): int
     {
-        $localNow = Date::now($user->effectiveTimezone());
-
-        if ($localNow->hour !== 8) {
-            return false;
+        if (Date::now($user->effectiveTimezone())->hour !== 8) {
+            return 0;
         }
 
         if (! $user->wantsNotification(NotificationType::TaskDigest, NotificationChannel::Email)) {
-            return false;
+            return 0;
         }
 
-        $payload = $digestService->forUser($user);
+        $sent = 0;
 
-        if ($payload->isEmpty()) {
-            return false;
+        foreach ($user->allWorkspaces() as $workspace) {
+            $digest = $digestService->forWorkspace($user, $workspace);
+
+            if ($digest->isEmpty()) {
+                continue;
+            }
+
+            Mail::to($user)->send(new TaskDigestMail($user, $workspace, $digest));
+            $sent++;
         }
 
-        Mail::to($user)
-            ->send(new TaskDigestMail($user, $payload));
-
-        return true;
+        return $sent;
     }
 }

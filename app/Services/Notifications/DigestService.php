@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Services\Notifications;
 
 use App\Contracts\Entitlements;
-use App\Data\DigestPayload;
+use App\Data\DigestRecord;
 use App\Data\DigestTaskItem;
-use App\Data\DigestWorkspaceSection;
+use App\Data\TaskDigest;
 use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\TaskField;
@@ -17,8 +17,10 @@ use App\Support\CanonicalRecordUrl;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\JoinClause;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use stdClass;
 
 final readonly class DigestService
 {
@@ -27,44 +29,62 @@ final readonly class DigestService
         private CanonicalRecordUrl $urls,
     ) {}
 
-    public function forUser(User $user): DigestPayload
-    {
-        $timezone = $user->effectiveTimezone();
-        $startOfToday = Date::now($timezone)->startOfDay()->utc();
-        $windowEnd = $startOfToday->copy()->addDay();
-
-        $sections = [];
-
-        foreach ($user->allWorkspaces() as $workspace) {
-            if (! $this->entitlements->allowsAccess($workspace)) {
-                continue;
-            }
-
-            $section = $this->sectionForWorkspace($user, $workspace, $startOfToday, $windowEnd);
-
-            if (! $section->isEmpty()) {
-                $sections[] = $section;
-            }
-        }
-
-        return new DigestPayload($sections);
-    }
-
-    private function sectionForWorkspace(User $user, Workspace $workspace, CarbonImmutable $startOfToday, CarbonImmutable $windowEnd): DigestWorkspaceSection
+    public function forWorkspace(User $user, Workspace $workspace): TaskDigest
     {
         $meta = $this->resolveFieldMetadata($workspace);
 
-        if ($meta['due_field_id'] === null) {
-            return new DigestWorkspaceSection($workspace->name, [], []);
+        if ($meta['due_field_id'] === null || ! $this->entitlements->allowsAccess($workspace)) {
+            return new TaskDigest([], []);
         }
 
-        $rows = DB::table('tasks as t')
+        $startOfToday = Date::now($user->effectiveTimezone())->startOfDay()->utc();
+        $rows = $this->dueTaskRows($user, $workspace, $meta, $startOfToday->addDay());
+        $records = $this->linkedRecords($workspace, array_values($rows->map(fn (object $row): string => (string) $row->id)->all()));
+
+        $overdue = [];
+        $upcoming = [];
+
+        foreach ($rows as $row) {
+            $dueAt = Date::parse($row->due_at);
+
+            $item = new DigestTaskItem(
+                title: (string) $row->title,
+                dueAt: $dueAt,
+                editUrl: $this->urls->buildOrFail(CrmEntity::Task, (string) $row->id, $workspace),
+                records: $records[(string) $row->id] ?? [],
+                priority: $row->priority !== null ? (string) $row->priority : null,
+                priorityColor: $row->priority_color !== null ? (string) $row->priority_color : null,
+            );
+
+            if ($dueAt->lt($startOfToday)) {
+                $overdue[] = $item;
+            } else {
+                $upcoming[] = $item;
+            }
+        }
+
+        return new TaskDigest($overdue, $upcoming);
+    }
+
+    /**
+     * @param  array{due_field_id: ?string, status_field_id: ?string, done_option_id: ?string, priority_field_id: ?string}  $meta
+     * @return Collection<int, stdClass>
+     */
+    private function dueTaskRows(User $user, Workspace $workspace, array $meta, CarbonImmutable $windowEnd): Collection
+    {
+        return DB::table('tasks as t')
             ->join('task_user as tu', 'tu.task_id', '=', 't.id')
             ->leftJoin('custom_field_values as due', function (JoinClause $join) use ($meta): void {
                 $join->on('due.entity_id', '=', 't.id')
                     ->where('due.entity_type', '=', 'task')
                     ->where('due.custom_field_id', '=', $meta['due_field_id']);
             })
+            ->leftJoin('custom_field_values as pr', function (JoinClause $join) use ($meta): void {
+                $join->on('pr.entity_id', '=', 't.id')
+                    ->where('pr.entity_type', '=', 'task')
+                    ->where('pr.custom_field_id', '=', $meta['priority_field_id']);
+            })
+            ->leftJoin('custom_field_options as po', 'po.id', '=', 'pr.string_value')
             ->where('t.workspace_id', $workspace->getKey())
             ->where('tu.user_id', $user->getKey())
             ->whereNull('t.deleted_at')
@@ -82,33 +102,43 @@ final readonly class DigestService
                 });
             })
             ->orderBy('due.datetime_value')
-            ->select(['t.id', 't.title', 'due.datetime_value as due_at'])
+            ->select(['t.id', 't.title', 'due.datetime_value as due_at', 'po.name as priority'])
+            ->selectRaw("po.settings->>'color' as priority_color")
             ->get();
-
-        $overdue = [];
-        $upcoming = [];
-
-        foreach ($rows as $row) {
-            $dueAt = Date::parse($row->due_at);
-
-            $item = new DigestTaskItem(
-                title: (string) $row->title,
-                dueAt: $dueAt,
-                editUrl: $this->urls->buildOrFail(CrmEntity::Task, (string) $row->id, $workspace),
-            );
-
-            if ($dueAt->lt($startOfToday)) {
-                $overdue[] = $item;
-            } else {
-                $upcoming[] = $item;
-            }
-        }
-
-        return new DigestWorkspaceSection($workspace->name, $overdue, $upcoming);
     }
 
     /**
-     * @return array{due_field_id: ?string, status_field_id: ?string, done_option_id: ?string}
+     * @param  list<string>  $taskIds
+     * @return array<string, list<DigestRecord>>
+     */
+    private function linkedRecords(Workspace $workspace, array $taskIds): array
+    {
+        if ($taskIds === []) {
+            return [];
+        }
+
+        $records = [];
+
+        foreach (CrmEntity::linkable() as $entity) {
+            $rows = DB::table('taskables as link')
+                ->join($entity->table().' as record', 'record.id', '=', 'link.taskable_id')
+                ->whereIn('link.task_id', $taskIds)
+                ->where('link.taskable_type', $entity->value)
+                ->where('record.workspace_id', $workspace->getKey())
+                ->whereNull('record.deleted_at')
+                ->orderBy('record.'.$entity->titleColumn())
+                ->get(['link.task_id', 'record.'.$entity->titleColumn().' as name']);
+
+            foreach ($rows as $row) {
+                $records[(string) $row->task_id][] = new DigestRecord($entity, (string) $row->name);
+            }
+        }
+
+        return $records;
+    }
+
+    /**
+     * @return array{due_field_id: ?string, status_field_id: ?string, done_option_id: ?string, priority_field_id: ?string}
      */
     private function resolveFieldMetadata(Workspace $workspace): array
     {
@@ -119,11 +149,12 @@ final readonly class DigestService
             })
             ->where('cf.tenant_id', $workspace->getKey())
             ->where('cf.entity_type', 'task')
-            ->whereIn('cf.code', ['due_date', 'status'])
+            ->whereIn('cf.code', ['due_date', 'status', 'priority'])
             ->selectRaw(implode(', ', [
                 "MAX(CASE WHEN cf.code = 'due_date' THEN cf.id END) AS due_field_id",
                 "MAX(CASE WHEN cf.code = 'status' THEN cf.id END) AS status_field_id",
                 "MAX(CASE WHEN cf.code = 'status' THEN opt.id END) AS done_option_id",
+                "MAX(CASE WHEN cf.code = 'priority' THEN cf.id END) AS priority_field_id",
             ]))
             ->first();
 
@@ -131,6 +162,7 @@ final readonly class DigestService
             'due_field_id' => $row?->due_field_id !== null ? (string) $row->due_field_id : null,
             'status_field_id' => $row?->status_field_id !== null ? (string) $row->status_field_id : null,
             'done_option_id' => $row?->done_option_id !== null ? (string) $row->done_option_id : null,
+            'priority_field_id' => $row?->priority_field_id !== null ? (string) $row->priority_field_id : null,
         ];
     }
 }

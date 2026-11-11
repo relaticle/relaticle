@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Data\DigestPayload;
+use App\Data\TaskDigest;
 use App\Enums\Plan;
 use App\Listeners\Email\DropBouncedRecipientsListener;
 use App\Listeners\Email\ParkInactiveRecipientsListener;
@@ -42,11 +42,16 @@ function useMailcoachAnswering(MockHttpClient $client): void
     ));
 }
 
+function emptyDigestMail(User $user): TaskDigestMail
+{
+    return new TaskDigestMail($user, Workspace::factory()->create(), new TaskDigest([], []));
+}
+
 function queueDigestThrough(MockHttpClient $client, User $user, string $expectedException): void
 {
     useMailcoachAnswering($client);
 
-    expect(fn () => Mail::mailer('array')->to($user)->queue(new TaskDigestMail($user, new DigestPayload([]))))
+    expect(fn () => Mail::mailer('array')->to($user)->queue(emptyDigestMail($user)))
         ->toThrow($expectedException);
 }
 
@@ -55,7 +60,7 @@ it('parks the recipient when the provider reports an inactive address', function
 
     useMailcoachAnswering(new MockHttpClient(new MockResponse('', ['http_code' => 406])));
 
-    Mail::mailer('array')->to($user)->queue(new TaskDigestMail($user, new DigestPayload([])));
+    Mail::mailer('array')->to($user)->queue(emptyDigestMail($user));
 
     expect($user->fresh()->email_bounced_at)->not->toBeNull();
 });
@@ -92,7 +97,7 @@ it('parks the owner when the trial notice bounces', function (): void {
 it('drops a parked recipient of parkable mail before the message reaches the transport', function (): void {
     $parked = User::factory()->withPersonalWorkspace()->create(['email_bounced_at' => now()]);
 
-    Mail::mailer('array')->to($parked)->send(new TaskDigestMail($parked, new DigestPayload([])));
+    Mail::mailer('array')->to($parked)->send(emptyDigestMail($parked));
 
     expect(Mail::mailer('array')->getSymfonyTransport()->messages())->toBeEmpty();
 });
@@ -109,7 +114,7 @@ it('still delivers parkable mail to the other recipients of a message', function
     $parked = User::factory()->create(['email_bounced_at' => now()]);
     $active = User::factory()->withPersonalWorkspace()->create();
 
-    Mail::mailer('array')->to([$parked, $active])->send(new TaskDigestMail($active, new DigestPayload([])));
+    Mail::mailer('array')->to([$parked, $active])->send(emptyDigestMail($active));
 
     $sent = Mail::mailer('array')->getSymfonyTransport()->messages();
 
@@ -178,7 +183,7 @@ it('does not fail or report the queued mailable when the provider rejects an ina
     $user = User::factory()->withPersonalWorkspace()->create();
     useMailcoachAnswering(new MockHttpClient(new MockResponse('', ['http_code' => 406])));
 
-    Mail::mailer('array')->to($user)->queue(new TaskDigestMail($user, new DigestPayload([])));
+    Mail::mailer('array')->to($user)->queue(emptyDigestMail($user));
 
     Exceptions::assertNotReported(HttpTransportException::class);
     expect($user->fresh()->email_bounced_at)->not->toBeNull();
@@ -224,7 +229,7 @@ it('parks nobody and keeps failing when a message with several recipients bounce
     $second = User::factory()->create();
     useMailcoachAnswering(new MockHttpClient(new MockResponse('', ['http_code' => 406])));
 
-    expect(fn () => Mail::mailer('array')->to([$first, $second])->send(new TaskDigestMail($first, new DigestPayload([]))))
+    expect(fn () => Mail::mailer('array')->to([$first, $second])->send(emptyDigestMail($first)))
         ->toThrow(HttpTransportException::class);
 
     expect($first->fresh()->email_bounced_at)->toBeNull()
@@ -259,7 +264,7 @@ it('queues mail with retries so a provider outage does not lose it', function ()
     Queue::fake();
     $user = User::factory()->withPersonalWorkspace()->create();
 
-    Mail::to($user)->queue(new TaskDigestMail($user, new DigestPayload([])));
+    Mail::to($user)->queue(emptyDigestMail($user));
 
     Queue::assertPushed(SendQueuedMailable::class, fn (SendQueuedMailable $job): bool => $job->tries === 3
         && $job->backoff() === [60, 300]);

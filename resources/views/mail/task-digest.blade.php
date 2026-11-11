@@ -2,18 +2,18 @@
 <x-slot:preheader>{{ $preheader }}</x-slot:preheader>
 # {{ __('mail.task_digest.heading', ['name' => $greetingName]) }}
 
-@foreach($sections as $section)
-## {{ $section['name'] }}
+{{ $summary }}
 
-@if($section['overdue'] !== [])
-<x-mail::list :title="__('mail.task_digest.overdue')" :rows="$section['overdue']" />
-@endif
-@if($section['upcoming'] !== [])
-<x-mail::list :title="__('mail.task_digest.due_today')" :rows="$section['upcoming']" />
-@endif
-@endforeach
+<p class="sub">{{ __('mail.task_digest.open_hint', ['workspace' => $workspaceName]) }}</p>
 
-<x-mail::button :url="$tasksUrl">
+<x-mail::button :url="$tasksUrl" align="left">
 {{ __('mail.task_digest.cta') }}
 </x-mail::button>
+
+@if($overdue !== [])
+<x-mail::task-list :title="__('mail.task_digest.overdue')" :tasks="$overdue" tone="overdue" />
+@endif
+@if($upcoming !== [])
+<x-mail::task-list :title="__('mail.task_digest.due_today')" :tasks="$upcoming" />
+@endif
 </x-mail::message>

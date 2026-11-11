@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
-use App\Data\DigestPayload;
+use App\Data\DigestRecord;
 use App\Data\DigestTaskItem;
-use App\Data\DigestWorkspaceSection;
+use App\Data\TaskDigest;
 use App\Enums\Notifications\NotificationType;
 use App\Filament\Pages\NotificationPreferences;
 use App\Filament\Resources\TaskResource;
 use App\Models\User;
+use App\Models\Workspace;
+use Filament\Support\Colors\Color;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -21,6 +23,7 @@ use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 
 #[Tries(3)]
 #[Backoff(60, 300)]
@@ -28,9 +31,16 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
+    private const int PREHEADER_TITLES = 3;
+
+    private const int RECORDS_SHOWN = 1;
+
+    private const int RECORD_NAME_LIMIT = 24;
+
     public function __construct(
         public User $user,
-        public DigestPayload $payload,
+        public Workspace $workspace,
+        public TaskDigest $digest,
     ) {}
 
     public function envelope(): Envelope
@@ -40,19 +50,19 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
 
     private function digestSubject(): string
     {
-        $overdue = $this->payload->overdueCount();
-        $due = $this->payload->upcomingCount();
-        $date = now($this->user->effectiveTimezone())->format('M j');
+        $overdue = $this->digest->overdueCount();
+        $due = $this->digest->upcomingCount();
+        $replace = ['workspace' => $this->workspace->name, 'date' => now($this->user->effectiveTimezone())->format('M j')];
 
         if ($overdue > 0 && $due > 0) {
-            return __('mail.task_digest.subject_both', ['overdue' => $overdue, 'due' => $due, 'date' => $date]);
+            return __('mail.task_digest.subject_both', [...$replace, 'overdue' => $overdue, 'due' => $due]);
         }
 
         if ($overdue > 0) {
-            return trans_choice('mail.task_digest.subject_overdue', $overdue, ['date' => $date]);
+            return trans_choice('mail.task_digest.subject_overdue', $overdue, $replace);
         }
 
-        return trans_choice('mail.task_digest.subject_due', $due, ['date' => $date]);
+        return trans_choice('mail.task_digest.subject_due', $due, $replace);
     }
 
     public function headers(): Headers
@@ -73,46 +83,118 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
 
     public function content(): Content
     {
-        $tenant = $this->user->currentWorkspace ?? $this->user->allWorkspaces()->first();
         $timezone = $this->user->effectiveTimezone();
 
         return new Content(
             markdown: 'mail.task-digest',
             with: [
                 'greetingName' => explode(' ', $this->user->name)[0],
-                'preheader' => __('mail.task_digest.preheader', [
-                    'overdue' => $this->payload->overdueCount(),
-                    'due' => $this->payload->upcomingCount(),
-                ]),
-                'sections' => array_map(fn (DigestWorkspaceSection $workspace): array => [
-                    'name' => $workspace->workspaceName,
-                    'overdue' => $this->rows($workspace->overdue, $timezone),
-                    'upcoming' => $this->rows($workspace->upcoming, $timezone),
-                ], $this->payload->workspaces),
+                'preheader' => $this->preheader(),
+                'summary' => $this->summary(),
+                'workspaceName' => $this->workspace->name,
+                'overdue' => $this->cards($this->digest->overdue, fn (DigestTaskItem $item): string => __('mail.task_digest.due_overdue', [
+                    'date' => $item->dueAt->setTimezone($timezone)->format('M j, Y'),
+                ])),
+                'upcoming' => $this->cards($this->digest->upcoming, fn (): string => __('mail.task_digest.due_today_chip')),
                 'tasksUrl' => TaskResource::getUrl(
                     name: 'index',
                     parameters: [
                         'tableFilters' => ['assigned_to_me' => ['isActive' => true]],
-                        'tenant' => $tenant,
+                        'tenant' => $this->workspace,
                     ],
                     panel: 'app',
                 ),
-                'settingsUrl' => NotificationPreferences::getUrl(panel: 'app', tenant: $tenant),
+                'settingsUrl' => NotificationPreferences::getUrl(panel: 'app', tenant: $this->workspace),
                 'unsubscribeUrl' => $this->unsubscribeUrl(),
             ],
         );
     }
 
+    private function summary(): string
+    {
+        $overdue = $this->digest->overdueCount();
+        $due = $this->digest->upcomingCount();
+        $overdueText = '**'.trans_choice('mail.task_digest.summary_overdue', $overdue).'**';
+        $dueText = '**'.trans_choice('mail.task_digest.summary_due', $due).'**';
+
+        if ($overdue > 0 && $due > 0) {
+            return __('mail.task_digest.summary_both', ['overdue' => $overdueText, 'due' => $dueText, 'workspace' => $this->workspace->name]);
+        }
+
+        return __('mail.task_digest.summary', ['tasks' => $overdue > 0 ? $overdueText : $dueText, 'workspace' => $this->workspace->name]);
+    }
+
+    private function preheader(): string
+    {
+        $titles = array_map(
+            fn (DigestTaskItem $item): string => $item->title,
+            [...$this->digest->overdue, ...$this->digest->upcoming],
+        );
+
+        $shown = implode(', ', array_slice($titles, 0, self::PREHEADER_TITLES));
+        $hidden = count($titles) - self::PREHEADER_TITLES;
+
+        return $hidden > 0 ? __('mail.task_digest.preheader_more', ['tasks' => $shown, 'count' => $hidden]) : $shown;
+    }
+
     /**
      * @param  list<DigestTaskItem>  $items
-     * @return list<array{label: string, url: string, meta: string}>
+     * @param  callable(DigestTaskItem): string  $dueLabel
+     * @return list<array{title: string, url: string, due: string, dueIcon: string, priority: ?array{label: string, dot: ?string, text: ?string, background: ?string, border: ?string}, records: list<array{label: string, icon: ?string}>}>
      */
-    private function rows(array $items, string $timezone): array
+    private function cards(array $items, callable $dueLabel): array
     {
         return array_map(fn (DigestTaskItem $item): array => [
-            'label' => $item->title,
+            'title' => $item->title,
             'url' => $item->editUrl,
-            'meta' => __('mail.task_digest.due', ['date' => $item->dueAt->copy()->setTimezone($timezone)->format('M j, Y')]),
+            'due' => $dueLabel($item),
+            'dueIcon' => $this->iconUrl('lucide-calendar'),
+            'priority' => $item->priority === null ? null : ['label' => $item->priority, ...$this->priorityColors($item->priorityColor)],
+            'records' => $this->recordChips($item->records),
         ], $items);
+    }
+
+    /**
+     * @return array{dot: ?string, text: ?string, background: ?string, border: ?string}
+     */
+    private function priorityColors(?string $color): array
+    {
+        // The shades Filament's colored badge uses, so the chip matches the board's priority badge.
+        if ($color === null || preg_match('/^#[0-9a-f]{6}$/i', $color) !== 1) {
+            return ['dot' => null, 'text' => null, 'background' => null, 'border' => null];
+        }
+
+        $palette = Color::hex($color);
+
+        return [
+            'dot' => Color::convertToHex($palette[500]),
+            'text' => Color::convertToHex($palette[700]),
+            'background' => Color::convertToHex($palette[50]),
+            'border' => Color::convertToHex($palette[100]),
+        ];
+    }
+
+    /**
+     * @param  list<DigestRecord>  $records
+     * @return list<array{label: string, icon: ?string}>
+     */
+    private function recordChips(array $records): array
+    {
+        $chips = array_map(fn (DigestRecord $record): array => [
+            'label' => Str::limit($record->name, self::RECORD_NAME_LIMIT),
+            'icon' => $this->iconUrl($record->entity->icon()),
+        ], array_slice($records, 0, self::RECORDS_SHOWN));
+        $hidden = count($records) - self::RECORDS_SHOWN;
+
+        if ($hidden > 0) {
+            $chips[] = ['label' => __('mail.task_digest.more_records', ['count' => $hidden]), 'icon' => null];
+        }
+
+        return $chips;
+    }
+
+    private function iconUrl(string $lucideIcon): string
+    {
+        return asset('brand/email-icons/'.Str::after($lucideIcon, 'lucide-').'.png');
     }
 }
