@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Data\TableStateData;
 use App\Enums\CrmEntity;
+use App\Enums\WorkspaceRole;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\NoteResource\Pages\ManageNotes;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
@@ -11,6 +12,7 @@ use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Tables\Concerns\HasColumnMenu;
 use App\Filament\Tables\ResizableColumns;
+use App\Models\CustomField;
 use App\Models\SavedView;
 use App\Models\TablePreference;
 use App\Models\User;
@@ -787,4 +789,125 @@ it('tells the member every attribute is in the view once none is hidden', functi
 
     $component->assertSeeText('Every attribute is already in this view');
     $component->call('hideTableColumn', 'created_at')->assertDontSeeText('Every attribute is already in this view');
+});
+
+function newAttributeColumns(Testable $component, array $before): array
+{
+    return array_values(array_diff(columnOrder($component), $before));
+}
+
+function customFieldCount(): int
+{
+    return CustomField::query()->withoutGlobalScopes()->where('system_defined', false)->count();
+}
+
+it('adds a text attribute as a shown column at the end of the view, on the same component and on a fresh mount', function (string $page, CrmEntity $entity): void {
+    $component = livewire($page);
+    $before = columnOrder($component);
+
+    $component->callAction('createTableAttribute', data: ['name' => 'Lead score', 'type' => 'text'])
+        ->assertHasNoActionErrors()
+        ->assertNotified();
+
+    $added = newAttributeColumns($component, $before);
+
+    expect($added)->toHaveCount(1)
+        ->and(last(columnOrder($component)))->toBe($added[0])
+        ->and(columnIsShown($component, $added[0]))->toBeTrue()
+        ->and($component->instance()->getTable()->getColumn($added[0]))->not->toBeNull()
+        ->and(CustomField::query()->where('entity_type', $entity->value)->where('name', 'Lead score')->sole()->settings->visible_in_list)->toBeTrue();
+
+    $fresh = livewire($page);
+
+    expect(columnOrder($fresh))->toContain($added[0])
+        ->and(columnIsShown($fresh, $added[0]))->toBeTrue();
+})->with('column menu pages');
+
+it('leaves another saved view unmodified after an attribute is added', function (): void {
+    $stored = storedColumns(livewire(ListCompanies::class));
+    $view = SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+        'entity' => CrmEntity::Company,
+        'state' => new TableStateData(columns: $stored),
+    ]);
+    $component = livewire(ListCompanies::class);
+
+    $component->callAction('createTableAttribute', data: ['name' => 'Lead score', 'type' => 'text'])
+        ->call('applySavedView', $view->getKey());
+
+    expect($component->instance()->isSavedViewModified())->toBeFalse();
+
+    $fresh = livewire(ListCompanies::class);
+
+    expect($fresh->get('activeSavedViewId'))->toBe($view->getKey())
+        ->and($fresh->instance()->isSavedViewModified())->toBeFalse();
+});
+
+it('adds a select attribute with its three options', function (): void {
+    $component = livewire(ListCompanies::class);
+    $before = columnOrder($component);
+
+    $component->callAction('createTableAttribute', data: ['name' => 'Tier', 'type' => 'select', 'options' => [['name' => 'Gold'], ['name' => 'Silver'], ['name' => 'Bronze']]])
+        ->assertHasNoActionErrors();
+
+    $field = CustomField::query()->where('entity_type', 'company')->where('name', 'Tier')->sole();
+
+    expect($field->options->pluck('name')->all())->toBe(['Gold', 'Silver', 'Bronze'])
+        ->and(newAttributeColumns($component, $before))->toHaveCount(1);
+});
+
+it('adds a record attribute linked to companies', function (): void {
+    $component = livewire(ListPeople::class);
+    $before = columnOrder($component);
+
+    $component->callAction('createTableAttribute', data: ['name' => 'Employer', 'type' => 'record', 'lookup_type' => 'company'])
+        ->assertHasNoActionErrors();
+
+    expect(CustomField::query()->where('entity_type', 'people')->where('name', 'Employer')->sole()->lookup_type)->toBe('company')
+        ->and(newAttributeColumns($component, $before))->toHaveCount(1);
+});
+
+it('takes the entity from the list and never from the form', function (): void {
+    livewire(ListCompanies::class)->callAction('createTableAttribute', data: ['name' => 'Lead score', 'type' => 'text', 'entity_type' => 'people']);
+
+    expect(CustomField::query()->where('name', 'Lead score')->sole()->entity_type)->toBe('company');
+});
+
+it('shows the validator error on the name and creates nothing for a duplicate', function (): void {
+    $component = livewire(ListCompanies::class)->callAction('createTableAttribute', data: ['name' => 'Lead score', 'type' => 'text']);
+    $count = customFieldCount();
+    $columns = columnOrder($component);
+
+    $component->callAction('createTableAttribute', data: ['name' => 'lead score', 'type' => 'text'])
+        ->assertHasActionErrors(['name']);
+
+    expect(customFieldCount())->toBe($count)
+        ->and(columnOrder($component))->toBe($columns);
+});
+
+it('shows a repeated option on its own row', function (): void {
+    $count = customFieldCount();
+
+    livewire(ListCompanies::class)
+        ->callAction('createTableAttribute', data: ['name' => 'Tier', 'type' => 'select', 'options' => [['name' => 'Gold'], ['name' => 'gold']]])
+        ->assertHasActionErrors(['options.1.name']);
+
+    expect(customFieldCount())->toBe($count);
+});
+
+function actAsMember(object $test): void
+{
+    $member = User::factory()->create();
+    $test->user->currentWorkspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member->switchWorkspace($test->user->currentWorkspace);
+    $test->actingAs($member->fresh());
+    Filament::setTenant($test->user->currentWorkspace);
+}
+
+it('refuses a member who calls the create attribute action directly', function (): void {
+    actAsMember($this);
+    $count = customFieldCount();
+
+    livewire(ListCompanies::class)->mountAction('createTableAttribute')->assertForbidden();
+
+    expect(customFieldCount())->toBe($count);
 });

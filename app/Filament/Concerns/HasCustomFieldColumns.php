@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Concerns;
 
 use App\Filament\Components\Tables\ColumnHeaderLabel;
+use App\Filament\Tables\Concerns\CreatesTableAttribute;
 use App\Filament\Tables\Concerns\HasColumnMenu;
 use App\Filament\Tables\Concerns\HasFilterBar;
 use App\Filament\Tables\Concerns\HasResizableColumns;
@@ -24,6 +25,7 @@ use Relaticle\CustomFields\Facades\CustomFields;
 
 trait HasCustomFieldColumns
 {
+    use CreatesTableAttribute;
     use HasColumnMenu;
     use HasFilterBar;
     use HasResizableColumns;
