@@ -54,6 +54,10 @@ final class ScheduleInactiveTrialDeletionsCommand extends Command
                 return;
             }
 
+            if ($workspace->inactivity_notice_sent_at === null) {
+                return;
+            }
+
             $lastActiveAt = $inactive->lastActivity($workspace);
             $deletesAt = $lastActiveAt->addDays(InactiveTrialWorkspacesQuery::KEEP_DAYS);
             $earliest = now()->addDays(InactiveTrialWorkspacesQuery::WARNING_DAYS);
