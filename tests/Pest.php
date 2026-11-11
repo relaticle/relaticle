@@ -403,6 +403,11 @@ function asyncAlpineComponentsLoaded(): string
     return 'document.querySelector("[x-load][x-ignore]") === null';
 }
 
+function livewireStarted(): string
+{
+    return 'new Promise(resolve => { const poll = () => window.Livewire?.all().length > 0 ? resolve(true) : setTimeout(poll, 25); poll(); })';
+}
+
 function pdfBytes(): string
 {
     return "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n";

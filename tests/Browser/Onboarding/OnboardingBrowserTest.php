@@ -27,7 +27,7 @@ function walkToUseCaseStep(User $user, string $name, string $slug): AwaitableWeb
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Help us customize your workspace')
         ->assertPathIs("/app/{$slug}/setup")
-        ->assertScript(asyncAlpineComponentsLoaded());
+        ->assertScript(livewireStarted());
 }
 
 it('records onboarding conversions after navigation without counting them again', function (string $event): void {
@@ -103,7 +103,7 @@ it('walks a new owner through every setup screen to the setup conversation', fun
         ->waitForText('Help us customize your workspace')
         ->assertPathIs('/app/my-first-workspace/setup')
         ->assertNoJavaScriptErrors()
-        ->assertScript(asyncAlpineComponentsLoaded())
+        ->assertScript(livewireStarted())
         ->click('[for$="onboarding_use_case-other"]')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Invite your team')
@@ -245,7 +245,7 @@ it('moves focus to the heading of each new wizard and setup step', function (): 
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Help us customize your workspace')
         ->assertScript(FOCUSED_HEADING, 'Help us customize your workspace')
-        ->assertScript(asyncAlpineComponentsLoaded())
+        ->assertScript(livewireStarted())
         ->click('[for$="onboarding_use_case-other"]')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Invite your team')
@@ -285,7 +285,7 @@ it('stores the assistant and the question behind an AI referral picked in the br
         ->type('[id$="onboarding_referral_prompt"]', 'A CRM my assistant can update')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Help us customize your workspace')
-        ->assertScript(asyncAlpineComponentsLoaded())
+        ->assertScript(livewireStarted())
         ->click('[for$="onboarding_use_case-other"]')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Invite your team')

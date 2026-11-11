@@ -23,7 +23,7 @@ it('can create a new workspace through the browser', function (): void {
         ->waitForText('Help us customize your workspace')
         ->assertPathIs('/app/second-workspace/setup')
         ->assertDontSee('How did you hear about us?')
-        ->assertScript(asyncAlpineComponentsLoaded())
+        ->assertScript(livewireStarted())
         ->click('[for$="onboarding_use_case-other"]')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Invite your team')

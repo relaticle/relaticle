@@ -104,9 +104,9 @@ it('runs the greeting on the opener and carries its instructions in the turn blo
         && str_contains($prompt->agent->dynamicInstructions(), "<turn>\n".MessageOrigin::Greeting->directive()."\n</turn>"));
 });
 
-it('asks for a list of people or companies in the greeting', function (): void {
+it('says a pasted list works in the greeting and never calls records contacts', function (): void {
     expect(MessageOrigin::Greeting->directive())
-        ->toContain('paste a list of people or companies in any columns and any order')
+        ->toContain('say a pasted list works too')
         ->not->toContain('contacts');
 });
 
