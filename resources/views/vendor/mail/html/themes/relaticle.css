@@ -455,13 +455,15 @@ img {
 }
 
 .task-more {
-    padding: 8px 4px 4px;
+    padding: 2px 4px 0;
 }
 
 .task-more-link {
+    display: inline-block;
     font-size: 13px;
     font-weight: 500;
     line-height: 20px;
+    padding: 6px 0 4px;
     text-decoration: none;
 }
 
