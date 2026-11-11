@@ -240,7 +240,7 @@ trait HasViewSwitcher
 
     /**
      * @param  array<string, array{name: string, url: string, active: bool, label: string}>  $pages
-     * @return list<array{key: string, kind: string, label: string, icon: string, tone: string, url: string, active: bool, canUpdate: bool, createdLabel: ?string}>
+     * @return list<array{key: string, kind: string, label: string, icon: string, tone: string, url: string, active: bool, canUpdate: bool, createdLabel: array<array-key, mixed>|string|null}>
      */
     private function viewSwitcherEntries(array $pages): array
     {
@@ -281,6 +281,14 @@ trait HasViewSwitcher
             ];
         }
 
-        return array_values(array_map(static fn (string $key): array => $entries[$key], array_filter($this->viewOrder(), static fn (string $key): bool => isset($entries[$key]))));
+        $ordered = [];
+
+        foreach ($this->viewOrder() as $key) {
+            if (isset($entries[$key])) {
+                $ordered[] = $entries[$key];
+            }
+        }
+
+        return $ordered;
     }
 }
