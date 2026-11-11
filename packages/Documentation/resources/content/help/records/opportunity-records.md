@@ -32,8 +32,7 @@ move another view to the top of the switcher. Dragging a card is how you
 The board can be filtered by **Company** and **Point of Contact**, and every column
 has its own add button for creating a deal directly in that stage. Hover a
 card and click its preview button to open the deal in a side panel without
-leaving the board. In the list, the same button sits beside the name, and
-**Open preview** is in the row menu.
+leaving the board. In the list, the same button sits beside the name.
 
 ## The record page
 

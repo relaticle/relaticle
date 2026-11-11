@@ -2,7 +2,7 @@
 title: Company records
 description: What lives on a company, from owner and domains to the auto-fetched logo and the tabs for people, tasks, and notes.
 order: 1
-updated: "2026-11-08"
+updated: "2026-11-12"
 related: [help/records/people-records, help/getting-started/create-your-first-company, help/records/see-who-changed-a-record]
 ---
 
@@ -59,6 +59,5 @@ or Rela, whichever created the record) or show
 Header buttons cover **New company** and **Import / Export**.
 
 You can also look at a company without leaving the list. Hover its row and
-click the preview button beside the name, or pick **Open preview** from the
-row menu. The company opens in a side panel with the same tabs. The arrows step to the
+click the preview button beside the name. The company opens in a side panel with the same tabs. The arrows step to the
 previous or next company, and the expand button opens the full page.

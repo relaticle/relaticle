@@ -2,7 +2,7 @@
 title: People records
 description: People with unique emails, phone, job title, and a company link, created standalone or from a company.
 order: 2
-updated: "2026-11-08"
+updated: "2026-11-12"
 related: [help/records/company-records, help/getting-started/add-your-first-person]
 ---
 
@@ -35,4 +35,4 @@ here too.
 In the **People** list the company column links to the company too, so you
 can move between a person and their company from anywhere. To open a person
 in a side panel without leaving the list, hover their row and click the
-preview button beside the name. **Open preview** in the row menu does the same.
+preview button beside the name.

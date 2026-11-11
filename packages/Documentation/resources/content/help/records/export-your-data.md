@@ -2,7 +2,7 @@
 title: Export your data
 description: Download any record type as CSV or Excel. Full lists or selected rows, custom fields included.
 order: 5
-updated: "2026-08-13"
+updated: "2026-11-12"
 related: [help/import/update-existing-records, help/import/prepare-your-csv]
 ---
 
@@ -17,8 +17,8 @@ field, which makes an export the perfect starting template for a
 2. Click **Import / Export**, then **Export**.
 3. Choose the columns and format.
 
-To export only some records, select their rows first and use the **Export**
-bulk action instead.
+To export only some records, tick their rows first and click the export
+button in the bar at the bottom of the list.
 
 ## What you get
 
