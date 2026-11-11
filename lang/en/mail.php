@@ -133,7 +133,7 @@ return [
         'overdue' => 'Overdue',
         'due_today' => 'Due today',
         'due_overdue' => ':date (Overdue)',
-        'due_today_chip' => 'Due Today',
+        'due_today_chip' => 'Due today',
         'more_records' => '+:count',
         'more_tasks' => 'View :count more task|View :count more tasks',
         'cta' => 'Open my tasks',

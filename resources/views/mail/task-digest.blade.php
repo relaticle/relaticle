@@ -6,7 +6,7 @@
 
 <p class="sub">{{ __('mail.task_digest.open_hint', ['workspace' => $workspaceName]) }}</p>
 
-<x-mail::button :url="$tasksUrl" align="left">
+<x-mail::button :url="$tasksUrl">
 {{ __('mail.task_digest.cta') }}
 </x-mail::button>
 

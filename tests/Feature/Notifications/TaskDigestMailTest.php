@@ -39,8 +39,10 @@ it('renders the digest with subject, preheader, summary, footer, and settings li
     $mail->assertSeeInHtml('123 Test St');
     $mail->assertSeeInHtml(__('mail.footer.settings'));
     $mail->assertSeeInHtml(__('mail.footer.reason.digest'));
-    $mail->assertSeeInText('Call client: https://app.test/tasks?a ('.now('UTC')->subDay()->format('M j, Y').' (Overdue))');
-    $mail->assertSeeInText('Send proposal: https://app.test/tasks?b (Due Today)');
+    $mail->assertSeeInText("Call client: https://app.test/tasks?a\n".now('UTC')->subDay()->format('M j, Y').' (Overdue)');
+    $mail->assertSeeInText("Send proposal: https://app.test/tasks?b\nDue today");
+    $mail->assertDontSeeInHtml('Due Today');
+    $mail->assertDontSeeInHtml('align="left"');
     $mail->assertSeeInText(__('mail.task_digest.cta').': ');
     $mail->assertDontSeeInText('Call client, Send proposal');
     $mail->assertSeeInHtml(__('mail.task_digest.open_hint', ['workspace' => 'Acme']));
@@ -84,7 +86,9 @@ it('shows priority with the board badge colors and one linked record plus a coun
     $mail->assertSeeInHtml('Northwind');
     $mail->assertDontSeeInHtml('Ana Reyes');
     $mail->assertSeeInHtml('+2');
-    $mail->assertSeeInText('Call client: https://app.test/tasks?b (Odd, Due Today, International Business M...)');
+    $mail->assertSeeInText("Call client: https://app.test/tasks?b\nOdd · Due today · International Business M...");
+    $mail->assertSeeInText('High · '.now()->subDays(3)->format('M j, Y').' (Overdue) · Northwind +2');
+    $mail->assertSeeInHtml(asset('brand/email-icons/flag.png'));
     $mail->assertDontSeeInHtml('not-a-color');
     expect(substr_count($mail->render(), 'class="task-chip-dot"'))->toBe(1);
     $mail->assertSeeInHtml(asset('brand/email-icons/building.png'));
@@ -92,7 +96,7 @@ it('shows priority with the board badge colors and one linked record plus a coun
 });
 
 it('ships an icon file for the due date and every record type a task links to', function (): void {
-    $icons = ['lucide-calendar', ...array_map(fn (CrmEntity $entity): string => $entity->icon(), CrmEntity::linkable())];
+    $icons = ['lucide-calendar', 'lucide-flag', ...array_map(fn (CrmEntity $entity): string => $entity->icon(), CrmEntity::linkable())];
 
     foreach ($icons as $icon) {
         expect(public_path('brand/email-icons/'.Str::after($icon, 'lucide-').'.png'))->toBeFile();

@@ -16,7 +16,7 @@
 <span class="task-card-title">{{ $task['title'] }}</span>
 <span class="task-card-chips">
 @if($task['priority'] !== null)
-<span class="task-chip task-chip-priority"@if($task['priority']['text'] !== null) style="background-color: {{ $task['priority']['background'] }}; border-color: {{ $task['priority']['border'] }}; color: {{ $task['priority']['text'] }};"@endif>@if($task['priority']['dot'] !== null)<span class="task-chip-dot" style="background-color: {{ $task['priority']['dot'] }};"></span>@endif{{ $task['priority']['label'] }}</span>
+<span class="task-chip task-chip-priority"@if($task['priority']['text'] !== null) style="background-color: {{ $task['priority']['background'] }}; border-color: {{ $task['priority']['border'] }}; color: {{ $task['priority']['text'] }};"@endif><img src="{{ $task['priority']['icon'] }}" class="task-chip-icon @if($task['priority']['dot'] !== null)task-chip-flag @endif" width="14" height="14" alt="">@if($task['priority']['dot'] !== null)<span class="task-chip-dot" style="background-color: {{ $task['priority']['dot'] }};"></span>@endif{{ $task['priority']['label'] }}</span>
 @endif
 <span class="task-chip"><img src="{{ $task['dueIcon'] }}" class="task-chip-icon" width="14" height="14" alt="">{{ $task['due'] }}</span>
 @foreach($task['records'] as $record)

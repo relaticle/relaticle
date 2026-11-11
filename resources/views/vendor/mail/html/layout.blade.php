@@ -147,6 +147,14 @@ border-color: #2e3341 !important;
 color: #e4e4e7 !important;
 }
 
+.task-chip-flag {
+display: none !important;
+}
+
+.task-chip-dot {
+display: inline-block !important;
+}
+
 .subcopy {
 border-top-color: #3f3f46 !important;
 }
@@ -251,6 +259,14 @@ border-color: #292f3d !important;
 background-color: #1f2634 !important;
 border-color: #2e3341 !important;
 color: #e4e4e7 !important;
+}
+
+[data-ogsc] .task-chip-flag {
+display: none !important;
+}
+
+[data-ogsc] .task-chip-dot {
+display: inline-block !important;
 }
 
 [data-ogsc] .table th {

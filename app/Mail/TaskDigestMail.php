@@ -145,18 +145,19 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
     /**
      * @param  list<DigestTaskItem>  $items
      * @param  callable(DigestTaskItem): string  $dueLabel
-     * @return list<array{title: string, url: string, due: string, dueIcon: string, priority: ?array{label: string, dot: ?string, text: ?string, background: ?string, border: ?string}, records: list<array{label: string, icon: ?string}>}>
+     * @return list<array{title: string, url: string, due: string, dueIcon: string, priority: ?array{label: string, icon: string, dot: ?string, text: ?string, background: ?string, border: ?string}, records: list<array{label: string, icon: ?string}>}>
      */
     private function cards(array $items, callable $dueLabel): array
     {
         $dueIcon = $this->iconUrl('lucide-calendar');
+        $priorityIcon = $this->iconUrl('lucide-flag');
 
         return array_map(fn (DigestTaskItem $item): array => [
             'title' => Str::squish($item->title),
             'url' => $item->editUrl,
             'due' => $dueLabel($item),
             'dueIcon' => $dueIcon,
-            'priority' => $item->priority === null ? null : ['label' => Str::squish($item->priority), ...$this->priorityColors($item->priorityColor)],
+            'priority' => $item->priority === null ? null : ['label' => Str::squish($item->priority), 'icon' => $priorityIcon, ...$this->priorityColors($item->priorityColor)],
             'records' => $this->recordChips($item->records),
         ], array_slice($items, 0, self::CARDS_PER_COLUMN));
     }

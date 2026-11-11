@@ -1,7 +1,8 @@
 @props(['title', 'total', 'moreUrl', 'tasks' => []])
 {{ $title }} ({{ $total }})
 @foreach($tasks as $task)
-{{ $task['title'] }}: {{ $task['url'] }} ({{ implode(', ', [...($task['priority'] === null ? [] : [$task['priority']['label']]), $task['due'], ...array_column($task['records'], 'label')]) }})
+{{ $task['title'] }}: {{ $task['url'] }}
+{{ implode(' · ', array_filter([$task['priority']['label'] ?? null, $task['due'], implode(' ', array_column($task['records'], 'label'))])) }}
 
 @endforeach
 @if($total > count($tasks))
