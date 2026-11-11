@@ -111,10 +111,6 @@
     @apply pointer-events-none absolute top-0 z-15 -ml-px hidden w-0.5 bg-primary-500;
 }
 
-.column-resize-badge {
-    @apply pointer-events-none fixed z-61 hidden -translate-x-1/2 translate-y-[calc(-100%-10px)] rounded-sm bg-primary-500 px-1.5 py-0.75 text-[length:var(--text-micro)] leading-none font-semibold whitespace-nowrap text-white shadow-sm;
-}
-
 body.resizing-column,
 body.resizing-column * {
     @apply cursor-col-resize!;

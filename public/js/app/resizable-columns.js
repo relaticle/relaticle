@@ -3,10 +3,9 @@
 
 (() => {
     let dragGuideline = null
-    let dragBadge = null
 
     // The guideline lives inside the scroll wrapper, so a horizontal scroll mid-drag keeps it on
-    // the column edge. The badge is fixed and follows the cursor.
+    // the column edge.
     function ensureDragGuideline(wrapper) {
         if (!dragGuideline) {
             dragGuideline = document.createElement('div')
@@ -18,26 +17,12 @@
         return dragGuideline
     }
 
-    // `wire:navigate` swaps the whole body, which detaches a badge created on an earlier page.
-    function ensureDragBadge() {
-        if (!dragBadge?.isConnected) {
-            dragBadge = document.createElement('div')
-            dragBadge.className = 'column-resize-badge'
-            document.body.appendChild(dragBadge)
-        }
-        return dragBadge
-    }
-
-    function moveDragOverlay(wrapper, contentX, height, width, cursorX, cursorY) {
+    function moveDragOverlay(wrapper, contentX, height) {
         Object.assign(ensureDragGuideline(wrapper).style, { display: 'block', left: `${contentX}px`, height: `${height}px` })
-        const badge = ensureDragBadge()
-        Object.assign(badge.style, { display: 'block', left: `${cursorX}px`, top: `${cursorY}px` })
-        badge.textContent = `${width}px`
     }
 
     function hideDragOverlay() {
         if (dragGuideline) dragGuideline.style.display = 'none'
-        if (dragBadge) dragBadge.style.display = 'none'
     }
 
     // `.fi-ta-content-ctn` scrolls horizontally, which defeats `position: sticky` on the header,
@@ -1140,7 +1125,7 @@
                         widthFrame = null
                         this.applyWidth(currentWidth)
                     })
-                    moveDragOverlay(this.tableWrapper, contentLeftEdge + currentWidth, guidelineHeight, currentWidth, moveEvent.clientX, moveEvent.clientY)
+                    moveDragOverlay(this.tableWrapper, contentLeftEdge + currentWidth, guidelineHeight)
                 }
 
                 const onUp = (upEvent) => {

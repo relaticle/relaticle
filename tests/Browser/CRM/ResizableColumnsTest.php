@@ -48,13 +48,14 @@ function dragFeedbackMidDrag(string $column): string
             const y = box.top + box.height / 2;
             handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerId: 1, isPrimary: true, clientX: x, clientY: y }));
             document.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerId: 1, isPrimary: true, clientX: x + 40, clientY: y }));
-            const badge = document.querySelector('.column-resize-badge');
+            const guideline = document.querySelector('.column-resize-guideline');
             const feedback = {
-                badge: badge !== null && badge.isConnected && getComputedStyle(badge).display !== 'none',
+                guideline: guideline !== null && getComputedStyle(guideline).display !== 'none',
                 handleActive: document.querySelector(`%s .column-resize-handle-bar`).classList.contains('active'),
+                widthReadout: [...document.body.querySelectorAll('*')].some((element) => element.children.length === 0 && /^\s*\d+\s*px\s*$/.test(element.textContent) && element.checkVisibility()),
             };
             document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1, isPrimary: true, clientX: x + 40, clientY: y }));
-            return feedback.badge && feedback.handleActive;
+            return feedback.guideline && feedback.handleActive && ! feedback.widthReadout;
         })();
     JS, headerSelector($column), headerSelector($column));
 }
@@ -107,6 +108,16 @@ it('resizes a column by dragging its edge and keeps the width after a reload', f
         ->refresh()
         ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar')
         ->assertScript(headerWidth('created_at'), $before + 120)
+        ->assertNoJavaScriptErrors();
+});
+
+it('shows the edge guideline but no pixel width while a column is resized', function (): void {
+    loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->assertVisible(headerSelector('name').' .column-resize-handle-bar')
+        ->assertScript(dragFeedbackMidDrag('name'), true)
         ->assertNoJavaScriptErrors();
 });
 
