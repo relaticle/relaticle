@@ -8,11 +8,13 @@ use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
 use App\Mail\TaskDigestMail;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Services\Notifications\DigestService;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Mail;
 
@@ -54,16 +56,30 @@ final class SendTaskDigestCommand extends Command
         $sent = 0;
 
         foreach ($user->allWorkspaces() as $workspace) {
-            $digest = $digestService->forWorkspace($user, $workspace);
-
-            if ($digest->isEmpty()) {
-                continue;
-            }
-
-            Mail::to($user)->send(new TaskDigestMail($user, $workspace, $digest));
-            $sent++;
+            $sent += (int) rescue(fn (): bool => $this->sendForWorkspace($user, $workspace, $digestService), false);
         }
 
         return $sent;
+    }
+
+    private function sendForWorkspace(User $user, Workspace $workspace, DigestService $digestService): bool
+    {
+        $digest = $digestService->forWorkspace($user, $workspace);
+
+        if ($digest->isEmpty() || ! $this->claimToday($user, $workspace)) {
+            return false;
+        }
+
+        Mail::to($user)->send(new TaskDigestMail($user, $workspace, $digest));
+
+        return true;
+    }
+
+    // The schedule runs once an hour, but a manual or overlapping second run would mail everyone again.
+    private function claimToday(User $user, Workspace $workspace): bool
+    {
+        $localDate = Date::now($user->effectiveTimezone())->toDateString();
+
+        return Cache::add("task-digest:{$user->getKey()}:{$workspace->getKey()}:{$localDate}", true, Date::now()->addDay());
     }
 }
