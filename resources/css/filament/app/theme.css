@@ -2013,6 +2013,11 @@ html.fi-record-stacked .fi-record-layout {
     @apply size-menu-icon shrink-0;
 }
 
+/* A menu marks its current item with this check alone. A fill on a row means hover or keyboard focus. */
+.fi-menu-check {
+    @apply ms-auto size-menu-icon shrink-0 text-primary-600 dark:text-primary-400;
+}
+
 .fi-dropdown-list-item-label {
     @apply min-w-0 flex-1 text-start;
 }

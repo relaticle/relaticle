@@ -66,7 +66,7 @@
                             >
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path x-bind:d="column.icon"></path></svg>
                                 <span class="fi-filter-label" x-text="column.label"></span>
-                                <x-filament::icon icon="lucide-check" class="fi-filter-tick" x-show="column.key === sortTarget" />
+                                <x-filament::icon icon="lucide-check" class="fi-menu-check" x-show="column.key === sortTarget" />
                             </button>
                         </template>
                         <p class="fi-filter-hint" x-show="sortChoices().length === 0">{{ __('filament/panel.tables.filters.no_field') }}</p>

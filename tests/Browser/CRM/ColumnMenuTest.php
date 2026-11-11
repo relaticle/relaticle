@@ -151,7 +151,7 @@ it('sorts a column both ways from its menu and shows the sort in the bar', funct
 
 function checkedSort(): string
 {
-    return '[...document.querySelectorAll(".fi-ta-column-menu [role=menuitemradio]")].filter((item) => item.getAttribute("aria-checked") === "true" && item.querySelector(".fi-ta-column-menu-check").checkVisibility()).map((item) => item.dataset.columnMenuItem)';
+    return '[...document.querySelectorAll(".fi-ta-column-menu [role=menuitemradio]")].filter((item) => item.getAttribute("aria-checked") === "true" && item.querySelector(".fi-menu-check").checkVisibility()).map((item) => item.dataset.columnMenuItem)';
 }
 
 it('changes a sorted column in place and puts a new one first, keeping the other sorts', function (): void {

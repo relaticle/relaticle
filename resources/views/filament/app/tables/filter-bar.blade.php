@@ -51,8 +51,8 @@
                         >
                             <svg x-show="group.icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path x-bind:d="group.icon"></path></svg>
                             <span class="fi-filter-label" x-text="group.label"></span>
-                            <x-filament::icon icon="lucide-arrow-up" class="fi-filter-tick" x-show="grouping?.id === group.id && grouping.direction === 'asc'" />
-                            <x-filament::icon icon="lucide-arrow-down" class="fi-filter-tick" x-show="grouping?.id === group.id && grouping.direction === 'desc'" />
+                            <x-filament::icon icon="lucide-arrow-up" class="fi-menu-check" x-show="grouping?.id === group.id && grouping.direction === 'asc'" />
+                            <x-filament::icon icon="lucide-arrow-down" class="fi-menu-check" x-show="grouping?.id === group.id && grouping.direction === 'desc'" />
                         </button>
                     </template>
                 </div>
@@ -139,7 +139,7 @@
                                 x-on:click="pickCondition(chip, condition)"
                             >
                                 <span x-text="condition.label"></span>
-                                <x-filament::icon icon="lucide-check" class="fi-filter-tick" x-show="condition.value === chip.condition" />
+                                <x-filament::icon icon="lucide-check" class="fi-menu-check" x-show="condition.value === chip.condition" />
                             </button>
                         </template>
                     </div>
@@ -278,7 +278,7 @@
                                                 x-on:click="pickUnit(chip, unit)"
                                             >
                                                 <span x-text="unit.singular"></span>
-                                                <x-filament::icon icon="lucide-check" class="fi-filter-tick" x-show="chip.value?.unit === unit.value" />
+                                                <x-filament::icon icon="lucide-check" class="fi-menu-check" x-show="chip.value?.unit === unit.value" />
                                             </button>
                                         </template>
                                     </div>
@@ -364,11 +364,11 @@
                     <div class="fi-filter-pop" x-anchor.bottom-start.offset.6.fixed="$el.parentElement" data-pop data-sheet x-bind:data-open="isOpen('deleted', 'val')" role="menu" aria-label="{{ __('filament/panel.tables.filters.deleted_records') }}" x-on:keydown="navigate($event)">
                         <button type="button" tabindex="0" role="menuitemradio" class="fi-filter-item" data-pop-item data-deleted-mode="included" x-bind:class="{ 'fi-on': deleted === 'included' }" x-bind:aria-checked="(deleted === 'included').toString()" x-on:click="setDeleted('included')">
                             <span>{{ __('filament/panel.tables.filters.deleted_included') }}</span>
-                            <x-filament::icon icon="lucide-check" class="fi-filter-tick" x-show="deleted === 'included'" />
+                            <x-filament::icon icon="lucide-check" class="fi-menu-check" x-show="deleted === 'included'" />
                         </button>
                         <button type="button" tabindex="0" role="menuitemradio" class="fi-filter-item" data-pop-item data-deleted-mode="only" x-bind:class="{ 'fi-on': deleted === 'only' }" x-bind:aria-checked="(deleted === 'only').toString()" x-on:click="setDeleted('only')">
                             <span>{{ __('filament/panel.tables.filters.deleted_only') }}</span>
-                            <x-filament::icon icon="lucide-check" class="fi-filter-tick" x-show="deleted === 'only'" />
+                            <x-filament::icon icon="lucide-check" class="fi-menu-check" x-show="deleted === 'only'" />
                         </button>
                     </div>
                     </template>

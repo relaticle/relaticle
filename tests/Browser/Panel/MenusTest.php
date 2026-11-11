@@ -125,6 +125,65 @@ it('keeps a long menu above the window edge and scrolls only its list', function
     'filter field picker' => ['[data-filter-add]', '.fi-filter-pop-picker', '[role=listbox]'],
 ]);
 
+function currentItem(string $current, string $other): string
+{
+    return <<<JS
+        (async () => {
+            await new Promise((resolve) => setTimeout(resolve, 300));
+
+            const visible = (element) => element.getClientRects().length > 0;
+            const current = [...document.querySelectorAll('{$current}')].find(visible);
+            const other = [...document.querySelectorAll('{$other}')].find(visible);
+            const label = (row) => row.querySelector('.fi-dropdown-list-item-label, .fi-filter-label') ?? row;
+            const check = [...current.querySelectorAll('.fi-menu-check')].find(visible);
+
+            return {
+                check: check ? Math.round(check.getBoundingClientRect().width) : 0,
+                trailing: check ? check.getBoundingClientRect().right > current.getBoundingClientRect().right - 48 : false,
+                fill: getComputedStyle(current).backgroundColor,
+                sameText: getComputedStyle(label(current)).color === getComputedStyle(label(other)).color,
+                otherCheck: [...other.querySelectorAll('.fi-menu-check')].some(visible),
+            };
+        })()
+        JS;
+}
+
+it('marks the current item with a trailing check and no fill', function (string $surface): void {
+    $column = "th[x-data^=\"resizableColumn('created_at'\"] [data-column-menu-trigger]";
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies");
+
+    if ($surface !== 'views') {
+        $page->click($column)->click('[data-column-menu-item="sortAscending"]')->assertPresent('[data-filter-sort-label]');
+    }
+
+    [$current, $other] = match ($surface) {
+        'views' => ['.fi-ta-views-row:has([aria-current])', '.fi-ta-views-row:not(:has([aria-current]))'],
+        'sort chooser' => ['[data-sort-pop] .fi-filter-item[aria-selected="true"]', '[data-sort-pop] .fi-filter-item[aria-selected="false"]'],
+        'column header' => ['.fi-ta-column-menu [aria-checked="true"]', '.fi-ta-column-menu [aria-checked="false"]'],
+    };
+
+    match ($surface) {
+        'views' => $page->click('.fi-view-switcher .fi-dropdown-trigger button'),
+        'sort chooser' => $page->click('[data-filter-sort]')->click('[data-sort-field]'),
+        'column header' => $page->click($column),
+    };
+
+    $page->hover('.fi-sidebar-nav .fi-sidebar-item-btn >> nth=0');
+
+    expect($page->script(currentItem($current, $other)))->toBe([
+        'check' => 16,
+        'trailing' => true,
+        'fill' => 'rgba(0, 0, 0, 0)',
+        'sameText' => true,
+        'otherCheck' => false,
+    ]);
+    $page->assertNoJavaScriptErrors();
+})->with(['views', 'sort chooser', 'column header']);
+
 function holdLook(array $targets): string
 {
     $selectors = json_encode($targets);

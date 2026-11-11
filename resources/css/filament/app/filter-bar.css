@@ -157,16 +157,8 @@ button.fi-filter-seg {
 .fi-filter-item {
     @apply flex h-menu-row w-full items-center gap-2 rounded-menu-item px-2 text-start text-sm whitespace-nowrap hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-0 dark:hover:bg-white/5 dark:focus-visible:bg-white/5;
 
-    &.fi-on {
-        @apply bg-gray-100 dark:bg-white/5;
-    }
-
-    & svg {
+    & svg:not(.fi-menu-check) {
         @apply size-menu-icon shrink-0 text-gray-500 dark:text-gray-400;
-    }
-
-    & .fi-filter-tick {
-        @apply ms-auto text-primary-600 dark:text-primary-400;
     }
 
     &.fi-danger,

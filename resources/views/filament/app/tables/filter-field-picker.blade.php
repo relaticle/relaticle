@@ -28,7 +28,7 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path x-bind:d="field.icon"></path></svg>
                 <span x-text="field.label"></span>
 @if ($forChip)
-                <x-filament::icon icon="lucide-check" class="fi-filter-tick" x-show="field.key === chip.field" />
+                <x-filament::icon icon="lucide-check" class="fi-menu-check" x-show="field.key === chip.field" />
 @endif
             </button>
         </template>

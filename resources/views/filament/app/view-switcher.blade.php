@@ -97,7 +97,7 @@
             <div class="fi-ta-views-list" x-ref="list" x-sort="reorder" x-sort:config="{ draggable: '.fi-ta-views-draggable', filter: '.fi-ta-views-row-actions', preventOnFilter: false, delay: 200, delayOnTouchOnly: true, animation: 150 }">
                 @foreach ($entries as $entry)
                     <div
-                        @class(['fi-ta-views-row', 'fi-ta-views-selected' => $entry['active']])
+                        class="fi-ta-views-row"
                         x-sort:item="{{ Js::from($entry['key']) }}"
                         data-view-key="{{ $entry['key'] }}"
                         data-view-kind="{{ $entry['kind'] }}"
@@ -108,7 +108,7 @@
                     >
                         @if ($canApply && $entry['kind'] === 'list')
                             <x-filament::dropdown.list.item
-                                :color="$entry['active'] ? 'primary' : 'gray'"
+                                color="gray"
                                 :aria-current="$entry['active'] ? 'true' : null"
                                 class="min-w-0 flex-1"
                                 wire:click="applyOwnTable"
@@ -117,7 +117,7 @@
                             </x-filament::dropdown.list.item>
                         @elseif ($canApply && $entry['kind'] === 'view')
                             <x-filament::dropdown.list.item
-                                :color="$entry['active'] ? 'primary' : 'gray'"
+                                color="gray"
                                 :aria-current="$entry['active'] ? 'true' : null"
                                 class="min-w-0 flex-1"
                                 wire:click="applySavedView('{{ $entry['key'] }}')"
@@ -129,7 +129,7 @@
                                 tag="a"
                                 :href="$entry['url']"
                                 :spa-mode="true"
-                                :color="$entry['active'] ? 'primary' : 'gray'"
+                                color="gray"
                                 :aria-current="$entry['active'] ? 'page' : null"
                                 class="min-w-0 flex-1"
                             >

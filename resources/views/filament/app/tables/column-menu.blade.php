@@ -31,7 +31,7 @@
                 x-on:click="sortBy('asc')"
             >
                 {{ __('filament/panel.tables.column_menu.sort_ascending') }}
-                <x-filament::icon icon="lucide-circle-check" class="fi-ta-column-menu-check" x-show="sorted === 'asc'" />
+                <x-filament::icon icon="lucide-check" class="fi-menu-check" x-show="sorted === 'asc'" />
             </x-filament::dropdown.list.item>
             <x-filament::dropdown.list.item
                 icon="lucide-arrow-down-wide-narrow"
@@ -41,7 +41,7 @@
                 x-on:click="sortBy('desc')"
             >
                 {{ __('filament/panel.tables.column_menu.sort_descending') }}
-                <x-filament::icon icon="lucide-circle-check" class="fi-ta-column-menu-check" x-show="sorted === 'desc'" />
+                <x-filament::icon icon="lucide-check" class="fi-menu-check" x-show="sorted === 'desc'" />
             </x-filament::dropdown.list.item>
         </div>
         <div class="fi-dropdown-list" x-show="movable">

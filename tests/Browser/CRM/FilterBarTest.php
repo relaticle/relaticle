@@ -1245,7 +1245,7 @@ it('marks the current field in the field list of a chip', function (): void {
     addChip($page, 'name', 'contains')->keys(valueInput(), 'Escape');
     $page->click('[data-filter-segment="field"]')
         ->assertScript('[...document.querySelectorAll("[data-pop][data-open=true] [data-field]")].filter((item) => item.getAttribute("aria-selected") === "true").map((item) => item.dataset.field).join() === "name"', true)
-        ->assertScript('document.querySelector("[data-pop][data-open=true] [data-field=name] .fi-filter-tick").checkVisibility()', true)
+        ->assertScript('document.querySelector("[data-pop][data-open=true] [data-field=name] .fi-menu-check").checkVisibility()', true)
         ->assertNoJavaScriptErrors();
 });
 

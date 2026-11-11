@@ -46,17 +46,6 @@
     }
 }
 
-/* The view the table shows. Darker than the hover, so the two never read alike. */
-.fi-ta-views-selected {
-    @apply bg-gray-100 dark:bg-white/10;
-
-    &:hover,
-    &:has(:focus-visible),
-    &:has([aria-expanded='true']) {
-        @apply bg-gray-100 dark:bg-white/10;
-    }
-}
-
 .fi-ta-views-list {
     @apply flex flex-col;
 }

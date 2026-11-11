@@ -818,6 +818,9 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
 - A menu stops at `menu-max` (28rem) or 16px above the window edge, whichever comes first, and only its list scrolls.
   A Filament dropdown gets the room from its `size` prop. The filter bar measures it on open into `--menu-room`. The same
   test fails a menu that runs past the window at 320px tall.
+- A menu marks its current item with `fi-menu-check`, a 16px check at the row's end, and never with a fill or a text
+  color. A fill on a row means hover or keyboard focus. The same test fails a current row that is filled, recolored or
+  missing its check in Views, the sort chooser and a column menu.
 
 ## Scripts
 
