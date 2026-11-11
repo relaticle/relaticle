@@ -1,8 +1,9 @@
-<x-mail::message :reason="__('mail.footer.reason.former_owner', ['workspace' => $workspaceName])">
+@use('Illuminate\Support\Str')
+<x-mail::message :reason="__('mail.footer.reason.former_owner', ['workspace' => Str::squish($workspaceName)])">
 <x-slot:preheader>{{ __('cloud::inactivity.deleted.preheader') }}</x-slot:preheader>
-# {{ __('cloud::inactivity.deleted.heading', ['workspace' => $workspaceName]) }}
+<h1>{{ __('cloud::inactivity.deleted.heading', ['workspace' => Str::squish($workspaceName)]) }}</h1>
 
-{{ __('cloud::inactivity.deleted.body', ['workspace' => $workspaceName]) }}
+<p>{{ __('cloud::inactivity.deleted.body', ['workspace' => Str::squish($workspaceName)]) }}</p>
 
 {{ __('cloud::inactivity.deleted.restart') }}
 

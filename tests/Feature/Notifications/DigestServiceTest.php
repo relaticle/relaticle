@@ -2,8 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Data\DigestRecord;
+use App\Enums\CrmEntity;
 use App\Features\OnboardSeed;
 use App\Filament\Resources\TaskResource;
+use App\Models\Company;
+use App\Models\Opportunity;
+use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\Notifications\DigestService;
@@ -48,6 +53,22 @@ function digestSetDue(Task $task, string $fieldId, DateTimeInterface $dueAt): vo
     ]);
 }
 
+function digestSetOption(Task $task, string $fieldCode, string $optionName): void
+{
+    $field = DB::table('custom_fields')->where('tenant_id', $task->workspace_id)
+        ->where('entity_type', 'task')->where('code', $fieldCode)->first();
+    $option = DB::table('custom_field_options')->where('custom_field_id', trim((string) $field->id))->where('name', $optionName)->first();
+
+    DB::table('custom_field_values')->insert([
+        'id' => (string) Str::ulid(),
+        'entity_type' => 'task',
+        'entity_id' => $task->id,
+        'custom_field_id' => trim((string) $field->id),
+        'tenant_id' => $task->workspace_id,
+        'string_value' => trim((string) $option->id),
+    ]);
+}
+
 function digestSetStatus(Task $task, string $fieldId, string $optionId): void
 {
     DB::table('custom_field_values')->insert([
@@ -77,11 +98,10 @@ it('daily digest contains overdue and due-today tasks only', function (): void {
     $nextWeek->assignees()->attach($user);
     digestSetDue($nextWeek, $field, now()->addDays(3));
 
-    $payload = resolve(DigestService::class)->forUser($user);
+    $digest = resolve(DigestService::class)->forWorkspace($user, $workspace);
 
-    expect($payload->taskCount())->toBe(2)
-        ->and(collect($payload->workspaces[0]->overdue)->pluck('title')->all())->toBe(['overdue'])
-        ->and(collect($payload->workspaces[0]->upcoming)->pluck('title')->all())->toBe(['today']);
+    expect(collect($digest->overdue)->pluck('title')->all())->toBe(['overdue'])
+        ->and(collect($digest->upcoming)->pluck('title')->all())->toBe(['today']);
 });
 
 it('links each digest task to its edit modal in the task workspace', function (): void {
@@ -92,9 +112,106 @@ it('links each digest task to its edit modal in the task workspace', function ()
     $task->assignees()->attach($user);
     digestSetDue($task, digestDueField($workspace->id), now()->subDay());
 
-    $payload = resolve(DigestService::class)->forUser($user);
+    $digest = resolve(DigestService::class)->forWorkspace($user, $workspace);
 
-    expect($payload->workspaces[0]->overdue[0]->editUrl)->toBe(TaskResource::getUrl('index', ['task' => $task->id], panel: 'app', tenant: $workspace));
+    expect($digest->overdue[0]->editUrl)->toBe(TaskResource::getUrl('index', ['task' => $task->id], panel: 'app', tenant: $workspace));
+});
+
+it('names the company, person and opportunity linked to each digest task, skipping deleted ones', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+
+    $task = Task::factory()->for($workspace)->create(['title' => 'linked']);
+    $task->assignees()->attach($user);
+    digestSetDue($task, digestDueField($workspace->id), now()->subDay());
+
+    $task->companies()->attach(Company::factory()->for($workspace)->create(['name' => 'Northwind']));
+    $task->people()->attach(People::factory()->for($workspace)->create(['name' => 'Ana Reyes']));
+    $task->opportunities()->attach(Opportunity::factory()->for($workspace)->create(['name' => 'Fleet renewal']));
+    $deleted = Company::factory()->for($workspace)->create(['name' => 'Gone Corp']);
+    $task->companies()->attach($deleted);
+    $deleted->delete();
+
+    $unlinked = Task::factory()->for($workspace)->create(['title' => 'unlinked']);
+    $unlinked->assignees()->attach($user);
+    digestSetDue($unlinked, digestDueField($workspace->id), now()->subDay());
+
+    $overdue = collect(resolve(DigestService::class)->forWorkspace($user, $workspace)->overdue)->keyBy('title');
+
+    expect(array_map(fn (DigestRecord $record): array => [$record->entity, $record->name], $overdue['linked']->records))->toBe([
+        [CrmEntity::Company, 'Northwind'],
+        [CrmEntity::People, 'Ana Reyes'],
+        [CrmEntity::Opportunity, 'Fleet renewal'],
+    ])
+        ->and($overdue['unlinked']->records)->toBe([]);
+});
+
+it('never names a linked record from another workspace', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $otherWorkspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+
+    $task = Task::factory()->for($workspace)->create(['title' => 'linked']);
+    $task->assignees()->attach($user);
+    digestSetDue($task, digestDueField($workspace->id), now()->subDay());
+    $task->companies()->attach(Company::factory()->for($otherWorkspace)->create(['name' => 'Other Tenant Inc']));
+
+    expect(resolve(DigestService::class)->forWorkspace($user, $workspace)->overdue[0]->records)->toBe([]);
+});
+
+it('carries each digest task priority and its option color', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+
+    $urgent = Task::factory()->for($workspace)->create(['title' => 'urgent']);
+    $urgent->assignees()->attach($user);
+    digestSetDue($urgent, digestDueField($workspace->id), now()->subDay());
+    digestSetOption($urgent, 'priority', 'High');
+
+    $plain = Task::factory()->for($workspace)->create(['title' => 'plain']);
+    $plain->assignees()->attach($user);
+    digestSetDue($plain, digestDueField($workspace->id), now()->subDay());
+
+    $overdue = collect(resolve(DigestService::class)->forWorkspace($user, $workspace)->overdue)->keyBy('title');
+
+    expect($overdue['urgent']->priority)->toBe('High')
+        ->and($overdue['urgent']->priorityColor)->toBe('#dc2626')
+        ->and($overdue['plain']->priority)->toBeNull();
+});
+
+it('leaves the priority uncolored when the workspace turned option colors off, as the board does', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+
+    $task = Task::factory()->for($workspace)->create(['title' => 'urgent']);
+    $task->assignees()->attach($user);
+    digestSetDue($task, digestDueField($workspace->id), now()->subDay());
+    digestSetOption($task, 'priority', 'High');
+
+    DB::table('custom_fields')->where('tenant_id', $workspace->id)->where('entity_type', 'task')->where('code', 'priority')
+        ->update(['settings' => DB::raw("jsonb_set(settings::jsonb, '{enable_option_colors}', 'false')")]);
+
+    $digest = resolve(DigestService::class)->forWorkspace($user, $workspace);
+
+    expect($digest->overdue[0]->priority)->toBe('High')
+        ->and($digest->overdue[0]->priorityColor)->toBeNull();
+});
+
+it('builds the digest without priorities when the workspace has no priority field', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+
+    $task = Task::factory()->for($workspace)->create(['title' => 'no priority field']);
+    $task->assignees()->attach($user);
+    digestSetDue($task, digestDueField($workspace->id), now()->subDay());
+
+    DB::table('custom_fields')->where('tenant_id', $workspace->id)->where('entity_type', 'task')->where('code', 'priority')->delete();
+
+    $digest = resolve(DigestService::class)->forWorkspace($user, $workspace);
+
+    expect($digest->overdue)->toHaveCount(1)
+        ->and($digest->overdue[0]->priority)->toBeNull()
+        ->and($digest->overdue[0]->priorityColor)->toBeNull();
 });
 
 it('excludes done tasks and tasks without a due date', function (): void {
@@ -115,13 +232,13 @@ it('excludes done tasks and tasks without a due date', function (): void {
     $open->assignees()->attach($user);
     digestSetDue($open, $field, now()->subDay());
 
-    $payload = resolve(DigestService::class)->forUser($user);
+    $digest = resolve(DigestService::class)->forWorkspace($user, $workspace);
 
-    expect($payload->taskCount())->toBe(1)
-        ->and(collect($payload->workspaces[0]->overdue)->pluck('title')->all())->toBe(['open']);
+    expect($digest->upcoming)->toBe([])
+        ->and(collect($digest->overdue)->pluck('title')->all())->toBe(['open']);
 });
 
-it('groups tasks by workspace for multi-workspace users', function (): void {
+it('builds each workspace digest from that workspace tasks only', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspaceA = $user->currentWorkspace;
     $workspaceB = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
@@ -135,10 +252,10 @@ it('groups tasks by workspace for multi-workspace users', function (): void {
     $b->assignees()->attach($user);
     digestSetDue($b, digestDueField($workspaceB->id), now());
 
-    $payload = resolve(DigestService::class)->forUser($user);
+    $service = resolve(DigestService::class);
 
-    expect($payload->workspaces)->toHaveCount(2)
-        ->and($payload->taskCount())->toBe(2);
+    expect(collect($service->forWorkspace($user, $workspaceA)->upcoming)->pluck('title')->all())->toBe(['a'])
+        ->and(collect($service->forWorkspace($user, $workspaceB)->upcoming)->pluck('title')->all())->toBe(['b']);
 });
 
 it('computes the digest window in the recipient timezone, not the app timezone', function (): void {
@@ -152,8 +269,8 @@ it('computes the digest window in the recipient timezone, not the app timezone',
     $task->assignees()->attach($user);
     digestSetDue($task, $field, Date::parse('2026-06-29 10:00:00', 'UTC'));
 
-    $payload = resolve(DigestService::class)->forUser($user);
+    $digest = resolve(DigestService::class)->forWorkspace($user, $workspace);
 
-    expect($payload->taskCount())->toBe(1)
-        ->and(collect($payload->workspaces[0]->upcoming)->pluck('title')->all())->toBe(['tokyo_evening']);
+    expect($digest->overdue)->toBe([])
+        ->and(collect($digest->upcoming)->pluck('title')->all())->toBe(['tokyo_evening']);
 });

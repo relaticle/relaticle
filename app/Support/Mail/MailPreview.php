@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Support\Mail;
 
-use App\Data\DigestPayload;
+use App\Data\DigestRecord;
 use App\Data\DigestTaskItem;
-use App\Data\DigestWorkspaceSection;
+use App\Data\TaskDigest;
+use App\Enums\CrmEntity;
 use App\Mail\SetupNudgeMail;
 use App\Mail\TaskAssignedMail;
 use App\Mail\TaskDigestMail;
@@ -67,14 +68,15 @@ final readonly class MailPreview
         return [
             'setup-nudge' => fn (User $owner, Workspace $workspace): Mailable => new SetupNudgeMail($owner, $workspace, 'first_record', url()->getAppUrl('chat')),
             'task-assigned' => fn (User $owner, Workspace $workspace): Mailable => new TaskAssignedMail('Call Ana Reyes about the renewal', url()->getAppUrl('tasks'), $workspace->name),
-            'task-digest' => fn (User $owner): Mailable => new TaskDigestMail($owner, new DigestPayload([
-                new DigestWorkspaceSection('Acme Robotics', [
-                    new DigestTaskItem('Send revised proposal', now()->subDays(2), url()->getAppUrl('tasks')),
-                ], [
-                    new DigestTaskItem('Call Ana Reyes about the renewal', now(), url()->getAppUrl('tasks')),
+            'task-digest' => fn (User $owner, Workspace $workspace): Mailable => new TaskDigestMail($owner, $workspace, new TaskDigest(
+                overdue: [
+                    new DigestTaskItem('Send revised proposal', now()->subDays(2), url()->getAppUrl('tasks'), [new DigestRecord(CrmEntity::Company, 'Northwind Logistics'), new DigestRecord(CrmEntity::Opportunity, 'Q4 fleet expansion')], 'High', '#dc2626'),
+                ],
+                upcoming: [
+                    new DigestTaskItem('Call Ana Reyes about the renewal', now(), url()->getAppUrl('tasks'), [new DigestRecord(CrmEntity::Company, 'Brightline Health'), new DigestRecord(CrmEntity::People, 'Ana Reyes'), new DigestRecord(CrmEntity::Opportunity, 'Annual renewal')], 'Medium', '#d4a574'),
                     new DigestTaskItem('Prepare onboarding deck', now(), url()->getAppUrl('tasks')),
-                ]),
-            ])),
+                ],
+            )),
             'workspace-invitation' => fn (User $owner, Workspace $workspace): Mailable => new WorkspaceInvitationMail(
                 $this->invitation($owner, $workspace),
                 'preview-token',

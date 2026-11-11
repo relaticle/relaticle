@@ -10,8 +10,10 @@ use App\Mail\TaskDigestMail;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\Notifications\DigestService;
+use Illuminate\Routing\Exceptions\UrlGenerationException;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
@@ -59,6 +61,56 @@ it('queues a digest for a user at 08:00 local time', function (): void {
     $this->artisan('notifications:send-task-digest')->assertSuccessful();
 
     Mail::assertQueued(TaskDigestMail::class, fn (TaskDigestMail $mail): bool => $mail->hasTo($user->email));
+});
+
+it('queues one digest per workspace that has due tasks', function (): void {
+    $this->travelTo(Date::parse('2026-06-29 08:00:00', 'UTC'));
+    $user = userWithDueTask('UTC');
+    $personal = $user->currentWorkspace;
+
+    $shared = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+    $shared->users()->attach($user, ['role' => 'member']);
+    $task = Task::factory()->for($shared)->create(['title' => 'Shared task']);
+    $task->assignees()->attach($user);
+    digestCmdSetDue($task, $shared->id, now());
+
+    $idle = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+    $idle->users()->attach($user, ['role' => 'member']);
+
+    $this->artisan('notifications:send-task-digest')->expectsOutput('Queued 2 task digest email(s).')->assertSuccessful();
+
+    Mail::assertQueuedCount(2);
+    Mail::assertQueued(TaskDigestMail::class, fn (TaskDigestMail $mail): bool => $mail->workspace->is($personal) && $mail->digest->overdueCount() === 1);
+    Mail::assertQueued(TaskDigestMail::class, fn (TaskDigestMail $mail): bool => $mail->workspace->is($shared) && $mail->digest->upcomingCount() === 1);
+});
+
+it('keeps sending the other workspaces when one workspace digest fails', function (): void {
+    Exceptions::fake();
+    $this->travelTo(Date::parse('2026-06-29 08:00:00', 'UTC'));
+    $user = userWithDueTask('UTC');
+
+    $broken = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+    $broken->users()->attach($user, ['role' => 'member']);
+    $task = Task::factory()->for($broken)->create();
+    $task->assignees()->attach($user);
+    digestCmdSetDue($task, $broken->id, now());
+    DB::table('workspaces')->where('id', $broken->id)->update(['slug' => '']);
+
+    $this->artisan('notifications:send-task-digest')->expectsOutput('Queued 1 task digest email(s).')->assertSuccessful();
+
+    Mail::assertQueued(TaskDigestMail::class, fn (TaskDigestMail $mail): bool => $mail->workspace->is($user->currentWorkspace));
+    Exceptions::assertReported(UrlGenerationException::class);
+});
+
+it('sends each workspace digest once a day when the command runs twice', function (): void {
+    $this->travelTo(Date::parse('2026-06-29 08:00:00', 'UTC'));
+    userWithDueTask('UTC');
+
+    $this->artisan('notifications:send-task-digest')->expectsOutput('Queued 1 task digest email(s).');
+    $this->travelTo(Date::parse('2026-06-29 08:40:00', 'UTC'));
+    $this->artisan('notifications:send-task-digest')->expectsOutput('Queued 0 task digest email(s).');
+
+    Mail::assertQueuedCount(1);
 });
 
 it('does not queue outside 08:00 local time', function (): void {

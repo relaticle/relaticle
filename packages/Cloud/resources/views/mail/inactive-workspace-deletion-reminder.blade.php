@@ -1,8 +1,9 @@
-<x-mail::message :reason="__('mail.footer.reason.owner', ['workspace' => $workspace->name])">
+@use('Illuminate\Support\Str')
+<x-mail::message :reason="__('mail.footer.reason.owner', ['workspace' => Str::squish($workspace->name)])">
 <x-slot:preheader>{{ __('cloud::inactivity.reminder.preheader') }}</x-slot:preheader>
-# {{ __('cloud::inactivity.reminder.heading', ['workspace' => $workspace->name, 'date' => $date]) }}
+<h1>{{ __('cloud::inactivity.reminder.heading', ['workspace' => Str::squish($workspace->name), 'date' => $date]) }}</h1>
 
-{{ __('cloud::inactivity.reminder.body', ['workspace' => $workspace->name, 'date' => $date]) }}
+<p>{{ __('cloud::inactivity.reminder.body', ['workspace' => Str::squish($workspace->name), 'date' => $date]) }}</p>
 
 {{ __('cloud::inactivity.reminder.keep') }}
 

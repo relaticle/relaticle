@@ -1,6 +1,6 @@
 <x-mail::message :reason="__('mail.footer.reason.account', ['company' => config('relaticle.company.name')])">
 <x-slot:preheader>{{ __('mail.account_deletion_cancelled.preheader') }}</x-slot:preheader>
-# {{ __('mail.account_deletion_cancelled.heading', ['name' => $name]) }}
+<h1>{{ __('mail.account_deletion_cancelled.heading', ['name' => $name]) }}</h1>
 
 {{ __('mail.account_deletion_cancelled.body') }}
 

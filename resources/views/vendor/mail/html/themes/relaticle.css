@@ -7,7 +7,7 @@
 /* Base */
 
 body,
-body *:not(html):not(style):not(br):not(tr):not(code) {
+body *:not(html):not(style):not(br):not(tr):not(code):not(.task-chip-icon):not(.task-chip-dot) {
     box-sizing: border-box;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif,
         'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
@@ -340,6 +340,160 @@ img {
     color: #52525b;
     font-size: 14px;
     line-height: 20px;
+}
+
+/* Task board column: mirrors the tasks board (Flowforge) column, card and badge. */
+
+.task-column {
+    -premailer-cellpadding: 0;
+    -premailer-cellspacing: 0;
+    -premailer-width: 100%;
+    margin: 16px 0 0;
+    width: 100%;
+}
+
+.task-column-header {
+    padding: 0 4px 8px;
+}
+
+.task-column-dot {
+    border-radius: 9999px;
+    display: inline-block;
+    height: 8px;
+    margin-right: 8px;
+    vertical-align: middle;
+    width: 8px;
+}
+
+.task-column-dot-overdue {
+    background-color: #f87171;
+}
+
+.task-column-dot-today {
+    background-color: #a78bfa;
+}
+
+.task-column-title {
+    color: #09090b;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 20px;
+    vertical-align: middle;
+}
+
+.task-column-count {
+    color: #71717a;
+    font-size: 14px;
+    line-height: 20px;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
+.task-column-tray {
+    background-color: #fafafa;
+    border-radius: 16px;
+    padding: 4px 12px;
+}
+
+.task-card-slot {
+    padding: 4px 0;
+}
+
+.task-card {
+    background-color: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    table-layout: fixed;
+    width: 100%;
+}
+
+.task-card-body {
+    padding: 0;
+}
+
+.task-card-link {
+    color: #09090b;
+    display: block;
+    padding: 12px;
+    text-decoration: none;
+}
+
+.task-card-title {
+    color: #09090b;
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 20px;
+}
+
+.task-card-chips {
+    display: block;
+    line-height: 16px;
+    margin-top: 4px;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.task-card-chevron-cell {
+    padding: 0;
+    text-align: right;
+    vertical-align: middle;
+    width: 26px;
+}
+
+.task-card-chevron {
+    color: #a1a1aa;
+    display: block;
+    font-size: 20px;
+    line-height: 20px;
+    padding: 20px 14px 20px 0;
+    text-decoration: none;
+}
+
+.task-more {
+    padding: 2px 4px 0;
+}
+
+.task-more-link {
+    display: inline-block;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 20px;
+    padding: 6px 0 4px;
+    text-decoration: none;
+}
+
+.task-chip {
+    background-color: #fafafa;
+    border: 1px solid #e9e9eb;
+    border-radius: 8px;
+    color: #52525b;
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 16px;
+    margin: 4px 4px 0 0;
+    padding: 1px 6px;
+    white-space: nowrap;
+}
+
+.task-chip-icon {
+    border: 0;
+    display: inline-block;
+    height: 14px;
+    margin-right: 4px;
+    vertical-align: -3px;
+    width: 14px;
+}
+
+.task-chip-dot {
+    border-radius: 9999px;
+    display: none;
+    height: 6px;
+    margin-right: 4px;
+    vertical-align: 1px;
+    width: 6px;
 }
 
 /* Tables */

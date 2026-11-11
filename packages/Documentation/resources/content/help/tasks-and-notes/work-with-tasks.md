@@ -36,6 +36,6 @@ there arrive already linked to the record.
 
 Open **Settings** from your avatar menu, then **Notifications**, to control
 two signals. **Task Assignments** is an in-app notification when a task is
-assigned to you, with an optional email. **Daily digest** is an email each
-morning listing your overdue and due-today tasks. The digest only sends when
-there's something in it.
+assigned to you, with an optional email. **Daily digest** is a morning email
+listing your overdue and due-today tasks. Each workspace sends its own, and
+only when there's something in it.

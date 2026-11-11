@@ -1,13 +1,14 @@
-<x-mail::message :reason="__('mail.footer.reason.owner', ['workspace' => $workspace->name])">
-<x-slot:preheader>{{ __($grandfathered ? 'mail.trial_ending.preheader_grandfathered' : 'mail.trial_ending.preheader', ['workspace' => $workspace->name]) }}</x-slot:preheader>
-# {{ __('mail.trial_ending.heading', ['workspace' => $workspace->name, 'date' => $endsOnShort]) }}
+@use('Illuminate\Support\Str')
+<x-mail::message :reason="__('mail.footer.reason.owner', ['workspace' => Str::squish($workspace->name)])">
+<x-slot:preheader>{{ __($grandfathered ? 'mail.trial_ending.preheader_grandfathered' : 'mail.trial_ending.preheader', ['workspace' => Str::squish($workspace->name)]) }}</x-slot:preheader>
+<h1>{{ __('mail.trial_ending.heading', ['workspace' => Str::squish($workspace->name), 'date' => $endsOnShort]) }}</h1>
 
 {{ __('mail.trial_ending.ends_at', ['datetime' => $endsOnLong, 'zone' => $zone]) }}
 
 @if($grandfathered)
-{{ __('mail.trial_ending.grandfathered', ['workspace' => $workspace->name]) }}
+<p>{{ __('mail.trial_ending.grandfathered', ['workspace' => Str::squish($workspace->name)]) }}</p>
 @else
-{{ __('mail.trial_ending.pauses', ['workspace' => $workspace->name]) }}
+<p>{{ __('mail.trial_ending.pauses', ['workspace' => Str::squish($workspace->name)]) }}</p>
 @if($deletesWhenInactive)
 
 {{ __('mail.trial_ending.kept') }}

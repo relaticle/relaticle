@@ -12,6 +12,7 @@ use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Str;
 use Relaticle\Cloud\Marketing\Enums\ContactInquiry;
 
 #[Tries(3)]
@@ -48,9 +49,9 @@ final class NewContactSubmissionMail extends Mailable implements ShouldQueue
                     ? __('cloud::mail.contact_submission.preheader_without_company', ['email' => $this->data['email']])
                     : __('cloud::mail.contact_submission.preheader', ['company' => $company, 'email' => $this->data['email']]),
                 'rows' => array_filter([
-                    ['label' => __('cloud::mail.contact_submission.name'), 'value' => $this->data['name']],
+                    ['label' => __('cloud::mail.contact_submission.name'), 'value' => Str::squish($this->data['name'])],
                     ['label' => __('cloud::mail.contact_submission.email'), 'value' => $this->data['email']],
-                    $company === null || $company === '' ? null : ['label' => __('cloud::mail.contact_submission.company'), 'value' => $company],
+                    $company === null || $company === '' ? null : ['label' => __('cloud::mail.contact_submission.company'), 'value' => Str::squish($company)],
                 ]),
             ],
         );
