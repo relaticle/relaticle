@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Actions\Notifications\ArchiveNotification;
 use App\Actions\Task\NotifyTaskAssignees;
-use App\Enums\CrmEntity;
 use App\Enums\Notifications\NotificationReason;
 use App\Enums\Plan;
 use App\Features\EmailIntegration;
@@ -12,12 +11,9 @@ use App\Features\OnboardSeed;
 use App\Filament\Pages\NotificationPreferences;
 use App\Livewire\App\AppDatabaseNotifications;
 use App\Models\Notification;
-use App\Models\SavedView;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Notifications\SavedViewChangedNotification;
-use App\Support\CanonicalRecordUrl;
 use App\Support\CurrentWorkspace;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
@@ -602,67 +598,6 @@ it('renders shared email rows without per-row queries', function (): void {
     $withFifty = $queriesPerRender();
 
     expect($withFifty)->toBe($withFive);
-});
-
-it('shows the owner who deleted their view and links to the table', function (): void {
-    $admin = User::factory()->create(['name' => 'Dana Whitfield']);
-    $this->workspaceA->users()->attach($admin, ['role' => 'admin']);
-
-    $view = SavedView::factory()->for($this->user)->for($this->workspaceA)->create(['entity' => CrmEntity::Company, 'name' => 'Renewals']);
-
-    $this->user->notify(SavedViewChangedNotification::deleted($view, $admin));
-
-    Livewire::actingAs($this->user)->test(AppDatabaseNotifications::class)
-        ->assertSeeText('Dana Whitfield deleted your view')
-        ->assertSeeText('Renewals')
-        ->assertSeeText('It was on the companies table.')
-        ->assertSeeText('Open Companies')
-        ->assertSee(resolve(CanonicalRecordUrl::class)->listPageUrl(CrmEntity::Company, $this->workspaceA));
-});
-
-it('shows a renamed view notice with both names', function (): void {
-    $admin = User::factory()->create(['name' => 'Dana Whitfield']);
-    $this->workspaceA->users()->attach($admin, ['role' => 'admin']);
-
-    $view = SavedView::factory()->for($this->user)->for($this->workspaceA)->create(['entity' => CrmEntity::Company, 'name' => 'Renewals this quarter']);
-
-    $this->user->notify(SavedViewChangedNotification::renamed($view, $admin, 'Renewals'));
-
-    Livewire::actingAs($this->user)->test(AppDatabaseNotifications::class)
-        ->assertSeeText('Dana Whitfield renamed your view')
-        ->assertSeeText('Renewals this quarter')
-        ->assertSeeText('It is still shared on the companies table.');
-});
-
-it('escapes the view and actor names in a view notice', function (): void {
-    $admin = User::factory()->create(['name' => '<b>Dana</b>']);
-    $this->workspaceA->users()->attach($admin, ['role' => 'admin']);
-
-    $view = SavedView::factory()->for($this->user)->for($this->workspaceA)->create(['entity' => CrmEntity::Company, 'name' => '<a href="https://evil.example">Renewals</a>']);
-
-    $this->user->notify(SavedViewChangedNotification::renamed($view, $admin, '<img src="https://evil.example/px.gif">'));
-
-    Livewire::actingAs($this->user)->test(AppDatabaseNotifications::class)
-        ->assertSee('&lt;a href', escape: false)
-        ->assertSee('&lt;img src', escape: false)
-        ->assertSee('&lt;b&gt;Dana&lt;/b&gt;', escape: false)
-        ->assertDontSee('<a href="https://evil.example"', escape: false)
-        ->assertDontSee('<img src="https://evil.example/px.gif"', escape: false);
-});
-
-it('shows a view notice whose actor has since been deleted', function (): void {
-    $admin = User::factory()->create();
-    $this->workspaceA->users()->attach($admin, ['role' => 'admin']);
-
-    $view = SavedView::factory()->for($this->user)->for($this->workspaceA)->create(['entity' => CrmEntity::Company, 'name' => 'Renewals']);
-
-    $this->user->notify(SavedViewChangedNotification::unshared($view, $admin));
-    $admin->delete();
-
-    Livewire::actingAs($this->user)->test(AppDatabaseNotifications::class)
-        ->assertSeeText('is no longer shared')
-        ->assertDontSeeText('stopped sharing your view')
-        ->assertSeeText('It is private to you again on the companies table.');
 });
 
 it('renders managed invoice rows without per-row queries', function (): void {

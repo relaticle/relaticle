@@ -23,12 +23,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CrmEntity $entity
  * @property SavedViewType $type
  * @property string $name
- * @property bool $is_shared
  * @property TableStateData $state
  * @property string $user_id
  */
 #[ScopedBy(WorkspaceScope::class)]
-#[Fillable(['workspace_id', 'user_id', 'entity', 'type', 'name', 'is_shared', 'state'])]
+#[Fillable(['workspace_id', 'user_id', 'entity', 'type', 'name', 'state'])]
 final class SavedView extends Model
 {
     /** @use HasFactory<SavedViewFactory> */
@@ -49,7 +48,6 @@ final class SavedView extends Model
         return [
             'entity' => CrmEntity::class,
             'type' => SavedViewType::class,
-            'is_shared' => 'boolean',
             'state' => TableStateData::class,
         ];
     }
@@ -62,13 +60,6 @@ final class SavedView extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function nameTakenMessage(User $actor): string
-    {
-        return $this->user_id === $actor->getKey()
-            ? __('filament/panel.tables.views.name_taken')
-            : __('filament/panel.tables.views.name_taken_by_owner', ['owner' => $this->user->name]);
-    }
-
     /**
      * @param  Builder<self>  $query
      */
@@ -78,7 +69,7 @@ final class SavedView extends Model
         $query->withoutGlobalScope(WorkspaceScope::class)
             ->where('workspace_id', $workspaceId)
             ->where('entity', $entity)
-            ->where(fn (Builder $visible): Builder => $visible->whereBelongsTo($user)->orWhere('is_shared', true));
+            ->whereBelongsTo($user);
     }
 
     /**

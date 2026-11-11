@@ -1506,23 +1506,6 @@ it('keeps a relative period unchanged when a day passes, and moves its records',
         ->and(filterBarShownNames($component))->toBe(['Far', 'Near']);
 });
 
-it('reads a shared me view as unchanged for a second member, who sees their own records', function (): void {
-    $colleague = filterBarMember($this->user);
-    filterBarRecord($this->user, Company::class, 'By owner');
-    filterBarRecord($this->user, Company::class, 'By colleague', ['creator_id' => $colleague->getKey()]);
-    $view = SavedView::factory()->for($this->user)->for($this->workspace)->shared()->create([
-        'entity' => CrmEntity::Company,
-        'state' => new TableStateData(filters: filterBarRulesState([['field' => 'creator', 'condition' => 'is_any_of', 'value' => ['@me']]])),
-    ]);
-
-    $this->actingAs($colleague);
-    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('$refresh');
-
-    expect($component->instance()->isSavedViewModified())->toBeFalse()
-        ->and(filterBarShownNames($component))->toBe(['By colleague'])
-        ->and($component->get('tableFilters.conditions.rules.0.value'))->toBe(['@me']);
-});
-
 it('reads a view as changed after a rule is added, and as unchanged after discarding it', function (): void {
     $view = SavedView::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Company, 'state' => new TableStateData(filters: filterBarRulesState([]))]);
 
@@ -1979,28 +1962,6 @@ it('shows the viewer once, as me, whichever way a rule stores them', function ()
         ->and(array_column($shown(['@me', $viewer])['labels'], 'id'))->toBe(['@me'])
         ->and($shown([$viewer])['display'])->toBe("{$this->user->name} (me)")
         ->and($shown([$viewer])['labels'][0])->toMatchArray(['id' => $viewer, 'label' => "{$this->user->name} (me)", 'image' => $this->user->getFilamentAvatarUrl()]);
-});
-
-it('reads the stored id of the one who saved a shared view as their name for a teammate, and as me for them', function (): void {
-    $colleague = filterBarMember($this->user);
-    $colleague->update(['name' => 'Casey Colleague']);
-    $ownerId = (string) $this->user->getKey();
-    $view = SavedView::factory()->for($this->user)->for($this->workspace)->shared()->create([
-        'entity' => CrmEntity::Company,
-        'state' => new TableStateData(filters: filterBarRulesState([
-            ['field' => 'creator', 'condition' => 'is_any_of', 'value' => ['@me', $ownerId, (string) $colleague->getKey()]],
-        ])),
-    ]);
-    $opened = fn (): array => livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->instance()->getFilterBarData()['rules'][0];
-
-    $asOwner = $opened();
-    $this->actingAs($colleague);
-    $asColleague = $opened();
-
-    expect($asOwner['display'])->toBe("{$this->user->name} (me), Casey Colleague")
-        ->and(array_column($asOwner['labels'], 'label'))->toBe(["{$this->user->name} (me)", 'Casey Colleague'])
-        ->and($asColleague['display'])->toBe("Casey Colleague (me), {$this->user->name}")
-        ->and(array_column($asColleague['labels'], 'label'))->toBe(['Casey Colleague (me)', $this->user->name]);
 });
 
 it('names a deleted company in a rule instead of showing a blank or an id', function (): void {

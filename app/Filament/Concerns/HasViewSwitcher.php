@@ -175,36 +175,22 @@ trait HasViewSwitcher
     private function viewSwitcherGroups(Collection $views, User $user, ?SavedView $active, ?string $defaultId, string $listPageName): array
     {
         $zone = FilamentTimezone::get();
-        $groups = ['mine' => [], 'shared' => []];
+        $rows = [];
 
         foreach ($views as $view) {
-            $owner = $view->user_id === $user->getKey() ? null : $view->user?->name;
             $date = $view->created_at?->setTimezone($zone)->translatedFormat('M j, Y');
 
-            $groups[$owner === null ? 'mine' : 'shared'][] = [
+            $rows[] = [
                 'id' => $view->getKey(),
                 'name' => $view->name,
-                'owner' => $owner,
-                'isShared' => $view->is_shared,
                 'isDefault' => $view->getKey() === $defaultId,
                 'isActive' => $view->is($active),
                 'canUpdate' => $user->can('update', $view),
                 'url' => static::getResource()::getUrl($listPageName, ['view' => $view->getKey()]),
-                'createdLabel' => $owner === null
-                    ? __('filament/panel.tables.views.created_on', ['date' => $date])
-                    : __('filament/panel.tables.views.created_on_by', ['date' => $date, 'owner' => $owner]),
+                'createdLabel' => __('filament/panel.tables.views.created_on', ['date' => $date]),
             ];
         }
 
-        $headings = ['mine' => __('filament/panel.tables.views.mine'), 'shared' => __('filament/panel.tables.views.shared_with_workspace')];
-        $result = [];
-
-        foreach ($groups as $key => $rows) {
-            if ($rows !== []) {
-                $result[] = ['heading' => $headings[$key], 'rows' => $rows];
-            }
-        }
-
-        return $result;
+        return $rows === [] ? [] : [['heading' => __('filament/panel.tables.views.mine'), 'rows' => $rows]];
     }
 }

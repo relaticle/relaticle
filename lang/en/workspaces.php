@@ -312,9 +312,6 @@ return [
         'activity' => [
             'view' => ['label' => 'View the activity log'],
         ],
-        'views' => [
-            'manage' => ['label' => 'Edit and delete views shared with the workspace'],
-        ],
     ],
 
     'role_matrix' => [

@@ -28,7 +28,7 @@ final readonly class DuplicateSavedView
         try {
             DB::transaction(fn (): bool => $copy->save());
         } catch (UniqueConstraintViolationException) {
-            throw ValidationException::withMessages(['name' => $copy->nameTakenMessage($user)]);
+            throw ValidationException::withMessages(['name' => __('filament/panel.tables.views.name_taken')]);
         }
 
         return $copy;

@@ -34,7 +34,7 @@ final readonly class CreateSavedView
         try {
             DB::transaction(fn (): bool => $view->save());
         } catch (UniqueConstraintViolationException) {
-            throw ValidationException::withMessages(['name' => $view->nameTakenMessage($user)]);
+            throw ValidationException::withMessages(['name' => __('filament/panel.tables.views.name_taken')]);
         }
 
         return $view;

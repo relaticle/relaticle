@@ -7,12 +7,4 @@
             <span class="fi-ta-views-tag">{{ __('filament/panel.tables.views.default') }}</span>
         @endif
     </span>
-
-    <span class="fi-ta-views-row-meta">
-        @if ($row['owner'] !== null)
-            <span class="truncate">{{ $row['owner'] }}</span>
-        @elseif ($row['isShared'])
-            <span>{{ __('filament/panel.tables.views.shared_label') }}</span>
-        @endif
-    </span>
 </span>

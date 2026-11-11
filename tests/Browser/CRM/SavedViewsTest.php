@@ -53,27 +53,6 @@ it('applies a view from the switcher and offers to discard or save a change', fu
         ->assertNoJavaScriptErrors();
 });
 
-it('offers save as new view from the arrow beside save for everyone on a shared view', function (): void {
-    SavedView::factory()->for($this->user)->for($this->workspace)->create([
-        'name' => 'Team pipeline',
-        'is_shared' => true,
-        'state' => new TableStateData(sort: 'name:desc'),
-    ]);
-
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
-        ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->click('Team pipeline');
-    changeViewByRule($page);
-    $page->assertSeeIn('[data-view-save]', 'Save for everyone')
-        ->click('[aria-label="More ways to save"]')
-        ->click('[data-view-save] .fi-dropdown-list-item[data-view-save-action="save-as"]')
-        ->assertSee('Share with workspace')
-        ->assertNoJavaScriptErrors();
-});
-
 it('joins the save halves into one chip-height control that stays pinned beside a long row of chips', function (): void {
     SavedView::factory()->for($this->user)->for($this->workspace)->create([
         'name' => 'Hot leads',
@@ -117,108 +96,9 @@ it('joins the save halves into one chip-height control that stays pinned beside 
     $page->assertNoJavaScriptErrors();
 });
 
-it('draws the keyboard focus ring of each save half over the half beside it', function (): void {
-    SavedView::factory()->for($this->user)->for($this->workspace)->create([
-        'name' => 'Team pipeline',
-        'is_shared' => true,
-        'state' => new TableStateData(sort: 'name:desc'),
-    ]);
-    $focusedHalfIsAbove = 'document.activeElement.matches(":focus-visible") && Number(getComputedStyle(document.activeElement).zIndex) > 0';
-
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
-        ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->click('Team pipeline');
-    changeViewByRule($page);
-    $page->assertSee('Save for everyone');
-
-    if (! str_contains((string) $page->script('navigator.userAgent'), 'Chrome')) {
-        $this->markTestSkipped('Safari never matches :focus-visible on a button reached without a real Tab key.');
-    }
-
-    $page->script('document.querySelector("[data-view-save-action=save]").focus()');
-    $page->keys('[data-view-save-action="save"]', 'Shift')
-        ->assertScript('document.activeElement === document.querySelector("[data-view-save-action=save]")', true)
-        ->assertScript($focusedHalfIsAbove, true);
-
-    $page->script('document.querySelector(".fi-view-save-more").focus()');
-    $page->keys('.fi-view-save-more', 'Shift')
-        ->assertScript('document.activeElement === document.querySelector(".fi-view-save-more")', true)
-        ->assertScript($focusedHalfIsAbove, true)
-        ->assertNoJavaScriptErrors();
-});
-
-it('leaves the chip strip room on a phone with an icon discard beside save for everyone', function (): void {
-    SavedView::factory()->for($this->user)->for($this->workspace)->create([
-        'name' => 'Team pipeline',
-        'is_shared' => true,
-        'state' => new TableStateData(sort: 'name:desc'),
-    ]);
-
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(390, 844)
-        ->navigate("/app/{$this->workspace->slug}/companies")
-        ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->click('Team pipeline');
-    $page->script("Livewire.all().find((component) => component.name.includes('ListCompanies')).\$wire.\$call('setFilterRules', Array.from({ length: 3 }, (_, index) => ({ field: 'name', condition: 'contains', value: 'chip' + index })))");
-    $page->assertSeeIn('[data-view-save]', 'Save for everyone')
-        ->assertScript('document.querySelectorAll("[data-filter-chip]").length === 3', true)
-        ->assertScript('document.querySelector(".fi-filter-bar-start").getBoundingClientRect().width >= 120', true)
-        ->assertScript('document.querySelectorAll("[data-view-save-action=discard]").length === 1', true)
-        ->assertScript('(() => { const discard = document.querySelector("[data-view-save-action=discard]"); const icon = discard.querySelector(".fi-view-save-discard-icon"); return discard.textContent.trim() === "Discard changes" && icon.checkVisibility() && discard.querySelector(".fi-view-save-discard-text").getBoundingClientRect().width <= 1 && discard.getBoundingClientRect().height === document.querySelector("[data-filter-chip]").getBoundingClientRect().height; })()', true);
-
-    $page->script('document.querySelector(".fi-filter-bar-start").scrollLeft = 99999');
-    $page->script('window.probeMore = [...document.querySelectorAll("[data-filter-chip] [data-filter-more]")].at(-1); window.probeMore.click()');
-    $page->assertScript(savedViewsWaitFor('(() => { const pop = document.querySelector("[data-pop][data-open=true]"); return Boolean(pop?.checkVisibility() && pop.contains(document.activeElement)); })()'), true)
-        ->keys('[data-pop][data-open=true] [data-pop-item]', 'Escape')
-        ->assertScript(savedViewsWaitFor('document.activeElement === window.probeMore'), true)
-        ->click('[data-view-save-action="discard"]')
-        ->assertScript('(async () => { for (let attempt = 0; attempt < 50; attempt++) { if (document.querySelectorAll("[data-filter-chip]").length === 0) { return true; } await new Promise((resolve) => setTimeout(resolve, 100)); } return false; })()', true)
-        ->assertNoJavaScriptErrors();
-});
-
-it('compacts sort and save for everyone on a 360 px phone and shows both in full on a desktop', function (): void {
-    SavedView::factory()->for($this->user)->for($this->workspace)->create([
-        'name' => 'Team pipeline',
-        'is_shared' => true,
-        'state' => new TableStateData(sort: 'name:desc'),
-    ]);
-
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(360, 740)
-        ->navigate("/app/{$this->workspace->slug}/companies")
-        ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->click('Team pipeline');
-    $page->script("Livewire.all().find((component) => component.name.includes('ListCompanies')).\$wire.\$call('setFilterRules', Array.from({ length: 3 }, (_, index) => ({ field: 'name', condition: 'contains', value: 'chip' + index })))");
-
-    $save = 'document.querySelector("[data-view-save-action=save]")';
-    $sort = 'document.querySelector("[data-filter-sort]")';
-
-    $page->assertScript('document.querySelectorAll("[data-filter-chip]").length === 3', true)
-        ->assertScript('document.querySelector(".fi-filter-bar-start").getBoundingClientRect().width >= 170', true)
-        ->assertScript("{$save}.textContent.replace(/\\s+/g, ' ').trim() === 'Save Save for everyone'", true)
-        ->assertScript("{$save}.getAttribute('data-tooltip') === 'Save for everyone' && {$save}.querySelector('.fi-view-save-primary-icon').checkVisibility() && {$save}.querySelector('span[aria-hidden=true]').checkVisibility()", true)
-        ->assertScript("{$save}.querySelector('.max-sm\\\\:sr-only').getBoundingClientRect().width <= 1", true)
-        ->assertScript("{$sort}.classList.contains('fi-set')", true)
-        ->assertScript("/^Sorted by Company, descending$/.test({$sort}.getAttribute('aria-label'))", true)
-        ->assertScript("{$sort}.querySelector('span').getBoundingClientRect().width <= 1", true);
-
-    $page->resize(1440, 900)
-        ->assertScript("{$sort}.querySelector('span').getBoundingClientRect().width > 0", true)
-        ->assertScript("! {$save}.querySelector('.fi-view-save-primary-icon').checkVisibility()", true)
-        ->assertSeeIn('[data-view-save-action=save]', 'Save for everyone')
-        ->assertSeeIn('[data-filter-sort]', 'Company')
-        ->assertNoJavaScriptErrors();
-});
-
 it('keeps a tabbed-to chip control inside the strip on a phone', function (): void {
     SavedView::factory()->for($this->user)->for($this->workspace)->create([
         'name' => 'Team pipeline',
-        'is_shared' => true,
         'state' => new TableStateData(sort: 'name:desc'),
     ]);
 
@@ -354,50 +234,29 @@ it('closes a view confirmation from its close button on a phone, where the switc
     expect(SavedView::query()->whereKey($view->getKey())->exists())->toBeTrue();
 });
 
-it('keeps a shared view name readable beside a long owner name', function (): void {
-    $owner = User::factory()->create(['name' => 'Maximiliana Alexandrova-Konstantinopoulou']);
-    $this->workspace->users()->attach($owner, ['role' => 'member']);
-    SavedView::factory()->for($owner)->for($this->workspace)->shared()->create(['name' => 'Enterprise renewals']);
-
-    $nameBox = 'document.querySelector(".fi-ta-views-row [title=\"Enterprise renewals\"]").getBoundingClientRect()';
-    $panelBox = 'document.querySelector(".fi-ta-views-row").closest(".fi-dropdown-panel").getBoundingClientRect()';
-    $ownerBox = 'document.querySelector(".fi-ta-views-row-meta").getBoundingClientRect()';
-
-    loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
-        ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->assertScript("{$nameBox}.width >= 80", true)
-        ->assertScript("{$ownerBox}.right <= {$panelBox}.right", true)
-        ->assertNoJavaScriptErrors();
-});
-
 it('opens each view row menu with that view own options and acts on that view', function (): void {
-    $member = User::factory()->create(['current_workspace_id' => $this->workspace->getKey()]);
-    $this->workspace->users()->attach($member, ['role' => 'member']);
-    $mine = SavedView::factory()->for($member)->for($this->workspace)->shared()->create(['name' => 'Mine']);
-    $theirs = SavedView::factory()->for($this->user)->for($this->workspace)->shared()->create(['name' => 'Theirs']);
+    $mine = SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => 'Mine']);
+    $other = SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => 'Other']);
 
     $visibleRowMenuItems = '[...document.querySelectorAll(".fi-ta-views-row-menu .fi-dropdown-list-item")].filter((item) => item.offsetParent !== null).map((item) => item.textContent.trim())';
 
-    $page = loginViaBrowser($member)
+    $page = loginViaBrowser($this->user)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/companies")
         ->click('.fi-view-switcher .fi-dropdown-trigger button');
 
     $page->hover('.fi-ta-views-row:has([title="Mine"])')->click('[aria-label="Actions for Mine"]');
-    $page->assertScript($visibleRowMenuItems, ['Set as my default', 'Rename', 'Duplicate', 'Stop sharing', 'Delete view']);
+    $page->assertScript($visibleRowMenuItems, ['Set as my default', 'Rename', 'Duplicate', 'Delete view']);
 
     $page->click('[aria-label="Actions for Mine"]');
-    $page->hover('.fi-ta-views-row:has([title="Theirs"])')->click('[aria-label="Actions for Theirs"]');
-    $page->assertScript($visibleRowMenuItems, ['Set as my default', 'Duplicate']);
+    $page->hover('.fi-ta-views-row:has([title="Other"])')->click('[aria-label="Actions for Other"]');
+    $page->assertScript($visibleRowMenuItems, ['Set as my default', 'Rename', 'Duplicate', 'Delete view']);
 
     $page->script('[...document.querySelectorAll(".fi-ta-views-row-menu .fi-dropdown-list-item")].find((item) => item.offsetParent !== null).click()');
     $page->wait(1)->assertNoJavaScriptErrors();
 
-    expect(TablePreference::query()->withoutGlobalScopes()->whereBelongsTo($member)->value('default_view_id'))->toBe($theirs->getKey());
+    expect(TablePreference::query()->withoutGlobalScopes()->whereBelongsTo($this->user)->value('default_view_id'))->toBe($other->getKey());
 
     $page->click('.fi-view-switcher .fi-dropdown-trigger button');
     $page->hover('.fi-ta-views-row:has([title="Mine"])')->click('[aria-label="Actions for Mine"]');
@@ -414,14 +273,10 @@ it('opens each view row menu with that view own options and acts on that view', 
         ->assertScript('document.activeElement?.closest(".fi-ta-views-row-menu") !== null && document.activeElement.textContent.trim() === "Set as my default"', true);
 });
 
-it('hides a view group heading when the search matches none of its views', function (): void {
+it('hides the view group heading when the search matches none of its views', function (): void {
     foreach (range(1, 7) as $number) {
         SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => "Alpha {$number}"]);
     }
-
-    $colleague = User::factory()->create();
-    $this->workspace->users()->attach($colleague, ['role' => 'member']);
-    SavedView::factory()->for($colleague)->for($this->workspace)->shared()->create(['name' => 'Zeta']);
 
     $visibleHeadings = '[...document.querySelectorAll(".fi-ta-views-heading")].filter((heading) => heading.offsetParent !== null).length';
 
@@ -430,19 +285,17 @@ it('hides a view group heading when the search matches none of its views', funct
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/companies")
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->assertScript($visibleHeadings, 2)
+        ->assertScript($visibleHeadings, 1)
         ->type('.fi-ta-views-search input', 'Alpha')
         ->assertScript($visibleHeadings, 1)
         ->type('.fi-ta-views-search input', 'Zeta')
-        ->assertScript($visibleHeadings, 1)
+        ->assertScript($visibleHeadings, 0)
         ->assertNoJavaScriptErrors();
 });
 
-it('keeps a long view name beside a long owner name truncated and opens its row menu inside the viewport', function (): void {
-    $owner = User::factory()->create(['name' => 'Maximiliana Alexandrova-Konstantinopoulou-Papadopoulos']);
-    $this->workspace->users()->attach($owner, ['role' => 'member']);
+it('keeps a long view name truncated and opens its row menu inside the viewport', function (): void {
     $name = 'Quarterly enterprise renewals across every region with a signed order form and a named champion';
-    SavedView::factory()->for($owner)->for($this->workspace)->shared()->create(['name' => $name]);
+    SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => $name]);
 
     $row = 'document.querySelector(".fi-ta-views-row")';
     $viewportWidth = 'document.documentElement.clientWidth';
@@ -453,8 +306,7 @@ it('keeps a long view name beside a long owner name truncated and opens its row 
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/companies")
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->assertScript("{$row}.querySelector('[title]').scrollWidth > {$row}.querySelector('[title]').clientWidth", true)
-        ->assertScript("{$row}.querySelector('.fi-ta-views-row-meta').getBoundingClientRect().right <= {$row}.closest('.fi-dropdown-panel').getBoundingClientRect().right", true);
+        ->assertScript("{$row}.querySelector('[title]').scrollWidth > {$row}.querySelector('[title]').clientWidth", true);
 
     $page->hover('.fi-ta-views-row')
         ->click('.fi-ta-views-row [aria-label^="Actions for"]')
@@ -537,31 +389,6 @@ it('returns focus to the view switcher after discarding or saving from the keybo
     $page->keys('[data-view-save-action="save"]', 'Enter')
         ->assertDontSee('Discard changes')
         ->assertScript($onSwitcher, true)
-        ->assertNoJavaScriptErrors();
-});
-
-it('returns focus to the view switcher once the confirmation for saving over a shared view closes', function (): void {
-    $member = User::factory()->create(['current_workspace_id' => $this->workspace->getKey()]);
-    $this->workspace->users()->attach($member, ['role' => 'member']);
-    SavedView::factory()->for($member)->for($this->workspace)->create([
-        'name' => 'Team pipeline',
-        'is_shared' => true,
-        'state' => new TableStateData(sort: 'name:desc'),
-    ]);
-
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
-        ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->click('Team pipeline');
-    changeViewByRule($page);
-    $page->click('[data-view-save-action="save"]')
-        ->assertSee('Save over "Team pipeline"?');
-
-    $page->click('.fi-modal-footer-actions .fi-color-primary')
-        ->assertDontSee('Save over "Team pipeline"?')
-        ->assertScript('document.activeElement === document.querySelector(".fi-view-switcher-trigger")', true)
         ->assertNoJavaScriptErrors();
 });
 

@@ -50,8 +50,7 @@ such as the last 30 days or this month. A saved view keeps the period
 relative, so it moves with the calendar. **Today** works the same way.
 
 Fields that hold a member list you first, as your name followed by
-**(me)**. In a shared view, **(me)** means whoever opens it, so each
-teammate sees their own name.
+**(me)**.
 
 ## Show deleted records
 
@@ -68,9 +67,7 @@ name. On Tasks, **Group** groups the
 list by status or priority.
 
 Filters, sort, and grouping save with the view. When you change them,
-**Discard changes** and **Save** appear at the right of the row. On a
-shared view, Save reads **Save for everyone**, because the view changes for
-your whole team.
+**Discard changes** and **Save** appear at the right of the row.
 
 ## If you can't find a field in the filter list
 

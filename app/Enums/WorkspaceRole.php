@@ -53,7 +53,6 @@ enum WorkspaceRole: string
                 WorkspaceCapability::EmailManage,
                 WorkspaceCapability::EmailAgentSend,
                 WorkspaceCapability::ActivityView,
-                WorkspaceCapability::ViewsManage,
             ],
             self::Member => [
                 WorkspaceCapability::RecordsView,

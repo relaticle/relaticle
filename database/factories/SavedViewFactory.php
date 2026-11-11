@@ -26,13 +26,7 @@ final class SavedViewFactory extends Factory
             'entity' => CrmEntity::Company,
             'type' => SavedViewType::Table,
             'name' => fake()->unique()->words(2, true),
-            'is_shared' => false,
             'state' => new TableStateData,
         ];
-    }
-
-    public function shared(): self
-    {
-        return $this->state(['is_shared' => true]);
     }
 }

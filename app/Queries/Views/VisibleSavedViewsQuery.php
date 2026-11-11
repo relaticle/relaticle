@@ -19,7 +19,6 @@ final readonly class VisibleSavedViewsQuery
     {
         return SavedView::query()
             ->visibleTo($user, (string) $workspace->getKey(), $entity)
-            ->with('user:id,name')
             ->orderByRaw('lower(name)')
             ->get();
     }

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Filament\Tables\Concerns;
 
 use App\Actions\Views\CreateSavedView;
-use App\Actions\Views\CreateSharedSavedView;
 use App\Actions\Views\DeleteSavedView;
 use App\Actions\Views\DuplicateSavedView;
 use App\Actions\Views\SetDefaultSavedView;
@@ -18,7 +17,6 @@ use App\Queries\Views\VisibleSavedViewsQuery;
 use Closure;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
-use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Text;
@@ -35,7 +33,7 @@ trait HasSavedViews
     #[Url(as: 'view')]
     public ?string $requestedSavedViewId = null;
 
-    private const array SAVED_VIEW_ROW_ACTIONS = ['renameSavedView', 'shareSavedView', 'stopSharingSavedView', 'deleteSavedView'];
+    private const array SAVED_VIEW_ROW_ACTIONS = ['renameSavedView', 'deleteSavedView'];
 
     /** @var Collection<int, SavedView>|null */
     private ?Collection $visibleSavedViews = null;
@@ -147,13 +145,6 @@ trait HasSavedViews
     {
         return Action::make('saveSavedView')
             ->label(__('filament/panel.tables.views.save'))
-            ->visible(fn (): bool => ! ($this->getActiveSavedView() instanceof SavedView) || $this->canUpdateSavedView($this->getActiveSavedView()))
-            ->requiresConfirmation()
-            ->modalHidden(fn (): bool => ! $this->isSomeoneElsesSavedView($this->getActiveSavedView()))
-            ->modalIcon('lucide-users')
-            ->modalHeading(fn (): string => __('filament/panel.tables.views.save_heading', ['name' => $this->getActiveSavedView()?->name]))
-            ->modalDescription(fn (): string => __('filament/panel.tables.views.save_description', ['owner' => $this->getActiveSavedView()?->user?->name]))
-            ->modalSubmitActionLabel(__('filament/panel.tables.views.save'))
             ->action(function (): void {
                 $view = $this->getActiveSavedView();
 
@@ -262,18 +253,10 @@ trait HasSavedViews
             ->modalSubmitActionLabel(fn (array $arguments): string => __($this->opensAsCreate($arguments) ? 'filament/panel.tables.views.create_submit' : 'filament/panel.tables.views.save'))
             ->schema(fn (array $arguments): array => [
                 $this->savedViewNameInput(),
-                Checkbox::make('is_shared')
-                    ->label(__('filament/panel.tables.views.share'))
-                    ->helperText(fn (): string => __('filament/panel.tables.views.share_description', ['workspace' => $this->savedViewWorkspace()->name]))
-                    ->default(false),
                 Text::make(__('filament/panel.tables.views.create_note'))->visible($this->opensAsCreate($arguments)),
             ])
             ->action(function (array $data, Schema $schema): void {
-                $isShared = (bool) ($data['is_shared'] ?? false);
-
-                $create = $isShared ? CreateSharedSavedView::class : CreateSavedView::class;
-
-                $view = $this->withViewNameErrors($schema, fn (): SavedView => resolve($create)->execute(
+                $view = $this->withViewNameErrors($schema, fn (): SavedView => resolve(CreateSavedView::class)->execute(
                     $this->savedViewUser(),
                     $this->savedViewWorkspace(),
                     $this->tableEntity(),
@@ -285,7 +268,7 @@ trait HasSavedViews
                 $this->markSavedViewApplied();
                 $this->visibleSavedViews = null;
 
-                Notification::make()->success()->title(__($isShared ? 'filament/panel.tables.views.created_shared' : 'filament/panel.tables.views.created', ['name' => e($view->name)]))->send();
+                Notification::make()->success()->title(__('filament/panel.tables.views.created', ['name' => e($view->name)]))->send();
             });
     }
 
@@ -302,15 +285,6 @@ trait HasSavedViews
             ->modalHeading(__('filament/panel.tables.views.rename'))
             ->modalWidth('md')
             ->modalSubmitActionLabel(__('filament/panel.tables.views.save'))
-            ->modalDescription(function (array $arguments): ?string {
-                $view = $this->argumentSavedView($arguments);
-
-                if (! $this->isSomeoneElsesSavedView($view)) {
-                    return null;
-                }
-
-                return __('filament/panel.tables.views.rename_description_other', ['owner' => $view?->user?->name]);
-            })
             ->visible(fn (array $arguments): bool => $this->canUpdateArgumentSavedView($arguments))
             ->fillForm(fn (array $arguments): array => ['name' => $this->argumentSavedView($arguments)?->name])
             ->schema([$this->savedViewNameInput()])
@@ -329,33 +303,6 @@ trait HasSavedViews
             });
     }
 
-    public function shareSavedViewAction(): Action
-    {
-        return Action::make('shareSavedView')
-            ->label(__('filament/panel.tables.views.share'))
-            ->requiresConfirmation()
-            ->modalIcon('lucide-users')
-            ->modalHeading(fn (array $arguments): string => __('filament/panel.tables.views.share_heading', ['name' => $this->argumentSavedView($arguments)?->name]))
-            ->modalDescription(fn (): string => __('filament/panel.tables.views.share_description', ['workspace' => $this->savedViewWorkspace()->name]))
-            ->modalSubmitActionLabel(__('filament/panel.tables.views.share_confirm'))
-            ->visible(fn (array $arguments): bool => $this->canUpdateArgumentSavedView($arguments) && ! $this->argumentSavedView($arguments)?->is_shared)
-            ->action(fn (array $arguments) => $this->setSavedViewSharing($this->requireArgumentSavedView($arguments), true));
-    }
-
-    public function stopSharingSavedViewAction(): Action
-    {
-        return Action::make('stopSharingSavedView')
-            ->label(__('filament/panel.tables.views.unshare'))
-            ->requiresConfirmation()
-            ->modalHidden(fn (array $arguments): bool => ! $this->isSomeoneElsesSavedView($this->argumentSavedView($arguments)))
-            ->modalIcon('lucide-lock')
-            ->modalHeading(fn (array $arguments): string => __('filament/panel.tables.views.unshare_heading', ['name' => $this->argumentSavedView($arguments)?->name]))
-            ->modalDescription(fn (array $arguments): string => __('filament/panel.tables.views.unshare_description', ['owner' => $this->argumentSavedView($arguments)?->user?->name]))
-            ->modalSubmitActionLabel(__('filament/panel.tables.views.unshare'))
-            ->visible(fn (array $arguments): bool => $this->canUpdateArgumentSavedView($arguments) && (bool) $this->argumentSavedView($arguments)?->is_shared)
-            ->action(fn (array $arguments) => $this->setSavedViewSharing($this->requireArgumentSavedView($arguments), false));
-    }
-
     public function deleteSavedViewAction(): Action
     {
         return Action::make('deleteSavedView')
@@ -363,13 +310,7 @@ trait HasSavedViews
             ->color('danger')
             ->requiresConfirmation()
             ->modalHeading(fn (array $arguments): string => __('filament/panel.tables.views.delete_heading', ['name' => $this->argumentSavedView($arguments)?->name]))
-            ->modalDescription(function (array $arguments): string {
-                $view = $this->argumentSavedView($arguments);
-
-                return $this->isSomeoneElsesSavedView($view)
-                    ? __('filament/panel.tables.views.delete_description_other', ['owner' => $view->user?->name])
-                    : __('filament/panel.tables.views.delete_description');
-            })
+            ->modalDescription(__('filament/panel.tables.views.delete_description'))
             ->visible(fn (array $arguments): bool => $this->canUpdateArgumentSavedView($arguments))
             ->action(function (array $arguments): void {
                 $view = $this->requireArgumentSavedView($arguments);
@@ -384,18 +325,6 @@ trait HasSavedViews
 
                 Notification::make()->success()->title(__('filament/panel.tables.views.deleted', ['name' => e($view->name)]))->send();
             });
-    }
-
-    private function setSavedViewSharing(SavedView $view, bool $isShared): void
-    {
-        $view = resolve(UpdateSavedView::class)->execute($this->savedViewUser(), $view, ['is_shared' => $isShared]);
-        $this->visibleSavedViews = null;
-
-        if ($this->savedViewUser()->cannot('view', $view)) {
-            $this->forgetSavedView($view->getKey());
-        }
-
-        Notification::make()->success()->title(__($isShared ? 'filament/panel.tables.views.shared' : 'filament/panel.tables.views.unshared', ['name' => e($view->name)]))->send();
     }
 
     /**
@@ -424,11 +353,6 @@ trait HasSavedViews
         $view = $this->argumentSavedView($arguments);
 
         return $view instanceof SavedView && $this->canUpdateSavedView($view);
-    }
-
-    private function isSomeoneElsesSavedView(?SavedView $view): bool
-    {
-        return $view instanceof SavedView && $view->user_id !== $this->savedViewUser()->getKey();
     }
 
     private function vanishedMountedSavedViewId(): ?string

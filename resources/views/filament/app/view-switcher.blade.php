@@ -4,7 +4,6 @@
     $rowMenuView = fn (array $row): array => [
         'id' => $row['id'],
         'canUpdate' => $row['canUpdate'],
-        'isShared' => $row['isShared'],
         'isDefault' => $row['isDefault'],
         'createdLabel' => $row['createdLabel'],
     ];
@@ -130,14 +129,6 @@
 
                         <x-filament::dropdown.list.item icon="lucide-copy" x-on:click="$wire.duplicateSavedView(rowView.id)">
                             {{ __('filament/panel.tables.views.duplicate') }}
-                        </x-filament::dropdown.list.item>
-
-                        <x-filament::dropdown.list.item icon="lucide-lock" x-show="rowView?.canUpdate && rowView?.isShared" x-on:click="$wire.mountAction('stopSharingSavedView', { view: rowView.id })">
-                            {{ __('filament/panel.tables.views.unshare') }}
-                        </x-filament::dropdown.list.item>
-
-                        <x-filament::dropdown.list.item icon="lucide-users" x-show="rowView?.canUpdate && ! rowView?.isShared" x-on:click="$wire.mountAction('shareSavedView', { view: rowView.id })">
-                            {{ __('filament/panel.tables.views.share') }}
                         </x-filament::dropdown.list.item>
                     </x-filament::dropdown.list>
 

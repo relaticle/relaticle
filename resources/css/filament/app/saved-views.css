@@ -18,16 +18,12 @@
     @apply max-sm:sr-only;
 }
 
-.fi-view-save-primary-icon {
-    @apply size-4 sm:hidden;
-}
-
 @media (width < 40rem) {
     .fi-view-save .fi-view-save-discard {
         @apply px-2;
     }
 
-    .fi-view-save :is(.fi-view-save-discard, .fi-view-save-primary) {
+    .fi-view-save .fi-view-save-discard {
         &:is(:hover, :focus-visible)::after {
             @apply pointer-events-none absolute top-full left-1/2 z-50 mt-1.5 -translate-x-1/2 rounded-md bg-gray-900 px-2 py-1 text-xs font-medium whitespace-nowrap text-white content-[attr(data-tooltip)] dark:bg-white dark:text-gray-900;
         }
@@ -102,10 +98,6 @@
     }
 }
 
-.fi-ta-views-row-meta {
-    @apply flex max-w-1/2 min-w-0 items-center gap-1.5 text-xs font-normal text-gray-500 dark:text-gray-400;
-}
-
 /* The view the table shows. A tint, unlike the gray hover, so the two never read alike. */
 .fi-ta-views-selected {
     @apply bg-primary-50! dark:bg-primary-400/10!;
@@ -138,10 +130,6 @@
     .fi-ta-views-row:has([aria-expanded='true']) {
         & .fi-ta-views-row-actions {
             @apply pointer-events-auto opacity-100;
-        }
-
-        & .fi-ta-views-row-meta {
-            @apply hidden;
         }
 
         & > .fi-dropdown-list-item {
