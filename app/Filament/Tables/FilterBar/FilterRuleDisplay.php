@@ -217,7 +217,7 @@ final readonly class FilterRuleDisplay
         $workspace = $user->currentWorkspace;
 
         if ($field->kind === FilterFieldKind::Member) {
-            return LinkOption::selecting(User::query()->memberOf($workspace)->whereKey($ids), 'name')->get()
+            return User::query()->memberOf($workspace)->whereKey($ids)->select(LinkOption::columns(new User, 'name'))->get()
                 ->mapWithKeys(fn (User $member): array => [(string) $member->getKey() => LinkOption::forRecord($member, $member->name)])
                 ->all();
         }
@@ -232,13 +232,13 @@ final readonly class FilterRuleDisplay
         $softDeletes = in_array(SoftDeletes::class, class_uses_recursive($model), true);
         $names = [];
 
-        $records = LinkOption::selecting(
-            $model::query()
-                ->withoutGlobalScopes([WorkspaceScope::class, SoftDeletingScope::class])
-                ->whereBelongsTo($workspace)
-                ->whereKey($ids),
-            $column,
-        )->get();
+        $records = $model::query()
+            ->withoutGlobalScopes([WorkspaceScope::class, SoftDeletingScope::class])
+            ->whereBelongsTo($workspace)
+            ->whereKey($ids)
+            ->select(LinkOption::columns(new $model, $column))
+            ->with(LinkOption::marks(new $model))
+            ->get();
 
         foreach ($records as $record) {
             $name = (string) $record->getAttribute($column);

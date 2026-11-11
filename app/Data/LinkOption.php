@@ -6,9 +6,10 @@ namespace App\Data;
 
 use App\Enums\CrmEntity;
 use App\Models\User;
+use Closure;
 use Filament\Models\Contracts\HasAvatar;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\MediaLibrary\HasMedia;
 
@@ -22,15 +23,9 @@ final readonly class LinkOption
         public bool $circular = true,
     ) {}
 
-    /**
-     * @template TModel of Model
-     *
-     * @param  Builder<TModel>  $query
-     * @return Builder<TModel>
-     */
-    public static function selecting(Builder $query, string $titleColumn): Builder
+    /** @return list<string> */
+    public static function columns(Model $model, string $titleColumn): array
     {
-        $model = $query->getModel();
         $columns = [$model->getKeyName(), $titleColumn];
 
         if (in_array(SoftDeletes::class, class_uses_recursive($model), true)) {
@@ -41,13 +36,17 @@ final readonly class LinkOption
             $columns[] = 'profile_photo_path';
         }
 
-        $query->select(array_map($model->qualifyColumn(...), array_unique($columns)));
+        return array_map($model->qualifyColumn(...), array_values(array_unique($columns)));
+    }
 
-        if ($model instanceof HasAvatar && $model instanceof HasMedia && defined($model::class.'::LOGO_MEDIA_COLLECTION')) {
-            $query->with(['media' => fn ($media) => $media->where('collection_name', constant($model::class.'::LOGO_MEDIA_COLLECTION'))]);
+    /** @return array<string, Closure(Relation<*, *, *>): mixed> */
+    public static function marks(Model $model): array
+    {
+        if (! $model instanceof HasAvatar || ! $model instanceof HasMedia || ! defined($model::class.'::LOGO_MEDIA_COLLECTION')) {
+            return [];
         }
 
-        return $query;
+        return ['media' => fn (Relation $media): Relation => $media->where('collection_name', constant($model::class.'::LOGO_MEDIA_COLLECTION'))];
     }
 
     public static function forRecord(Model $record, string $label, ?CrmEntity $entity = null): self

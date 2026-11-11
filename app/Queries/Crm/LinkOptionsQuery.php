@@ -55,7 +55,10 @@ final readonly class LinkOptionsQuery
      */
     private function labelled(Builder $query, string $column, string $term, ?CrmEntity $entity = null): array
     {
-        $options = LinkOption::selecting($query, $column)
+        $model = $query->getModel();
+        $options = $query
+            ->select(LinkOption::columns($model, $column))
+            ->with(LinkOption::marks($model))
             ->when($term !== '', fn (Builder $q): Builder => $q->where($column, 'ilike', '%'.LikePattern::escape($term).'%'))
             ->orderBy($column)
             ->orderBy($query->getModel()->getKeyName())
