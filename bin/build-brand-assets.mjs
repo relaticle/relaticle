@@ -23,13 +23,14 @@ const placed = (fraction) => {
 
     return `translate(${offset} ${offset}) scale(${scale})`;
 };
-const placement = placed(0.74);
 const brandColor = '#5D54E8';
+const ink = '#0F172A';
 const variants = [
-    { id: 'purple', background: brandColor, mark: whiteMark },
-    { id: 'light', background: '#FFFFFF', mark: colorMark },
-    { id: 'dark', background: '#0F172A', mark: whiteMark },
+    { id: 'light', background: '#F6F5FB', mark: colorMark, placement: placed(0.66) },
+    { id: 'purple', background: brandColor, mark: whiteMark, placement: placed(0.74) },
+    { id: 'dark', background: ink, mark: whiteMark, placement: placed(0.74) },
 ];
+const lockupArt = (mark, wordColor, dotColor) => `<g transform="scale(0.055268)">${mark}</g><g transform="translate(68 3.4) scale(0.0445)" stroke="${wordColor}" stroke-width="8" stroke-linejoin="round">${inner(wordmark).replaceAll(ink, wordColor).replaceAll(brandColor, dotColor)}</g>`;
 const platforms = [
     ['YouTube', 'youtube', 800], ['X', 'x', 400], ['LinkedIn', 'linkedin', 400],
     ['Instagram', 'instagram', 1080], ['Facebook', 'facebook', 1080], ['Threads', 'threads', 1080],
@@ -58,8 +59,9 @@ function svg(content, viewBox = '0 0 1024 1024', width = 1024, height = 1024) {
 }
 
 function writeSite(name, content) {
-    fs.mkdirSync(siteOutput, { recursive: true });
-    fs.writeFileSync(path.join(siteOutput, name), content);
+    const target = path.join(siteOutput, name);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, content);
     siteFiles.push(name);
 }
 
@@ -99,7 +101,7 @@ try {
     execFileSync('zip', ['-v']);
 
     for (const variant of variants) {
-        const artwork = svg(`<rect width="1024" height="1024" fill="${variant.background}"/><g transform="${placement}">${variant.mark}</g>`);
+        const artwork = svg(`<rect width="1024" height="1024" fill="${variant.background}"/><g transform="${variant.placement}">${variant.mark}</g>`);
         const master = write(`avatars/${variant.id}.svg`, artwork);
         manifest.avatars.push({
             id: variant.id,
@@ -114,13 +116,8 @@ try {
 
     for (const [variant, mark] of [['color', colorMark], ['white', whiteMark]]) {
         const symbol = write(`logos/symbol-${variant}.svg`, svg(mark, '-35 62 1228 1035', 1228, 1035));
-        const wordColor = variant === 'white' ? '#FFFFFF' : '#0F172A';
-        const inked = inner(wordmark).replaceAll('#0F172A', wordColor);
-        const glyphs = variant === 'white' ? inked.replaceAll(brandColor, '#FFFFFF') : inked;
-        const lockup = write(`logos/lockup-${variant}.svg`, svg(
-            `<g transform="scale(0.055268)">${mark}</g><g transform="translate(68 3.4) scale(0.0445)" stroke="${wordColor}" stroke-width="8" stroke-linejoin="round">${glyphs}</g>`,
-            '-6 -4 252 72', 252, 72,
-        ));
+        const art = variant === 'white' ? lockupArt(mark, '#FFFFFF', '#FFFFFF') : lockupArt(mark, ink, brandColor);
+        const lockup = write(`logos/lockup-${variant}.svg`, svg(art, '-6 -4 252 72', 252, 72));
         manifest.logos.push(
             { id: `lockup-${variant}`, variant, kind: 'lockup', svg: lockup, png: render(lockup, `logos/lockup-${variant}-2520.png`, 2520) },
             { id: `symbol-${variant}`, variant, kind: 'symbol', svg: symbol, png: render(symbol, `logos/symbol-${variant}-2048.png`, 2048) },
@@ -135,6 +132,8 @@ try {
     const favicon = svg(colorMark, '-24 -24 1206 1206', 1206, 1206);
     const appIcon = fs.readFileSync(path.join(output, 'avatars/purple.svg'));
     const maskableIcon = svg(`<rect width="1024" height="1024" fill="${brandColor}"/><g transform="${placed(0.6)}">${whiteMark}</g>`);
+    writeSite('brand/email-logo.png', rasterize(svg(lockupArt(colorMark, ink, brandColor), '0 0 240 64', 240, 64), 720));
+    writeSite('brand/email-logo-dark.png', rasterize(svg(lockupArt(colorMark, '#FFFFFF', brandColor), '0 0 240 64', 240, 64), 720));
     writeSite('favicon.svg', favicon);
     writeSite('favicon-96x96.png', rasterize(favicon, 96));
     writeSite('favicon.ico', ico([16, 32, 48], favicon));
@@ -146,7 +145,7 @@ try {
 
     write('README.txt', [
         'Relaticle brand kit', '',
-        'Use the purple avatar consistently across social accounts.',
+        'Use the light avatar consistently across social accounts.',
         'Upload the full square PNG. Platforms apply their own circular crop.',
         'The platform folders contain convenient export sizes, not permanent platform requirements.',
         'Preview the final crop in each platform uploader.', '',
@@ -187,7 +186,7 @@ try {
         if (changed.length || extras.length) {
             throw new Error(`Brand assets need rebuilding: ${[...changed.map(([name]) => name), ...extras].join(', ')}`);
         }
-        console.log(`Verified ${files.length} brand files, the ZIP and ${siteFiles.length} site icons against a fresh build.`);
+        console.log(`Verified ${files.length} brand files, the ZIP and ${siteFiles.length} site images against a fresh build.`);
     } else {
         fs.rmSync(path.join(destination, 'kit'), { recursive: true, force: true });
         fs.cpSync(output, path.join(destination, 'kit'), { recursive: true });
@@ -195,7 +194,7 @@ try {
         for (const name of siteFiles) {
             fs.copyFileSync(path.join(siteOutput, name), path.join(root, 'public', name));
         }
-        console.log(`Built ${files.length} brand files, public/brand/kit.zip and ${siteFiles.length} site icons.`);
+        console.log(`Built ${files.length} brand files, public/brand/kit.zip and ${siteFiles.length} site images.`);
     }
 } finally {
     fs.rmSync(temporary, { recursive: true, force: true });

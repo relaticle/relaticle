@@ -1,6 +1,6 @@
 Relaticle brand kit
 
-Use the purple avatar consistently across social accounts.
+Use the light avatar consistently across social accounts.
 Upload the full square PNG. Platforms apply their own circular crop.
 The platform folders contain convenient export sizes, not permanent platform requirements.
 Preview the final crop in each platform uploader.
