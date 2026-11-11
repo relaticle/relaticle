@@ -19,7 +19,6 @@ use Filament\Facades\Filament;
 use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
-use Livewire\Livewire;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Services\TenantContextService;
 
@@ -42,7 +41,7 @@ beforeEach(function () {
 });
 
 test('exports opportunity records', function () {
-    Livewire::test(ListOpportunities::class)
+    openList(ListOpportunities::class)
         ->assertActionExists('export')
         ->callAction('export')
         ->assertHasNoFormErrors();
@@ -59,7 +58,7 @@ test('exports respect workspace scoping', function () {
     $otherWorkspace = Workspace::factory()->create(['personal_workspace' => false]);
     $this->user->workspaces()->attach($otherWorkspace);
 
-    Livewire::test(ListOpportunities::class)
+    openList(ListOpportunities::class)
         ->callAction('export')
         ->assertHasNoFormErrors();
 
@@ -108,7 +107,7 @@ test('export generates CSV with correct data', function () {
         'name' => 'Big Deal',
     ]);
 
-    Livewire::test(ListOpportunities::class)
+    openList(ListOpportunities::class)
         ->callAction('export')
         ->assertHasNoFormErrors();
 

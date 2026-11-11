@@ -52,14 +52,14 @@ function createdAtHiddenAndFirst(array $columns): array
 }
 
 it('brings back hidden columns, order, sort, filters and page size on a new visit', function (string $page): void {
-    $component = livewire($page);
+    $component = openList($page);
     $component->call('applyTableColumnManager', createdAtHiddenAndFirst($component->get('tableColumns')), true)
         ->call('sortTable', 'created_at', 'desc')
         ->set('tableRecordsPerPage', 50)
         ->set('tableFilters', ['trashed' => ['value' => 0]]);
 
     session()->flush();
-    $revisit = livewire($page);
+    $revisit = openList($page);
 
     expect($revisit->get('tableSort'))->toBe('created_at:desc')
         ->and((int) $revisit->get('tableRecordsPerPage'))->toBe(50)
@@ -69,16 +69,16 @@ it('brings back hidden columns, order, sort, filters and page size on a new visi
 })->with('remembered list pages');
 
 it('writes nothing when a table is opened', function (string $page): void {
-    livewire($page);
+    openList($page);
 
     expect(savedPreferences())->toBe(0);
 
-    livewire($page)->call('sortTable', 'created_at', 'desc');
+    openList($page)->call('sortTable', 'created_at', 'desc');
     $updatedAt = TablePreference::query()->withoutGlobalScopes()->value('updated_at');
 
     $this->travelTo(now()->addHour());
     session()->flush();
-    livewire($page);
+    openList($page);
 
     expect(TablePreference::query()->withoutGlobalScopes()->value('updated_at'))->toEqual($updatedAt);
 })->with('remembered list pages');
@@ -128,13 +128,13 @@ it('brings back a grouping on a new visit', function (): void {
 });
 
 it('writes nothing on a follow-up request that changes nothing', function (string $page): void {
-    livewire($page)->call('$refresh')->call('gotoPage', 2)->call('$refresh');
+    openList($page)->call('$refresh')->call('gotoPage', 2)->call('$refresh');
 
     expect(savedPreferences())->toBe(0);
 })->with('remembered list pages');
 
 it('writes nothing on follow-up requests when a saved state is open', function (string $page): void {
-    $component = livewire($page);
+    $component = openList($page);
     $component->call('applyTableColumnManager', createdAtHiddenAndFirst($component->get('tableColumns')), true)
         ->call('sortTable', 'created_at', 'desc')
         ->set('tableRecordsPerPage', 50)
@@ -144,7 +144,7 @@ it('writes nothing on follow-up requests when a saved state is open', function (
 
     $this->travelTo(now()->addHour());
     session()->flush();
-    livewire($page)->call('$refresh')->call('gotoPage', 2)->call('$refresh');
+    openList($page)->call('$refresh')->call('gotoPage', 2)->call('$refresh');
 
     expect(TablePreference::query()->withoutGlobalScopes()->value('updated_at'))->toEqual($updatedAt);
 })->with('remembered list pages');
@@ -246,10 +246,10 @@ it('stops writing table state to the session', function (): void {
 });
 
 it('brings back a width on a new visit', function (string $page): void {
-    livewire($page)->call('updateResizableColumnWidth', 'created_at', '300');
+    openList($page)->call('updateResizableColumnWidth', 'created_at', '300');
     session()->flush();
 
-    expect(livewire($page)->instance()->tableColumnWidths)->toBe(['created_at' => 300]);
+    expect(openList($page)->instance()->tableColumnWidths)->toBe(['created_at' => 300]);
 })->with('remembered list pages');
 
 it('saves a width in the same request that resizes it', function (): void {

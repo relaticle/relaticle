@@ -13,11 +13,13 @@ use App\Enums\CrmEntity;
 use App\Enums\SavedViewType;
 use App\Enums\WorkspaceRole;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
+use App\Filament\Resources\NoteResource;
 use App\Filament\Resources\NoteResource\Pages\ManageNotes;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
+use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Tables\Concerns\HasSavedViews;
 use App\Filament\Tables\Concerns\PersistsTableState;
@@ -1115,7 +1117,7 @@ it('escapes a view name that carries markup, quotes and apostrophes', function (
 
 it('opens the built-in list from a link and leaves the applied view behind', function (): void {
     $view = viewFor($this->user, ['entity' => CrmEntity::Opportunity, 'name' => 'Open pipeline', 'state' => hotLeads()]);
-    livewire(ListOpportunities::class)->call('applySavedView', $view->getKey());
+    Livewire::withQueryParams(['view' => $view->getKey()])->test(ListOpportunities::class);
 
     $component = Livewire::withQueryParams(['view' => SavedView::BUILT_IN_LIST_LINK])->test(ListOpportunities::class);
 
@@ -1307,12 +1309,12 @@ it('leaves a link that carries any query parameter on the page it names', functi
     'assigned to me' => [TaskResource::class, CrmEntity::Task, ['board', 'list'], ['filters' => ['assigned_to_me' => ['isActive' => true]]]],
 ]);
 
-it('leaves a note edit link on the list when the cards are first', function (): void {
+it('leaves a note edit link and the cards page alone when the cards are first', function (): void {
     $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
     resolve(ReorderViews::class)->execute($this->user, $this->workspace, CrmEntity::Note, ['cards', 'list']);
 
     $this->get(NoteResource::getUrl('list').'?'.http_build_query(['tableAction' => 'edit', 'tableActionRecord' => $note->getKey()]))->assertOk();
-    $this->get(NoteResource::getUrl('list'))->assertRedirect(NoteResource::getUrl('index'));
+    $this->get(NoteResource::getUrl('index'))->assertOk();
 });
 
 it('serves the opportunities list for an empty view parameter and redirects a bare visit to the board', function (): void {

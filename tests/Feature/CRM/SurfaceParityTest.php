@@ -197,7 +197,7 @@ it('narrows a list to the same records through the table filter and the api', fu
     $midMarket->saveCustomFieldValue($field, $value('Mid-Market'));
     $smb->saveCustomFieldValue($field, $value('SMB'));
 
-    livewire(ListOpportunities::class)
+    openList(ListOpportunities::class)
         ->set('tableFilters.conditions.rules', [['field' => 'custom_fields.segment', 'condition' => $operator === '$in' ? 'is_any_of' : 'has_any_of', 'value' => [$stored('Enterprise'), $stored('Mid-Market')]]])
         ->assertCanSeeTableRecords([$enterprise, $midMarket])
         ->assertCanNotSeeTableRecords([$smb, $blank]);

@@ -13,7 +13,6 @@ use App\Enums\WorkspaceRole;
 use App\Filament\Concerns\HasCustomFieldColumns;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\NoteResource\Pages\ManageNotes;
-use App\Filament\Resources\NoteResource\Pages\NotesCards;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
@@ -2154,11 +2153,11 @@ it('offers deleted records to every signed-in member, a viewer too', function (s
     $viewer = User::factory()->create(['current_workspace_id' => $this->workspace->getKey()]);
     $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
 
-    expect(livewire($page)->instance()->getFilterBarData()['deletable'])->toBeTrue();
+    expect(openList($page)->instance()->getFilterBarData()['deletable'])->toBeTrue();
 
     $this->actingAs($viewer);
 
-    expect(livewire($page)->instance()->getFilterBarData()['deletable'])->toBeTrue();
+    expect(openList($page)->instance()->getFilterBarData()['deletable'])->toBeTrue();
 })->with('filter bar pages');
 
 it('offers deleted records to nobody once the member is signed out', function (): void {

@@ -21,6 +21,7 @@ use App\Features\Billing;
 use App\Filament\Pages\CreateWorkspace;
 use App\Filament\Pages\SetupWorkspace;
 use App\Models\Notification as NotificationRow;
+use App\Models\SavedView;
 use App\Models\TablePreference;
 use App\Models\User;
 use App\Models\Workspace;
@@ -128,6 +129,11 @@ function livewire(string $component, array $params = []): Testable
 /**
  * @return Collection<int, array<string, mixed>>
  */
+function openList(string $page): Testable
+{
+    return Livewire::withQueryParams(['view' => SavedView::BUILT_IN_LIST_LINK])->test($page);
+}
+
 function openOpportunitiesOnTheList(User $user, Workspace $workspace): void
 {
     TablePreference::factory()->for($user)->for($workspace)->create(['entity' => CrmEntity::Opportunity, 'view_order' => ['list', 'board']]);
