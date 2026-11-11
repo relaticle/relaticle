@@ -337,6 +337,18 @@ function settingsMenuItem(string $key): string
     return ".fi-view-settings-row-menu [data-view-settings-menu-item=\"{$key}\"]";
 }
 
+function rowMenuOpen(): string
+{
+    return '(() => { const menu = document.querySelector(".fi-view-settings-row-menu"); return menu.checkVisibility() && getComputedStyle(menu).visibility === "visible"; })()';
+}
+
+function openRowMenu(AwaitableWebpage $page, string $column): AwaitableWebpage
+{
+    $page->click(settingsRow($column, '[data-view-settings-menu]'));
+
+    return waitUntil($page, rowMenuOpen().' && document.activeElement.matches(".fi-view-settings-row-menu [role=menuitem]")');
+}
+
 function removeFromSettings(AwaitableWebpage $page, string $column): AwaitableWebpage
 {
     return $page->click(settingsRow($column, '[data-view-settings-menu]'))
@@ -1272,4 +1284,85 @@ it('moves a column by the neighbours it has when the item is chosen, not when th
     $page->click(columnMenuItem('moveRight'));
 
     waitUntil($page, headerOrder().'.indexOf("creator.name") === '.($index + 1))->assertNoJavaScriptErrors();
+});
+
+it('closes the row menu when the list scrolls or the window resizes', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug)->resize(1440, 420);
+    openViewSettings($page);
+    $order = $page->script(settingsOrder());
+
+    openRowMenu($page, $order[1]);
+    $page->script('document.querySelector(".fi-view-settings-scroll").scrollTop = 40');
+    waitUntil($page, '!('.rowMenuOpen().')');
+
+    openRowMenu($page, $order[1])->resize(1300, 420);
+    waitUntil($page, '!('.rowMenuOpen().')')->assertNoJavaScriptErrors();
+});
+
+it('closes the row menu on Tab and Shift+Tab and returns focus to its button', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+    $trigger = settingsRow('created_at', '[data-view-settings-menu]');
+    $focusedTrigger = sprintf('document.activeElement === document.querySelector(`%s`)', $trigger);
+
+    foreach (['Tab', 'Shift+Tab'] as $key) {
+        openRowMenu($page, 'created_at')->keys(':focus', $key);
+        waitUntil($page, '!('.rowMenuOpen().') && '.$focusedTrigger);
+    }
+
+    $page->assertVisible('.fi-view-settings-panel')->assertNoJavaScriptErrors();
+});
+
+it('moves through the row menu with Home and End', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+
+    openRowMenu($page, 'created_at')->keys(':focus', 'End');
+    waitUntil($page, 'document.activeElement.matches(`[data-view-settings-menu-item="remove"]`)');
+    $page->keys(':focus', 'Home');
+    waitUntil($page, 'document.activeElement.matches(`[data-view-settings-menu-item="label"]`)')->assertNoJavaScriptErrors();
+});
+
+it('keeps focus in the table after the label modal closes', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+
+    openRowMenu($page, 'created_at')->click(settingsMenuItem('label'))->assertVisible('.fi-modal-window input');
+    $page->keys('.fi-modal-window input', 'Escape');
+
+    waitUntil($page, 'document.activeElement !== document.body')->assertNoJavaScriptErrors();
+});
+
+it('closes the row menu when a grip is dragged', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+    $order = $page->script(settingsOrder());
+
+    openRowMenu($page, $order[1])->drag(settingsRow($order[3], '.fi-view-settings-grip'), settingsRow($order[2], '.fi-view-settings-grip'));
+
+    waitUntil($page, '!('.rowMenuOpen().')')->assertNoJavaScriptErrors();
+});
+
+it('keeps the row of the open menu highlighted and ties the button to the menu', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+
+    openRowMenu($page, 'created_at')
+        ->assertScript(sprintf('getComputedStyle(document.querySelector(`%s`)).backgroundColor !== "rgba(0, 0, 0, 0)"', settingsRow('created_at')), true)
+        ->assertScript(sprintf('document.querySelector(`%s`).getAttribute("aria-controls") === document.querySelector(".fi-view-settings-row-menu").id', settingsRow('created_at', '[data-view-settings-menu]')), true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('focuses the neighbouring row button after Remove column', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+    $order = $page->script(settingsOrder());
+
+    openRowMenu($page, $order[2])->click(settingsMenuItem('remove'));
+
+    waitUntil($page, sprintf('document.activeElement === document.querySelector(`%s`)', settingsRow($order[3], '[data-view-settings-menu]')))->assertNoJavaScriptErrors();
+});
+
+it('opens the row menu above its button near the bottom of the viewport', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+
+    openRowMenu($page, 'created_at')
+        ->assertScript('(() => { const innerHeight = document.documentElement.clientHeight; Alpine.$data(document.querySelector("[data-view-settings]")).placeMenu({ left: 300, top: innerHeight - 40, bottom: innerHeight - 16 }); return innerHeight; })() > 0', true);
+
+    waitUntil($page, '(() => { const m = document.querySelector(".fi-view-settings-row-menu").getBoundingClientRect(); const vh = document.documentElement.clientHeight; return m.bottom <= vh - 40 + 1 && m.top >= 0; })()')
+        ->assertNoJavaScriptErrors();
 });

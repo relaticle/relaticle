@@ -9,13 +9,14 @@
         </x-filament::button>
     </x-slot>
 
-    <div class="fi-view-settings-panel" x-data="viewSettingsColumns" data-view-settings role="group" aria-label="{{ __('filament/panel.tables.views.view_settings_panel') }}">
+    <div class="fi-view-settings-panel" x-data="viewSettingsColumns" x-on:resize.window="closeMenu(false)" x-on:scroll.window.capture="closeMenu(false)" x-on:livewire:navigating.window="closeMenu(false)" data-view-settings role="group" aria-label="{{ __('filament/panel.tables.views.view_settings_panel') }}">
         <div class="fi-view-settings-scroll">
         <p class="fi-ta-views-heading">{{ __('filament/panel.tables.views.columns') }}</p>
 
         <div
             x-sortable
             x-on:end.stop="reorder($event)"
+            x-on:pointerdown="$event.target.closest('[data-view-settings-menu]') || closeMenu(false)"
             data-sortable-animation-duration="150"
             class="fi-view-settings-list"
         >
@@ -47,6 +48,8 @@
                         size="sm"
                         :label="__('filament/panel.tables.views.column_options', ['column' => $column['text']])"
                         aria-haspopup="menu"
+                        tabindex="0"
+                        aria-controls="view-settings-row-menu"
                         x-bind:aria-expanded="(menu === {{ Js::from($column['name']) }}).toString()"
                         data-view-settings-menu
                         class="fi-view-settings-row-menu-trigger"
@@ -111,6 +114,7 @@
 
         <div
             x-ref="rowMenu"
+            id="view-settings-row-menu"
             role="menu"
             aria-label="{{ __('filament/panel.tables.column_menu.options') }}"
             x-cloak
@@ -120,6 +124,9 @@
             x-on:dropdown-escape.prevent="closeMenu(true)"
             x-on:keydown.arrow-down.prevent="step(1)"
             x-on:keydown.arrow-up.prevent="step(-1)"
+            x-on:keydown.home.prevent="menuItems()[0]?.focus()"
+            x-on:keydown.end.prevent="menuItems().at(-1)?.focus()"
+            x-on:keydown.tab.prevent="closeMenu(true)"
             x-on:focusout="focusLeft($event)"
             x-on:click.outside="$event.target.closest('[data-view-settings-menu]') || closeMenu(false)"
             class="fi-dropdown-panel fi-view-settings-row-menu"

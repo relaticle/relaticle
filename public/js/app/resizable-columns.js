@@ -805,7 +805,7 @@
 
                         this.placeMenu(button.getBoundingClientRect())
                         this.placed = true
-                        this.$nextTick(() => requestAnimationFrame(() => this.menuItems()[0]?.focus()))
+                        this.$nextTick(() => requestAnimationFrame(() => this.menuItems()[0]?.focus({ preventScroll: true })))
                     })
                 },
 
