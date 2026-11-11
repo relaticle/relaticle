@@ -21,7 +21,7 @@ final class AcquisitionTable extends Widget
     protected function getViewData(): array
     {
         return [
-            'rows' => (new OverviewCache)->remember('acquisition.'.now()->toDateString(), fn (): array => AcquisitionFunnel::rows()),
+            'rows' => (new OverviewCache)->remember('acquisition.rows.'.now()->toDateString(), fn (): array => AcquisitionFunnel::rows()),
             'emailEnabled' => EmailIntegrationServiceProvider::enabled(),
         ];
     }

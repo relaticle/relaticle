@@ -95,6 +95,33 @@ final class OverviewData
         ]);
     }
 
+    public static function mcpConnector(Workspace $workspace, User $user, string $clientName): void
+    {
+        $clientId = (string) Str::uuid();
+
+        DB::table('oauth_clients')->insert([
+            'id' => $clientId,
+            'name' => $clientName,
+            'redirect_uris' => '["https://example.com/callback"]',
+            'grant_types' => '["authorization_code","refresh_token"]',
+            'revoked' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('oauth_access_tokens')->insert([
+            'id' => Str::random(80),
+            'user_id' => $user->getKey(),
+            'client_id' => $clientId,
+            'workspace_id' => $workspace->getKey(),
+            'scopes' => '["mcp:use"]',
+            'revoked' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+            'expires_at' => now()->addDays(30),
+        ]);
+    }
+
     public static function internalOwner(): User
     {
         $administrator = SystemAdministrator::factory()->create([

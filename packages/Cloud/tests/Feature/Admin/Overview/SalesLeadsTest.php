@@ -77,6 +77,23 @@ it('lists free customers with real use, most active first, and says why', functi
         ->assertSee('uses API');
 });
 
+it('names the MCP clients a workspace connected and falls back to the write source', function (): void {
+    $connected = OverviewData::owner(CarbonImmutable::parse('2026-09-01'));
+    OverviewData::ownRecord(OverviewData::workspaceOf($connected), $connected, now()->subDay());
+    OverviewData::mcpConnector(OverviewData::workspaceOf($connected), $connected, 'Claude');
+    OverviewData::mcpConnector(OverviewData::workspaceOf($connected), $connected, 'ChatGPT');
+    OverviewData::mcpConnector(OverviewData::workspaceOf($connected), $connected, 'Claude');
+
+    $tokenOnly = OverviewData::owner(CarbonImmutable::parse('2026-09-01'));
+    OverviewData::ownRecord(OverviewData::workspaceOf($tokenOnly), $tokenOnly, now()->subDays(2), CreationSource::MCP);
+
+    leadsOn(LeadStage::Free)
+        ->assertCanSeeTableRecords([OverviewData::workspaceOf($connected), OverviewData::workspaceOf($tokenOnly)])
+        ->assertSee('MCP via ChatGPT, Claude')
+        ->assertDontSee('ChatGPT, Claude, Claude')
+        ->assertSee('uses MCP');
+});
+
 it('leaves out a workspace whose only records a mailbox sync created', function (): void {
     $synced = OverviewData::owner(CarbonImmutable::parse('2026-09-01'));
     OverviewData::ownRecord(OverviewData::workspaceOf($synced), $synced, now()->subDay(), CreationSource::MAILBOX);

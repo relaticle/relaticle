@@ -131,10 +131,16 @@ final class SalesLeads extends TableWidget
             $parts[] = "{$teammates} ".Str::plural('teammate', $teammates);
         }
 
-        foreach (['api' => 'uses API', 'mcp' => 'uses MCP'] as $source => $label) {
-            if (in_array($source, $sources, true)) {
-                $parts[] = $label;
-            }
+        if (in_array('api', $sources, true)) {
+            $parts[] = 'uses API';
+        }
+
+        $mcpClients = (string) $record->getAttribute('mcp_clients');
+
+        if ($mcpClients !== '') {
+            $parts[] = "MCP via {$mcpClients}";
+        } elseif (in_array('mcp', $sources, true)) {
+            $parts[] = 'uses MCP';
         }
 
         return implode(', ', $parts);
