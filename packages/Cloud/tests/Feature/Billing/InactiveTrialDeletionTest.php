@@ -67,9 +67,15 @@ function inactivePausedWorkspace(array $attributes = [], string $timezone = 'UTC
         'pro_trial_used_at' => CarbonImmutable::parse(INACTIVE_PAUSED_AT)->subDays(14),
         'trial_ends_at' => null,
         'paused_at' => INACTIVE_PAUSED_AT,
+        'inactivity_notice_sent_at' => INACTIVE_PAUSED_AT,
         'hosted_free_grandfathered_at' => null,
         ...$attributes,
     ]);
+}
+
+function workspacePausedBeforeLaunch(array $attributes = [], string $timezone = 'UTC'): Workspace
+{
+    return inactivePausedWorkspace(['inactivity_notice_sent_at' => null, ...$attributes], $timezone);
 }
 
 function inactivePausedAt(): CarbonImmutable
@@ -102,6 +108,17 @@ it('schedules a paused trial on the 46th daily run and warns the owner once', fu
     Mail::assertQueued(InactiveWorkspaceDeletionWarningMail::class, 1);
     Mail::assertQueued(InactiveWorkspaceDeletionWarningMail::class, fn (InactiveWorkspaceDeletionWarningMail $mail): bool => $mail->hasTo($workspace->owner->email)
         && $mail->workspace->is($workspace));
+});
+
+it('never schedules a workspace whose owner was never told the rule', function (): void {
+    Mail::fake();
+    $workspace = workspacePausedBeforeLaunch();
+
+    $this->travelTo(inactivityRunOn(90));
+    runInactivityCommand();
+
+    expect($workspace->refresh()->scheduled_deletion_at)->toBeNull();
+    Mail::assertNotQueued(InactiveWorkspaceDeletionWarningMail::class);
 });
 
 it('schedules nothing while hosted billing is off', function (): void {
@@ -547,7 +564,7 @@ it('lets the owner of a purged inactive workspace sign in and start a new worksp
 
 it('lists who would get the launch notice and writes nothing without force', function (): void {
     Mail::fake();
-    $workspace = inactivePausedWorkspace();
+    $workspace = workspacePausedBeforeLaunch();
 
     $this->travelTo(inactivePausedAt());
 
@@ -562,7 +579,7 @@ it('lists who would get the launch notice and writes nothing without force', fun
 
 it('sends one launch notice per paused owner, dated 60 days from the last activity', function (): void {
     Mail::fake();
-    $workspace = inactivePausedWorkspace(timezone: 'Pacific/Kiritimati');
+    $workspace = workspacePausedBeforeLaunch(timezone: 'Pacific/Kiritimati');
 
     $this->travelTo(inactivePausedAt());
     $this->artisan('billing:announce-inactivity-rule', ['--force' => true])
@@ -586,7 +603,7 @@ it('sends one launch notice per paused owner, dated 60 days from the last activi
 
 it('dates the launch notice from a member sign-in ten days after the pause', function (): void {
     Mail::fake();
-    $workspace = inactivePausedWorkspace();
+    $workspace = workspacePausedBeforeLaunch();
     $member = User::factory()->create(['last_login_at' => inactivePausedAt()->addDays(10)]);
     $workspace->users()->attach($member, ['role' => 'admin']);
 
@@ -602,7 +619,7 @@ it('dates the launch notice from a member sign-in ten days after the pause', fun
 
 it('starts the 60 days on the day the launch notice goes out, not the day of the migration', function (): void {
     Mail::fake();
-    $workspace = inactivePausedWorkspace();
+    $workspace = workspacePausedBeforeLaunch();
     $noticeDay = inactivePausedAt()->addDays(3);
 
     $this->travelTo($noticeDay);
@@ -622,7 +639,7 @@ it('starts the 60 days on the day the launch notice goes out, not the day of the
 it('sends no launch notice while hosted billing is off', function (): void {
     Feature::define(BillingFeature::class, false);
     Mail::fake();
-    $workspace = inactivePausedWorkspace();
+    $workspace = workspacePausedBeforeLaunch();
 
     $this->travelTo(inactivePausedAt());
     $this->artisan('billing:announce-inactivity-rule', ['--force' => true])->assertSuccessful();
@@ -633,7 +650,7 @@ it('sends no launch notice while hosted billing is off', function (): void {
 
 it('never sends the launch notice twice', function (): void {
     Mail::fake();
-    inactivePausedWorkspace();
+    workspacePausedBeforeLaunch();
 
     $this->travelTo(inactivePausedAt());
     $this->artisan('billing:announce-inactivity-rule', ['--force' => true])->assertSuccessful();
@@ -644,7 +661,7 @@ it('never sends the launch notice twice', function (): void {
 
 it('skips a workspace already scheduled for deletion on request when announcing the rule', function (): void {
     Mail::fake();
-    $workspace = inactivePausedWorkspace([
+    $workspace = workspacePausedBeforeLaunch([
         'scheduled_deletion_at' => inactivePausedAt()->addDays(20),
         'deletion_reason' => DeletionReason::Requested,
     ]);
@@ -679,7 +696,7 @@ it('never sends the launch notice to a trial paused after launch', function (): 
 
 it('does not send the launch notice to a workspace noticed after it was read', function (): void {
     Mail::fake();
-    $workspace = inactivePausedWorkspace();
+    $workspace = workspacePausedBeforeLaunch();
     $noticedAt = inactivePausedAt()->addHour();
 
     $raced = false;
@@ -704,7 +721,7 @@ it('does not send the launch notice to a workspace noticed after it was read', f
 
 it('does not send the launch notice to a workspace the owner asked to delete after it was read', function (): void {
     Mail::fake();
-    $workspace = inactivePausedWorkspace();
+    $workspace = workspacePausedBeforeLaunch();
     $requestedFor = inactivePausedAt()->addDays(30);
 
     $raced = false;
@@ -732,7 +749,7 @@ it('does not send the launch notice to a workspace the owner asked to delete aft
 it('stores the deletion date the launch notice promised, whatever hour the workspace was paused', function (): void {
     Mail::fake();
     $workspaces = collect(['2026-11-01 00:30:00', '2026-11-01 09:59:00', INACTIVE_PAUSED_AT])
-        ->map(fn (string $pausedAt): Workspace => inactivePausedWorkspace(['paused_at' => $pausedAt]));
+        ->map(fn (string $pausedAt): Workspace => workspacePausedBeforeLaunch(['paused_at' => $pausedAt]));
 
     $this->travelTo(inactivePausedAt());
     $this->artisan('billing:announce-inactivity-rule', ['--force' => true])->assertSuccessful();
