@@ -31,29 +31,40 @@ final readonly class DigestService
 
     public function forWorkspace(User $user, Workspace $workspace): TaskDigest
     {
+        if (! $this->entitlements->allowsAccess($workspace)) {
+            return new TaskDigest([], []);
+        }
+
         $meta = $this->resolveFieldMetadata($workspace);
 
-        if ($meta['due_field_id'] === null || ! $this->entitlements->allowsAccess($workspace)) {
+        if ($meta['due_field_id'] === null) {
             return new TaskDigest([], []);
         }
 
         $startOfToday = Date::now($user->effectiveTimezone())->startOfDay()->utc();
         $rows = $this->dueTaskRows($user, $workspace, $meta, $startOfToday->addDay());
+
+        if ($rows->isEmpty()) {
+            return new TaskDigest([], []);
+        }
+
         $records = $this->linkedRecords($workspace, array_values($rows->map(fn (object $row): string => (string) $row->id)->all()));
+        $priorities = $this->priorityOptions($meta['priority_field_id']);
 
         $overdue = [];
         $upcoming = [];
 
         foreach ($rows as $row) {
             $dueAt = Date::parse($row->due_at);
+            $priority = $priorities[(string) $row->priority_option_id] ?? null;
 
             $item = new DigestTaskItem(
                 title: (string) $row->title,
                 dueAt: $dueAt,
                 editUrl: $this->urls->buildOrFail(CrmEntity::Task, (string) $row->id, $workspace),
                 records: $records[(string) $row->id] ?? [],
-                priority: $row->priority !== null ? (string) $row->priority : null,
-                priorityColor: $row->priority_color !== null ? (string) $row->priority_color : null,
+                priority: $priority?->name,
+                priorityColor: $priority?->color,
             );
 
             if ($dueAt->lt($startOfToday)) {
@@ -84,7 +95,6 @@ final readonly class DigestService
                     ->where('pr.entity_type', '=', 'task')
                     ->where('pr.custom_field_id', '=', $meta['priority_field_id']);
             })
-            ->leftJoin('custom_field_options as po', 'po.id', '=', 'pr.string_value')
             ->where('t.workspace_id', $workspace->getKey())
             ->where('tu.user_id', $user->getKey())
             ->whereNull('t.deleted_at')
@@ -102,9 +112,28 @@ final readonly class DigestService
                 });
             })
             ->orderBy('due.datetime_value')
-            ->select(['t.id', 't.title', 'due.datetime_value as due_at', 'po.name as priority'])
-            ->selectRaw("po.settings->>'color' as priority_color")
+            ->select(['t.id', 't.title', 'due.datetime_value as due_at', 'pr.string_value as priority_option_id'])
             ->get();
+    }
+
+    /**
+     * @return array<string, object{name: string, color: ?string}>
+     */
+    private function priorityOptions(?string $priorityFieldId): array
+    {
+        if ($priorityFieldId === null) {
+            return [];
+        }
+
+        // Read once, never joined per task: production has no index on custom_field_options,
+        // and the per-row join planned as a nested loop that took 22 s for a 36-task digest.
+        return DB::table('custom_field_options')
+            ->where('custom_field_id', $priorityFieldId)
+            ->select(['id', 'name'])
+            ->selectRaw("settings->>'color' as color")
+            ->get()
+            ->mapWithKeys(fn (object $option): array => [(string) $option->id => (object) ['name' => (string) $option->name, 'color' => $option->color]])
+            ->all();
     }
 
     /**

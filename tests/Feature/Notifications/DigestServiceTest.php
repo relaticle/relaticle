@@ -166,6 +166,23 @@ it('carries each digest task priority and its option color', function (): void {
         ->and($overdue['plain']->priority)->toBeNull();
 });
 
+it('builds the digest without priorities when the workspace has no priority field', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+
+    $task = Task::factory()->for($workspace)->create(['title' => 'no priority field']);
+    $task->assignees()->attach($user);
+    digestSetDue($task, digestDueField($workspace->id), now()->subDay());
+
+    DB::table('custom_fields')->where('tenant_id', $workspace->id)->where('entity_type', 'task')->where('code', 'priority')->delete();
+
+    $digest = resolve(DigestService::class)->forWorkspace($user, $workspace);
+
+    expect($digest->overdue)->toHaveCount(1)
+        ->and($digest->overdue[0]->priority)->toBeNull()
+        ->and($digest->overdue[0]->priorityColor)->toBeNull();
+});
+
 it('excludes done tasks and tasks without a due date', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
