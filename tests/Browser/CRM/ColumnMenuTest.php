@@ -573,6 +573,30 @@ it('changes a column label from its row menu and shows it in the row and the hea
         ->assertNoJavaScriptErrors();
 });
 
+it('creates an attribute from the add panel and shows it as a column, with focus back on view settings', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+
+    $page->click('[data-view-settings-add]')
+        ->assertVisible('[data-view-settings-create]')
+        ->click('[data-view-settings-create]')
+        ->assertVisible('.fi-modal-window input')
+        ->type('.fi-modal-window input', 'Lead score')
+        ->click('.fi-modal-window .fi-select-input-btn')
+        ->assertScript('document.querySelectorAll(".fi-modal-window .fi-select-input-option .lucide").length > 10', true)
+        ->click('.fi-modal-window .fi-select-input-option:nth-child(2)');
+
+    $page->click('.fi-modal-window button[type="submit"]');
+
+    waitUntil($page, 'document.querySelector(`th[x-data^="resizableColumn(\'custom_fields.lead_score\'"]`) !== null')
+        ->assertScript(headerOrder().'.at(-1)', 'custom_fields.lead_score')
+        ->assertScript('document.activeElement.matches(".fi-view-settings-trigger")', true)
+        ->assertNoJavaScriptErrors();
+
+    openViewSettings($page)
+        ->assertScript(settingsOrder().'.at(-1)', 'custom_fields.lead_score')
+        ->assertNoJavaScriptErrors();
+});
+
 it('never starts a drag from the row menu button', function (): void {
     $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
     $order = $page->script(settingsOrder());

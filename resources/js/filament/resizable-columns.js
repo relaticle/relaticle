@@ -882,6 +882,12 @@
                     this.$wire.mountAction('editTableColumnLabel', { column })
                 },
 
+                createAttribute() {
+                    this.closeMenu(false)
+                    labelFocus = { target: () => document.querySelector('.fi-view-settings-trigger'), opened: false }
+                    this.$wire.mountAction('createTableAttribute')
+                },
+
                 async remove() {
                     const column = this.menu
                     const row = panel.querySelector(`[data-column="${CSS.escape(column)}"]`)
@@ -935,7 +941,7 @@
                 },
 
                 stepAdd(delta) {
-                    const items = this.addItems()
+                    const items = [...this.addItems(), ...panel.querySelectorAll('[data-view-settings-create]')]
 
                     if (items.length === 0) return
 

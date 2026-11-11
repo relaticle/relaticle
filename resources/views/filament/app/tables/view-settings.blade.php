@@ -147,6 +147,20 @@
                     </p>
                 @endif
             </div>
+
+            @if ($canCreateAttribute)
+                <div class="fi-dropdown-list fi-view-settings-footer" x-on:keydown.arrow-down.prevent="stepAdd(1)" x-on:keydown.arrow-up.prevent="stepAdd(-1)">
+                    <x-filament::dropdown.list.item
+                        icon="lucide-plus"
+                        role="button"
+                        tabindex="0"
+                        data-view-settings-create
+                        x-on:click="createAttribute(); close()"
+                    >
+                        {{ __('filament/panel.tables.views.create_attribute') }}
+                    </x-filament::dropdown.list.item>
+                </div>
+            @endif
         </div>
 
         <div

@@ -884,6 +884,17 @@ it('shows the validator error on the name and creates nothing for a duplicate', 
         ->and(columnOrder($component))->toBe($columns);
 });
 
+it('drops options and a linked entity the chosen type does not take', function (): void {
+    livewire(ListCompanies::class)
+        ->callAction('createTableAttribute', data: ['name' => 'Lead score', 'type' => 'text', 'options' => [['name' => 'Gold']], 'lookup_type' => 'company'])
+        ->assertHasNoActionErrors();
+
+    $field = CustomField::query()->where('entity_type', 'company')->where('name', 'Lead score')->sole();
+
+    expect($field->options)->toHaveCount(0)
+        ->and($field->lookup_type)->toBeNull();
+});
+
 it('shows a repeated option on its own row', function (): void {
     $count = customFieldCount();
 
@@ -910,4 +921,17 @@ it('refuses a member who calls the create attribute action directly', function (
     livewire(ListCompanies::class)->mountAction('createTableAttribute')->assertForbidden();
 
     expect(customFieldCount())->toBe($count);
+});
+
+it('pins the create attribute button below the add panel list for an owner and hides it from a member', function (): void {
+    Filament::bootCurrentPanel();
+    $owner = new Crawler(livewire(ListCompanies::class)->html());
+
+    expect($owner->filter('[data-view-settings-add-panel] > .fi-view-settings-footer [data-view-settings-create]')->count())->toBe(1)
+        ->and($owner->filter('[data-view-settings-add-panel] .fi-view-settings-scroll [data-view-settings-create]')->count())->toBe(0)
+        ->and(trim($owner->filter('[data-view-settings-create]')->text()))->toBe('Create new attribute');
+
+    actAsMember($this);
+
+    expect(new Crawler(livewire(ListCompanies::class)->html())->filter('[data-view-settings-create]')->count())->toBe(0);
 });

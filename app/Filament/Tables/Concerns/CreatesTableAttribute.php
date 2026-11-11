@@ -67,6 +67,7 @@ trait CreatesTableAttribute
                 ->options($this->tableAttributeTypeOptions())
                 ->allowHtml()
                 ->native(false)
+                ->default(CustomFieldType::TEXT->value)
                 ->required()
                 ->live(),
             Repeater::make('options')
