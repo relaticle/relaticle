@@ -374,7 +374,7 @@ it('keeps the view settings order in step with the headers', function (): void {
     $page->assertNoJavaScriptErrors();
 });
 
-it('hides a column from view settings and shows it again from add column', function (): void {
+it('hides a column from view settings and shows it again from the add attribute panel', function (): void {
     $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
 
     removeFromSettings($page, 'accountOwner.name')
@@ -466,7 +466,7 @@ it('reaches every row menu from the keyboard and returns focus to the trigger on
         ->assertNoJavaScriptErrors();
 });
 
-it('reaches add column and reset to default from the keyboard', function (): void {
+it('reaches add attribute and reset to default from the keyboard', function (): void {
     $page = sortedCompaniesTable($this);
     $page->keys('.fi-view-settings-trigger', 'Tab');
 
@@ -483,6 +483,9 @@ it('reaches add column and reset to default from the keyboard', function (): voi
 
         if ($target === '[data-view-settings-add]') {
             $page->keys(':focus', 'Enter');
+            waitUntil($page, 'document.activeElement.matches("[data-view-settings-search]")');
+            $page->keys(':focus', 'Escape');
+            waitUntil($page, 'document.activeElement.matches("[data-view-settings-add]")');
         }
     }
 
@@ -543,7 +546,7 @@ it('opens the row menu beside its button, aligned to its start edge and inside t
         ->assertNoJavaScriptErrors();
 });
 
-it('removes a column from its row menu and offers it again in add column', function (): void {
+it('removes a column from its row menu and offers it again in the add attribute panel', function (): void {
     $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
 
     removeFromSettings($page, 'accountOwner.name')
@@ -552,7 +555,7 @@ it('removes a column from its row menu and offers it again in add column', funct
         ->assertVisible('.fi-view-settings-panel');
 
     $page->click('[data-view-settings-add]')
-        ->assertPresent('[aria-label="Show Account Owner"]')
+        ->assertVisible('[aria-label="Show Account Owner"]')
         ->assertNoJavaScriptErrors();
 });
 
@@ -1366,3 +1369,182 @@ it('opens the row menu above its button near the bottom of the viewport', functi
     waitUntil($page, '(() => { const m = document.querySelector(".fi-view-settings-row-menu").getBoundingClientRect(); const vh = document.documentElement.clientHeight; return m.bottom <= vh - 40 + 1 && m.top >= 0; })()')
         ->assertNoJavaScriptErrors();
 });
+
+function addPanelOpen(): string
+{
+    return 'document.querySelector("[data-view-settings-add-panel]").checkVisibility()';
+}
+
+function addItems(): string
+{
+    return '[...document.querySelectorAll("[data-view-settings-add-item]")].filter((item) => item.checkVisibility()).map((item) => item.dataset.attribute)';
+}
+
+function openAddPanel(AwaitableWebpage $page): AwaitableWebpage
+{
+    $page->click('[data-view-settings-add]');
+
+    return waitUntil($page, addPanelOpen().' && document.activeElement.matches("[data-view-settings-search]")');
+}
+
+function hideColumns(AwaitableWebpage $page, array $columns): AwaitableWebpage
+{
+    foreach ($columns as $column) {
+        removeFromSettings($page, $column)->assertMissing(settingsRow($column));
+    }
+
+    return $page;
+}
+
+it('opens the add attribute panel in place of the list with a focused search and every hidden attribute', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+    $width = $page->script('document.querySelector(".fi-view-settings-panel").getBoundingClientRect().width');
+
+    hideColumns($page, ['accountOwner.name', 'created_at']);
+    openAddPanel($page)
+        ->assertScript('document.activeElement.placeholder', 'Search company attributes…')
+        ->assertScript('document.querySelector("[data-view-settings-back]").checkVisibility()', true)
+        ->assertScript('document.querySelector(".fi-view-settings-list").checkVisibility()', false)
+        ->assertScript('document.querySelector(".fi-view-settings-reset")?.checkVisibility() ?? false', false)
+        ->assertScript('document.querySelector(".fi-view-settings-panel").getBoundingClientRect().width', $width)
+        ->assertScript('["accountOwner.name", "created_at"].every((attribute) => '.addItems().'.includes(attribute))', true)
+        ->assertScript('[...document.querySelectorAll("[data-view-settings-add-item]")].every((item) => item.querySelector(".fi-view-settings-label svg"))', true)
+        ->assertScript('document.querySelector("[data-view-settings-add-item][data-attribute=name]")', null)
+        ->assertNoJavaScriptErrors();
+});
+
+it('narrows the add attribute list as the member types, in any case and anywhere in the label', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+
+    hideColumns($page, ['accountOwner.name', 'created_at']);
+    openAddPanel($page);
+    $label = $page->script('document.querySelector("[data-view-settings-add-item][data-attribute=\'created_at\']").dataset.text');
+    $needle = strtoupper(substr($label, 1, 3));
+
+    $page->type('[data-view-settings-search]', $needle);
+
+    waitUntil($page, addItems().'.includes("created_at")')
+        ->assertScript(addItems().'.every((attribute) => document.querySelector(`[data-attribute="${attribute}"]`).dataset.text.toLowerCase().includes('.json_encode(strtolower($needle)).'))', true)
+        ->type('[data-view-settings-search]', 'zzzz-no-match');
+
+    waitUntil($page, addItems().'.length === 0')
+        ->assertSee('No attribute matches your search')
+        ->assertNoJavaScriptErrors();
+});
+
+it('moves through the add attribute results with the arrow keys and picks with Enter', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+
+    hideColumns($page, ['accountOwner.name', 'created_at']);
+    openAddPanel($page);
+    $items = $page->script(addItems());
+
+    $page->keys(':focus', 'ArrowDown');
+    waitUntil($page, sprintf('document.activeElement.dataset.attribute === %s', json_encode($items[0])));
+    $page->keys(':focus', 'ArrowDown');
+    waitUntil($page, sprintf('document.activeElement.dataset.attribute === %s', json_encode($items[1])));
+    $page->keys(':focus', 'ArrowUp')->keys(':focus', 'ArrowUp');
+    waitUntil($page, 'document.activeElement.matches("[data-view-settings-search]")');
+    $page->keys(':focus', 'ArrowDown')->keys(':focus', 'ArrowDown')->keys(':focus', 'Enter');
+
+    waitUntil($page, sprintf('document.querySelector(`%s`) !== null', columnHeader($items[1])))
+        ->assertMissing(columnHeader($items[0]))
+        ->assertNoJavaScriptErrors();
+});
+
+it('picks the first match with Enter from the search input and keeps the panel open with the search', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+
+    hideColumns($page, ['accountOwner.name', 'created_at']);
+    openAddPanel($page);
+    $first = $page->script(addItems())[0];
+    $text = $page->script(sprintf('document.querySelector(`[data-attribute="%s"]`).dataset.text', $first));
+    $term = substr($text, 0, 2);
+
+    $page->type('[data-view-settings-search]', $term)->keys('[data-view-settings-search]', 'Enter');
+
+    waitUntil($page, sprintf('document.querySelector(`%s`) !== null', columnHeader($first)))
+        ->assertScript(addPanelOpen(), true)
+        ->assertScript('document.querySelector("[data-view-settings-search]").value', $term)
+        ->assertScript('document.activeElement.matches("[data-view-settings-search]")', true)
+        ->assertScript(addItems().'.includes('.json_encode($first).')', false);
+
+    waitUntil($page, headerOrder().'.at(-1) === '.json_encode($first))
+        ->assertNoJavaScriptErrors();
+});
+
+it('shows the picked attribute at the end of the list when the member goes back', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+
+    hideColumns($page, ['accountOwner.name', 'created_at']);
+    openAddPanel($page)->click('[data-view-settings-add-item][data-attribute="accountOwner.name"]');
+
+    waitUntil($page, headerOrder().'.at(-1) === "accountOwner.name"')
+        ->assertScript(addPanelOpen(), true)
+        ->assertScript(addItems().'.includes("created_at") && !'.addItems().'.includes("accountOwner.name")', true);
+
+    $page->click('[data-view-settings-back]');
+
+    waitUntil($page, 'document.activeElement.matches("[data-view-settings-add]")')
+        ->assertScript(addPanelOpen(), false)
+        ->assertScript(settingsOrder().'.at(-1)', 'accountOwner.name')
+        ->assertNoJavaScriptErrors();
+});
+
+it('says every attribute is in the view when none is hidden', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+
+    openAddPanel($page);
+
+    for ($remaining = count($page->script(addItems())); $remaining > 0; $remaining--) {
+        $page->keys('[data-view-settings-search]', 'Enter');
+        waitUntil($page, addItems().'.length < '.$remaining);
+    }
+
+    $page->assertSee('Every attribute is already in this view')
+        ->assertScript(addItems(), [])
+        ->assertNoJavaScriptErrors();
+});
+
+it('goes back to the list on Escape and closes view settings on a second Escape', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+
+    openAddPanel($page)->keys(':focus', 'Escape');
+
+    waitUntil($page, 'document.activeElement.matches("[data-view-settings-add]")')
+        ->assertScript(addPanelOpen(), false)
+        ->assertVisible('.fi-view-settings-panel')
+        ->assertVisible('.fi-view-settings-reset');
+
+    $page->keys(':focus', 'Escape');
+
+    waitUntil($page, 'document.activeElement === document.querySelector(".fi-view-settings-trigger")')
+        ->assertScript('document.querySelector(".fi-view-settings-panel").checkVisibility()', false)
+        ->assertNoJavaScriptErrors();
+});
+
+it('reopens view settings on the list', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+
+    openAddPanel($page)->type('[data-view-settings-search]', 'abc')->keys(':focus', 'Escape');
+    waitUntil($page, 'document.activeElement.matches("[data-view-settings-add]")')->keys(':focus', 'Escape');
+    waitUntil($page, 'document.activeElement === document.querySelector(".fi-view-settings-trigger")');
+
+    $page->click('.fi-view-settings-trigger');
+
+    waitUntil($page, 'document.querySelector(".fi-view-settings-list").checkVisibility()')
+        ->assertScript(addPanelOpen(), false)
+        ->assertNoJavaScriptErrors();
+});
+
+it('keeps the add attribute panel inside the viewport and scrolls its list on a phone', function (int $width): void {
+    $page = companiesTable($this->user, $this->workspace->slug)->resize($width, 700)->wait(0.5);
+
+    openViewSettings($page);
+    hideColumns($page, ['accountOwner.name', 'created_at']);
+    openAddPanel($page)
+        ->assertScript('(() => { const r = document.querySelector("[data-view-settings-add-panel]").getBoundingClientRect(); return r.left >= 0 && r.right <= document.documentElement.clientWidth && r.bottom <= window.innerHeight; })()', true)
+        ->assertScript('document.querySelector("[data-view-settings-search]").getBoundingClientRect().top >= 0', true)
+        ->assertScript('document.documentElement.scrollWidth <= document.documentElement.clientWidth', true)
+        ->assertNoJavaScriptErrors();
+})->with([390, 360]);

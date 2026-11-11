@@ -765,6 +765,7 @@
 
             return {
                 adding: false,
+                query: '',
                 menu: null,
                 locked: false,
                 placed: false,
@@ -774,6 +775,9 @@
 
                 init() {
                     panel = this.$el
+
+                    // The dropdown reopens on the list, whatever the member left open.
+                    panel.closest('.fi-dropdown-panel')?.addEventListener('dropdown-opened', () => this.resetAdd())
 
                     // A pinned column keeps its place, so nothing is dropped across one.
                     this.$nextTick(() => panel.querySelector('.fi-view-settings-list')?.sortable?.option('onMove', (event) => !event.related.hasAttribute('data-column-pinned')))
@@ -864,10 +868,59 @@
                     this.$nextTick(() => (neighbour?.isConnected ? neighbour.querySelector('[data-view-settings-menu]') : null)?.focus())
                 },
 
+                openAdd() {
+                    this.closeMenu(false)
+                    this.adding = true
+                    this.$nextTick(() => requestAnimationFrame(() => this.searchInput().focus()))
+                },
+
+                closeAdd() {
+                    this.resetAdd()
+                    this.$nextTick(() => requestAnimationFrame(() => panel.querySelector('[data-view-settings-add]').focus()))
+                },
+
+                resetAdd() {
+                    this.adding = false
+                    this.query = ''
+                },
+
+                searchInput() {
+                    return panel.querySelector('[data-view-settings-search]')
+                },
+
+                matches(text) {
+                    return text.toLowerCase().includes(this.query.trim().toLowerCase())
+                },
+
+                addItems() {
+                    return [...panel.querySelectorAll('[data-view-settings-add-item]')].filter((item) => item.offsetParent !== null)
+                },
+
+                stepAdd(delta) {
+                    const items = this.addItems()
+
+                    if (items.length === 0) return
+
+                    const index = items.indexOf(document.activeElement)
+                    const next = index === -1 ? (delta > 0 ? 0 : items.length - 1) : index + delta
+
+                    if (next < 0) {
+                        this.searchInput().focus()
+                    } else {
+                        items[Math.min(next, items.length - 1)].focus()
+                    }
+                },
+
+                pickFirst() {
+                    const first = this.addItems()[0]
+
+                    if (first) this.show(first.dataset.attribute)
+                },
+
                 async show(name) {
                     await this.$wire.toggleTableColumn(name)
 
-                    this.$nextTick(() => panel.querySelector('[data-view-settings-add]:not([aria-disabled="true"]), [data-view-settings-menu]')?.focus())
+                    this.$nextTick(() => this.searchInput().focus())
                 },
             }
         })

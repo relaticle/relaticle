@@ -219,9 +219,21 @@
     }
 
     & .fi-view-settings-list ~ .fi-dropdown-list,
-    & > .fi-view-settings-footer {
+    & .fi-view-settings-footer {
         @apply mt-1 shrink-0 border-t border-gray-100 pt-1 dark:border-white/10;
     }
+}
+
+.fi-view-settings-view {
+    @apply flex min-h-0 flex-1 flex-col;
+}
+
+.fi-view-settings-search {
+    @apply flex shrink-0 items-center gap-1 border-b border-gray-100 pb-1 dark:border-white/10;
+}
+
+.fi-view-settings-search-input {
+    @apply min-w-0 flex-1 border-0 bg-transparent py-1.5 pe-2 ps-1 text-sm text-gray-950 outline-none placeholder:text-gray-400 focus:ring-0 dark:text-white dark:placeholder:text-gray-500;
 }
 
 .fi-view-settings-scroll {
@@ -299,15 +311,7 @@
 }
 
 .fi-view-settings-add-chevron {
-    @apply size-4 text-gray-400 transition-transform dark:text-gray-500;
-
-    &.fi-expanded {
-        @apply rotate-90;
-    }
-}
-
-.fi-view-settings-hidden {
-    @apply flex flex-col gap-1 ps-4;
+    @apply size-4 text-gray-400 dark:text-gray-500;
 }
 
 .fi-view-settings-reset .fi-icon {

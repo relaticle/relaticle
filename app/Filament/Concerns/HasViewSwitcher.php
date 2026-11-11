@@ -20,6 +20,7 @@ use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\HtmlString;
+use Illuminate\Support\Str;
 use Relaticle\Flowforge\Contracts\HasBoard;
 
 /**
@@ -98,6 +99,7 @@ trait HasViewSwitcher
         return new HtmlString(view('filament.app.tables.view-settings', [
             'shown' => array_values(array_filter($columns, fn (array $column): bool => $column['isShown'])),
             'hidden' => array_values(array_filter($columns, fn (array $column): bool => ! $column['isShown'] && ! $column['isLocked'])),
+            'entityLabel' => Str::lower(static::getResource()::getModelLabel()),
             'canReset' => is_callable([$this, 'canResetTable']) && call_user_func([$this, 'canResetTable']),
         ])->render());
     }

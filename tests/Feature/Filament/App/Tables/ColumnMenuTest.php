@@ -592,7 +592,7 @@ it('ignores a column the table does not have in view settings', function (): voi
     expect($component->get('tableColumns'))->toBe($before);
 });
 
-it('lists a hidden column under add column and shows it again at the end', function (): void {
+it('lists a hidden column in the add attribute panel and shows it again at the end', function (): void {
     Filament::bootCurrentPanel();
     $component = livewire(ListCompanies::class);
     $first = columnsBesideTitle($component, CrmEntity::Company)[0];
@@ -715,4 +715,55 @@ it('hides the reset action while a saved view is applied', function (): void {
     livewire(ListCompanies::class)->assertActionVisible('resetTableToDefault')
         ->call('applySavedView', $view->getKey())
         ->assertActionHidden('resetTableToDefault');
+});
+
+it('words the add attribute search with the list page entity', function (string $page, CrmEntity $entity, string $label): void {
+    Filament::bootCurrentPanel();
+
+    livewire($page)->assertSeeHtml('placeholder="Search '.$label.' attributes…"');
+})->with([
+    'companies' => [ListCompanies::class, CrmEntity::Company, 'company'],
+    'people' => [ListPeople::class, CrmEntity::People, 'person'],
+    'opportunities' => [ListOpportunities::class, CrmEntity::Opportunity, 'opportunity'],
+    'tasks' => [ManageTasks::class, CrmEntity::Task, 'task'],
+    'notes' => [ManageNotes::class, CrmEntity::Note, 'note'],
+]);
+
+it('offers every hidden toggleable attribute in the add panel and never a main column', function (string $page, CrmEntity $entity): void {
+    Filament::bootCurrentPanel();
+    $component = livewire($page);
+    $hidden = columnsBesideTitle($component, $entity);
+    $toggleable = array_values(array_filter($hidden, fn (string $column): bool => $component->instance()->getTable()->getColumn($column)->isToggleable()));
+
+    foreach ($toggleable as $column) {
+        $component->call('hideTableColumn', $column);
+    }
+
+    $items = new Crawler($component->html())->filter('[data-view-settings-add-panel] [data-view-settings-add-item]');
+
+    expect($items->each(fn (Crawler $item): ?string => $item->attr('data-attribute')))->toEqualCanonicalizing($toggleable)
+        ->and($items->each(fn (Crawler $item): ?string => $item->attr('data-attribute')))->not->toContain($entity->titleColumn());
+})->with('column menu pages');
+
+it('keeps the reset in the list footer and out of the add panel', function (): void {
+    Filament::bootCurrentPanel();
+    $html = livewire(ListCompanies::class)->html();
+
+    expect(new Crawler($html)->filter('[data-view-settings-add-panel] .fi-view-settings-reset')->count())->toBe(0)
+        ->and(new Crawler($html)->filter('[data-view-settings] .fi-view-settings-reset')->count())->toBe(1)
+        ->and($html)->not->toContain('Every column is shown');
+});
+
+it('tells the member every attribute is in the view once none is hidden', function (): void {
+    Filament::bootCurrentPanel();
+    $component = livewire(ListCompanies::class);
+
+    foreach (columnsBesideTitle($component, CrmEntity::Company) as $column) {
+        if (! columnIsShown($component, $column) && $component->instance()->getTable()->getColumn($column)->isToggleable()) {
+            $component->call('toggleTableColumn', $column);
+        }
+    }
+
+    $component->assertSeeText('Every attribute is already in this view');
+    $component->call('hideTableColumn', 'created_at')->assertDontSeeText('Every attribute is already in this view');
 });

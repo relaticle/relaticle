@@ -9,108 +9,145 @@
         </x-filament::button>
     </x-slot>
 
-    <div class="fi-view-settings-panel" x-data="viewSettingsColumns" x-on:resize.window="closeMenu(false)" x-on:scroll.window.capture="closeMenu(false)" x-on:livewire:navigating.window="closeMenu(false)" data-view-settings role="group" aria-label="{{ __('filament/panel.tables.views.view_settings_panel') }}">
-        <div class="fi-view-settings-scroll">
-        <p class="fi-ta-views-heading">{{ __('filament/panel.tables.views.columns') }}</p>
+    <div class="fi-view-settings-panel" x-data="viewSettingsColumns" x-on:resize.window="closeMenu(false)" x-on:scroll.window.capture="closeMenu(false)" x-on:livewire:navigating.window="closeMenu(false)" data-view-settings role="group" x-on:dropdown-escape="adding && ($event.preventDefault(), closeAdd())" aria-label="{{ __('filament/panel.tables.views.view_settings_panel') }}">
+        <div class="fi-view-settings-view" x-show="! adding">
+            <div class="fi-view-settings-scroll">
+            <p class="fi-ta-views-heading">{{ __('filament/panel.tables.views.columns') }}</p>
 
-        <div
-            x-sortable
-            x-on:end.stop="reorder($event)"
-            x-on:pointerdown="$event.target.closest('[data-view-settings-menu]') || closeMenu(false)"
-            data-sortable-animation-duration="150"
-            class="fi-view-settings-list"
-        >
-            @foreach ($shown as $column)
-                <div
-                    class="fi-view-settings-row"
-                    x-sortable-item="{{ $column['name'] }}"
-                    data-column="{{ $column['name'] }}"
-                    @if ($column['isPinned']) data-column-pinned @endif
-                    @if ($column['isLocked']) data-column-locked @endif
-                    wire:key="view-settings.{{ $column['name'] }}"
-                >
-                    @if ($column['isPinned'])
-                        <span class="fi-view-settings-handle fi-view-settings-pin" title="{{ __('filament/panel.tables.views.pinned_column') }}">
-                            <x-filament::icon icon="lucide-pin" />
-                            <span class="sr-only">{{ __('filament/panel.tables.views.pinned_column') }}</span>
-                        </span>
-                    @else
-                        <button type="button" x-sortable-handle tabindex="-1" aria-hidden="true" class="fi-view-settings-handle fi-view-settings-grip">
-                            <x-filament::icon icon="lucide-grip-vertical" />
-                        </button>
-                    @endif
+            <div
+                x-sortable
+                x-on:end.stop="reorder($event)"
+                x-on:pointerdown="$event.target.closest('[data-view-settings-menu]') || closeMenu(false)"
+                data-sortable-animation-duration="150"
+                class="fi-view-settings-list"
+            >
+                @foreach ($shown as $column)
+                    <div
+                        class="fi-view-settings-row"
+                        x-sortable-item="{{ $column['name'] }}"
+                        data-column="{{ $column['name'] }}"
+                        @if ($column['isPinned']) data-column-pinned @endif
+                        @if ($column['isLocked']) data-column-locked @endif
+                        wire:key="view-settings.{{ $column['name'] }}"
+                    >
+                        @if ($column['isPinned'])
+                            <span class="fi-view-settings-handle fi-view-settings-pin" title="{{ __('filament/panel.tables.views.pinned_column') }}">
+                                <x-filament::icon icon="lucide-pin" />
+                                <span class="sr-only">{{ __('filament/panel.tables.views.pinned_column') }}</span>
+                            </span>
+                        @else
+                            <button type="button" x-sortable-handle tabindex="-1" aria-hidden="true" class="fi-view-settings-handle fi-view-settings-grip">
+                                <x-filament::icon icon="lucide-grip-vertical" />
+                            </button>
+                        @endif
 
-                    <span class="fi-view-settings-label">{{ $column['label'] }}</span>
+                        <span class="fi-view-settings-label">{{ $column['label'] }}</span>
 
-                    <x-filament::icon-button
-                        icon="lucide-ellipsis-vertical"
-                        color="gray"
-                        size="sm"
-                        :label="__('filament/panel.tables.views.column_options', ['column' => $column['text']])"
-                        aria-haspopup="menu"
-                        tabindex="0"
-                        aria-controls="view-settings-row-menu"
-                        x-bind:aria-expanded="(menu === {{ Js::from($column['name']) }}).toString()"
-                        data-view-settings-menu
-                        class="fi-view-settings-row-menu-trigger"
-                        x-on:click="openMenu($el)"
-                        x-on:dropdown-escape="menu !== null && ($event.preventDefault(), closeMenu(true))"
-                    />
-                </div>
-            @endforeach
-        </div>
+                        <x-filament::icon-button
+                            icon="lucide-ellipsis-vertical"
+                            color="gray"
+                            size="sm"
+                            :label="__('filament/panel.tables.views.column_options', ['column' => $column['text']])"
+                            aria-haspopup="menu"
+                            tabindex="0"
+                            aria-controls="view-settings-row-menu"
+                            x-bind:aria-expanded="(menu === {{ Js::from($column['name']) }}).toString()"
+                            data-view-settings-menu
+                            class="fi-view-settings-row-menu-trigger"
+                            x-on:click="openMenu($el)"
+                            x-on:dropdown-escape="menu !== null && ($event.preventDefault(), closeMenu(true))"
+                        />
+                    </div>
+                @endforeach
+            </div>
 
-        <div class="fi-dropdown-list">
-            @if ($hidden === [])
-                <p class="fi-view-settings-note">
-                    <x-filament::icon icon="lucide-check" />
-                    {{ __('filament/panel.tables.views.all_columns_shown') }}
-                </p>
-            @else
+            <div class="fi-dropdown-list">
                 <x-filament::dropdown.list.item
                     icon="lucide-plus"
                     role="button"
                     tabindex="0"
                     data-view-settings-add
-                    x-bind:aria-expanded="adding.toString()"
-                    x-on:click="adding = ! adding"
+                        x-bind:aria-expanded="adding.toString()"
+                    x-on:click="openAdd()"
                 >
                     <span class="fi-view-settings-add">
-                        {{ __('filament/panel.tables.views.add_column') }}
-                        <x-filament::icon icon="lucide-chevron-right" class="fi-view-settings-add-chevron" x-bind:class="{ 'fi-expanded': adding }" />
+                        {{ __('filament/panel.tables.views.add_attribute') }}
+                        <x-filament::icon icon="lucide-chevron-right" class="fi-view-settings-add-chevron" />
                     </span>
                 </x-filament::dropdown.list.item>
+            </div>
+            </div>
 
-                <div x-show="adding" x-cloak class="fi-view-settings-hidden">
+            @if ($canReset)
+                <div class="fi-dropdown-list fi-view-settings-footer">
+                    <x-filament::dropdown.list.item
+                        icon="lucide-undo-2"
+                        role="button"
+                        tabindex="0"
+                        class="fi-view-settings-reset"
+                        x-on:click="close(); $wire.mountAction('resetTableToDefault')"
+                    >
+                        {{ __('filament/panel.tables.views.reset') }}
+                    </x-filament::dropdown.list.item>
+                </div>
+            @endif
+        </div>
+
+        <div class="fi-view-settings-view" x-show="adding" x-cloak data-view-settings-add-panel>
+            <div class="fi-view-settings-search">
+                <x-filament::icon-button
+                    icon="lucide-chevron-left"
+                    color="gray"
+                    size="sm"
+                    :label="__('filament/panel.tables.views.back')"
+                    data-view-settings-back
+                    x-on:click="closeAdd()"
+                />
+                <input
+                    type="search"
+                    x-model="query"
+                    autocomplete="off"
+                    placeholder="{{ __('filament/panel.tables.views.search_attributes', ['entity' => $entityLabel]) }}"
+                    aria-label="{{ __('filament/panel.tables.views.search_attributes', ['entity' => $entityLabel]) }}"
+                    class="fi-view-settings-search-input"
+                    data-view-settings-search
+                    x-on:keydown.enter.prevent="pickFirst()"
+                    x-on:keydown.arrow-down.prevent="stepAdd(1)"
+                    x-on:keydown.arrow-up.prevent="stepAdd(-1)"
+                />
+            </div>
+
+            <div class="fi-view-settings-scroll" x-on:keydown.arrow-down.prevent="stepAdd(1)" x-on:keydown.arrow-up.prevent="stepAdd(-1)">
+                <div class="fi-dropdown-list">
                     @foreach ($hidden as $column)
                         <x-filament::dropdown.list.item
                             :wire:key="'view-settings-add.'.$column['name']"
                             role="button"
                             tabindex="0"
                             :aria-label="__('filament/panel.tables.views.show_column', ['column' => $column['text']])"
-                            x-on:click="show({{ Js::from($column['name']) }})"
+                            data-view-settings-add-item
+                            :data-attribute="$column['name']"
+                            :data-text="$column['text']"
+                            x-show="matches($el.dataset.text)"
+                            x-on:click="show($el.dataset.attribute)"
                         >
                             <span class="fi-view-settings-label">{{ $column['label'] }}</span>
                         </x-filament::dropdown.list.item>
                     @endforeach
                 </div>
-            @endif
-        </div>
-        </div>
 
-        @if ($canReset)
-            <div class="fi-dropdown-list fi-view-settings-footer">
-                <x-filament::dropdown.list.item
-                    icon="lucide-undo-2"
-                    role="button"
-                    tabindex="0"
-                    class="fi-view-settings-reset"
-                    x-on:click="close(); $wire.mountAction('resetTableToDefault')"
-                >
-                    {{ __('filament/panel.tables.views.reset') }}
-                </x-filament::dropdown.list.item>
+                @if ($hidden === [])
+                    <p class="fi-view-settings-note">
+                        <x-filament::icon icon="lucide-check" />
+                        {{ __('filament/panel.tables.views.all_attributes_in_view') }}
+                    </p>
+                @else
+                    <p class="fi-view-settings-note" x-cloak x-show="addItems().length === 0">
+                        {{ __('filament/panel.tables.views.no_attribute_matches') }}
+                    </p>
+                @endif
             </div>
-        @endif
+        </div>
 
         <div
             x-ref="rowMenu"
