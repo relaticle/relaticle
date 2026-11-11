@@ -255,6 +255,10 @@ button.fi-filter-seg {
     @apply flex min-w-0 items-center gap-1;
 }
 
+.fi-filter-more-values {
+    @apply shrink-0;
+}
+
 .fi-filter-value {
     @apply flex min-w-0 items-center gap-1;
 

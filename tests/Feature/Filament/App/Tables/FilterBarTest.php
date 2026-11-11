@@ -941,7 +941,7 @@ it('marks a company with its logo or the company icon and a person with the pers
     $companies = collect(filterBarSearch($this, ListPeople::class, 'company', 'acme'))->keyBy('label');
     $people = filterBarSearch($this, ListOpportunities::class, 'custom_fields.contact_pick', 'acme');
 
-    expect($companies['Acme Logo'])->toMatchArray(['image' => $logo->fresh()->logo, 'icon' => null, 'circular' => false])
+    expect($companies['Acme Logo'])->toMatchArray(['image' => $logo->fresh()->logo, 'icon' => CrmEntity::Company->iconPath(), 'circular' => false])
         ->and($companies['Acme Plain'])->toMatchArray(['image' => null, 'icon' => CrmEntity::Company->iconPath(), 'circular' => false])
         ->and($people[0])->toMatchArray(['label' => 'Acme Person', 'image' => null, 'icon' => CrmEntity::People->iconPath(), 'circular' => true]);
 });
@@ -1911,7 +1911,7 @@ it('carries the mark of every stored record in the rule labels and gives a delet
         ])
         ->instance()->getFilterBarData()['rules'];
 
-    expect($shown[0]['labels'][0])->toMatchArray(['image' => $logo->fresh()->logo, 'icon' => null, 'circular' => false])
+    expect($shown[0]['labels'][0])->toMatchArray(['image' => $logo->fresh()->logo, 'icon' => CrmEntity::Company->iconPath(), 'circular' => false])
         ->and($shown[0]['labels'][1])->toMatchArray(['label' => 'Gone Co (deleted)', 'image' => null, 'icon' => CrmEntity::Company->iconPath()])
         ->and($shown[1]['labels'][0])->toMatchArray(['image' => $colleague->getFilamentAvatarUrl(), 'icon' => null, 'circular' => true]);
 });

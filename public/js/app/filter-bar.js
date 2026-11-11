@@ -5,6 +5,7 @@
     const MAX_FIELD_RESULTS = 200
     const SEARCH_THRESHOLD = 8
     const SHOWN_VALUES = 2
+    const VALUE_BUDGET = 28
     const FADE_WIDTH = 32
     const LOOKUP_KINDS = ['member', 'relation', 'record']
     const LIST_KINDS = ['choice', 'multi_choice', ...LOOKUP_KINDS]
@@ -29,6 +30,7 @@
                 deleted: null,
                 deletable: false,
                 view: null,
+                viewerId: null,
                 server: [],
                 chips: [],
                 open: null,
@@ -89,6 +91,7 @@
                     this.deleted = state.deleted
                     this.deletable = state.deletable
                     this.view = state.view
+                    this.viewerId = state.viewerId
                     this.server = state.rules
                 },
 
@@ -279,7 +282,7 @@
                     const chip = this.chips.find((other) => other.id === this.open?.id)
 
                     this.resetLookup()
-                    this.pinned = Array.isArray(chip?.value) ? [...chip.value] : []
+                    this.pinned = chip ? this.valueIds(chip) : []
 
                     if (this.open?.part === 'val' && this.isLookup(chip)) {
                         this.lookup(chip)
@@ -559,6 +562,34 @@
                     return option?.label ?? chip.labels[id]?.label ?? id
                 },
 
+                valueIds(chip) {
+                    const ids = Array.isArray(chip.value) ? chip.value : []
+
+                    if (this.fieldOf(chip)?.kind !== 'member') {
+                        return ids
+                    }
+
+                    return [...new Set(ids.map((id) => (id === this.viewerId ? ME : id)))]
+                },
+
+                shownValues(chip) {
+                    const shown = []
+                    let used = 0
+
+                    for (const id of this.valueIds(chip)) {
+                        const length = this.labelFor(chip, id).length
+
+                        if (shown.length > 0 && used + length > VALUE_BUDGET) {
+                            break
+                        }
+
+                        shown.push(id)
+                        used += length
+                    }
+
+                    return shown
+                },
+
                 markedValues(chip) {
                     if (!LOOKUP_KINDS.includes(this.fieldOf(chip)?.kind) || !Array.isArray(chip.value) || !this.complete(chip)) {
                         return []
@@ -566,17 +597,20 @@
 
                     const options = this.fieldOf(chip).options
 
-                    return chip.value
-                        .slice(0, SHOWN_VALUES)
-                        .map((id) => ({ ...chip.labels[id], ...options.find((option) => option.id === id), id, label: this.labelFor(chip, id) }))
+                    return this.shownValues(chip).map((id) => ({
+                        ...chip.labels[id],
+                        ...options.find((option) => option.id === id),
+                        id,
+                        label: this.labelFor(chip, id),
+                    }))
                 },
 
                 hiddenValues(chip) {
-                    return Array.isArray(chip.value) ? Math.max(0, chip.value.length - SHOWN_VALUES) : 0
+                    return this.valueIds(chip).length - this.shownValues(chip).length
                 },
 
                 isChecked(chip, id) {
-                    return Array.isArray(chip.value) && chip.value.includes(id)
+                    return this.valueIds(chip).includes(id)
                 },
 
                 optionColor(option) {
@@ -602,15 +636,16 @@
 
                 toggleOption(chip, option) {
                     const current = Array.isArray(chip.value) ? chip.value : []
+                    const stored = option.id === ME && this.fieldOf(chip).kind === 'member' ? [ME, this.viewerId] : [option.id]
 
                     chip.labels[option.id] = option
-                    chip.value = current.includes(option.id) ? current.filter((id) => id !== option.id) : [...current, option.id]
+                    chip.value = stored.some((id) => current.includes(id)) ? current.filter((id) => !stored.includes(id)) : [...current, option.id]
                     chip.display = this.summary(chip)
                     this.schedulePush()
                 },
 
                 summary(chip) {
-                    const labels = (chip.value ?? []).map((id) => this.labelFor(chip, id))
+                    const labels = this.valueIds(chip).map((id) => this.labelFor(chip, id))
                     const shown = labels.slice(0, SHOWN_VALUES).join(', ')
 
                     return labels.length > SHOWN_VALUES ? `${shown} +${labels.length - SHOWN_VALUES}` : shown
@@ -618,7 +653,7 @@
 
                 typed(chip) {
                     this.resetLookup()
-                    this.pinned = Array.isArray(chip.value) ? [...chip.value] : []
+                    this.pinned = this.valueIds(chip)
 
                     if (this.isLookup(chip)) {
                         this.searching = true

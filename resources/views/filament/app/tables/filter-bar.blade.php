@@ -23,7 +23,7 @@
                 aria-haspopup="menu"
                 x-on:click="toggle('sort', 'main', $event)"
             >
-                <x-filament::icon icon="lucide-arrow-up-down" x-show="! sort" />
+                <x-filament::icon icon="lucide-arrow-down-wide-narrow" x-show="! sort" />
                 <x-filament::icon icon="lucide-arrow-up" x-show="sort?.direction === 'asc'" />
                 <x-filament::icon icon="lucide-arrow-down" x-show="sort?.direction === 'desc'" />
                 <template x-if="! sort"><span class="max-sm:hidden">{{ __('filament/panel.tables.filters.sort') }}</span></template>
@@ -223,15 +223,8 @@
                             <span class="fi-filter-values">
                                 <template x-for="(item, index) in markedValues(chip)" x-bind:key="item.id">
                                     <span class="fi-filter-value">
-                                        <template x-if="item.image || item.icon">
-                                            <span class="fi-filter-mark" x-bind:class="{ 'fi-square': item.circular === false }">
-                                                <template x-if="item.image"><img x-bind:src="item.image" alt="" loading="lazy" /></template>
-                                                <template x-if="! item.image && item.icon">
-                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path x-bind:d="item.icon"></path></svg>
-                                                </template>
-                                            </span>
-                                        </template>
-                                        <span x-text="item.label + (index < markedValues(chip).length - 1 || hiddenValues(chip) > 0 ? ',' : '')"></span>
+                                        @include('filament.app.tables.filter-mark', ['of' => 'item'])
+                                        <span x-text="item.label + (index < markedValues(chip).length - 1 ? ',' : '')"></span>
                                     </span>
                                 </template>
                                 <span class="fi-filter-more-values" x-show="hiddenValues(chip) > 0" x-text="'+' + hiddenValues(chip)"></span>
@@ -276,14 +269,7 @@
                                                     <x-filament::icon icon="lucide-check" x-show="isChecked(chip, option.id)" />
                                                 </span>
                                                 <span class="fi-filter-dot" x-show="optionColor(option)" x-bind:style="{ '--option-color': optionColor(option) }"></span>
-                                                <template x-if="option.image || option.icon">
-                                                    <span class="fi-filter-mark" x-bind:class="{ 'fi-square': option.circular === false }" data-filter-mark>
-                                                        <template x-if="option.image"><img x-bind:src="option.image" alt="" loading="lazy" /></template>
-                                                        <template x-if="! option.image && option.icon">
-                                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path x-bind:d="option.icon"></path></svg>
-                                                        </template>
-                                                    </span>
-                                                </template>
+                                                @include('filament.app.tables.filter-mark', ['of' => 'option', 'tagged' => true])
                                                 <span class="fi-filter-label" x-text="option.label"></span>
                                             </button>
                                         </template>

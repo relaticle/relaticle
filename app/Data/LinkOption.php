@@ -58,7 +58,7 @@ final readonly class LinkOption
             id: (string) $record->getKey(),
             label: $label,
             image: $image,
-            icon: $image === null ? $entity?->iconPath() : null,
+            icon: $entity?->iconPath(),
             circular: $entity !== CrmEntity::Company,
         );
     }

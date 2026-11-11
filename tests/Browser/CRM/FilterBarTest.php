@@ -1111,3 +1111,98 @@ it('shifts a value popover left instead of clipping it at the right edge', funct
 
     $page->assertScript(filterBarWaitFor($inside), true)->assertNoJavaScriptErrors();
 });
+
+function peopleCompanyChip(AwaitableWebpage $page, array $companyIds): AwaitableWebpage
+{
+    addChip($page, 'company', 'is_any_of');
+
+    foreach ($companyIds as $id) {
+        $page->click(optionButton((string) $id));
+    }
+
+    return $page;
+}
+
+function companyId(Workspace $workspace, string $name): string
+{
+    return (string) Company::query()->withoutGlobalScopes()->where('workspace_id', $workspace->getKey())->where('name', $name)->value('id');
+}
+
+it('swaps a company logo that fails to load for the company icon in the list and in the chip', function (): void {
+    $company = Company::query()->withoutGlobalScopes()->where('workspace_id', $this->workspace->getKey())->where('name', 'Acme Robotics')->first();
+    $media = $company->addMediaFromString(onePixelPng())->usingFileName('logo.png')->toMediaCollection(Company::LOGO_MEDIA_COLLECTION);
+    unlink($media->getPath());
+    $page = openOn($this->user, $this->workspace, 'people');
+    $mark = fn (string $scope): string => "document.querySelector('{$scope} .fi-filter-mark')";
+    $iconShown = fn (string $scope): string => "{$mark($scope)}?.querySelector('svg')?.checkVisibility() === true && !{$mark($scope)}.querySelector('img')?.checkVisibility()";
+
+    addChip($page, 'company', 'is_any_of')->assertPresent(optionButton((string) $company->getKey()).' [data-filter-mark] img');
+    $page->assertScript(filterBarWaitFor($iconShown(optionButton((string) $company->getKey()))), true)
+        ->click(optionButton((string) $company->getKey()))
+        ->assertScript(filterBarWaitFor($iconShown('[data-filter-chip][data-field="company"] .fi-filter-value')), true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('shows the first long name truncated and a whole plus count instead of squeezing the second name', function (): void {
+    $long = 'VER1111 Northwestern Regional Renewable Energy Holdings';
+    foreach ([$long, 'Airbnb'] as $name) {
+        Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => $name]);
+    }
+    $page = openOn($this->user, $this->workspace, 'people');
+
+    peopleCompanyChip($page, [companyId($this->workspace, $long), companyId($this->workspace, 'Airbnb')])->keys(searchInput(), 'Escape');
+
+    $page->assertScript(filterBarWaitFor('document.querySelectorAll("[data-filter-chip] .fi-filter-value").length === 1'), true)
+        ->assertScript('(() => { const label = document.querySelector("[data-filter-chip] .fi-filter-value > span:last-child"); return label.textContent.trim() === '.json_encode($long).' && label.scrollWidth > label.clientWidth; })()', true)
+        ->assertScript('(() => { const more = document.querySelector("[data-filter-chip] .fi-filter-more-values"); const segment = document.querySelector("[data-filter-chip] [data-filter-segment=value]").getBoundingClientRect(); const box = more.getBoundingClientRect(); return more.textContent.trim() === "+1" && more.scrollWidth <= more.clientWidth && box.width > 0 && box.right <= segment.right; })()', true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('shows whole short names with their marks until the budget is reached', function (): void {
+    foreach (['Airbnb', 'Stripe', 'Notion Labs International'] as $name) {
+        Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => $name]);
+    }
+    $page = openOn($this->user, $this->workspace, 'people');
+
+    peopleCompanyChip($page, array_map(fn (string $name): string => companyId($this->workspace, $name), ['Airbnb', 'Stripe', 'Notion Labs International']))->keys(searchInput(), 'Escape');
+
+    $page->assertScript(filterBarWaitFor('document.querySelectorAll("[data-filter-chip] .fi-filter-value").length === 2'), true)
+        ->assertScript('[...document.querySelectorAll("[data-filter-chip] .fi-filter-value")].every((value) => value.querySelector(".fi-filter-mark") && value.lastElementChild.scrollWidth <= value.lastElementChild.clientWidth)', true)
+        ->assertSeeIn('[data-filter-chip] [data-filter-segment="value"]', 'Airbnb, Stripe')
+        ->assertSeeIn('[data-filter-chip] .fi-filter-more-values', '+1')
+        ->assertNoJavaScriptErrors();
+});
+
+it('marks the current field in the field list of a chip', function (): void {
+    $page = ($this->open)();
+
+    addChip($page, 'name', 'contains')->keys(valueInput(), 'Escape');
+    $page->click('[data-filter-segment="field"]')
+        ->assertScript('[...document.querySelectorAll("[data-pop][data-open=true] [data-field]")].filter((item) => item.getAttribute("aria-selected") === "true").map((item) => item.dataset.field).join() === "name"', true)
+        ->assertScript('document.querySelector("[data-pop][data-open=true] [data-field=name] .fi-filter-tick").checkVisibility()', true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('draws the sort control with its own icon at every width', function (int $width): void {
+    $page = ($this->open)($width);
+    $paths = fn (string $html): array => (preg_match_all('/ d="([^"]+)"/', $html, $matches) ? $matches[1] : []);
+    $shown = $page->script('[...document.querySelectorAll("[data-filter-sort] svg:not(.fi-filter-sorted-icon)")].filter((svg) => svg.checkVisibility()).map((svg) => [...svg.querySelectorAll("path")].map((path) => path.getAttribute("d")))[0]');
+
+    expect($shown)->not->toBe($paths(svg('lucide-arrow-up-down')->toHtml()))
+        ->and($shown)->toBe($paths(svg('lucide-arrow-down-wide-narrow')->toHtml()));
+    $page->assertNoJavaScriptErrors();
+})->with([390, 1440]);
+
+it('lists the viewer once whichever way the rule stores them, and unchecks both', function (): void {
+    $page = openOn($this->user, $this->workspace, 'opportunities');
+    $viewer = (string) $this->user->getKey();
+    $page->script("Livewire.all().find((component) => component.name.includes('ListOpportunities')).\$wire.\$call('setFilterRules', [{ field: 'creator', condition: 'is_any_of', value: ['@me', '{$viewer}'] }])");
+    $page->assertScript(filterBarWaitFor('document.querySelectorAll("[data-filter-chip]").length === 1'), true)
+        ->assertSeeIn('[data-filter-chip] [data-filter-segment="value"]', "{$this->user->name} (me)")
+        ->assertScript('document.querySelector("[data-filter-chip] [data-filter-segment=value]").textContent.split("(me)").length === 2', true)
+        ->click('[data-filter-chip] [data-filter-segment="value"]')
+        ->assertScript('[...document.querySelectorAll("[data-pop][data-open=true] [data-option]")].length === 1 && document.querySelector("[data-pop][data-open=true] [data-option=\\"@me\\"]").getAttribute("aria-selected") === "true"', true)
+        ->click(optionButton('@me'))
+        ->assertScript(filterBarWaitFor('document.querySelector("[data-filter-bar]").dataset.state && JSON.parse(document.querySelector("[data-filter-bar]").dataset.state).rules.length === 0'), true)
+        ->assertNoJavaScriptErrors();
+});

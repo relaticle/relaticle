@@ -12,9 +12,24 @@
     </label>
     <div role="listbox" x-bind:aria-label="@js($label){{ $forChip ? ".replace(':chip', label(chip))" : '' }}">
         <template x-for="field in matchingFields()" x-bind:key="field.key">
-            <button type="button" tabindex="0" role="option" class="fi-filter-item" data-pop-item x-bind:data-field="field.key" x-on:click="pickField(field)">
+            <button
+                type="button"
+                tabindex="0"
+                role="option"
+                class="fi-filter-item"
+                data-pop-item
+                x-bind:data-field="field.key"
+@if ($forChip)
+                x-bind:class="{ 'fi-on': field.key === chip.field }"
+                x-bind:aria-selected="(field.key === chip.field).toString()"
+@endif
+                x-on:click="pickField(field)"
+            >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path x-bind:d="field.icon"></path></svg>
                 <span x-text="field.label"></span>
+@if ($forChip)
+                <x-filament::icon icon="lucide-check" class="fi-filter-tick" x-show="field.key === chip.field" />
+@endif
             </button>
         </template>
 @unless ($forChip)
