@@ -26,12 +26,13 @@ remove it from there.
 
 ## Filter a list
 
-1. Click **+ Filter** in the row above the table.
+1. Click **Filter** in the row above the table. Once a filter is set, it
+   shows as **+**.
 2. Pick a field. Type to narrow the list of fields.
 3. Pick a condition, such as **contains**, **is any of**, or **in the past**.
 4. Enter or pick a value. The list updates once the filter is complete.
 
-![The filter row above the Opportunities list with three chips: Stage is any of Negotiation/Review, Close Date in the next 30 days, and Amount greater than 10000](/help-assets/getting-started/find-anything-with-search-and-filters-2.png)
+![The filter row above the Opportunities list with three chips: Stage is any of Negotiation/Review, Close Date in the next 30 days, and Amount greater than $10,000.00](/help-assets/getting-started/find-anything-with-search-and-filters-2.png)
 
 Each filter shows as a chip in the row. Click its condition or its value to
 change it. To remove it, click **⋮** on the chip, then **Remove filter**.
@@ -64,7 +65,9 @@ it. Clicking a column header does the same. On Tasks, **Group** groups the
 list by status or priority.
 
 Filters, sort, and grouping save with the view. When you change them,
-**Discard changes** and **Save** appear at the right of the row.
+**Discard changes** and **Save** appear at the right of the row. On a
+shared view, Save reads **Save for everyone**, because the view changes for
+your whole team.
 
 ## If you can't find a field in the filter list
 
