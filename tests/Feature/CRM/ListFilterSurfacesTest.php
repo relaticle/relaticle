@@ -712,6 +712,8 @@ it('filters a record custom field by linked record id alike on the api and mcp',
         [$on(['$is_empty' => false]), ['Low', 'High']],
         [$on(['$has_any' => [$foreign->getKey()]]), []],
         [$on(['$has_none' => [$foreign->getKey()]]), ['Low', 'High', 'Cleared', 'Unset']],
+        [$on(['$has_any' => $globex->getKey()]), ['High']],
+        [$on(['$has_none' => $globex->getKey()]), ['Low', 'Cleared', 'Unset']],
     ]);
 
     $globex->delete();

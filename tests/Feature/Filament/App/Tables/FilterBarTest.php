@@ -1257,6 +1257,22 @@ it('survives a client that calls the filter setters with nothing or the wrong ty
     'rules a string' => ['setFilterRules', ['x'], 1],
 ]);
 
+it('clears a rule that was set when the client sends rules that are not a list', function (string $page, string $model, array $arguments): void {
+    $rule = ['field' => 'creation_source', 'condition' => 'is_any_of', 'value' => ['api']];
+
+    livewire($page)
+        ->call('setFilterRules', [$rule])
+        ->assertSet('tableFilters.conditions.rules', [$rule])
+        ->call('setDeletedRecordsFilter', 'included')
+        ->call('setFilterRules', ...$arguments)
+        ->assertOk()
+        ->assertSet('tableFilters.conditions.rules', [])
+        ->assertSet('tableFilters.trashed.value', 1);
+})->with('filter bar pages')->with([
+    'rules missing' => [[]],
+    'rules a string' => [['x']],
+]);
+
 function filterBarLegacyCase(string $case, User $user): array
 {
     $rule = fn (string $field, string $condition, array $value): array => ['field' => $field, 'condition' => $condition, 'value' => $value];
@@ -1858,6 +1874,17 @@ it('offers every tag once whatever its case, including one whose option is gone'
         ->and(livewire(ListCompanies::class)
             ->call('setFilterRules', [['field' => 'custom_fields.labels', 'condition' => 'has_any_of', 'value' => ['old']]])
             ->assertCanSeeTableRecords([$vip])->assertCountTableRecords(1))->not->toBeNull();
+});
+
+it('offers no tag that only a deleted record holds', function (): void {
+    filterBarField($this->user, 'company', 'labels', CustomFieldType::TAGS_INPUT->value);
+    filterBarRecord($this->user, Company::class, 'Live', values: ['labels' => ['kept', 'shared']]);
+    filterBarRecord($this->user, Company::class, 'Gone', values: ['labels' => ['dropped', 'shared']])->delete();
+    WorkspaceCustomField::byCode($this->user->currentWorkspace->getKey(), 'company', 'labels')->options()->delete();
+
+    $options = collect(livewire(ListCompanies::class)->instance()->getFilterBarData()['fields'])->keyBy('key')['custom_fields.labels']['options'];
+
+    expect(array_column($options, 'id'))->toEqualCanonicalizing(['kept', 'shared']);
 });
 
 it('narrows the list by a tag whatever the case it was stored in', function (): void {
