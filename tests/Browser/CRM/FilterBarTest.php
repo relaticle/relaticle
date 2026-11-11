@@ -1153,23 +1153,25 @@ it('shows the first long name truncated and a whole plus count instead of squeez
     peopleCompanyChip($page, [companyId($this->workspace, $long), companyId($this->workspace, 'Airbnb')])->keys(searchInput(), 'Escape');
 
     $page->assertScript(filterBarWaitFor('document.querySelectorAll("[data-filter-chip] .fi-filter-value").length === 1'), true)
-        ->assertScript('(() => { const label = document.querySelector("[data-filter-chip] .fi-filter-value > span:last-child"); return label.textContent.trim() === '.json_encode($long).' && label.scrollWidth > label.clientWidth; })()', true)
+        ->assertScript('(() => { const label = document.querySelector("[data-filter-chip] .fi-filter-value-label"); return label.textContent.trim() === '.json_encode($long).' && label.scrollWidth > label.clientWidth; })()', true)
         ->assertScript('(() => { const more = document.querySelector("[data-filter-chip] .fi-filter-more-values"); const segment = document.querySelector("[data-filter-chip] [data-filter-segment=value]").getBoundingClientRect(); const box = more.getBoundingClientRect(); return more.textContent.trim() === "+1" && more.scrollWidth <= more.clientWidth && box.width > 0 && box.right <= segment.right; })()', true)
         ->assertNoJavaScriptErrors();
 });
 
-it('shows whole short names with their marks until the budget is reached', function (): void {
-    foreach (['Airbnb', 'Stripe', 'Notion Labs International'] as $name) {
+it('shows two whole short names with their marks, a visible comma and a plus count', function (): void {
+    $names = ['Airbnb', 'Stripe', 'Figma', 'Heh'];
+    foreach ($names as $name) {
         Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => $name]);
     }
     $page = openOn($this->user, $this->workspace, 'people');
 
-    peopleCompanyChip($page, array_map(fn (string $name): string => companyId($this->workspace, $name), ['Airbnb', 'Stripe', 'Notion Labs International']))->keys(searchInput(), 'Escape');
+    peopleCompanyChip($page, array_map(fn (string $name): string => companyId($this->workspace, $name), $names))->keys(searchInput(), 'Escape');
 
     $page->assertScript(filterBarWaitFor('document.querySelectorAll("[data-filter-chip] .fi-filter-value").length === 2'), true)
-        ->assertScript('[...document.querySelectorAll("[data-filter-chip] .fi-filter-value")].every((value) => value.querySelector(".fi-filter-mark") && value.lastElementChild.scrollWidth <= value.lastElementChild.clientWidth)', true)
-        ->assertSeeIn('[data-filter-chip] [data-filter-segment="value"]', 'Airbnb, Stripe')
-        ->assertSeeIn('[data-filter-chip] .fi-filter-more-values', '+1')
+        ->assertScript('JSON.stringify([...document.querySelectorAll("[data-filter-chip] .fi-filter-value-label")].map((label) => label.textContent.trim()))', '["Airbnb","Stripe"]')
+        ->assertScript('[...document.querySelectorAll("[data-filter-chip] .fi-filter-value")].every((value) => value.querySelector(".fi-filter-mark") && value.querySelector(".fi-filter-value-label").scrollWidth <= value.querySelector(".fi-filter-value-label").clientWidth)', true)
+        ->assertScript('(() => { const [first, second] = document.querySelectorAll("[data-filter-chip] .fi-filter-value"); const comma = first.lastElementChild.getBoundingClientRect(); return first.lastElementChild.textContent === "," && comma.width > 0 && comma.right <= second.getBoundingClientRect().left; })()', true)
+        ->assertSeeIn('[data-filter-chip] .fi-filter-more-values', '+2')
         ->assertNoJavaScriptErrors();
 });
 

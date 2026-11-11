@@ -579,7 +579,7 @@
                     for (const id of this.valueIds(chip)) {
                         const length = this.labelFor(chip, id).length
 
-                        if (shown.length > 0 && used + length > VALUE_BUDGET) {
+                        if (shown.length === SHOWN_VALUES || (shown.length > 0 && used + length > VALUE_BUDGET)) {
                             break
                         }
 

@@ -224,7 +224,8 @@
                                 <template x-for="(item, index) in markedValues(chip)" x-bind:key="item.id">
                                     <span class="fi-filter-value">
                                         @include('filament.app.tables.filter-mark', ['of' => 'item'])
-                                        <span x-text="item.label + (index < markedValues(chip).length - 1 ? ',' : '')"></span>
+                                        <span class="fi-filter-value-label" x-text="item.label"></span>
+                                        <span x-show="index < markedValues(chip).length - 1" aria-hidden="true">,</span>
                                     </span>
                                 </template>
                                 <span class="fi-filter-more-values" x-show="hiddenValues(chip) > 0" x-text="'+' + hiddenValues(chip)"></span>
