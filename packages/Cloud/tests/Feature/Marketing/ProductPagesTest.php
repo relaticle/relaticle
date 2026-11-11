@@ -244,7 +244,7 @@ it('ends the self-hosted page on the closing band with a cloud signup', function
 it('gives each product page its own social card instead of the sitewide one', function (string $path, string $image): void {
     $html = $this->get($path)->assertOk()->getContent();
 
-    expect($html)->toContain('content="'.url("/images/{$image}").'?v=1"')
+    expect($html)->toContain('content="'.url("/images/{$image}").'?v=2"')
         ->and($html)->not->toContain('/images/open-graph.jpg');
 
     expect(public_path("images/{$image}"))->toBeReadableFile();

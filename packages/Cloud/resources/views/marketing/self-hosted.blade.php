@@ -98,7 +98,7 @@
     :description="$description"
     :ogTitle="$title"
     :ogDescription="$description"
-    :ogImage="url('/images/open-graph-self-hosted.jpg').'?v=1'"
+    :ogImage="url('/images/open-graph-self-hosted.jpg').'?v=2'"
 >
     <x-cloud::marketing.hero align="start">
         <x-slot:eyebrow>
