@@ -15,6 +15,7 @@ use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Str;
 use Laravel\Jetstream\Jetstream;
 
 /**
@@ -51,8 +52,8 @@ final class WorkspaceInvitationMail extends Mailable implements EssentialMail, S
             markdown: 'mail.workspace-invitation',
             with: [
                 'acceptUrl' => route('workspace-invitations.token.accept', ['token' => $this->rawToken]),
-                'inviterName' => $this->invitation->inviter?->name,
-                'workspaceName' => $this->invitation->workspace->name,
+                'inviterName' => $this->invitation->inviter === null ? null : Str::squish($this->invitation->inviter->name),
+                'workspaceName' => Str::squish($this->invitation->workspace->name),
                 'roleName' => Jetstream::findRole($this->invitation->role)?->name,
             ],
         );

@@ -1,12 +1,12 @@
 @use('Carbon\CarbonInterface')
 <x-mail::message :reason="__('mail.footer.reason.invitee', ['email' => $invitation->email, 'workspace' => $workspaceName])">
 <x-slot:preheader>{{ __('mail.workspace_invitation.preheader', ['workspace' => $workspaceName, 'role' => $roleName]) }}</x-slot:preheader>
-# {{ __('mail.workspace_invitation.heading', ['workspace' => $workspaceName]) }}
+<h1>{{ __('mail.workspace_invitation.heading', ['workspace' => $workspaceName]) }}</h1>
 
 @if($inviterName)
-{{ __('mail.workspace_invitation.line_with_inviter', ['inviter' => $inviterName, 'workspace' => $workspaceName, 'role' => $roleName]) }}
+<p>{{ __('mail.workspace_invitation.line_with_inviter', ['inviter' => $inviterName, 'workspace' => $workspaceName, 'role' => $roleName]) }}</p>
 @else
-{{ __('mail.workspace_invitation.line', ['workspace' => $workspaceName, 'role' => $roleName]) }}
+<p>{{ __('mail.workspace_invitation.line', ['workspace' => $workspaceName, 'role' => $roleName]) }}</p>
 @endif
 
 <x-mail::button :url="$acceptUrl">

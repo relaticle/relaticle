@@ -11,6 +11,7 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Tries;
+use Illuminate\Support\Str;
 
 #[Tries(3)]
 #[Backoff(60, 300)]
@@ -33,7 +34,7 @@ final class WorkspaceMemberRemovedNotification extends Notification implements S
         return (new MailMessage)
             ->subject(__('mail.workspace_member_removed.subject', ['workspace' => $this->workspace->name]))
             ->markdown('mail.notifications.workspace-member-removed', [
-                'workspaceName' => $this->workspace->name,
+                'workspaceName' => Str::squish($this->workspace->name),
                 'appUrl' => url()->getAppUrl(),
             ]);
     }

@@ -1,6 +1,6 @@
 <x-mail::message :reason="__('mail.footer.reason.digest')" :settings-url="$settingsUrl" :unsubscribe-url="$unsubscribeUrl">
 <x-slot:preheader>{{ $preheader }}</x-slot:preheader>
-# {{ __('mail.task_digest.heading', ['name' => $greetingName]) }}
+<h1>{{ __('mail.task_digest.heading', ['name' => $greetingName]) }}</h1>
 
 <p>{{ $summary }}</p>
 

@@ -92,7 +92,7 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
         return new Content(
             markdown: 'mail.task-digest',
             with: [
-                'greetingName' => explode(' ', $this->user->name)[0],
+                'greetingName' => explode(' ', Str::squish($this->user->name))[0],
                 'preheader' => $this->preheader(),
                 'summary' => $this->summary(),
                 'overdue' => $this->cards($this->digest->overdue, fn (DigestTaskItem $item): string => __('mail.task_digest.due_overdue', [
