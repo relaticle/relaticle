@@ -911,15 +911,23 @@ it('keeps the column menu on screen beside a column at the left edge', function 
         ->assertNoJavaScriptErrors();
 });
 
-it('opens the menu of a pinned column at the minimum width from a click on its header', function (): void {
+it('opens the menu of a pinned column at the minimum width from a real click on its header', function (): void {
     TablePreference::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
         'entity' => CrmEntity::Company,
         'state' => new TableStateData(widths: ['created_at' => 40]),
     ]);
     $page = pinFromMenu(companiesTable($this->user, $this->workspace->slug), 'created_at');
     $page->keys(':focus', 'Escape');
+    $label = columnHeader('created_at').' .fi-ta-resizable-label';
 
-    $page->script(sprintf('document.querySelector(`%s`).click()', columnHeader('created_at')));
+    $page->assertScript(sprintf(<<<'JS'
+        (() => {
+            const box = document.querySelector(`%s`).getBoundingClientRect();
+            const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+            return !!hit && document.querySelector(`%s`).contains(hit);
+        })();
+    JS, $label, columnHeader('created_at')), true);
+    $page->click($label);
 
     waitUntil($page, menuItemFocused())
         ->assertNoJavaScriptErrors();
@@ -1020,14 +1028,15 @@ it('keeps the column menu on screen when its column sits near the left edge', fu
         ->assertNoJavaScriptErrors();
 });
 
-it('starts every options button collapsed and named after its column, and hides the resize handles from assistive tech', function (): void {
+it('starts every header control collapsed and named after its column, and hides the resize handles from assistive tech', function (): void {
     $page = companiesTable($this->user, $this->workspace->slug);
 
     $buttons = '[...document.querySelectorAll(`th[x-data^="resizableColumn"] [data-column-menu-trigger]`)]';
 
     $page->assertScript("{$buttons}.length > 3 && {$buttons}.every((button) => button.getAttribute(\"aria-expanded\") === \"false\")", true)
-        ->assertScript(sprintf('document.querySelector(`%s [data-column-menu-trigger]`).getAttribute("aria-label")', columnHeader('name')), 'Company options')
-        ->assertScript("new Set({$buttons}.map((button) => button.getAttribute(\"aria-label\"))).size === {$buttons}.length", true)
+        ->assertScript("{$buttons}.every((button) => button.getAttribute(\"aria-haspopup\") === \"menu\" && !button.hasAttribute(\"aria-label\"))", true)
+        ->assertScript(sprintf('document.querySelector(`%s [data-column-menu-trigger]`).textContent.trim()', columnHeader('name')), 'Company')
+        ->assertScript("new Set({$buttons}.map((button) => button.textContent.trim())).size === {$buttons}.length", true)
         ->assertScript('[...document.querySelectorAll(`th[x-data^="resizableColumn"] .column-resize-handle-bar`)].every((handle) => handle.getAttribute("aria-hidden") === "true")', true)
         ->assertNoJavaScriptErrors();
 });
@@ -1074,4 +1083,108 @@ it('outlines the header control when the keyboard focuses it', function (): void
 
     $page->assertScript('document.activeElement.matches(":focus-visible") && getComputedStyle(document.activeElement).outlineStyle !== "none" && parseFloat(getComputedStyle(document.activeElement).outlineWidth) >= 2', true)
         ->assertNoJavaScriptErrors();
+});
+
+function openFilterPopover(AwaitableWebpage $page): AwaitableWebpage
+{
+    return $page->click('[data-filter-add]')
+        ->assertScript('document.querySelector("[data-pop][data-open=true]")?.checkVisibility() === true', true);
+}
+
+function filterPopoverOpen(): string
+{
+    return 'document.querySelector("[data-pop][data-open=true]")?.checkVisibility() === true';
+}
+
+it('closes an open filter popover when a column header is clicked', function (): void {
+    $page = openFilterPopover(companiesTable($this->user, $this->workspace->slug));
+
+    $page->click(columnHeader('created_at').' .fi-ta-resizable-label');
+
+    waitUntil($page, menuItemFocused())
+        ->assertScript(filterPopoverOpen(), false)
+        ->assertNoJavaScriptErrors();
+});
+
+it('closes an open filter popover when a header click moves no focus', function (): void {
+    $page = openFilterPopover(companiesTable($this->user, $this->workspace->slug));
+
+    $page->script(sprintf('document.querySelector(`%s .fi-ta-header-cell-sort-btn`).click()', columnHeader('created_at')));
+
+    waitUntil($page, menuItemFocused())
+        ->assertScript(filterPopoverOpen(), false)
+        ->assertNoJavaScriptErrors();
+});
+
+it('switches the menu to the header clicked next', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
+
+    $page->script(openColumnMenu('created_at'));
+    waitUntil($page, menuItemFocused());
+    $page->click(columnHeader('name').' .fi-ta-header-cell-sort-btn');
+
+    waitUntil($page, 'document.querySelector(`'.columnHeader('name').' [data-column-menu-trigger]`).getAttribute("aria-expanded") === "true"')
+        ->assertScript('document.querySelector(`'.columnHeader('created_at').' [data-column-menu-trigger]`).getAttribute("aria-expanded")', 'false')
+        ->assertScript(visibleMenuItems().'.length > 0', true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('closes the menu of one column when focus moves to the header of another', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
+
+    $page->script(openColumnMenu('created_at'));
+    waitUntil($page, menuItemFocused());
+    $page->script(sprintf('document.querySelector(`%s [data-column-menu-trigger]`).focus()', columnHeader('name')));
+
+    waitUntil($page, visibleMenuItems().'.length === 0')
+        ->assertScript('document.querySelector(`'.columnHeader('created_at').' [data-column-menu-trigger]`).getAttribute("aria-expanded")', 'false')
+        ->assertNoJavaScriptErrors();
+});
+
+it('closes the menu when another header starts a drag', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
+
+    $page->script(openColumnMenu('created_at'));
+    waitUntil($page, menuItemFocused());
+
+    expect($page->script(pressHeader('creator.name', '.fi-ta-header-cell-sort-btn', 40)))->toBeTrue();
+
+    waitUntil($page, visibleMenuItems().'.length === 0')->assertNoJavaScriptErrors();
+});
+
+it('does not open the menu after a resize that ends on the header at the minimum width', function (): void {
+    TablePreference::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+        'entity' => CrmEntity::Company,
+        'state' => new TableStateData(widths: ['created_at' => ResizableColumns::MIN_WIDTH]),
+    ]);
+    $page = companiesTable($this->user, $this->workspace->slug);
+
+    $page->drag(columnHeader('created_at').' .column-resize-handle-bar', columnHeader('created_at').' .fi-ta-resizable-label')
+        ->wait(0.5)
+        ->assertScript(visibleMenuItems().'.length === 0', true)
+        ->assertScript(sprintf('document.querySelector(`%s [data-column-menu-trigger]`).getAttribute("aria-expanded")', columnHeader('created_at')), 'false')
+        ->assertNoJavaScriptErrors();
+});
+
+it('opens the menu from a header click while the table is loading', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
+    $page->script(sprintf('document.querySelector(`%s .fi-ta-header-cell-sort-btn`).setAttribute("aria-disabled", "true")', columnHeader('created_at')));
+
+    $page->script(sprintf('document.querySelector(`%s .fi-ta-header-cell-sort-btn`).click()', columnHeader('created_at')));
+
+    waitUntil($page, menuItemFocused())->assertNoJavaScriptErrors();
+});
+
+it('moves a column by the neighbours it has when the item is chosen, not when the menu opened', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
+    $order = $page->script(headerOrder());
+    $index = array_search('creator.name', $order, true);
+
+    $page->script(openColumnMenu('creator.name'));
+    waitUntil($page, menuItemFocused());
+    $page->script(sprintf('Livewire.all().find((component) => component.name.includes("ListCompanies")).$wire.hideTableColumn(%s)', json_encode($order[$index + 1])));
+    $page->assertMissing(columnHeader($order[$index + 1]));
+    $page->click(columnMenuItem('moveRight'));
+
+    waitUntil($page, headerOrder().'.indexOf("creator.name") === '.($index + 1))->assertNoJavaScriptErrors();
 });

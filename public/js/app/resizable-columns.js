@@ -327,8 +327,14 @@
         th.insertBefore(wrapper, th.firstChild)
     }
 
+    // Filament swallows a click on a sort button while the table loads, but a header click must still open the menu.
+    function releaseSortButton(th) {
+        th.querySelector('.fi-ta-header-cell-sort-btn')?.removeAttribute('data-prevent-disabled-clicks')
+    }
+
     function reapplyHeader(th) {
         wrapHeaderLabel(th)
+        releaseSortButton(th)
         if (!th.querySelector('.column-resize-handle-bar')) {
             window.Alpine?.$data?.(th)?.createHandle?.()
         }
@@ -601,6 +607,7 @@
 
             if (!drag.ghost) {
                 if (Math.abs(moveEvent.clientX - startX) < DRAG_THRESHOLD) return
+                window.dispatchEvent(new CustomEvent('column-menu-close'))
                 window.getSelection()?.removeAllRanges()
                 drag.ghost = createDragGhost(th, source.elements.slice(1))
                 source.elements.forEach((element) => element.classList.add('fi-ta-column-dragging'))
@@ -647,6 +654,7 @@
         window.Alpine.data('tableColumnMenu', () => ({
             column: null,
             trigger: null,
+            anchor: null,
             panel: null,
             hideable: false,
             movable: false,
@@ -657,6 +665,29 @@
             neighbour: null,
             top: 0,
             left: 0,
+
+            focusLeft(event) {
+                const next = event.relatedTarget
+
+                if (next && !this.panel.contains(next) && next !== this.trigger) this.close(false)
+            },
+
+            refresh() {
+                const column = this.anchor?.isConnected
+                    ? this.anchor
+                    : headersOf(this.$el.closest('.fi-ta')).find((header) => headerName(header) === this.column)
+
+                if (!column) {
+                    this.close(false)
+
+                    return false
+                }
+
+                this.anchor = column
+                Object.assign(this, moveTargets(column))
+
+                return true
+            },
 
             open(detail) {
                 if (this.column === detail.column) {
@@ -794,11 +825,18 @@
                     this.column.reorderListenerBound = true
                     this.column.addEventListener('pointerdown', (e) => startHeaderDrag(e, this.column, this.$wire))
                     // Captured, so Filament's own `wire:click` on the sort control never receives the click.
+                    // That click is replayed on the header, so the listeners above it still hear a header click.
                     this.column.addEventListener('click', (e) => {
                         if (e.target.closest('.column-resize-handle-bar')) return
 
-                        e.preventDefault()
-                        e.stopPropagation()
+                        if (e.target.closest('.fi-ta-header-cell-sort-btn')) {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            this.column.click()
+
+                            return
+                        }
+
                         this.openMenu(headerTrigger(this.column))
                     }, true)
                 }
@@ -809,9 +847,8 @@
 
                 if (!trigger) return
 
-                const label = this.column.querySelector(':scope > .fi-ta-resizable-label')?.textContent.replace(/\s+/g, ' ').trim()
+                releaseSortButton(this.column)
                 trigger.setAttribute('data-column-menu-trigger', '')
-                trigger.setAttribute('aria-label', window.filamentData.columnOptionsFor.replace(':column', label || columnName))
                 trigger.setAttribute('aria-haspopup', 'menu')
                 trigger.setAttribute('aria-expanded', 'false')
 
@@ -925,6 +962,7 @@
 
                 const onUp = (upEvent) => {
                     if (upEvent.pointerId !== event.pointerId) return
+                    if (Math.abs(upEvent.pageX - startX) >= DRAG_THRESHOLD) swallowNextClick()
                     flushWidth()
                     this.handleBar.classList.remove('active')
                     document.body.classList.remove('resizing-column')

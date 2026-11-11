@@ -155,33 +155,51 @@ function narrowestHeaderState(string $column): string
             const cellRight = th.getBoundingClientRect().right;
             const text = th.querySelector('.fi-ta-header-cell-field > .truncate');
             const textBox = text.getBoundingClientRect();
+            const barLeft = th.querySelector('.column-resize-handle-bar').getBoundingClientRect().left;
             return {
                 width: Math.round(th.getBoundingClientRect().width),
                 textVisible: textBox.width >= 16,
                 textEllipsized: text.scrollWidth > text.clientWidth,
-                textInsideHeader: textBox.right <= cellRight,
+                textClearOfBar: textBox.right <= barLeft,
+                textClearOfNext: textBox.right <= cellRight,
             };
         })()
     JS, headerSelector($column));
 }
 
-it('stops narrowing where the name still fits', function (): void {
+it('stops narrowing where a long name is ellipsized clear of the resize bar and the next header', function (): void {
     $page = loginViaBrowser($this->user)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/companies")
         ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
+    $labels = [
+        'name' => 'Annual recurring revenue per account',
+        'created_at' => 'Date the first contract was signed',
+        'custom_fields.domains' => 'Every domain the company owns',
+    ];
+
+    foreach ($labels as $column => $label) {
+        $page->script('Livewire.all().find((component) => component.name.includes("ListCompanies")).$wire.mountAction("editTableColumnLabel", { column: '.json_encode($column).' })');
+        $page->assertVisible('.fi-modal-window input')
+            ->type('.fi-modal-window input', $label)
+            ->click('.fi-modal-window button[type="submit"]')
+            ->assertMissing('.fi-modal-window')
+            ->assertSeeIn(headerSelector($column), $label);
+    }
 
     $states = [];
 
-    foreach (['name', 'created_at', 'custom_fields.domains'] as $column) {
+    foreach (array_keys($labels) as $column) {
         $page->script(dragColumnEdge($column, -$page->script(headerWidth($column))));
         $states[$column] = $page->script(narrowestHeaderState($column));
 
         expect($states[$column])->toMatchArray([
             'width' => ResizableColumns::MIN_WIDTH,
             'textVisible' => true,
-            'textInsideHeader' => true,
+            'textEllipsized' => true,
+            'textClearOfBar' => true,
+            'textClearOfNext' => true,
         ]);
     }
 

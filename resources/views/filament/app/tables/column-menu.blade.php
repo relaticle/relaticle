@@ -4,6 +4,7 @@
     x-on:resize.window="close(false)"
     x-on:scroll.window.capture="close(false)"
     x-on:livewire:navigating.window="close(false)"
+    x-on:column-menu-close.window="close(false)"
     class="contents" wire:ignore wire:key="{{ $this->getId() }}.table.column-menu">
     <div
         x-init="panel = $el"
@@ -17,8 +18,8 @@
         x-on:keydown.arrow-up.prevent="step(-1)"
         x-on:keydown.home.prevent="items()[0]?.focus()"
         x-on:keydown.end.prevent="items().at(-1)?.focus()"
-        x-on:focusout="$event.relatedTarget && ! $el.contains($event.relatedTarget) && ! $event.relatedTarget.closest('[data-column-menu-trigger]') && close(false)"
-        x-on:click.outside="$event.target.closest('thead th[data-column-pinned]') || close(false)"
+        x-on:focusout="focusLeft($event)"
+        x-on:click.outside="$event.target.closest('.column-resize-handle-bar') || ! $event.target.closest('thead th[x-data^=resizableColumn]') ? close(false) : null"
         class="fi-dropdown-panel fi-ta-column-menu"
     >
         <div class="fi-dropdown-list" x-show="movable">
@@ -28,7 +29,7 @@
                 x-bind:disabled="! canMoveLeft"
                 x-bind:aria-disabled="(! canMoveLeft).toString()"
                 x-bind:class="{ 'fi-disabled': ! canMoveLeft }"
-                x-on:click="choose(() => $wire.moveTableColumn(column, before.left), column)"
+                x-on:click="refresh() && canMoveLeft && choose(() => $wire.moveTableColumn(column, before.left), column)"
             >
                 {{ __('filament/panel.tables.column_menu.move_left') }}
             </x-filament::dropdown.list.item>
@@ -38,7 +39,7 @@
                 x-bind:disabled="! canMoveRight"
                 x-bind:aria-disabled="(! canMoveRight).toString()"
                 x-bind:class="{ 'fi-disabled': ! canMoveRight }"
-                x-on:click="choose(() => $wire.moveTableColumn(column, before.right), column)"
+                x-on:click="refresh() && canMoveRight && choose(() => $wire.moveTableColumn(column, before.right), column)"
             >
                 {{ __('filament/panel.tables.column_menu.move_right') }}
             </x-filament::dropdown.list.item>
@@ -73,7 +74,7 @@
                 icon="lucide-eye-off"
                 data-column-menu-item="hide"
                 x-show="hideable"
-                x-on:click="choose(() => $wire.hideTableColumn(column), neighbour)"
+                x-on:click="refresh() && choose(() => $wire.hideTableColumn(column), neighbour)"
             >
                 {{ __('filament/panel.tables.column_menu.hide') }}
             </x-filament::dropdown.list.item>
