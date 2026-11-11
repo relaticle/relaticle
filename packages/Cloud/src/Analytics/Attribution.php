@@ -70,6 +70,9 @@ final readonly class Attribution
             $request->is('blog', 'blog/*') => 'blog',
             $request->is('compare/*', 'alternatives/*') => 'comparison',
             $request->is('ai', 'ai-native-crm', 'crm-for-*') => 'assistant',
+            $request->is('self-hosted') => 'self-hosted',
+            $request->is('security') => 'security',
+            $request->is('email-and-calendar') => 'email-and-calendar',
             $request->routeIs('login', 'filament.app.auth.login') => 'login',
             default => 'other',
         };
