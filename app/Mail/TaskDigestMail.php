@@ -106,6 +106,7 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
                 ),
                 'settingsUrl' => NotificationPreferences::getUrl(panel: 'app', tenant: $this->workspace),
                 'unsubscribeUrl' => $this->unsubscribeUrl(),
+                'workspaceName' => $this->workspaceName(),
             ],
         );
     }
@@ -116,7 +117,7 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
         $due = $this->digest->upcomingCount();
         $overdueText = '<strong>'.e(trans_choice('mail.task_digest.summary_overdue', $overdue)).'</strong>';
         $dueText = '<strong>'.e(trans_choice('mail.task_digest.summary_due', $due)).'</strong>';
-        $workspace = e($this->workspace->name);
+        $workspace = e($this->workspaceName());
 
         if ($overdue > 0 && $due > 0) {
             return new HtmlString(__('mail.task_digest.summary_both', ['overdue' => $overdueText, 'due' => $dueText, 'workspace' => $workspace]));
@@ -128,7 +129,7 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
     private function preheader(): string
     {
         $titles = array_map(
-            fn (DigestTaskItem $item): string => $item->title,
+            fn (DigestTaskItem $item): string => Str::squish($item->title),
             [...$this->digest->overdue, ...$this->digest->upcoming],
         );
 
@@ -148,11 +149,11 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
         $dueIcon = $this->iconUrl('lucide-calendar');
 
         return array_map(fn (DigestTaskItem $item): array => [
-            'title' => $item->title,
+            'title' => Str::squish($item->title),
             'url' => $item->editUrl,
             'due' => $dueLabel($item),
             'dueIcon' => $dueIcon,
-            'priority' => $item->priority === null ? null : ['label' => $item->priority, ...$this->priorityColors($item->priorityColor)],
+            'priority' => $item->priority === null ? null : ['label' => Str::squish($item->priority), ...$this->priorityColors($item->priorityColor)],
             'records' => $this->recordChips($item->records),
         ], $items);
     }
@@ -184,7 +185,7 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
     private function recordChips(array $records): array
     {
         $chips = array_map(fn (DigestRecord $record): array => [
-            'label' => Str::limit($record->name, self::RECORD_NAME_LIMIT),
+            'label' => Str::limit(Str::squish($record->name), self::RECORD_NAME_LIMIT),
             'icon' => $this->iconUrl($record->entity->icon()),
         ], array_slice($records, 0, self::RECORDS_SHOWN));
         $hidden = count($records) - self::RECORDS_SHOWN;
@@ -194,6 +195,12 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
         }
 
         return $chips;
+    }
+
+    // The view is Markdown: a blank line in a user-supplied name ends the HTML block and its text renders as Markdown.
+    private function workspaceName(): string
+    {
+        return Str::squish($this->workspace->name);
     }
 
     private function iconUrl(string $lucideIcon): string

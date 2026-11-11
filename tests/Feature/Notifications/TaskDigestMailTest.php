@@ -122,6 +122,25 @@ it('renders a workspace name as text, never as markdown or html', function (): v
         ->and($html)->toContain('[Verify your account](https://phish.example) *now* &lt;a href="https://phish.test"&gt;here&lt;/a&gt;');
 });
 
+it('keeps a blank line in a name, title or label from breaking out into markdown', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = digestWorkspace($user, "Acme\n\n[Verify](https://phish.example)");
+
+    $digest = new TaskDigest([new DigestTaskItem(
+        "Send proposal\n\n[Click](https://phish.example)",
+        now()->subDay(),
+        'https://app.test/tasks?a',
+        [new DigestRecord(CrmEntity::Company, "Northwind\n\n[Open](https://phish.example)")],
+        "High\n\n[Fix](https://phish.example)",
+        '#dc2626',
+    )], []);
+
+    $html = (new TaskDigestMail($user, $workspace, $digest))->render();
+
+    expect($html)->not->toContain('href="https://phish.example"')
+        ->and($html)->toContain('Send proposal [Click](https://phish.example)');
+});
+
 it('never leaks a lang key into the rendered digest', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
 
