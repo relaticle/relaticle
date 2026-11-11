@@ -323,7 +323,7 @@
 
         const wrapper = document.createElement('span')
         wrapper.className = 'fi-ta-resizable-label'
-        wrapper.append(...Array.from(th.childNodes).filter((node) => !node.matches?.('.column-resize-handle-bar, .fi-ta-column-handle')))
+        wrapper.append(...Array.from(th.childNodes).filter((node) => !node.matches?.('.column-resize-handle-bar')))
         th.insertBefore(wrapper, th.firstChild)
     }
 
@@ -332,7 +332,7 @@
         if (!th.querySelector('.column-resize-handle-bar')) {
             window.Alpine?.$data?.(th)?.createHandle?.()
         }
-        if (!th.querySelector('.fi-ta-column-handle')) {
+        if (!headerTrigger(th)?.hasAttribute('data-column-menu-trigger')) {
             window.Alpine?.$data?.(th)?.createColumnControls?.()
         }
     }
@@ -356,11 +356,14 @@
         handle?.focus()
     }
 
-    // A morph strips and rebuilds the header handles, so a handle is found again by its column.
-    function columnHandle(table, column) {
-        const th = headersOf(table).find((header) => headerName(header) === column)
+    // The sort control is already focusable, so it carries the menu; a column that cannot sort uses its label.
+    function headerTrigger(th) {
+        return th?.querySelector('.fi-ta-header-cell-sort-btn') ?? th?.querySelector(':scope > .fi-ta-resizable-label') ?? null
+    }
 
-        return th?.querySelector('.fi-ta-column-handle') ?? null
+    // A morph strips and rebuilds the header controls, so a trigger is found again by its column.
+    function columnHandle(table, column) {
+        return headerTrigger(headersOf(table).find((header) => headerName(header) === column))
     }
 
     function headersOf(table) {
@@ -395,7 +398,7 @@
         }
     }
 
-    // A header press only turns into a drag past this distance, so a click still sorts.
+    // A header press only turns into a drag past this distance, so a click still opens the menu.
     const DRAG_THRESHOLD = 4
     // Within this distance of the scroll wrapper's edge, a drag scrolls the table sideways.
     const AUTO_SCROLL_EDGE = 48
@@ -426,7 +429,7 @@
         copy.className = `${cell.className} fi-ta-column-drag-ghost-cell`
         Object.assign(copy.style, { top: `${top}px`, height: `${cell.offsetHeight}px`, padding: getComputedStyle(cell).padding })
         // Only what the cell shows: a stacked table's card label is hidden by rules the copy, outside the table, would lose.
-        copy.append(...[...cell.children].filter((child) => !child.matches('.fi-ta-column-handle, .column-resize-handle-bar') && getComputedStyle(child).display !== 'none').map((child) => child.cloneNode(true)))
+        copy.append(...[...cell.children].filter((child) => !child.matches('.column-resize-handle-bar') && getComputedStyle(child).display !== 'none').map((child) => child.cloneNode(true)))
 
         return copy
     }
@@ -486,12 +489,12 @@
     // A press on a movable header drags it, except on its controls. Touch keeps swiping the table.
     function startHeaderDrag(event, th, wire) {
         if (event.button !== 0 || event.pointerType === 'touch' || !isMovable(th)) return
-        if (event.target.closest('.fi-ta-column-handle, .column-resize-handle-bar')) return
+        if (event.target.closest('.column-resize-handle-bar')) return
 
         startColumnDrag(event, th, wire)
     }
 
-    // The press that ends a drag still clicks what it lands on, and a header click would sort.
+    // The press that ends a drag still clicks what it lands on, and a header click would open the menu.
     function swallowNextClick() {
         const swallow = (clickEvent) => {
             clickEvent.preventDefault()
@@ -653,7 +656,7 @@
             before: { left: null, right: null },
             neighbour: null,
             top: 0,
-            right: 0,
+            left: 0,
 
             open(detail) {
                 if (this.column === detail.column) {
@@ -665,16 +668,16 @@
                 pendingColumnFocus = null
                 this.close(false)
 
-                // Placed by its right edge in the same update that shows it, so it never appears elsewhere first.
+                // Placed by its start edge in the same update that shows it, so it never appears elsewhere first.
                 // A hidden panel still reports its CSS width, which keeps it on screen beside a column at the left edge.
-                const rect = detail.trigger.getBoundingClientRect()
+                const rect = detail.anchor.getBoundingClientRect()
                 const width = parseFloat(getComputedStyle(this.panel).width) || 0
                 // The viewport width without a classic scrollbar, which `fixed` positioning also excludes.
                 const viewportWidth = document.documentElement.clientWidth
                 // Kept inside the table's own left edge, so the sidebar beside the table never covers it.
                 const minLeft = Math.max(8, (this.$el.closest('.fi-ta')?.getBoundingClientRect().left ?? 0) + 8)
-                const right = Math.min(viewportWidth - rect.right, viewportWidth - width - minLeft)
-                Object.assign(this, detail, { top: rect.bottom + 4, right: Math.max(8, right) })
+                const left = Math.max(minLeft, Math.min(rect.left, viewportWidth - width - 8))
+                Object.assign(this, detail, { top: rect.bottom + 4, left })
                 this.trigger.setAttribute('aria-expanded', 'true')
 
                 // Alpine reveals the menu sections a frame after the update, so the height is read then.
@@ -790,37 +793,57 @@
                 if (!this.column.reorderListenerBound) {
                     this.column.reorderListenerBound = true
                     this.column.addEventListener('pointerdown', (e) => startHeaderDrag(e, this.column, this.$wire))
+                    // Captured, so Filament's own `wire:click` on the sort control never receives the click.
+                    this.column.addEventListener('click', (e) => {
+                        if (e.target.closest('.column-resize-handle-bar')) return
+
+                        e.preventDefault()
+                        e.stopPropagation()
+                        this.openMenu(headerTrigger(this.column))
+                    }, true)
                 }
             },
 
             createColumnControls() {
-                this.column.querySelector(':scope > .fi-ta-column-handle')?.remove()
+                const trigger = headerTrigger(this.column)
 
-                const handle = document.createElement('button')
-                handle.type = 'button'
-                handle.className = 'fi-ta-column-handle'
+                if (!trigger) return
+
                 const label = this.column.querySelector(':scope > .fi-ta-resizable-label')?.textContent.replace(/\s+/g, ' ').trim()
-                handle.setAttribute('aria-label', window.filamentData.columnOptionsFor.replace(':column', label || columnName))
-                handle.setAttribute('aria-haspopup', 'menu')
-                handle.setAttribute('aria-expanded', 'false')
-                if (isMovable(this.column)) {
-                    handle.addEventListener('keydown', (e) => this.moveByKey(e))
-                }
-                handle.addEventListener('click', (e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    window.dispatchEvent(new CustomEvent('column-menu-open', {
-                        detail: {
-                            column: columnName,
-                            trigger: handle,
-                            hideable: this.column.dataset.columnHideable === '1',
-                            pinned: this.column.dataset.columnPinned === '1',
-                            ...moveTargets(this.column),
-                        },
-                    }))
-                })
+                trigger.setAttribute('data-column-menu-trigger', '')
+                trigger.setAttribute('aria-label', window.filamentData.columnOptionsFor.replace(':column', label || columnName))
+                trigger.setAttribute('aria-haspopup', 'menu')
+                trigger.setAttribute('aria-expanded', 'false')
 
-                this.column.appendChild(handle)
+                if (!trigger.classList.contains('fi-ta-header-cell-sort-btn')) {
+                    trigger.setAttribute('role', 'button')
+                    trigger.tabIndex = 0
+                }
+
+                if (trigger.columnMenuBound) return
+
+                trigger.columnMenuBound = true
+                trigger.addEventListener('keydown', (e) => {
+                    if ((e.key === 'Enter' || e.key === ' ') && trigger.matches('.fi-ta-resizable-label')) {
+                        e.preventDefault()
+                        this.openMenu(trigger)
+                    } else if (isMovable(this.column)) {
+                        this.moveByKey(e)
+                    }
+                })
+            },
+
+            openMenu(trigger) {
+                window.dispatchEvent(new CustomEvent('column-menu-open', {
+                    detail: {
+                        column: columnName,
+                        trigger,
+                        anchor: this.column,
+                        hideable: this.column.dataset.columnHideable === '1',
+                        pinned: this.column.dataset.columnPinned === '1',
+                        ...moveTargets(this.column),
+                    },
+                }))
             },
 
             moveByKey(event) {

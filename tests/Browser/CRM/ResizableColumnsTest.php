@@ -120,10 +120,10 @@ function fittedColumnShowsEverything(string $column): string
                 range.selectNodeContents(root);
                 return Math.max(...[...range.getClientRects()].map((box) => box.right));
             };
-            const handle = th.querySelector('.fi-ta-column-handle').getBoundingClientRect();
+            const cellRight = th.getBoundingClientRect().right;
             const cells = [...document.querySelectorAll(`td.fi-ta-cell-${CSS.escape(th.dataset.resizableColumnId)}`)];
             return [
-                rightEdge(th.querySelector('.fi-ta-header-cell-sort-btn')) <= handle.left,
+                rightEdge(th.querySelector('.fi-ta-header-cell-sort-btn')) <= cellRight,
                 cells.every((td) => rightEdge(td) <= td.getBoundingClientRect().right),
             ];
         })()
@@ -152,24 +152,20 @@ function narrowestHeaderState(string $column): string
     return sprintf(<<<'JS'
         (() => {
             const th = document.querySelector(`%s`);
-            const menuLeft = th.querySelector('.fi-ta-column-handle').getBoundingClientRect().left;
-            const chevron = th.querySelector('.fi-ta-header-cell-sort-btn > svg')?.getBoundingClientRect();
+            const cellRight = th.getBoundingClientRect().right;
             const text = th.querySelector('.fi-ta-header-cell-field > .truncate');
             const textBox = text.getBoundingClientRect();
             return {
                 width: Math.round(th.getBoundingClientRect().width),
                 textVisible: textBox.width >= 16,
                 textEllipsized: text.scrollWidth > text.clientWidth,
-                textClearOfMenu: textBox.right <= menuLeft,
-                chevronAfterText: chevron ? chevron.width > 0 && chevron.left >= textBox.right : true,
-                chevronClearOfMenu: chevron ? chevron.right <= menuLeft : true,
-                chevronGap: chevron ? Math.round(menuLeft - chevron.right) : null,
+                textInsideHeader: textBox.right <= cellRight,
             };
         })()
     JS, headerSelector($column));
 }
 
-it('stops narrowing where the name, the sort chevron and the options button still fit', function (): void {
+it('stops narrowing where the name still fits', function (): void {
     $page = loginViaBrowser($this->user)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
@@ -185,18 +181,14 @@ it('stops narrowing where the name, the sort chevron and the options button stil
         expect($states[$column])->toMatchArray([
             'width' => ResizableColumns::MIN_WIDTH,
             'textVisible' => true,
-            'textEllipsized' => true,
-            'textClearOfMenu' => true,
-            'chevronAfterText' => true,
-            'chevronClearOfMenu' => true,
+            'textInsideHeader' => true,
         ]);
     }
 
-    expect($states['name']['chevronGap'])->toBe($states['created_at']['chevronGap']);
     $page->assertNoJavaScriptErrors();
 });
 
-it('fits a column so its header controls and its widest cell stay in view', function (): void {
+it('fits a column so its header name and its widest cell stay in view', function (): void {
     Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Beekeepers International Holdings']);
 
     $page = loginViaBrowser($this->user)
@@ -232,7 +224,7 @@ it('keeps resizing after navigating to another table and after sorting', functio
     $page->script(dragColumnEdge('name', 120));
     $page->wait(1);
 
-    $page->script(sprintf('document.querySelector(`%s .fi-ta-header-cell-sort-btn`).click()', headerSelector('name')));
+    $page->script('Livewire.all().find((component) => /List(Companies|People)/.test(component.name)).$wire.setFilterBarSort("name", "asc")');
 
     $page->wait(1)
         ->assertScript($savedWidth, (string) ($before + 120))
@@ -286,7 +278,7 @@ it('keeps a width when the table is sorted straight after the drag', function ()
     $before = $page->script(headerWidth('created_at'));
 
     $page->script(dragColumnEdge('created_at', 120));
-    $page->script(sprintf('document.querySelector(`%s .fi-ta-header-cell-sort-btn`).click()', headerSelector('name')));
+    $page->script('Livewire.all().find((component) => /List(Companies|People)/.test(component.name)).$wire.setFilterBarSort("name", "asc")');
 
     $page->wait(1.5)
         ->assertScript(headerWidth('created_at'), $before + 120)

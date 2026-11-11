@@ -63,7 +63,8 @@ allowed to see deleted records.
 ## Sort and group a list
 
 Click **Sort** to order the list by a column, flip the direction, or clear
-it. Clicking a column header does the same. On Tasks, **Group** groups the
+it. Once a column is set, the button reads **Sorted by** and the column
+name. On Tasks, **Group** groups the
 list by status or priority.
 
 Filters, sort, and grouping save with the view. When you change them,

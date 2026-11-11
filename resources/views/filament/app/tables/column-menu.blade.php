@@ -11,14 +11,14 @@
         aria-label="{{ __('filament/panel.tables.column_menu.options') }}"
         x-cloak
         x-bind:class="{ 'hidden': column === null }"
-        x-bind:style="{ top: `${top}px`, right: `${right}px` }"
+        x-bind:style="{ top: `${top}px`, left: `${left}px` }"
         x-on:keydown.escape.prevent.stop="close(true)"
         x-on:keydown.arrow-down.prevent="step(1)"
         x-on:keydown.arrow-up.prevent="step(-1)"
         x-on:keydown.home.prevent="items()[0]?.focus()"
         x-on:keydown.end.prevent="items().at(-1)?.focus()"
-        x-on:focusout="$event.relatedTarget && ! $el.contains($event.relatedTarget) && ! $event.relatedTarget.closest('.fi-ta-column-handle') && close(false)"
-        x-on:click.outside="$event.target.closest('.fi-ta-column-handle') || close(false)"
+        x-on:focusout="$event.relatedTarget && ! $el.contains($event.relatedTarget) && ! $event.relatedTarget.closest('[data-column-menu-trigger]') && close(false)"
+        x-on:click.outside="$event.target.closest('thead th[data-column-pinned]') || close(false)"
         class="fi-dropdown-panel fi-ta-column-menu"
     >
         <div class="fi-dropdown-list" x-show="movable">

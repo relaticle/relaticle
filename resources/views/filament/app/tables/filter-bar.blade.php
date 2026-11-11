@@ -26,7 +26,8 @@
                 <x-filament::icon icon="lucide-arrow-up-down" x-show="! sort" />
                 <x-filament::icon icon="lucide-arrow-up" x-show="sort?.direction === 'asc'" />
                 <x-filament::icon icon="lucide-arrow-down" x-show="sort?.direction === 'desc'" />
-                <span class="max-sm:hidden" x-text="sort ? sort.label : @js(__('filament/panel.tables.filters.sort'))"></span>
+                <template x-if="! sort"><span class="max-sm:hidden">{{ __('filament/panel.tables.filters.sort') }}</span></template>
+                <template x-if="sort"><span class="fi-filter-sorted inline-flex min-w-0 gap-1 max-sm:hidden" data-filter-sort-label><span class="fi-filter-muted">{{ __('filament/panel.tables.filters.sorted_by') }}</span> <span class="fi-filter-sorted-column" x-text="sort.label"></span></span></template>
             </button>
 
             <template x-if="isOpen('sort', 'main')">

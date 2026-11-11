@@ -68,6 +68,14 @@
     & svg {
         @apply size-4 shrink-0;
     }
+
+    & .fi-filter-muted {
+        @apply font-normal text-gray-500 dark:text-gray-400;
+    }
+
+    & .fi-filter-sorted-column {
+        @apply truncate text-gray-700 dark:text-gray-200;
+    }
 }
 
 .fi-filter-chip {

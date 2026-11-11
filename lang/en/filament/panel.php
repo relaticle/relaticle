@@ -47,6 +47,7 @@ return [
         ],
         'filters' => [
             'sort' => 'Sort',
+            'sorted_by' => 'Sorted by',
             'sort_by' => 'Sort by',
             'sort_ascending' => 'ascending',
             'sort_descending' => 'descending',

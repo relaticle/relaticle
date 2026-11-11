@@ -908,14 +908,29 @@ it('sets the sort from the control and shows it in the column header, then flips
         ->assertNoJavaScriptErrors();
 });
 
-it('shows a header click in the sort control', function (): void {
+it('reads Sort until a column is set and then Sorted by the column in two tones', function (): void {
     $page = ($this->open)();
 
-    $page->script('document.querySelector(".fi-ta-header-cell-name .fi-ta-header-cell-sort-btn").click()');
-    $page->assertScript(filterBarWaitFor('document.querySelector("[data-filter-sort]").classList.contains("fi-set") && document.querySelector("[data-filter-sort]").textContent.includes("Company")'), true);
+    $page->assertSeeIn('[data-filter-sort]', 'Sort')
+        ->assertDontSeeIn('[data-filter-sort]', 'Sorted by')
+        ->click('[data-filter-sort]')
+        ->click('[data-sort-column][data-column="name"]')
+        ->assertScript(filterBarWaitFor('document.querySelector("[data-filter-sort]").classList.contains("fi-set")'), true)
+        ->assertSeeIn('[data-filter-sort]', 'Sorted by Company')
+        ->assertScript('(() => { const [muted, column] = ["fi-filter-muted", "fi-filter-sorted-column"].map((name) => getComputedStyle(document.querySelector("[data-filter-sort] ." + name)).color); return muted !== column; })()', true)
+        ->assertScript('document.querySelector("[data-filter-sort]").getAttribute("aria-label").includes("Company")', true)
+        ->click('[data-sort-flip]')
+        ->assertScript(filterBarWaitFor('document.querySelector("[data-filter-sort]").getAttribute("aria-label").includes("descending")'), true)
+        ->assertNoJavaScriptErrors();
+});
 
-    $page->script('document.querySelector(".fi-ta-header-cell-name .fi-ta-header-cell-sort-btn").click()');
-    $page->assertScript(filterBarWaitFor('document.querySelector(".fi-ta-header-cell-name").getAttribute("aria-sort") === "descending" && document.querySelector("[data-filter-sort]").getAttribute("aria-label").includes("descending")'), true)
+it('keeps the sort control icon-only on a phone with the column in its name', function (): void {
+    $page = ($this->open)(390, 844);
+
+    $page->script('Livewire.all().find((component) => /List(Companies|People)/.test(component.name)).$wire.setFilterBarSort("name", "asc")');
+    $page->assertScript(filterBarWaitFor('document.querySelector("[data-filter-sort]").classList.contains("fi-set")'), true)
+        ->assertScript('[...document.querySelectorAll("[data-filter-sort] > span")].every((span) => !span.checkVisibility())', true)
+        ->assertScript('document.querySelector("[data-filter-sort]").getAttribute("aria-label").includes("Company")', true)
         ->assertNoJavaScriptErrors();
 });
 
@@ -1049,7 +1064,8 @@ it('shows the marks of the picked members and companies in the chips after a rel
 
     addChip($page, 'company', 'is_any_of')->click(optionButton((string) $acme))->keys(searchInput(), 'Escape');
     addChip($page, 'creator', 'is_any_of')->click(optionButton('@me'))->keys(searchInput(), 'Escape');
-    $page->navigate("/app/{$this->workspace->slug}/people")
+    $page->assertScript(filterBarWaitFor('JSON.parse(document.querySelector("[data-filter-bar]").dataset.state).rules.length === 2'), true)
+        ->navigate("/app/{$this->workspace->slug}/people")
         ->assertPresent('[data-filter-chip][data-field="company"] .fi-filter-value .fi-filter-mark.fi-square svg')
         ->assertPresent('[data-filter-chip][data-field="creator"] .fi-filter-value .fi-filter-mark img[src]')
         ->assertScript('(() => { const chip = document.querySelector("[data-filter-chip][data-field=creator]"); return chip.getBoundingClientRect().height <= 30 && chip.textContent.includes("(me)"); })()', true)

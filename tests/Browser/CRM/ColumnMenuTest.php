@@ -28,7 +28,7 @@ function companiesTable(User $user, string $slug): AwaitableWebpage
         ->assertPathIs("/app/{$slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$slug}/companies")
-        ->assertPresent(columnHeader('created_at').' .fi-ta-column-handle');
+        ->assertPresent(columnHeader('created_at').' [data-column-menu-trigger]');
 }
 
 function columnHeader(string $column): string
@@ -43,7 +43,7 @@ function headerOrder(): string
 
 function openColumnMenu(string $column): string
 {
-    return sprintf('document.querySelector(`%s .fi-ta-column-handle`).click()', columnHeader($column));
+    return sprintf('document.querySelector(`%s [data-column-menu-trigger]`).click()', columnHeader($column));
 }
 
 function columnMenuItem(string $key): string
@@ -102,17 +102,56 @@ it('moves and hides a column from its handle menu and keeps it after a reload', 
         ->assertNoJavaScriptErrors();
 });
 
-it('keeps sorting on the header and gives the title column a handle', function (): void {
+it('opens the column menu from a header click and never sorts', function (): void {
     $page = companiesTable($this->user, $this->workspace->slug)
-        ->assertPresent(columnHeader('name').' .fi-ta-column-handle');
+        ->assertPresent(columnHeader('name').' [data-column-menu-trigger]');
+    $tableSort = 'Livewire.all().find((component) => component.name.includes("ListCompanies")).$wire.tableSort';
 
     $page->script(sprintf('document.querySelector(`%s .fi-ta-header-cell-sort-btn`).click()', columnHeader('created_at')));
-    waitUntil($page, sprintf('document.querySelector(`%s`).getAttribute("aria-sort") === "ascending"', columnHeader('created_at')));
+
+    waitUntil($page, menuItemFocused())
+        ->assertScript(visibleMenuItems(), ['Move left', 'Move right', 'Pin to left', 'Edit column label', 'Hide column'])
+        ->wait(0.5)
+        ->assertScript($tableSort.' === null', true)
+        ->assertScript(sprintf('document.querySelector(`%s`).getAttribute("aria-sort")', columnHeader('created_at')), 'none')
+        ->assertScript(sprintf('document.querySelector(`%s .fi-ta-header-cell-sort-btn > .fi-icon`)?.checkVisibility() ?? false', columnHeader('created_at')), false)
+        ->assertNoJavaScriptErrors();
+});
+
+it('opens the menu of every header from a click on its cell, sortable or not', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
+    $columns = $page->script(headerOrder());
+
+    foreach ($columns as $column) {
+        $page->script(sprintf('document.querySelector(`%s`).click()', columnHeader($column)));
+        waitUntil($page, menuItemFocused());
+        $page->keys(':focus', 'Escape');
+        waitUntil($page, '!document.querySelector(".fi-ta-column-menu") || document.querySelector(".fi-ta-column-menu").classList.contains("hidden")');
+    }
+
+    $page->assertNoJavaScriptErrors();
+});
+
+it('opens the menu from Enter or Space on a focused header and returns focus on Escape', function (string $key): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
+    $trigger = columnHeader('created_at').' [data-column-menu-trigger]';
+
+    $page->assertAttribute($trigger, 'aria-haspopup', 'menu')
+        ->assertAttribute($trigger, 'aria-expanded', 'false')
+        ->keys($trigger, $key);
+    waitUntil($page, menuItemFocused())->assertAttribute($trigger, 'aria-expanded', 'true');
+    $page->keys(':focus', 'Escape');
+    waitUntil($page, sprintf('document.activeElement === document.querySelector(`%s`)', $trigger))
+        ->assertScript('Livewire.all().find((component) => component.name.includes("ListCompanies")).$wire.tableSort === null', true)
+        ->assertNoJavaScriptErrors();
+})->with(['Enter', 'Space']);
+
+it('places the column menu below its header cell on the start edge', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
 
     $page->script(openColumnMenu('created_at'));
     waitUntil($page, menuItemFocused())
-        ->assertScript(visibleMenuItems(), ['Move left', 'Move right', 'Pin to left', 'Edit column label', 'Hide column'])
-        ->assertScript(sprintf('document.querySelector(`%s`).getAttribute("aria-sort")', columnHeader('created_at')), 'ascending')
+        ->assertScript(sprintf('(() => { const th = document.querySelector(`%s`).getBoundingClientRect(); const menu = document.querySelector(".fi-ta-column-menu").getBoundingClientRect(); return Math.abs(menu.left - th.left) <= 1 && Math.abs(menu.top - th.bottom - 4) <= 1; })()', columnHeader('created_at')), true)
         ->assertNoJavaScriptErrors();
 });
 
@@ -193,8 +232,8 @@ it('works the handle by keyboard alone and keeps focus on the moved column', fun
     $page = companiesTable($this->user, $this->workspace->slug);
     $index = array_search('creator.name', $page->script(headerOrder()), true);
     $positionIs = fn (int $position): string => headerOrder().'.indexOf("creator.name") === '.$position;
-    $handleFocused = '(document.activeElement.classList.contains("fi-ta-column-handle") && ('.focusedColumn().') === "creator.name")';
-    $handle = columnHeader('creator.name').' .fi-ta-column-handle';
+    $handleFocused = '(document.activeElement.hasAttribute("data-column-menu-trigger") && ('.focusedColumn().') === "creator.name")';
+    $handle = columnHeader('creator.name').' [data-column-menu-trigger]';
 
     $page->keys($handle, 'Enter');
     waitUntil($page, menuItemFocused())->keys(':focus', ['ArrowDown', 'Enter']);
@@ -232,24 +271,48 @@ function pressHeader(string $column, string $on, int $moveBy, string $pointerTyp
     JS, columnHeader($column), $on, json_encode($pointerType), $moveBy);
 }
 
-it('sorts on a header click but not after a drag that comes back to the header', function (): void {
+it('opens the menu on a plain header click but not after a drag that comes back to the header', function (): void {
     $page = companiesTable($this->user, $this->workspace->slug);
-    $sort = sprintf('document.querySelector(`%s`).getAttribute("aria-sort")', columnHeader('created_at'));
 
     expect($page->script(pressHeader('created_at', '.fi-ta-header-cell-sort-btn', 2)))->toBeFalse();
-    waitUntil($page, $sort.' === "ascending"');
+    waitUntil($page, menuItemFocused());
+    $page->keys(':focus', 'Escape');
+    waitUntil($page, 'document.querySelector(".fi-ta-column-menu").classList.contains("hidden")');
 
     expect($page->script(pressHeader('created_at', '.fi-ta-header-cell-sort-btn', 40)))->toBeTrue();
     $page->wait(0.5)
-        ->assertScript($sort, 'ascending')
+        ->assertScript('document.querySelector(".fi-ta-column-menu").classList.contains("hidden")', true)
         ->assertNoJavaScriptErrors();
 });
 
-it('starts no drag from the options button or from a touch', function (): void {
+it('reorders a column dragged from its header and leaves the sort alone', function (): void {
     $page = companiesTable($this->user, $this->workspace->slug);
     $order = $page->script(headerOrder());
 
-    expect($page->script(pressHeader('created_at', '.fi-ta-column-handle', 40)))->toBeFalse()
+    $page->script(sprintf(<<<'JS'
+        (() => {
+            const th = document.querySelector(`%s`);
+            const next = document.querySelector(`%s`).getBoundingClientRect();
+            const box = th.querySelector('.fi-ta-header-cell-sort-btn').getBoundingClientRect();
+            const y = box.top + box.height / 2;
+            const pointer = (type, clientX, on = document) => on.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, pointerId: 1, pointerType: 'mouse', clientX, clientY: y }));
+            pointer('pointerdown', box.left + 4, th.querySelector('.fi-ta-header-cell-sort-btn'));
+            pointer('pointermove', box.left + 30);
+            pointer('pointermove', next.right + 20);
+            pointer('pointerup', next.right + 20);
+        })();
+    JS, columnHeader('creator.name'), columnHeader($order[array_search('creator.name', $order, true) + 1] ?? 'creator.name')));
+
+    waitUntil($page, headerOrder().'.indexOf("creator.name") !== '.array_search('creator.name', $order, true))
+        ->assertScript('Livewire.all().find((component) => component.name.includes("ListCompanies")).$wire.tableSort === null', true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('starts no drag from the resize grip or from a touch', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
+    $order = $page->script(headerOrder());
+
+    expect($page->script(pressHeader('created_at', '.column-resize-handle-bar', 40)))->toBeFalse()
         ->and($page->script(pressHeader('created_at', '.fi-ta-resizable-label', 40, 'touch')))->toBeFalse();
 
     $page->wait(0.3)
@@ -317,7 +380,7 @@ it('reorders a column by dragging it in view settings and keeps the order after 
         ->assertScript(settingsOrder(), $page->script(headerOrder()))
         ->wait(1)
         ->refresh()
-        ->assertPresent(columnHeader('created_at').' .fi-ta-column-handle')
+        ->assertPresent(columnHeader('created_at').' [data-column-menu-trigger]')
         ->assertScript(headerOrder().'.indexOf('.json_encode($moved).') < '.headerOrder().'.indexOf('.json_encode($target).')', true)
         ->assertNoJavaScriptErrors();
 });
@@ -491,7 +554,7 @@ it('drops a dragged header before another and keeps the order after a reload', f
         ->assertScript(dragLeftovers(), false)
         ->wait(1)
         ->refresh()
-        ->assertPresent(columnHeader('created_at').' .fi-ta-column-handle')
+        ->assertPresent(columnHeader('created_at').' [data-column-menu-trigger]')
         ->assertScript(headerOrder().'.indexOf('.json_encode($last).')', 1)
         ->assertNoJavaScriptErrors();
 });
@@ -634,7 +697,7 @@ it('focuses the title column after hiding the last column beside it by keyboard'
         $page->click(columnMenuItem('hide'))->assertMissing(columnHeader($column));
     }
 
-    $page->keys(columnHeader('created_at').' .fi-ta-column-handle', 'Enter');
+    $page->keys(columnHeader('created_at').' [data-column-menu-trigger]', 'Enter');
     waitUntil($page, menuItemFocused())->keys(':focus', ['ArrowUp', 'Enter']);
     waitUntil($page, headerOrder().'.join() === "name"');
     waitUntil($page, '('.focusedColumn().') === "name"')
@@ -664,7 +727,7 @@ it('pins a column from its menu and keeps the pin after a reload', function (): 
         ->assertScript(headerOrder().'.slice(0, 2)', ['created_at', 'name'])
         ->assertScript(sprintf('document.querySelector(`%s`).dataset.columnPinned', columnHeader('name')), '0')
         ->refresh()
-        ->assertPresent(columnHeader('created_at').' .fi-ta-column-handle')
+        ->assertPresent(columnHeader('created_at').' [data-column-menu-trigger]')
         ->assertScript(headerOrder().'.slice(0, 2)', ['created_at', 'name'])
         ->assertScript(sprintf('document.querySelector(`%s`).dataset.columnPinned', columnHeader('created_at')), '1');
 
@@ -848,23 +911,17 @@ it('keeps the column menu on screen beside a column at the left edge', function 
         ->assertNoJavaScriptErrors();
 });
 
-it('shows only the handle of a pinned column at the minimum width', function (): void {
+it('opens the menu of a pinned column at the minimum width from a click on its header', function (): void {
     TablePreference::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
         'entity' => CrmEntity::Company,
         'state' => new TableStateData(widths: ['created_at' => 40]),
     ]);
     $page = pinFromMenu(companiesTable($this->user, $this->workspace->slug), 'created_at');
+    $page->keys(':focus', 'Escape');
 
-    $page->assertScript(sprintf(<<<'JS'
-        (() => {
-            const handle = document.querySelector(`%s .fi-ta-column-handle`);
-            const box = handle.getBoundingClientRect();
-            handle.style.visibility = 'hidden';
-            const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
-            handle.style.visibility = '';
-            return !hit?.closest('.fi-ta-resizable-label');
-        })();
-    JS, columnHeader('created_at')), true)
+    $page->script(sprintf('document.querySelector(`%s`).click()', columnHeader('created_at')));
+
+    waitUntil($page, menuItemFocused())
         ->assertNoJavaScriptErrors();
 });
 
@@ -886,7 +943,7 @@ it('keeps the handles of scrolled headers under the pinned headers', function ()
         (() => {
             const wrapper = document.querySelector('.fi-ta-content-ctn');
             const pinned = document.querySelector(`%s`).getBoundingClientRect();
-            const handle = document.querySelector(`%s .fi-ta-column-handle`);
+            const handle = document.querySelector(`%s [data-column-menu-trigger]`);
             wrapper.scrollLeft += handle.getBoundingClientRect().left - (pinned.left + pinned.width / 2);
             handle.style.opacity = '1';
             const box = handle.getBoundingClientRect();
@@ -911,7 +968,7 @@ it('renames a column from its handle menu and keeps the name after a reload', fu
     waitUntil($page, '('.$labelOf('created_at').') === "Added on"')
         ->wait(1)
         ->refresh()
-        ->assertPresent(columnHeader('created_at').' .fi-ta-column-handle')
+        ->assertPresent(columnHeader('created_at').' [data-column-menu-trigger]')
         ->assertScript($labelOf('created_at'), 'Added on')
         ->assertNoJavaScriptErrors();
 });
@@ -922,7 +979,7 @@ it('shows the move cursor on a movable header and keeps the pointer on its contr
 
     $page->assertScript($cursor(columnHeader('created_at')), 'move')
         ->assertScript($cursor(columnHeader('created_at').' .fi-ta-header-cell-sort-btn'), 'pointer')
-        ->assertScript($cursor(columnHeader('created_at').' .fi-ta-column-handle'), 'pointer')
+        ->assertScript($cursor(columnHeader('created_at').' [data-column-menu-trigger]'), 'pointer')
         ->assertScript($cursor(columnHeader('name')), 'move')
         ->assertMissing('.fi-ta-column-grip')
         ->assertNoJavaScriptErrors();
@@ -966,10 +1023,10 @@ it('keeps the column menu on screen when its column sits near the left edge', fu
 it('starts every options button collapsed and named after its column, and hides the resize handles from assistive tech', function (): void {
     $page = companiesTable($this->user, $this->workspace->slug);
 
-    $buttons = '[...document.querySelectorAll(`th[x-data^="resizableColumn"] .fi-ta-column-handle`)]';
+    $buttons = '[...document.querySelectorAll(`th[x-data^="resizableColumn"] [data-column-menu-trigger]`)]';
 
     $page->assertScript("{$buttons}.length > 3 && {$buttons}.every((button) => button.getAttribute(\"aria-expanded\") === \"false\")", true)
-        ->assertScript(sprintf('document.querySelector(`%s .fi-ta-column-handle`).getAttribute("aria-label")', columnHeader('name')), 'Company options')
+        ->assertScript(sprintf('document.querySelector(`%s [data-column-menu-trigger]`).getAttribute("aria-label")', columnHeader('name')), 'Company options')
         ->assertScript("new Set({$buttons}.map((button) => button.getAttribute(\"aria-label\"))).size === {$buttons}.length", true)
         ->assertScript('[...document.querySelectorAll(`th[x-data^="resizableColumn"] .column-resize-handle-bar`)].every((handle) => handle.getAttribute("aria-hidden") === "true")', true)
         ->assertNoJavaScriptErrors();
@@ -983,7 +1040,7 @@ function columnMenuPlacement(AwaitableWebpage $page, string $column): array
     return $page->script(sprintf(<<<'JS'
         (() => {
             const panel = document.querySelector('.fi-ta-column-menu').getBoundingClientRect();
-            const trigger = document.querySelector(`%s .fi-ta-column-handle`).getBoundingClientRect();
+            const trigger = document.querySelector(`%s [data-column-menu-trigger]`).getBoundingClientRect();
             return { panelTop: panel.top, panelBottom: panel.bottom, triggerTop: trigger.top, viewport: document.documentElement.clientHeight };
         })()
     JS, columnHeader($column)));
@@ -1010,10 +1067,10 @@ it('keeps the column menu inside a viewport too short for either side of its but
     $page->assertNoJavaScriptErrors();
 });
 
-it('outlines the options button when the keyboard focuses it', function (): void {
+it('outlines the header control when the keyboard focuses it', function (): void {
     $page = companiesTable($this->user, $this->workspace->slug);
 
-    $page->script(sprintf('document.querySelector(`%s .fi-ta-column-handle`).focus()', columnHeader('created_at')));
+    $page->script(sprintf('document.querySelector(`%s [data-column-menu-trigger]`).focus()', columnHeader('created_at')));
 
     $page->assertScript('document.activeElement.matches(":focus-visible") && getComputedStyle(document.activeElement).outlineStyle !== "none" && parseFloat(getComputedStyle(document.activeElement).outlineWidth) >= 2', true)
         ->assertNoJavaScriptErrors();
