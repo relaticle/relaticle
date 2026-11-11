@@ -99,6 +99,26 @@ it('ships an icon file for the due date and every record type a task links to', 
     }
 });
 
+it('shows five cards per column, keeps the full count and links the rest to the task list', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = digestWorkspace($user);
+    $item = fn (string $title): DigestTaskItem => new DigestTaskItem($title, now()->subDay(), "https://app.test/tasks?task={$title}");
+
+    $mail = new TaskDigestMail($user, $workspace, new TaskDigest(
+        overdue: array_map($item, ['o1', 'o2', 'o3', 'o4', 'o5', 'o6', 'o7']),
+        upcoming: array_map($item, ['t1', 't2']),
+    ));
+    $tasksUrl = TaskResource::getUrl('index', ['tableFilters' => ['assigned_to_me' => ['isActive' => true]], 'tenant' => $workspace], panel: 'app');
+
+    expect(substr_count($mail->render(), 'class="task-card"'))->toBe(7);
+    $mail->assertDontSeeInHtml('task=o6');
+    $mail->assertSeeInHtml('View 2 more tasks');
+    $mail->assertDontSeeInHtml('View 0 more');
+    $mail->assertSeeInText('Overdue (7)');
+    $mail->assertSeeInText('View 2 more tasks: '.$tasksUrl);
+    $mail->assertSeeInText('Due today (2)');
+});
+
 it('caps the preheader at three task titles', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
 

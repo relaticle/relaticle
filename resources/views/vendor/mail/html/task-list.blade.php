@@ -1,7 +1,7 @@
-@props(['title', 'tasks' => [], 'tone' => 'today'])
+@props(['title', 'total', 'moreUrl', 'tasks' => [], 'tone' => 'today'])
 <table class="task-column" width="100%" cellpadding="0" cellspacing="0" role="presentation">
 <tr>
-<td class="task-column-header"><span class="task-column-dot task-column-dot-{{ $tone }}"></span><span class="task-column-title">{{ $title }}</span><span class="task-column-count">{{ count($tasks) }}</span></td>
+<td class="task-column-header"><span class="task-column-dot task-column-dot-{{ $tone }}"></span><span class="task-column-title">{{ $title }}</span><span class="task-column-count">{{ $total }}</span></td>
 </tr>
 <tr>
 <td class="task-column-tray">
@@ -32,6 +32,11 @@
 </td>
 </tr>
 @endforeach
+@if($total > count($tasks))
+<tr>
+<td class="task-more"><a href="{{ $moreUrl }}" class="task-more-link">{{ trans_choice('mail.task_digest.more_tasks', $total - count($tasks)) }}</a></td>
+</tr>
+@endif
 </table>
 </td>
 </tr>

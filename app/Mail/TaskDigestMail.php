@@ -34,6 +34,9 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
 
     private const int PREHEADER_TITLES = 3;
 
+    // Each card is about 6 KB once the theme is inlined; five per column keeps a digest under Gmail's 102 KB clip.
+    private const int CARDS_PER_COLUMN = 5;
+
     private const int RECORDS_SHOWN = 1;
 
     private const int RECORD_NAME_LIMIT = 24;
@@ -155,7 +158,7 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
             'dueIcon' => $dueIcon,
             'priority' => $item->priority === null ? null : ['label' => Str::squish($item->priority), ...$this->priorityColors($item->priorityColor)],
             'records' => $this->recordChips($item->records),
-        ], $items);
+        ], array_slice($items, 0, self::CARDS_PER_COLUMN));
     }
 
     /**

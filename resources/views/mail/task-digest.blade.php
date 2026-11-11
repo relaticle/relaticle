@@ -11,9 +11,9 @@
 </x-mail::button>
 
 @if($overdue !== [])
-<x-mail::task-list :title="__('mail.task_digest.overdue')" :tasks="$overdue" tone="overdue" />
+<x-mail::task-list :title="__('mail.task_digest.overdue')" :tasks="$overdue" :total="$digest->overdueCount()" :more-url="$tasksUrl" tone="overdue" />
 @endif
 @if($upcoming !== [])
-<x-mail::task-list :title="__('mail.task_digest.due_today')" :tasks="$upcoming" />
+<x-mail::task-list :title="__('mail.task_digest.due_today')" :tasks="$upcoming" :total="$digest->upcomingCount()" :more-url="$tasksUrl" />
 @endif
 </x-mail::message>

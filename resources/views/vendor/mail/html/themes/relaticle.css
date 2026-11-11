@@ -454,6 +454,17 @@ img {
     text-decoration: none;
 }
 
+.task-more {
+    padding: 8px 4px 4px;
+}
+
+.task-more-link {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 20px;
+    text-decoration: none;
+}
+
 .task-chip {
     background-color: #fafafa;
     border: 1px solid #e9e9eb;
