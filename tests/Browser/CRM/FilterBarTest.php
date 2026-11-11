@@ -922,6 +922,21 @@ it('adds, searches, reorders and keeps several sorts', function (): void {
         ->assertNoJavaScriptErrors();
 });
 
+it('focuses the field search every time the filter picker opens', function (): void {
+    $searchFocused = 'document.activeElement.matches("[data-pop][data-open=true] input[data-filter-find]")';
+    $page = ($this->open)()
+        ->click('[data-filter-add]')
+        ->assertScript(filterBarWaitFor($searchFocused), true)
+        ->click('[data-pop][data-open=true] [data-field="name"]')
+        ->assertScript(filterBarWaitFor('document.querySelectorAll("[data-filter-chip]").length === 1'), true)
+        ->click('[data-filter-add]')
+        ->assertScript(filterBarWaitFor($searchFocused), true)
+        ->keys('[data-pop][data-open=true] input[data-filter-find]', 'Escape')
+        ->click('[data-filter-add]')
+        ->assertScript(filterBarWaitFor($searchFocused), true)
+        ->assertNoJavaScriptErrors();
+});
+
 it('focuses the search every time the sort picker opens from the editor', function (): void {
     $page = ($this->open)()
         ->click('[data-filter-sort]')

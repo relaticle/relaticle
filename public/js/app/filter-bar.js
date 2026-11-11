@@ -276,7 +276,8 @@
                     this.opener = event.currentTarget
                     this.find = ''
                     this.opened()
-                    this.focusPop()
+                    // The popover that was open stays in the page until Alpine renders, and would take the focus.
+                    this.$nextTick(() => this.focusPop())
                 },
 
                 opened() {
@@ -495,7 +496,7 @@
                     this.open = { id: 'sort', part: 'pick' }
                     this.sortTarget = target
                     this.find = ''
-                    this.$nextTick(() => root.querySelector('[data-sort-pop] input[data-filter-find]')?.focus())
+                    this.$nextTick(() => this.focusPop())
                 },
 
                 showSorts(focusColumn = null, control = 'field') {
