@@ -128,7 +128,7 @@
                             data-view-settings-add-item
                             :data-attribute="$column['name']"
                             :data-text="$column['text']"
-                            x-show="matches($el.dataset.text)"
+                            x-show="isCandidate($el)"
                             x-on:click="show($el.dataset.attribute)"
                         >
                             <span class="fi-view-settings-label">{{ $column['label'] }}</span>

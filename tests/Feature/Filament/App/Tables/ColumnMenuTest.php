@@ -748,10 +748,31 @@ it('offers every hidden toggleable attribute in the add panel and never a main c
 it('keeps the reset in the list footer and out of the add panel', function (): void {
     Filament::bootCurrentPanel();
     $html = livewire(ListCompanies::class)->html();
+    $panel = new Crawler($html)->filter('[data-view-settings-add-panel]');
 
-    expect(new Crawler($html)->filter('[data-view-settings-add-panel] .fi-view-settings-reset')->count())->toBe(0)
+    expect($panel->count())->toBe(1)
+        ->and($panel->filter('.fi-view-settings-reset')->count())->toBe(0)
         ->and(new Crawler($html)->filter('[data-view-settings] .fi-view-settings-reset')->count())->toBe(1)
-        ->and($html)->not->toContain('Every column is shown');
+        ->and(new Crawler($html)->filter('[data-view-settings] > .fi-view-settings-view:not([data-view-settings-add-panel]) .fi-view-settings-footer .fi-view-settings-reset')->count())->toBe(1);
+});
+
+it('never offers a main column in the add panel even when its state says hidden', function (): void {
+    Filament::bootCurrentPanel();
+    $component = livewire(ListPeople::class);
+    $table = $component->instance()->getTable();
+    $locked = array_values(array_filter(columnOrder($component), fn (string $column): bool => ! $table->getColumn($column)->isToggleable()));
+
+    expect($locked)->not->toBeEmpty();
+
+    $component->set('tableColumns', array_map(
+        fn (array $item): array => in_array($item['name'], $locked, true) ? [...$item, 'isToggled' => false] : $item,
+        $component->get('tableColumns'),
+    ));
+
+    $items = (new Crawler($component->html()))->filter('[data-view-settings-add-panel] [data-view-settings-add-item]')
+        ->each(fn (Crawler $item): ?string => $item->attr('data-attribute'));
+
+    expect($items)->not->toContain(...$locked);
 });
 
 it('tells the member every attribute is in the view once none is hidden', function (): void {

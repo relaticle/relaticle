@@ -788,6 +788,8 @@
             return {
                 adding: false,
                 query: '',
+                pending: [],
+                revision: 0,
                 menu: null,
                 locked: false,
                 placed: false,
@@ -894,7 +896,14 @@
                 openAdd() {
                     this.closeMenu(false)
                     this.adding = true
-                    this.$nextTick(() => requestAnimationFrame(() => this.searchInput().focus()))
+                    this.$nextTick(() => requestAnimationFrame(() => this.focusAddStart()))
+                },
+
+                focusAddStart() {
+                    // A phone keyboard would cover the list and iOS would zoom, so focus stays on the back arrow.
+                    const compact = window.matchMedia('(width < 40rem), (pointer: coarse)').matches
+
+                    ;(compact ? panel.querySelector('[data-view-settings-back]') : this.searchInput()).focus()
                 },
 
                 closeAdd() {
@@ -915,8 +924,14 @@
                     return text.toLowerCase().includes(this.query.trim().toLowerCase())
                 },
 
+                isCandidate(item) {
+                    this.revision
+
+                    return !this.pending.includes(item.dataset.attribute) && this.matches(item.dataset.text)
+                },
+
                 addItems() {
-                    return [...panel.querySelectorAll('[data-view-settings-add-item]')].filter((item) => item.offsetParent !== null)
+                    return [...panel.querySelectorAll('[data-view-settings-add-item]')].filter((item) => this.isCandidate(item))
                 },
 
                 stepAdd(delta) {
@@ -941,9 +956,18 @@
                 },
 
                 async show(name) {
-                    await this.$wire.toggleTableColumn(name)
+                    if (this.pending.includes(name)) return
 
-                    this.$nextTick(() => this.searchInput().focus())
+                    this.pending.push(name)
+
+                    try {
+                        await this.$wire.toggleTableColumn(name)
+                    } finally {
+                        this.pending = this.pending.filter((pending) => pending !== name)
+                        this.revision++
+                    }
+
+                    this.$nextTick(() => this.focusAddStart())
                 },
             }
         })

@@ -1399,6 +1399,18 @@ function openAddPanel(AwaitableWebpage $page): AwaitableWebpage
     return waitUntil($page, addPanelOpen().' && document.activeElement.matches("[data-view-settings-search]")');
 }
 
+function openAddPanelWithoutFocus(AwaitableWebpage $page): AwaitableWebpage
+{
+    $page->click('[data-view-settings-add]');
+
+    return waitUntil($page, addPanelOpen());
+}
+
+function noMatchNoteVisible(): string
+{
+    return '[...document.querySelectorAll("[data-view-settings-add-panel] .fi-view-settings-note")].some((note) => note.checkVisibility())';
+}
+
 function hideColumns(AwaitableWebpage $page, array $columns): AwaitableWebpage
 {
     foreach ($columns as $column) {
@@ -1422,6 +1434,11 @@ it('opens the add attribute panel in place of the list with a focused search and
         ->assertScript('["accountOwner.name", "created_at"].every((attribute) => '.addItems().'.includes(attribute))', true)
         ->assertScript('[...document.querySelectorAll("[data-view-settings-add-item]")].every((item) => item.querySelector(".fi-view-settings-label svg"))', true)
         ->assertScript('document.querySelector("[data-view-settings-add-item][data-attribute=name]")', null)
+        ->assertScript(noMatchNoteVisible(), false);
+
+    $page->type('[data-view-settings-search]', 'zzzz-no-match');
+
+    waitUntil($page, noMatchNoteVisible())
         ->assertNoJavaScriptErrors();
 });
 
@@ -1549,14 +1566,72 @@ it('reopens view settings on the list', function (): void {
         ->assertNoJavaScriptErrors();
 });
 
-it('keeps the add attribute panel inside the viewport and scrolls its list on a phone', function (int $width): void {
-    $page = companiesTable($this->user, $this->workspace->slug)->resize($width, 700)->wait(0.5);
+it('reopens view settings on the list after closing it from the add panel', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+
+    openAddPanel($page)->type('[data-view-settings-search]', 'abc')->click('.fi-view-settings-trigger');
+    waitUntil($page, 'document.querySelector(".fi-view-settings-panel").checkVisibility() === false');
+
+    $page->click('.fi-view-settings-trigger');
+
+    waitUntil($page, 'document.querySelector(".fi-view-settings-list").checkVisibility()')
+        ->assertScript(addPanelOpen(), false)
+        ->assertScript('document.querySelector("[data-view-settings-search]").value', '')
+        ->assertNoJavaScriptErrors();
+});
+
+it('picks a column once however fast the member presses Enter', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+
+    hideColumns($page, ['accountOwner.name', 'created_at']);
+    openAddPanel($page);
+    $text = $page->script('document.querySelector("[data-view-settings-add-item][data-attribute=\'created_at\']").dataset.text');
+
+    $page->type('[data-view-settings-search]', $text);
+    waitUntil($page, addItems().'.length === 1');
+    $page->script('(async () => { const input = document.querySelector("[data-view-settings-search]"); for (let i = 0; i < 2; i++) { input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })); await new Promise((resolve) => setTimeout(resolve, 15)); } })()');
+
+    waitUntil($page, sprintf('document.querySelector(`%s`) !== null', columnHeader('created_at')));
+    $page->wait(1.5)
+        ->assertPresent(columnHeader('created_at'))
+        ->assertScript(headerOrder().'.filter((column) => column === "created_at").length', 1)
+        ->assertNoJavaScriptErrors();
+});
+
+it('leaves the search unfocused on a phone, at 16px, and after a pick', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug)->resize(390, 700)->wait(0.5);
 
     openViewSettings($page);
     hideColumns($page, ['accountOwner.name', 'created_at']);
-    openAddPanel($page)
+    openAddPanelWithoutFocus($page)->wait(0.5)
+        ->assertScript('document.activeElement.matches("[data-view-settings-search]")', false)
+        ->assertScript('getComputedStyle(document.querySelector("[data-view-settings-search]")).fontSize', '16px');
+
+    $page->click('[data-view-settings-add-item][data-attribute="created_at"]');
+    waitUntil($page, sprintf('document.querySelector(`%s`) !== null', columnHeader('created_at')));
+    $page->wait(0.5)->assertScript('document.activeElement.matches("[data-view-settings-search]")', false)
+        ->assertNoJavaScriptErrors();
+});
+
+it('scrolls the add attribute list on a phone and keeps the search on screen', function (int $width): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
+
+    openViewSettings($page);
+    $columns = array_slice($page->script('[...document.querySelectorAll(".fi-view-settings-row:not([data-column-locked])")].map((row) => row.dataset.column)'), 0, 6);
+    hideColumns($page, $columns);
+    $page->resize($width, 460)->wait(0.5);
+
+    if ($page->script('document.querySelector(".fi-view-settings-panel").checkVisibility()') !== true) {
+        openViewSettings($page);
+    }
+
+    openAddPanelWithoutFocus($page)
         ->assertScript('(() => { const r = document.querySelector("[data-view-settings-add-panel]").getBoundingClientRect(); return r.left >= 0 && r.right <= document.documentElement.clientWidth && r.bottom <= window.innerHeight; })()', true)
-        ->assertScript('document.querySelector("[data-view-settings-search]").getBoundingClientRect().top >= 0', true)
+        ->assertScript('(() => { const list = document.querySelector("[data-view-settings-add-panel] .fi-view-settings-scroll"); return list.scrollHeight > list.clientHeight; })()', true);
+
+    $page->script('(() => { const list = document.querySelector("[data-view-settings-add-panel] .fi-view-settings-scroll"); list.scrollTop = list.scrollHeight; })()');
+
+    $page->assertScript('(() => { const r = document.querySelector("[data-view-settings-search]").getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight; })()', true)
         ->assertScript('document.documentElement.scrollWidth <= document.documentElement.clientWidth', true)
         ->assertNoJavaScriptErrors();
 })->with([390, 360]);

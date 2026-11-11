@@ -232,7 +232,7 @@
 }
 
 .fi-view-settings-search-input {
-    @apply min-w-0 flex-1 border-0 bg-transparent py-1.5 pe-2 ps-1 text-sm text-gray-950 outline-none placeholder:text-gray-400 focus:ring-0 dark:text-white dark:placeholder:text-gray-500;
+    @apply min-w-0 flex-1 border-0 bg-transparent py-1.5 pe-2 ps-1 text-base text-gray-950 sm:text-sm outline-none placeholder:text-gray-400 focus:ring-0 dark:text-white dark:placeholder:text-gray-500;
 }
 
 .fi-view-settings-scroll {
