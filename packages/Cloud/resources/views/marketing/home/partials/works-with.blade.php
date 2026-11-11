@@ -4,7 +4,7 @@
 
     $answers = [
         [
-            __('You approve every change'),
+            __(':name asks before every change', ['name' => $assistantName]),
             __(':name proposes a create, update or delete as a card. Nothing is saved until you approve it.', ['name' => $assistantName]),
             __('How approval works'),
             $documentationActive
