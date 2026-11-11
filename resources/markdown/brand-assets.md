@@ -56,7 +56,7 @@ Platform presets are convenient export sizes, not permanent platform requirement
   - `packages/Cloud/resources/views/components/layout/header.blade.php`
   - `packages/Cloud/resources/views/components/layout/footer.blade.php`
   - `packages/Cloud/resources/views/components/layout/mobile-menu.blade.php`
-- Filament app panel logo uses symbol-only component:
+- Filament app panel logo uses the lockup component:
   - `resources/views/filament/app/logo.blade.php`
 - Email HTML header uses static PNG for client compatibility:
   - `resources/views/vendor/mail/html/header.blade.php`
