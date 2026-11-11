@@ -184,7 +184,7 @@ trait CreatesTableAttribute
 
         return match (true) {
             $key === 'name' && isset($failed['name'][ClosureValidationRule::class]) => ['name', [__('filament/panel.tables.views.attribute_name_taken', ['name' => (string) ($data['name'] ?? '')])]],
-            $key === 'entity_type' && isset($failed['entity_type'][ClosureValidationRule::class]) => ['name', [__('filament/panel.tables.views.attribute_limit_reached', ['max' => (int) config('chat.max_custom_fields_per_entity', 50)])]],
+            $key === 'entity_type' && isset($failed['entity_type'][ClosureValidationRule::class]) => ['name', [__('filament/panel.tables.views.attribute_limit_reached', ['max' => CustomFieldDefinitionValidator::maxFields()])]],
             $segments[0] === 'options' && isset($segments[1]) => [$this->tableAttributeOptionPath($segments, $rowKeys), isset($failed[$key]['Distinct']) ? [__('filament/panel.tables.views.attribute_option_repeated')] : $messages],
             in_array($segments[0], ['name', 'type', 'options', 'lookup_type'], true) => [$key, $messages],
             default => ['name', $messages],

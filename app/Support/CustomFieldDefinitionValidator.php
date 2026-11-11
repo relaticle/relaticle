@@ -286,7 +286,7 @@ final readonly class CustomFieldDefinitionValidator
     private static function withinFieldCap(int|string $tenantId, string $entityType, int $proposedAlongside): Closure
     {
         return function (string $attribute, mixed $value, Closure $fail) use ($tenantId, $entityType, $proposedAlongside): void {
-            $max = (int) config('chat.max_custom_fields_per_entity', 50);
+            $max = self::maxFields();
 
             $existing = DB::table(self::definitionsTable())
                 ->where(self::tenantKey(), $tenantId)
@@ -330,6 +330,11 @@ final readonly class CustomFieldDefinitionValidator
     private static function expectsOptions(string $type): bool
     {
         return in_array($type, CreateCustomField::CHOICE_TYPES, true);
+    }
+
+    public static function maxFields(): int
+    {
+        return (int) config('chat.max_custom_fields_per_entity', 50);
     }
 
     public static function maxOptions(): int

@@ -945,8 +945,7 @@ it('creates nothing when a member forges a submit of the create attribute action
     $count = customFieldCount();
 
     livewire(ListCompanies::class)
-        ->call('mountAction', 'createTableAttribute')
-        ->set('mountedActions.0.data', ['name' => 'Lead score', 'type' => 'text'])
+        ->set('mountedActions', [['name' => 'createTableAttribute', 'arguments' => [], 'context' => [], 'data' => ['name' => 'Lead score', 'type' => 'text']]])
         ->call('callMountedAction');
 
     expect(customFieldCount())->toBe($count);
