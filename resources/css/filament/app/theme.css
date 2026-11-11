@@ -1803,6 +1803,16 @@ html.fi-record-stacked .fi-record-layout {
         .fi-ta-pagination {
             @apply px-4 lg:px-6;
         }
+
+        /* A short list ends mid-page and still needs a line under it. The -1px tucks that line under the
+           footer's own border when the rows fill the page, so the two never stack. */
+        .fi-ta-table tbody tr:last-child td {
+            @apply border-b border-gray-200/60 dark:border-white/5;
+        }
+
+        .fi-ta-content-ctn {
+            @apply -mb-px;
+        }
     }
 }
 
