@@ -1655,9 +1655,11 @@ it('says every attribute is in the view when none is hidden', function (): void 
 
     openAddPanel($page);
 
+    $headers = count($page->script(headerOrder()));
+
     for ($remaining = count($page->script(addItems())); $remaining > 0; $remaining--) {
         $page->keys('[data-view-settings-search]', 'Enter');
-        waitUntil($page, addItems().'.length < '.$remaining);
+        waitUntil($page, headerOrder().'.length === '.++$headers);
     }
 
     $page->assertSee('Every attribute is already in this view')
