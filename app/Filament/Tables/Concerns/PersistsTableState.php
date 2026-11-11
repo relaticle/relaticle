@@ -234,8 +234,7 @@ trait PersistsTableState
         $hasSavedState = $preference !== null && $preference->state->columns !== [];
         $isCleanCopy = $hasSavedState && $active instanceof SavedView && $preference->state->withoutWidths()->hash() === $preference->applied_view_hash;
 
-        // A default starts each session over the last state, which is saved so the rest of the session keeps it.
-        if ($this->opensTableFirstThisSession() && $default instanceof SavedView) {
+        if ($this->isBareArrival() && $default instanceof SavedView) {
             $this->savesTableStateOnOpen = $hasSavedState && (! $isCleanCopy || ! $active->is($default));
 
             if ($hasSavedState && ! $active instanceof SavedView) {
@@ -282,16 +281,6 @@ trait PersistsTableState
         }
 
         return $preference->active_view_id === null ? $preference->state->withoutWidths() : $preference->own_state;
-    }
-
-    private function opensTableFirstThisSession(): bool
-    {
-        $key = 'tables.opened.'.$this->savedViewWorkspace()->getKey().'.'.$this->tableEntity()->value;
-        $isFirst = ! session()->has($key);
-
-        session()->put($key, true);
-
-        return $isFirst;
     }
 
     private function seedFromSavedView(SavedView $view): TableStateData

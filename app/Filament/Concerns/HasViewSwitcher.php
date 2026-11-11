@@ -24,6 +24,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
+use Livewire\Mechanisms\HandleRequests\HandleRequests;
 use LogicException;
 use Relaticle\Flowforge\Contracts\HasBoard;
 
@@ -39,11 +40,7 @@ trait HasViewSwitcher
 
     public function mountHasViewSwitcher(): void
     {
-        if ($this->redirectToFirstView()) {
-            return;
-        }
-
-        static::getResource()::rememberViewMode(static::getResourcePageName());
+        $this->redirectToFirstView();
     }
 
     public function getHeader(): ?View
@@ -109,23 +106,24 @@ trait HasViewSwitcher
         );
     }
 
-    private function redirectToFirstView(): bool
+    protected function isBareArrival(): bool
+    {
+        return ! resolve(HandleRequests::class)->isLivewireRequest() && request()->query->count() === 0;
+    }
+
+    private function redirectToFirstView(): void
     {
         $pages = $this->viewSwitcherPages();
-        $isListArrival = ($pages['list']['active'] ?? false)
-            && property_exists($this, 'requestedSavedViewId')
-            && $this->requestedSavedViewId === null
-            && $this->canSwitchViews();
 
-        $first = $isListArrival ? ($this->viewOrder()[0] ?? 'list') : 'list';
-
-        if ($first === 'list' || ! isset($pages[$first])) {
-            return false;
+        if (! ($pages['list']['active'] ?? false) || ! $this->isBareArrival() || ! $this->canSwitchViews()) {
+            return;
         }
 
-        $this->redirect($pages[$first]['url'], navigate: FilamentView::hasSpaMode($pages[$first]['url']));
+        $first = $this->viewOrder()[0] ?? 'list';
 
-        return true;
+        if ($first !== 'list' && isset($pages[$first])) {
+            $this->redirect($pages[$first]['url'], navigate: FilamentView::hasSpaMode($pages[$first]['url']));
+        }
     }
 
     private function canSwitchViews(): bool

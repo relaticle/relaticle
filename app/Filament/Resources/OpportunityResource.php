@@ -9,7 +9,6 @@ use App\Filament\Actions\PreviewRecordAction;
 use App\Filament\Components\Tables\EmptyListDescription;
 use App\Filament\Components\Tables\FilteredEmptyState;
 use App\Filament\Components\Tables\RecordChipColumn;
-use App\Filament\Concerns\RemembersViewMode;
 use App\Filament\Exports\OpportunityExporter;
 use App\Filament\Resources\OpportunityResource\Forms\OpportunityForm;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
@@ -37,8 +36,6 @@ use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
 
 final class OpportunityResource extends Resource
 {
-    use RemembersViewMode;
-
     protected static ?string $model = Opportunity::class;
 
     protected static ?string $recordTitleAttribute = 'name';

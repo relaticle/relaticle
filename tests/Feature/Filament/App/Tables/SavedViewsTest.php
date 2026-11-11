@@ -21,6 +21,7 @@ use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Tables\Concerns\HasSavedViews;
 use App\Filament\Tables\Concerns\PersistsTableState;
+use App\Models\Note;
 use App\Models\SavedView;
 use App\Models\TablePreference;
 use App\Models\User;
@@ -125,7 +126,6 @@ it('writes nothing to a view whose stored hash predates search leaving the state
         'view_order' => null,
         'applied_view_hash' => hash('xxh128', json_encode(sortedKeys([...$state->toArray(), 'search' => null, 'columnSearches' => []]), JSON_THROW_ON_ERROR)),
     ]);
-    session()->put("tables.opened.{$this->workspace->getKey()}.company", true);
     $updatedAt = $view->updated_at;
     $this->travelTo(now()->addHour());
 
@@ -1120,7 +1120,7 @@ it('opens the built-in list from a link and leaves the applied view behind', fun
     $component = Livewire::withQueryParams(['view' => SavedView::BUILT_IN_LIST_LINK])->test(ListOpportunities::class);
 
     expect($component->get('activeSavedViewId'))->toBeNull()
-        ->and($component->get('requestedSavedViewId'))->toBeNull()
+        ->and($component->get('requestedSavedViewId'))->toBe(SavedView::BUILT_IN_LIST_LINK)
         ->and(preferenceRow()->active_view_id)->toBeNull();
     $component->assertSeeHtml('data-active-view="All opportunities"')->assertNotNotified();
 });
@@ -1132,7 +1132,7 @@ it('writes nothing when a link names the built-in list and no view is applied', 
     $this->travelTo(now()->addHour());
     $component = Livewire::withQueryParams(['view' => SavedView::BUILT_IN_LIST_LINK])->test(ListCompanies::class);
 
-    expect($component->get('requestedSavedViewId'))->toBeNull()
+    expect($component->get('requestedSavedViewId'))->toBe(SavedView::BUILT_IN_LIST_LINK)
         ->and($component->get('tableSort'))->toBe('name:asc')
         ->and(preferenceRow()->updated_at)->toEqual($updatedAt);
     $component->assertNotNotified();
@@ -1265,27 +1265,28 @@ it('reorders from the switcher and ignores a key that is no longer there', funct
 });
 
 it('opens the board from the opportunities list when the board is first and the list when it is not', function (): void {
-    livewire(ListOpportunities::class)->assertRedirect(OpportunityResource::getUrl('board'));
+    $this->get(OpportunityResource::getUrl('index'))->assertRedirect(OpportunityResource::getUrl('board'));
 
     resolve(ReorderViews::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, ['list', 'board']);
 
-    livewire(ListOpportunities::class)->assertNoRedirect();
+    $this->get(OpportunityResource::getUrl('index'))->assertOk();
 });
 
 it('never redirects from the built-in list link, the board itself or a requested view', function (): void {
     $view = viewFor($this->user, ['entity' => CrmEntity::Opportunity, 'name' => 'Open']);
 
-    Livewire::withQueryParams(['view' => SavedView::BUILT_IN_LIST_LINK])->test(ListOpportunities::class)->assertNoRedirect();
-    Livewire::withQueryParams(['view' => $view->getKey()])->test(ListOpportunities::class)->assertNoRedirect()->assertSet('activeSavedViewId', $view->getKey());
-    livewire(OpportunitiesBoard::class)->assertNoRedirect();
+    $this->get(OpportunityResource::getUrl('index').'?view='.SavedView::BUILT_IN_LIST_LINK)->assertOk();
+    $this->get(OpportunityResource::getUrl('index').'?view='.$view->getKey())->assertOk();
+    $this->get(OpportunityResource::getUrl('board'))->assertOk();
 });
 
 it('applies the first view when it is a saved one and does not redirect', function (): void {
     $view = viewFor($this->user, ['entity' => CrmEntity::Opportunity, 'name' => 'Open', 'state' => hotLeads()]);
     resolve(ReorderViews::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, [$view->getKey()]);
 
+    $this->get(OpportunityResource::getUrl('index'))->assertOk();
+
     livewire(ListOpportunities::class)
-        ->assertNoRedirect()
         ->assertSet('activeSavedViewId', $view->getKey())
         ->assertSet('tableSort', 'created_at:desc');
 });
@@ -1294,3 +1295,49 @@ it('names the board Pipeline for opportunities and Board for tasks', function ()
     Livewire::withQueryParams(['view' => 'all'])->test(ListOpportunities::class)->assertSeeHtml('Pipeline')->assertDontSeeHtml('>Board<');
     livewire(ManageTasks::class)->assertSeeHtml('Board')->assertDontSeeHtml('Pipeline');
 });
+
+it('leaves a link that carries any query parameter on the page it names', function (string $resource, CrmEntity $entity, array $order, array $query): void {
+    resolve(ReorderViews::class)->execute($this->user, $this->workspace, $entity, $order);
+
+    $this->get($resource::getUrl('index').'?'.http_build_query($query))->assertOk();
+})->with([
+    'export' => [OpportunityResource::class, CrmEntity::Opportunity, ['board', 'list'], ['action' => 'export']],
+    'filters' => [OpportunityResource::class, CrmEntity::Opportunity, ['board', 'list'], ['filters' => ['conditions' => ['match' => 'all']]]],
+    'task' => [TaskResource::class, CrmEntity::Task, ['board', 'list'], ['task' => '01k0000000000000000000000z']],
+    'assigned to me' => [TaskResource::class, CrmEntity::Task, ['board', 'list'], ['filters' => ['assigned_to_me' => ['isActive' => true]]]],
+]);
+
+it('leaves a note edit link on the list when the cards are first', function (): void {
+    $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
+    resolve(ReorderViews::class)->execute($this->user, $this->workspace, CrmEntity::Note, ['cards', 'list']);
+
+    $this->get(NoteResource::getUrl('list').'?'.http_build_query(['tableAction' => 'edit', 'tableActionRecord' => $note->getKey()]))->assertOk();
+    $this->get(NoteResource::getUrl('list'))->assertRedirect(NoteResource::getUrl('index'));
+});
+
+it('serves the opportunities list for an empty view parameter and redirects a bare visit to the board', function (): void {
+    $this->get(OpportunityResource::getUrl('index').'?view=')->assertOk();
+    $this->get(OpportunityResource::getUrl('index'))->assertRedirect(OpportunityResource::getUrl('board'));
+});
+
+it('applies the first view on every bare visit, not only the first of a session', function (): void {
+    $first = viewFor($this->user, ['name' => 'First', 'state' => hotLeads()]);
+    $other = viewFor($this->user, ['name' => 'Other', 'state' => new TableStateData(sort: 'name:asc')]);
+    resolve(ReorderViews::class)->execute($this->user, $this->workspace, CrmEntity::Company, [$first->getKey()]);
+
+    expect(livewire(ListCompanies::class)->get('activeSavedViewId'))->toBe($first->getKey());
+
+    livewire(ListCompanies::class)->call('applySavedView', $other->getKey());
+
+    expect(livewire(ListCompanies::class)->get('activeSavedViewId'))->toBe($first->getKey())
+        ->and(Livewire::withQueryParams(['view' => $other->getKey()])->test(ListCompanies::class)->get('activeSavedViewId'))->toBe($other->getKey());
+});
+
+it('points the sidebar at the index whatever page the member opened last', function (string $resource, string $board): void {
+    $this->get($resource::getUrl($board))->assertOk();
+
+    expect($resource::getNavigationUrl())->toBe($resource::getUrl('index'));
+})->with([
+    'opportunities' => [OpportunityResource::class, 'board'],
+    'tasks' => [TaskResource::class, 'board'],
+]);

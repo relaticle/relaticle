@@ -74,10 +74,11 @@ grouping, column or column name while a view is open, and the view keeps the
 change. To start another view from what's on screen, open the view switcher
 and pick **Create new view**.
 
-The switcher lists your views in one order, the built-in table among them. Drag
-a row by its handle to move it, or open its menu and choose **Move up** or
-**Move down**. The view at the top is the one a page opens on. Search narrows
-the list by name.
+The switcher lists your views in one order. The built-in table is one of the rows, such as **All companies**. Opportunities add **Pipeline**, Tasks add **Board**, and Notes add **Cards**. Search at the top narrows the list by name.
+
+Drag a row to move it. A short press and hold does the same on a touch screen. Each row's menu also has **Move up** and **Move down**, which work from the keyboard. Search turns dragging and moving off while you type.
+
+The view at the top is the one a page opens on when you visit it with no link attached, such as from the sidebar. A board or the cards view at the top opens that page. A link that names something, such as a filter, a record, or **All companies**, opens what it points to.
 
 ## If you can't find a field in the filter list
 

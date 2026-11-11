@@ -61,6 +61,11 @@
 
                 step < 0 ? target.before(rows[index]) : target.after(rows[index])
                 this.reorder()
+                this.closeRowMenu()
+                this.$nextTick(() => rows[index].querySelector('[data-view-actions]')?.focus())
+            },
+            closeRowMenu() {
+                window.Alpine.$data(this.$refs.rowMenu.querySelector('.fi-dropdown')).close()
             },
             openRowMenu(trigger, event, view) {
                 const panel = document.querySelector('.fi-ta-views-row-menu')
@@ -89,7 +94,7 @@
         </label>
 
         <div class="fi-ta-views-scroll">
-            <div class="fi-ta-views-list" x-ref="list" x-sort="reorder" x-sort:config="{ filter: '.fi-ta-views-row-actions', preventOnFilter: false, delay: 200, delayOnTouchOnly: true, animation: 150 }">
+            <div class="fi-ta-views-list" x-ref="list" x-sort="reorder" x-sort:config="{ draggable: '.fi-ta-views-draggable', filter: '.fi-ta-views-row-actions', preventOnFilter: false, delay: 200, delayOnTouchOnly: true, animation: 150 }">
                 @foreach ($entries as $entry)
                     <div
                         @class(['fi-ta-views-row', 'fi-ta-views-selected' => $entry['active']])
@@ -138,6 +143,7 @@
                                 color="gray"
                                 size="sm"
                                 :label="__('filament/panel.tables.views.actions', ['name' => $entry['label']])"
+                                data-view-actions
                                 x-on:click="openRowMenu($el, $event, {{ Js::from(['key' => $entry['key'], 'isView' => $canApply && $entry['kind'] === 'view', 'canUpdate' => $entry['canUpdate'], 'createdLabel' => $entry['createdLabel']]) }})"
                             />
                         </div>
@@ -148,18 +154,18 @@
             <p class="fi-ta-views-empty" x-show="query && ! hasMatch()" x-cloak>{{ __('filament/panel.tables.views.no_match') }}</p>
         </div>
 
-        <div>
+        <div x-ref="rowMenu">
             <x-filament::dropdown placement="right-start" :offset="16" width="fi-ta-views-row-menu" shift teleport>
                 <x-slot name="trigger">
                     <span hidden></span>
                 </x-slot>
 
                 <x-filament::dropdown.list>
-                    <x-filament::dropdown.list.item icon="lucide-arrow-up" x-bind:disabled="rowView?.isFirst" x-on:click="move(rowView.key, -1)">
+                    <x-filament::dropdown.list.item icon="lucide-arrow-up" x-bind:disabled="!! (rowView?.isFirst || query)" x-on:click.stop="move(rowView.key, -1)">
                         {{ __('filament/panel.tables.views.move_up') }}
                     </x-filament::dropdown.list.item>
 
-                    <x-filament::dropdown.list.item icon="lucide-arrow-down" x-bind:disabled="rowView?.isLast" x-on:click="move(rowView.key, 1)">
+                    <x-filament::dropdown.list.item icon="lucide-arrow-down" x-bind:disabled="!! (rowView?.isLast || query)" x-on:click.stop="move(rowView.key, 1)">
                         {{ __('filament/panel.tables.views.move_down') }}
                     </x-filament::dropdown.list.item>
                 </x-filament::dropdown.list>

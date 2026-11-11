@@ -493,13 +493,3 @@ it('offers a per page choice on note cards only once there is more than one page
 
     expect($component->instance()->getTable()->getPaginationPageOptions())->toBe([24, 48, 96]);
 });
-
-it('points the navigation link at the view the user opened last', function (): void {
-    livewire(ManageNotes::class)->assertOk();
-
-    expect(NoteResource::getNavigationUrl())->toBe(NoteResource::getUrl('list'));
-
-    livewire(NotesCards::class)->assertOk();
-
-    expect(NoteResource::getNavigationUrl())->toBe(NoteResource::getUrl('index'));
-});

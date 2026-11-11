@@ -169,11 +169,11 @@ it('opens each view row menu with that view own options and acts on that view', 
     $page->assertScript($visibleRowMenuItems, ['Move up', 'Move down', 'Rename', 'Duplicate', 'Delete view']);
 
     $page->script('[...document.querySelectorAll(".fi-ta-views-row-menu .fi-dropdown-list-item")].find((item) => item.offsetParent !== null && item.textContent.trim() === "Move up").click()');
-    $page->wait(1)->assertNoJavaScriptErrors();
+    waitForStoredOrder($page, $this->user, CrmEntity::Company, ['list', $other->getKey(), $mine->getKey()]);
+    $page->assertNoJavaScriptErrors();
 
-    expect(TablePreference::query()->withoutGlobalScopes()->whereBelongsTo($this->user)->value('view_order'))->toBe(['list', $other->getKey(), $mine->getKey()]);
+    expect(storedViewOrder($this->user, CrmEntity::Company))->toBe(['list', $other->getKey(), $mine->getKey()]);
 
-    $page->click('.fi-view-switcher .fi-dropdown-trigger button');
     $page->hover('.fi-ta-views-row:has([title="Mine"])')->click('[aria-label="Actions for Mine"]');
     $page->script('[...document.querySelectorAll(".fi-ta-views-row-menu .fi-dropdown-list-item")].find((item) => item.offsetParent !== null && item.textContent.trim() === "Rename").click()');
     $page->assertValue('.fi-modal.fi-modal-open input', 'Mine')
@@ -271,7 +271,7 @@ it('opens the built-in list from the board even when a view was last applied on 
         ->click('All opportunities')
         ->assertPathIs("/app/{$this->workspace->slug}/opportunities")
         ->assertSeeIn('.fi-view-switcher-trigger', 'All opportunities')
-        ->assertScript('location.search', '')
+        ->assertScript('location.search', '?view=all')
         ->assertNoJavaScriptErrors();
 });
 
@@ -296,6 +296,13 @@ it('keeps a descending sort when a view sorted that way is picked from an unsort
 function switcherKeys(): string
 {
     return '[...document.querySelectorAll(".fi-ta-views-row")].map((row) => row.dataset.viewKey)';
+}
+
+function waitForStoredOrder(mixed $page, User $user, CrmEntity $entity, array $expected): void
+{
+    for ($attempt = 0; $attempt < 50 && storedViewOrder($user, $entity) !== $expected; $attempt++) {
+        $page->wait(0.1);
+    }
 }
 
 function storedViewOrder(User $user, CrmEntity $entity): ?array
@@ -344,7 +351,7 @@ it('reorders by dragging a row and keeps the order after a reload', function ():
         ->assertScript(switcherKeys(), ['list', $alpha->getKey(), $beta->getKey()]);
 
     $page->drag("[data-view-key=\"{$beta->getKey()}\"] .fi-dropdown-list-item", '[data-view-key="list"] .fi-dropdown-list-item');
-    $page->assertScript(savedViewsWaitFor('JSON.stringify('.switcherKeys().') === '.json_encode(json_encode([$beta->getKey(), 'list', $alpha->getKey()]))), true);
+    waitForStoredOrder($page, $this->user, CrmEntity::Company, [$beta->getKey(), 'list', $alpha->getKey()]);
 
     expect(storedViewOrder($this->user, CrmEntity::Company))->toBe([$beta->getKey(), 'list', $alpha->getKey()]);
 
@@ -371,34 +378,52 @@ it('moves a row from its menu and disables the move that has nowhere to go', fun
         ->assertScript($item('Move up').'.disabled', false);
 
     $page->script($item('Move up').'.click()');
-    $page->assertScript(savedViewsWaitFor('JSON.stringify('.switcherKeys().') === '.json_encode(json_encode(['list', $beta->getKey(), $alpha->getKey()]))), true);
-    $page->wait(1);
+    waitForStoredOrder($page, $this->user, CrmEntity::Company, ['list', $beta->getKey(), $alpha->getKey()]);
 
     expect(storedViewOrder($this->user, CrmEntity::Company))->toBe(['list', $beta->getKey(), $alpha->getKey()]);
 
-    $page->click('.fi-view-switcher .fi-dropdown-trigger button');
+    $page->assertScript(switcherKeys(), ['list', $beta->getKey(), $alpha->getKey()])
+        ->assertVisible('.fi-ta-views-search input')
+        ->assertScript('document.activeElement === document.querySelector(\'[aria-label="Actions for Beta"]\')', true);
+
     $page->hover('.fi-ta-views-row:has([title="All companies"])')->click('[aria-label="Actions for All companies"]');
     $page->assertScript($item('Move up').'.disabled', true)
         ->assertNoJavaScriptErrors();
 });
 
-it('narrows the rows by name and stops dragging while a query is typed', function (): void {
-    foreach (['Alpha', 'Beta'] as $name) {
-        SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => $name]);
-    }
+it('narrows the rows by name and takes no part in dragging while a query is typed', function (): void {
+    $views = collect(['Alpha one', 'Alpha two', 'Beta'])->map(fn (string $name): SavedView => SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => $name]));
 
     $visible = '[...document.querySelectorAll(".fi-ta-views-row")].filter((row) => row.offsetParent !== null).map((row) => row.dataset.viewName)';
     $draggable = 'document.querySelectorAll(".fi-ta-views-draggable").length';
 
-    loginViaBrowser($this->user)
+    $page = loginViaBrowser($this->user)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/companies")
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->assertScript($draggable, 3)
-        ->type('.fi-ta-views-search input', 'alp')
-        ->assertScript($visible, ['alpha'])
-        ->assertScript($draggable, 0)
+        ->assertScript($draggable, 4)
+        ->type('.fi-ta-views-search input', 'alpha')
+        ->assertScript($visible, ['alpha one', 'alpha two'])
+        ->assertScript($draggable, 0);
+
+    $page->drag("[data-view-key=\"{$views[1]->getKey()}\"] .fi-dropdown-list-item", "[data-view-key=\"{$views[0]->getKey()}\"] .fi-dropdown-list-item");
+    $page->wait(1)
+        ->assertScript(switcherKeys(), ['list', $views[0]->getKey(), $views[1]->getKey(), $views[2]->getKey()])
+        ->assertNoJavaScriptErrors();
+
+    expect(storedViewOrder($this->user, CrmEntity::Company))->toBeNull();
+});
+
+it('keeps opportunities on the list when the built-in list is reloaded', function (): void {
+    loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/opportunities?view=all")
+        ->assertPathIs("/app/{$this->workspace->slug}/opportunities")
+        ->refresh()
+        ->assertPathIs("/app/{$this->workspace->slug}/opportunities")
+        ->assertSeeIn('.fi-view-switcher-trigger', 'All opportunities')
         ->assertNoJavaScriptErrors();
 });
 

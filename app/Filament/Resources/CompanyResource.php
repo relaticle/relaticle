@@ -11,7 +11,6 @@ use App\Filament\Components\RecordChip;
 use App\Filament\Components\Tables\EmptyListDescription;
 use App\Filament\Components\Tables\FilteredEmptyState;
 use App\Filament\Components\Tables\RecordChipColumn;
-use App\Filament\Concerns\RemembersViewMode;
 use App\Filament\Exports\CompanyExporter;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
@@ -43,8 +42,6 @@ use Relaticle\EmailIntegration\Filament\Actions\MassSendBulkAction;
 
 final class CompanyResource extends Resource
 {
-    use RemembersViewMode;
-
     protected static ?string $model = Company::class;
 
     protected static ?string $recordTitleAttribute = 'name';

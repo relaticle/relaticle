@@ -134,6 +134,7 @@ trait HasSavedViews
 
         $this->applyTableState($view->state);
         $this->activeSavedViewId = $view->getKey();
+        $this->requestedSavedViewId = null;
         $this->markSavedViewApplied();
     }
 
@@ -162,6 +163,8 @@ trait HasSavedViews
 
     public function applyOwnTable(): void
     {
+        $this->requestedSavedViewId = SavedView::BUILT_IN_LIST_LINK;
+
         if ($this->activeSavedViewId === null) {
             return;
         }

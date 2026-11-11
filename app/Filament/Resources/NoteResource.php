@@ -9,7 +9,6 @@ use App\Enums\CrmEntity;
 use App\Filament\Components\Tables\EmptyListDescription;
 use App\Filament\Components\Tables\FilteredEmptyState;
 use App\Filament\Components\Tables\LinkedRecordsColumn;
-use App\Filament\Concerns\RemembersViewMode;
 use App\Filament\Exports\NoteExporter;
 use App\Filament\Resources\NoteResource\Forms\NoteForm;
 use App\Filament\Resources\NoteResource\Pages\ManageNotes;
@@ -35,8 +34,6 @@ use Override;
 
 final class NoteResource extends Resource
 {
-    use RemembersViewMode;
-
     protected static ?string $model = Note::class;
 
     protected static ?string $recordTitleAttribute = 'title';
