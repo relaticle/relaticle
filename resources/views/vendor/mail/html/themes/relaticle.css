@@ -7,7 +7,7 @@
 /* Base */
 
 body,
-body *:not(html):not(style):not(br):not(tr):not(code) {
+body *:not(html):not(style):not(br):not(tr):not(code):not(.task-chip-icon):not(.task-chip-dot) {
     box-sizing: border-box;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif,
         'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
@@ -400,9 +400,6 @@ img {
 }
 
 .task-card {
-    -premailer-cellpadding: 0;
-    -premailer-cellspacing: 0;
-    -premailer-width: 100%;
     background-color: #ffffff;
     border: 1px solid #e5e7eb;
     border-radius: 12px;
