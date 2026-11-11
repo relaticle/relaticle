@@ -608,7 +608,7 @@ it('narrows opportunities by creator with Me pinned first and a teammate after i
     expect(companyRows($page, 2))->toBeTrue();
     $page->assertDontSee('Priya deal')
         ->click(optionButton((string) $teammate->getKey()))
-        ->assertSeeIn('[data-filter-segment="value"]', "{$this->user->name} (me), Priya Shah");
+        ->assertScript(filterBarWaitFor('JSON.stringify([...document.querySelectorAll("[data-filter-segment=value] .fi-filter-value-label")].map((label) => label.textContent.trim())) === '.json_encode(json_encode(["{$this->user->name} (me)", 'Priya Shah']))), true);
     expect(companyRows($page, 3))->toBeTrue();
     $page->assertNoJavaScriptErrors();
 });
