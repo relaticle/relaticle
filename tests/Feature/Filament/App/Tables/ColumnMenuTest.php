@@ -92,20 +92,6 @@ it('moves a column before another and keeps the order on a new visit', function 
     expect(columnOrder(livewire($page)))->toBe($order);
 })->with('column menu pages');
 
-it('puts the columns back in their declared order with the standard view', function (string $page, CrmEntity $entity): void {
-    $component = livewire($page);
-    $declared = columnOrder($component);
-    $movable = columnsBesideTitle($component, $entity);
-
-    $component->call('moveTableColumn', end($movable), $movable[0])->call('useStandardTable');
-
-    expect(columnOrder($component))->toBe($declared);
-
-    session()->flush();
-
-    expect(columnOrder(livewire($page)))->toBe($declared);
-})->with('column menu pages');
-
 it('moves a column to the end when nothing follows it', function (string $page, CrmEntity $entity): void {
     $component = livewire($page);
     $first = columnsBesideTitle($component, $entity)[0];
@@ -416,7 +402,7 @@ it('marks the pins of a view in the render that applied it and clears them in th
     expect($pinned('name'))->toBe('1')
         ->and($pinned('creator.name'))->toBe('1');
 
-    $component->call('useStandardTable');
+    $component->call('applyOwnTable');
 
     expect($pinned('name'))->toBe('0')
         ->and($pinned('creator.name'))->toBe('0');
@@ -614,15 +600,6 @@ it('draws no column manager trigger in the toolbar', function (): void {
     expect(livewire(ListCompanies::class)->instance()->getTable()->hasColumnManager())->toBeFalse();
 });
 
-it('offers a reset only on the built-in list', function (): void {
-    Filament::bootCurrentPanel();
-    $view = SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create(['entity' => CrmEntity::Company]);
-
-    livewire(ListCompanies::class)->assertSeeText('Reset to default')
-        ->call('applySavedView', $view->getKey())
-        ->assertDontSeeText('Reset to default');
-});
-
 it('shows a renamed column with its new label in view settings', function (): void {
     Filament::bootCurrentPanel();
     $component = livewire(ListCompanies::class);
@@ -677,49 +654,6 @@ it('lists the pinned columns first in view settings and marks them', function ()
     $component->assertSeeHtmlInOrder(['data-column="created_at"', 'data-column-pinned', 'data-column="name"']);
 });
 
-it('keeps the member\'s widths when the table goes back to its default', function (): void {
-    $component = livewire(ListCompanies::class)
-        ->call('sortTable', 'name', 'asc')
-        ->call('updateResizableColumnWidth', 'created_at', '300')
-        ->call('pinTableColumn', 'created_at')
-        ->call('useStandardTable');
-
-    expect($component->get('tableColumnWidths'))->toBe(['created_at' => 300])
-        ->and($component->get('tableSort'))->toBeNull()
-        ->and(pinnedColumns($component))->toBe([]);
-});
-
-it('offers the reset again once the applied view is deleted elsewhere', function (): void {
-    Filament::bootCurrentPanel();
-    $view = SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create(['entity' => CrmEntity::Company]);
-    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->assertDontSeeText('Reset to default');
-
-    $view->delete();
-
-    $component->call('$refresh')->assertSeeText('Reset to default');
-});
-
-it('resets the table to its default from the confirmation and keeps the widths', function (): void {
-    $component = livewire(ListCompanies::class)
-        ->call('sortTable', 'name', 'asc')
-        ->call('updateResizableColumnWidth', 'created_at', '300')
-        ->call('toggleTableColumn', 'accountOwner.name')
-        ->callAction('resetTableToDefault')
-        ->assertHasNoActionErrors();
-
-    expect($component->get('tableSort'))->toBeNull()
-        ->and(columnIsShown($component, 'accountOwner.name'))->toBeTrue()
-        ->and($component->get('tableColumnWidths'))->toBe(['created_at' => 300]);
-});
-
-it('hides the reset action while a saved view is applied', function (): void {
-    $view = SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create(['entity' => CrmEntity::Company]);
-
-    livewire(ListCompanies::class)->assertActionVisible('resetTableToDefault')
-        ->call('applySavedView', $view->getKey())
-        ->assertActionHidden('resetTableToDefault');
-});
-
 it('words the add attribute search with the list page entity', function (string $page, CrmEntity $entity, string $label): void {
     Filament::bootCurrentPanel();
 
@@ -747,17 +681,6 @@ it('offers every hidden toggleable attribute in the add panel and never a main c
     expect($items->each(fn (Crawler $item): ?string => $item->attr('data-attribute')))->toEqualCanonicalizing($toggleable)
         ->and($items->each(fn (Crawler $item): ?string => $item->attr('data-attribute')))->not->toContain($entity->titleColumn());
 })->with('column menu pages');
-
-it('keeps the reset in the list footer and out of the add panel', function (): void {
-    Filament::bootCurrentPanel();
-    $html = livewire(ListCompanies::class)->html();
-    $panel = new Crawler($html)->filter('[data-view-settings-add-panel]');
-
-    expect($panel->count())->toBe(1)
-        ->and($panel->filter('.fi-view-settings-reset')->count())->toBe(0)
-        ->and(new Crawler($html)->filter('[data-view-settings] .fi-view-settings-reset')->count())->toBe(1)
-        ->and(new Crawler($html)->filter('[data-view-settings] > .fi-view-settings-view:not([data-view-settings-add-panel]) .fi-view-settings-footer .fi-view-settings-reset')->count())->toBe(1);
-});
 
 it('never offers a main column in the add panel even when its state says hidden', function (): void {
     Filament::bootCurrentPanel();

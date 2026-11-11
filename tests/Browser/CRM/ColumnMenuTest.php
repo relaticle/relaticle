@@ -535,55 +535,25 @@ it('reaches every row menu from the keyboard and returns focus to the trigger on
         ->assertNoJavaScriptErrors();
 });
 
-it('reaches add attribute and reset to default from the keyboard', function (): void {
+it('reaches add attribute from the keyboard', function (): void {
     $page = sortedCompaniesTable($this);
     $page->keys('.fi-view-settings-trigger', 'Tab');
 
-    foreach (['[data-view-settings-add]', '.fi-view-settings-reset'] as $target) {
-        foreach (range(1, 40) as $attempt) {
-            if ($page->script(sprintf('document.activeElement.matches(`%s`)', $target)) === true) {
-                break;
-            }
-
-            $page->keys(':focus', 'Tab');
+    foreach (range(1, 40) as $attempt) {
+        if ($page->script('document.activeElement.matches("[data-view-settings-add]")') === true) {
+            break;
         }
 
-        $page->assertScript(sprintf('document.activeElement.matches(`%s`)', $target), true);
-
-        if ($target === '[data-view-settings-add]') {
-            $page->keys(':focus', 'Enter');
-            waitUntil($page, 'document.activeElement.matches("[data-view-settings-search]")');
-            $page->keys(':focus', 'Escape');
-            waitUntil($page, 'document.activeElement.matches("[data-view-settings-add]")');
-        }
+        $page->keys(':focus', 'Tab');
     }
 
+    $page->assertScript('document.activeElement.matches("[data-view-settings-add]")', true)
+        ->keys(':focus', 'Enter');
+    waitUntil($page, 'document.activeElement.matches("[data-view-settings-search]")');
+    $page->keys(':focus', 'Escape');
+    waitUntil($page, 'document.activeElement.matches("[data-view-settings-add]")');
+
     $page->assertNoJavaScriptErrors();
-});
-
-it('resets the table to its default after a confirmation', function (): void {
-    $page = sortedCompaniesTable($this);
-
-    $page->assertScript(companiesTableSort(), 'name:asc')
-        ->click('.fi-view-settings-reset')
-        ->assertSee('Reset this table to its default?')
-        ->click('Reset table');
-
-    waitUntil($page, '('.companiesTableSort().') === null')
-        ->assertVisible(columnHeader('accountOwner.name'))
-        ->assertNoJavaScriptErrors();
-});
-
-it('keeps the table as it was when the reset is cancelled', function (): void {
-    $page = sortedCompaniesTable($this);
-
-    $page->click('.fi-view-settings-reset')
-        ->assertSee('Reset this table to its default?')
-        ->click('Cancel')
-        ->wait(1)
-        ->assertMissing(columnHeader('accountOwner.name'))
-        ->assertScript(companiesTableSort(), 'name:asc')
-        ->assertNoJavaScriptErrors();
 });
 
 it('offers only a label change in the title column menu of view settings', function (): void {
@@ -1590,7 +1560,6 @@ it('opens the add attribute panel in place of the list with a focused search and
         ->assertScript('document.activeElement.placeholder', 'Search company attributes…')
         ->assertScript('document.querySelector("[data-view-settings-back]").checkVisibility()', true)
         ->assertScript('document.querySelector(".fi-view-settings-list").checkVisibility()', false)
-        ->assertScript('document.querySelector(".fi-view-settings-reset")?.checkVisibility() ?? false', false)
         ->assertScript('document.querySelector(".fi-view-settings-panel").getBoundingClientRect().width', $width)
         ->assertScript('["accountOwner.name", "created_at"].every((attribute) => '.addItems().'.includes(attribute))', true)
         ->assertScript('[...document.querySelectorAll("[data-view-settings-add-item]")].every((item) => item.querySelector(".fi-view-settings-label svg"))', true)
@@ -1704,7 +1673,7 @@ it('goes back to the list on Escape and closes view settings on a second Escape'
     waitUntil($page, 'document.activeElement.matches("[data-view-settings-add]")')
         ->assertScript(addPanelOpen(), false)
         ->assertVisible('.fi-view-settings-panel')
-        ->assertVisible('.fi-view-settings-reset');
+        ->assertVisible('[data-view-settings-add]');
 
     $page->keys(':focus', 'Escape');
 

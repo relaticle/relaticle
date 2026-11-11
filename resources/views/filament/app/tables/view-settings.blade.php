@@ -77,20 +77,6 @@
                 </x-filament::dropdown.list.item>
             </div>
             </div>
-
-            @if ($canReset)
-                <div class="fi-dropdown-list fi-view-settings-footer">
-                    <x-filament::dropdown.list.item
-                        icon="lucide-undo-2"
-                        role="button"
-                        tabindex="0"
-                        class="fi-view-settings-reset"
-                        x-on:click="close(); $wire.mountAction('resetTableToDefault')"
-                    >
-                        {{ __('filament/panel.tables.views.reset') }}
-                    </x-filament::dropdown.list.item>
-                </div>
-            @endif
         </div>
 
         <div class="fi-view-settings-view" x-show="adding" x-cloak data-view-settings-add-panel>

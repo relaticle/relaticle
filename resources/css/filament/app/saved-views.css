@@ -175,8 +175,7 @@
         }
     }
 
-    & .fi-view-settings-list ~ .fi-dropdown-list,
-    & .fi-view-settings-footer {
+    & .fi-view-settings-list ~ .fi-dropdown-list {
         @apply mt-1 shrink-0 border-t border-gray-100 pt-1 dark:border-white/10;
     }
 }
@@ -277,8 +276,4 @@
 
 .fi-view-settings-add-chevron {
     @apply size-4 text-gray-400 dark:text-gray-500;
-}
-
-.fi-view-settings-reset .fi-icon {
-    @apply size-4!;
 }

@@ -333,17 +333,17 @@ it('writes neither view when the member switches from one to the other', functio
         ->and($second->state->sort)->toBe('name:asc');
 });
 
-it('writes no view when the member returns to the built-in list', function (string $return): void {
+it('writes no view when the member returns to the built-in list', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
     $updatedAt = $view->updated_at;
     $this->travelTo(now()->addHour());
 
-    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call($return);
+    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('applyOwnTable');
 
     expect($component->get('activeSavedViewId'))->toBeNull()
         ->and($view->refresh()->updated_at)->toEqual($updatedAt)
         ->and($view->state->sort)->toBe('created_at:desc');
-})->with(['applyOwnTable', 'useStandardTable']);
+});
 
 it('leaves no deleted view active and writes nothing to another view', function (): void {
     $active = viewFor($this->user, ['name' => 'Hot leads', 'state' => hotLeads()]);
@@ -448,20 +448,6 @@ it('opens on the default view when the member has no saved state, and writes not
         ->and($component->get('activeSavedViewId'))->toBe($view->getKey())
         ->and($view->refresh()->updated_at)->toEqual($viewUpdatedAt)
         ->and(preferenceRow()->updated_at)->toEqual($updatedAt);
-});
-
-it('switches back to the standard view from a saved one', function (): void {
-    $view = viewFor($this->user, ['state' => hotLeads()]);
-    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('useStandardTable');
-
-    expect($component->get('tableSort'))->toBeNull()
-        ->and((int) $component->get('tableRecordsPerPage'))->toBe(25)
-        ->and($component->get('activeSavedViewId'))->toBeNull()
-        ->and(collect($component->get('tableColumns'))->firstWhere('name', 'created_at')['isToggled'])->toBeTrue();
-
-    session()->flush();
-
-    expect(livewire(ListCompanies::class)->get('tableSort'))->toBeNull();
 });
 
 it('offers the standard view and nothing to manage when no view is saved', function (): void {
@@ -820,18 +806,6 @@ it('keeps the member\'s own table across sessions while a view is applied', func
     expect(livewire(ListCompanies::class)->call('applyOwnTable')->get('tableSort'))->toBe('name:asc');
 });
 
-it('forgets the member\'s own table on a reset to the default', function (): void {
-    $view = viewFor($this->user, ['state' => hotLeads()]);
-    $component = livewire(ListCompanies::class)->call('sortTable', 'name', 'asc')->call('applySavedView', $view->getKey());
-
-    $component->call('useStandardTable');
-    expect(preferenceRow()->own_state)->toBeNull();
-
-    $component->call('applySavedView', $view->getKey())->call('applyOwnTable');
-
-    expect($component->get('tableSort'))->toBeNull();
-});
-
 it('writes no view when the member changes their own table', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
     $component = livewire(ListCompanies::class)
@@ -980,15 +954,6 @@ it('gives a second tab the table the first tab returned to', function (): void {
     $second->call('applyOwnTable');
 
     expect($second->get('tableSort'))->toBe('name:desc');
-});
-
-it('clears a parked table left on a row with no view when the member resets to the default', function (): void {
-    TablePreference::factory()->for($this->user)->for($this->workspace)->create(['own_state' => new TableStateData(sort: 'name:asc')]);
-
-    livewire(ListCompanies::class)->call('useStandardTable');
-
-    expect(preferenceRow()->own_state)->toBeNull()
-        ->and(preferenceRow()->active_view_id)->toBeNull();
 });
 
 it('clears a view that vanished elsewhere when the member returns to their own table, and leaves the table as it is', function (): void {

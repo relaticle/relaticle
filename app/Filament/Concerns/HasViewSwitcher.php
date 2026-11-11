@@ -180,7 +180,6 @@ trait HasViewSwitcher
             'shown' => array_values(array_filter($columns, fn (array $column): bool => $column['isShown'])),
             'hidden' => array_values(array_filter($columns, fn (array $column): bool => ! $column['isShown'] && ! $column['isLocked'])),
             'entityLabel' => Str::lower(static::getResource()::getModelLabel()),
-            'canReset' => is_callable([$this, 'canResetTable']) && call_user_func([$this, 'canResetTable']),
             'canCreateAttribute' => is_callable([$this, 'canCreateTableAttribute']) && call_user_func([$this, 'canCreateTableAttribute']),
         ])->render());
     }
