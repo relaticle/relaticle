@@ -7,6 +7,8 @@
     const SHOWN_VALUES = 2
     const VALUE_BUDGET = 28
     const FADE_WIDTH = 32
+    // The popovers open 6px below the strip (x-anchor offset.6) and keep Filament's 16px dropdown margin to the viewport.
+    const POPOVER_GAP = 6 + 16
     const LOOKUP_KINDS = ['member', 'relation', 'record']
     const LIST_KINDS = ['choice', 'multi_choice', ...LOOKUP_KINDS]
     const NUMERIC_KINDS = ['number', 'inactivity']
@@ -347,6 +349,10 @@
                     if (this.open && next && !next.closest('[data-pop], [data-pop-trigger]')) {
                         this.close(false)
                     }
+                },
+
+                measureRoom() {
+                    root.style.setProperty('--menu-room', `${window.innerHeight - scroller.getBoundingClientRect().bottom - POPOVER_GAP}px`)
                 },
 
                 fade() {

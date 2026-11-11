@@ -86,8 +86,8 @@
 }
 
 /* Filament's size option caps the panel at the room below the trigger. The menu inside shrinks to it. */
-:is(.fi-view-switcher, .fi-view-settings) > .fi-dropdown-panel {
-    @apply flex flex-col;
+:is(.fi-view-switcher, .fi-view-settings) > .fi-dropdown-panel:not([style*='display: none']) {
+    @apply flex! flex-col;
 }
 
 /* Search and Create stay in view; only the views between them scroll. */

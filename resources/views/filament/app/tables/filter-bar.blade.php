@@ -3,6 +3,7 @@
     data-filter-bar
     data-state="{{ json_encode($this->getFilterBarData()) }}"
     x-data="filterBar"
+    x-effect="open && measureRoom()"
     x-on:click.document="outside($event)"
     x-on:keydown.escape="escape($event)"
     x-on:focusout="focusLeft($event)"

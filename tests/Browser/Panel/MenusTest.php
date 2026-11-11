@@ -10,11 +10,19 @@ use App\Models\User;
 function menuMetrics(string $panel, string $rows, string $icons): string
 {
     return <<<JS
-        (() => {
+        (async () => {
             const panel = document.querySelector('{$panel}');
             const visible = (element) => element.getClientRects().length > 0;
-            const rows = [...panel.querySelectorAll('{$rows}')].filter(visible);
+            const visibleRows = () => [...panel.querySelectorAll('{$rows}')].filter(visible);
             const unique = (values) => [...new Set(values)];
+            const settle = () => new Promise((resolve) => setTimeout(resolve, 100));
+
+            for (let attempt = 0, count = -1; attempt < 20 && count !== visibleRows().length; attempt++) {
+                count = visibleRows().length;
+                await settle();
+            }
+
+            const rows = visibleRows();
 
             return {
                 rows: unique(rows.map((row) => Math.round(row.getBoundingClientRect().height))),
@@ -22,6 +30,24 @@ function menuMetrics(string $panel, string $rows, string $icons): string
                 icons: unique([...panel.querySelectorAll('{$icons}')].filter(visible).map((icon) => Math.round(icon.getBoundingClientRect().width))),
                 panelRadius: getComputedStyle(panel.closest('.fi-dropdown-panel, .fi-filter-pop')).borderRadius,
                 rowRadius: unique(rows.map((row) => getComputedStyle(row).borderRadius)),
+            };
+        })()
+        JS;
+}
+
+function menuRoom(string $panel, string $list): string
+{
+    return <<<JS
+        (() => {
+            const panel = document.querySelector('{$panel}').closest('.fi-dropdown-panel, .fi-filter-pop');
+            const box = panel.getBoundingClientRect();
+            const list = panel.querySelector('{$list}');
+
+            return {
+                height: box.height <= 448,
+                bottom: box.bottom <= window.innerHeight - 16,
+                listScrolls: list.scrollHeight > list.clientHeight,
+                panelScrolls: panel.scrollHeight > panel.clientHeight + 1,
             };
         })()
         JS;
@@ -64,4 +90,29 @@ it('draws every menu with the shared row, icon and corner spec', function (strin
     'filter field picker' => ['[data-filter-add]', '.fi-filter-pop-picker', '.fi-filter-item', '.fi-filter-item > svg'],
     'import and export' => ['.fi-header button.fi-ac-btn-group:visible', '.fi-header .fi-dropdown-panel:not([style*="display: none"])', '.fi-dropdown-list-item', '.fi-dropdown-list-item > svg'],
     'column header' => ["th[x-data^=\"resizableColumn('created_at'\"] [data-column-menu-trigger]", '.fi-ta-column-menu', '.fi-dropdown-list-item', '.fi-dropdown-list-item > svg'],
+]);
+
+it('keeps a long menu above the window edge and scrolls only its list', function (string $open, string $panel, string $list): void {
+    foreach (range(1, 8) as $index) {
+        SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => "Pipeline {$index}"]);
+    }
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 320)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click($open)
+        ->assertVisible($panel);
+
+    expect($page->script(menuRoom($panel, $list)))->toBe([
+        'height' => true,
+        'bottom' => true,
+        'listScrolls' => true,
+        'panelScrolls' => false,
+    ]);
+    $page->assertNoJavaScriptErrors();
+})->with([
+    'views' => ['.fi-view-switcher .fi-dropdown-trigger button', '.fi-ta-views-panel', '.fi-ta-views-scroll'],
+    'view settings' => ['.fi-view-settings-trigger', '.fi-view-settings-panel', '.fi-view-settings-scroll'],
+    'filter field picker' => ['[data-filter-add]', '.fi-filter-pop-picker', '[role=listbox]'],
 ]);

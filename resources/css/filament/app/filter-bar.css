@@ -131,15 +131,19 @@ button.fi-filter-seg {
 }
 
 .fi-filter-pop {
-    @apply fixed z-30 min-w-52 cursor-default rounded-menu bg-white p-1 font-normal text-gray-950 shadow-lg ring-1 ring-gray-950/10 dark:bg-gray-900 dark:text-white dark:ring-white/15;
+    @apply fixed z-30 max-h-[min(var(--spacing-menu-max),var(--menu-room,100dvh))] min-w-52 cursor-default overflow-y-auto rounded-menu bg-white p-1 font-normal text-gray-950 shadow-lg ring-1 ring-gray-950/10 dark:bg-gray-900 dark:text-white dark:ring-white/15;
 
     &.fi-filter-pop-picker {
-        @apply min-w-70;
+        @apply flex min-w-70 flex-col;
+
+        & > [role='listbox'] {
+            @apply min-h-0 overflow-y-auto overscroll-contain;
+        }
     }
 }
 
 .fi-filter-find {
-    @apply -mx-1 -mt-1 mb-1 flex items-center gap-2 border-b border-gray-200/75 px-2 py-1.5 text-gray-400 dark:border-white/10 dark:text-gray-500;
+    @apply -mx-1 -mt-1 mb-1 flex shrink-0 items-center gap-2 border-b border-gray-200/75 px-2 py-1.5 text-gray-400 dark:border-white/10 dark:text-gray-500;
 
     & svg {
         @apply size-menu-icon shrink-0;

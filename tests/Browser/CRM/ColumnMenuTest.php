@@ -1421,7 +1421,7 @@ it('moves a column by the neighbours it has when the item is chosen, not when th
 });
 
 it('closes the row menu when the list scrolls or the window resizes', function (): void {
-    $page = companiesTable($this->user, $this->workspace->slug)->resize(1440, 420);
+    $page = companiesTable($this->user, $this->workspace->slug)->resize(1440, 360);
     openViewSettings($page);
     $order = $page->script(settingsOrder());
 
@@ -1429,7 +1429,7 @@ it('closes the row menu when the list scrolls or the window resizes', function (
     $page->script('document.querySelector(".fi-view-settings-scroll").scrollTop = 40');
     waitUntil($page, '!('.rowMenuOpen().')');
 
-    openRowMenu($page, $order[1])->resize(1300, 420);
+    openRowMenu($page, $order[1])->resize(1300, 360);
     waitUntil($page, '!('.rowMenuOpen().')')->assertNoJavaScriptErrors();
 });
 

@@ -66,6 +66,9 @@
 - A custom menu uses those utilities and never a raw height, icon size or radius. A phone sheet keeps its taller rows.
   `tests/Browser/Panel/MenusTest.php` opens Views, View settings, the filter picker, Import / Export and a column menu,
   and fails when a row, an icon or a corner leaves the spec. A new menu joins its dataset.
+- A menu stops at `menu-max` (28rem) or 16px above the window edge, whichever comes first, and only its list scrolls.
+  A Filament dropdown gets the room from its `size` prop. The filter bar measures it on open into `--menu-room`. The same
+  test fails a menu that runs past the window at 320px tall.
 
 ## Scripts
 

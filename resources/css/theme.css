@@ -33,6 +33,7 @@
     /* Every menu in the panels: stock dropdowns, the filter bar, Views and View settings */
     --spacing-menu-row: 2rem;
     --spacing-menu-icon: 1rem;
+    --spacing-menu-max: 28rem;
     --radius-menu: 0.625rem;
     --radius-menu-item: 0.375rem;
 }
