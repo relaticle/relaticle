@@ -588,7 +588,7 @@ it('sets then clears a value for every writable custom field type', function (st
     'date' => ['date', '2026-09-10', '2026-09-10T00:00:00+00:00'],
     'date-time' => ['date-time', '2026-09-10T10:30:00Z', '2026-09-10T10:30:00+00:00'],
     'date-time with an offset' => ['date-time', '2026-09-10T10:30:00+05:00', '2026-09-10T05:30:00+00:00'],
-    'rich-editor' => ['rich-editor', '**bold**', "<p><strong>bold</strong></p>\n"],
+    'rich-editor' => ['rich-editor', '**bold**', '<p><strong>bold</strong></p>'],
     'select' => ['select', null, 'OPTION_ID'],
     'radio' => ['radio', null, 'OPTION_ID'],
     'toggle-buttons' => ['toggle-buttons', null, 'OPTION_ID'],

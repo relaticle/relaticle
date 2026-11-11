@@ -12,6 +12,7 @@ use App\Support\Media\UploadAllowlist;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\RichEditor\Plugins\Contracts\RichContentPlugin;
+use Filament\Forms\Components\RichEditor\RichContentRenderer;
 use Filament\Forms\Components\RichEditor\ToolbarButtonGroup;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Relaticle\CustomFields\FieldTypeSystem\BaseFieldType;
@@ -78,6 +79,14 @@ final class RichEditorFieldType extends BaseFieldType
                     ...($customField instanceof AppCustomField && $customField->isDocument() ? ['class' => 'fi-fo-rich-editor-seamless'] : []),
                 ]))
             ->infolistEntry(RichContentEntry::class);
+    }
+
+    public function normalize(string $value, CustomField $customField): string
+    {
+        return RichContentRenderer::make($value)
+            ->plugins($this->plugins($customField))
+            ->getEditor()
+            ->getHTML();
     }
 
     /** @return list<RichContentPlugin> */

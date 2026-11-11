@@ -50,7 +50,7 @@ it('never matches an option id or rich text markup that merely contains the quer
 
     TenantContextService::setTenantId($workspace->getKey());
     $note = Note::factory()->for($workspace)->create(['title' => 'Meeting notes']);
-    $note->update(['custom_fields' => ['body' => "<div data-ref=\"{$optionId}\">Follow up</div>"]]);
+    $note->update(['custom_fields' => ['body' => "<p><a href=\"https://relaticle.com/{$optionId}\">Follow up</a></p>"]]);
     TenantContextService::setTenantId(null);
 
     $storedStatus = DB::table('custom_field_values')
