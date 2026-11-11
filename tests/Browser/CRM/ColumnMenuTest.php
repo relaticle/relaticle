@@ -53,12 +53,12 @@ function columnMenuItem(string $key): string
 
 function visibleMenuItems(): string
 {
-    return '[...document.querySelectorAll(".fi-ta-column-menu [role=menuitem]")].filter((item) => item.offsetParent !== null).map((item) => item.textContent.trim())';
+    return '[...document.querySelectorAll(".fi-ta-column-menu [role^=menuitem]")].filter((item) => item.offsetParent !== null).map((item) => item.textContent.trim())';
 }
 
 function menuItemFocused(): string
 {
-    return 'document.activeElement.getAttribute("role") === "menuitem"';
+    return 'document.activeElement.getAttribute("role")?.startsWith("menuitem") === true';
 }
 
 function waitUntil(AwaitableWebpage $page, string $expression): AwaitableWebpage
@@ -110,11 +110,80 @@ it('opens the column menu from a header click and never sorts', function (): voi
     $page->script(sprintf('document.querySelector(`%s .fi-ta-header-cell-sort-btn`).click()', columnHeader('created_at')));
 
     waitUntil($page, menuItemFocused())
-        ->assertScript(visibleMenuItems(), ['Move left', 'Move right', 'Pin to left', 'Change attribute label', 'Remove column'])
+        ->assertScript(visibleMenuItems(), ['Sort ascending', 'Sort descending', 'Move left', 'Move right', 'Pin to left', 'Edit column label', 'Hide from view'])
         ->wait(0.5)
         ->assertScript($tableSort.' === null', true)
         ->assertScript(sprintf('document.querySelector(`%s`).getAttribute("aria-sort")', columnHeader('created_at')), 'none')
         ->assertScript(sprintf('document.querySelector(`%s .fi-ta-header-cell-sort-btn > .fi-icon`)?.checkVisibility() ?? false', columnHeader('created_at')), false)
+        ->assertNoJavaScriptErrors();
+});
+
+it('sorts a column both ways from its menu and shows the sort in the bar', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
+    $tableSort = 'Livewire.all().find((component) => component.name.includes("ListCompanies")).$wire.tableSort';
+
+    $page->script(openColumnMenu('creator.name'));
+    waitUntil($page, menuItemFocused())->click(columnMenuItem('sortAscending'));
+    waitUntil($page, $tableSort.' === "creator.name:asc"');
+    waitUntil($page, sprintf('document.querySelector(`%s`).getAttribute("aria-sort") === "ascending"', columnHeader('creator.name')))
+        ->assertSeeIn('[data-filter-sort-label]', 'Created by');
+    waitUntil($page, '('.focusedColumn().') === "creator.name"');
+
+    $page->script(openColumnMenu('creator.name'));
+    waitUntil($page, menuItemFocused())
+        ->assertScript(checkedSort(), ['sortAscending'])
+        ->click(columnMenuItem('sortDescending'));
+    waitUntil($page, $tableSort.' === "creator.name:desc"')
+        ->refresh()
+        ->assertPresent(columnHeader('creator.name').' [data-column-menu-trigger]')
+        ->assertScript(sprintf('document.querySelector(`%s`).getAttribute("aria-sort")', columnHeader('creator.name')), 'descending');
+
+    $page->script(openColumnMenu('creator.name'));
+    waitUntil($page, menuItemFocused())
+        ->assertScript(checkedSort(), ['sortDescending']);
+
+    $page->keys(':focus', 'Escape');
+    $page->script(openColumnMenu('created_at'));
+    waitUntil($page, menuItemFocused())
+        ->assertScript(checkedSort(), [])
+        ->assertNoJavaScriptErrors();
+});
+
+function checkedSort(): string
+{
+    return '[...document.querySelectorAll(".fi-ta-column-menu [role=menuitemradio]")].filter((item) => item.getAttribute("aria-checked") === "true" && item.querySelector(".fi-ta-column-menu-check").checkVisibility()).map((item) => item.dataset.columnMenuItem)';
+}
+
+it('changes a sorted column in place and puts a new one first, keeping the other sorts', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
+    $wire = 'Livewire.all().find((component) => component.name.includes("ListCompanies")).$wire';
+    $stored = "[{$wire}.tableSort, {$wire}.tableThenSorts].filter(Boolean).join()";
+
+    $page->script("{$wire}.setFilterBarSorts([{ column: 'name', direction: 'asc' }, { column: 'created_at', direction: 'desc' }])");
+    waitUntil($page, 'document.querySelector("[data-filter-sort-more]")?.textContent.trim() === "+1"');
+
+    $page->script(openColumnMenu('created_at'));
+    waitUntil($page, menuItemFocused())
+        ->assertScript(checkedSort(), ['sortDescending'])
+        ->click(columnMenuItem('sortAscending'));
+    waitUntil($page, $stored.' === "name:asc,created_at:asc"');
+
+    $page->script(openColumnMenu('creator.name'));
+    waitUntil($page, menuItemFocused())
+        ->assertScript(checkedSort(), [])
+        ->click(columnMenuItem('sortDescending'));
+    waitUntil($page, $stored.' === "creator.name:desc,name:asc,created_at:asc"')
+        ->assertNoJavaScriptErrors();
+});
+
+it('offers no sort in the menu of a column that cannot sort', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug)
+        ->assertPresent('th[data-column-sortable="0"] [data-column-menu-trigger]');
+
+    $page->script('document.querySelector(`th[data-column-sortable="0"] [data-column-menu-trigger]`).click()');
+
+    waitUntil($page, menuItemFocused())
+        ->assertScript(visibleMenuItems().'.includes("Sort ascending") || '.visibleMenuItems().'.includes("Sort descending")', false)
         ->assertNoJavaScriptErrors();
 });
 
@@ -209,7 +278,7 @@ it('jumps to the first and last menu item with Home and End', function (): void 
     waitUntil($page, menuItemFocused())->keys(':focus', 'End');
     waitUntil($page, "{$focusedItem} === 'hide'")->keys(':focus', 'Home');
 
-    waitUntil($page, "{$focusedItem} === 'moveLeft'")->assertNoJavaScriptErrors();
+    waitUntil($page, "{$focusedItem} === 'sortAscending'")->assertNoJavaScriptErrors();
 });
 
 it('moves a column right past a hidden one', function (): void {
@@ -236,7 +305,7 @@ it('works the handle by keyboard alone and keeps focus on the moved column', fun
     $handle = columnHeader('creator.name').' [data-column-menu-trigger]';
 
     $page->keys($handle, 'Enter');
-    waitUntil($page, menuItemFocused())->keys(':focus', ['ArrowDown', 'Enter']);
+    waitUntil($page, menuItemFocused())->keys(':focus', ['ArrowDown', 'ArrowDown', 'ArrowDown', 'Enter']);
     waitUntil($page, $positionIs($index + 1));
     waitUntil($page, $handleFocused);
 
@@ -522,7 +591,7 @@ it('offers only a label change in the title column menu of view settings', funct
 
     $page->click(settingsRow('name', '[data-view-settings-menu]'));
     waitUntil($page, 'document.querySelector(".fi-view-settings-row-menu").checkVisibility()')
-        ->assertScript('[...document.querySelectorAll(".fi-view-settings-row-menu [role=menuitem]")].filter((item) => item.offsetParent !== null).map((item) => item.textContent.trim())', ['Change attribute label'])
+        ->assertScript('[...document.querySelectorAll(".fi-view-settings-row-menu [role=menuitem]")].filter((item) => item.offsetParent !== null).map((item) => item.textContent.trim())', ['Edit column label'])
         ->assertNoJavaScriptErrors();
 });
 
@@ -540,7 +609,7 @@ it('opens the row menu beside its button, aligned to its start edge and inside t
 
     $page->click($trigger);
     waitUntil($page, 'document.querySelector(".fi-view-settings-row-menu").checkVisibility() && getComputedStyle(document.querySelector(".fi-view-settings-row-menu")).visibility === "visible"')
-        ->assertScript('[...document.querySelectorAll(".fi-view-settings-row-menu [role=menuitem]")].filter((item) => item.offsetParent !== null).map((item) => item.textContent.trim())', ['Change attribute label', 'Remove column'])
+        ->assertScript('[...document.querySelectorAll(".fi-view-settings-row-menu [role=menuitem]")].filter((item) => item.offsetParent !== null).map((item) => item.textContent.trim())', ['Edit column label', 'Hide from view'])
         ->assertScript(sprintf('(() => { const t = document.querySelector(`%s`).getBoundingClientRect(); const m = document.querySelector(".fi-view-settings-row-menu").getBoundingClientRect(); return Math.abs(m.left - t.left) <= 1 && m.top >= t.bottom && m.right <= document.documentElement.clientWidth && m.bottom <= document.documentElement.clientHeight; })()', $trigger), true)
         ->assertScript(sprintf('document.querySelector(`%s`).getAttribute("aria-expanded")', $trigger), 'true')
         ->assertNoJavaScriptErrors();
@@ -857,7 +926,7 @@ it('pins a column from its menu and keeps the pin after a reload', function (): 
 
     $page->script(openColumnMenu('created_at'));
     waitUntil($page, menuItemFocused())
-        ->assertScript(visibleMenuItems(), ['Unpin', 'Change attribute label', 'Remove column'])
+        ->assertScript(visibleMenuItems(), ['Sort ascending', 'Sort descending', 'Unpin', 'Edit column label', 'Hide from view'])
         ->assertNoJavaScriptErrors();
 });
 
@@ -866,7 +935,7 @@ it('pins the title column like any other and unpins a column from its lock', fun
         ->assertScript(headerOrder().'.slice(0, 2)', ['name', 'created_at']);
 
     $page->script(openColumnMenu('created_at'));
-    waitUntil($page, visibleMenuItems().'.join() === "Unpin,Change attribute label,Remove column"');
+    waitUntil($page, visibleMenuItems().'.join() === "Sort ascending,Sort descending,Unpin,Edit column label,Hide from view"');
     $page->click(columnMenuItem('unpin'));
     waitUntil($page, sprintf('document.querySelector(`%s`).dataset.columnPinned === "0"', columnHeader('created_at')))
         ->assertScript(sprintf('document.querySelector(`%s`).dataset.columnPinned', columnHeader('name')), '1')
@@ -1386,7 +1455,7 @@ it('keeps the row of the open menu highlighted and ties the button to the menu',
         ->assertNoJavaScriptErrors();
 });
 
-it('focuses the neighbouring row button after Remove column', function (): void {
+it('focuses the neighbouring row button after Hide from view', function (): void {
     $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
     $order = $page->script(settingsOrder());
 

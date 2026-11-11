@@ -650,9 +650,9 @@ it('words the row menu and the header menu from the same keys', function (): voi
     Filament::bootCurrentPanel();
     $html = livewire(ListCompanies::class)->html();
 
-    expect(substr_count($html, 'Change attribute label'))->toBe(2)
-        ->and(substr_count($html, 'Remove column'))->toBe(2)
-        ->and($html)->not->toContain('Edit column label')->not->toContain('Hide column');
+    expect(substr_count($html, 'Edit column label'))->toBe(2)
+        ->and(substr_count($html, 'Hide from view'))->toBe(2)
+        ->and($html)->not->toContain('Change attribute label')->not->toContain('Remove column');
 });
 
 it('escapes markup in a column label in view settings', function (): void {

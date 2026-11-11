@@ -22,6 +22,28 @@
         x-on:click.outside="$event.target.closest('.column-resize-handle-bar') || ! $event.target.closest('thead th[x-data^=resizableColumn]') ? close(false) : null"
         class="fi-dropdown-panel fi-ta-column-menu"
     >
+        <div class="fi-dropdown-list" x-show="sortable">
+            <x-filament::dropdown.list.item
+                icon="lucide-arrow-up-narrow-wide"
+                role="menuitemradio"
+                data-column-menu-item="sortAscending"
+                x-bind:aria-checked="(sorted === 'asc').toString()"
+                x-on:click="sortBy('asc')"
+            >
+                {{ __('filament/panel.tables.column_menu.sort_ascending') }}
+                <x-filament::icon icon="lucide-circle-check" class="fi-ta-column-menu-check" x-show="sorted === 'asc'" />
+            </x-filament::dropdown.list.item>
+            <x-filament::dropdown.list.item
+                icon="lucide-arrow-down-wide-narrow"
+                role="menuitemradio"
+                data-column-menu-item="sortDescending"
+                x-bind:aria-checked="(sorted === 'desc').toString()"
+                x-on:click="sortBy('desc')"
+            >
+                {{ __('filament/panel.tables.column_menu.sort_descending') }}
+                <x-filament::icon icon="lucide-circle-check" class="fi-ta-column-menu-check" x-show="sorted === 'desc'" />
+            </x-filament::dropdown.list.item>
+        </div>
         <div class="fi-dropdown-list" x-show="movable">
             <x-filament::dropdown.list.item
                 icon="lucide-arrow-left"
@@ -71,7 +93,7 @@
                 {{ __('filament/panel.tables.column_menu.edit_label') }}
             </x-filament::dropdown.list.item>
             <x-filament::dropdown.list.item
-                icon="lucide-circle-x"
+                icon="lucide-eye-off"
                 data-column-menu-item="hide"
                 x-show="hideable"
                 x-on:click="refresh() && choose(() => $wire.hideTableColumn(column), neighbour)"

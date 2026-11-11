@@ -7,12 +7,14 @@ namespace App\Filament\Tables\Concerns;
 use App\Actions\Views\SaveTablePreference;
 use App\Data\TableStateData;
 use App\Enums\CrmEntity;
+use App\Filament\Tables\FilterBar\SortList;
 use App\Models\SavedView;
 use App\Models\TablePreference;
 use App\Providers\Filament\AppPanelProvider;
 use App\Queries\Views\StoredTablePreferenceQuery;
 use Illuminate\Support\Arr;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Url;
 use LogicException;
 
 trait PersistsTableState
@@ -28,6 +30,10 @@ trait PersistsTableState
 
     #[Locked]
     public ?string $defaultSavedViewId = null;
+
+    // Filament's phone sort control rewrites a `tableSort` that is not one `column:direction`, so later sorts live here.
+    #[Url(as: 'then_sort')]
+    public ?string $tableThenSorts = null;
 
     private ?TableStateData $initialTableState = null;
 
@@ -51,7 +57,10 @@ trait PersistsTableState
 
         $initial = $this->initialTableState();
 
-        $this->tableSort = blank($this->tableSort) ? $initial->sort : $this->tableSort;
+        if (blank($this->tableSort)) {
+            $this->writeTableSorts(SortList::parse($initial->sort));
+        }
+
         $this->tableFilters = $this->canonicalTableFilters(blank($this->tableFilters) ? $initial->filters : $this->tableFilters);
         // The lists have no search box, so a ?search= link would filter with nothing to clear it.
         $this->tableSearch = '';
@@ -72,9 +81,7 @@ trait PersistsTableState
         $this->tableColumnWidths = $this->onlyTableColumns($this->tableColumnWidths);
         $this->tableColumnLabels = $this->onlyTableColumns($this->tableColumnLabels);
 
-        if (filled($this->tableSort) && ! array_key_exists(explode(':', $this->tableSort)[0], $table->getColumns())) {
-            $this->tableSort = null;
-        }
+        $this->writeTableSorts(array_intersect_key($this->tableSorts(), $table->getColumns()));
 
         if ($table->isPaginated() && ! $this->isOfferedTablePageSize($this->tableRecordsPerPage)) {
             $this->tableRecordsPerPage = $this->getDefaultTableRecordsPerPageSelectOption();
@@ -89,6 +96,8 @@ trait PersistsTableState
 
     public function dehydratePersistsTableState(): void
     {
+        $this->saveActiveSavedView();
+
         $state = $this->currentTableState();
         $hash = $this->tableStateSignature($state);
 
@@ -96,8 +105,6 @@ trait PersistsTableState
             resolve(SaveTablePreference::class)->execute(
                 $this->savedViewUser(),
                 $this->savedViewWorkspace(),
-        $this->saveActiveSavedView();
-
                 $this->tableEntity(),
                 $state,
                 $this->getActiveSavedView(),
@@ -111,6 +118,11 @@ trait PersistsTableState
         $this->ownTableStateDirty = false;
     }
 
+    private function tableStateSignature(TableStateData $state): string
+    {
+        return hash('xxh128', "{$state->hash()}|{$this->activeSavedViewId}|{$this->appliedSavedViewHash}");
+    }
+
     /**
      * @return array<int, array{type: string, name: string, label: string, isHidden: bool, isToggled: bool, isToggleable: bool, isToggledHiddenByDefault: ?bool, columns?: array<int, array{type: string, name: string, label: string, isHidden: bool, isToggled: bool, isToggleable: bool, isToggledHiddenByDefault: ?bool}>}>
      */
@@ -118,11 +130,6 @@ trait PersistsTableState
     {
         return $this->tableColumnsFrom($this->initialTableState());
     }
-    private function tableStateSignature(TableStateData $state): string
-    {
-        return hash('xxh128', "{$state->hash()}|{$this->activeSavedViewId}|{$this->appliedSavedViewHash}");
-    }
-
 
     /**
      * @template TValue
@@ -143,7 +150,7 @@ trait PersistsTableState
         $this->applyTableColumnManager($this->tableColumnsFrom($state), wasReordered: true);
         $this->stampResizableColumns($this->getTable());
 
-        $this->tableSort = $state->sort;
+        $this->writeTableSorts(SortList::parse($state->sort));
         $this->updatedTableSort();
 
         $this->tableGrouping = $state->grouping;
@@ -325,11 +332,28 @@ trait PersistsTableState
         $this->appliedSavedViewHash = $this->currentTableState()->withoutWidths()->hash();
     }
 
+    /**
+     * @return array<string, 'asc'|'desc'>
+     */
+    private function tableSorts(): array
+    {
+        return SortList::parse(implode(',', array_filter([$this->tableSort, $this->tableThenSorts])));
+    }
+
+    /**
+     * @param  array<string, string>  $sorts
+     */
+    private function writeTableSorts(array $sorts): void
+    {
+        $this->tableSort = SortList::format(array_slice($sorts, 0, 1, preserve_keys: true));
+        $this->tableThenSorts = SortList::format(array_slice($sorts, 1, preserve_keys: true));
+    }
+
     private function currentTableState(): TableStateData
     {
         return new TableStateData(
             columns: array_values(array_map(fn (array $item): array => Arr::only($item, ['type', 'name', 'isToggled']), $this->tableColumns)),
-            sort: filled($this->tableSort) ? $this->tableSort : null,
+            sort: SortList::format($this->tableSorts()),
             filters: $this->canonicalTableFilters($this->tableFilters),
             grouping: filled($this->tableGrouping) ? $this->tableGrouping : null,
             perPage: $this->tableRecordsPerPage,

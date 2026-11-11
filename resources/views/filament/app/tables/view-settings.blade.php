@@ -193,7 +193,7 @@
             </div>
             <div class="fi-dropdown-list" x-show="! locked">
                 <x-filament::dropdown.list.item
-                    icon="lucide-circle-x"
+                    icon="lucide-eye-off"
                     data-view-settings-menu-item="remove"
                     x-on:click="remove()"
                 >

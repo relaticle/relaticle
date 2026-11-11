@@ -10,65 +10,7 @@
 >
     <div class="fi-filter-bar-scroll" data-filter-scroll>
     <div class="fi-filter-bar-start" x-ref="strip" x-on:scroll.passive="fade()" x-on:focusin="$event.target.matches(':focus-visible') && revealFocus($event.target)" wire:ignore role="group" aria-label="{{ __('filament/panel.tables.filters.bar') }}">
-        <div class="fi-filter-part">
-            <button
-                type="button"
-                tabindex="0"
-                class="fi-filter-ghost"
-                data-filter-sort
-                data-pop-trigger
-                x-bind:class="{ 'fi-set': sort, 'fi-open': isOpen('sort', 'main') }"
-                x-bind:aria-expanded="isOpen('sort', 'main').toString()"
-                x-bind:aria-label="sort ? @js(__('filament/panel.tables.filters.sort_set')).replace(':column', sort.label).replace(':direction', sort.direction === 'asc' ? @js(__('filament/panel.tables.filters.sort_ascending')) : @js(__('filament/panel.tables.filters.sort_descending'))) : @js(__('filament/panel.tables.filters.sort'))"
-                aria-haspopup="menu"
-                x-on:click="toggle('sort', 'main', $event)"
-            >
-                <x-filament::icon icon="lucide-arrow-down-wide-narrow" x-show="! sort" />
-                <x-filament::icon icon="lucide-arrow-up" x-show="sort?.direction === 'asc'" />
-                <x-filament::icon icon="lucide-arrow-down" x-show="sort?.direction === 'desc'" />
-                <template x-if="! sort"><span class="max-sm:hidden">{{ __('filament/panel.tables.filters.sort') }}</span></template>
-                <template x-if="sort"><span class="fi-filter-sorted inline-flex min-w-0 gap-1 max-sm:hidden" data-filter-sort-label><span class="fi-filter-muted">{{ __('filament/panel.tables.filters.sorted_by') }}</span> <span class="fi-filter-sorted-column" x-text="sort.label"></span></span></template>
-            </button>
-
-            <template x-if="isOpen('sort', 'main')">
-            <div class="fi-filter-pop" x-anchor.bottom-start.offset.6.fixed="$el.parentElement" data-pop data-sheet x-bind:data-open="isOpen('sort', 'main')" role="menu" aria-label="{{ __('filament/panel.tables.filters.sort_by') }}" x-on:keydown="navigate($event)">
-                <div class="fi-filter-options">
-                    <template x-for="column in sortable" x-bind:key="column.key">
-                        <button
-                            type="button"
-                            tabindex="0"
-                            role="menuitemradio"
-                            class="fi-filter-item"
-                            data-pop-item
-                            data-sort-column
-                            x-bind:data-column="column.key"
-                            x-bind:class="{ 'fi-on': sort?.column === column.key }"
-                            x-bind:aria-checked="(sort?.column === column.key).toString()"
-                            x-on:click="orderBy(column)"
-                        >
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path x-bind:d="column.icon"></path></svg>
-                            <span class="fi-filter-label" x-text="column.label"></span>
-                            <x-filament::icon icon="lucide-arrow-up" class="fi-filter-tick" x-show="sort?.column === column.key && sort.direction === 'asc'" />
-                            <x-filament::icon icon="lucide-arrow-down" class="fi-filter-tick" x-show="sort?.column === column.key && sort.direction === 'desc'" />
-                        </button>
-                    </template>
-                </div>
-                <template x-if="sort">
-                    <div>
-                        <div class="fi-filter-rule" aria-hidden="true"></div>
-                        <button type="button" tabindex="0" role="menuitem" class="fi-filter-item" data-pop-item data-sort-flip x-on:click="flipSort()">
-                            <x-filament::icon icon="lucide-arrow-up-down" />
-                            <span x-text="sort.direction === 'asc' ? @js(__('filament/panel.tables.filters.sort_flip_to_descending')) : @js(__('filament/panel.tables.filters.sort_flip_to_ascending'))"></span>
-                        </button>
-                        <button type="button" tabindex="0" role="menuitem" class="fi-filter-item fi-danger" data-pop-item data-sort-clear x-on:click="clearSort()">
-                            <x-filament::icon icon="lucide-x" />
-                            {{ __('filament/panel.tables.filters.sort_clear') }}
-                        </button>
-                    </div>
-                </template>
-            </div>
-            </template>
-        </div>
+        @include('filament.app.tables.filter-sort')
 
         <template x-if="groups.length > 0">
         <div class="fi-filter-part">

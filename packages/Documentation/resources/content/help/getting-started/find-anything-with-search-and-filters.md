@@ -61,10 +61,13 @@ allowed to see deleted records.
 
 ## Sort and group a list
 
-Click **Sort** to order the list by a column, flip the direction, or clear
-it. Once a column is set, the button reads **Sorted by** and the column
-name. On Tasks, **Group** groups the
-list by status or priority.
+Click **Sort** and search for the column to order the list by. Click
+**Add sort** to break ties with another column, and drag a row by its
+handle to change which sort comes first. Each row switches between
+ascending and descending, and its X removes it. The button reads
+**Sorted by** and the first column, plus a count when more follow.
+
+On Tasks, **Group** groups the list by status or priority.
 
 A saved view is yours alone, and it saves itself. Change a filter, sort,
 grouping, column or column name while a view is open, and the view keeps the

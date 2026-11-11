@@ -23,8 +23,9 @@
             return {
                 fields: [],
                 units: [],
-                sort: null,
+                sorts: [],
                 sortable: [],
+                sortTarget: null,
                 grouping: null,
                 groups: [],
                 deleted: null,
@@ -84,7 +85,7 @@
 
                     this.fields = state.fields
                     this.units = state.periodUnits
-                    this.sort = state.sort
+                    this.sorts = state.sorts
                     this.sortable = state.sortable
                     this.grouping = state.grouping
                     this.groups = state.groups
@@ -320,10 +321,17 @@
                 },
 
                 escape(event) {
-                    if (this.open) {
-                        event.stopPropagation()
-                        this.close(true)
+                    if (!this.open) {
+                        return
                     }
+
+                    event.stopPropagation()
+
+                    if (this.isOpen('sort', 'pick') && this.sorts.length > 0) {
+                        return this.showSorts(this.sortTarget)
+                    }
+
+                    this.close(true)
                 },
 
                 outside(event) {
@@ -455,19 +463,109 @@
                     this.$nextTick(() => root.querySelector('[data-filter-add]')?.focus())
                 },
 
-                async orderBy(column) {
-                    const flipped = this.sort?.column === column.key && this.sort.direction === 'asc' ? 'desc' : 'asc'
+                sortSummary(empty, one, more, ascending, descending) {
+                    const [first] = this.sorts
 
-                    await this.$wire.setFilterBarSort(column.key, flipped)
+                    if (!first) {
+                        return empty
+                    }
+
+                    return (this.sorts.length > 1 ? more : one)
+                        .replace(':column', first.label)
+                        .replace(':direction', first.direction === 'asc' ? ascending : descending)
+                        .replace(':count', this.sorts.length - 1)
                 },
 
-                async flipSort() {
-                    await this.$wire.setFilterBarSort(this.sort.column, this.sort.direction === 'asc' ? 'desc' : 'asc')
+                choosingSort() {
+                    return this.isOpen('sort', 'pick') || this.sorts.length === 0
                 },
 
-                async clearSort() {
-                    this.close(true)
-                    await this.$wire.setFilterBarSort(null, null)
+                sortChoices() {
+                    const term = this.find.trim().toLowerCase()
+                    const used = this.sorts.map((sort) => sort.column).filter((column) => column !== this.sortTarget)
+
+                    return this.sortable.filter((column) => !used.includes(column.key) && column.label.toLowerCase().includes(term))
+                },
+
+                sortIcon(column) {
+                    return this.sortable.find((option) => option.key === column)?.icon ?? ''
+                },
+
+                chooseSort(target) {
+                    this.open = { id: 'sort', part: 'pick' }
+                    this.sortTarget = target
+                    this.find = ''
+                    this.$nextTick(() => root.querySelector('[data-sort-pop] input[data-filter-find]')?.focus())
+                },
+
+                showSorts(focusColumn = null, control = 'field') {
+                    this.open = { id: 'sort', part: 'main' }
+                    this.sortTarget = null
+                    this.find = ''
+                    this.focusSort(focusColumn, control)
+                },
+
+                focusSort(column, control) {
+                    this.$nextTick(() => {
+                        const row = column === null ? null : root.querySelector(`[data-sort-row][data-column="${CSS.escape(column)}"]`)
+
+                        ;(row?.querySelector(`[data-sort-${control}]`) ?? root.querySelector('[data-sort-pop] [data-pop-item], [data-sort-pop] input'))?.focus()
+                    })
+                },
+
+                pickFirstSort() {
+                    const first = this.sortChoices()[0]
+
+                    if (first) {
+                        this.pickSort(first)
+                    }
+                },
+
+                pickSort(column) {
+                    const sorts = this.sortTarget === null
+                        ? [...this.sorts, { column: column.key, direction: 'asc' }]
+                        : this.sorts.map((sort) => (sort.column === this.sortTarget ? { ...sort, column: column.key } : sort))
+
+                    this.applySorts(sorts)
+                    this.showSorts(column.key)
+                },
+
+                flipSortAt(column) {
+                    this.applySorts(this.sorts.map((sort) => (sort.column === column ? { ...sort, direction: sort.direction === 'asc' ? 'desc' : 'asc' } : sort)))
+                },
+
+                removeSort(column) {
+                    const index = this.sorts.findIndex((sort) => sort.column === column)
+                    const sorts = this.sorts.filter((sort) => sort.column !== column)
+                    const next = sorts[Math.min(index, sorts.length - 1)]
+
+                    this.applySorts(sorts)
+                    this.focusSort(next?.column ?? null, 'remove')
+                },
+
+                moveSort(column, delta) {
+                    const index = this.sorts.findIndex((sort) => sort.column === column)
+
+                    if (index + delta < 0 || index + delta >= this.sorts.length) {
+                        return
+                    }
+
+                    this.reorderSort(column, index + delta)
+                    this.focusSort(column, 'grip')
+                },
+
+                reorderSort(column, position) {
+                    const moved = this.sorts.find((sort) => sort.column === column)
+                    const sorts = this.sorts.filter((sort) => sort.column !== column)
+
+                    sorts.splice(position, 0, moved)
+                    this.applySorts(sorts)
+                },
+
+                async applySorts(sorts) {
+                    this.sorts = sorts.map((sort) => ({ ...sort, label: this.sortable.find((option) => option.key === sort.column)?.label ?? sort.column }))
+
+                    await this.$wire.setFilterBarSorts(sorts.map(({ column, direction }) => ({ column, direction })))
                 },
 
                 async groupBy(group) {

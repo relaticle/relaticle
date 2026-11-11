@@ -1161,8 +1161,23 @@ it('hands the sort control the direction a saved view sorts by', function (strin
     $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey());
 
     expect($component->get('tableSort'))->toBe($sort)
-        ->and($component->instance()->getFilterBarData()['sort'])->toMatchArray(['column' => 'name', 'direction' => $direction]);
+        ->and($component->instance()->getFilterBarData()['sorts'][0])->toMatchArray(['column' => 'name', 'direction' => $direction]);
 })->with([
     'descending' => ['name:desc', 'desc'],
     'ascending' => ['name:asc', 'asc'],
 ]);
+
+it('opens a view sorted by several columns with every sort and unmodified', function (): void {
+    $view = viewFor($this->user, ['entity' => CrmEntity::Company, 'state' => new TableStateData(sort: 'name:desc,created_at:asc')]);
+
+    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())
+        ->assertSet('tableSort', 'name:desc')
+        ->assertSet('tableThenSorts', 'created_at:asc');
+
+    expect(array_column($component->instance()->getFilterBarData()['sorts'], 'direction', 'column'))->toBe(['name' => 'desc', 'created_at' => 'asc'])
+        ->and($component->instance()->isSavedViewModified())->toBeFalse();
+
+    $component->call('setFilterBarSorts', [['column' => 'created_at', 'direction' => 'asc'], ['column' => 'name', 'direction' => 'desc']]);
+
+    expect($view->refresh()->state->sort)->toBe('created_at:asc,name:desc');
+});

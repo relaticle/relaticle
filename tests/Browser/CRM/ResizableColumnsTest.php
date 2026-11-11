@@ -275,7 +275,7 @@ it('keeps resizing after navigating to another table and after sorting', functio
     $page->script(dragColumnEdge('name', 120));
     $page->wait(1);
 
-    $page->script('Livewire.all().find((component) => /List(Companies|People)/.test(component.name)).$wire.setFilterBarSort("name", "asc")');
+    $page->script('Livewire.all().find((component) => /List(Companies|People)/.test(component.name)).$wire.setFilterBarSorts([{ column: "name", direction: "asc" }])');
 
     $page->wait(1)
         ->assertScript($savedWidth, (string) ($before + 120))
@@ -375,7 +375,7 @@ it('keeps a width when the table is sorted straight after the drag', function ()
     $before = $page->script(headerWidth('created_at'));
 
     $page->script(dragColumnEdge('created_at', 120));
-    $page->script('Livewire.all().find((component) => /List(Companies|People)/.test(component.name)).$wire.setFilterBarSort("name", "asc")');
+    $page->script('Livewire.all().find((component) => /List(Companies|People)/.test(component.name)).$wire.setFilterBarSorts([{ column: "name", direction: "asc" }])');
 
     $page->wait(1.5)
         ->assertScript(headerWidth('created_at'), $before + 120)

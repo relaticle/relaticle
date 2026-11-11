@@ -175,6 +175,64 @@ button.fi-filter-seg {
     @apply px-2 pt-1.5 pb-0.5 text-xs whitespace-normal text-gray-400 dark:text-gray-500;
 }
 
+.fi-filter-sorts {
+    @apply flex w-104 max-w-[calc(100vw-1rem)] flex-col gap-1;
+}
+
+.fi-filter-sort-list {
+    @apply flex flex-col gap-1 p-1;
+}
+
+.fi-filter-sort-row {
+    @apply flex items-center gap-1.5 bg-white dark:bg-gray-900;
+}
+
+:is(.fi-filter-sort-grip, .fi-filter-sort-remove) {
+    @apply flex size-8 shrink-0 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:bg-gray-100 focus-visible:outline-0 dark:text-gray-500 dark:hover:bg-white/5 dark:hover:text-gray-200 dark:focus-visible:bg-white/5;
+
+    & svg {
+        @apply size-4;
+    }
+}
+
+.fi-filter-sort-grip {
+    @apply cursor-grab;
+}
+
+:is(.fi-filter-sort-select, .fi-filter-sort-add) {
+    @apply flex h-8 min-w-0 items-center gap-2 rounded-lg px-2.5 text-sm whitespace-nowrap ring-1 ring-gray-950/10 hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:outline-0 dark:ring-white/15 dark:hover:bg-white/5 dark:focus-visible:ring-primary-500;
+
+    & svg {
+        @apply size-4 shrink-0 text-gray-500 dark:text-gray-400;
+    }
+}
+
+.fi-filter-sort-field {
+    @apply flex-1;
+}
+
+.fi-filter-sort-chevron {
+    @apply ms-auto;
+}
+
+.fi-filter-sort-direction {
+    @apply w-36 shrink-0;
+}
+
+.fi-filter-sort-add {
+    @apply ms-1 mb-1 gap-1.5 self-start;
+}
+
+.fi-filter-sort-learn,
+.fi-filter-sort-learn svg {
+    @apply text-gray-500 dark:text-gray-400;
+}
+
+body.sorting,
+body.sorting * {
+    @apply cursor-grabbing!;
+}
+
 .fi-filter-editor {
     @apply flex gap-1.5 p-1;
 
@@ -308,6 +366,26 @@ button.fi-filter-seg {
 
     .fi-filter-item {
         @apply h-11 text-base;
+    }
+
+    .fi-filter-sorts {
+        @apply w-full;
+    }
+
+    .fi-filter-sort-direction {
+        @apply w-auto;
+
+        & span {
+            @apply hidden;
+        }
+    }
+
+    .fi-filter-sort-chevron {
+        @apply hidden;
+    }
+
+    :is(.fi-filter-sort-select, .fi-filter-sort-add, .fi-filter-sort-grip, .fi-filter-sort-remove) {
+        @apply h-10 text-base;
     }
 }
 

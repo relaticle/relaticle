@@ -23,6 +23,7 @@ use App\Filament\Tables\FilterBar\ConditionsFilter;
 use App\Filament\Tables\FilterBar\FilterFieldCatalog;
 use App\Filament\Tables\FilterBar\FilterRuleCompiler;
 use App\Filament\Tables\FilterBar\FilterRules;
+use App\Filament\Tables\FilterBar\SortList;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -61,6 +62,7 @@ mutates(
     HasFilterBar::class,
     LogicFilter::class,
     PersistsTableState::class,
+    SortList::class,
     TreeFilter::class,
 );
 
@@ -2074,15 +2076,16 @@ it('sets the sort from the filter bar the way a header click does', function (st
     $component = livewire($page);
     $column = collect($component->instance()->getTable()->getVisibleColumns())->first(fn ($column): bool => $column->isSortable())->getName();
 
-    $component->call('setFilterBarSort', $column, 'desc')
+    $component->call('setFilterBarSorts', [['column' => $column, 'direction' => 'desc']])
         ->assertSet('tableSort', "{$column}:desc");
 
-    expect($component->instance()->getFilterBarData()['sort'])->toMatchArray(['column' => $column, 'direction' => 'desc']);
+    expect($component->instance()->getFilterBarData()['sorts'])->toHaveCount(1)
+        ->and($component->instance()->getFilterBarData()['sorts'][0])->toMatchArray(['column' => $column, 'direction' => 'desc']);
 
-    $component->call('setFilterBarSort', $column, 'asc')->assertSet('tableSort', "{$column}:asc")
-        ->call('setFilterBarSort', null, null)->assertSet('tableSort', null);
+    $component->call('setFilterBarSorts', [['column' => $column, 'direction' => 'asc']])->assertSet('tableSort', "{$column}:asc")
+        ->call('setFilterBarSorts', [])->assertSet('tableSort', null)->assertSet('tableThenSorts', null);
 
-    expect($component->instance()->getFilterBarData()['sort'])->toBeNull();
+    expect($component->instance()->getFilterBarData()['sorts'])->toBe([]);
 })->with('filter bar pages');
 
 it('ignores a sort the table does not hold or cannot sort', function (string $page): void {
@@ -2090,13 +2093,11 @@ it('ignores a sort the table does not hold or cannot sort', function (string $pa
     $plain = collect($component->instance()->getTable()->getVisibleColumns())->first(fn ($column): bool => ! $column->isSortable());
     $sortable = collect($component->instance()->getTable()->getVisibleColumns())->first(fn ($column): bool => $column->isSortable())->getName();
 
-    $component->call('setFilterBarSort', $sortable, 'asc');
+    $rejected = array_map(fn (string $name): array => ['column' => $name, 'direction' => 'desc'], array_filter(['no_such_column', 'id', '', $plain?->getName()]));
 
-    foreach (array_filter(['no_such_column', 'id', '', $plain?->getName()]) as $name) {
-        $component->call('setFilterBarSort', $name, 'desc')->assertSet('tableSort', "{$sortable}:asc");
-    }
-
-    $component->call('setFilterBarSort', $sortable, 'sideways')->assertSet('tableSort', "{$sortable}:asc");
+    $component->call('setFilterBarSorts', [...$rejected, ['column' => $sortable, 'direction' => 'sideways'], ['column' => $sortable], ['column' => $sortable, 'direction' => 'desc'], 'name', null])
+        ->assertSet('tableSort', "{$sortable}:asc")
+        ->assertSet('tableThenSorts', null);
 })->with('filter bar pages');
 
 it('offers the sort control only columns the member can see and sort', function (): void {
@@ -2105,10 +2106,10 @@ it('offers the sort control only columns the member can see and sort', function 
 
     expect($sortable)->toContain('name')->and($sortable)->not->toContain('no_such_column');
 
-    $component->call('setFilterBarSort', 'name', 'asc');
+    $component->call('setFilterBarSorts', [['column' => 'name', 'direction' => 'asc']]);
     $component->call('sortTable', 'no_such_column', 'asc');
 
-    expect($component->instance()->getFilterBarData()['sort'])->toBeNull();
+    expect($component->instance()->getFilterBarData()['sorts'])->toBe([]);
 });
 
 it('lists the groups a table declares and writes the grouping a toolbar change writes', function (): void {
@@ -2212,6 +2213,30 @@ it('ignores a sort written straight from the browser and keeps the one a header 
         ->call('sortTable', 'name', 'desc')
         ->set('tableSort', 'name:asc')
         ->assertSet('tableSort', 'name:desc')
-        ->call('setFilterBarSort', 'name', 'asc')
+        ->call('setFilterBarSorts', [['column' => 'name', 'direction' => 'asc']])
         ->assertSet('tableSort', 'name:asc');
 });
+
+it('orders by each sort in turn and breaks ties with the next one', function (): void {
+    $older = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme', 'created_at' => now()->subDays(3)]);
+    $newer = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme', 'created_at' => now()->subDay()]);
+    $other = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Beta', 'created_at' => now()->subDays(5)]);
+
+    $component = livewire(ListCompanies::class);
+    $order = fn (array $sorts): array => $component->call('setFilterBarSorts', $sorts)->instance()->getTableRecords()->modelKeys();
+
+    expect($order([['column' => 'name', 'direction' => 'asc'], ['column' => 'created_at', 'direction' => 'asc']]))->toBe([$older->getKey(), $newer->getKey(), $other->getKey()])
+        ->and($order([['column' => 'name', 'direction' => 'asc'], ['column' => 'created_at', 'direction' => 'desc']]))->toBe([$newer->getKey(), $older->getKey(), $other->getKey()])
+        ->and($order([['column' => 'created_at', 'direction' => 'asc'], ['column' => 'name', 'direction' => 'asc']]))->toBe([$other->getKey(), $older->getKey(), $newer->getKey()]);
+});
+
+it('sorts by every sortable column at once, relations and custom fields included', function (string $page, string $model): void {
+    $record = $model::factory()->recycle([$this->user, $this->workspace])->create();
+    $component = livewire($page);
+    $sortable = array_column($component->instance()->getFilterBarData()['sortable'], 'key');
+
+    $component->call('setFilterBarSorts', array_map(fn (string $column): array => ['column' => $column, 'direction' => 'desc'], $sortable))
+        ->assertCanSeeTableRecords([$record]);
+
+    expect(array_column($component->instance()->getFilterBarData()['sorts'], 'column'))->toBe($sortable);
+})->with('filter bar pages');

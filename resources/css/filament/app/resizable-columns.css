@@ -158,6 +158,14 @@ th[data-column-pinned="1"] > .fi-ta-resizable-label::after {
     @apply fixed z-60 w-56 transition-none;
 }
 
+.fi-ta-column-menu [role="menuitemradio"] .fi-dropdown-list-item-label {
+    @apply flex items-center justify-between gap-2;
+}
+
+.fi-ta-column-menu-check {
+    @apply size-4 shrink-0 text-primary-600 dark:text-primary-400;
+}
+
 /* The dragged column's slot stays empty and travels with the drop position. */
 .fi-ta-resizable-table .fi-ta-column-dragging {
     @apply bg-gray-100 dark:bg-gray-800;

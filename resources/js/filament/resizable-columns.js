@@ -376,6 +376,13 @@
         return [...table.querySelectorAll('thead th[x-data^="resizableColumn"]')]
     }
 
+    // The filter bar owns the sort list, so the menu reads the copy the server last rendered there.
+    function sortsOf(table) {
+        const state = table?.querySelector('[data-filter-bar]')?.dataset.state
+
+        return state ? JSON.parse(state).sorts.map(({ column, direction }) => ({ column, direction })) : []
+    }
+
     function headerName(th) {
         return th ? window.Alpine?.$data?.(th)?.columnName ?? null : null
     }
@@ -657,6 +664,8 @@
             anchor: null,
             panel: null,
             hideable: false,
+            sortable: false,
+            sorted: null,
             movable: false,
             pinned: false,
             canMoveLeft: false,
@@ -732,7 +741,7 @@
             },
 
             items() {
-                return [...this.panel.querySelectorAll('[role="menuitem"]')].filter((item) => !item.disabled && item.offsetParent !== null)
+                return [...this.panel.querySelectorAll('[role^="menuitem"]')].filter((item) => !item.disabled && item.offsetParent !== null)
             },
 
             step(delta) {
@@ -755,6 +764,16 @@
                 runColumnAction(run, focusColumn)
                 this.close(false)
                 swallowDoubleClickTail()
+            },
+
+            sortBy(direction) {
+                const column = this.column
+                const sorts = sortsOf(this.$el.closest('.fi-ta'))
+                const next = sorts.some((sort) => sort.column === column)
+                    ? sorts.map((sort) => (sort.column === column ? { column, direction } : sort))
+                    : [{ column, direction }, ...sorts]
+
+                this.choose(() => this.$wire.setFilterBarSorts(next), column)
             },
 
             editLabel() {
@@ -1047,6 +1066,8 @@
                         trigger,
                         anchor: this.column,
                         hideable: this.column.dataset.columnHideable === '1',
+                        sortable: this.column.dataset.columnSortable === '1',
+                        sorted: sortsOf(this.column.closest('.fi-ta')).find((sort) => sort.column === columnName)?.direction ?? null,
                         pinned: this.column.dataset.columnPinned === '1',
                         ...moveTargets(this.column),
                     },

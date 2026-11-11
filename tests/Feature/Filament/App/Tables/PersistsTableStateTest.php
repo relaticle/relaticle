@@ -160,6 +160,27 @@ it('lets a query string sort win over saved state and writes nothing', function 
         ->and(TablePreference::query()->withoutGlobalScopes()->value('updated_at'))->toEqual($updatedAt);
 });
 
+it('keeps the query string sorts the table can apply and drops the rest', function (): void {
+    $component = Livewire::withQueryParams(['sort' => 'no_such_column:asc', 'then_sort' => 'name:desc,created_at:sideways,name:asc,,created_at'])->test(ListCompanies::class);
+
+    expect($component->get('tableSort'))->toBe('name:desc')
+        ->and($component->get('tableThenSorts'))->toBe('created_at:asc');
+});
+
+it('keeps the stored sorts whose columns still exist', function (): void {
+    TablePreference::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+        'entity' => CrmEntity::Company,
+        'state' => new TableStateData(
+            columns: [['type' => 'column', 'name' => 'name', 'isToggled' => true]],
+            sort: 'custom_fields.gone:asc,created_at:desc,name:asc',
+        ),
+    ]);
+
+    livewire(ListCompanies::class)
+        ->assertSet('tableSort', 'created_at:desc')
+        ->assertSet('tableThenSorts', 'name:asc');
+});
+
 it('opens at the default page size when the saved one is not offered', function (): void {
     TablePreference::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
         'entity' => CrmEntity::Company,

@@ -878,13 +878,85 @@ it('sets the sort from the control and shows it in the column header, then flips
         ->assertScript(filterBarWaitFor('document.querySelector("[data-filter-sort]").classList.contains("fi-set")'), true)
         ->assertSeeIn('[data-filter-sort]', 'Company')
         ->assertScript('document.querySelector("[data-pop][data-open=true]")?.checkVisibility()', true)
-        ->click('[data-sort-flip]')
+        ->assertScript('document.activeElement.matches(`[data-sort-row][data-column="name"] [data-sort-field]`)', true)
+        ->click('[data-sort-row][data-column="name"] [data-sort-direction]')
         ->assertScript(filterBarWaitFor('document.querySelector(".fi-ta-header-cell-name")?.getAttribute("aria-sort") === "descending"'), true)
         ->assertScript('document.querySelector("[data-pop][data-open=true]")?.checkVisibility()', true)
-        ->assertScript('[...document.querySelectorAll("[data-pop][data-open=true] [data-sort-column]")].every((item) => item.querySelector("svg path")?.getAttribute("d"))', true)
-        ->click('[data-sort-clear]')
+        ->click('[data-sort-row][data-column="name"] [data-sort-remove]')
         ->assertScript(filterBarWaitFor('document.querySelector(".fi-ta-header-cell-name")?.getAttribute("aria-sort") === "none"'), true)
         ->assertScript('! document.querySelector("[data-filter-sort]").classList.contains("fi-set")', true)
+        ->assertScript('[...document.querySelectorAll("[data-pop][data-open=true] [data-sort-column]")].every((item) => item.querySelector("svg path")?.getAttribute("d"))', true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('adds, searches, reorders and keeps several sorts', function (): void {
+    $page = ($this->open)()
+        ->click('[data-filter-sort]')
+        ->assertScript('document.activeElement.matches("[data-sort-pop] input[data-filter-find]")', true)
+        ->type('[data-sort-pop] input[data-filter-find]', 'compa')
+        ->assertScript('[...document.querySelectorAll("[data-sort-pop] [data-sort-column]")].map((item) => item.dataset.column)', ['name'])
+        ->keys('[data-sort-pop] input[data-filter-find]', 'Enter')
+        ->assertScript(filterBarWaitFor('document.querySelectorAll("[data-sort-row]").length === 1'), true)
+        ->click('[data-sort-add]')
+        ->assertScript('[...document.querySelectorAll("[data-sort-pop] [data-sort-column]")].some((item) => item.dataset.column === "name")', false)
+        ->keys('[data-sort-pop] input[data-filter-find]', 'Escape')
+        ->assertScript('document.querySelectorAll("[data-sort-row]").length === 1', true)
+        ->click('[data-sort-add]')
+        ->click('[data-sort-pop] [data-sort-column][data-column="created_at"]');
+
+    $page->assertScript(filterBarWaitFor('document.querySelector("[data-filter-sort-more]")?.textContent.trim() === "+1"'), true)
+        ->assertScript(filterBarWaitFor('document.querySelector("[data-filter-sort]").getAttribute("aria-label") === "Sorted by Company, ascending, then 1 more"'), true)
+        ->keys('[data-sort-row][data-column="created_at"] [data-sort-grip]', 'ArrowUp')
+        ->assertScript(filterBarWaitFor('[...document.querySelectorAll("[data-sort-row]")].map((row) => row.dataset.column).join() === "created_at,name"'), true)
+        ->assertScript('document.activeElement.matches(`[data-sort-row][data-column="created_at"] [data-sort-grip]`)', true)
+        ->assertScript(filterBarWaitFor('Livewire.all().find((component) => component.name.includes("ListCompanies")).$wire.tableThenSorts === "name:asc"'), true)
+        ->refresh()
+        ->assertPresent('[data-filter-sort].fi-set')
+        ->assertSeeIn('[data-filter-sort]', 'Sorted by Creation Date')
+        ->click('[data-filter-sort]')
+        ->assertScript('[...document.querySelectorAll("[data-sort-row]")].map((row) => row.dataset.column).join()', 'created_at,name')
+        ->assertNoJavaScriptErrors();
+});
+
+it('focuses the search every time the sort picker opens from the editor', function (): void {
+    $page = ($this->open)()
+        ->click('[data-filter-sort]')
+        ->click('[data-sort-pop] [data-sort-column][data-column="name"]');
+    $searchFocused = 'document.activeElement.matches("[data-sort-pop] input[data-filter-find]")';
+
+    $page->assertScript(filterBarWaitFor('document.querySelectorAll("[data-sort-row]").length === 1'), true)
+        ->click('[data-sort-add]')
+        ->assertScript(filterBarWaitFor($searchFocused), true)
+        ->click('[data-sort-pop] [data-sort-column][data-column="created_at"]');
+
+    $page->assertScript(filterBarWaitFor('document.querySelectorAll("[data-sort-row]").length === 2'), true)
+        ->click('[data-sort-add]')
+        ->assertScript(filterBarWaitFor($searchFocused), true)
+        ->keys('[data-sort-pop] input[data-filter-find]', 'Escape')
+        ->click('[data-sort-row][data-column="name"] [data-sort-field]')
+        ->assertScript(filterBarWaitFor($searchFocused), true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('drags sort rows into a new order and keeps the list and the rows in step', function (): void {
+    $page = ($this->open)();
+    $page->script('Livewire.all().find((component) => component.name.includes("ListCompanies")).$wire.setFilterBarSorts([{ column: "name", direction: "asc" }, { column: "created_at", direction: "desc" }, { column: "updated_at", direction: "asc" }])');
+    $rows = '[...document.querySelectorAll("[data-sort-row]")].map((row) => row.dataset.column).join()';
+    $stored = '(() => { const wire = Livewire.all().find((component) => component.name.includes("ListCompanies")).$wire; return [wire.tableSort, wire.tableThenSorts].join(","); })()';
+
+    $page->assertScript(filterBarWaitFor('document.querySelector("[data-filter-sort-more]")?.textContent.trim() === "+2"'), true)
+        ->click('[data-filter-sort]')
+        ->drag('[data-sort-row][data-column="updated_at"] [data-sort-grip]', '[data-sort-row][data-column="name"] [data-sort-grip]');
+
+    $page->assertScript(filterBarWaitFor($stored.' === "updated_at:asc,name:asc,created_at:desc"'), true)
+        ->assertScript($rows, 'updated_at,name,created_at')
+        ->assertScript('document.querySelectorAll("[data-sort-row]").length', 3)
+        ->drag('[data-sort-row][data-column="updated_at"] [data-sort-grip]', '[data-sort-row][data-column="created_at"] [data-sort-grip]');
+
+    $page->assertScript(filterBarWaitFor($stored.' === "name:asc,created_at:desc,updated_at:asc"'), true)
+        ->assertScript($rows, 'name,created_at,updated_at')
+        ->assertScript('document.querySelectorAll("[data-sort-row]").length', 3)
+        ->assertScript('document.querySelector("[data-pop][data-open=true]")?.checkVisibility()', true)
         ->assertNoJavaScriptErrors();
 });
 
@@ -899,7 +971,7 @@ it('reads Sort until a column is set and then Sorted by the column in two tones'
         ->assertSeeIn('[data-filter-sort]', 'Sorted by Company')
         ->assertScript('(() => { const [muted, column] = ["fi-filter-muted", "fi-filter-sorted-column"].map((name) => getComputedStyle(document.querySelector("[data-filter-sort] ." + name)).color); return muted !== column; })()', true)
         ->assertScript('document.querySelector("[data-filter-sort]").getAttribute("aria-label").includes("Company")', true)
-        ->click('[data-sort-flip]')
+        ->click('[data-sort-row][data-column="name"] [data-sort-direction]')
         ->assertScript(filterBarWaitFor('document.querySelector("[data-filter-sort]").getAttribute("aria-label").includes("descending")'), true)
         ->assertNoJavaScriptErrors();
 });
@@ -907,7 +979,7 @@ it('reads Sort until a column is set and then Sorted by the column in two tones'
 it('keeps the sort control icon-only on a phone with the column in its name', function (): void {
     $page = ($this->open)(390, 844);
 
-    $page->script('Livewire.all().find((component) => /List(Companies|People)/.test(component.name)).$wire.setFilterBarSort("name", "asc")');
+    $page->script('Livewire.all().find((component) => /List(Companies|People)/.test(component.name)).$wire.setFilterBarSorts([{ column: "name", direction: "asc" }])');
     $page->assertScript(filterBarWaitFor('document.querySelector("[data-filter-sort]").classList.contains("fi-set")'), true)
         ->assertScript('[...document.querySelectorAll("[data-filter-sort] > span")].every((span) => !span.checkVisibility())', true)
         ->assertScript('document.querySelector("[data-filter-sort]").getAttribute("aria-label").includes("Company")', true)
@@ -1159,15 +1231,26 @@ it('marks the current field in the field list of a chip', function (): void {
         ->assertNoJavaScriptErrors();
 });
 
-it('draws the sort control with its own icon at every width', function (int $width): void {
+it('draws the unsorted sort control with a two-way arrow at every width', function (int $width): void {
     $page = ($this->open)($width);
     $paths = fn (string $html): array => (preg_match_all('/ d="([^"]+)"/', $html, $matches) ? $matches[1] : []);
     $shown = $page->script('[...document.querySelectorAll("[data-filter-sort] svg:not(.fi-filter-sorted-icon)")].filter((svg) => svg.checkVisibility()).map((svg) => [...svg.querySelectorAll("path")].map((path) => path.getAttribute("d")))[0]');
 
-    expect($shown)->not->toBe($paths(svg('lucide-arrow-up-down')->toHtml()))
-        ->and($shown)->toBe($paths(svg('lucide-arrow-down-wide-narrow')->toHtml()));
+    expect($shown)->toBe($paths(svg('lucide-arrow-up-down')->toHtml()));
     $page->assertNoJavaScriptErrors();
 })->with([390, 1440]);
+
+it('turns the sort control icon to the sort direction', function (string $direction, string $icon): void {
+    $page = ($this->open)();
+    $paths = fn (string $html): array => (preg_match_all('/ d="([^"]+)"/', $html, $matches) ? $matches[1] : []);
+
+    $page->script(sprintf('Livewire.all().find((component) => /List(Companies|People)/.test(component.name)).$wire.setFilterBarSorts([{ column: "name", direction: "%s" }])', $direction));
+    $page->assertScript(filterBarWaitFor('document.querySelector("[data-filter-sort]").classList.contains("fi-set")'), true);
+
+    expect($page->script('[...document.querySelectorAll("[data-filter-sort] svg")].filter((svg) => svg.checkVisibility()).map((svg) => [...svg.querySelectorAll("path")].map((path) => path.getAttribute("d")))'))
+        ->toBe([$paths(svg($icon)->toHtml())]);
+    $page->assertNoJavaScriptErrors();
+})->with(['ascending' => ['asc', 'lucide-arrow-up-narrow-wide'], 'descending' => ['desc', 'lucide-arrow-down-wide-narrow']]);
 
 it('lists the viewer once whichever way the rule stores them, and unchecks both', function (): void {
     $page = openOn($this->user, $this->workspace, 'opportunities');

@@ -21,6 +21,8 @@ use App\Support\IconPath;
 use Filament\Facades\Filament;
 use Filament\Support\Components\Attributes\Unexposed;
 use Filament\Tables\Grouping\Group;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Renderless;
 use RuntimeException;
@@ -75,7 +77,7 @@ trait HasFilterBar
     }
 
     /**
-     * @return array{view: ?string, viewerId: ?string, fields: list<array{key: string, label: string, icon: string, kind: string, limit: ?int, options: list<array{id: string, label: string, color: ?string, image?: ?string, icon?: ?string, circular?: bool}>, conditions: list<array{value: string, label: string, takesValue: bool, shape: string}>}>, rules: list<array<string, mixed>>, deleted: ?string, deletable: bool, sort: ?array{column: string, direction: string, label: string}, sortable: list<array{key: string, label: string, icon: string}>, groups: list<array{id: string, label: string, icon: ?string}>, grouping: ?array{id: string, direction: string, label: string}, periodUnits: list<array{value: string, label: string, singular: string, max: int}>}
+     * @return array{view: ?string, viewerId: ?string, fields: list<array{key: string, label: string, icon: string, kind: string, limit: ?int, options: list<array{id: string, label: string, color: ?string, image?: ?string, icon?: ?string, circular?: bool}>, conditions: list<array{value: string, label: string, takesValue: bool, shape: string}>}>, rules: list<array<string, mixed>>, deleted: ?string, deletable: bool, sorts: list<array{column: string, direction: string, label: string}>, sortable: list<array{key: string, label: string, icon: string}>, groups: list<array{id: string, label: string, icon: ?string}>, grouping: ?array{id: string, direction: string, label: string}, periodUnits: list<array{value: string, label: string, singular: string, max: int}>}
      */
     #[Unexposed]
     public function getFilterBarData(): array
@@ -127,17 +129,21 @@ trait HasFilterBar
 
     /**
      * @param  array<string, FilterField>  $catalog
-     * @return array{sort: ?array{column: string, direction: string, label: string}, sortable: list<array{key: string, label: string, icon: string}>, groups: list<array{id: string, label: string, icon: ?string}>, grouping: ?array{id: string, direction: string, label: string}}
+     * @return array{sorts: list<array{column: string, direction: string, label: string}>, sortable: list<array{key: string, label: string, icon: string}>, groups: list<array{id: string, label: string, icon: ?string}>, grouping: ?array{id: string, direction: string, label: string}}
      */
     private function filterBarOrdering(array $catalog): array
     {
         $sortable = $this->sortableTableColumns();
-        $column = $this->getTableSortColumn();
+        $sorts = $this->activeTableSorts();
         $group = $this->getTableGrouping();
         $groups = array_map(fn (Group $group): string => ColumnHeaderLabel::text($group->getLabel()), $this->getTable()->getGroups());
 
         return [
-            'sort' => isset($sortable[$column]) ? ['column' => $column, 'direction' => $this->getTableSortDirection() ?? 'asc', 'label' => $sortable[$column]] : null,
+            'sorts' => array_map(
+                fn (string $column, string $direction): array => ['column' => $column, 'direction' => $direction, 'label' => $sortable[$column]],
+                array_keys($sorts),
+                $sorts,
+            ),
             'sortable' => array_map(fn (string $key, string $label): array => [
                 'key' => $key,
                 'label' => $label,
@@ -269,17 +275,57 @@ trait HasFilterBar
         $this->updatedTableFilters();
     }
 
-    public function setFilterBarSort(mixed $column = null, mixed $direction = null): void
+    public function setFilterBarSorts(mixed $sorts = []): void
     {
-        if (! is_string($column)) {
-            $this->tableSort = null;
-        } elseif (array_key_exists($column, $this->sortableTableColumns()) && in_array($direction ??= 'asc', ['asc', 'desc'], true)) {
-            $this->tableSort = "{$column}:{$direction}";
-        } else {
-            return;
+        $sortable = $this->sortableTableColumns();
+        $list = [];
+
+        foreach (is_array($sorts) ? $sorts : [] as $sort) {
+            $column = is_array($sort) ? ($sort['column'] ?? null) : null;
+            $direction = is_array($sort) ? ($sort['direction'] ?? 'asc') : null;
+
+            if (is_string($column) && isset($sortable[$column]) && ! isset($list[$column]) && in_array($direction, ['asc', 'desc'], true)) {
+                $list[$column] = $direction;
+            }
         }
 
+        $this->writeTableSorts($list);
         $this->updatedTableSort();
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     * @return Builder<Model>
+     */
+    protected function applySortingToTableQuery(Builder $query): Builder
+    {
+        $table = $this->getTable();
+
+        if ($table->isGroupsOnly() || $this->isTableReordering()) {
+            return parent::applySortingToTableQuery($query);
+        }
+
+        foreach ($this->activeTableSorts() as $column => $direction) {
+            $table->getSortableVisibleColumn($column)?->applySort($query, $direction);
+        }
+
+        // With the sort cleared, Filament adds only its default sort and the key, after the member's sorts.
+        $sort = $this->tableSort;
+        $this->tableSort = null;
+
+        try {
+            return parent::applySortingToTableQuery($query);
+        } finally {
+            $this->tableSort = $sort;
+        }
+    }
+
+    /**
+     * @return array<string, 'asc'|'desc'>
+     */
+    private function activeTableSorts(): array
+    {
+        return array_intersect_key($this->tableSorts(), $this->sortableTableColumns());
     }
 
     public function setFilterBarGrouping(mixed $group = null, mixed $direction = null): void
