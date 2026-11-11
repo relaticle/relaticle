@@ -67,10 +67,12 @@ trait CreatesTableAttribute
                 ->native(false)
                 ->default(CustomFieldType::TEXT->value)
                 ->required()
+                ->selectablePlaceholder(false)
+                ->position('bottom')
                 ->live(),
             Repeater::make('options')
                 ->label(__('filament/panel.tables.views.attribute_options'))
-                ->schema([TextInput::make('name')->hiddenLabel()->required()->maxLength(255)])
+                ->schema([TextInput::make('name')->hiddenLabel()->placeholder(__('filament/panel.tables.views.attribute_option_placeholder'))->required()->maxLength(255)])
                 ->addActionLabel(__('filament/panel.tables.views.attribute_add_option'))
                 ->minItems(1)
                 ->maxItems(CustomFieldDefinitionValidator::maxOptions())

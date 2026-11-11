@@ -666,6 +666,74 @@ it('creates an attribute from the add panel and shows it as a column, with focus
         ->assertNoJavaScriptErrors();
 });
 
+it('shows the row menu button on every row without a hover, also on a phone', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug)->resize(390, 844)->wait(0.5);
+
+    openViewSettings($page)
+        ->assertScript('[...document.querySelectorAll(".fi-view-settings-row [data-view-settings-menu]")].every((button) => button.checkVisibility({ opacityProperty: true }) && Number(getComputedStyle(button).opacity) > 0)', true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('darkens the row menu button and fills the row on hover', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+    $button = settingsRow('created_at', '[data-view-settings-menu]');
+    $color = sprintf('getComputedStyle(document.querySelector(`%s`).querySelector(".fi-icon")).color', $button);
+    $resting = $page->script($color);
+
+    $page->hover(settingsRow('created_at', '.fi-view-settings-label'))
+        ->assertScript(sprintf('getComputedStyle(document.querySelector(`%s`)).backgroundColor', settingsRow('created_at')), $page->script('(() => { const probe = document.createElement("div"); probe.style.backgroundColor = "var(--color-gray-100)"; document.body.append(probe); const color = getComputedStyle(probe).backgroundColor; probe.remove(); return color; })()'));
+
+    expect($page->script($color))->not->toBe($resting);
+});
+
+it('draws the add panel items as tall as the view settings rows', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+    $rowHeight = $page->script('Math.round(document.querySelector(".fi-view-settings-row").getBoundingClientRect().height)');
+    $page->click(settingsRow('created_at', '[data-view-settings-menu]'))
+        ->click(settingsMenuItem('remove'))
+        ->click('[data-view-settings-add]')
+        ->assertVisible('[data-view-settings-add-item][data-attribute="created_at"]');
+
+    $page->assertScript('Math.round(document.querySelector("[data-view-settings-add-item][data-attribute=created_at]").getBoundingClientRect().height)', $rowHeight)
+        ->assertNoJavaScriptErrors();
+});
+
+it('clears the add panel search with Escape', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+
+    $page->click('[data-view-settings-add]')
+        ->type('[data-view-settings-search]', 'zzz')
+        ->keys('[data-view-settings-search]', 'Escape')
+        ->assertScript('document.querySelector("[data-view-settings-search]").value', '')
+        ->assertNoJavaScriptErrors();
+});
+
+it('offers the required type of a new attribute with no clear button and names the option input', function (): void {
+    $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
+
+    $page->click('[data-view-settings-add]')
+        ->click('[data-view-settings-create]')
+        ->assertVisible('.fi-modal-window .fi-select-input-btn')
+        ->assertMissing('.fi-modal-window .fi-select-input-value-remove-btn')
+        ->click('.fi-modal-window .fi-select-input-btn')
+        ->click('.fi-modal-window .fi-select-input-option[data-value="select"]')
+        ->assertVisible('.fi-modal-window .fi-fo-repeater input')
+        ->assertScript('document.querySelector(".fi-modal-window .fi-fo-repeater input").placeholder', 'Option name')
+        ->assertNoJavaScriptErrors();
+});
+
+it('opens the attribute type list below its button on a phone', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug)->resize(390, 844)->wait(0.5);
+
+    openViewSettings($page)->click('[data-view-settings-add]')
+        ->click('[data-view-settings-create]')
+        ->assertVisible('.fi-modal-window .fi-select-input-btn')
+        ->click('.fi-modal-window .fi-select-input-btn')
+        ->assertVisible('.fi-modal-window .fi-select-input-option[data-value="text"]')
+        ->assertScript('document.querySelector(".fi-modal-window .fi-select-input-option").closest("ul").getBoundingClientRect().top >= document.querySelector(".fi-modal-window .fi-select-input-btn").getBoundingClientRect().bottom', true)
+        ->assertNoJavaScriptErrors();
+});
+
 it('never starts a drag from the row menu button', function (): void {
     $page = openViewSettings(companiesTable($this->user, $this->workspace->slug));
     $order = $page->script(settingsOrder());

@@ -111,6 +111,23 @@ it('resizes a column by dragging its edge and keeps the width after a reload', f
         ->assertNoJavaScriptErrors();
 });
 
+it('leaves no focus ring behind after a mouse resize', function (): void {
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
+
+    $page->click(headerSelector('created_at').' .fi-ta-resizable-label')
+        ->wait(0.5)
+        ->keys(':focus', 'Escape')
+        ->wait(0.3)
+        ->drag(headerSelector('created_at').' .column-resize-handle-bar', headerSelector('updated_at'))
+        ->wait(1)
+        ->assertScript('document.querySelector(":focus-visible")', null)
+        ->assertNoJavaScriptErrors();
+});
+
 it('shows the edge guideline but no pixel width while a column is resized', function (): void {
     loginViaBrowser($this->user)
         ->assertPathIs("/app/{$this->workspace->slug}")

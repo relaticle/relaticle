@@ -1114,6 +1114,7 @@
                 if (event.button !== 0) return
                 event.preventDefault()
                 event.stopPropagation()
+                if (document.activeElement?.closest('thead')) document.activeElement.blur()
                 this.handleBar.classList.add('active')
                 document.body.classList.add('resizing-column')
 

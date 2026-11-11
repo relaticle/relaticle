@@ -95,7 +95,11 @@
     }
 
     & .fi-dropdown-list-item {
-        @apply p-2;
+        @apply h-8 px-2 py-0 hover:bg-gray-100 focus-visible:bg-gray-100 dark:hover:bg-white/5 dark:focus-visible:bg-white/5;
+
+        & .fi-icon {
+            @apply size-4;
+        }
     }
 }
 
@@ -149,7 +153,11 @@
     }
 
     & .fi-dropdown-list-item {
-        @apply p-2;
+        @apply h-8 px-2 py-0 hover:bg-gray-100 focus-visible:bg-gray-100 dark:hover:bg-white/5 dark:focus-visible:bg-white/5;
+
+        & .fi-icon {
+            @apply size-4;
+        }
     }
 
     & .fi-view-settings-list ~ .fi-dropdown-list,
@@ -164,6 +172,10 @@
 
 .fi-view-settings-search {
     @apply flex shrink-0 items-center gap-1 border-b border-gray-100 pb-1 dark:border-white/10;
+}
+
+.fi-view-settings-search-input::-webkit-search-cancel-button {
+    @apply hidden appearance-none;
 }
 
 .fi-view-settings-search-input {
@@ -192,7 +204,7 @@
     &:hover,
     &:has(:focus-visible),
     &:has([aria-expanded='true']) {
-        @apply bg-gray-50 dark:bg-white/5;
+        @apply bg-gray-100 dark:bg-white/5;
     }
 }
 
@@ -221,15 +233,18 @@
 }
 
 .fi-view-settings-row-menu-trigger {
-    @apply opacity-0 focus-visible:opacity-100 aria-expanded:bg-gray-100 aria-expanded:opacity-100 dark:aria-expanded:bg-white/10;
+    @apply aria-expanded:bg-gray-100 dark:aria-expanded:bg-white/10;
 
-    .fi-view-settings-row:hover &,
-    .fi-view-settings-row:focus-within & {
-        @apply opacity-100;
+    & .fi-icon {
+        @apply text-gray-400 dark:text-gray-500;
     }
 
-    @media (hover: none) {
-        @apply opacity-100;
+    .fi-view-settings-row:hover &,
+    &:focus-visible,
+    &[aria-expanded='true'] {
+        & .fi-icon {
+            @apply text-gray-700 dark:text-gray-200;
+        }
     }
 }
 

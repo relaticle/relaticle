@@ -199,6 +199,7 @@ return [
             'attribute_type' => 'Type',
             'attribute_options' => 'Options',
             'attribute_add_option' => 'Add option',
+            'attribute_option_placeholder' => 'Option name',
             'attribute_lookup' => 'Links to',
             'attribute_added' => ':name added to this view',
             'attribute_name_taken' => 'An attribute named :name already exists.',
