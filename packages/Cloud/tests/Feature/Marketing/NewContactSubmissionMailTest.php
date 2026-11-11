@@ -98,3 +98,18 @@ it('loads a payload queued under the class name it had before the move', functio
 
     expect(unserialize('O:'.strlen($preMoveName).':"'.$preMoveName.'":0:{}'))->toBeInstanceOf(NewContactSubmissionMail::class);
 });
+
+it('shows the visitor message as text with its line breaks, never as markdown', function (): void {
+    $mail = new NewContactSubmissionMail([
+        'name' => "Ana\n\n[Reply here](https://phish.example)",
+        'email' => 'ana@example.test',
+        'company' => null,
+        'message' => "Hello team\n\n[Verify your account](https://phish.example) *now*\nThanks",
+    ]);
+
+    $html = $mail->render();
+
+    expect($html)->not->toContain('href="https://phish.example"')
+        ->and($html)->not->toContain('<em')
+        ->and($html)->toContain('Hello team<br');
+});

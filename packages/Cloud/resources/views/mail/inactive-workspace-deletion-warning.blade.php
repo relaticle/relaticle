@@ -1,10 +1,11 @@
-<x-mail::message :reason="__('mail.footer.reason.owner', ['workspace' => $workspace->name])">
+@use('Illuminate\Support\Str')
+<x-mail::message :reason="__('mail.footer.reason.owner', ['workspace' => Str::squish($workspace->name)])">
 <x-slot:preheader>{{ __('cloud::inactivity.warning.preheader', ['since' => $since]) }}</x-slot:preheader>
-# {{ __('cloud::inactivity.warning.heading', ['workspace' => $workspace->name, 'date' => $date]) }}
+<h1>{{ __('cloud::inactivity.warning.heading', ['workspace' => Str::squish($workspace->name), 'date' => $date]) }}</h1>
 
-{{ __('cloud::inactivity.warning.paused', ['workspace' => $workspace->name, 'since' => $since]) }}
+<p>{{ __('cloud::inactivity.warning.paused', ['workspace' => Str::squish($workspace->name), 'since' => $since]) }}</p>
 
-{{ __('cloud::inactivity.warning.rule', ['workspace' => $workspace->name, 'date' => $date]) }}
+<p>{{ __('cloud::inactivity.warning.rule', ['workspace' => Str::squish($workspace->name), 'date' => $date]) }}</p>
 
 {{ __('cloud::inactivity.warning.keep') }}
 

@@ -1,14 +1,15 @@
-<x-mail::message :reason="__('mail.footer.reason.owner', ['workspace' => $workspace->name])">
+@use('Illuminate\Support\Str')
+<x-mail::message :reason="__('mail.footer.reason.owner', ['workspace' => Str::squish($workspace->name)])">
 <x-slot:preheader>{{ $preheader }}</x-slot:preheader>
-# {{ $heading }}
+<h1>{{ $heading }}</h1>
 
 @if($grandfathered)
-{{ $managedPlan ? __('mail.pro_ended.managed_ended.grandfathered', ['workspace' => $workspace->name]) : __('mail.pro_ended.grandfathered', ['workspace' => $workspace->name]) }}
+<p>{{ $managedPlan ? __('mail.pro_ended.managed_ended.grandfathered', ['workspace' => Str::squish($workspace->name)]) : __('mail.pro_ended.grandfathered', ['workspace' => Str::squish($workspace->name)]) }}</p>
 @else
-{{ __($isTrial ? 'mail.pro_ended.trial_paused' : 'mail.pro_ended.paused', ['workspace' => $workspace->name]) }}
+<p>{{ __($isTrial ? 'mail.pro_ended.trial_paused' : 'mail.pro_ended.paused', ['workspace' => Str::squish($workspace->name)]) }}</p>
 @if($keptOn)
 
-{{ __('mail.pro_ended.kept', ['workspace' => $workspace->name, 'date' => $keptOn]) }}
+<p>{{ __('mail.pro_ended.kept', ['workspace' => Str::squish($workspace->name), 'date' => $keptOn]) }}</p>
 @endif
 @if($mailboxSyncPaused)
 
