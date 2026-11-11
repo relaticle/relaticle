@@ -123,6 +123,7 @@ it('queues a relink again only when the record addresses change', function (): v
         && $job->uniqueId() === "relink-record-history-people-{$person->getKey()}");
 
     $releaseUniqueLock();
+    $this->travel(1)->minute();
     $person->update(['name' => 'Jane D.', 'custom_fields' => ['emails' => ['jane@partner.com']]]);
     Bus::assertDispatchedTimes(RelinkRecordHistoryJob::class, 1);
 

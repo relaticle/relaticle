@@ -35,7 +35,12 @@ final class QueueRecordHistoryRelink
             return;
         }
 
-        if ($this->isIdentityField((string) $record->workspace_id, (string) $value->entity_type, (string) $value->custom_field_id)) {
+        if (! $this->isIdentityField((string) $record->workspace_id, (string) $value->entity_type, (string) $value->custom_field_id)) {
+            return;
+        }
+
+        // A value row restamps updated_at and source on every write, so only its value column says the addresses moved.
+        if ($value->wasRecentlyCreated || $value->wasChanged(CustomFieldValue::getValueColumn($value->customField->type))) {
             $this->queue($record);
         }
     }
