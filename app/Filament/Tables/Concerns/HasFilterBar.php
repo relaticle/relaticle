@@ -52,7 +52,7 @@ trait HasFilterBar
     }
 
     /**
-     * @return list<array{id: string, label: string}>
+     * @return list<array{id: string, label: string, image: ?string, icon: ?string, circular: bool}>
      */
     #[Renderless]
     public function searchFilterOptions(string $field, string $search = ''): array
@@ -75,7 +75,7 @@ trait HasFilterBar
     }
 
     /**
-     * @return array{view: ?string, fields: list<array{key: string, label: string, icon: string, kind: string, limit: ?int, options: list<array{id: string, label: string, color: ?string}>, conditions: list<array{value: string, label: string, takesValue: bool, shape: string}>}>, rules: list<array<string, mixed>>, deleted: ?string, deletable: bool, sort: ?array{column: string, direction: string, label: string}, sortable: list<array{key: string, label: string, icon: string}>, groups: list<array{id: string, label: string, icon: ?string}>, grouping: ?array{id: string, direction: string, label: string}, periodUnits: list<array{value: string, label: string, singular: string, max: int}>}
+     * @return array{view: ?string, fields: list<array{key: string, label: string, icon: string, kind: string, limit: ?int, options: list<array{id: string, label: string, color: ?string, image?: ?string, icon?: ?string, circular?: bool}>, conditions: list<array{value: string, label: string, takesValue: bool, shape: string}>}>, rules: list<array<string, mixed>>, deleted: ?string, deletable: bool, sort: ?array{column: string, direction: string, label: string}, sortable: list<array{key: string, label: string, icon: string}>, groups: list<array{id: string, label: string, icon: ?string}>, grouping: ?array{id: string, direction: string, label: string}, periodUnits: list<array{value: string, label: string, singular: string, max: int}>}
      */
     #[Unexposed]
     public function getFilterBarData(): array
@@ -99,7 +99,7 @@ trait HasFilterBar
                 'icon' => $this->filterFieldIconPath($field->icon),
                 'kind' => $field->kind->value,
                 'limit' => $field->kind === FilterFieldKind::Inactivity ? StaleDaysFilter::MAX_DAYS : null,
-                'options' => $this->filterFieldOptions($field),
+                'options' => $this->filterFieldOptions($field, $user),
                 'conditions' => array_map(fn (FilterCondition $condition): array => [
                     'value' => $condition->value,
                     'label' => $condition->label(),
@@ -185,13 +185,13 @@ trait HasFilterBar
     }
 
     /**
-     * @return list<array{id: string, label: string, color: ?string}>
+     * @return list<array{id: string, label: string, color: ?string, image?: ?string, icon?: ?string, circular?: bool}>
      */
-    private function filterFieldOptions(FilterField $field): array
+    private function filterFieldOptions(FilterField $field, ?User $user): array
     {
         return match ($field->kind) {
             FilterFieldKind::Choice, FilterFieldKind::MultiChoice => $field->options,
-            FilterFieldKind::Member => [['id' => '@me', 'label' => __('filament/panel.tables.filters.me'), 'color' => null]],
+            FilterFieldKind::Member => $user instanceof User ? [[...FilterRuleDisplay::viewer($user)->toArray(), 'color' => null]] : [],
             FilterFieldKind::Text, FilterFieldKind::Number, FilterFieldKind::Date, FilterFieldKind::Checkbox,
             FilterFieldKind::MultiText, FilterFieldKind::Relation, FilterFieldKind::Record, FilterFieldKind::Inactivity => [],
         };

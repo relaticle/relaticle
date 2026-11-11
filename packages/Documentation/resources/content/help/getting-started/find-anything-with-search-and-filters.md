@@ -34,8 +34,9 @@ remove it from there.
 
 ![The filter row above the Opportunities list with three chips: Stage is any of Negotiation/Review, Close Date in the next 30 days, and Amount greater than $10,000.00](/help-assets/getting-started/find-anything-with-search-and-filters-2.png)
 
-Each filter shows as a chip in the row. Click its condition or its value to
-change it. To remove it, click **⋮** on the chip, then **Remove filter**.
+Each filter shows as a chip in the row. Click its field, its condition or its
+value to change it. Picking another field keeps the chip and clears its
+condition and value. To remove it, click **⋮** on the chip, then **Remove filter**.
 A record must match every chip to stay in the list. When the filters hide
 every record, click **Clear filters**.
 
@@ -48,8 +49,9 @@ Pick **in the past**, **in the next**, or **this** to filter by a period,
 such as the last 30 days or this month. A saved view keeps the period
 relative, so it moves with the calendar. **Today** works the same way.
 
-Fields that hold a member offer **Me**. In a shared view, **Me** means
-whoever opens it.
+Fields that hold a member list you first, as your name followed by
+**(me)**. In a shared view, **(me)** means whoever opens it, so each
+teammate sees their own name.
 
 ## Show deleted records
 

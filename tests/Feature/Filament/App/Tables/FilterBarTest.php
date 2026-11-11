@@ -886,7 +886,7 @@ it('searches the records of a relation field by name inside the workspace', func
     $found = filterBarSearch($this, ListPeople::class, 'company', 'acme');
 
     expect(array_column($found, 'label'))->toBe(['Acme Local'])
-        ->and(array_keys($found[0]))->toBe(['id', 'label'])
+        ->and(array_keys($found[0]))->toBe(['id', 'label', 'image', 'icon', 'circular'])
         ->and(array_column(filterBarSearch($this, ListPeople::class, 'company'), 'label'))->toBe(['Acme Local', 'Globex']);
 });
 
@@ -912,7 +912,53 @@ it('searches members of this workspace and no one else', function (): void {
 
     $found = filterBarSearch($this, ListCompanies::class, 'creator', 'casey');
 
-    expect($found)->toBe([['id' => $colleague->getKey(), 'label' => 'Casey Colleague']]);
+    expect($found)->toBe([[
+        'id' => $colleague->getKey(),
+        'label' => 'Casey Colleague',
+        'image' => $colleague->getFilamentAvatarUrl(),
+        'icon' => null,
+        'circular' => true,
+    ]]);
+});
+
+it('leaves the viewer out of a member search because the me entry stands for them', function (): void {
+    $colleague = filterBarMember($this->user);
+    $colleague->update(['name' => "{$this->user->name} Junior"]);
+
+    $found = filterBarSearch($this, ListCompanies::class, 'creator', $this->user->name);
+
+    expect(array_column($found, 'id'))->toBe([$colleague->getKey()])
+        ->and(array_column(filterBarSearch($this, ListCompanies::class, 'creator'), 'id'))->not->toContain($this->user->getKey());
+});
+
+it('marks a company with its logo or the company icon and a person with the person icon', function (): void {
+    $logo = filterBarRecord($this->user, Company::class, 'Acme Logo');
+    $logo->addMediaFromString(onePixelPng())->usingFileName('logo.png')->toMediaCollection(Company::LOGO_MEDIA_COLLECTION);
+    filterBarRecord($this->user, Company::class, 'Acme Plain');
+    filterBarRecord($this->user, People::class, 'Acme Person');
+    filterBarField($this->user, 'opportunity', 'contact_pick', CustomFieldType::RECORD->value, lookup: 'people');
+
+    $companies = collect(filterBarSearch($this, ListPeople::class, 'company', 'acme'))->keyBy('label');
+    $people = filterBarSearch($this, ListOpportunities::class, 'custom_fields.contact_pick', 'acme');
+
+    expect($companies['Acme Logo'])->toMatchArray(['image' => $logo->fresh()->logo, 'icon' => null, 'circular' => false])
+        ->and($companies['Acme Plain'])->toMatchArray(['image' => null, 'icon' => CrmEntity::Company->iconPath(), 'circular' => false])
+        ->and($people[0])->toMatchArray(['label' => 'Acme Person', 'image' => null, 'icon' => CrmEntity::People->iconPath(), 'circular' => true]);
+});
+
+it('looks up company logos without a query per company', function (): void {
+    foreach (range(1, 6) as $number) {
+        filterBarRecord($this->user, Company::class, "Logo {$number}")
+            ->addMediaFromString(onePixelPng())->usingFileName("logo-{$number}.png")->toMediaCollection(Company::LOGO_MEDIA_COLLECTION);
+    }
+    $component = livewire(ListPeople::class);
+
+    DB::enableQueryLog();
+    $found = $component->instance()->searchFilterOptions('company', 'logo');
+    $queries = collect(DB::getQueryLog())->filter(fn (array $log): bool => str_contains($log['query'], 'from "media"'));
+    DB::disableQueryLog();
+
+    expect($found)->toHaveCount(6)->and($queries)->toHaveCount(1);
 });
 
 it('searches the lookup records of a record custom field', function (): void {
@@ -1713,14 +1759,21 @@ it('hands the chip bar every field with its conditions', function (): void {
         ->and($fields['name']['icon'])->not->toBeEmpty();
 });
 
-it('hands the chip bar a choice field options and pins Me as the only member option', function (): void {
+it('hands the chip bar a choice field options and offers the viewer as the only member option', function (): void {
     filterBarField($this->user, 'opportunity', 'stage_pick', 'select', ['Won', 'Lost']);
 
     $fields = collect(livewire(ListOpportunities::class)->instance()->getFilterBarData()['fields'])->keyBy('key');
 
     expect(array_column($fields['custom_fields.stage_pick']['options'], 'label'))->toBe(['Won', 'Lost'])
         ->and(array_column($fields['custom_fields.stage_pick']['options'], 'color'))->toBe([null, null])
-        ->and($fields['creator']['options'])->toBe([['id' => '@me', 'label' => 'Me', 'color' => null]])
+        ->and($fields['creator']['options'])->toBe([[
+            'id' => '@me',
+            'label' => "{$this->user->name} (me)",
+            'image' => $this->user->getFilamentAvatarUrl(),
+            'icon' => null,
+            'circular' => true,
+            'color' => null,
+        ]])
         ->and($fields['company']['options'])->toBe([]);
 });
 
@@ -1802,8 +1855,30 @@ it('hands the chip bar a label for every stored id, naming a deleted record', fu
 
     expect(array_column($shown[0]['labels'], 'label'))->toBe(['Aa', 'Bb', 'Cc (deleted)'])
         ->and(array_column($shown[0]['labels'], 'id'))->toBe($companies->map(fn (Model $company): string => (string) $company->getKey())->all())
-        ->and(array_column($shown[1]['labels'], 'label'))->toBe(['Me', $this->user->name])
+        ->and(array_column($shown[1]['labels'], 'label'))->toBe(["{$this->user->name} (me)", $this->user->name])
+        ->and($shown[1]['labels'][0]['image'])->toBe($this->user->getFilamentAvatarUrl())
+        ->and($shown[0]['labels'][0])->toMatchArray(['image' => null, 'icon' => CrmEntity::Company->iconPath(), 'circular' => false])
         ->and($shown[2]['labels'])->toBe([]);
+});
+
+it('carries the mark of every stored record in the rule labels and gives a deleted company the icon', function (): void {
+    $logo = filterBarRecord($this->user, Company::class, 'Logo Co');
+    $logo->addMediaFromString(onePixelPng())->usingFileName('logo.png')->toMediaCollection(Company::LOGO_MEDIA_COLLECTION);
+    $gone = filterBarRecord($this->user, Company::class, 'Gone Co');
+    $gone->addMediaFromString(onePixelPng())->usingFileName('gone.png')->toMediaCollection(Company::LOGO_MEDIA_COLLECTION);
+    $gone->delete();
+    $colleague = filterBarMember($this->user);
+
+    $shown = livewire(ListOpportunities::class)
+        ->call('setFilterRules', [
+            ['field' => 'company', 'condition' => 'is_any_of', 'value' => [$logo->getKey(), $gone->getKey()]],
+            ['field' => 'creator', 'condition' => 'is_any_of', 'value' => [$colleague->getKey()]],
+        ])
+        ->instance()->getFilterBarData()['rules'];
+
+    expect($shown[0]['labels'][0])->toMatchArray(['image' => $logo->fresh()->logo, 'icon' => null, 'circular' => false])
+        ->and($shown[0]['labels'][1])->toMatchArray(['label' => 'Gone Co (deleted)', 'image' => null, 'icon' => CrmEntity::Company->iconPath()])
+        ->and($shown[1]['labels'][0])->toMatchArray(['image' => $colleague->getFilamentAvatarUrl(), 'icon' => null, 'circular' => true]);
 });
 
 it('reads a rule as the chip shows it', function (): void {
@@ -1815,7 +1890,20 @@ it('reads a rule as the chip shows it', function (): void {
 
     $shown = livewire(ListCompanies::class)->call('setFilterRules', $rules)->instance()->getFilterBarData()['rules'];
 
-    expect(array_column($shown, 'display'))->toBe(['acme', 'Me', '']);
+    expect(array_column($shown, 'display'))->toBe(['acme', "{$this->user->name} (me)", '']);
+});
+
+it('reads Me as the name of whoever opens a shared view', function (): void {
+    $colleague = filterBarMember($this->user);
+    $colleague->update(['name' => 'Casey Colleague']);
+    $rules = [['field' => 'creator', 'condition' => 'is_any_of', 'value' => ['@me']]];
+    $display = fn (): string => livewire(ListCompanies::class)->call('setFilterRules', $rules)->instance()->getFilterBarData()['rules'][0]['display'];
+
+    expect($display())->toBe("{$this->user->name} (me)");
+
+    $this->actingAs($colleague);
+
+    expect($display())->toBe('Casey Colleague (me)');
 });
 
 it('names a deleted company in a rule instead of showing a blank or an id', function (): void {

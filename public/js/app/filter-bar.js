@@ -10,6 +10,7 @@
     const LIST_KINDS = ['choice', 'multi_choice', ...LOOKUP_KINDS]
     const NUMERIC_KINDS = ['number', 'inactivity']
     const DEFAULT_PERIOD_UNIT = 'days'
+    const ME = '@me'
 
     const strip = (rule) => ({ field: rule.field, condition: rule.condition, ...('value' in rule ? { value: rule.value } : {}) })
 
@@ -114,7 +115,7 @@
                         condition: rule.condition,
                         value: rule.value ?? null,
                         display: rule.display ?? '',
-                        labels: Object.fromEntries((rule.labels ?? []).map((label) => [label.id, label.label])),
+                        labels: Object.fromEntries((rule.labels ?? []).map((label) => [label.id, label])),
                     }
                 },
 
@@ -414,8 +415,18 @@
                     const first = this.matchingFields()[0]
 
                     if (first) {
-                        this.addChip(first)
+                        this.pickField(first)
                     }
+                },
+
+                pickField(field) {
+                    const chip = this.chips.find((other) => other.id === this.open?.id)
+
+                    if (!chip) {
+                        return this.addChip(field)
+                    }
+
+                    this.changeField(chip, field)
                 },
 
                 async addDeleted() {
@@ -485,6 +496,23 @@
                     })
                 },
 
+                changeField(chip, field) {
+                    if (chip.field === field.key) {
+                        return this.close(true)
+                    }
+
+                    Object.assign(chip, { field: field.key, condition: null, value: null, display: '', labels: {} })
+                    this.resetLookup()
+                    this.open = { id: chip.id, part: 'cond' }
+                    this.find = ''
+                    this.opener = null
+                    this.$nextTick(() => {
+                        this.opener = this.segment(chip, 'condition')
+                        this.focusPop()
+                    })
+                    this.push()
+                },
+
                 pickCondition(chip, condition) {
                     const crossesShape = this.conditionOf(chip)?.shape !== condition.shape
 
@@ -528,7 +556,23 @@
                 labelFor(chip, id) {
                     const option = this.fieldOf(chip).options.find((candidate) => candidate.id === id)
 
-                    return option?.label ?? chip.labels[id] ?? id
+                    return option?.label ?? chip.labels[id]?.label ?? id
+                },
+
+                markedValues(chip) {
+                    if (!LOOKUP_KINDS.includes(this.fieldOf(chip)?.kind) || !Array.isArray(chip.value) || !this.complete(chip)) {
+                        return []
+                    }
+
+                    const options = this.fieldOf(chip).options
+
+                    return chip.value
+                        .slice(0, SHOWN_VALUES)
+                        .map((id) => ({ ...chip.labels[id], ...options.find((option) => option.id === id), id, label: this.labelFor(chip, id) }))
+                },
+
+                hiddenValues(chip) {
+                    return Array.isArray(chip.value) ? Math.max(0, chip.value.length - SHOWN_VALUES) : 0
                 },
 
                 isChecked(chip, id) {
@@ -545,21 +589,21 @@
                     const field = this.fieldOf(chip)
                     const term = this.find.trim().toLowerCase()
                     const known = (id) => field.options.find((option) => option.id === id)
-                    const pinned = this.pinned
-                        .map((id) => ({ id, label: this.labelFor(chip, id), color: known(id)?.color ?? null }))
-                        .sort((a, b) => Number(b.id === '@me') - Number(a.id === '@me'))
+                    const pinned = this.pinned.map((id) => ({ color: null, ...chip.labels[id], ...known(id), id, label: this.labelFor(chip, id) }))
                     const pool = this.isLookup(chip)
                         ? [...field.options.filter((option) => option.label.toLowerCase().includes(term)), ...this.results]
                         : field.options.filter((option) => option.label.toLowerCase().includes(term))
                     const seen = new Set(pinned.map((item) => item.id))
 
-                    return [...pinned, ...pool.filter((option) => !seen.has(option.id) && seen.add(option.id))]
+                    return [...pinned, ...pool.filter((option) => !seen.has(option.id) && seen.add(option.id))].sort(
+                        (a, b) => Number(b.id === ME) - Number(a.id === ME),
+                    )
                 },
 
                 toggleOption(chip, option) {
                     const current = Array.isArray(chip.value) ? chip.value : []
 
-                    chip.labels[option.id] = option.label
+                    chip.labels[option.id] = option
                     chip.value = current.includes(option.id) ? current.filter((id) => id !== option.id) : [...current, option.id]
                     chip.display = this.summary(chip)
                     this.schedulePush()

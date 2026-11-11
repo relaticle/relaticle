@@ -227,6 +227,42 @@ button.fi-filter-seg {
     @apply text-white;
 }
 
+.fi-filter-mark {
+    @apply grid size-5 shrink-0 place-items-center overflow-hidden rounded-full bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400;
+
+    &.fi-square {
+        @apply rounded-md;
+    }
+
+    & img {
+        @apply size-full object-cover;
+    }
+
+    & svg {
+        @apply size-3.5;
+    }
+}
+
+.fi-filter-values {
+    @apply flex min-w-0 items-center gap-1;
+}
+
+.fi-filter-value {
+    @apply flex min-w-0 items-center gap-1;
+
+    & > span:last-child {
+        @apply truncate;
+    }
+}
+
+.fi-filter-seg .fi-filter-mark {
+    @apply size-4;
+
+    & svg {
+        @apply size-3;
+    }
+}
+
 .fi-filter-dot {
     @apply size-2 shrink-0 rounded-full;
 

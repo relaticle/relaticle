@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Tables\FilterBar;
 
+use App\Data\LinkOption;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
 use App\Enums\FilterFieldKind;
@@ -11,10 +12,12 @@ use App\Enums\PeriodUnit;
 use App\Models\CustomField;
 use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Number;
+use Spatie\MediaLibrary\HasMedia;
 use Throwable;
 
 final readonly class FilterRuleDisplay
@@ -28,7 +31,7 @@ final readonly class FilterRuleDisplay
     /**
      * @param  list<array<string, mixed>>  $rules
      * @param  array<string, FilterField>  $catalog
-     * @return list<array{display: string, labels: list<array{id: string, label: string}>}>
+     * @return list<array{display: string, labels: list<array{id: string, label: string, image: ?string, icon: ?string, circular: bool}>}>
      */
     public static function describe(array $rules, array $catalog, User $user): array
     {
@@ -42,7 +45,7 @@ final readonly class FilterRuleDisplay
             return [
                 'display' => self::one($rule, $field, $known),
                 'labels' => array_values(array_map(
-                    fn (mixed $id): array => ['id' => (string) $id, 'label' => self::label($field, (string) $id, $known)],
+                    fn (mixed $id): array => ($known[(string) $id] ?? new LinkOption((string) $id, self::label($field, (string) $id, $known)))->toArray(),
                     $ids,
                 )),
             ];
@@ -51,7 +54,7 @@ final readonly class FilterRuleDisplay
 
     /**
      * @param  array<string, mixed>  $rule
-     * @param  array<string, string>  $names
+     * @param  array<string, LinkOption>  $names
      */
     private static function one(array $rule, FilterField $field, array $names): string
     {
@@ -95,15 +98,11 @@ final readonly class FilterRuleDisplay
             : (string) Number::currency($value, $definition->getCurrencyCode(), precision: $decimals);
     }
 
-    /** @param  array<string, string>  $names */
+    /** @param  array<string, LinkOption>  $names */
     private static function label(FilterField $field, string $id, array $names): string
     {
-        if ($field->kind === FilterFieldKind::Member && $id === self::ME) {
-            return __('filament/panel.tables.filters.me');
-        }
-
         if ($field->kind->holdsRecordIds()) {
-            return $names[$id] ?? $id;
+            return isset($names[$id]) ? $names[$id]->label : $id;
         }
 
         foreach ($field->options as $option) {
@@ -154,7 +153,7 @@ final readonly class FilterRuleDisplay
     /**
      * @param  list<array<string, mixed>>  $rules
      * @param  array<string, FilterField>  $catalog
-     * @return array<string, array<string, string>>
+     * @return array<string, array<string, LinkOption>>
      */
     private static function names(array $rules, array $catalog, User $user): array
     {
@@ -175,26 +174,46 @@ final readonly class FilterRuleDisplay
             $names[$key] = self::namesFor($catalog[$key], array_values(array_unique($ids)), $user);
         }
 
+        foreach ($rules as $rule) {
+            $field = $catalog[$rule['field']];
+
+            if ($field->kind === FilterFieldKind::Member && is_array($rule['value'] ?? null) && in_array(self::ME, $rule['value'], true)) {
+                $names[$field->key][self::ME] = self::viewer($user);
+            }
+        }
+
         return $names;
+    }
+
+    public static function viewer(User $user): LinkOption
+    {
+        return new LinkOption(
+            id: self::ME,
+            label: __('filament/panel.tables.filters.me_named', ['name' => $user->name]),
+            image: $user->getFilamentAvatarUrl(),
+        );
     }
 
     /**
      * @param  list<string>  $ids
-     * @return array<string, string>
+     * @return array<string, LinkOption>
      */
     private static function namesFor(FilterField $field, array $ids, User $user): array
     {
         $workspace = $user->currentWorkspace;
 
         if ($field->kind === FilterFieldKind::Member) {
-            return array_map(strval(...), User::query()->memberOf($workspace)->whereKey($ids)->pluck('users.name', 'users.id')->all());
+            return User::query()->memberOf($workspace)->whereKey($ids)->get()
+                ->mapWithKeys(fn (User $member): array => [(string) $member->getKey() => LinkOption::forRecord($member, $member->name)])
+                ->all();
         }
 
         if (! $field->related instanceof CrmEntity) {
             return [];
         }
 
-        $model = $field->related->model();
+        $entity = $field->related;
+        $model = $entity->model();
         $column = $field->related->titleColumn();
         $softDeletes = in_array(SoftDeletes::class, class_uses_recursive($model), true);
         $names = [];
@@ -203,13 +222,14 @@ final readonly class FilterRuleDisplay
             ->withoutGlobalScopes([WorkspaceScope::class, SoftDeletingScope::class])
             ->whereBelongsTo($workspace)
             ->whereKey($ids)
-            ->get([(new $model)->getKeyName(), $column, ...($softDeletes ? ['deleted_at'] : [])]);
+            ->when(is_subclass_of($model, HasMedia::class), fn (Builder $query): Builder => $query->with('media'))
+            ->get();
 
         foreach ($records as $record) {
             $name = (string) $record->getAttribute($column);
             $names[(string) $record->getKey()] = $softDeletes && $record->getAttribute('deleted_at') !== null
-                ? __('filament/panel.tables.filters.deleted_record', ['name' => $name])
-                : $name;
+                ? new LinkOption((string) $record->getKey(), __('filament/panel.tables.filters.deleted_record', ['name' => $name]), null, $entity->iconPath(), $entity !== CrmEntity::Company)
+                : LinkOption::forRecord($record, $name, $entity);
         }
 
         return $names;

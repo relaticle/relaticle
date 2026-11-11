@@ -143,10 +143,27 @@
                 x-bind:class="{ 'fi-pending': ! complete(chip) }"
                 x-bind:aria-label="label(chip)"
             >
-                <span class="fi-filter-seg fi-filter-field">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path x-bind:d="fieldOf(chip)?.icon"></path></svg>
-                    <span x-text="fieldOf(chip)?.label"></span>
-                </span>
+                <div class="fi-filter-part">
+                    <button
+                        type="button"
+                        tabindex="0"
+                        class="fi-filter-seg fi-filter-field"
+                        data-filter-segment="field"
+                        x-bind:class="{ 'fi-open': isOpen(chip.id, 'field') }"
+                        x-bind:aria-expanded="isOpen(chip.id, 'field').toString()"
+                        aria-haspopup="listbox"
+                        x-bind:aria-label="@js(__('filament/panel.tables.filters.change_field_for')).replace(':chip', label(chip))"
+                        data-pop-trigger
+                        x-on:click="toggle(chip.id, 'field', $event)"
+                    >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path x-bind:d="fieldOf(chip)?.icon"></path></svg>
+                        <span x-text="fieldOf(chip)?.label"></span>
+                    </button>
+
+                    <template x-if="isOpen(chip.id, 'field')">
+                        @include('filament.app.tables.filter-field-picker', ['id' => 'chip.id', 'label' => __('filament/panel.tables.filters.change_field_for'), 'forChip' => true])
+                    </template>
+                </div>
 
                 <div class="fi-filter-part">
                     <button
@@ -198,7 +215,27 @@
                             data-pop-trigger
                             x-on:click="toggle(chip.id, 'val', $event)"
                         >
-                            <span x-text="complete(chip) ? chip.display : @js(__('filament/panel.tables.filters.select_value'))"></span>
+                            <template x-if="markedValues(chip).length === 0">
+                                <span x-text="complete(chip) ? chip.display : @js(__('filament/panel.tables.filters.select_value'))"></span>
+                            </template>
+                            <template x-if="markedValues(chip).length > 0">
+                            <span class="fi-filter-values">
+                                <template x-for="(item, index) in markedValues(chip)" x-bind:key="item.id">
+                                    <span class="fi-filter-value">
+                                        <template x-if="item.image || item.icon">
+                                            <span class="fi-filter-mark" x-bind:class="{ 'fi-square': item.circular === false }">
+                                                <template x-if="item.image"><img x-bind:src="item.image" alt="" loading="lazy" /></template>
+                                                <template x-if="! item.image && item.icon">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path x-bind:d="item.icon"></path></svg>
+                                                </template>
+                                            </span>
+                                        </template>
+                                        <span x-text="item.label + (index < markedValues(chip).length - 1 || hiddenValues(chip) > 0 ? ',' : '')"></span>
+                                    </span>
+                                </template>
+                                <span class="fi-filter-more-values" x-show="hiddenValues(chip) > 0" x-text="'+' + hiddenValues(chip)"></span>
+                            </span>
+                            </template>
                         </button>
 
 
@@ -238,6 +275,14 @@
                                                     <x-filament::icon icon="lucide-check" x-show="isChecked(chip, option.id)" />
                                                 </span>
                                                 <span class="fi-filter-dot" x-show="optionColor(option)" x-bind:style="{ '--option-color': optionColor(option) }"></span>
+                                                <template x-if="option.image || option.icon">
+                                                    <span class="fi-filter-mark" x-bind:class="{ 'fi-square': option.circular === false }" data-filter-mark>
+                                                        <template x-if="option.image"><img x-bind:src="option.image" alt="" loading="lazy" /></template>
+                                                        <template x-if="! option.image && option.icon">
+                                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path x-bind:d="option.icon"></path></svg>
+                                                        </template>
+                                                    </span>
+                                                </template>
                                                 <span class="fi-filter-label" x-text="option.label"></span>
                                             </button>
                                         </template>
@@ -424,37 +469,7 @@
             </button>
 
             <template x-if="isOpen('add', 'field')">
-            <div class="fi-filter-pop fi-filter-pop-picker" x-anchor.bottom-start.offset.6.fixed="$el.parentElement" data-pop data-sheet x-bind:data-open="isOpen('add', 'field')" x-on:keydown="navigate($event)">
-                <label class="fi-filter-find">
-                    <x-filament::icon icon="lucide-search" />
-                    <input
-                        type="text"
-                        x-model="find"
-                        data-filter-find
-                        placeholder="{{ __('filament/panel.tables.filters.find_field') }}"
-                        aria-label="{{ __('filament/panel.tables.filters.find_field') }}"
-                        x-on:keydown.enter.prevent="pickFirst()"
-                    />
-                </label>
-                <div role="listbox" aria-label="{{ __('filament/panel.tables.filters.add_label') }}">
-                    <template x-for="field in matchingFields()" x-bind:key="field.key">
-                        <button type="button" tabindex="0" role="option" class="fi-filter-item" data-pop-item x-bind:data-field="field.key" x-on:click="addChip(field)">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path x-bind:d="field.icon"></path></svg>
-                            <span x-text="field.label"></span>
-                        </button>
-                    </template>
-                    <template x-if="canAddDeleted(@js(__('filament/panel.tables.filters.deleted_records')))">
-                        <div>
-                            <div class="fi-filter-rule" aria-hidden="true"></div>
-                            <button type="button" tabindex="0" role="option" class="fi-filter-item" data-pop-item data-filter-add-deleted x-on:click="addDeleted()">
-                                <x-filament::icon icon="lucide-trash-2" />
-                                <span>{{ __('filament/panel.tables.filters.deleted_records') }}</span>
-                            </button>
-                        </div>
-                    </template>
-                    <p class="fi-filter-hint" x-show="matchingFields().length === 0 && ! canAddDeleted(@js(__('filament/panel.tables.filters.deleted_records')))">{{ __('filament/panel.tables.filters.no_field') }}</p>
-                </div>
-            </div>
+                @include('filament.app.tables.filter-field-picker', ['id' => "'add'", 'label' => __('filament/panel.tables.filters.add_label'), 'forChip' => false])
             </template>
         </div>
     </div>

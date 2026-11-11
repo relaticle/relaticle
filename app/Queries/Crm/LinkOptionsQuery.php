@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Queries\Crm;
 
+use App\Data\LinkOption;
 use App\Enums\CrmEntity;
 use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
@@ -11,6 +12,7 @@ use App\Queries\Operand;
 use App\Support\LikePattern;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Spatie\MediaLibrary\HasMedia;
 
 final readonly class LinkOptionsQuery
 {
@@ -18,7 +20,7 @@ final readonly class LinkOptionsQuery
 
     private const int MAX_SEARCH_LENGTH = 100;
 
-    /** @return list<array{id: string, label: string}> */
+    /** @return list<array{id: string, label: string, image: ?string, icon: ?string, circular: bool}> */
     public function search(User $user, ?CrmEntity $related, string $search): array
     {
         $term = Operand::string(mb_substr(trim($search), 0, self::MAX_SEARCH_LENGTH));
@@ -31,7 +33,7 @@ final readonly class LinkOptionsQuery
 
         if (! $related instanceof CrmEntity) {
             return $user->belongsToWorkspace($workspace)
-                ? $this->labelled(User::query()->memberOf($workspace), 'name', $term)
+                ? $this->labelled(User::query()->memberOf($workspace)->whereKeyNot($user->getKey()), 'name', $term)
                 : [];
         }
 
@@ -43,24 +45,25 @@ final readonly class LinkOptionsQuery
             ->withoutGlobalScope(WorkspaceScope::class)
             ->whereBelongsTo($workspace);
 
-        return $this->labelled($records, $related->titleColumn(), $term);
+        return $this->labelled($records, $related->titleColumn(), $term, $related);
     }
 
     /**
      * @template TModel of Model
      *
      * @param  Builder<TModel>  $query
-     * @return list<array{id: string, label: string}>
+     * @return list<array{id: string, label: string, image: ?string, icon: ?string, circular: bool}>
      */
-    private function labelled(Builder $query, string $column, string $term): array
+    private function labelled(Builder $query, string $column, string $term, ?CrmEntity $entity = null): array
     {
         $options = $query
             ->when($term !== '', fn (Builder $q): Builder => $q->where($column, 'ilike', '%'.LikePattern::escape($term).'%'))
             ->orderBy($column)
             ->orderBy($query->getModel()->getKeyName())
+            ->when($query->getModel() instanceof HasMedia, fn (Builder $q): Builder => $q->with('media'))
             ->limit(self::LIMIT)
-            ->get([$query->getModel()->getKeyName(), $column])
-            ->map(static fn (Model $record): array => ['id' => (string) $record->getKey(), 'label' => (string) $record->getAttribute($column)])
+            ->get()
+            ->map(static fn (Model $record): array => LinkOption::forRecord($record, (string) $record->getAttribute($column), $entity)->toArray())
             ->all();
 
         return array_values($options);

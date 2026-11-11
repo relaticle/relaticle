@@ -589,6 +589,7 @@ it('lists a long choice with a search field and keeps the checked option on top 
 });
 
 it('narrows opportunities by creator with Me pinned first and a teammate after it', function (): void {
+    $this->user->update(['name' => 'Dana Viewer']);
     $teammate = User::factory()->create(['name' => 'Priya Shah']);
     $this->workspace->users()->attach($teammate, ['role' => 'member']);
     Opportunity::factory()->recycle([$this->user, $this->workspace])->count(2)->create(['creator_id' => $this->user->getKey()]);
@@ -607,9 +608,37 @@ it('narrows opportunities by creator with Me pinned first and a teammate after i
     expect(companyRows($page, 2))->toBeTrue();
     $page->assertDontSee('Priya deal')
         ->click(optionButton((string) $teammate->getKey()))
-        ->assertSeeIn('[data-filter-segment="value"]', 'Me, Priya Shah');
+        ->assertSeeIn('[data-filter-segment="value"]', "{$this->user->name} (me), Priya Shah");
     expect(companyRows($page, 3))->toBeTrue();
     $page->assertNoJavaScriptErrors();
+});
+
+it('lists the viewer once and first as the me entry with their photo and keeps it when their name is typed', function (): void {
+    $this->user->update(['name' => 'Dana Viewer']);
+    $this->workspace->users()->attach(User::factory()->create(['name' => 'Priya Shah']), ['role' => 'member']);
+    $page = openOn($this->user, $this->workspace, 'opportunities');
+    $entries = 'JSON.stringify([...document.querySelectorAll("[data-pop][data-open=true] [data-option]")].map((option) => [option.dataset.option, option.textContent.trim()]))';
+    $settled = fn (): array => json_decode($page->script("new Promise((resolve) => setTimeout(() => resolve({$entries}), 1200))"), true);
+
+    addChip($page, 'creator', 'is_any_of')->assertPresent(optionButton('@me').' img[src]');
+
+    expect($settled())->toBe([['@me', 'Dana Viewer (me)'], [(string) $this->workspace->users()->where('name', 'Priya Shah')->value('users.id'), 'Priya Shah']]);
+
+    $page->type(searchInput(), 'Dana');
+
+    expect($settled())->toBe([['@me', 'Dana Viewer (me)']]);
+    $page->assertScript('document.querySelector("[data-pop][data-open=true] [data-option=\\"@me\\"] img").getAttribute("alt") === ""', true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('marks a company lookup option with the company icon', function (): void {
+    $acme = Company::query()->withoutGlobalScopes()->where('workspace_id', $this->workspace->getKey())->where('name', 'Acme Robotics')->value('id');
+    $page = openOn($this->user, $this->workspace, 'people');
+
+    addChip($page, 'company', 'is_any_of')
+        ->assertPresent(optionButton((string) $acme).' [data-filter-mark].fi-square svg')
+        ->assertScript('(() => { const mark = document.querySelector("[data-filter-mark]").getBoundingClientRect(); return mark.width > 0 && mark.width === mark.height; })()', true)
+        ->assertNoJavaScriptErrors();
 });
 
 it('searches the workspace as the member types a company beyond the first page and keeps the pick listed', function (): void {
@@ -663,7 +692,7 @@ it('never shows one chip lookup results in another chip list', function (): void
         new Promise((resolve) => setTimeout(() => resolve([...document.querySelectorAll('[data-pop][data-open=true] [data-option]')].map((option) => option.textContent.trim())), 1200))
     JS;
 
-    expect($page->script($options))->not->toContain('Globex')->toContain('Me');
+    expect($page->script($options))->not->toContain('Globex')->toContain("{$this->user->name} (me)");
     $page->assertNoJavaScriptErrors();
 });
 
@@ -952,5 +981,77 @@ it('keeps the select row under the filter row on a phone for an owner', function
 
     openOn($this->user, $this->workspace, 'companies', 390)
         ->assertScript(filterBarWaitFor("{$visibleRows}.length === 1 && {$visibleRows}[0].querySelector('.fi-ta-page-checkbox')"), true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('changes the field of an unfinished chip in place and opens its conditions', function (): void {
+    $page = ($this->open)();
+
+    addChip($page, 'name', 'contains')
+        ->click('[data-filter-segment="field"]')
+        ->assertAttribute('[data-filter-segment="field"]', 'aria-expanded', 'true')
+        ->click('[data-pop-item][data-field="creation_source"]')
+        ->assertPresent('[data-filter-chip][data-field="creation_source"].fi-pending')
+        ->assertScript('document.querySelectorAll("[data-filter-chip]").length === 1', true)
+        ->assertSeeIn('[data-filter-chip]', 'Select condition')
+        ->assertPresent('[data-pop][data-open=true] [data-condition="is_any_of"]');
+    expect($page->script(popVisible()))->toBeTrue();
+
+    $page->click('[data-pop][data-open=true] [data-condition="is_any_of"]')
+        ->click('[data-filter-segment="field"]')
+        ->click('[data-pop-item][data-field="creation_source"]')
+        ->assertPresent('[data-filter-chip][data-field="creation_source"]')
+        ->assertNoJavaScriptErrors();
+});
+
+it('widens the list when a complete chip of a saved view changes field and restores it on discard', function (): void {
+    SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'name' => 'Acme only',
+        'state' => new TableStateData(filters: ['conditions' => ['match' => 'all', 'rules' => [['field' => 'name', 'condition' => 'contains', 'value' => 'acme']]]]),
+    ]);
+
+    $page = ($this->open)()
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->click('Acme only');
+    expect(companyRows($page, 1))->toBeTrue();
+    $page->assertDontSee('Discard changes')
+        ->click('[data-filter-segment="field"]')
+        ->click('[data-pop-item][data-field="creation_source"]');
+    expect(companyRows($page, 3))->toBeTrue();
+    $page->assertSee('Discard changes')
+        ->assertPresent('[data-filter-chip][data-field="creation_source"].fi-pending')
+        ->click('[data-view-save-action="discard"]');
+    expect(companyRows($page, 1))->toBeTrue();
+    $page->assertDontSee('Discard changes')
+        ->assertPresent('[data-filter-chip][data-field="name"]')
+        ->assertSeeIn('[data-filter-chip]', 'acme')
+        ->assertNoJavaScriptErrors();
+});
+
+it('opens the field list of a chip from the keyboard', function (): void {
+    $page = ($this->open)();
+
+    addChip($page, 'name', 'contains')->keys(valueInput(), 'Escape');
+    $page->script('document.querySelector("[data-filter-segment=field]").focus()');
+    $page->assertAttribute('[data-filter-segment="field"]', 'aria-haspopup', 'listbox')
+        ->assertAttribute('[data-filter-segment="field"]', 'aria-label', 'Change field for Company contains')
+        ->keys('[data-filter-segment="field"]', 'Enter')
+        ->assertAttribute('[data-filter-segment="field"]', 'aria-expanded', 'true')
+        ->assertScript(chipFocus('[data-pop][data-open=true] [data-filter-find]'), true)
+        ->keys('[data-pop][data-open=true] [data-filter-find]', 'Escape')
+        ->assertScript(chipFocus('[data-filter-segment="field"]'), true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('shows the marks of the picked members and companies in the chips after a reload', function (): void {
+    $acme = Company::query()->withoutGlobalScopes()->where('workspace_id', $this->workspace->getKey())->where('name', 'Acme Robotics')->value('id');
+    $page = openOn($this->user, $this->workspace, 'people');
+
+    addChip($page, 'company', 'is_any_of')->click(optionButton((string) $acme))->keys(searchInput(), 'Escape');
+    addChip($page, 'creator', 'is_any_of')->click(optionButton('@me'))->keys(searchInput(), 'Escape');
+    $page->navigate("/app/{$this->workspace->slug}/people")
+        ->assertPresent('[data-filter-chip][data-field="company"] .fi-filter-value .fi-filter-mark.fi-square svg')
+        ->assertPresent('[data-filter-chip][data-field="creator"] .fi-filter-value .fi-filter-mark img[src]')
+        ->assertScript('(() => { const chip = document.querySelector("[data-filter-chip][data-field=creator]"); return chip.getBoundingClientRect().height <= 30 && chip.textContent.includes("(me)"); })()', true)
         ->assertNoJavaScriptErrors();
 });
