@@ -228,3 +228,55 @@ body.reordering-column .column-resize-handle-bar::before {
 .fi-ta-resizable-table td .fi-ta-text-item:not(.fi-wrapped, .fi-ta-text-has-line-clamp, :is(.fi-wrapped, .fi-ta-text-has-line-clamp) *) {
     @apply sm:block sm:truncate;
 }
+
+/* The five list pages fill the screen below the topbar, so the table scrolls inside itself and its horizontal
+   scrollbar sits at the bottom edge. Phones keep page scroll, where the table stacks into cards. */
+@media (width >= 40rem) {
+    .fi-app-layout .fi-main:has(.fi-ta-fill-screen) {
+        @apply h-full;
+    }
+
+    .fi-page:has(> .fi-ta-fill-screen) {
+        @apply h-full;
+
+        .fi-page-header-main-ctn {
+            @apply h-full gap-y-0 py-0;
+        }
+
+        .fi-page-main {
+            @apply min-h-0 flex-1;
+        }
+
+        :is(.fi-page-content, .fi-grid, .fi-grid-col, .fi-sc-component, .fi-ta, .fi-ta-ctn):not(.fi-modal *) {
+            @apply h-full min-h-0;
+        }
+
+        :is(.fi-page-content, .fi-grid) {
+            @apply grid-rows-[minmax(0,1fr)];
+        }
+
+        .fi-ta-main:not(.fi-modal *) {
+            @apply flex min-h-0 flex-col;
+        }
+
+        .fi-ta-main > :is(.fi-ta-header-ctn, .fi-pagination, .fi-ta-filters-below-content) {
+            @apply shrink-0;
+        }
+
+        .fi-ta-content-ctn:not(.fi-modal *) {
+            @apply min-h-0 flex-1 overscroll-contain;
+        }
+
+        .fi-ta-content-ctn:not(.fi-modal *) thead {
+            @apply sticky top-0;
+
+            &[data-sticky-header] {
+                animation: none;
+            }
+        }
+
+        .fi-ta-empty-state:not(.fi-modal *) {
+            @apply flex min-h-0 flex-1 flex-col justify-center;
+        }
+    }
+}

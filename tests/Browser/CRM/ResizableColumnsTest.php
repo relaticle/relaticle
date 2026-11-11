@@ -59,6 +59,28 @@ function dragFeedbackMidDrag(string $column): string
     JS, headerSelector($column), headerSelector($column));
 }
 
+function tableAreaBottomGap(): string
+{
+    return <<<'JS'
+        (() => {
+            const container = document.querySelector('.fi-ta-content-ctn');
+            const pagination = document.querySelector('.fi-ta-ctn .fi-pagination');
+            const lowest = Math.max(container.getBoundingClientRect().bottom, pagination ? pagination.getBoundingClientRect().bottom : 0);
+            return Math.abs(Math.round(lowest - window.innerHeight)) <= 1;
+        })();
+    JS;
+}
+
+function pageScrollsVertically(): string
+{
+    return <<<'JS'
+        (() => {
+            const layout = document.querySelector('.fi-layout');
+            return document.scrollingElement.scrollHeight > window.innerHeight + 1 || layout.scrollHeight > layout.clientHeight + 1;
+        })();
+    JS;
+}
+
 beforeEach(function (): void {
     $this->withVite();
 
@@ -251,10 +273,10 @@ it('keeps resizing after navigating to another table and after sorting', functio
         ->assertNoJavaScriptErrors();
 });
 
-it('keeps the table head pinned while the page scrolls', function (): void {
+it('keeps the table head pinned while the rows scroll', function (): void {
     People::factory()->recycle([$this->user, $this->workspace])->count(30)->create();
 
-    $headOffset = '(() => { const layout = document.querySelector(".fi-layout"); return Math.abs(Math.round(document.querySelector("thead").getBoundingClientRect().top - layout.getBoundingClientRect().top)); })()';
+    $headOffset = '(() => { const container = document.querySelector(".fi-ta-content-ctn"); return Math.abs(Math.round(document.querySelector("thead").getBoundingClientRect().top - container.getBoundingClientRect().top)); })()';
 
     $page = loginViaBrowser($this->user)
         ->assertPathIs("/app/{$this->workspace->slug}")
@@ -262,10 +284,56 @@ it('keeps the table head pinned while the page scrolls', function (): void {
         ->navigate("/app/{$this->workspace->slug}/people")
         ->assertVisible(headerSelector('name').' .column-resize-handle-bar');
 
-    $page->script('document.querySelector(".fi-layout").scrollTo(0, 600)');
+    $page->script('document.querySelector(".fi-ta-content-ctn").scrollTo(0, 600)');
 
     $page->wait(0.5)
+        ->assertScript('document.querySelector(".fi-ta-content-ctn").scrollTop > 0', true)
         ->assertScript($headOffset, 0)
+        ->assertNoJavaScriptErrors();
+});
+
+it('puts the horizontal scrollbar at the bottom of the screen with few records', function (): void {
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
+
+    $page->assertScript(tableAreaBottomGap(), true)
+        ->assertScript('(() => { const c = document.querySelector(".fi-ta-content-ctn"); return c.scrollWidth > c.clientWidth; })()', true)
+        ->assertScript(pageScrollsVertically(), false)
+        ->assertNoJavaScriptErrors();
+});
+
+it('puts the horizontal scrollbar at the bottom of the screen with many records and scrolls the rows inside the table', function (): void {
+    People::factory()->recycle([$this->user, $this->workspace])->count(60)->create();
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/people")
+        ->assertVisible(headerSelector('name').' .column-resize-handle-bar');
+
+    $page->script('(() => { const select = document.querySelector(".fi-pagination-records-per-page-select:not(.fi-compact) select"); select.value = "50"; select.dispatchEvent(new Event("change", { bubbles: true })); })()');
+
+    $page->wait(1.5)
+        ->assertScript('document.querySelectorAll(".fi-ta-content-ctn tbody tr").length', 50)
+        ->assertScript(tableAreaBottomGap(), true)
+        ->assertScript(pageScrollsVertically(), false)
+        ->assertScript('(() => { const c = document.querySelector(".fi-ta-content-ctn"); return c.scrollHeight > c.clientHeight + 1; })()', true)
+        ->assertScript('document.querySelector(".fi-ta-ctn .fi-pagination") !== null', true)
+        ->assertScript('(() => { const p = document.querySelector(".fi-ta-ctn .fi-pagination").getBoundingClientRect(); return p.top >= 0 && p.bottom <= window.innerHeight + 1; })()', true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('keeps the empty state inside the table area', function (): void {
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/tasks");
+
+    $page->assertScript('(() => { const empty = document.querySelector(".fi-ta-empty-state").getBoundingClientRect(); return empty.height > 200 && empty.bottom <= window.innerHeight + 1; })()', true)
+        ->assertScript(pageScrollsVertically(), false)
         ->assertNoJavaScriptErrors();
 });
 

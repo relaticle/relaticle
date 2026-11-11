@@ -398,6 +398,11 @@ final class AppPanelProvider extends PanelProvider
 
         $panel
             ->renderHook(
+                PanelsRenderHook::PAGE_START,
+                fn (): string => '<span class="fi-ta-fill-screen" hidden></span>',
+                scopes: $listPages,
+            )
+            ->renderHook(
                 TablesRenderHook::TOOLBAR_BEFORE,
                 fn (): View|Factory => view('filament.app.tables.filter-bar'),
                 scopes: $listPages,
