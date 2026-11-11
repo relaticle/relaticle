@@ -66,7 +66,7 @@
             <x-filament::dropdown.list.item
                 icon="lucide-tag"
                 data-column-menu-item="editLabel"
-                x-on:click="choose(() => $wire.mountAction('editTableColumnLabel', { column }), null)"
+                x-on:click="editLabel()"
             >
                 {{ __('filament/panel.tables.column_menu.edit_label') }}
             </x-filament::dropdown.list.item>

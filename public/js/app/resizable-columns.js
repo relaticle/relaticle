@@ -289,7 +289,10 @@
             lockTable(table)
             table.querySelectorAll('thead th[x-data^="resizableColumn"]').forEach(reapplyHeader)
 
-            if (el.contains(table)) restoreColumnFocus(table)
+            if (el.contains(table)) {
+                restoreColumnFocus(table)
+                restoreLabelFocus(table)
+            }
 
             const wrapper = table.closest('.fi-ta-content-ctn')
             const savedScrollLeft = wrapper && wrapperScrollLeft.get(wrapper)
@@ -345,6 +348,18 @@
 
     // A move re-renders the headers, so the control that started it is focused again afterwards.
     let pendingColumnFocus = null
+    // The label modal's own focus return lands on the body once the morph that closes it redraws the header.
+    let labelFocus = null
+
+    document.addEventListener('x-modal-opened', () => {
+        if (labelFocus) labelFocus.opened = true
+    })
+
+    function restoreLabelFocus(table) {
+        if (!labelFocus?.opened || document.querySelector('.fi-modal-open')) return
+        labelFocus.target(table)?.focus({ preventScroll: true })
+        labelFocus = null
+    }
 
     function forgetColumnFocus() {
         pendingColumnFocus = null
@@ -756,6 +771,13 @@
                 this.close(false)
                 swallowDoubleClickTail()
             },
+
+            editLabel() {
+                const column = this.column
+
+                labelFocus = { target: (table) => columnHandle(table, column), opened: false }
+                this.choose(() => this.$wire.mountAction('editTableColumnLabel', { column }), null)
+            },
         }))
     }
 
@@ -803,14 +825,14 @@
                     this.locked = row.hasAttribute('data-column-locked')
                     this.placed = false
 
-                    // Measured after Alpine reveals it, so the menu never shows at a guessed place.
-                    this.$nextTick(() => {
+                    // Measured a frame after Alpine reveals it: before that its height reads 0 and it never flips above.
+                    this.$nextTick(() => requestAnimationFrame(() => {
                         if (this.menu === null) return
 
                         this.placeMenu(button.getBoundingClientRect())
                         this.placed = true
                         this.$nextTick(() => requestAnimationFrame(() => this.menuItems()[0]?.focus({ preventScroll: true })))
-                    })
+                    }))
                 },
 
                 placeMenu(rect) {
@@ -854,6 +876,7 @@
                     const column = this.menu
 
                     this.closeMenu(false)
+                    labelFocus = { target: () => document.querySelector('.fi-view-settings-trigger'), opened: false }
                     this.$wire.mountAction('editTableColumnLabel', { column })
                 },
 

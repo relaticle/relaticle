@@ -93,8 +93,7 @@
     @apply relative flex items-center rounded-md;
 
     &:hover,
-    &:has(:focus-visible),
-    &:has([aria-expanded='true']) {
+    &:has(:focus-visible) {
         @apply bg-gray-50 dark:bg-white/5;
     }
 
@@ -256,7 +255,8 @@
     @apply flex items-center gap-1 rounded-md py-1 pe-1 ps-0.5 text-sm text-gray-950 dark:text-white;
 
     &:hover,
-    &:has(:focus-visible) {
+    &:has(:focus-visible),
+    &:has([aria-expanded='true']) {
         @apply bg-gray-50 dark:bg-white/5;
     }
 }
