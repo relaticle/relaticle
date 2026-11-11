@@ -92,7 +92,6 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
                 'greetingName' => explode(' ', $this->user->name)[0],
                 'preheader' => $this->preheader(),
                 'summary' => $this->summary(),
-                'workspaceName' => $this->workspace->name,
                 'overdue' => $this->cards($this->digest->overdue, fn (DigestTaskItem $item): string => __('mail.task_digest.due_overdue', [
                     'date' => $item->dueAt->setTimezone($timezone)->format('M j, Y'),
                 ])),
@@ -146,11 +145,13 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
      */
     private function cards(array $items, callable $dueLabel): array
     {
+        $dueIcon = $this->iconUrl('lucide-calendar');
+
         return array_map(fn (DigestTaskItem $item): array => [
             'title' => $item->title,
             'url' => $item->editUrl,
             'due' => $dueLabel($item),
-            'dueIcon' => $this->iconUrl('lucide-calendar'),
+            'dueIcon' => $dueIcon,
             'priority' => $item->priority === null ? null : ['label' => $item->priority, ...$this->priorityColors($item->priorityColor)],
             'records' => $this->recordChips($item->records),
         ], $items);

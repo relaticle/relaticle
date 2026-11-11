@@ -142,10 +142,6 @@ final readonly class DigestService
      */
     private function linkedRecords(Workspace $workspace, array $taskIds): array
     {
-        if ($taskIds === []) {
-            return [];
-        }
-
         $records = [];
 
         foreach (CrmEntity::linkable() as $entity) {
