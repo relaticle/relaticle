@@ -29,9 +29,15 @@
                             </button>
                         </form>
 
-                        <x-filament::badge :color="$persona->expect->getColor()">
-                            {{ $persona->expect->getLabel() }}
-                        </x-filament::badge>
+                        @if ($persona->expect)
+                            <x-filament::badge :color="$persona->expect->getColor()">
+                                {{ $persona->expect->getLabel() }}
+                            </x-filament::badge>
+                        @else
+                            <x-filament::badge color="gray">
+                                {{ __('No workspace') }}
+                            </x-filament::badge>
+                        @endif
                     </div>
                 @endforeach
             </div>

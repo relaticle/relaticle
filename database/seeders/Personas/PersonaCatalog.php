@@ -63,6 +63,17 @@ final class PersonaCatalog
             ),
 
             new Persona(
+                slug: 'fresh',
+                email: 'fresh@'.self::DOMAIN,
+                name: 'Fresh Start',
+                workspace: null,
+                purpose: 'Signed up with no workspace yet, so login opens the first-run wizard.',
+                // Every seed deletes the workspaces this login made, so one walk through
+                // onboarding never uses the persona up.
+                expect: null,
+            ),
+
+            new Persona(
                 slug: 'paused',
                 email: 'paused@'.self::DOMAIN,
                 name: 'Pia Paused',
