@@ -10,6 +10,7 @@ use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\SavedView;
+use App\Models\TablePreference;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CurrentWorkspace;
@@ -159,7 +160,7 @@ it('leaves the list and the view alone while a chip is unfinished', function ():
 });
 
 it('saves a complete chip on a saved view as it completes and keeps the chip after a reload', function (): void {
-    SavedView::factory()->for($this->user)->for($this->workspace)->create([
+    $view = SavedView::factory()->for($this->user)->for($this->workspace)->create([
         'name' => 'Hot leads',
         'state' => new TableStateData(sort: 'created_at:asc'),
     ]);
@@ -169,12 +170,15 @@ it('saves a complete chip on a saved view as it completes and keeps the chip aft
         ->click('Hot leads');
 
     addChip($page, 'name', 'contains')->type(valueInput(), 'glo');
-    $page->assertMissing('[data-view-save]');
-    expect(companyRows($page, 1))->toBeTrue();
+    $page->assertScript(filterRowSaveControlCount(), 0);
+    expect(companyRows($page, 1))->toBeTrue()
+        ->and(data_get($view->refresh()->state->filters, 'conditions.rules.0.value'))->toBe('glo');
 
-    $page->navigate("/app/{$this->workspace->slug}/companies")
+    TablePreference::query()->withoutGlobalScopes()->delete();
+
+    $page->navigate("/app/{$this->workspace->slug}/companies?view={$view->getKey()}")
         ->assertSeeIn('[data-filter-chip]', 'glo')
-        ->assertMissing('[data-view-save]');
+        ->assertScript(filterRowSaveControlCount(), 0);
     expect(companyRows($page, 1))->toBeTrue();
     $page->assertNoJavaScriptErrors();
 });
@@ -756,11 +760,11 @@ it('keeps a date in the next 30 days with a saved view and reads the same after 
         ->type(amountInput(), '30');
     expect(companyRows($page, 1))->toBeTrue();
     $page->assertSeeIn('[data-filter-chip]', '30 days')
-        ->assertMissing('[data-view-save]')
+        ->assertScript(filterRowSaveControlCount(), 0)
         ->navigate("/app/{$this->workspace->slug}/companies")
         ->assertSeeIn('[data-filter-chip]', 'in the next')
         ->assertSeeIn('[data-filter-chip]', '30 days')
-        ->assertMissing('[data-view-save]');
+        ->assertScript(filterRowSaveControlCount(), 0);
     expect(companyRows($page, 1))->toBeTrue();
     $page->assertNoJavaScriptErrors();
 });
@@ -1085,7 +1089,7 @@ it('widens the list when a complete chip of a saved view changes field', functio
         ->click('[data-pop-item][data-field="creation_source"]');
     expect(companyRows($page, 3))->toBeTrue();
     $page->assertPresent('[data-filter-chip][data-field="creation_source"].fi-pending')
-        ->assertMissing('[data-view-save]')
+        ->assertScript(filterRowSaveControlCount(), 0)
         ->assertNoJavaScriptErrors();
 });
 

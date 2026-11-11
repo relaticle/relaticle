@@ -47,7 +47,7 @@ it('applies a view from the switcher and shows no discard or save control after 
     changeViewByRule($page);
     $page->assertScript(savedViewsWaitFor('document.querySelectorAll("[data-filter-chip]").length === 1'), true)
         ->assertDontSee('Discard changes')
-        ->assertMissing('[data-filter-bar] [data-view-save]')
+        ->assertScript(filterRowSaveControlCount(), 0)
         ->assertNoJavaScriptErrors();
 })->with([[1440, 900], [390, 844]]);
 

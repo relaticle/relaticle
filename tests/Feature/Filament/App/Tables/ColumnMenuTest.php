@@ -191,7 +191,7 @@ it('stores a move on the applied view', function (): void {
     $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey());
     $movable = columnsBesideTitle($component, CrmEntity::Company);
 
-    expect($component->instance()->isSavedViewModified())->toBeFalse();
+    expect($view->refresh()->state->columns)->toBe([]);
 
     $component->call('moveTableColumn', end($movable), $movable[0]);
 
@@ -211,7 +211,7 @@ it('tells the browser which headers hide', function (string $page, CrmEntity $en
         ->and($toggleable)->toMatchArray(['data-column-hideable' => '1']);
 })->with('column menu pages');
 
-it('applies a view that stored the title column elsewhere as stored and unmodified', function (string $page, CrmEntity $entity): void {
+it('applies a view that stored the title column elsewhere as stored and leaves it as stored', function (string $page, CrmEntity $entity): void {
     $columns = collect(withTitleLast(livewire($page), $entity))
         ->map(fn (array $item): array => ['type' => $item['type'], 'name' => $item['name'], 'isToggled' => $item['isToggled']])
         ->all();
@@ -223,7 +223,7 @@ it('applies a view that stored the title column elsewhere as stored and unmodifi
     $component = livewire($page)->call('applySavedView', $view->getKey());
 
     expect(last(columnOrder($component)))->toBe($entity->titleColumn())
-        ->and($component->instance()->isSavedViewModified())->toBeFalse();
+        ->and(array_column($view->refresh()->state->columns, 'name'))->toBe(array_column($columns, 'name'));
 })->with('column menu pages');
 
 /**
@@ -395,7 +395,7 @@ it('restores the pins a view was saved with and stores them when they change', f
 
     expect(pinnedColumns($component))->toBe(['name', 'creator.name'])
         ->and(array_slice(columnOrder($component), 0, 2))->toBe(['name', 'creator.name'])
-        ->and($component->instance()->isSavedViewModified())->toBeFalse();
+        ->and($view->refresh()->state->pinned)->toBe(['name', 'creator.name']);
 
     $component->call('unpinTableColumn', 'creator.name');
 
@@ -521,7 +521,7 @@ it('carries labels in a saved view and stores a changed one', function (): void 
     $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey());
 
     expect(columnLabelText($component, 'created_at'))->toBe('Added')
-        ->and($component->instance()->isSavedViewModified())->toBeFalse();
+        ->and($view->refresh()->state->labels)->toBe(['created_at' => 'Added']);
 
     $component->callAction('editTableColumnLabel', data: ['label' => 'Joined'], arguments: ['column' => 'created_at']);
 
@@ -832,7 +832,7 @@ it('stores an added attribute on the active saved view and leaves another view a
     ]))->all();
     $component = livewire(ListCompanies::class)->call('applySavedView', $viewA->getKey());
 
-    expect($component->instance()->isSavedViewModified())->toBeFalse();
+    expect($viewA->refresh()->state->columns)->toHaveCount(count($stored));
 
     $component->callAction('createTableAttribute', data: ['name' => 'Lead score', 'type' => 'text']);
 
@@ -841,7 +841,8 @@ it('stores an added attribute on the active saved view and leaves another view a
 
     $component->call('applySavedView', $viewB->getKey());
 
-    expect($component->instance()->isSavedViewModified())->toBeFalse();
+    expect($viewA->refresh()->state->columns)->toHaveCount(count($stored) + 1)
+        ->and($viewB->refresh()->state->columns)->toHaveCount(count($stored));
 });
 
 it('adds a select attribute with its three options', function (): void {

@@ -375,6 +375,11 @@ function assertActionHasMailboxOAuthUrl(
     );
 }
 
+function filterRowSaveControlCount(): string
+{
+    return '[...document.querySelectorAll("[data-filter-bar] button, [data-filter-bar] a")].filter((control) => /^(save|save for everyone|discard changes)$/i.test((control.getAttribute("aria-label") ?? control.textContent).trim())).length';
+}
+
 /**
  * Log in through the real two-step login form: type the email and submit to
  * reveal the password field, then type the password and submit again.

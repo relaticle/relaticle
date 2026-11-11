@@ -1411,11 +1411,13 @@ function filterBarStateWith(mixed $component, array $filters): TableStateData
     return $state;
 }
 
-it('reads a view as unchanged however its filters were stored, on the next request and on a fresh mount', function (array $filters, string $how): void {
+it('writes nothing to a view however its filters were stored, on the next request and on a fresh mount', function (array $filters, string $how): void {
     filterBarScenario('companies', $this->user);
     $fresh = livewire(ListCompanies::class);
     $stored = filterBarStateWith($fresh, $filters);
     $view = SavedView::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Company, 'state' => $stored]);
+    $updatedAt = $view->updated_at;
+    $this->travelTo(now()->addHour());
 
     if ($how === 'stored') {
         TablePreference::factory()->for($this->user)->for($this->workspace)->create([
@@ -1431,21 +1433,22 @@ it('reads a view as unchanged however its filters were stored, on the next reque
         : livewire(ListCompanies::class);
 
     if ($how === 'stored') {
-        expect($component->get('activeSavedViewId'))->toBe($view->getKey())
-            ->and($component->instance()->isSavedViewModified())->toBeFalse();
+        expect($component->get('activeSavedViewId'))->toBe($view->getKey());
     }
 
     $component->call('$refresh');
 
-    expect($component->instance()->isSavedViewModified())->toBeFalse();
+    expect($view->refresh()->updated_at)->toEqual($updatedAt);
 })->with('stored filter shapes')->with(['apply', 'stored']);
 
-it('reads a copy of a view as unchanged when only its old filter shape differs, and as changed when it really differs', function (string $source, bool $changed): void {
+it('leaves a view alone and shows the stored copy, whether the copy differs from it or only its old filter shape does', function (string $source): void {
     $fresh = livewire(ListCompanies::class);
     $view = SavedView::factory()->for($this->user)->for($this->workspace)->create([
         'entity' => CrmEntity::Company,
         'state' => filterBarStateWith($fresh, ['creation_source' => ['values' => ['api']]]),
     ]);
+    $updatedAt = $view->updated_at;
+    $this->travelTo(now()->addHour());
     TablePreference::factory()->for($this->user)->for($this->workspace)->create([
         'entity' => CrmEntity::Company,
         'active_view_id' => $view->getKey(),
@@ -1453,16 +1456,17 @@ it('reads a copy of a view as unchanged when only its old filter shape differs, 
         'state' => filterBarStateWith($fresh, ['creation_source' => ['values' => [$source]], 'custom_fields.gone' => ['values' => ['x']]]),
     ]);
 
-    $component = livewire(ListCompanies::class);
+    $component = livewire(ListCompanies::class)->call('$refresh');
 
     expect($component->get('activeSavedViewId'))->toBe($view->getKey())
-        ->and($component->instance()->isSavedViewModified())->toBe($changed);
+        ->and($component->get('tableFilters.conditions.rules.0.value'))->toBe([$source])
+        ->and($view->refresh()->updated_at)->toEqual($updatedAt);
 })->with([
-    'the copy equals the view' => ['api', false],
-    'the copy differs' => ['import', true],
+    'the copy equals the view' => ['api'],
+    'the copy differs' => ['import'],
 ]);
 
-it('reads a view as unchanged when a stored preference predates the conditions filter', function (bool $changed): void {
+it('leaves a view alone and shows the stored copy when a stored preference predates the conditions filter', function (bool $changed): void {
     filterBarScenario('companies', $this->user);
     $before = new TableStateData(
         columns: [['type' => 'column', 'name' => 'created_at', 'isToggled' => true]],
@@ -1470,6 +1474,8 @@ it('reads a view as unchanged when a stored preference predates the conditions f
         filters: ['assigned_to_me' => ['isActive' => false], 'creation_source' => ['values' => ['api']], 'trashed' => ['value' => null]],
     );
     $view = SavedView::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Company, 'state' => $before]);
+    $updatedAt = $view->updated_at;
+    $this->travelTo(now()->addHour());
     TablePreference::factory()->for($this->user)->for($this->workspace)->create([
         'entity' => CrmEntity::Company,
         'active_view_id' => $view->getKey(),
@@ -1481,7 +1487,8 @@ it('reads a view as unchanged when a stored preference predates the conditions f
     $component->call('$refresh');
 
     expect($component->get('activeSavedViewId'))->toBe($view->getKey())
-        ->and($component->instance()->isSavedViewModified())->toBe($changed)
+        ->and($component->get('tableSort'))->toBe($changed ? 'created_at:asc' : 'created_at:desc')
+        ->and($view->refresh()->updated_at)->toEqual($updatedAt)
         ->and($component->get('tableFilters.conditions.rules'))->toBe([['field' => 'creation_source', 'condition' => 'is_any_of', 'value' => ['api']]]);
 })->with([
     'a clean copy' => [false],
@@ -1496,6 +1503,7 @@ it('keeps a relative period unchanged when a day passes, and moves its records',
         'entity' => CrmEntity::Company,
         'state' => new TableStateData(filters: filterBarRulesState([['field' => 'created_at', 'condition' => 'in_the_next', 'value' => ['amount' => 30, 'unit' => 'days']]])),
     ]);
+    $updatedAt = $view->updated_at;
     $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey());
     $before = filterBarShownNames($component);
 
@@ -1503,7 +1511,7 @@ it('keeps a relative period unchanged when a day passes, and moves its records',
     $component->call('$refresh');
 
     expect($before)->toBe(['Near'])
-        ->and($component->instance()->isSavedViewModified())->toBeFalse()
+        ->and($view->refresh()->updated_at)->toEqual($updatedAt)
         ->and(filterBarShownNames($component))->toBe(['Far', 'Near']);
 });
 
@@ -1511,12 +1519,11 @@ it('stores a rule added to a view on the view', function (): void {
     $view = SavedView::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Company, 'state' => new TableStateData(filters: filterBarRulesState([]))]);
 
     $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey());
-    expect($component->instance()->isSavedViewModified())->toBeFalse();
+    expect($view->refresh()->state->filters['conditions']['rules'])->toBe([]);
 
     $component->call('setFilterRules', [['field' => 'name', 'condition' => 'contains', 'value' => 'a']]);
 
-    expect($component->instance()->isSavedViewModified())->toBeFalse()
-        ->and($view->refresh()->state->filters['conditions']['rules'][0])->toMatchArray(['field' => 'name', 'condition' => 'contains', 'value' => 'a']);
+    expect($view->refresh()->state->filters['conditions']['rules'][0])->toMatchArray(['field' => 'name', 'condition' => 'contains', 'value' => 'a']);
 });
 
 it('resolves the records of a field with one query however many rules name them', function (): void {
@@ -1689,15 +1696,16 @@ it('reads a saved view that includes deleted records as unchanged and stores the
         'entity' => CrmEntity::Company,
         'state' => new TableStateData(filters: ['trashed' => ['value' => 1]]),
     ]);
+    $updatedAt = $view->updated_at;
+    $this->travelTo(now()->addHour());
 
     $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey());
 
-    expect($component->get('tableFilters.trashed.value'))->toBe(1)
-        ->and($component->instance()->isSavedViewModified())->toBeFalse();
+    expect($component->get('tableFilters.trashed.value'))->toBe(1);
 
     $component->call('$refresh');
 
-    expect($component->instance()->isSavedViewModified())->toBeFalse();
+    expect($view->refresh()->updated_at)->toEqual($updatedAt);
 
     $component->call('setDeletedRecordsFilter', 'only');
 
@@ -1705,8 +1713,7 @@ it('reads a saved view that includes deleted records as unchanged and stores the
 
     $component->call('setDeletedRecordsFilter', 'included');
 
-    expect($view->refresh()->state->filters['trashed']['value'])->toBe(1)
-        ->and($component->instance()->isSavedViewModified())->toBeFalse();
+    expect($view->refresh()->state->filters['trashed']['value'])->toBe(1);
 });
 
 it('lists neither the live nor the deleted record when a negated name rule matches both', function (string $page, string $model): void {
@@ -2058,13 +2065,13 @@ it('reads a saved number rule as unchanged when the number comes back as text', 
         'state' => new TableStateData(filters: ['conditions' => $rule($saved)]),
     ]);
 
+    $updatedAt = $view->updated_at;
+    $this->travelTo(now()->addHour());
+
     $component = livewire(ListOpportunities::class)->call('applySavedView', $view->getKey());
-
-    expect($component->instance()->isSavedViewModified())->toBeFalse();
-
     $component->set('tableFilters.conditions', $rule($written));
 
-    expect($component->instance()->isSavedViewModified())->toBeFalse()
+    expect($view->refresh()->updated_at)->toEqual($updatedAt)
         ->and($component->get('tableFilters.conditions.rules.0.value'))->toBe($saved);
 })->with([
     'whole' => [1000, '1000'],
@@ -2165,7 +2172,7 @@ it('stores a grouping set from the group control on the view and reads the view 
 
     $component = livewire(ManageTasks::class)->call('applySavedView', $view->getKey());
 
-    expect($component->instance()->isSavedViewModified())->toBeFalse();
+    expect($view->refresh()->state->grouping)->toBeNull();
 
     $component->call('setFilterBarGrouping', 'status_group', 'desc');
 
@@ -2173,8 +2180,7 @@ it('stores a grouping set from the group control on the view and reads the view 
 
     $revisit = livewire(ManageTasks::class)->call('applySavedView', $view->getKey());
 
-    expect($revisit->get('tableGrouping'))->toBe('status_group:desc')
-        ->and($revisit->instance()->isSavedViewModified())->toBeFalse();
+    expect($revisit->get('tableGrouping'))->toBe('status_group:desc');
 });
 
 it('hands the sort and group controls an icon for each column that has one', function (): void {

@@ -80,12 +80,6 @@ trait HasSavedViews
         return $this->getVisibleSavedViews()->find($this->activeSavedViewId);
     }
 
-    public function isSavedViewModified(): bool
-    {
-        return $this->getActiveSavedView() instanceof SavedView
-            && $this->currentTableState()->withoutWidths()->hash() !== $this->appliedSavedViewHash;
-    }
-
     private function saveActiveSavedView(): void
     {
         if ($this->activeSavedViewId === null || $this->tableStateHash === null) {

@@ -91,6 +91,8 @@ function preferenceRow(): ?TablePreference
 
 it('applies columns, sort, filters and page size in one call', function (string $page, CrmEntity $entity): void {
     $view = viewFor($this->user, ['entity' => $entity, 'state' => hotLeads()]);
+    $updatedAt = $view->updated_at;
+    $this->travelTo(now()->addHour());
 
     $component = livewire($page)->call('applySavedView', $view->getKey());
 
@@ -100,7 +102,7 @@ it('applies columns, sort, filters and page size in one call', function (string 
         ->and($component->instance()->getTableFiltersForm()->getRawState()['trashed']['value'])->toEqual(0)
         ->and($component->get('tableColumns.0.name'))->toBe('created_at')
         ->and($component->get('tableColumns.0.isToggled'))->toBeFalse()
-        ->and($component->instance()->isSavedViewModified())->toBeFalse()
+        ->and($view->refresh()->updated_at)->toEqual($updatedAt)
         ->and(preferenceRow()->active_view_id)->toBe($view->getKey());
 })->with('view list pages');
 
@@ -113,7 +115,7 @@ function sortedKeys(array $value): array
     return array_map(fn (mixed $item): mixed => is_array($item) ? sortedKeys($item) : $item, $value);
 }
 
-it('reads an unchanged view as unchanged against a hash stored before search left', function (): void {
+it('writes nothing to a view whose stored hash predates search leaving the state', function (): void {
     $state = new TableStateData(columns: [['type' => 'column', 'name' => 'created_at', 'isToggled' => true]], sort: 'name:asc');
     $view = viewFor($this->user, ['state' => $state]);
     TablePreference::factory()->for($this->user)->for($this->workspace)->create([
@@ -124,19 +126,25 @@ it('reads an unchanged view as unchanged against a hash stored before search lef
         'applied_view_hash' => hash('xxh128', json_encode(sortedKeys([...$state->toArray(), 'search' => null, 'columnSearches' => []]), JSON_THROW_ON_ERROR)),
     ]);
     session()->put("tables.opened.{$this->workspace->getKey()}.company", true);
+    $updatedAt = $view->updated_at;
+    $this->travelTo(now()->addHour());
 
-    expect(livewire(ListCompanies::class)->instance()->isSavedViewModified())->toBeFalse();
+    livewire(ListCompanies::class)->call('$refresh');
+
+    expect($view->refresh()->updated_at)->toEqual($updatedAt);
 });
 
-it('opens a view stored with a search unchanged and applies no search', function (string $page, CrmEntity $entity): void {
+it('opens a view stored with a search without writing it and applies no search', function (string $page, CrmEntity $entity): void {
     $view = viewFor($this->user, ['entity' => $entity, 'state' => hotLeads()]);
     DB::table('saved_views')->where('id', $view->getKey())->update(['state' => json_encode([...$view->state->toArray(), 'search' => 'acme', 'columnSearches' => ['name' => 'acme']])]);
+    $updatedAt = $view->refresh()->updated_at;
+    $this->travelTo(now()->addHour());
 
-    $component = livewire($page)->call('applySavedView', $view->getKey());
+    $component = livewire($page)->call('applySavedView', $view->getKey())->call('$refresh');
 
     expect($component->get('tableSearch'))->toBeEmpty()
         ->and($component->get('tableColumnSearches'))->toBeEmpty()
-        ->and($component->instance()->isSavedViewModified())->toBeFalse();
+        ->and($view->refresh()->updated_at)->toEqual($updatedAt);
 })->with('view list pages');
 
 it('falls back to the default page size when a view holds one the table does not offer', function (): void {
@@ -190,7 +198,7 @@ it('lets two members use the same view name', function (): void {
     expect(SavedView::query()->withoutGlobalScopes()->count())->toBe(2);
 });
 
-it('stays unmodified when the page size is changed and set back from the select', function (): void {
+it('ends on the original state when the page size is changed and set back from the select', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
 
     $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())
@@ -199,16 +207,20 @@ it('stays unmodified when the page size is changed and set back from the select'
 
     $preference = preferenceRow();
 
-    expect($component->instance()->isSavedViewModified())->toBeFalse()
+    expect($view->refresh()->state->perPage)->toBe(50)
+        ->and($view->state->sort)->toBe('created_at:desc')
         ->and($preference->state->withoutWidths()->hash())->toBe($preference->applied_view_hash);
 });
 
-it('ignores widths when telling whether a view was changed', function (): void {
+it('writes nothing to a view when a column width changes', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
+    $updatedAt = $view->updated_at;
+    $this->travelTo(now()->addHour());
 
-    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('updateResizableColumnWidth', 'created_at', '300');
+    livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call('updateResizableColumnWidth', 'created_at', '300');
 
-    expect($component->instance()->isSavedViewModified())->toBeFalse();
+    expect($view->refresh()->updated_at)->toEqual($updatedAt)
+        ->and($view->state->widths)->toBe([]);
 });
 
 it('stores a filter change on the active view with no save step and keeps it on a fresh mount', function (): void {
@@ -308,6 +320,47 @@ it('writes no view for a change on the built-in list', function (): void {
         ->and(preferenceRow()->state->sort)->toBe('name:asc');
 });
 
+it('writes neither view when the member switches from one to the other', function (): void {
+    $first = viewFor($this->user, ['name' => 'Hot leads', 'state' => hotLeads()]);
+    $second = viewFor($this->user, ['name' => 'By name', 'state' => new TableStateData(sort: 'name:asc')]);
+    $before = [$first->updated_at, $second->updated_at];
+    $this->travelTo(now()->addHour());
+
+    livewire(ListCompanies::class)->call('applySavedView', $first->getKey())->call('applySavedView', $second->getKey());
+
+    expect([$first->refresh()->updated_at, $second->refresh()->updated_at])->toEqual($before)
+        ->and($first->state->sort)->toBe('created_at:desc')
+        ->and($second->state->sort)->toBe('name:asc');
+});
+
+it('writes no view when the member returns to the built-in list', function (string $return): void {
+    $view = viewFor($this->user, ['state' => hotLeads()]);
+    $updatedAt = $view->updated_at;
+    $this->travelTo(now()->addHour());
+
+    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey())->call($return);
+
+    expect($component->get('activeSavedViewId'))->toBeNull()
+        ->and($view->refresh()->updated_at)->toEqual($updatedAt)
+        ->and($view->state->sort)->toBe('created_at:desc');
+})->with(['applyOwnTable', 'useStandardTable']);
+
+it('writes nothing to another view when the active view is deleted', function (): void {
+    $active = viewFor($this->user, ['name' => 'Hot leads', 'state' => hotLeads()]);
+    $other = viewFor($this->user, ['name' => 'By name', 'state' => new TableStateData(sort: 'name:asc')]);
+    $updatedAt = $other->updated_at;
+    $this->travelTo(now()->addHour());
+
+    livewire(ListCompanies::class)
+        ->call('applySavedView', $active->getKey())
+        ->callAction('deleteSavedView', arguments: ['view' => $active->getKey()])
+        ->call('sortTable', 'created_at', 'asc');
+
+    expect(SavedView::query()->withoutGlobalScopes()->pluck('name')->all())->toBe(['By name'])
+        ->and($other->refresh()->updated_at)->toEqual($updatedAt)
+        ->and($other->state->sort)->toBe('name:asc');
+});
+
 it('renders no discard or save control on a changed view', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
 
@@ -344,8 +397,7 @@ it('brings back the last state within a session, and the view as it was left in 
     $revisit = livewire(ListCompanies::class);
 
     expect($revisit->get('tableSort'))->toBe('name:asc')
-        ->and($revisit->get('activeSavedViewId'))->toBe($view->getKey())
-        ->and($revisit->instance()->isSavedViewModified())->toBeFalse();
+        ->and($revisit->get('activeSavedViewId'))->toBe($view->getKey());
 
     session()->flush();
     $nextSession = livewire(ListCompanies::class);
@@ -360,6 +412,8 @@ it('opens a new session on the default view over another applied one, and keeps 
     $other = viewFor($this->user, ['name' => 'By name', 'state' => new TableStateData(sort: 'name:asc')]);
     livewire(ListCompanies::class)->call('toggleDefaultSavedView', $default->getKey())->call('applySavedView', $other->getKey());
 
+    $updatedAt = [$default->updated_at, $other->updated_at];
+    $this->travelTo(now()->addHour());
     session()->flush();
 
     expect(livewire(ListCompanies::class)->get('activeSavedViewId'))->toBe($default->getKey());
@@ -368,7 +422,7 @@ it('opens a new session on the default view over another applied one, and keeps 
 
     expect($sameSession->get('activeSavedViewId'))->toBe($default->getKey())
         ->and($sameSession->get('tableSort'))->toBe('created_at:desc')
-        ->and($sameSession->instance()->isSavedViewModified())->toBeFalse();
+        ->and([$default->refresh()->updated_at, $other->refresh()->updated_at])->toEqual($updatedAt);
 });
 
 it('keeps the last state across sessions for a member with no default view', function (): void {
@@ -384,13 +438,14 @@ it('opens on the default view when the member has no saved state, and writes not
     $view = viewFor($this->user, ['state' => hotLeads()]);
     TablePreference::factory()->for($this->user)->for($this->workspace)->create(['default_view_id' => $view->getKey()]);
     $updatedAt = preferenceRow()->updated_at;
+    $viewUpdatedAt = $view->updated_at;
 
     $this->travelTo(now()->addHour());
     $component = livewire(ListCompanies::class);
 
     expect($component->get('tableSort'))->toBe('created_at:desc')
         ->and($component->get('activeSavedViewId'))->toBe($view->getKey())
-        ->and($component->instance()->isSavedViewModified())->toBeFalse()
+        ->and($view->refresh()->updated_at)->toEqual($viewUpdatedAt)
         ->and(preferenceRow()->updated_at)->toEqual($updatedAt);
 });
 
@@ -529,7 +584,7 @@ it('refuses to update another member\'s view, whatever reaches the action', func
     $view = viewFor(savedViewMember(WorkspaceRole::Member), ['name' => 'Team', 'state' => hotLeads()]);
     $member = savedViewMember(WorkspaceRole::Member);
 
-    expect(fn () => resolve(UpdateSavedView::class)->execute($member, $view, ['state' => hotLeads()]))
+    expect(fn () => resolve(UpdateSavedView::class)->execute($member, $view, ['state' => new TableStateData(sort: 'name:asc')]))
         ->toThrow(HttpException::class);
 
     expect($view->refresh()->state->sort)->toBe('created_at:desc');
@@ -787,14 +842,14 @@ it('forgets the member\'s own table on a reset to the default', function (): voi
     expect($component->get('tableSort'))->toBeNull();
 });
 
-it('never marks the member\'s own table as modified', function (): void {
+it('writes no view when the member changes their own table', function (): void {
     $view = viewFor($this->user, ['state' => hotLeads()]);
     $component = livewire(ListCompanies::class)
         ->call('applySavedView', $view->getKey())
         ->call('applyOwnTable')
         ->call('sortTable', 'name', 'asc');
 
-    expect($component->instance()->isSavedViewModified())->toBeFalse()
+    expect($view->refresh()->state->sort)->toBe('created_at:desc')
         ->and($component->get('activeSavedViewId'))->toBeNull()
         ->and($component->get('appliedSavedViewHash'))->toBeNull()
         ->and(preferenceRow()->own_state)->toBeNull();
@@ -813,7 +868,7 @@ it('stores the member\'s own table without widths and keeps their widths when it
     $component->call('applyOwnTable');
 
     expect($component->get('tableColumnWidths'))->toBe(['created_at' => 300])
-        ->and($component->instance()->isSavedViewModified())->toBeFalse();
+        ->and($view->refresh()->state->widths)->toBe([]);
 });
 
 it('leaves the member\'s own table alone when another view replaces the active one', function (): void {
@@ -956,7 +1011,6 @@ it('clears a view that vanished elsewhere when the member returns to their own t
 
     expect($component->get('activeSavedViewId'))->toBeNull()
         ->and($component->get('appliedSavedViewHash'))->toBeNull()
-        ->and($component->instance()->isSavedViewModified())->toBeFalse()
         ->and($component->get('tableSort'))->toBe('created_at:desc')
         ->and(preferenceRow()->own_state)->toBeNull()
         ->and(preferenceRow()->active_view_id)->toBeNull();
@@ -977,7 +1031,6 @@ it('opens a view named in the link', function (): void {
     expect($component->get('activeSavedViewId'))->toBe($view->getKey())
         ->and($component->get('tableSort'))->toBe('created_at:desc')
         ->and($component->get('requestedSavedViewId'))->toBeNull()
-        ->and($component->instance()->isSavedViewModified())->toBeFalse()
         ->and(preferenceRow()->active_view_id)->toBe($view->getKey());
 });
 
@@ -1029,7 +1082,6 @@ it('opens a link to a view the member already changed on the view as changed', f
     $component = Livewire::withQueryParams(['view' => $view->getKey()])->test(ListCompanies::class);
 
     expect($component->get('tableSort'))->toBe('name:asc')
-        ->and($component->instance()->isSavedViewModified())->toBeFalse()
         ->and($view->refresh()->state->sort)->toBe('name:asc');
 });
 
@@ -1175,7 +1227,7 @@ it('opens a view sorted by several columns with every sort and unmodified', func
         ->assertSet('tableThenSorts', 'created_at:asc');
 
     expect(array_column($component->instance()->getFilterBarData()['sorts'], 'direction', 'column'))->toBe(['name' => 'desc', 'created_at' => 'asc'])
-        ->and($component->instance()->isSavedViewModified())->toBeFalse();
+        ->and($view->refresh()->state->sort)->toBe('name:desc,created_at:asc');
 
     $component->call('setFilterBarSorts', [['column' => 'created_at', 'direction' => 'asc'], ['column' => 'name', 'direction' => 'desc']]);
 
