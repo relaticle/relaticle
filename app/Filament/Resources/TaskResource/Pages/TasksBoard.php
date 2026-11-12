@@ -6,6 +6,7 @@ namespace App\Filament\Resources\TaskResource\Pages;
 
 use App\Actions\Task\UpdateTask;
 use App\Contracts\OrdersBoardStages;
+use App\Data\BoardStateData;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\TaskField as TaskCustomField;
 use App\Filament\Actions\CreateTaskAction;
@@ -341,7 +342,10 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
         $task = $currentWorkspace->tasks()->create($data);
 
         if (filled($columnId)) {
-            $task->saveCustomFieldValue($this->boardColumnField(), $this->columnValueFor((string) $columnId));
+            if ($columnId !== BoardStateData::NO_VALUE_COLUMN) {
+                $task->saveCustomFieldValue($this->boardColumnField(), $columnId);
+            }
+
             $task->order_column = (float) $this->getBoardPositionInColumn($columnId);
             $task->saveQuietly();
         }

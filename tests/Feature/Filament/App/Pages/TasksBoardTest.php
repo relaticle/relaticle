@@ -1479,7 +1479,8 @@ it('clears the status when a task moves into the no status column and sets it wh
     $component = livewire(TasksBoard::class)->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true);
 
     $component->call('moveCard', (string) $task->id, BoardStateData::NO_VALUE_COLUMN)->assertReturned(true);
-    expect(taskValueOf($task, $this->statusField))->toBeNull();
+    expect($task->customFieldValues()->where('custom_field_id', $this->statusField->getKey())->exists())->toBeTrue()
+        ->and(taskValueOf($task, $this->statusField))->toBeNull();
 
     $component->call('moveCard', (string) $task->id, $inProgress)->assertReturned(true);
     expect(taskValueOf($task, $this->statusField))->toBe($inProgress);
@@ -1501,4 +1502,18 @@ it('moves a task into the no status column and to another assignee lane in one d
 
     expect(taskValueOf($task, $this->statusField))->toBeNull()
         ->and($task->assignees()->pluck('users.id')->all())->toBe([$joining->id]);
+});
+
+it('creates a task with no status from the no status column', function (): void {
+    $component = livewire(TasksBoard::class)
+        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
+        ->call('mountAction', 'create', ['column' => BoardStateData::NO_VALUE_COLUMN])
+        ->set('mountedActions.0.data.title', 'Bare task')
+        ->call('callMountedAction');
+
+    $created = Task::query()->where('title', 'Bare task')->firstOrFail();
+
+    expect(taskValueOf($created, $this->statusField))->toBeNull()
+        ->and($created->order_column)->not->toBeNull()
+        ->and(noStatusCardIds($component))->toContain($created->id);
 });

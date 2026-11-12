@@ -1629,7 +1629,8 @@ it('clears the stage when a card moves into the no stage column and sets it when
     $component = livewire(OpportunitiesBoard::class)->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true);
 
     $component->call('moveCard', (string) $card->id, BoardStateData::NO_VALUE_COLUMN)->assertReturned(true);
-    expect($card->fresh()->getCustomFieldValue($this->stageField))->toBeNull();
+    expect($card->customFieldValues()->where('custom_field_id', $this->stageField->getKey())->exists())->toBeTrue()
+        ->and($card->customFieldValues()->where('custom_field_id', $this->stageField->getKey())->value($this->stageField->getValueColumn()))->toBeNull();
 
     $component->call('moveCard', (string) $card->id, $qualification)->assertReturned(true);
     expect($card->fresh()->getCustomFieldValue($this->stageField))->toBe($qualification);
@@ -1645,6 +1646,7 @@ it('creates an opportunity with no stage from the no stage column', function ():
     $created = Opportunity::query()->where('name', 'Bare deal')->firstOrFail();
 
     expect($created->customFieldValues()->where('custom_field_id', $this->stageField->getKey())->value($this->stageField->getValueColumn()))->toBeNull()
+        ->and($created->order_column)->not->toBeNull()
         ->and(noStageCardIds($component))->toContain($created->id);
 });
 
@@ -1669,7 +1671,13 @@ it('shows an empty no stage column with its add row when every opportunity has a
 
     expect(noStageCardIds($component))->toBe([])
         ->and(boardColumnOrder($component))->toContain(BoardStateData::NO_VALUE_COLUMN);
-    $component->assertSeeHtml('ff-add-row');
+
+    $html = $component->html();
+    $start = strpos($html, 'data-column-root="'.BoardStateData::NO_VALUE_COLUMN.'"');
+    $column = substr($html, $start, strpos($html, 'data-column-root=', $start + 1) - $start);
+
+    expect($start)->not->toBeFalse()
+        ->and($column)->toMatch('/ff-add-row/');
 });
 
 it('keeps the no stage column out of the stage order and off a header drag', function (): void {
@@ -1725,4 +1733,34 @@ it('moves a card into the no stage column and to another company lane in one dro
 
     expect($card->fresh()->getCustomFieldValue($this->stageField))->toBeNull()
         ->and($card->fresh()->company_id)->toBe($globex->id);
+});
+
+it('refuses the no stage column as a target when it is on only for another attribute', function (): void {
+    $tier = opportunitySelectField($this, 'Tier', ['Gold', 'Silver']);
+    $card = opportunityInStage($this, 'Acme renewal', 'Prospecting');
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnField', $tier->code)
+        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
+        ->call('setBoardColumnField', null);
+
+    $component->call('moveCard', (string) $card->id, BoardStateData::NO_VALUE_COLUMN)->assertReturned(false);
+
+    expect($card->fresh()->getCustomFieldValue($this->stageField))->toBe((string) $this->stageField->options->firstWhere('name', 'Prospecting')->getKey());
+});
+
+it('keeps the last real column locked while the no stage column is on', function (): void {
+    $ids = stageIds($this->stageField);
+    $component = livewire(OpportunitiesBoard::class)->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true);
+
+    foreach (array_slice($ids, 1) as $id) {
+        $component->call('setBoardColumnVisible', $id, false);
+    }
+
+    $html = (string) $component->instance()->boardViewSettings();
+    $start = strpos($html, 'data-stage-id="'.$ids[0].'"');
+    $row = substr($html, $start, strpos($html, 'data-stage-id=', $start + 1) - $start);
+
+    expect($row)->toContain('board-last-column-hint')
+        ->and($html)->toMatch('/data-board-columns-trigger.*?fi-board-settings-value-text">\s*2\s*</s');
 });

@@ -203,7 +203,7 @@
                     @foreach ($columns as $column)
                         @php
                             $dotColor = ColorResolver::resolve($column['color']);
-                            $isLastVisible = $column['visible'] && $visibleCount <= 1;
+                            $isLastVisible = $column['visible'] && $visibleRealCount <= 1;
                         @endphp
 
                         <div

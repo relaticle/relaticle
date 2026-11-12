@@ -6,6 +6,7 @@ namespace App\Filament\Resources\OpportunityResource\Pages;
 
 use App\Actions\Opportunity\UpdateOpportunity;
 use App\Contracts\OrdersBoardStages;
+use App\Data\BoardStateData;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\OpportunityField as OpportunityCustomField;
 use App\Filament\Actions\MoveCardAction;
@@ -307,7 +308,10 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
         $opportunity = $currentWorkspace->opportunities()->create($data);
 
         if (filled($columnId)) {
-            $opportunity->saveCustomFieldValue($this->boardColumnField(), $this->columnValueFor((string) $columnId));
+            if ($columnId !== BoardStateData::NO_VALUE_COLUMN) {
+                $opportunity->saveCustomFieldValue($this->boardColumnField(), $columnId);
+            }
+
             $opportunity->order_column = (float) $this->getBoardPositionInColumn($columnId);
             $opportunity->saveQuietly();
         }

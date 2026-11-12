@@ -27,7 +27,9 @@ document.addEventListener('alpine:init', () => {
         },
 
         columnIds(container) {
-            return [...container.querySelectorAll(':scope > .ff-column:not(.ff-column-dragging)')].map((column) => column.dataset.columnRoot)
+            return [...container.querySelectorAll(':scope > .ff-column:not(.ff-column-dragging)')]
+                .map((column) => column.dataset.columnRoot)
+                .filter((id) => id !== this.$el.dataset.boardNoValueColumn)
         },
 
         restore(container, ids) {

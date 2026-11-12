@@ -108,6 +108,7 @@ trait HasBoardStageOrder
                 ->map(static fn (array $option): array => [...$option, 'visible' => in_array($option['id'], $visible, true)])
                 ->all(),
             'visibleCount' => count($visible) + ($this->showsNoValueColumn() ? 1 : 0),
+            'visibleRealCount' => count($visible),
             'noValueColumn' => ['label' => $this->noValueColumnLabel(), 'on' => $this->showsNoValueColumn()],
             'groupings' => $this->boardGroupings(),
             'grouping' => $this->getBoard()->getActiveGrouping()?->getName(),
