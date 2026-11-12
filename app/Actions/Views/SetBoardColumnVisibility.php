@@ -38,6 +38,7 @@ final readonly class SetBoardColumnVisibility
                 }
 
                 $hidden = array_values(array_intersect($stored->hiddenColumns, $optionIds));
+                $hidden = array_diff($optionIds, $hidden) === [] ? [] : $hidden;
                 $hidden = $visible
                     ? array_values(array_diff($hidden, [$optionId]))
                     : array_values(array_unique([...$hidden, $optionId]));

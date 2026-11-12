@@ -1552,6 +1552,16 @@ it('draws every column when the stored state hides every option', function (): v
         ->and(TablePreference::query()->sole()->board_state->hiddenColumns)->toBe($ids);
 });
 
+it('lets a member hide a column after the stored state hid every option', function (): void {
+    $ids = stageIds($this->stageField);
+    rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(hiddenColumns: $ids));
+
+    $component = livewire(OpportunitiesBoard::class)->call('setBoardColumnVisible', $ids[0], false)->assertOk();
+
+    expect(TablePreference::query()->sole()->board_state->hiddenColumns)->toBe([$ids[0]])
+        ->and(boardColumnOrder($component))->toBe(array_slice($ids, 1));
+});
+
 it('ignores a hide that would leave no visible column or names an unknown option', function (): void {
     $ids = stageIds($this->stageField);
     rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(hiddenColumns: array_slice($ids, 1)));
