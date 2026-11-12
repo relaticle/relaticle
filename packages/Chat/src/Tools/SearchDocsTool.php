@@ -63,6 +63,16 @@ final readonly class SearchDocsTool implements Tool
         'why', 'will', 'with', 'would', 'you', 'your',
     ];
 
+    /**
+     * Copy retired "field" for "attribute"; members still type the old word.
+     *
+     * @var array<string, string>
+     */
+    private const array RETIRED_WORDS = [
+        'field' => 'attribute',
+        'fields' => 'attributes',
+    ];
+
     public function __construct(
         private BuildSearchIndex $index,
         private DocsRepository $docs,
@@ -343,7 +353,7 @@ final readonly class SearchDocsTool implements Tool
         $words = preg_split('/[^\p{L}\p{N}.]+/u', mb_strtolower(trim($query)), -1, PREG_SPLIT_NO_EMPTY) ?: [];
 
         $terms = array_filter(
-            array_map(fn (string $word): string => trim($word, '.'), $words),
+            array_map(fn (string $word): string => self::RETIRED_WORDS[trim($word, '.')] ?? trim($word, '.'), $words),
             fn (string $word): bool => mb_strlen($word) >= self::MIN_TERM_LENGTH
                 && ! in_array($word, self::STOP_WORDS, true),
         );

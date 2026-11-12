@@ -50,6 +50,10 @@ it('surfaces a second article instead of letting one page take every slot', func
     expect(array_unique(array_column($results['results'], 'title')))->toHaveCount(2);
 });
 
+it('reads the retired word field as attribute', function (string $query): void {
+    expect(searchDocs($query)['results'][0]['title'])->toContain('attributes');
+})->with(['custom fields', 'how do I add a custom field']);
+
 it('matches a stemmed term in both directions', function (): void {
     $sections = array_column(searchDocs('connectors')['results'], 'section');
 
