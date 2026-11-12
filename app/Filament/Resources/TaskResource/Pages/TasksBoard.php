@@ -34,7 +34,6 @@ use Filament\Support\Facades\FilamentTimezone;
 use Filament\Tables\Enums\FiltersLayout;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
@@ -73,7 +72,6 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
     public function board(Board $board): Board
     {
         $columnField = $this->boardColumnField();
-        $valueColumn = $columnField->getValueColumn();
 
         $customFields = CustomFields::infolist()
             ->forModel(Task::class)
@@ -85,17 +83,9 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
             ->keyBy(fn (mixed $field): string => $field->getName());
 
         return $board
-            ->query(
-                Task::query()
-                    ->leftJoin('custom_field_values as cfv', function (JoinClause $join) use ($columnField): void {
-                        $join->on('tasks.id', '=', 'cfv.entity_id')
-                            ->where('cfv.custom_field_id', '=', $columnField->getKey());
-                    })
-                    ->with(['assignees'])
-                    ->select('tasks.*', 'cfv.'.$valueColumn)
-            )
+            ->query($this->boardColumnQuery(Task::query()->with(['assignees']), $columnField))
             ->recordTitleAttribute('title')
-            ->columnIdentifier($valueColumn)
+            ->columnIdentifier($this->boardColumnIdentifier())
             ->positionIdentifier('order_column')
             ->columns($this->boardColumns())
             ->cardSchema(function (Schema $schema) use ($customFields): Schema {
@@ -251,7 +241,7 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
         $card->update([$this->getBoard()->getPositionIdentifierAttribute() => $position]);
 
         /** @var Task $card */
-        $card->saveCustomFieldValue($this->boardColumnField(), $columnValue);
+        $card->saveCustomFieldValue($this->boardColumnField(), $this->columnValueFor((string) $columnValue));
     }
 
     /**
@@ -351,17 +341,12 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
         $task = $currentWorkspace->tasks()->create($data);
 
         if (filled($columnId)) {
-            $task->saveCustomFieldValue($this->boardColumnField(), $columnId);
+            $task->saveCustomFieldValue($this->boardColumnField(), $this->columnValueFor((string) $columnId));
             $task->order_column = (float) $this->getBoardPositionInColumn($columnId);
             $task->saveQuietly();
         }
 
         return $task;
-    }
-
-    private function ownsColumn(string $id): bool
-    {
-        return in_array($id, $this->visibleBoardColumnIds(), true);
     }
 
     private function descriptionCustomField(): ?CustomField

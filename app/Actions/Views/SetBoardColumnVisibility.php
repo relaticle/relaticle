@@ -24,13 +24,19 @@ final readonly class SetBoardColumnVisibility
 
         $optionIds = $this->columnFields->optionIds($user, $workspace, $entity, $fieldCode);
 
-        abort_if($optionIds === null || ! in_array($optionId, $optionIds, true), 403);
+        abort_if($optionIds === null || ($optionId !== BoardStateData::NO_VALUE_COLUMN && ! in_array($optionId, $optionIds, true)), 403);
 
         return $this->saveBoardState->execute(
             $user,
             $workspace,
             $entity,
-            function (BoardStateData $stored) use ($optionIds, $optionId, $visible): array {
+            function (BoardStateData $stored) use ($fieldCode, $optionIds, $optionId, $visible): array {
+                if ($optionId === BoardStateData::NO_VALUE_COLUMN) {
+                    $codes = array_values(array_diff($stored->noValueColumns, [$fieldCode]));
+
+                    return ['no_value_columns' => $visible ? [...$codes, $fieldCode] : $codes];
+                }
+
                 $hidden = array_values(array_intersect($stored->hiddenColumns, $optionIds));
                 $hidden = $visible
                     ? array_values(array_diff($hidden, [$optionId]))

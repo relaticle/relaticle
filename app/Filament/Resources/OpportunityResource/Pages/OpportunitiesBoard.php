@@ -34,7 +34,6 @@ use Filament\Support\Facades\FilamentTimezone;
 use Filament\Tables\Enums\FiltersLayout;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
@@ -63,7 +62,6 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
     public function board(Board $board): Board
     {
         $columnField = $this->boardColumnField();
-        $valueColumn = $columnField->getValueColumn();
 
         $customFields = CustomFields::infolist()
             ->forModel(Opportunity::class)
@@ -75,17 +73,9 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
             ->keyBy(fn (mixed $field): string => $field->getName());
 
         return $board
-            ->query(
-                Opportunity::query()
-                    ->leftJoin('custom_field_values as cfv', function (JoinClause $join) use ($columnField): void {
-                        $join->on('opportunities.id', '=', 'cfv.entity_id')
-                            ->where('cfv.custom_field_id', '=', $columnField->getKey());
-                    })
-                    ->select('opportunities.*', 'cfv.'.$valueColumn)
-                    ->with(['company.media', 'contact'])
-            )
+            ->query($this->boardColumnQuery(Opportunity::query()->with(['company.media', 'contact']), $columnField))
             ->recordTitleAttribute('name')
-            ->columnIdentifier($valueColumn)
+            ->columnIdentifier($this->boardColumnIdentifier())
             ->positionIdentifier('order_column')
             ->columns($this->boardColumns())
             ->cardSchema(fn (Schema $schema): Schema => $this->cardSchema($schema, $customFields))
@@ -198,7 +188,7 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
         $card->update([$this->getBoard()->getPositionIdentifierAttribute() => $position]);
 
         /** @var Opportunity $card */
-        $card->saveCustomFieldValue($this->boardColumnField(), $columnValue);
+        $card->saveCustomFieldValue($this->boardColumnField(), $this->columnValueFor((string) $columnValue));
     }
 
     private function cardCreation(): CreateAction
@@ -317,17 +307,12 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
         $opportunity = $currentWorkspace->opportunities()->create($data);
 
         if (filled($columnId)) {
-            $opportunity->saveCustomFieldValue($this->boardColumnField(), $columnId);
+            $opportunity->saveCustomFieldValue($this->boardColumnField(), $this->columnValueFor((string) $columnId));
             $opportunity->order_column = (float) $this->getBoardPositionInColumn($columnId);
             $opportunity->saveQuietly();
         }
 
         return $opportunity;
-    }
-
-    private function ownsColumn(string $id): bool
-    {
-        return in_array($id, $this->visibleBoardColumnIds(), true);
     }
 
     private static function stageCustomField(): ?CustomField

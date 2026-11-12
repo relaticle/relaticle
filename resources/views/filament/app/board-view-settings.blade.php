@@ -174,6 +174,31 @@
             </div>
 
             <div class="fi-ta-views-scroll">
+                <div class="fi-ta-views-row fi-board-stage-row fi-board-no-value-row" data-board-no-value-toggle>
+                    <span class="fi-board-stage-grip-space" aria-hidden="true"></span>
+
+                    <span @class(['fi-board-stage', 'fi-board-stage-off' => ! $noValueColumn['on']])>
+                        <span class="fi-board-stage-mark">
+                            <span class="fi-board-stage-dot-empty"></span>
+                        </span>
+                        <span class="fi-board-stage-name" title="{{ $noValueColumn['label'] }}">{{ $noValueColumn['label'] }}</span>
+                    </span>
+
+                    <span
+                        class="fi-board-stage-switch"
+                        x-on:click="$wire.setBoardColumnVisible({{ Js::from(\App\Data\BoardStateData::NO_VALUE_COLUMN) }}, {{ $noValueColumn['on'] ? 'false' : 'true' }}).finally(() => syncSwitch($el))"
+                    >
+                        <x-filament::toggle
+                            :state="$noValueColumn['on'] ? 'true' : 'false'"
+                            :aria-label="__('filament/pages/boards.view_settings.show_column', ['column' => $noValueColumn['label']])"
+                            :data-visible="$noValueColumn['on'] ? 'true' : 'false'"
+                            data-board-column-toggle
+                        />
+                    </span>
+                </div>
+
+                <hr class="fi-board-stage-divider" />
+
                 <div class="fi-ta-views-list" x-ref="list" x-sort="reorder" x-sort:config="{ draggable: '.fi-ta-views-draggable', filter: '.fi-ta-views-row-actions, .fi-board-stage-switch', preventOnFilter: false, delay: 200, delayOnTouchOnly: true, animation: 150 }">
                     @foreach ($columns as $column)
                         @php

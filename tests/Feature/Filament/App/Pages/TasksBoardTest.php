@@ -1445,3 +1445,60 @@ it('refuses a card created or moved into a hidden column', function (): void {
     expect(Task::query()->where('title', 'Hidden column task')->exists())->toBeFalse()
         ->and(taskValueOf($card->fresh(), $this->statusField))->toBe($this->statusField->options->firstWhere('name', 'In progress')->getKey());
 });
+
+/**
+ * @return list<int|string>
+ */
+function noStatusCardIds(Testable $component): array
+{
+    return $component->instance()->getBoard()->getBoardRecords(BoardStateData::NO_VALUE_COLUMN)->pluck('id')->all();
+}
+
+it('shows a no status column first, holding exactly the tasks with no status, once it is switched on', function (): void {
+    taskInStatus($this, 'Write brief', 'To do');
+    $bare = Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Bare task']);
+    $cleared = taskInStatus($this, 'Cleared task', 'To do');
+    $cleared->saveCustomFieldValue($this->statusField, null);
+
+    $off = livewire(TasksBoard::class);
+    expect(taskBoardColumnOrder($off))->not->toContain(BoardStateData::NO_VALUE_COLUMN);
+
+    $on = $off->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true);
+
+    expect(taskBoardColumnOrder($on)[0])->toBe(BoardStateData::NO_VALUE_COLUMN)
+        ->and(noStatusCardIds($on))->toEqualCanonicalizing([$bare->id, $cleared->id])
+        ->and($on->instance()->getBoard()->getBatchedBoardRecordCounts()[BoardStateData::NO_VALUE_COLUMN])->toBe(2)
+        ->and(TablePreference::query()->sole()->board_state->noValueColumns)->toBe(['status']);
+    $on->assertSee('No Status');
+});
+
+it('clears the status when a task moves into the no status column and sets it when it moves out', function (): void {
+    $task = taskInStatus($this, 'Write brief', 'To do');
+    $inProgress = (string) $this->statusField->options->firstWhere('name', 'In progress')->getKey();
+
+    $component = livewire(TasksBoard::class)->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true);
+
+    $component->call('moveCard', (string) $task->id, BoardStateData::NO_VALUE_COLUMN)->assertReturned(true);
+    expect(taskValueOf($task, $this->statusField))->toBeNull();
+
+    $component->call('moveCard', (string) $task->id, $inProgress)->assertReturned(true);
+    expect(taskValueOf($task, $this->statusField))->toBe($inProgress);
+});
+
+it('moves a task into the no status column and to another assignee lane in one drop', function (): void {
+    $this->withoutDefer();
+
+    [$leaving, $joining] = User::factory()->count(2)->create()->all();
+    $this->workspace->users()->attach([$leaving->id, $joining->id], ['role' => 'member']);
+    $task = taskInStatus($this, 'Write brief', 'To do');
+    $task->assignees()->attach($leaving);
+    Task::factory()->recycle([$this->user, $this->workspace])->create()->assignees()->attach($joining);
+
+    livewire(TasksBoard::class, ['groupBy' => 'assignee'])
+        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
+        ->call('moveCard', (string) $task->id, BoardStateData::NO_VALUE_COLUMN, null, null, (string) $leaving->id, (string) $joining->id)
+        ->assertReturned(true);
+
+    expect(taskValueOf($task, $this->statusField))->toBeNull()
+        ->and($task->assignees()->pluck('users.id')->all())->toBe([$joining->id]);
+});

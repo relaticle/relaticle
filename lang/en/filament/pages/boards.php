@@ -22,6 +22,7 @@ return [
         'visible_columns' => 'Visible columns',
         'show_column' => 'Show :column',
         'last_column' => 'One column stays visible.',
+        'no_value_column' => 'No :attribute',
     ],
 
     'layout' => [

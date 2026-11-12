@@ -9,7 +9,7 @@
             </div>
         @endif
 
-        <span x-data="boardStageOrder" hidden></span>
+        <span x-data="boardStageOrder" data-board-no-value-column="{{ \App\Data\BoardStateData::NO_VALUE_COLUMN }}" hidden></span>
     </div>
 
     @include('filament.app.tables.filter-bar')

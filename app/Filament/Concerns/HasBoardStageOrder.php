@@ -11,12 +11,14 @@ use App\Data\BoardStateData;
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
+use App\Models\CustomFieldValue;
 use App\Models\SavedView;
 use App\Queries\Views\BoardColumnFieldsQuery;
 use Closure;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection;
 use Illuminate\Support\HtmlString;
 use LogicException;
@@ -54,7 +56,7 @@ trait HasBoardStageOrder
         $visible = filter_var($visible, FILTER_VALIDATE_BOOL);
         $visibleIds = $this->visibleBoardColumnIds();
 
-        if (! is_string($optionId) || ! $this->boardColumnOptions()->contains('id', $optionId) || (! $visible && $visibleIds === [$optionId])) {
+        if (! is_string($optionId) || ! $this->canSetColumnVisible($optionId, $visible, $visibleIds)) {
             return;
         }
 
@@ -66,6 +68,18 @@ trait HasBoardStageOrder
         }
 
         $this->boardStateWritten($saved);
+    }
+
+    /**
+     * @param  list<string>  $visibleIds
+     */
+    private function canSetColumnVisible(string $optionId, bool $visible, array $visibleIds): bool
+    {
+        if ($optionId === BoardStateData::NO_VALUE_COLUMN) {
+            return true;
+        }
+
+        return $this->boardColumnOptions()->contains('id', $optionId) && ($visible || $visibleIds !== [$optionId]);
     }
 
     public function setBoardColumnField(mixed $code = null): void
@@ -93,7 +107,8 @@ trait HasBoardStageOrder
             'columns' => $this->boardColumnOptions()
                 ->map(static fn (array $option): array => [...$option, 'visible' => in_array($option['id'], $visible, true)])
                 ->all(),
-            'visibleCount' => count($visible),
+            'visibleCount' => count($visible) + ($this->showsNoValueColumn() ? 1 : 0),
+            'noValueColumn' => ['label' => $this->noValueColumnLabel(), 'on' => $this->showsNoValueColumn()],
             'groupings' => $this->boardGroupings(),
             'grouping' => $this->getBoard()->getActiveGrouping()?->getName(),
             'columnFields' => $this->boardColumnFields()
@@ -180,9 +195,70 @@ trait HasBoardStageOrder
             ->all());
     }
 
+    protected function showsNoValueColumn(): bool
+    {
+        return in_array($this->boardColumnField()->code, $this->storedBoardState()->noValueColumns, true);
+    }
+
+    protected function boardColumnIdentifier(): string
+    {
+        return $this->showsNoValueColumn() ? 'board_column' : $this->boardColumnField()->getValueColumn();
+    }
+
     protected function boardColumnExpression(): string
     {
-        return 'cfv.'.$this->boardColumnField()->getValueColumn();
+        $identifier = $this->boardColumnIdentifier();
+
+        return $this->showsNoValueColumn() ? $identifier : "cfv.{$identifier}";
+    }
+
+    protected function columnValueFor(string $columnId): ?string
+    {
+        return $columnId === BoardStateData::NO_VALUE_COLUMN ? null : $columnId;
+    }
+
+    protected function ownsColumn(string $id): bool
+    {
+        return in_array($id, $this->visibleBoardColumnIds(), true)
+            || ($id === BoardStateData::NO_VALUE_COLUMN && $this->showsNoValueColumn());
+    }
+
+    private function noValueColumnLabel(): string
+    {
+        return __('filament/pages/boards.view_settings.no_value_column', ['attribute' => $this->boardColumnField()->name]);
+    }
+
+    /**
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     * @return Builder<TModel>
+     */
+    protected function boardColumnQuery(Builder $query, CustomField $field): Builder
+    {
+        $table = $query->getModel()->getTable();
+        $valueColumn = $field->getValueColumn();
+
+        if (! $this->showsNoValueColumn()) {
+            return $query
+                ->leftJoin('custom_field_values as cfv', function (JoinClause $join) use ($table, $field): void {
+                    $join->on("{$table}.id", '=', 'cfv.entity_id')->where('cfv.custom_field_id', '=', $field->getKey());
+                })
+                ->select("{$table}.*", "cfv.{$valueColumn}");
+        }
+
+        $values = CustomFieldValue::query()->withoutGlobalScopes()->toBase()
+            ->select('entity_id', "{$valueColumn} as board_value")
+            ->where('custom_field_id', $field->getKey());
+
+        $eagerLoads = $query->getEagerLoads();
+        $query->setEagerLoads([])
+            ->leftJoinSub($values, 'cfv', "{$table}.id", '=', 'cfv.entity_id')
+            ->select("{$table}.*")
+            ->getQuery()
+            ->selectRaw('coalesce(cfv.board_value::text, ?) as board_column', [BoardStateData::NO_VALUE_COLUMN]);
+
+        return $query->getModel()->newQuery()->fromSub($query, $table)->select("{$table}.*")->setEagerLoads($eagerLoads);
     }
 
     /**
@@ -208,12 +284,16 @@ trait HasBoardStageOrder
     {
         $hidden = $this->hiddenBoardColumnIds();
 
-        return array_values($this->boardColumnOptions()
+        $columns = $this->boardColumnOptions()
             ->map(static fn (array $option): Column => Column::make($option['id'])
                 ->color($option['color'])
                 ->label($option['name'])
                 ->hidden(in_array($option['id'], $hidden, true)))
-            ->all());
+            ->all();
+
+        return array_values($this->showsNoValueColumn()
+            ? [Column::make(BoardStateData::NO_VALUE_COLUMN)->label($this->noValueColumnLabel()), ...$columns]
+            : $columns);
     }
 
     abstract protected function defaultBoardColumnField(): ?CustomField;

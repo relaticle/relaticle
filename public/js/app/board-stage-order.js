@@ -50,7 +50,7 @@ document.addEventListener('alpine:init', () => {
 
                 window.Sortable.create(container, {
                     group: { name: 'board-columns', pull: false, put: false },
-                    draggable: '.ff-column',
+                    draggable: `.ff-column:not([data-column-root="${CSS.escape(this.$el.dataset.boardNoValueColumn)}"])`,
                     handle: '.ff-column-header',
                     filter: '.ff-column-actions, .ff-count, .ff-column-header button',
                     preventOnFilter: false,

@@ -297,6 +297,27 @@
     @apply size-2 rounded-full bg-(--color-500);
 }
 
+.fi-board-stage-dot-empty {
+    @apply size-2 rounded-full border-[1.5px] border-gray-400 dark:border-gray-500;
+}
+
+.fi-board-stage-grip-space {
+    @apply size-6 shrink-0;
+}
+
+.fi-board-no-value-row {
+    @apply flex items-center gap-2;
+}
+
+.fi-board-stage-divider {
+    @apply my-1 border-gray-950/5 dark:border-white/10;
+}
+
+[data-column-root='__none__'] .ff-column-heading::before {
+    content: '';
+    @apply size-2 shrink-0 rounded-full border-[1.5px] border-gray-400 dark:border-gray-500;
+}
+
 .fi-board-stage-name {
     @apply min-w-0 truncate;
 }
