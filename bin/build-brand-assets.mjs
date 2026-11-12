@@ -69,8 +69,8 @@ function rasterize(artwork, width) {
     return execFileSync('rsvg-convert', ['-w', String(width)], { input: artwork, maxBuffer: 10 * 1024 * 1024 });
 }
 
-function ico(sizes, artwork) {
-    const images = sizes.map((size) => rasterize(artwork, size));
+function ico(entries) {
+    const images = entries.map(([size, artwork]) => rasterize(artwork, size));
     const header = Buffer.alloc(6 + 16 * images.length);
     let offset = header.length;
 
@@ -78,8 +78,9 @@ function ico(sizes, artwork) {
     header.writeUInt16LE(images.length, 4);
     images.forEach((image, index) => {
         const entry = 6 + 16 * index;
-        header.writeUInt8(sizes[index], entry);
-        header.writeUInt8(sizes[index], entry + 1);
+        const [size] = entries[index];
+        header.writeUInt8(size, entry);
+        header.writeUInt8(size, entry + 1);
         header.writeUInt16LE(1, entry + 4);
         header.writeUInt16LE(32, entry + 6);
         header.writeUInt32LE(image.length, entry + 8);
@@ -130,6 +131,10 @@ try {
         { id: 'purple', png: render('avatars/purple.svg', 'watermarks/purple-150.png', 150) },
     );
     const favicon = svg(colorMark, '-24 -24 1206 1206', 1206, 1206);
+    // Shift and scale found by search: at 16 px they give the most solid pixels
+    // and the clearest gaps beside the connectors.
+    const pixelFit = 'translate(588.42 541.31) scale(0.96) translate(-579 -579)';
+    const favicon16 = svg(`<g transform="${pixelFit}">${colorMark}</g>`, '-24 -24 1206 1206', 1206, 1206);
     const appIcon = fs.readFileSync(path.join(output, 'avatars/purple.svg'));
     const maskableIcon = svg(`<rect width="1024" height="1024" fill="${brandColor}"/><g transform="${placed(0.6)}">${whiteMark}</g>`);
     writeSite('brand/email-logo.png', rasterize(svg(lockupArt(colorMark, ink, brandColor), '0 0 240 64', 240, 64), 720));
@@ -137,7 +142,7 @@ try {
     writeSite('brand/logo-white.png', rasterize(svg(lockupArt(colorMark, ink, brandColor), '0 0 240 64', 240, 64), 960));
     writeSite('favicon.svg', favicon);
     writeSite('favicon-96x96.png', rasterize(favicon, 96));
-    writeSite('favicon.ico', ico([16, 32, 48], favicon));
+    writeSite('favicon.ico', ico([[16, favicon16], [32, favicon], [48, favicon]]));
     writeSite('apple-touch-icon.png', rasterize(appIcon, 180));
     for (const size of [192, 512]) {
         writeSite(`web-app-manifest-${size}x${size}.png`, rasterize(appIcon, size));

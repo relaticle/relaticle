@@ -10,7 +10,7 @@
 - `public/brand/kit/watermarks/`: Small white and purple PNGs for YouTube.
 - `public/brand/kit/manifest.json`: Generated download catalog, dimensions, and SHA-256 checksums.
 - `public/brand/kit.zip`: Complete brand kit. Product screenshots remain separate downloads on `/press`.
-- `public/favicon.svg`, `favicon-96x96.png`, `favicon.ico`: The color mark for browser tabs.
+- `public/favicon.svg`, `favicon-96x96.png`, `favicon.ico`: The color mark for browser tabs. The 16-pixel entry of `favicon.ico` is the same drawing fitted to the pixel grid.
 - `public/apple-touch-icon.png` and `public/web-app-manifest-*.png`: The purple avatar for home screens, installs, and the MCP server icon. The `maskable` pair keeps the mark inside the 80% safe circle.
 - `public/brand/email-logo*.png`: Email headers for light and dark mode, generated from the lockup.
 - `public/brand/logo-white.png`: Emails sent before the dark mode redesign still load it by URL, so keep the name and its 960 by 256 size. It is generated from the light lockup.
