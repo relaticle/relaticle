@@ -37,6 +37,8 @@ env:
 jobs:
   build:
     runs-on: ${{ matrix.runner }}
+    # The production environment only admits main and v* tags, so a pull request build runs without it.
+    environment: ${{ github.event_name != 'pull_request' && 'production' || '' }}
     permissions:
       contents: read
       packages: write
@@ -141,6 +143,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
     needs: build
+    environment: production
     permissions:
       contents: read
       packages: write
