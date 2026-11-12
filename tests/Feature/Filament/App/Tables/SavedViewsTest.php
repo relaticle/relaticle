@@ -2167,10 +2167,10 @@ it('leaves the open view alone when the other type is created', function (string
         'entity' => CrmEntity::Opportunity,
         'board_state' => new BoardStateData(sort: 'name:asc'),
     ]);
-    $viewUpdatedAt = $open->updated_at;
-    $viewState = $open->refresh()->getRawOriginal('state');
-    $preferenceUpdatedAt = $preference->updated_at;
     $component = Livewire::withQueryParams(['view' => $open->getKey()])->test($page);
+    $viewUpdatedAt = $open->refresh()->updated_at;
+    $viewState = $open->getRawOriginal('state');
+    $preferenceUpdatedAt = $preference->refresh()->updated_at;
 
     $this->travelTo(now()->addHour());
     $writes = boardViewStoreWrites(fn () => $component->callAction('saveSavedViewAs', ['type' => $type->value, 'name' => 'Elsewhere'])->call('$refresh'));
