@@ -112,7 +112,7 @@ it('keeps the view list in step with the search box after Escape', function (): 
         SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => "View {$number}"]);
     }
 
-    $visibleRows = '[...document.querySelectorAll(".fi-ta-views-row")].filter((row) => row.offsetParent !== null).length';
+    $visibleRows = '[...document.querySelectorAll(".fi-view-switcher .fi-ta-views-row")].filter((row) => row.offsetParent !== null).length';
 
     $page = loginViaBrowser($this->user)
         ->assertPathIs("/app/{$this->workspace->slug}")
@@ -295,7 +295,7 @@ it('keeps a descending sort when a view sorted that way is picked from an unsort
 
 function switcherKeys(): string
 {
-    return '[...document.querySelectorAll(".fi-ta-views-row")].map((row) => row.dataset.viewKey)';
+    return '[...document.querySelectorAll(".fi-view-switcher .fi-ta-views-row")].map((row) => row.dataset.viewKey)';
 }
 
 function waitForStoredOrder(mixed $page, User $user, CrmEntity $entity, array $expected): void
@@ -322,8 +322,8 @@ it('shows the search, a tile per kind and the rows in order with the pipeline fi
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->assertVisible('.fi-ta-views-search input')
         ->assertScript(switcherKeys(), ['board', 'list', $view->getKey()])
-        ->assertScript('[...document.querySelectorAll(".fi-ta-views-row .fi-view-tile")].map((tile) => tile.className.split(" ").pop())', ['fi-view-tile-orange', 'fi-view-tile-success', 'fi-view-tile-success'])
-        ->assertScript('[...document.querySelectorAll(".fi-ta-views-row")].map((row) => row.textContent.trim().replace(/\s+/g, " "))', ['Pipeline', 'All opportunities', 'Open pipeline'])
+        ->assertScript('[...document.querySelectorAll(".fi-view-switcher .fi-ta-views-row .fi-view-tile")].map((tile) => tile.className.split(" ").pop())', ['fi-view-tile-orange', 'fi-view-tile-success', 'fi-view-tile-success'])
+        ->assertScript('[...document.querySelectorAll(".fi-view-switcher .fi-ta-views-row")].map((row) => row.textContent.trim().replace(/\s+/g, " "))', ['Pipeline', 'All opportunities', 'Open pipeline'])
         ->assertNoJavaScriptErrors();
 });
 
@@ -394,7 +394,7 @@ it('moves a row from its menu and disables the move that has nowhere to go', fun
 it('narrows the rows by name and takes no part in dragging while a query is typed', function (): void {
     $views = collect(['Alpha one', 'Alpha two', 'Beta'])->map(fn (string $name): SavedView => SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => $name]));
 
-    $visible = '[...document.querySelectorAll(".fi-ta-views-row")].filter((row) => row.offsetParent !== null).map((row) => row.dataset.viewName)';
+    $visible = '[...document.querySelectorAll(".fi-view-switcher .fi-ta-views-row")].filter((row) => row.offsetParent !== null).map((row) => row.dataset.viewName)';
     $draggable = 'document.querySelectorAll(".fi-ta-views-draggable").length';
 
     $page = loginViaBrowser($this->user)
