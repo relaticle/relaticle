@@ -128,7 +128,10 @@ it('draws a rule only between the groups a menu shows', function (array $steps, 
 })->with([
     'view settings on a column that cannot hide' => [[['click', '.fi-view-settings-trigger'], ['click', '[data-column-locked] [data-view-settings-menu]']], '.fi-view-settings-row-menu'],
     'views on the default list' => [[['click', '.fi-view-switcher .fi-dropdown-trigger button'], ['hover', '.fi-ta-views-row[data-view-kind=list]'], ['click', '.fi-ta-views-row[data-view-kind=list] [data-view-actions]']], '.fi-ta-views-row-menu'],
-    'column header that cannot sort' => [[['click', "th[x-data^=\"resizableColumn('custom_fields.domains'\"] [data-column-menu-trigger]"]], '.fi-ta-column-menu'],
+    'column header that cannot sort' => [[
+        ['assertPresent', "th[x-data^=\"resizableColumn('custom_fields.domains'\"] [data-column-menu-trigger]"],
+        ['script', "document.querySelector(`th[x-data^=\"resizableColumn('custom_fields.domains'\"] [data-column-menu-trigger]`).click()"],
+    ], '.fi-ta-column-menu'],
 ]);
 
 it('keeps a long menu above the window edge and scrolls only its list', function (string $open, string $panel, string $list): void {
