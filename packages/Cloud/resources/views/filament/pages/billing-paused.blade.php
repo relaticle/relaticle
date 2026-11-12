@@ -67,7 +67,7 @@
                         <div class="mt-5 flex justify-center">
                             <x-filament::dropdown placement="bottom" data-workspace-switcher>
                                 <x-slot name="trigger">
-                                    <button type="button" class="inline-flex items-center gap-1 text-sm font-medium text-gray-600 transition hover:text-gray-950 dark:text-gray-400 dark:hover:text-white">
+                                    <button type="button" class="inline-flex items-center gap-1 text-sm font-medium text-gray-600 transition hover:text-gray-950 [@media(hover:hover)]:aria-expanded:text-gray-950 dark:text-gray-400 dark:hover:text-white dark:[@media(hover:hover)]:aria-expanded:text-white">
                                         {{ __('cloud::billing.paused.switch') }}
                                         <x-lucide-chevron-down class="h-4 w-4" />
                                     </button>

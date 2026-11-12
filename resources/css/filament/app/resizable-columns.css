@@ -73,8 +73,14 @@
     @apply transition-[border-right-color] duration-120;
 }
 
-.fi-ta-resizable-table thead th.fi-ta-resizable-header:is(:hover, :has([data-column-menu-trigger][aria-expanded='true'])) {
+.fi-ta-resizable-table thead th.fi-ta-resizable-header:hover {
     @apply border-r-gray-400 dark:border-r-gray-500;
+}
+
+@media (hover: hover) {
+    .fi-ta-resizable-table thead th.fi-ta-resizable-header:has([data-column-menu-trigger][aria-expanded='true']) {
+        @apply border-r-gray-400 dark:border-r-gray-500;
+    }
 }
 
 .fi-ta-resizable-table thead th.fi-ta-resizable-header:has(.column-resize-handle-bar:hover),
@@ -87,8 +93,14 @@
     @apply pointer-events-none absolute inset-y-0 left-1/2 w-0 translate-x-[calc(-50%+0.5px)] bg-transparent transition-[width,background-color] duration-120 content-[''];
 }
 
-.fi-ta-resizable-table thead th.fi-ta-resizable-header:is(:hover, :has([data-column-menu-trigger][aria-expanded='true'])) .column-resize-handle-bar::before {
+.fi-ta-resizable-table thead th.fi-ta-resizable-header:hover .column-resize-handle-bar::before {
     @apply w-0.5 bg-gray-400 dark:bg-gray-500;
+}
+
+@media (hover: hover) {
+    .fi-ta-resizable-table thead th.fi-ta-resizable-header:has([data-column-menu-trigger][aria-expanded='true']) .column-resize-handle-bar::before {
+        @apply w-0.5 bg-gray-400 dark:bg-gray-500;
+    }
 }
 
 /* A finger cannot hover, so touch screens always show where a column resizes. */
@@ -218,6 +230,12 @@ body.reordering-column .column-resize-handle-bar::before {
 /* Opaque versions of the row tints, so pinned cells keep the row's state. */
 .fi-ta-has-pinned .fi-ta-row:is(.fi-clickable:hover, .fi-selected, .fi-striped) > :is([data-column-pinned="1"], .fi-ta-selection-cell) {
     @apply bg-(--surface-table-head-bg);
+}
+
+@media (hover: hover) {
+    .fi-ta-has-pinned .fi-ta-row.fi-clickable:has([aria-expanded='true']) > :is([data-column-pinned="1"], .fi-ta-selection-cell) {
+        @apply bg-(--surface-table-head-bg);
+    }
 }
 
 .fi-ta-has-pinned[data-scrolled-x] [data-column-pinned-last] {

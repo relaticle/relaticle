@@ -39,7 +39,7 @@
                             x-on:click.outside="menu = false"
                             :aria-expanded="menu ? 'true' : 'false'"
                             aria-label="{{ __('filament/pages/dashboard.activation.more_actions') }}"
-                            class="rounded-lg p-1.5 text-gray-400 transition max-sm:flex max-sm:size-11 max-sm:items-center max-sm:justify-center hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/5 dark:hover:text-gray-200"
+                            class="rounded-lg p-1.5 text-gray-400 transition max-sm:flex max-sm:size-11 max-sm:items-center max-sm:justify-center hover:bg-gray-100 hover:text-gray-700 [@media(hover:hover)]:aria-expanded:bg-gray-100 [@media(hover:hover)]:aria-expanded:text-gray-700 dark:hover:bg-white/5 dark:hover:text-gray-200 dark:[@media(hover:hover)]:aria-expanded:bg-white/5 dark:[@media(hover:hover)]:aria-expanded:text-gray-200"
                         >
                             <x-lucide-ellipsis class="h-4 w-4" />
                         </button>
