@@ -16,7 +16,7 @@ there arrive already linked to the record.
 - **Title**: required, the only must-have.
 - **Status**: To do, In progress, or Done by default; these options are
   [yours to rename](/help/custom-fields/edit-the-options-in-a-select-field),
-  and they define the board's columns.
+  and by default they define the board's columns.
 - **Priority**: Low, Medium, or High.
 - **Due Date**: drives the overdue highlights and the daily digest.
 - **Description**: rich text for the details.

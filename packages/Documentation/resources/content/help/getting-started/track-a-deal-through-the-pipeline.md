@@ -24,16 +24,19 @@ Open **Opportunities**. The page opens on **Pipeline**, the board. If it opens
 on another view, use the view menu at the top left and choose **Pipeline**. Every
 stage (Prospecting, Qualification, Needs Analysis, Value Proposition, Id.
 Decision Makers, Perception Analysis, Proposal/Price Quote,
-Negotiation/Review, Closed Won, and Closed Lost) appears as a column, with
-each deal shown as a card underneath it.
+Negotiation/Review, Closed Won, and Closed Lost) appears as a column by
+default, with each deal shown as a card underneath it. Open **View settings**
+and use **Grouped by** to make the columns from another single-choice attribute.
 
 ![The Opportunities board with deals grouped into Prospecting, Qualification, Needs Analysis, and Value Proposition columns](/help-assets/getting-started/track-a-deal-through-the-pipeline-1.png)
 
 ## Put the stages in your own order
 
 Drag a column header left or right to move that stage. You can also click
-**View settings** at the top of the board and drag the stages in the list, or
-use **Move up** and **Move down** from a stage's menu. The order is saved for
+**View settings** at the top of the board and drag the stages under **Visible
+columns**, or use **Move up** and **Move down** from a stage's menu. Switch a
+stage off there to hide its column. Switch on **No Stage** to add a first column
+for deals with no stage. Dragging a deal into it clears the stage. The order is saved for
 you alone, so teammates keep theirs. It never changes the order in the
 **Stage** field's settings, which stays the starting order for everyone. A
 stage added later joins the end of your order.
@@ -42,6 +45,7 @@ stage added later joins the end of your order.
 
 Drag a deal's card from its current column into the column for its next
 stage. The change saves as soon as you drop it, with no need to open the record.
+With a **Sort** set, you can still drag a card to another column but not reorder it by hand.
 
 You can also change a deal's stage from its own record: open it, click
 **Edit**, choose a new **Stage**, and click **Save changes**.

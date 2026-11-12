@@ -17,6 +17,8 @@ attribute, which makes an export the perfect starting template for a
 2. Click **Import / Export**, then **Export**.
 3. Choose the columns and format.
 
+On an opportunities or tasks board, the same button exports every record the filters match. That includes records in hidden columns and records with no value.
+
 To export only some records, tick their rows first and click the export
 button in the bar at the bottom of the list.
 

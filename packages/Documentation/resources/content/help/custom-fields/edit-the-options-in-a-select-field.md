@@ -22,9 +22,9 @@ opportunity **Stage** attribute (your pipeline) and the task **Status** attribut
 ![The Stage attribute's options editor, each pipeline stage with its own colour swatch, name box, drag handle, and remove button](/help-assets/custom-fields/edit-the-options-in-a-select-field-1.png)
 
 The change lands everywhere at once: forms, list filters, and the boards,
-whose columns follow the options and their order exactly. Renaming
-"Prospecting" to "New lead" relabels the board column; adding a "Contract
-sent" option adds a column.
+whose columns start from the options and their order. Each member's own order
+and hidden columns apply on top. Renaming "Prospecting" to "New lead" relabels
+the board column. Adding a "Contract sent" option adds a column.
 
 ## What happens to existing records
 
