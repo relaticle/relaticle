@@ -43,6 +43,7 @@ use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\Flowforge\Board;
 use Relaticle\Flowforge\Grouping;
 use Relaticle\Flowforge\Lane;
+use Relaticle\Flowforge\Services\DecimalPosition;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Helpers\WorkspaceCustomField;
 
@@ -1515,8 +1516,20 @@ it('creates a task with no status from the no status column', function (): void 
     $created = Task::query()->where('title', 'Bare task')->firstOrFail();
 
     expect(taskValueOf($created, $this->statusField))->toBeNull()
-        ->and($created->order_column)->not->toBeNull()
+        ->and((float) $created->order_column)->toBe((float) DecimalPosition::forEmptyColumn())
         ->and(noStatusCardIds($component))->toContain($created->id);
+});
+
+it('puts a task created in the no status column above the ones already there', function (): void {
+    Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Bare task'])->forceFill(['order_column' => 5000])->saveQuietly();
+
+    livewire(TasksBoard::class)
+        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
+        ->call('mountAction', 'addCard', ['column' => BoardStateData::NO_VALUE_COLUMN])
+        ->set('mountedActions.0.data.title', 'Fresh task')
+        ->call('callMountedAction');
+
+    expect((float) Task::query()->where('title', 'Fresh task')->firstOrFail()->order_column)->toBe((float) DecimalPosition::before('5000'));
 });
 
 it('offers the list\'s import, export and new task actions in the board header', function (): void {

@@ -43,6 +43,7 @@ use Livewire\Livewire;
 use Relaticle\Flowforge\Board;
 use Relaticle\Flowforge\Grouping;
 use Relaticle\Flowforge\Lane;
+use Relaticle\Flowforge\Services\DecimalPosition;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Helpers\WorkspaceCustomField;
 
@@ -1647,8 +1648,20 @@ it('creates an opportunity with no stage from the no stage column', function ():
     $created = Opportunity::query()->where('name', 'Bare deal')->firstOrFail();
 
     expect($created->customFieldValues()->where('custom_field_id', $this->stageField->getKey())->value($this->stageField->getValueColumn()))->toBeNull()
-        ->and($created->order_column)->not->toBeNull()
+        ->and((float) $created->order_column)->toBe((float) DecimalPosition::forEmptyColumn())
         ->and(noStageCardIds($component))->toContain($created->id);
+});
+
+it('puts an opportunity created in the no stage column above the ones already there', function (): void {
+    noStageOpportunity($this, 'Globex upsell')->forceFill(['order_column' => 5000])->saveQuietly();
+
+    livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
+        ->call('mountAction', 'addCard', ['column' => BoardStateData::NO_VALUE_COLUMN])
+        ->set('mountedActions.0.data.name', 'Bare deal')
+        ->call('callMountedAction');
+
+    expect((float) Opportunity::query()->where('name', 'Bare deal')->firstOrFail()->order_column)->toBe((float) DecimalPosition::before('5000'));
 });
 
 it('refuses the no stage column as a target while it is off', function (): void {
