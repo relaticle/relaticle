@@ -2297,10 +2297,8 @@ html.fi-record-stacked .fi-record-layout {
 }
 
 .fi-page:has(.fi-board-header[data-board-column-width='narrow']) .ff-board {
-    --ff-column-width: 15rem;
-
-    @media (width < 40rem) {
-        --ff-column-width: min(15rem, calc(100vw - 3.5rem));
+    @media (width >= 40rem) {
+        --ff-column-width: 15rem;
     }
 }
 

@@ -109,7 +109,7 @@ trait HasBoardStageOrder
     {
         $width = is_string($width) ? BoardColumnWidth::tryFrom($width) : null;
 
-        if (! $width instanceof BoardColumnWidth) {
+        if (! $width instanceof BoardColumnWidth || $width === $this->storedBoardState()->columnWidth) {
             return;
         }
 

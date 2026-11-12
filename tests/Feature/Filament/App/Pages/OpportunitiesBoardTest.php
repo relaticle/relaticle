@@ -2015,6 +2015,14 @@ it('ignores a width or size the board does not have', function (mixed $value): v
     expect(TablePreference::query()->count())->toBe(0);
 })->with(['sideways', 3, null, [['wide']]]);
 
+it('writes nothing when a layout toggle is set to the value it already holds', function (): void {
+    livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnWidth', 'wide')
+        ->call('setBoardCardSize', 'full');
+
+    expect(TablePreference::query()->count())->toBe(0);
+});
+
 it('opens wide and full by default', function (): void {
     $component = livewire(OpportunitiesBoard::class)
         ->assertSeeHtml('data-board-column-width="wide"')

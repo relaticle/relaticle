@@ -88,7 +88,7 @@ trait HasBoardCards
     {
         $size = is_string($size) ? BoardCardSize::tryFrom($size) : null;
 
-        if ($size instanceof BoardCardSize) {
+        if ($size instanceof BoardCardSize && $size !== $this->storedBoardState()->cardSize) {
             $this->saveCardSetting('card_size', $size->value);
         }
     }
