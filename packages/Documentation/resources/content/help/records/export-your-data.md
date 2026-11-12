@@ -8,7 +8,7 @@ related: [help/import/update-existing-records, help/import/prepare-your-csv]
 
 Every record type (companies, people, opportunities, tasks, and notes) can
 be exported to CSV or Excel. Exports include the record IDs and every custom
-field, which makes an export the perfect starting template for a
+attribute, which makes an export the perfect starting template for a
 [bulk update by import](/help/import/update-existing-records).
 
 ## Export a list

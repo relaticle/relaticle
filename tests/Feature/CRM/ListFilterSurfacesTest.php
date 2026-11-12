@@ -981,7 +981,7 @@ it('names the node to fix under the same key on the api and in the same words on
     'unknown name' => ['companies', ['industry' => ['$eq' => 'x']], 'filter.industry', 'name, created_at, updated_at, creation_source, creator, accountOwner, people, opportunities, custom_fields, $and, $or, $not'],
     'unknown keyword' => ['companies', ['$nor' => [['name' => ['$eq' => 'x']]]], 'filter.$nor', 'Unknown filter $nor.'],
     'unknown name on a related record' => ['people', ['company' => ['title' => ['$eq' => 'x']]], 'filter.company.title', 'Unknown filter title.'],
-    'unknown custom field on a related record' => ['people', ['company' => ['custom_fields' => ['nope' => ['$eq' => 'x']]]], 'filter.company.custom_fields.nope', '"nope" is not a filterable custom attribute on company'],
+    'unknown custom field on a related record' => ['people', ['company' => ['custom_fields' => ['nope' => ['$eq' => 'x']]]], 'filter.company.custom_fields.nope', '"nope" is not a filterable custom attribute (custom field) on company'],
     'unknown name inside a group' => ['companies', ['$or' => [['name' => ['$eq' => 'x']], ['industry' => ['$eq' => 'x']]]], 'filter.$or.1.industry', 'Unknown filter industry.'],
     'third relation hop' => ['people', ['$or' => [['name' => ['$eq' => 'x']], ['company' => ['people' => ['company' => ['name' => ['$eq' => 'x']]]]]]], 'filter.$or.1.company.people.company', 'nest at most 2 levels'],
     'fourth logic level' => ['companies', ['$not' => ['$or' => [['$and' => [['$not' => ['name' => ['$eq' => 'x']]]]]]]], 'filter.$not.$or.0.$and.0.$not', 'nest at most 3 levels'],

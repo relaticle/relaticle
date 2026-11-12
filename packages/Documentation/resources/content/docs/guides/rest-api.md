@@ -53,7 +53,7 @@ An access token can also carry three email permissions: **Read email**, **Draft 
 | Opportunities | `/v1/opportunities` |
 | Tasks | `/v1/tasks` |
 | Notes | `/v1/notes` |
-| Custom attributes | `/v1/custom-fields` (read only) |
+| Custom attributes (custom fields) | `/v1/custom-fields` (read only) |
 
 Each record resource supports list, create, read, update and delete. Responses follow [JSON:API](https://jsonapi.org/), and each record carries its custom attribute values under `custom_fields`. List endpoints take filtering, sorting and pagination parameters, which the [API reference](/developers/api) documents per endpoint.
 

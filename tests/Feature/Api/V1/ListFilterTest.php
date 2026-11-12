@@ -596,7 +596,7 @@ it('ignores an empty custom_fields at the top level and rejects it inside a grou
 
     $this->postJson('/api/v1/opportunities/query', ['filter' => ['$not' => ['custom_fields' => null]]])
         ->assertUnprocessable()
-        ->assertJsonValidationErrors(['filter.$not.custom_fields' => 'Custom attribute filters must be an object keyed by field code.']);
+        ->assertJsonValidationErrors(['filter.$not.custom_fields' => 'Custom attribute (custom field) filters must be an object keyed by field code.']);
 });
 
 it('hints the sigil for a bare operator on a relation node', function (): void {

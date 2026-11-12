@@ -179,7 +179,7 @@ The server provides 50 tools. They cover account context, cross-entity discovery
 | `get-crm-summary-tool` | Get record counts, pipeline totals by stage, and task due status in your timezone |
 | `aggregate-opportunities-tool` | Group opportunity counts and amounts by stage or company, with optional date bounds |
 | `list-activity-tool` | List recent CRM changes with actors, record links, and field-level differences. A deleted account shows as `Former member` |
-| `list-custom-fields-tool` | List active and inactive custom-field definitions, including choice options |
+| `list-custom-fields-tool` | List active and inactive custom attribute (custom field) definitions, including choice options |
 
 ### Companies
 
@@ -391,7 +391,7 @@ Stage labels and field codes belong to your workspace. Call `get-crm-schema-tool
 
 #### Filter errors
 
-An invalid filter returns an error that names the part to fix. For example, an unknown custom attribute code returns `"stagee" is not a filterable custom attribute on opportunity. Available: amount, close_date, stage.` A bare operator returns `Operators start with $. Use $eq.`
+An invalid filter returns an error that names the part to fix. For example, an unknown custom attribute code returns `"stagee" is not a filterable custom attribute (custom field) on opportunity. Available: amount, close_date, stage.` A bare operator returns `Operators start with $. Use $eq.`
 
 The flat names of the earlier filter no longer exist. Inside `filter`, keys such as `search`, `created_after`, `company_id` and `assignee_ids` return an error that names the replacement, for example `company_id was replaced. Use company (or companies) with $in.` The same names sent beside `filter` return that error too.
 
@@ -409,7 +409,7 @@ The server exposes five schema resources that describe each entity's fields, inc
 | `relaticle://schema/task` | Task fields and custom attributes |
 | `relaticle://schema/note` | Note fields and custom attributes |
 
-Resource support varies by MCP client. Use `get-crm-schema-tool` before a custom-field write when your client does not expose resources automatically.
+Resource support varies by MCP client. Use `get-crm-schema-tool` before a custom attribute (custom field) write when your client does not expose resources automatically.
 
 ---
 

@@ -164,7 +164,7 @@ it('rejects unknown field codes', function (): void {
         ->get())
         ->toThrow(function (ValidationException $exception): void {
             expect(array_keys($exception->errors()))->toBe(['filter.custom_fields.nonexistent_field'])
-                ->and($exception->getMessage())->toContain('"nonexistent_field" is not a filterable custom attribute on opportunity.');
+                ->and($exception->getMessage())->toContain('"nonexistent_field" is not a filterable custom attribute (custom field) on opportunity.');
         });
 });
 
@@ -178,7 +178,7 @@ it('names one unknown field code at a time', function (): void {
                 ],
             ],
         ])
-        ->assertHasErrors(['"first_typo" is not a filterable custom attribute on opportunity.']);
+        ->assertHasErrors(['"first_typo" is not a filterable custom attribute (custom field) on opportunity.']);
 });
 
 it('rejects unknown operators', function (): void {
@@ -261,7 +261,7 @@ it('rejects an encrypted custom field as an unknown filter code', function (): v
         ->tool(ListOpportunitiesTool::class, [
             'filter' => ['custom_fields' => ['secret_code' => ['$eq' => 'x']]],
         ])
-        ->assertHasErrors(['"secret_code" is not a filterable custom attribute on opportunity']);
+        ->assertHasErrors(['"secret_code" is not a filterable custom attribute (custom field) on opportunity']);
 });
 
 it('sees a custom field created or deactivated after an earlier filter in the same process', function (): void {
@@ -278,7 +278,7 @@ it('sees a custom field created or deactivated after an earlier filter in the sa
 
     RelaticleServer::actingAs($this->user)
         ->tool(ListPeopleTool::class, ['filter' => ['custom_fields' => ['second_note' => ['$contains' => 'hell']]]])
-        ->assertHasErrors(['"second_note" is not a filterable custom attribute on people']);
+        ->assertHasErrors(['"second_note" is not a filterable custom attribute (custom field) on people']);
 });
 
 it('returns an actionable MCP error for an invalid operand shape', function (): void {

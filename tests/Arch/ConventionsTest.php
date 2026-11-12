@@ -877,9 +877,16 @@ it('keeps the retired contact and deal words out of record copy', function (): v
 it('keeps the retired custom field words out of published copy', function (): void {
     $root = dirname(__DIR__, 2);
 
-    $pathsNamingThePackage = [
+    $filesCarryingTheSynonym = [
+        'lang/en/validation.php',
         'packages/Documentation/resources/content/docs/guides/contributing.md',
+        'packages/Documentation/resources/content/docs/guides/mcp.md',
+        'packages/Documentation/resources/content/docs/guides/rest-api.md',
+        'resources/views/scribe/index.blade.php',
     ];
+
+    $spaced = '/\bcustom\s+fields?\b/i';
+    $hyphenated = '/(?<![\w\/.:\-\'"`])custom-fields?(?![\w\-\/:\'"`]|\.(?:php|js|json|css|png|md)\b)/i';
 
     $offenders = [];
 
@@ -894,15 +901,19 @@ it('keeps the retired custom field words out of published copy', function (): vo
             $relativePath = str_replace($root.'/', '', $file->getPathname());
 
             $isPublishedCopy = preg_match('#^(lang|resources/views|resources/js|packages/\w+/(resources|lang))/#', $relativePath) === 1
-                && ! in_array($relativePath, $pathsNamingThePackage, true);
+                && ! in_array($relativePath, $filesCarryingTheSynonym, true);
 
             if (! $isPublishedCopy) {
                 continue;
             }
 
-            foreach (explode("\n", (string) file_get_contents($file->getPathname())) as $index => $line) {
-                if (preg_match('/\bcustom fields?\b/i', $line) === 1 && preg_match('/custom attribute/i', $line) !== 1) {
-                    $offenders[] = $relativePath.':'.($index + 1);
+            $contents = (string) file_get_contents($file->getPathname());
+
+            foreach ([$spaced, $hyphenated] as $pattern) {
+                preg_match_all($pattern, $contents, $matches, PREG_OFFSET_CAPTURE);
+
+                foreach ($matches[0] as [, $offset]) {
+                    $offenders[] = $relativePath.':'.(substr_count($contents, "\n", 0, $offset) + 1);
                 }
             }
         }
@@ -911,7 +922,7 @@ it('keeps the retired custom field words out of published copy', function (): vo
     expect($offenders)->toBe(
         [],
         'A property a record carries beyond the built-in ones is a custom attribute in published copy (.ai/guidelines/relaticle/architecture.md, '.
-        'Business language). "Custom field" survives in code, the API and tool names, and as a synonym on a line that also says "custom attribute". '.
+        'Business language). "Custom field" survives in code, the API and tool names, and in the listed files that carry it as a synonym. '.
         'Offending lines: '.implode(', ', array_slice($offenders, 0, 40)),
     );
 });

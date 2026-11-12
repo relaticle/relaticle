@@ -124,7 +124,7 @@ Relaticle enforces workspace and token scope on every tool request.
 - Companies, people, opportunities, tasks, and notes.
 - Record identifiers and canonical record URLs.
 - Contact details.
-- Custom-field definitions, options, and values.
+- Custom attribute definitions, options, and values.
 - Relationships between records.
 - Opportunity stages and amounts.
 - Activity actors, field changes, and timestamps.

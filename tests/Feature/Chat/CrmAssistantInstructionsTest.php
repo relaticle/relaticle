@@ -1198,6 +1198,7 @@ it('names records as the app does and repeats a word the user chose', function (
         ->toContain('This covers every sentence you write, the closing offer included')
         ->toContain('a person record is a "person", never a "contact"')
         ->toContain('use their word in that reply')
+        ->toContain('it is a "custom attribute", never a "custom field", unless the user\'s message says "custom fields", and then use their word')
         ->not->toContain('interchangeably')
         ->toContain('people per company')
         ->toContain('an email draft to a person')

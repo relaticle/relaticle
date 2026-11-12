@@ -159,7 +159,7 @@ describe('Legal pages', function () {
         $response->assertSee('Companies, people, opportunities, tasks, and notes.');
         $response->assertSee('Record identifiers and canonical record URLs.');
         $response->assertSee('Contact details.');
-        $response->assertSee('Custom-field definitions, options, and values.');
+        $response->assertSee('Custom attribute definitions, options, and values.');
         $response->assertSee('Relationships between records.');
         $response->assertSee('Opportunity stages and amounts.');
         $response->assertSee('Activity actors, field changes, and timestamps.');
