@@ -60,6 +60,11 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
         return __('filament/pages/boards.opportunities.title');
     }
 
+    protected function getHeaderActions(): array
+    {
+        return $this->prefillingFirstVisibleColumn(OpportunityResource::collectionActions());
+    }
+
     public function board(Board $board): Board
     {
         $columnField = $this->boardColumnField();
@@ -194,7 +199,7 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
 
     private function cardCreation(): CreateAction
     {
-        return CreateAction::make()
+        return CreateAction::make('addCard')
             ->authorize(fn (): bool => Gate::allows('create', Opportunity::class))
             ->label(__('filament/pages/boards.opportunities.actions.add'))
             ->icon('lucide-plus')

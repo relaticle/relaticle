@@ -15,6 +15,9 @@ use App\Models\CustomFieldValue;
 use App\Models\SavedView;
 use App\Queries\Views\BoardColumnFieldsQuery;
 use Closure;
+use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\CreateAction;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -295,6 +298,20 @@ trait HasBoardStageOrder
         return array_values($this->showsNoValueColumn()
             ? [Column::make(BoardStateData::NO_VALUE_COLUMN)->label($this->noValueColumnLabel()), ...$columns]
             : $columns);
+    }
+
+    /**
+     * @param  list<Action|ActionGroup>  $actions
+     * @return list<Action|ActionGroup>
+     */
+    protected function prefillingFirstVisibleColumn(array $actions): array
+    {
+        return array_map(
+            fn (Action|ActionGroup $action): Action|ActionGroup => $action instanceof CreateAction
+                ? $action->fillForm(fn (): array => ['custom_fields' => [$this->boardColumnField()->code => $this->visibleBoardColumnIds()[0] ?? null]])
+                : $action,
+            $actions,
+        );
     }
 
     abstract protected function defaultBoardColumnField(): ?CustomField;

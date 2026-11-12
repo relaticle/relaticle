@@ -7,11 +7,14 @@ namespace App\Filament\Resources;
 use App\Enums\CrmEntity;
 use App\Enums\FilterCondition;
 use App\Filament\Actions\CopyToClipboardAction;
+use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Actions\EditTaskAction;
+use App\Filament\Actions\ImportExportActionGroup;
 use App\Filament\Components\Tables\EmptyListDescription;
 use App\Filament\Components\Tables\FilteredEmptyState;
 use App\Filament\Components\Tables\LinkedRecordsColumn;
 use App\Filament\Components\Tables\RecordChipColumn;
+use App\Filament\Exports\TaskExporter;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
@@ -22,14 +25,17 @@ use App\Models\CustomField;
 use App\Models\Task;
 use App\Models\Workspace;
 use App\Support\CanonicalRecordUrl;
+use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\ExportAction;
 use Filament\Actions\ForceDeleteBulkAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Size;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Grouping\Group;
@@ -39,6 +45,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Relaticle\CustomFields\Contracts\ValueResolvers;
+use Relaticle\ImportWizard\Filament\Pages\ImportTasks;
 
 final class TaskResource extends Resource
 {
@@ -85,6 +92,30 @@ final class TaskResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return TaskForm::get($schema);
+    }
+
+    /**
+     * @return list<Action|ActionGroup>
+     */
+    public static function collectionActions(): array
+    {
+        return [
+            ImportExportActionGroup::make([
+                Action::make('import')
+                    ->label(__('filament/resources/task.pages.list.actions.import.label'))
+                    ->icon('lucide-upload')
+                    ->url(ImportTasks::getUrl())
+                    ->visible(ImportTasks::canAccess(...)),
+                ExportAction::make()->exporter(TaskExporter::class)->authorize('exportAny', Task::class),
+            ])->label(__('filament/resources/task.pages.list.actions.import_export.label')),
+            CreateTaskAction::make()
+                ->icon('lucide-plus')
+                ->authorize(self::canCreate(...))
+                ->size(Size::Small)
+                ->slideOver()
+                ->model(Task::class)
+                ->schema(fn (Schema $schema): Schema => self::form($schema->columns(2))),
+        ];
     }
 
     public static function table(Table $table): Table

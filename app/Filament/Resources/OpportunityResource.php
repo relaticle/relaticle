@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources;
 
 use App\Enums\CrmEntity;
+use App\Filament\Actions\ImportExportActionGroup;
 use App\Filament\Actions\PreviewRecordAction;
 use App\Filament\Components\Tables\EmptyListDescription;
 use App\Filament\Components\Tables\FilteredEmptyState;
@@ -21,18 +22,24 @@ use App\Filament\Resources\OpportunityResource\RelationManagers\TasksRelationMan
 use App\Filament\Tables\BulkBar;
 use App\Filament\Tables\RowActions;
 use App\Models\Opportunity;
+use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\ExportAction;
 use Filament\Actions\ExportBulkAction;
 use Filament\Actions\ForceDeleteBulkAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Size;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Override;
 use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
+use Relaticle\ImportWizard\Filament\Pages\ImportOpportunities;
 
 final class OpportunityResource extends Resource
 {
@@ -49,6 +56,29 @@ final class OpportunityResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return OpportunityForm::get($schema);
+    }
+
+    /**
+     * @return list<Action|ActionGroup>
+     */
+    public static function collectionActions(): array
+    {
+        return [
+            ImportExportActionGroup::make([
+                Action::make('import')
+                    ->label(__('filament/resources/opportunity.pages.list.actions.import.label'))
+                    ->icon('lucide-upload')
+                    ->url(ImportOpportunities::getUrl())
+                    ->visible(ImportOpportunities::canAccess(...)),
+                ExportAction::make()->exporter(OpportunityExporter::class)->authorize('exportAny', Opportunity::class),
+            ])->label(__('filament/resources/opportunity.pages.list.actions.import_export.label')),
+            CreateAction::make()
+                ->icon('lucide-plus')
+                ->authorize(self::canCreate(...))
+                ->size(Size::Small)
+                ->model(Opportunity::class)
+                ->schema(fn (Schema $schema): Schema => self::form($schema->columns(2))),
+        ];
     }
 
     public static function table(Table $table): Table

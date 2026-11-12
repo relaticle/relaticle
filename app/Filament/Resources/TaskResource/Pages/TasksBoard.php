@@ -67,6 +67,11 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
         return __('filament/pages/boards.tasks.title');
     }
 
+    protected function getHeaderActions(): array
+    {
+        return $this->prefillingFirstVisibleColumn(TaskResource::collectionActions());
+    }
+
     /**
      * Configure the board using the new Filament V4 architecture.
      */
@@ -275,7 +280,7 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
 
     private function cardCreation(): CreateTaskAction
     {
-        return CreateTaskAction::make()
+        return CreateTaskAction::make('addCard')
             ->authorize(fn (): bool => Gate::allows('create', Task::class))
             ->label(__('filament/pages/boards.tasks.actions.add'))
             ->icon('lucide-plus')

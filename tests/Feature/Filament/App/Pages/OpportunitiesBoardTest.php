@@ -24,6 +24,7 @@ use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
+use App\Models\Export;
 use App\Models\Opportunity;
 use App\Models\SavedView;
 use App\Models\TablePreference;
@@ -380,7 +381,7 @@ it('puts a card created while sorted at the top of the hand order', function ():
 
     livewire(OpportunitiesBoard::class)
         ->call('setFilterBarSorts', [['column' => 'name', 'direction' => 'desc']])
-        ->call('mountAction', 'create', ['column' => (string) $prospecting->getKey()])
+        ->call('mountAction', 'addCard', ['column' => (string) $prospecting->getKey()])
         ->set('mountedActions.0.data.name', 'Fresh deal')
         ->call('callMountedAction')
         ->assertOk();
@@ -750,8 +751,8 @@ it('rejects a card created in a stage option the board does not own', function (
     $targetId = $targetKind === 'foreign' ? (string) $foreignOptionId : 'not-an-option';
 
     livewire(OpportunitiesBoard::class)
-        ->assertActionDisabled(TestAction::make('create')->arguments(['column' => $targetId]))
-        ->call('mountAction', 'create', ['column' => $targetId])
+        ->assertActionDisabled(TestAction::make('addCard')->arguments(['column' => $targetId]))
+        ->call('mountAction', 'addCard', ['column' => $targetId])
         ->set('mountedActions.0.data.name', 'Rejected deal')
         ->call('callMountedAction')
         ->assertOk();
@@ -763,7 +764,7 @@ it('creates a card in a stage option the board owns', function (): void {
     $qualification = $this->stageField->options->firstWhere('name', 'Qualification');
 
     livewire(OpportunitiesBoard::class)
-        ->call('mountAction', 'create', ['column' => (string) $qualification->getKey()])
+        ->call('mountAction', 'addCard', ['column' => (string) $qualification->getKey()])
         ->set('mountedActions.0.data.name', 'Accepted deal')
         ->call('callMountedAction')
         ->assertOk();
@@ -824,7 +825,7 @@ it('labels the contact select point of contact when adding an opportunity to a c
     $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');
 
     $page = livewire(OpportunitiesBoard::class)
-        ->call('mountAction', 'create', ['column' => (string) $prospecting->getKey()])
+        ->call('mountAction', 'addCard', ['column' => (string) $prospecting->getKey()])
         ->instance();
 
     expect($page->getSchema($page->getMountedActionSchemaName())->toHtml())->toContain('Point of Contact');
@@ -1437,7 +1438,7 @@ it('refuses a card created or moved into a hidden column', function (): void {
 
     $component = livewire(OpportunitiesBoard::class)->call('setBoardColumnVisible', $prospecting, false);
 
-    $component->call('mountAction', 'create', ['column' => $prospecting])
+    $component->call('mountAction', 'addCard', ['column' => $prospecting])
         ->set('mountedActions.0.data.name', 'Hidden column deal')
         ->call('callMountedAction');
 
@@ -1639,7 +1640,7 @@ it('clears the stage when a card moves into the no stage column and sets it when
 it('creates an opportunity with no stage from the no stage column', function (): void {
     $component = livewire(OpportunitiesBoard::class)
         ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
-        ->call('mountAction', 'create', ['column' => BoardStateData::NO_VALUE_COLUMN])
+        ->call('mountAction', 'addCard', ['column' => BoardStateData::NO_VALUE_COLUMN])
         ->set('mountedActions.0.data.name', 'Bare deal')
         ->call('callMountedAction');
 
@@ -1656,7 +1657,7 @@ it('refuses the no stage column as a target while it is off', function (): void 
     $component = livewire(OpportunitiesBoard::class);
 
     $component->call('moveCard', (string) $card->id, BoardStateData::NO_VALUE_COLUMN)->assertReturned(false);
-    $component->call('mountAction', 'create', ['column' => BoardStateData::NO_VALUE_COLUMN])
+    $component->call('mountAction', 'addCard', ['column' => BoardStateData::NO_VALUE_COLUMN])
         ->set('mountedActions.0.data.name', 'Refused deal')
         ->call('callMountedAction');
 
@@ -1764,3 +1765,61 @@ it('keeps the last real column locked while the no stage column is on', function
     expect($row)->toContain('board-last-column-hint')
         ->and($html)->toMatch('/data-board-columns-trigger.*?fi-board-settings-value-text">\s*2\s*</s');
 });
+
+it('offers the list\'s import, export and new opportunity actions in the board header', function (): void {
+    livewire(OpportunitiesBoard::class)
+        ->assertActionVisible('create')
+        ->assertActionVisible('export')
+        ->assertActionVisible('import');
+});
+
+it('shows a viewer none of the header actions', function (): void {
+    $viewer = User::factory()->create();
+    $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
+    $viewer->switchWorkspace($this->workspace);
+    $this->actingAs($viewer);
+
+    livewire(OpportunitiesBoard::class)
+        ->assertActionHidden('create')
+        ->assertActionHidden('export')
+        ->assertActionHidden('import');
+});
+
+it('creates an opportunity from the header into the first visible stage', function (): void {
+    $ids = stageIds($this->stageField);
+
+    livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnVisible', $ids[0], false)
+        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
+        ->mountAction('create')
+        ->assertSchemaStateSet(['custom_fields.'.OpportunityField::STAGE->value => $ids[1]])
+        ->setActionData(['name' => 'Header deal'])
+        ->callMountedAction()
+        ->assertHasNoActionErrors();
+
+    $component = livewire(OpportunitiesBoard::class);
+    $cards = $component->instance()->getBoard()->getBoardRecords($ids[1]);
+
+    expect($cards->pluck('name')->all())->toContain('Header deal')
+        ->and($cards->last()->name)->toBe('Header deal');
+});
+
+it('exports the opportunities the bar\'s filters match from the board', function (bool $noValueColumn): void {
+    opportunityInStage($this, 'Acme renewal', 'Prospecting');
+    opportunityInStage($this, 'Globex upsell', 'Prospecting');
+
+    $component = livewire(OpportunitiesBoard::class);
+
+    if ($noValueColumn) {
+        $component->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true);
+    }
+
+    $component
+        ->call('setFilterRules', [['field' => 'name', 'condition' => 'contains', 'value' => 'Acme']])
+        ->callAction('export');
+
+    expect(Export::query()->sole()->total_rows)->toBe(1);
+})->with([
+    'no stage column off' => [false],
+    'no stage column on' => [true],
+]);

@@ -57,6 +57,7 @@ trait HasViewSwitcher
             'heading' => $this->getHeading(),
             'viewSwitcher' => $this->getViewSwitcher(),
             'viewSettings' => $this->getViewSettings(),
+            'actions' => $this->getCachedHeaderActions(),
         ]);
     }
 

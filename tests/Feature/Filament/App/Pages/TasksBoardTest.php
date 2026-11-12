@@ -22,6 +22,7 @@ use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
+use App\Models\Export;
 use App\Models\Opportunity;
 use App\Models\SavedView;
 use App\Models\TablePreference;
@@ -348,8 +349,8 @@ it('rejects a card created in a status option the board does not own', function 
     $targetId = $targetKind === 'foreign' ? (string) $foreignOptionId : 'not-an-option';
 
     livewire(TasksBoard::class)
-        ->assertActionDisabled(TestAction::make('create')->arguments(['column' => $targetId]))
-        ->call('mountAction', 'create', ['column' => $targetId])
+        ->assertActionDisabled(TestAction::make('addCard')->arguments(['column' => $targetId]))
+        ->call('mountAction', 'addCard', ['column' => $targetId])
         ->set('mountedActions.0.data.title', 'Rejected task')
         ->call('callMountedAction')
         ->assertOk();
@@ -361,7 +362,7 @@ it('creates a card in a status option the board owns', function (): void {
     $inProgress = $this->statusField->options->firstWhere('name', 'In progress');
 
     livewire(TasksBoard::class)
-        ->call('mountAction', 'create', ['column' => (string) $inProgress->getKey()])
+        ->call('mountAction', 'addCard', ['column' => (string) $inProgress->getKey()])
         ->set('mountedActions.0.data.title', 'Accepted task')
         ->call('callMountedAction')
         ->assertOk();
@@ -473,7 +474,7 @@ it('notifies the assignee of a task added from a board column', function (): voi
 
     livewire(TasksBoard::class)
         ->callAction(
-            TestAction::make('create')->arguments(['column' => (string) $column->getKey()]),
+            TestAction::make('addCard')->arguments(['column' => (string) $column->getKey()]),
             data: ['title' => 'Prepare the renewal deck', 'assignees' => [$assignee->id]],
         )
         ->assertHasNoActionErrors();
@@ -823,7 +824,7 @@ it('puts a card created while sorted at the top of the hand order', function ():
 
     livewire(TasksBoard::class)
         ->call('setFilterBarSorts', [['column' => 'title', 'direction' => 'desc']])
-        ->call('mountAction', 'create', ['column' => (string) $todo->getKey()])
+        ->call('mountAction', 'addCard', ['column' => (string) $todo->getKey()])
         ->set('mountedActions.0.data.title', 'Fresh task')
         ->call('callMountedAction')
         ->assertOk();
@@ -1242,7 +1243,7 @@ it('creates a card in a priority column with that priority and hides priority in
 
     livewire(TasksBoard::class)
         ->call('setBoardColumnField', TaskField::PRIORITY->value)
-        ->call('mountAction', 'create', ['column' => (string) $low->getKey()])
+        ->call('mountAction', 'addCard', ['column' => (string) $low->getKey()])
         ->assertSchemaComponentDoesNotExist('custom_fields.priority', 'mountedActionSchema0')
         ->assertSchemaComponentExists('custom_fields.status', 'mountedActionSchema0')
         ->set('mountedActions.0.data.title', 'Low task')
@@ -1436,7 +1437,7 @@ it('refuses a card created or moved into a hidden column', function (): void {
 
     $component = livewire(TasksBoard::class)->call('setBoardColumnVisible', $todo, false);
 
-    $component->call('mountAction', 'create', ['column' => $todo])
+    $component->call('mountAction', 'addCard', ['column' => $todo])
         ->set('mountedActions.0.data.title', 'Hidden column task')
         ->call('callMountedAction');
 
@@ -1507,7 +1508,7 @@ it('moves a task into the no status column and to another assignee lane in one d
 it('creates a task with no status from the no status column', function (): void {
     $component = livewire(TasksBoard::class)
         ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
-        ->call('mountAction', 'create', ['column' => BoardStateData::NO_VALUE_COLUMN])
+        ->call('mountAction', 'addCard', ['column' => BoardStateData::NO_VALUE_COLUMN])
         ->set('mountedActions.0.data.title', 'Bare task')
         ->call('callMountedAction');
 
@@ -1517,3 +1518,60 @@ it('creates a task with no status from the no status column', function (): void 
         ->and($created->order_column)->not->toBeNull()
         ->and(noStatusCardIds($component))->toContain($created->id);
 });
+
+it('offers the list\'s import, export and new task actions in the board header', function (): void {
+    livewire(TasksBoard::class)
+        ->assertActionVisible('create')
+        ->assertActionVisible('export')
+        ->assertActionVisible('import');
+});
+
+it('shows a viewer none of the header actions', function (): void {
+    $viewer = User::factory()->create();
+    $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
+    $viewer->switchWorkspace($this->workspace);
+    $this->actingAs($viewer);
+
+    livewire(TasksBoard::class)
+        ->assertActionHidden('create')
+        ->assertActionHidden('export')
+        ->assertActionHidden('import');
+});
+
+it('creates a task from the header into the first visible status', function (): void {
+    $ids = statusIds($this->statusField);
+
+    livewire(TasksBoard::class)
+        ->call('setBoardColumnVisible', $ids[0], false)
+        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
+        ->mountAction('create')
+        ->assertSchemaStateSet(['custom_fields.'.TaskField::STATUS->value => $ids[1]])
+        ->setActionData(['title' => 'Header task'])
+        ->callMountedAction()
+        ->assertHasNoActionErrors();
+
+    $cards = livewire(TasksBoard::class)->instance()->getBoard()->getBoardRecords($ids[1]);
+
+    expect($cards->pluck('title')->all())->toContain('Header task')
+        ->and($cards->last()->title)->toBe('Header task');
+});
+
+it('exports the tasks the bar\'s filters match from the board', function (bool $noValueColumn): void {
+    taskInStatus($this, 'Acme brief', 'To do');
+    taskInStatus($this, 'Globex brief', 'To do');
+
+    $component = livewire(TasksBoard::class);
+
+    if ($noValueColumn) {
+        $component->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true);
+    }
+
+    $component
+        ->call('setFilterRules', [['field' => 'title', 'condition' => 'contains', 'value' => 'Acme']])
+        ->callAction('export');
+
+    expect(Export::query()->sole()->total_rows)->toBe(1);
+})->with([
+    'no status column off' => [false],
+    'no status column on' => [true],
+]);

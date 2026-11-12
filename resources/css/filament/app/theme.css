@@ -1914,6 +1914,10 @@ html.fi-record-stacked .fi-record-layout {
         @apply flex items-center gap-x-4 border-b border-gray-200/60 px-4 py-3 lg:px-6 dark:border-white/10;
     }
 
+    .fi-board-header-actions {
+        @apply ml-auto flex shrink-0 items-center gap-x-2;
+    }
+
     .fi-page-main {
         @apply min-h-0 flex-1;
     }
