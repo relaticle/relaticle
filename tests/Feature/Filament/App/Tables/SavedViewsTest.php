@@ -1646,9 +1646,20 @@ it('merges a closure change under the lock and refuses an unknown key from it', 
     $view = boardViewFor($this->user, ['state' => new BoardStateData(hiddenColumns: ['a'])]);
     $save = fn (Closure $changes): BoardStateData => resolve(SaveBoardState::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, $changes, $view);
 
-    $state = $save(fn (BoardStateData $stored): array => ['hidden_columns' => [...$stored->hiddenColumns, 'x']]);
+    $queries = [];
+    DB::listen(function (QueryExecuted $query) use (&$queries): void {
+        $queries[] = $query->sql;
+    });
+    $lockedBeforeClosure = null;
 
-    expect($state->hiddenColumns)->toBe(['a', 'x'])
+    $state = $save(function (BoardStateData $stored) use (&$queries, &$lockedBeforeClosure): array {
+        $lockedBeforeClosure = array_any($queries, fn (string $sql): bool => preg_match('/^select .* from "saved_views" .* for update/', $sql) === 1);
+
+        return ['hidden_columns' => [...$stored->hiddenColumns, 'x']];
+    });
+
+    expect($lockedBeforeClosure)->toBeTrue()
+        ->and($state->hiddenColumns)->toBe(['a', 'x'])
         ->and($view->refresh()->boardState()->hiddenColumns)->toBe(['a', 'x'])
         ->and(fn () => $save(fn (BoardStateData $stored): array => ['bogus' => 1]))->toThrow(HttpException::class, '', 422);
 });

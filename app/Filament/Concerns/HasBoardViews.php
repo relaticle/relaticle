@@ -511,7 +511,6 @@ trait HasBoardViews
             $this->storedBoardState = $state;
         }
 
-        $this->boardStateHash = $this->boardStateSignature($this->currentBoardState());
         $this->columnCardLimits = [];
         $this->cellCardLimits = [];
         $this->rebuildBoard();

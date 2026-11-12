@@ -1003,6 +1003,40 @@ it('keeps every board setting when stages are reordered', function (): void {
         ->and($stored->cardSize)->toBe(BoardCardSize::Compact);
 });
 
+it('keeps every board setting of an open board view when stages are reordered', function (): void {
+    $tier = opportunitySelectField($this, 'Tier', ['Gold', 'Silver']);
+    $tierIds = $tier->options->pluck('id')->map(strval(...))->all();
+    $plain = rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(sort: 'name:asc'));
+    $view = SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'entity' => CrmEntity::Opportunity,
+        'type' => SavedViewType::Board,
+        'state' => new BoardStateData(stageOrder: array_reverse($tierIds), hiddenColumns: [$tierIds[0]]),
+    ]);
+    $plainHash = $plain->board_state->hash();
+    $reversed = array_reverse(stageIds($this->stageField));
+
+    Livewire::withQueryParams(['view' => $view->getKey()])->test(OpportunitiesBoard::class)->call('reorderBoardStages', $reversed);
+
+    $stored = $view->refresh()->boardState();
+    expect($stored->orderStages($tierIds))->toBe(array_reverse($tierIds))
+        ->and($stored->orderStages(stageIds($this->stageField)))->toBe($reversed)
+        ->and($stored->hiddenColumns)->toBe([$tierIds[0]])
+        ->and($plain->refresh()->board_state->hash())->toBe($plainHash);
+});
+
+it('stores a sort change that arrives in the same request as a stage reorder', function (): void {
+    $reversed = array_reverse(stageIds($this->stageField));
+
+    livewire(OpportunitiesBoard::class)->update(
+        calls: [['path' => '', 'method' => 'reorderBoardStages', 'params' => [$reversed]]],
+        updates: ['boardSort' => 'name:desc'],
+    );
+
+    $stored = TablePreference::query()->sole()->board_state;
+    expect($stored->sort)->toBe('name:desc')
+        ->and($stored->stageOrder)->toBe($reversed);
+});
+
 it('writes nothing on arrival when Part 2 settings are stored', function (): void {
     $preference = rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(cardAttributes: ['company'], showLabels: true, columnWidth: BoardColumnWidth::Narrow));
     $updatedAt = $preference->updated_at;
