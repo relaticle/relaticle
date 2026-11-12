@@ -1399,12 +1399,52 @@ it('writes a board state to the member\'s own view and to nobody else\'s', funct
     $mine = viewFor($this->user, ['entity' => CrmEntity::Opportunity, 'type' => SavedViewType::Board, 'state' => new BoardStateData(grouping: 'company')]);
     $other = savedViewMember(WorkspaceRole::Member);
     $theirs = viewFor($other, ['entity' => CrmEntity::Opportunity, 'type' => SavedViewType::Board, 'state' => new BoardStateData]);
+    $filters = ['conditions' => ['match' => 'all', 'rules' => []]];
 
-    $saved = resolve(SaveBoardState::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, ['filters' => ['conditions' => ['match' => 'all', 'rules' => []]]], $mine);
+    $saved = resolve(SaveBoardState::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, ['filters' => $filters], $mine);
 
     expect($saved->grouping)->toBe('company')
+        ->and($mine->fresh()->boardState()->grouping)->toBe('company')
+        ->and($mine->fresh()->boardState()->filters)->toEqual($filters)
         ->and(fn () => resolve(SaveBoardState::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, ['grouping' => null], $theirs))->toThrow(HttpException::class)
+        ->and($theirs->fresh()->boardState()->grouping)->toBeNull()
         ->and(fn () => resolve(SaveBoardState::class)->execute($this->user, $this->workspace, CrmEntity::Company, ['grouping' => null]))->toThrow(HttpException::class);
+});
+
+it('refuses a board state the member may not write', function (string $case): void {
+    $mine = viewFor($this->user, ['entity' => CrmEntity::Opportunity, 'type' => SavedViewType::Board, 'state' => new BoardStateData(grouping: 'company')]);
+    $stranger = User::factory()->withWorkspace()->create();
+    $changes = ['grouping' => 'assignee'];
+
+    [$user, $view] = match ($case) {
+        'non member' => [$stranger, $mine],
+        'view of another entity' => [$this->user, viewFor($this->user, ['entity' => CrmEntity::Task, 'type' => SavedViewType::Board, 'state' => new BoardStateData(grouping: 'company')])],
+        'view of another workspace' => [$this->user, SavedView::factory()->for($this->user)->for($stranger->currentWorkspace)->create(['entity' => CrmEntity::Opportunity, 'type' => SavedViewType::Board, 'state' => new BoardStateData(grouping: 'company')])],
+        'table view' => [$this->user, viewFor($this->user, ['entity' => CrmEntity::Opportunity])],
+        'unknown key' => [$this->user, $mine],
+    };
+
+    if ($case === 'unknown key') {
+        $changes = ['stageOrder' => []];
+    }
+
+    expect(fn () => resolve(SaveBoardState::class)->execute($user, $this->workspace, CrmEntity::Opportunity, $changes, $view))
+        ->toThrow(HttpException::class);
+
+    expect($view->fresh()->state->toArray())->toEqual($view->state->toArray())
+        ->and($mine->fresh()->boardState()->grouping)->toBe('company')
+        ->and(TablePreference::query()->withoutGlobalScopes()->count())->toBe(0);
+})->with(['non member', 'view of another entity', 'view of another workspace', 'table view', 'unknown key']);
+
+it('refuses a board state for an entity without a board', function (): void {
+    expect(fn () => resolve(CreateSavedView::class)->execute($this->user, $this->workspace, CrmEntity::Company, 'Pipeline', new BoardStateData))
+        ->toThrow(HttpException::class);
+
+    expect(SavedView::query()->count())->toBe(0);
+
+    $company = viewFor($this->user);
+    expect(fn () => resolve(UpdateSavedView::class)->execute($this->user, $company, ['state' => new BoardStateData]))
+        ->toThrow(HttpException::class);
 });
 
 function boardViewFor(User $owner, array $attributes = []): SavedView

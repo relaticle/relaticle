@@ -23,6 +23,8 @@ final readonly class CreateSavedView
     {
         abort_unless($user->belongsToWorkspaceId($workspace->getKey()), 403);
 
+        abort_if($state instanceof BoardStateData && $entity->boardFieldCode() === null, 422);
+
         $view = new SavedView([
             'workspace_id' => $workspace->getKey(),
             'user_id' => $user->getKey(),

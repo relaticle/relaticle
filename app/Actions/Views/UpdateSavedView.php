@@ -33,6 +33,7 @@ final readonly class UpdateSavedView
             $state = $attributes['state'];
 
             abort_unless($state instanceof BoardStateData === ($view->type === SavedViewType::Board), 422);
+            abort_if($state instanceof BoardStateData && $view->entity->boardFieldCode() === null, 422);
 
             $attributes['state'] = $state instanceof TableStateData ? $state->withoutWidths() : $state;
         }

@@ -22,6 +22,7 @@ final readonly class SaveBoardState
      */
     public function execute(User $user, Workspace $workspace, CrmEntity $entity, array $changes, ?SavedView $view = null): BoardStateData
     {
+        abort_if(array_diff(array_keys($changes), ['stage_order', 'filters', 'grouping']) !== [], 422);
         abort_unless($user->belongsToWorkspaceId($workspace->getKey()), 403);
         abort_if($entity->boardFieldCode() === null, 403);
 
