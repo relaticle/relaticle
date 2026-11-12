@@ -2157,3 +2157,56 @@ it('keeps the open board view when a list view is deleted from the board', funct
     expect(SavedView::query()->withoutGlobalScopes()->whereKey($table->getKey())->exists())->toBeFalse()
         ->and($open->refresh()->updated_at)->toEqual($updatedAt);
 });
+
+it('leaves the open view alone when the other type is created', function (string $page, SavedViewType $type): void {
+    $isList = $type === SavedViewType::Board;
+    $open = $isList
+        ? viewFor($this->user, ['entity' => CrmEntity::Opportunity, 'state' => hotLeads()])
+        : boardViewFor($this->user);
+    $preference = TablePreference::factory()->for($this->user)->for($this->workspace)->create([
+        'entity' => CrmEntity::Opportunity,
+        'board_state' => new BoardStateData(sort: 'name:asc'),
+    ]);
+    $viewUpdatedAt = $open->updated_at;
+    $viewState = $open->refresh()->getRawOriginal('state');
+    $preferenceUpdatedAt = $preference->updated_at;
+    $component = Livewire::withQueryParams(['view' => $open->getKey()])->test($page);
+
+    $this->travelTo(now()->addHour());
+    $writes = boardViewStoreWrites(fn () => $component->callAction('saveSavedViewAs', ['type' => $type->value, 'name' => 'Elsewhere'])->call('$refresh'));
+
+    expect($writes)->toBe(1)
+        ->and($open->refresh()->updated_at)->toEqual($viewUpdatedAt)
+        ->and($open->getRawOriginal('state'))->toBe($viewState)
+        ->and($component->get('activeSavedViewId'))->toBe($open->getKey())
+        ->and($preference->refresh()->updated_at)->toEqual($preferenceUpdatedAt)
+        ->and($preference->board_state->sort)->toBe('name:asc');
+})->with([
+    'a table view open on the list' => [ListOpportunities::class, SavedViewType::Board],
+    'a board view open on the board' => [OpportunitiesBoard::class, SavedViewType::Table],
+]);
+
+it('opens a list view created from a board with the default columns and writes nothing', function (): void {
+    livewire(OpportunitiesBoard::class)
+        ->call('setFilterRules', [boardNameRule('Keep')])
+        ->callAction('saveSavedViewAs', ['type' => SavedViewType::Table->value, 'name' => 'From board'])
+        ->assertHasNoActionErrors();
+    $view = SavedView::query()->withoutGlobalScopes()->sole();
+    $plain = openOpportunitiesList();
+
+    $component = null;
+    $writes = 0;
+    DB::listen(function (QueryExecuted $query) use (&$writes): void {
+        $writes += preg_match('/^(update|insert into) "saved_views"/', $query->sql);
+    });
+    $component = Livewire::withQueryParams(['view' => $view->getKey()])->test(ListOpportunities::class);
+    $component->call('$refresh')->call('$refresh');
+
+    $shown = fn (Testable $page): array => collect($page->get('tableColumns'))->where('isToggled', true)->pluck('name')->all();
+
+    expect($shown($component))->toBe($shown($plain))
+        ->and($shown($component))->not->toBe([])
+        ->and($component->get('activeSavedViewId'))->toBe($view->getKey())
+        ->and($component->get('tableFilters.conditions.rules'))->toHaveCount(1)
+        ->and($writes)->toBe(0);
+});

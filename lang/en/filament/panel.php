@@ -239,7 +239,7 @@ return [
             'type' => 'View type',
             'type_descriptions' => [
                 'table' => 'See your records in rows and columns',
-                'board' => 'Move your records through stages',
+                'board' => 'Move your records from one step to the next',
             ],
             'name_placeholder' => 'Name this view',
         ],

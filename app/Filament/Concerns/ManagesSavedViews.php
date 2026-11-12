@@ -117,7 +117,7 @@ trait ManagesSavedViews
         return Action::make('saveSavedViewAs')
             ->label(__('filament/panel.tables.views.save_current'))
             ->modalHeading(__('filament/panel.tables.views.create_heading'))
-            ->modalWidth('md')
+            ->modalWidth('3xl')
             ->modalSubmitActionLabel(__('filament/panel.tables.views.create_submit'))
             ->schema([
                 $this->savedViewTypeInput(),
