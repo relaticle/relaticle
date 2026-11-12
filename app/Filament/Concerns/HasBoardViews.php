@@ -93,7 +93,18 @@ trait HasBoardViews
         $viewId = $this->activeSavedViewId;
         $this->activeSavedViewId = null;
 
-        $viewId === null ? $this->applyOwnBoard() : $this->applySavedView($viewId);
+        if ($viewId === null) {
+            $this->applyOwnBoard();
+
+            return;
+        }
+
+        $this->applySavedView($viewId);
+
+        if (! $this->activeBoardView() instanceof SavedView) {
+            $this->forgetStoredBoardState();
+            $this->rebuildBoard();
+        }
     }
 
     public function applySavedView(string $viewId): void

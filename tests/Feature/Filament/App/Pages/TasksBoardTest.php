@@ -1396,6 +1396,7 @@ it('refuses a field code or ids that do not belong together when stages are reor
 it('lists the board column fields with their options whatever custom attribute tenant is bound', function (?string $tenant): void {
     $other = User::factory()->withWorkspace()->create();
     TenantContextService::setTenantId($tenant === 'other' ? $other->currentWorkspace->getKey() : null);
+    Filament::setTenant(null);
 
     $fields = resolve(BoardColumnFieldsQuery::class)->get($this->user, $this->workspace, CrmEntity::Task);
 

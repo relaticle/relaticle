@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\CustomFields\CreateCustomField;
 use App\Actions\Views\CreateSavedView;
 use App\Actions\Views\DeleteSavedView;
 use App\Actions\Views\DuplicateSavedView;
@@ -2153,6 +2154,19 @@ it('shows the plain board with the same cards when the open view was deleted els
     $component->call('setFilterRules', [boardNameRule('Drop')]);
 
     expect(preferenceRow()->board_state->filters['conditions']['rules'][0]['value'])->toBe('Drop');
+});
+
+it('draws the plain board\'s columns when the picked view is deleted while another view is open', function (): void {
+    $tier = resolve(CreateCustomField::class)->execute($this->user, ['name' => 'Tier', 'type' => 'select', 'entity_type' => 'opportunity', 'options' => [['name' => 'Gold'], ['name' => 'Silver']]]);
+    $open = boardViewFor($this->user, ['state' => new BoardStateData(columnField: $tier->code)]);
+    $picked = boardViewFor($this->user);
+    $component = openBoardWithView($open);
+    $picked->delete();
+
+    $component->set('activeSavedViewId', $picked->getKey());
+
+    expect($component->get('activeSavedViewId'))->toBeNull()
+        ->and($component->instance()->getBoard()->getColumnIdentifiers())->toBe(opportunityStageOptionIds());
 });
 
 it('treats a board view deleted before the save as gone and writes nothing', function (): void {
