@@ -14,9 +14,7 @@ final readonly class ContinueWithSetupChat
     {
         $workspace = $import->workspace;
 
-        if (! $workspace instanceof Workspace
-            || $workspace->onboarding_data_source?->isFile() !== true
-            || (string) $workspace->user_id !== (string) auth()->id()) {
+        if (! $workspace instanceof Workspace || (string) $workspace->user_id !== (string) auth()->id()) {
             return null;
         }
 

@@ -396,16 +396,9 @@ function loginViaBrowser(User $user, ?string $theme = null, ?AwaitableWebpage $p
         ->click('button[type="submit"]');
 }
 
-const FOCUSED_HEADING = 'new Promise(resolve => { const end = Date.now() + 3000; const poll = () => { const focused = document.activeElement; focused?.tagName === "H1" || Date.now() > end ? resolve(focused?.tagName === "H1" ? focused.innerText.trim() : focused?.tagName) : setTimeout(poll, 50); }; poll(); })';
-
 function asyncAlpineComponentsLoaded(): string
 {
     return 'document.querySelector("[x-load][x-ignore]") === null';
-}
-
-function livewireStarted(): string
-{
-    return 'new Promise(resolve => { const poll = () => window.Livewire?.all().length > 0 ? resolve(true) : setTimeout(poll, 25); poll(); })';
 }
 
 function pdfBytes(): string
@@ -534,6 +527,10 @@ function onboardWorkspace(User $user, array $workspace, array $useCase = ['onboa
     Filament::setTenant($created);
 
     $setup = livewire(SetupWorkspace::class);
+
+    if ($created->onboarding_step === WorkspaceSetupStep::Email) {
+        $setup->callAction('skipMailbox');
+    }
 
     $setup->fillForm($useCase)->call('saveUseCase')->assertHasNoFormErrors();
 

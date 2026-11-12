@@ -8,7 +8,6 @@ use App\Actions\Onboarding\StartDataArrivedTurn;
 use App\Actions\Onboarding\StartSetupGreeting;
 use App\Contracts\Entitlements;
 use App\Enums\CreationSource;
-use App\Enums\OnboardingDataSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\WorkspaceRole;
 use App\Features\Billing;
@@ -294,12 +293,10 @@ it('does not greet when the workspace is out of credits', function (): void {
     Queue::assertNothingPushed();
 });
 
-it('greets an inbox workspace with what its mailbox brought in', function (): void {
+it('greets an owner who connected a mailbox with what it brought in', function (): void {
     $user = User::factory()->create();
-    $workspace = personalWorkspaceFor($user, [
-        'onboarding_use_case' => OnboardingUseCase::Sales,
-        'onboarding_data_source' => OnboardingDataSource::Inbox,
-    ]);
+    $workspace = personalWorkspaceFor($user, ['onboarding_use_case' => OnboardingUseCase::Sales]);
+    ConnectedAccount::factory()->create(['workspace_id' => $workspace->getKey(), 'user_id' => $user->getKey()]);
 
     People::factory()->count(30)->create(['workspace_id' => $workspace->getKey(), 'creator_id' => null, 'creation_source' => CreationSource::MAILBOX]);
     Company::factory()->count(12)->create(['workspace_id' => $workspace->getKey(), 'creator_id' => null, 'creation_source' => CreationSource::MAILBOX]);
@@ -325,7 +322,7 @@ it('greets an inbox workspace with what its mailbox brought in', function (): vo
     $job->handle(resolve(CreditService::class));
 
     CrmAssistant::assertPrompted(fn ($prompt): bool => $prompt->prompt === MessageOrigin::Greeting->opener()
-        && str_contains($prompt->agent->dynamicInstructions(), "data_source: inbox\n")
+        && str_contains($prompt->agent->dynamicInstructions(), "mailbox: connected\n")
         && str_contains($prompt->agent->dynamicInstructions(), "arrived: 30 people and 12 companies from mailbox today\n")
         && str_contains($prompt->agent->dynamicInstructions(), "<turn>\n".MessageOrigin::Greeting->directive()."\n</turn>"));
 });
@@ -334,7 +331,6 @@ function setupWorkspaceWithGreeting(User $user, array $attributes = []): Workspa
 {
     $workspace = personalWorkspaceFor($user, [
         'onboarding_use_case' => OnboardingUseCase::Sales,
-        'onboarding_data_source' => OnboardingDataSource::Spreadsheet,
         ...$attributes,
     ]);
 
@@ -426,7 +422,7 @@ it('opens a turn for a second import after the first one', function (): void {
 it('leaves the turn to the greeting when the setup chat was never opened', function (): void {
     Queue::fake([ProcessChatMessage::class]);
     $user = User::factory()->create();
-    $workspace = personalWorkspaceFor($user, ['onboarding_data_source' => OnboardingDataSource::Spreadsheet]);
+    $workspace = personalWorkspaceFor($user);
 
     $user->notifyNow(new ImportFinishedNotification(finishedImport($user, $workspace), ImportOutcome::Completed), ['database']);
 
@@ -487,7 +483,7 @@ it('opens no data arrived turn when the workspace is out of credits', function (
 it('opens a data arrived turn when the mailbox history import completes', function (): void {
     Queue::fake([ProcessChatMessage::class]);
     $user = User::factory()->create();
-    $workspace = setupWorkspaceWithGreeting($user, ['onboarding_data_source' => OnboardingDataSource::Inbox]);
+    $workspace = setupWorkspaceWithGreeting($user);
     $account = ConnectedAccount::factory()->create(['workspace_id' => $workspace->getKey(), 'user_id' => $user->getKey()]);
 
     $notification = new MailboxHistoryImportCompletedNotification($account, 'batch-1', importedEmailCount: 40, importedCalendarCount: 0, includesCalendar: false);
@@ -501,7 +497,7 @@ it('opens a data arrived turn when the mailbox history import completes', functi
 it('opens no data arrived turn for a mailbox that imported nothing', function (): void {
     Queue::fake([ProcessChatMessage::class]);
     $user = User::factory()->create();
-    $workspace = setupWorkspaceWithGreeting($user, ['onboarding_data_source' => OnboardingDataSource::Inbox]);
+    $workspace = setupWorkspaceWithGreeting($user);
     $account = ConnectedAccount::factory()->create(['workspace_id' => $workspace->getKey(), 'user_id' => $user->getKey()]);
 
     $user->notifyNow(new MailboxHistoryImportCompletedNotification($account, 'batch-1', importedEmailCount: 0, importedCalendarCount: 0, includesCalendar: false), ['database']);

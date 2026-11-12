@@ -52,7 +52,7 @@ function setupButtonRows(string $appUrl): array
     return [
         (new SetupOption('pick_first', SetupOption::KIND_PROMPT, 'Pick who to work on first', 'lucide-flag', prompt: 'Pick who to work on first'))->toArray(),
         (new SetupOption('upload_file', SetupOption::KIND_LINK, 'Upload a file', 'lucide-upload', url: $appUrl))->toArray(),
-        (new SetupOption('connect_steps', SetupOption::KIND_LINK, 'See the connection steps', 'lucide-external-link', url: 'https://relaticle.example/help/connect'))->toArray(),
+        (new SetupOption('connect_assistant', SetupOption::KIND_LINK, 'Connect Claude or ChatGPT', 'lucide-sparkles', url: 'https://relaticle.example/help/connect'))->toArray(),
     ];
 }
 
@@ -84,7 +84,7 @@ it('renders the setup buttons bordered with their icons under the latest reply',
         })();
     JS);
 
-    expect($layout['labels'])->toBe(['Pick who to work on first', 'Upload a file', 'See the connection steps'])
+    expect($layout['labels'])->toBe(['Pick who to work on first', 'Upload a file', 'Connect Claude or ChatGPT'])
         ->and($layout['tags'])->toBe(['BUTTON', 'A', 'A'])
         ->and(min($layout['borders']))->toBeGreaterThan(0.0)
         ->and(min($layout['iconWidths']))->toBeGreaterThan(0)

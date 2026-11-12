@@ -8,6 +8,7 @@ use App\Enums\OnboardingUseCase;
 use App\Enums\WorkspaceSetupStep;
 use App\Filament\Pages\Concerns\BuildsOnboardingPreview;
 use App\Filament\Pages\Concerns\RunsInviteStep;
+use App\Filament\Pages\Concerns\RunsMailboxSteps;
 use App\Filament\Pages\Concerns\RunsUseCaseStep;
 use App\Models\User;
 use App\Models\Workspace;
@@ -26,6 +27,7 @@ final class SetupWorkspace extends Page
 {
     use BuildsOnboardingPreview;
     use RunsInviteStep;
+    use RunsMailboxSteps;
     use RunsUseCaseStep;
 
     protected static string $layout = 'filament-panels::components.layout.simple';
@@ -59,7 +61,13 @@ final class SetupWorkspace extends Page
             return;
         }
 
+        $this->leaveMailboxStepWhenSettled($workspace);
+
         $this->form->fill();
+
+        if ($this->step() === WorkspaceSetupStep::Sharing) {
+            $this->sharingTier = $this->preselectedSharingTier();
+        }
     }
 
     public function authUser(): User
@@ -106,6 +114,10 @@ final class SetupWorkspace extends Page
 
     public function previewPanel(): string
     {
+        if (in_array($this->step(), [WorkspaceSetupStep::Email, WorkspaceSetupStep::Sharing], true)) {
+            return 'people';
+        }
+
         if ($this->step() === WorkspaceSetupStep::Invite) {
             return 'members';
         }
@@ -120,12 +132,18 @@ final class SetupWorkspace extends Page
     {
         $workspace = $this->workspace;
 
-        return $this->onboardingPreview(
+        $preview = $this->onboardingPreview(
             $workspace->name,
             $workspace->getFilamentAvatarUrl(),
             $this->authUser()->name,
             $this->selectedUseCase()?->pipelineStages() ?? [],
         );
+
+        if ($this->step() === WorkspaceSetupStep::Sharing && $this->connectedMailbox()?->isActive()) {
+            $preview['mailboxProgress'] = $this->mailboxProgress();
+        }
+
+        return $preview;
     }
 
     /**

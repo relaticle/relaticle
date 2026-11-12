@@ -84,6 +84,23 @@ The figures come from ad-hoc queries over aggregates; no chat or email text was 
 - Any member seeing another member's private mail activity.
 - Counting sample or mailbox-synced records toward the goal.
 
+## What changed (2026-11-12)
+
+Decisions 2, 3, 6 and 8 below are replaced. The rest stands.
+
+- **No routing question.** The wizard keeps the steps main already has: mailbox, sharing, use
+  case, invite. Nothing about where clients live is asked or stored.
+- **Buttons follow one fact: is the owner's mailbox connected.** Connected: "Show my synced
+  companies", "Add someone not in my email". Not connected: "Upload my file", "Add a client",
+  "Connect Claude or ChatGPT". Once companies arrived today from an import or a mailbox: "Pick who
+  to work on first", "Later". Buttons are written on the greeting and the data arrived turn only.
+- **Rela reads the same fact.** The onboarding block carries a `mailbox:` line in place of the
+  data source line, and the greeting gives the next step for each state.
+- **No samples when the setup chat is the landing.** An owner who connected a mailbox at the
+  wizard step gets none either, as on main. An install without the setup chat keeps main's rule.
+- **Still open:** how long after signup the data arrived turn and "Continue with Rela" stay on,
+  and what happens when data arrives while a proposal is pending or the greeting is streaming.
+
 ## What was decided (2026-11-07)
 
 1. **Goal:** 10+ own records by end of day 1, with return within 14 days as the check.

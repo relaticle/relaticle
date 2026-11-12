@@ -126,6 +126,16 @@ final class ConnectedAccount extends Model
     }
 
     /**
+     * @param  Builder<ConnectedAccount>  $query
+     * @return Builder<ConnectedAccount>
+     */
+    #[Scope]
+    protected function newestConnectedFor(Builder $query, User $user, Workspace $workspace): Builder
+    {
+        return $query->ownedBy($user, $workspace)->connected()->latest();
+    }
+
+    /**
      * Scope to accounts that are connected and authorised (safe to sync/send through).
      *
      * @param  Builder<ConnectedAccount>  $query

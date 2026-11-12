@@ -4,12 +4,9 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Http\Controllers;
 
-use App\Actions\Onboarding\SaveOnboardingDataSource;
 use App\Contracts\Billing;
 use App\Contracts\Entitlements;
-use App\Enums\OnboardingDataSource;
 use App\Enums\Plan;
-use App\Features\SetupConversation;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -27,7 +24,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use Laravel\Pennant\Feature;
 use Relaticle\Chat\Actions\CreateConversation;
 use Relaticle\Chat\Actions\DeleteConversation;
 use Relaticle\Chat\Actions\MarkAttachmentSent;
@@ -71,7 +67,6 @@ final readonly class ChatController
         private ModelAccess $modelAccess,
         private Entitlements $entitlements,
         private Billing $billing,
-        private SaveOnboardingDataSource $saveDataSource,
     ) {}
 
     /** @return list<string> */
@@ -168,8 +163,6 @@ final readonly class ChatController
         if (! $this->creditService->reserveCredit($workspace, reservationKey: "reserve-{$turnId}", conversationId: $conversation, userId: (string) $user->getKey())) {
             return $this->creditsExhaustedResponse($workspace);
         }
-
-        $this->saveSetupAnswer($user, $workspace, $conversation, $validated['next_step'] ?? null);
 
         DB::transaction(function () use ($conversation, $user, $workspace): void {
             $row = DB::table('agent_conversations')
@@ -272,21 +265,6 @@ final readonly class ChatController
             'upgrade_available' => $isFree,
             'upgrade_url' => $isFree ? $this->billing->url($workspace) : null,
         ], 403);
-    }
-
-    private function saveSetupAnswer(User $user, Workspace $workspace, string $conversation, ?string $nextStep): void
-    {
-        $source = $nextStep === null ? null : OnboardingDataSource::fromButtonId($nextStep);
-
-        if (! $source instanceof OnboardingDataSource || ! Feature::active(SetupConversation::class)) {
-            return;
-        }
-
-        if (! $workspace->setupConversation()->whereKey($conversation)->exists()) {
-            return;
-        }
-
-        $this->saveDataSource->execute($user, $workspace, $source);
     }
 
     private function creditsExhaustedResponse(Workspace $workspace): JsonResponse

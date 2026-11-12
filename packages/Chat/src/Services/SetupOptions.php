@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Services;
 
-use App\Enums\CreationSource;
-use App\Enums\OnboardingDataSource;
 use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Queries\Onboarding\ArrivedRecordsQuery;
+use App\Services\WorkspaceActivationFacts;
 use Relaticle\Chat\Data\SetupOption;
 use Relaticle\Chat\Support\DestinationResolver;
 
@@ -18,6 +17,7 @@ final readonly class SetupOptions
     public function __construct(
         private ArrivedRecordsQuery $arrived,
         private DestinationResolver $destinations,
+        private WorkspaceActivationFacts $facts,
     ) {}
 
     /**
@@ -25,79 +25,32 @@ final readonly class SetupOptions
      */
     public function for(User $user, Workspace $workspace): array
     {
-        $answer = $workspace->onboarding_data_source;
-        $source = $workspace->effectiveDataSource();
-
-        if ($this->companiesArrivedToday($user, $workspace, $source)) {
+        if ($this->companiesArrivedToday($user, $workspace)) {
             return [
                 $this->prompt('pick_first', 'lucide-flag'),
                 $this->prompt('later', 'lucide-clock'),
             ];
         }
 
-        if (! $answer instanceof OnboardingDataSource) {
-            return $this->answers();
-        }
-
-        $options = match ($source) {
-            OnboardingDataSource::Memory => $answer === OnboardingDataSource::Inbox ? [
-                $this->link($user, $workspace, 'connect_mailbox', 'email_accounts', 'lucide-mail'),
-                $this->prompt('add_client', 'lucide-building-2'),
-            ] : [
-                $this->prompt('add_client', 'lucide-building-2'),
-                $this->prompt('add_deal', 'lucide-briefcase'),
-            ],
-            OnboardingDataSource::Inbox => [
+        if ($this->facts->hasConnectedMailbox($user, $workspace)) {
+            return [
                 $this->prompt('show_synced', 'lucide-mail'),
                 $this->prompt('add_outside_email', 'lucide-user-plus'),
-            ],
-            OnboardingDataSource::Assistant => [
-                $this->prompt('copy_prompt', 'lucide-clipboard'),
-                $this->link($user, $workspace, 'connect_steps', 'connect_assistant', 'lucide-external-link'),
-            ],
-            OnboardingDataSource::Spreadsheet, OnboardingDataSource::OtherCrm => [
-                $this->link($user, $workspace, 'upload_file', 'import_people', 'lucide-upload'),
-            ],
-        };
+            ];
+        }
 
-        return array_values(array_filter($options));
+        return array_values(array_filter([
+            $this->link($user, $workspace, 'upload_file', 'import_people', 'lucide-upload'),
+            $this->prompt('add_client', 'lucide-building-2'),
+            $this->link($user, $workspace, 'connect_assistant', 'connect_assistant', 'lucide-sparkles'),
+        ]));
     }
 
-    /**
-     * @return list<SetupOption>
-     */
-    private function answers(): array
+    private function companiesArrivedToday(User $user, Workspace $workspace): bool
     {
-        return array_map(
-            fn (OnboardingDataSource $source): SetupOption => new SetupOption(
-                id: $source->buttonId(),
-                kind: SetupOption::KIND_PROMPT,
-                label: $source->getLabel(),
-                icon: $this->answerIcon($source),
-                prompt: $source->getLabel(),
-            ),
-            OnboardingDataSource::offered(),
-        );
-    }
-
-    private function answerIcon(OnboardingDataSource $source): string
-    {
-        return match ($source) {
-            OnboardingDataSource::Spreadsheet => 'lucide-file-spreadsheet',
-            OnboardingDataSource::OtherCrm => 'lucide-database',
-            OnboardingDataSource::Inbox => 'lucide-mail',
-            OnboardingDataSource::Memory => 'lucide-brain',
-            OnboardingDataSource::Assistant => 'lucide-sparkles',
-        };
-    }
-
-    private function companiesArrivedToday(User $user, Workspace $workspace, OnboardingDataSource $source): bool
-    {
-        $arrived = $this->arrived->today($user, $workspace);
-
         return array_any(
-            $source->arrivalSources(),
-            fn (CreationSource $creationSource): bool => ($arrived[$creationSource->value]['companies'] ?? 0) > 0,
+            $this->arrived->today($user, $workspace),
+            fn (array $counts): bool => $counts['companies'] > 0,
         );
     }
 

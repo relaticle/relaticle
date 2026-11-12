@@ -74,6 +74,29 @@ return [
     ],
     'setup_workspace' => [
         'title' => 'Set up your workspace',
+        'email' => [
+            'heading' => 'Start with the people you already email',
+            'description' => 'Connect your mailbox and Relaticle builds your CRM while you finish setup.',
+            'google' => 'Continue with Google',
+            'microsoft' => 'Continue with Microsoft',
+            'privacy' => 'Only you can read your emails. You choose what your team sees next.',
+            'benefit_records' => 'People and companies you email, added for you',
+            'benefit_timeline' => 'Emails and meetings on the right record',
+            'benefit_send' => 'Send from Relaticle with your own address',
+            'skip' => "I'll add people and companies myself",
+            'skip_confirm' => [
+                'heading' => 'Continue without your mailbox?',
+                'description' => 'Connecting your mailbox does this work for you.',
+                'submit' => "Yes, I'm sure",
+            ],
+        ],
+        'sharing' => [
+            'heading' => 'Choose what your team sees',
+            'syncing' => 'Your mailbox is syncing.',
+            'description' => 'Only you can read your emails. Pick how they appear to other members.',
+            'connected' => 'Connected',
+            'footer' => 'You can change this any time in settings.',
+        ],
         'invite' => [
             'heading' => 'Invite your team',
             'description' => 'Add the people you work with. They get an email with a link to join.',
@@ -89,6 +112,13 @@ return [
                 'title' => 'Some invitations were not sent',
                 'body' => 'Your workspace is ready. Check Members in settings and invite anyone missing.',
             ],
+        ],
+        'preview' => [
+            'people' => 'People',
+            'person' => 'Person',
+            'company' => 'Company',
+            'from_mailbox' => 'From your mailbox',
+            'found' => '{0} Reading your mailbox|{1} :count person found|[2,*] :count people found',
         ],
     ],
 ];

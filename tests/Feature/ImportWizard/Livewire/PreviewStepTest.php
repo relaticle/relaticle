@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Actions\Onboarding\CreateSetupConversation;
-use App\Enums\OnboardingDataSource;
 use App\Events\WorkspaceCreated;
 use App\Features\SetupConversation;
 use App\Filament\Pages\ChatConversation;
@@ -788,17 +787,17 @@ function completePreviewImport(object $context): void
     ]);
 }
 
-function onboardingWorkspaceWithSetupChat(object $context, ?OnboardingDataSource $source): string
+function onboardingWorkspaceWithSetupChat(object $context): string
 {
     Feature::define(SetupConversation::class, true);
 
-    $context->workspace->forceFill(['personal_workspace' => true, 'onboarding_data_source' => $source])->save();
+    $context->workspace->forceFill(['personal_workspace' => true])->save();
 
     return resolve(CreateSetupConversation::class)->execute($context->workspace->fresh());
 }
 
 it('shows continue with rela after an onboarding import completes', function (): void {
-    $conversationId = onboardingWorkspaceWithSetupChat($this, OnboardingDataSource::Spreadsheet);
+    $conversationId = onboardingWorkspaceWithSetupChat($this);
     completePreviewImport($this);
 
     mountPreviewStep($this)
@@ -808,7 +807,7 @@ it('shows continue with rela after an onboarding import completes', function ():
 
 it('names the configured assistant on the continue button', function (): void {
     config()->set('chat.assistant_name', 'Aria');
-    onboardingWorkspaceWithSetupChat($this, OnboardingDataSource::Spreadsheet);
+    onboardingWorkspaceWithSetupChat($this);
     completePreviewImport($this);
 
     mountPreviewStep($this)
@@ -816,22 +815,14 @@ it('names the configured assistant on the continue button', function (): void {
         ->assertDontSee('Continue with Rela');
 });
 
-it('shows no continue button to a workspace past onboarding', function (): void {
-    onboardingWorkspaceWithSetupChat($this, null);
-    completePreviewImport($this);
-
-    mountPreviewStep($this)->assertDontSee('Continue with Rela');
-});
-
-it('shows no continue button when the owner did not bring a file', function (): void {
-    onboardingWorkspaceWithSetupChat($this, OnboardingDataSource::Memory);
+it('shows no continue button to a workspace that has no setup chat', function (): void {
     completePreviewImport($this);
 
     mountPreviewStep($this)->assertDontSee('Continue with Rela');
 });
 
 it('shows no continue button to a teammate of the workspace owner', function (): void {
-    onboardingWorkspaceWithSetupChat($this, OnboardingDataSource::Spreadsheet);
+    onboardingWorkspaceWithSetupChat($this);
     completePreviewImport($this);
 
     $this->actingAs(User::factory()->create());
@@ -840,7 +831,7 @@ it('shows no continue button to a teammate of the workspace owner', function ():
 });
 
 it('shows no continue button before the import completes', function (): void {
-    onboardingWorkspaceWithSetupChat($this, OnboardingDataSource::Spreadsheet);
+    onboardingWorkspaceWithSetupChat($this);
     createPreviewReadyStore($this, ['Name'], [
         makePreviewRow(2, ['Name' => 'John']),
     ], [

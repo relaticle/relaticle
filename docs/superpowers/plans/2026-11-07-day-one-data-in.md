@@ -1,5 +1,8 @@
 # Day-one data in: implementation plan
 
+> **Superseded in part on 2026-11-12.** Tasks 1 and 2 (the data-source step and routing by answer) were
+> dropped. See "What changed (2026-11-12)" in the spec for the design that shipped.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: execute with the `sdd-lean` skill (the owner's rule), task by task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A new owner says where their clients live today, lands on the tool that brings that data in, and leaves day one with dated follow-ups Rela proposed, so the next morning's task digest brings them back.

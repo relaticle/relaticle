@@ -15,15 +15,9 @@ final readonly class SetupOption
         'lucide-flag',
         'lucide-clock',
         'lucide-building-2',
-        'lucide-briefcase',
         'lucide-mail',
         'lucide-user-plus',
-        'lucide-clipboard',
-        'lucide-external-link',
         'lucide-upload',
-        'lucide-file-spreadsheet',
-        'lucide-database',
-        'lucide-brain',
         'lucide-sparkles',
     ];
 

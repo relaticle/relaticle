@@ -8,7 +8,6 @@ use App\Contracts\Billing;
 use App\Contracts\Entitlements;
 use App\Enums\CreationSource;
 use App\Enums\CustomFields\OpportunityField;
-use App\Enums\OnboardingDataSource;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Models\CustomField;
@@ -457,11 +456,9 @@ When the <onboarding> block carries `setup_mode: true`, this is the workspace's 
 - A paste that names a stage the stages line lacks: propose the missing stages with SetCustomFieldOptionsTool in the same turn, after the records. List every current stage too, so none is removed.
 - More than 25 rows, or the user mentions a CSV file they have not attached: call GuideToPageTool with the matching "import_*" destination, give that link, and propose the first 25 rows. When an attached CSV preview carries an import link for that record type, give that link instead (see Citations).
 - People described in prose instead of a list: propose them from the description. Ask for at most one missing detail per record, and only when a name is absent.
-- The data_source line is where the user said their clients live today: spreadsheet, other_crm, inbox, memory or assistant, or none when they have not answered yet. members is how many people share the workspace. pick_sources lists the creation sources the user's own data arrives from. An arrived line counts the people and companies an import or a mailbox sync brought in today, by source: it is the only record of what arrived, so never state a number that is not on it.
-- When the data_source line names a source and the user's message answers where their clients live, give that source's next step in two short sentences and call no tools. spreadsheet: they can upload their file of people and companies, and the button below opens the import. other_crm: ask which CRM they use, and say an exported CSV of people and companies comes in through the import. inbox: the people and companies they email arrive once a mailbox is connected, and the arrived line says what has come in so far. memory: ask which people and deals they are working on right now, and say a pasted list works too. assistant: offer to show them how to connect their assistant. A stored answer does not change: if they later say their clients live somewhere else, help with what they ask and leave the data_source line as it is.
-- When the data_source line is none, nothing is stored from what the user types. Ask where their clients live today. If they already described it in words, give the next step of the matching path above in prose, and never say it was saved. If they ask something else, answer it.
-- With data_source assistant, when the user asks how to connect their assistant or accepts that offer, call GuideToPageTool with destination "connect_assistant", give the link, then give the assistant_prompt line verbatim in a code block they can paste into their assistant. When they ask to see the prompt to paste into their assistant, give that same assistant_prompt line verbatim in a code block, with no rewording and no link.
-- To pick who to work on first, when the user asks or accepts that offer: call the companies list tool with `filter: {"creation_source": {"$in": [<each value on the pick_sources line, quoted>]}, "created_at": {"$gte": <the start of today, with the offset from the Current Date block>}}`, so sample companies never appear. Never rank them, and end by asking which ones to start with.
+- The mailbox line says whether the user has connected a mailbox in this workspace: connected or not_connected. members is how many people share the workspace. An arrived line counts the people and companies an import or a mailbox sync brought in today, by source: it is the only record of what arrived, so never state a number that is not on it.
+- When the user asks how to connect their assistant, such as Claude or ChatGPT, call GuideToPageTool with destination "connect_assistant", give the link, then give the assistant_prompt line verbatim in a code block they can paste into their assistant. When they ask to see the prompt to paste into their assistant, give that same assistant_prompt line verbatim in a code block, with no rewording and no link.
+- To pick who to work on first, when the user asks or accepts that offer: call the companies list tool with `filter: {"creation_source": {"$in": ["import", "mailbox"]}, "created_at": {"$gte": <the start of today, with the offset from the Current Date block>}}`, so sample companies never appear. Never rank them, and end by asking which ones to start with.
 - When they name the companies to start with, ask ONCE when to follow up unless they already said, offering the next business day at 09:00 in their timezone as the default. Then propose in ONE turn one opportunity per company (named for the company, its `company_id` the picked company's id, in the first stage of the stages line) and one task per opportunity titled "Follow up with <company name>", linked with `$ref:<pending_action_id>#<index>` in `opportunity_ids`. Set each task's `due_date` custom field to that date. When the members line is 1, put the current user's id in `assignee_ids` so the task reaches their digest; with more members, leave the tasks unassigned.
 - A request to change or delete a record here: find it with a read tool, link it by name, and say that edits happen on the record page or in a new conversation. Never answer that it is unsupported. Removing the sample data is the exception: RemoveSampleDataTool is available here.
 PROMPT;
@@ -659,26 +656,21 @@ PROMPT;
     /** @return list<string> */
     private function setupDataLines(Workspace $workspace): array
     {
-        $source = $workspace->onboarding_data_source;
-        $lines = ['data_source: '.($source instanceof OnboardingDataSource ? $source->value : 'none')];
-
-        $lines[] = 'members: '.(1 + $workspace->users()->count());
-
         $user = $this->conversationUser;
+        $connected = $user instanceof User && resolve(WorkspaceActivationFacts::class)->hasConnectedMailbox($user, $workspace);
+
+        $lines = [
+            'mailbox: '.($connected ? 'connected' : 'not_connected'),
+            'members: '.(1 + $workspace->users()->count()),
+        ];
+
         $arrived = $user instanceof User ? resolve(ArrivedRecordsQuery::class)->today($user, $workspace) : [];
 
         foreach ($arrived as $creationSource => $counts) {
             $lines[] = "arrived: {$counts['people']} people and {$counts['companies']} companies from {$creationSource} today";
         }
 
-        $lines[] = 'pick_sources: '.implode(', ', array_map(
-            fn (CreationSource $creationSource): string => $creationSource->value,
-            $workspace->effectiveDataSource()->arrivalSources(),
-        ));
-
-        if ($source === OnboardingDataSource::Assistant) {
-            $lines[] = 'assistant_prompt: "'.__('onboarding/setup.assistant_prompt').'"';
-        }
+        $lines[] = 'assistant_prompt: "'.__('onboarding/setup.assistant_prompt').'"';
 
         return $lines;
     }

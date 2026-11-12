@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\WorkspaceSetupStep;
+use App\Features\EmailIntegration;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\CreateWorkspace;
 use App\Filament\Pages\SetupWorkspace;
@@ -10,6 +11,7 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Request;
+use Laravel\Pennant\Feature;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 use Relaticle\Cloud\Analytics\Actions\AssociateAcquisitionWorkspace;
@@ -176,6 +178,7 @@ it('counts explicit authentication only after MFA succeeds', function (): void {
 });
 
 it('links only the first owned workspace and records setup only when it finishes', function (): void {
+    Feature::define(EmailIntegration::class, false);
     $this->get('/pricing?utm_source=github')->assertOk();
     $user = registerAcquiredUser();
     $user->markEmailAsVerified();

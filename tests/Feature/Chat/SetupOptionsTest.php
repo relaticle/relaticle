@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Enums\CreationSource;
-use App\Enums\OnboardingDataSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\WorkspaceRole;
 use App\Features\SetupConversation;
@@ -48,13 +47,6 @@ beforeEach(function (): void {
     ]);
 });
 
-function answeredWith(?OnboardingDataSource $source): Workspace
-{
-    test()->workspace->forceFill(['onboarding_data_source' => $source])->save();
-
-    return test()->workspace->fresh();
-}
-
 /**
  * @return list<string>
  */
@@ -76,227 +68,114 @@ function peopleArrivedFrom(CreationSource $source): void
     People::factory()->create(['workspace_id' => test()->workspace->getKey(), 'creator_id' => null, 'creation_source' => $source]);
 }
 
-it('offers the memory buttons to an in my head workspace', function (): void {
-    answeredWith(OnboardingDataSource::Memory);
-
-    $options = resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh());
-
-    expect(array_map(fn (SetupOption $option): string => $option->id, $options))->toBe(['add_client', 'add_deal'])
-        ->and(array_map(fn (SetupOption $option): string => $option->kind, $options))->toBe(['prompt', 'prompt'])
-        ->and($options[0]->prompt)->toBeString()
-        ->and($options[0]->url)->toBeNull();
-});
-
-function withoutEmailIntegration(): void
+function connectMailboxFor(User $user): void
 {
-    config()->set('relaticle.features.email_integration', false);
-    Feature::flushCache();
+    ConnectedAccount::factory()->create(['workspace_id' => test()->workspace->getKey(), 'user_id' => $user->getKey()]);
 }
 
-it('offers one answer button per source to a workspace that never answered', function (): void {
-    answeredWith(null);
-
+it('offers three ways in to an owner with no mailbox', function (): void {
     $options = resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh());
 
-    expect(array_map(fn (SetupOption $option): string => $option->id, $options))
-        ->toBe(['source_spreadsheet', 'source_other_crm', 'source_inbox', 'source_memory', 'source_assistant'])
-        ->and(array_map(fn (SetupOption $option): string => $option->kind, $options))->each->toBe('prompt')
-        ->and(array_map(fn (SetupOption $option): string => (string) $option->prompt, $options))
-        ->toBe(array_map(fn (SetupOption $option): string => $option->label, $options))
-        ->and($options[3]->label)->toBe('In my head');
+    expect(array_map(fn (SetupOption $option): string => $option->id, $options))->toBe(['upload_file', 'add_client', 'connect_assistant'])
+        ->and(array_map(fn (SetupOption $option): string => $option->kind, $options))->toBe(['link', 'prompt', 'link'])
+        ->and($options[0]->url)->toBe(resolve(DestinationResolver::class)->resolve('import_people', $this->workspace))
+        ->and($options[1]->prompt)->toBeString()
+        ->and($options[1]->url)->toBeNull()
+        ->and($options[2]->url)->toBe(resolve(DestinationResolver::class)->resolve('connect_assistant', $this->workspace));
 });
 
-it('leaves out the inbox answer when no mailbox can connect', function (): void {
-    withoutEmailIntegration();
-    answeredWith(null);
-
-    expect(optionIds())->toBe(['source_spreadsheet', 'source_other_crm', 'source_memory', 'source_assistant']);
-});
-
-it('leaves out the inbox answer when email integration is on but no provider is configured', function (): void {
-    config()->set('services.gmail.client_id', null);
-    config()->set('services.azure.client_id', null);
-    answeredWith(null);
-
-    expect(optionIds())->toBe(['source_spreadsheet', 'source_other_crm', 'source_memory', 'source_assistant']);
-});
-
-it('offers the company pick to a workspace that never answered once companies arrived', function (CreationSource $arrivedFrom): void {
-    answeredWith(null);
-    arrivedFrom($arrivedFrom);
-
-    expect(optionIds())->toBe(['pick_first', 'later']);
-})->with([CreationSource::IMPORT, CreationSource::MAILBOX]);
-
-it('offers no answers once the question was answered', function (OnboardingDataSource $source): void {
-    answeredWith($source);
-
-    expect(array_filter(optionIds(), fn (string $id): bool => str_starts_with($id, 'source_')))->toBe([]);
-})->with(OnboardingDataSource::cases());
-
-it('derives an answer id from the source and reads it back', function (): void {
-    foreach (OnboardingDataSource::cases() as $source) {
-        expect(OnboardingDataSource::fromButtonId($source->buttonId()))->toBe($source)
-            ->and($source->buttonId())->toMatch('/^[a-z_]+$/');
-    }
-
-    expect(OnboardingDataSource::fromButtonId('pick_first'))->toBeNull()
-        ->and(OnboardingDataSource::fromButtonId('source_nothing'))->toBeNull();
-});
-
-it('offers the inbox buttons once a mailbox is connected', function (): void {
-    answeredWith(OnboardingDataSource::Inbox);
-    ConnectedAccount::factory()->create(['workspace_id' => $this->workspace->getKey(), 'user_id' => $this->user->getKey()]);
+it('offers the mailbox buttons once the owner connected a mailbox', function (): void {
+    connectMailboxFor($this->user);
 
     expect(optionIds())->toBe(['show_synced', 'add_outside_email']);
 });
 
-it('offers the mailbox link and the add button to an inbox answer with no mailbox', function (): void {
-    answeredWith(OnboardingDataSource::Inbox);
+it('reads the mailbox of the person in the chat, not a teammate\'s', function (): void {
+    $teammate = User::factory()->create();
+    $this->workspace->users()->attach($teammate, ['role' => WorkspaceRole::Member->value]);
+    connectMailboxFor($teammate);
 
-    $options = resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh());
-
-    expect(array_map(fn (SetupOption $option): string => $option->id, $options))->toBe(['connect_mailbox', 'add_client'])
-        ->and($options[0]->kind)->toBe('link')
-        ->and($options[0]->url)->toBe(resolve(DestinationResolver::class)->resolve('email_accounts', $this->workspace));
+    expect(optionIds())->toBe(['upload_file', 'add_client', 'connect_assistant']);
 });
 
-it('offers only the add button to an inbox answer with no mailbox when the email page is unavailable', function (): void {
-    withoutEmailIntegration();
-    answeredWith(OnboardingDataSource::Inbox);
+it('offers the company pick once companies arrived today', function (bool $mailboxConnected, CreationSource $arrivedFrom): void {
+    if ($mailboxConnected) {
+        connectMailboxFor($this->user);
+    }
 
-    expect(optionIds())->toBe(['add_client']);
-});
-
-it('offers the assistant buttons with a prompt and a link to the connection steps', function (): void {
-    answeredWith(OnboardingDataSource::Assistant);
-
-    $options = resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh());
-
-    expect(array_map(fn (SetupOption $option): string => $option->id, $options))->toBe(['copy_prompt', 'connect_steps'])
-        ->and($options[0]->kind)->toBe('prompt')
-        ->and($options[0]->prompt)->toContain('prompt')
-        ->and($options[1]->kind)->toBe('link')
-        ->and($options[1]->url)->toBe(resolve(DestinationResolver::class)->resolve('connect_assistant', $this->workspace))
-        ->and($options[1]->prompt)->toBeNull();
-});
-
-it('offers the upload link to a file answer while nothing has arrived', function (OnboardingDataSource $source): void {
-    answeredWith($source);
-
-    $options = resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh());
-
-    expect(array_map(fn (SetupOption $option): string => $option->id, $options))->toBe(['upload_file'])
-        ->and($options[0]->kind)->toBe('link')
-        ->and($options[0]->url)->toBe(resolve(DestinationResolver::class)->resolve('import_people', $this->workspace));
-})->with([OnboardingDataSource::Spreadsheet, OnboardingDataSource::OtherCrm]);
-
-it('offers pick who to work on first once records arrived today', function (OnboardingDataSource $source, CreationSource $arrivedFrom): void {
-    answeredWith($source);
     arrivedFrom($arrivedFrom);
 
     expect(optionIds())->toBe(['pick_first', 'later']);
 })->with([
-    'spreadsheet import' => [OnboardingDataSource::Spreadsheet, CreationSource::IMPORT],
-    'other crm import' => [OnboardingDataSource::OtherCrm, CreationSource::IMPORT],
-    'inbox mailbox' => [OnboardingDataSource::Inbox, CreationSource::MAILBOX],
-    'memory import' => [OnboardingDataSource::Memory, CreationSource::IMPORT],
-    'assistant mailbox' => [OnboardingDataSource::Assistant, CreationSource::MAILBOX],
+    'no mailbox, import' => [false, CreationSource::IMPORT],
+    'no mailbox, mailbox records' => [false, CreationSource::MAILBOX],
+    'mailbox, import' => [true, CreationSource::IMPORT],
+    'mailbox, mailbox records' => [true, CreationSource::MAILBOX],
 ]);
 
 it('does not offer the company pick when only people arrived', function (): void {
-    answeredWith(OnboardingDataSource::Spreadsheet);
     peopleArrivedFrom(CreationSource::IMPORT);
 
-    expect(optionIds())->toBe(['upload_file']);
+    expect(optionIds())->toBe(['upload_file', 'add_client', 'connect_assistant']);
 });
 
-it('offers the memory buttons to an inbox answer with no mailbox when a file import brought companies', function (): void {
-    answeredWith(OnboardingDataSource::Inbox);
-    arrivedFrom(CreationSource::IMPORT);
+it('does not offer the company pick for sample or hand-made companies', function (CreationSource $source): void {
+    arrivedFrom($source);
 
-    expect(optionIds())->toBe(['pick_first', 'later']);
-});
-
-it('ignores records that arrived from a source the answer does not bring in', function (): void {
-    answeredWith(OnboardingDataSource::Spreadsheet);
-    arrivedFrom(CreationSource::MAILBOX);
-    arrivedFrom(CreationSource::SAMPLE);
-
-    expect(optionIds())->toBe(['upload_file']);
-});
+    expect(optionIds())->toBe(['upload_file', 'add_client', 'connect_assistant']);
+})->with([CreationSource::SAMPLE, CreationSource::WEB, CreationSource::CHAT]);
 
 it('ignores records that arrived before the owner day began', function (): void {
     $this->travelTo('2026-11-08 02:00:00');
     $this->user->forceFill(['timezone' => 'America/New_York'])->save();
-    answeredWith(OnboardingDataSource::Spreadsheet);
     Company::factory()->create(['workspace_id' => $this->workspace->getKey(), 'creation_source' => CreationSource::IMPORT, 'created_at' => '2026-11-07 03:00:00']);
 
-    expect(optionIds())->toBe(['upload_file']);
+    expect(optionIds())->toBe(['upload_file', 'add_client', 'connect_assistant']);
 });
 
-it('never offers an import button to an owner without data import', function (): void {
+it('never offers an import button to a member without data import', function (): void {
     $viewer = User::factory()->create();
     $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
     $viewer->switchWorkspace($this->workspace);
-    answeredWith(OnboardingDataSource::Spreadsheet);
 
-    expect(optionIds($viewer->fresh()))->toBe([])
-        ->and(optionIds($this->user))->toBe(['upload_file']);
-});
-
-it('keeps the link that needs no capability for a user without data import', function (): void {
-    $viewer = User::factory()->create();
-    $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
-    $viewer->switchWorkspace($this->workspace);
-    answeredWith(OnboardingDataSource::Assistant);
-
-    expect(optionIds($viewer->fresh()))->toBe(['copy_prompt', 'connect_steps']);
+    expect(optionIds($viewer->fresh()))->toBe(['add_client', 'connect_assistant'])
+        ->and(optionIds($this->user))->toBe(['upload_file', 'add_client', 'connect_assistant']);
 });
 
 it('drops a link whose page is unavailable', function (): void {
-    answeredWith(OnboardingDataSource::Assistant);
     config()->set('documentation.public_url', null);
 
     expect(resolve(DestinationResolver::class)->resolve('connect_assistant', $this->workspace))->toBeNull()
-        ->and(optionIds())->toBe(['copy_prompt']);
+        ->and(optionIds())->toBe(['upload_file', 'add_client']);
 });
 
-it('links to the email accounts page only for an inbox answer that has no mailbox', function (): void {
+/**
+ * @return list<SetupOption>
+ */
+function optionsInEveryState(): array
+{
+    $options = resolve(SetupOptions::class)->for(test()->user, test()->workspace->fresh());
+
+    connectMailboxFor(test()->user);
+    $options = [...$options, ...resolve(SetupOptions::class)->for(test()->user, test()->workspace->fresh())];
+
+    arrivedFrom(CreationSource::IMPORT);
+
+    return [...$options, ...resolve(SetupOptions::class)->for(test()->user, test()->workspace->fresh())];
+}
+
+it('never links to the email accounts page', function (): void {
     $emailAccounts = resolve(DestinationResolver::class)->resolve('email_accounts', $this->workspace);
 
-    foreach ([null, ...OnboardingDataSource::cases()] as $source) {
-        answeredWith($source);
-
-        $urls = array_map(fn (SetupOption $option): ?string => $option->url, resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh()));
-
-        expect(in_array($emailAccounts, $urls, true))->toBe($source === OnboardingDataSource::Inbox);
-    }
-
-    ConnectedAccount::factory()->create(['workspace_id' => $this->workspace->getKey(), 'user_id' => $this->user->getKey()]);
-    answeredWith(OnboardingDataSource::Inbox);
-
-    expect(array_column(array_map(fn (SetupOption $option): array => $option->toArray(), resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh())), 'url'))
-        ->not->toContain($emailAccounts);
+    expect($emailAccounts)->toBeString()
+        ->and(array_map(fn (SetupOption $option): ?string => $option->url, optionsInEveryState()))->not->toContain($emailAccounts);
 });
 
 it('keeps every label and prompt short, in the app words, with no dash', function (): void {
     $this->travelTo('2026-11-08 12:00:00');
-    $options = [];
+    $options = optionsInEveryState();
 
-    foreach ([null, ...OnboardingDataSource::cases()] as $source) {
-        answeredWith($source);
-        $options = [...$options, ...resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh())];
-    }
-
-    ConnectedAccount::factory()->create(['workspace_id' => $this->workspace->getKey(), 'user_id' => $this->user->getKey()]);
-    answeredWith(OnboardingDataSource::Inbox);
-    $options = [...$options, ...resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh())];
-
-    arrivedFrom(CreationSource::IMPORT);
-    $options = [...$options, ...resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh())];
-
-    expect($options)->not->toBeEmpty();
+    expect($options)->toHaveCount(7);
 
     foreach ($options as $option) {
         expect(mb_strlen($option->label))->toBeLessThanOrEqual(48)
@@ -307,10 +186,14 @@ it('keeps every label and prompt short, in the app words, with no dash', functio
     }
 });
 
-it('serialises an option to the shape the transcript reads', function (): void {
-    answeredWith(OnboardingDataSource::Memory);
+it('draws every option with an icon the chat ships and ships no unused icon', function (): void {
+    $icons = array_values(array_unique(array_map(fn (SetupOption $option): string => $option->icon, optionsInEveryState())));
 
-    expect(resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh())[0]->toArray())->toBe([
+    expect($icons)->toEqualCanonicalizing(SetupOption::ICONS);
+});
+
+it('serialises an option to the shape the transcript reads', function (): void {
+    expect(resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh())[1]->toArray())->toBe([
         'id' => 'add_client',
         'kind' => 'prompt',
         'label' => 'Add a client',
@@ -361,14 +244,14 @@ function expectedOptionArrays(): array
 
 it('writes setup buttons on the greeting turn', function (): void {
     suggestNextStepsFake();
-    answeredWith(OnboardingDataSource::Memory);
     CrmAssistant::fake(['Hi, your workspace is ready.']);
 
     runSetupTurn($this->user, $this->workspace->fresh(), MessageOrigin::Greeting);
 
     $expected = expectedOptionArrays();
 
-    expect(lastAssistantNextSteps($this->workspace->setupConversation->id))->toEqual($expected);
+    expect(array_column($expected, 'id'))->toBe(['upload_file', 'add_client', 'connect_assistant'])
+        ->and(lastAssistantNextSteps($this->workspace->setupConversation->id))->toEqual($expected);
 
     Queue::assertNotPushed(SuggestNextSteps::class);
     Event::assertDispatched(
@@ -378,44 +261,19 @@ it('writes setup buttons on the greeting turn', function (): void {
     );
 });
 
-it('writes setup buttons on the data arrived turn', function (): void {
+it('writes the mailbox buttons on the greeting turn of an owner who connected a mailbox', function (): void {
     suggestNextStepsFake();
-    answeredWith(OnboardingDataSource::Spreadsheet);
-    arrivedFrom(CreationSource::IMPORT);
-    CrmAssistant::fake(['Your companies arrived.']);
+    connectMailboxFor($this->user);
+    CrmAssistant::fake(['Hi, your mailbox is connected.']);
 
-    runSetupTurn($this->user, $this->workspace->fresh(), MessageOrigin::DataArrived);
+    runSetupTurn($this->user, $this->workspace->fresh(), MessageOrigin::Greeting);
 
-    expect(array_column(lastAssistantNextSteps($this->workspace->setupConversation->id), 'id'))->toBe(['pick_first', 'later']);
+    expect(array_column(lastAssistantNextSteps($this->workspace->setupConversation->id), 'id'))->toBe(['show_synced', 'add_outside_email']);
     Queue::assertNotPushed(SuggestNextSteps::class);
 });
 
-it('keeps suggested next steps for a typed turn in the setup chat', function (): void {
+it('writes the company pick on the data arrived turn', function (CreationSource $arrivedFrom): void {
     suggestNextStepsFake();
-    answeredWith(OnboardingDataSource::Memory);
-    CrmAssistant::fake(['Tell me who you work with.']);
-
-    runSetupTurn($this->user, $this->workspace->fresh());
-
-    expect(lastAssistantNextSteps($this->workspace->setupConversation->id))->toBeNull();
-    Queue::assertPushed(SuggestNextSteps::class);
-});
-
-it('writes the answer buttons on any setup turn while the question is unanswered', function (MessageOrigin $origin): void {
-    suggestNextStepsFake();
-    answeredWith(null);
-    CrmAssistant::fake(['Where do your clients live today?']);
-
-    runSetupTurn($this->user, $this->workspace->fresh(), $origin);
-
-    expect(array_column(lastAssistantNextSteps($this->workspace->setupConversation->id), 'id'))
-        ->toBe(['source_spreadsheet', 'source_other_crm', 'source_inbox', 'source_memory', 'source_assistant']);
-    Queue::assertNotPushed(SuggestNextSteps::class);
-})->with([MessageOrigin::Greeting, MessageOrigin::DataArrived, MessageOrigin::Typed]);
-
-it('writes the company pick on a data arrived turn while the question is unanswered', function (CreationSource $arrivedFrom): void {
-    suggestNextStepsFake();
-    answeredWith(null);
     arrivedFrom($arrivedFrom);
     CrmAssistant::fake(['Your companies arrived.']);
 
@@ -425,56 +283,22 @@ it('writes the company pick on a data arrived turn while the question is unanswe
     Queue::assertNotPushed(SuggestNextSteps::class);
 })->with([CreationSource::IMPORT, CreationSource::MAILBOX]);
 
-it('resumes suggested next steps on a typed turn once an unanswered workspace holds its own record', function (): void {
+it('keeps suggested next steps for a typed turn in the setup chat', function (?string $nextStep): void {
     suggestNextStepsFake();
-    answeredWith(null);
-    Company::factory()->create(['workspace_id' => $this->workspace->getKey(), 'creation_source' => CreationSource::WEB]);
-    CrmAssistant::fake(['Here is what you have.']);
-
-    runSetupTurn($this->user, $this->workspace->fresh());
-
-    expect(lastAssistantNextSteps($this->workspace->setupConversation->id))->toBeNull();
-    Queue::assertPushed(SuggestNextSteps::class);
-});
-
-it('keeps the answer buttons on a greeting turn once an unanswered workspace holds its own record', function (): void {
-    suggestNextStepsFake();
-    answeredWith(null);
-    Company::factory()->create(['workspace_id' => $this->workspace->getKey(), 'creation_source' => CreationSource::WEB]);
-    CrmAssistant::fake(['Welcome.']);
-
-    runSetupTurn($this->user, $this->workspace->fresh(), MessageOrigin::Greeting);
-
-    expect(array_column(lastAssistantNextSteps($this->workspace->setupConversation->id), 'id'))
-        ->toBe(['source_spreadsheet', 'source_other_crm', 'source_inbox', 'source_memory', 'source_assistant']);
-});
-
-it('writes the path buttons on the turn that answered the question', function (): void {
-    suggestNextStepsFake();
-    answeredWith(OnboardingDataSource::Memory);
-    CrmAssistant::fake(['Which people are you working with right now?']);
-
-    runSetupTurn($this->user, $this->workspace->fresh(), MessageOrigin::Typed, 'source_memory');
-
-    expect(array_column(lastAssistantNextSteps($this->workspace->setupConversation->id), 'id'))->toBe(['add_client', 'add_deal']);
-    Queue::assertNotPushed(SuggestNextSteps::class);
-});
-
-it('keeps suggested next steps for a typed turn that no answer button sent', function (): void {
-    suggestNextStepsFake();
-    answeredWith(OnboardingDataSource::Memory);
     CrmAssistant::fake(['Tell me who you work with.']);
 
-    runSetupTurn($this->user, $this->workspace->fresh(), MessageOrigin::Typed, 'add_client');
+    runSetupTurn($this->user, $this->workspace->fresh(), nextStep: $nextStep);
 
     expect(lastAssistantNextSteps($this->workspace->setupConversation->id))->toBeNull();
     Queue::assertPushed(SuggestNextSteps::class);
-});
+})->with([
+    'typed by hand' => [null],
+    'sent by a setup button' => ['add_client'],
+]);
 
 it('writes no setup buttons when next steps are switched off', function (): void {
     suggestNextStepsFake();
     config()->set('chat.next_steps.enabled', false);
-    answeredWith(OnboardingDataSource::Memory);
     CrmAssistant::fake(['Hi, your workspace is ready.']);
 
     runSetupTurn($this->user, $this->workspace->fresh(), MessageOrigin::Greeting);
@@ -482,22 +306,8 @@ it('writes no setup buttons when next steps are switched off', function (): void
     expect(lastAssistantNextSteps($this->workspace->setupConversation->id))->toBeNull();
 });
 
-it('writes nothing for an answer that has no button to offer', function (): void {
-    suggestNextStepsFake();
-    $viewer = User::factory()->create();
-    $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
-    $viewer->switchWorkspace($this->workspace);
-    answeredWith(OnboardingDataSource::Spreadsheet);
-    CrmAssistant::fake(['Ask your workspace owner to upload the file.']);
-
-    runSetupTurn($viewer->fresh(), $this->workspace->fresh(), MessageOrigin::Greeting);
-
-    expect(lastAssistantNextSteps($this->workspace->setupConversation->id))->toBeNull();
-});
-
 it('keeps suggesting next steps in an ordinary conversation', function (): void {
     Queue::fake();
-    answeredWith(OnboardingDataSource::Memory);
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
@@ -538,33 +348,4 @@ it('reads a stored link button and drops one without a url', function (): void {
     expect($steps)->toBe([
         ['id' => 'upload_file', 'kind' => 'link', 'label' => 'Upload my file', 'prompt' => null, 'url' => 'https://app.test/import', 'icon' => 'lucide-upload'],
     ]);
-});
-
-it('draws every option with an icon the chat ships', function (): void {
-
-    $icons = [];
-
-    foreach ([null, ...OnboardingDataSource::cases()] as $source) {
-        answeredWith($source);
-
-        foreach (resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh()) as $option) {
-            $icons[] = $option->icon;
-        }
-    }
-
-    ConnectedAccount::factory()->create(['workspace_id' => $this->workspace->getKey(), 'user_id' => $this->user->getKey()]);
-    answeredWith(OnboardingDataSource::Inbox);
-
-    foreach (resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh()) as $option) {
-        $icons[] = $option->icon;
-    }
-
-    arrivedFrom(CreationSource::IMPORT);
-
-    foreach (resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh()) as $option) {
-        $icons[] = $option->icon;
-    }
-
-    expect(array_values(array_unique($icons)))->not->toBeEmpty()
-        ->and(array_diff($icons, SetupOption::ICONS))->toBe([]);
 });

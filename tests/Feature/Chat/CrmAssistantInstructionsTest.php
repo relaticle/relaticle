@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Contracts\Billing as BillingContract;
 use App\Contracts\Entitlements;
 use App\Enums\CreationSource;
-use App\Enums\OnboardingDataSource;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\WorkspaceCapability;
@@ -515,9 +514,9 @@ it('leaves the referral line out when the workspace never answered', function ()
     expect($agent->dynamicInstructions())->not->toContain('referral:');
 });
 
-function setupAgent(Workspace $workspace, ?OnboardingDataSource $source = null): CrmAssistant
+function setupAgent(Workspace $workspace): CrmAssistant
 {
-    $workspace->forceFill(['onboarding_use_case' => OnboardingUseCase::Sales, 'onboarding_data_source' => $source])->save();
+    $workspace->forceFill(['onboarding_use_case' => OnboardingUseCase::Sales])->save();
 
     return resolve(CrmAssistant::class)
         ->withWorkspace($workspace->fresh())
@@ -525,64 +524,69 @@ function setupAgent(Workspace $workspace, ?OnboardingDataSource $source = null):
         ->withSetupMode(true);
 }
 
-it('tells rela where the user said their data lives in setup mode', function (OnboardingDataSource $source): void {
+it('tells rela whether the user connected a mailbox in setup mode', function (): void {
     $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
 
-    expect(setupAgent($workspace, $source)->dynamicInstructions())->toContain("data_source: {$source->value}\n");
-})->with(OnboardingDataSource::cases());
+    expect(setupAgent($workspace)->dynamicInstructions())->toContain("mailbox: not_connected\n");
 
-it('says none when the user never answered where their data lives', function (): void {
-    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+    ConnectedAccount::factory()->create(['workspace_id' => $workspace->getKey(), 'user_id' => $workspace->owner->getKey()]);
 
-    expect(setupAgent($workspace)->dynamicInstructions())->toContain("data_source: none\n");
+    expect(setupAgent($workspace)->dynamicInstructions())
+        ->toContain("mailbox: connected\n")
+        ->not->toContain('not_connected');
 });
 
-it('has the greeting ask where the clients live when the user has not answered', function (): void {
+it('does not count a teammate\'s mailbox as the user\'s own', function (): void {
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+    $teammate = User::factory()->create();
+    $workspace->users()->attach($teammate, ['role' => WorkspaceRole::Member->value]);
+    ConnectedAccount::factory()->create(['workspace_id' => $workspace->getKey(), 'user_id' => $teammate->getKey()]);
+
+    expect(setupAgent($workspace)->dynamicInstructions())->toContain("mailbox: not_connected\n");
+});
+
+it('has the greeting give the next step for each mailbox state and ask no question about where clients live', function (): void {
     $greeting = MessageOrigin::Greeting->directive();
 
     expect($greeting)
-        ->toContain('When the data_source line is none, ask where their clients live today, in one or two short sentences, and point them to the answers below')
+        ->toContain('With no arrived line and the mailbox line connected, say their mailbox is connected and the people and companies they email appear here as it syncs')
+        ->toContain('With no arrived line and the mailbox line not_connected, ask how they want to bring their clients in and point them to the choices below')
         ->toContain('call no tools in this turn')
-        ->not->toContain('just tell you')
-        ->not->toContain('none means')
+        ->not->toContain('data_source')
+        ->not->toContain('where their clients live')
         ->not->toContain(chr(0x2014));
 
     $agent = setupAgent(User::factory()->withPersonalWorkspace()->create()->currentWorkspace)->withTurnOrigin(MessageOrigin::Greeting);
 
     expect($agent->dynamicInstructions())
-        ->toContain("data_source: none\n")
+        ->toContain("mailbox: not_connected\n")
         ->toContain("<turn>\n{$greeting}\n</turn>");
 });
 
-it('keys the setup rules on the data source line and never on an answer label', function (): void {
+it('keys the setup rules on the mailbox line and stores no answer', function (): void {
     $instructions = resolve(CrmAssistant::class)->staticInstructions();
-
-    expect($instructions)
-        ->toContain("When the data_source line names a source and the user's message answers where their clients live, give that source's next step")
-        ->toContain('other_crm: ask which CRM they use, and say an exported CSV of people and companies comes in through the import')
-        ->toContain('A stored answer does not change')
-        ->toContain('When the data_source line is none, nothing is stored from what the user types')
-        ->toContain('never say it was saved')
-        ->not->toContain('crm_named');
 
     $start = (int) strpos($instructions, '## Setup mode');
     $setupMode = substr($instructions, $start, (int) strpos($instructions, "\n## ", $start + 1) - $start);
 
-    expect($setupMode)->toContain('When the data_source line is none')->toContain('RemoveSampleDataTool');
-
-    foreach (OnboardingDataSource::cases() as $source) {
-        expect($setupMode)->not->toContain($source->getLabel());
-    }
+    expect($setupMode)
+        ->toContain('The mailbox line says whether the user has connected a mailbox in this workspace: connected or not_connected.')
+        ->toContain('RemoveSampleDataTool')
+        ->not->toContain('data_source')
+        ->not->toContain('pick_sources')
+        ->not->toContain('crm_named')
+        ->not->toContain('stored answer');
 });
 
-it('leaves the data source lines out of an ordinary conversation', function (): void {
+it('leaves the setup lines out of an ordinary conversation', function (): void {
     $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
-    $workspace->forceFill(['onboarding_use_case' => OnboardingUseCase::Sales, 'onboarding_data_source' => OnboardingDataSource::Spreadsheet])->save();
+    $workspace->forceFill(['onboarding_use_case' => OnboardingUseCase::Sales])->save();
 
     expect(resolve(CrmAssistant::class)->withWorkspace($workspace->fresh())->dynamicInstructions())
-        ->not->toContain('data_source:')
+        ->not->toContain('mailbox:')
         ->not->toContain('members:')
-        ->not->toContain('arrived:');
+        ->not->toContain('arrived:')
+        ->not->toContain('assistant_prompt:');
 });
 
 it('tells rela how many records arrived today and from where', function (): void {
@@ -591,7 +595,7 @@ it('tells rela how many records arrived today and from where', function (): void
     People::factory()->count(12)->create(['workspace_id' => $workspace->getKey(), 'creation_source' => CreationSource::IMPORT]);
     Company::factory()->count(5)->create(['workspace_id' => $workspace->getKey(), 'creation_source' => CreationSource::IMPORT]);
 
-    expect(setupAgent($workspace, OnboardingDataSource::Spreadsheet)->dynamicInstructions())
+    expect(setupAgent($workspace)->dynamicInstructions())
         ->toContain("arrived: 12 people and 5 companies from import today\n");
 });
 
@@ -602,7 +606,7 @@ it('counts mailbox records apart from imports', function (): void {
     People::factory()->count(30)->create(['workspace_id' => $workspace->getKey(), 'creator_id' => null, 'creation_source' => CreationSource::MAILBOX]);
     Company::factory()->count(12)->create(['workspace_id' => $workspace->getKey(), 'creator_id' => null, 'creation_source' => CreationSource::MAILBOX]);
 
-    expect(setupAgent($workspace, OnboardingDataSource::Inbox)->dynamicInstructions())
+    expect(setupAgent($workspace)->dynamicInstructions())
         ->toContain("arrived: 3 people and 0 companies from import today\n")
         ->toContain("arrived: 30 people and 12 companies from mailbox today\n");
 });
@@ -618,7 +622,7 @@ it('never counts sample, web or other workspaces records as arrived', function (
 
     People::factory()->count(4)->create(['workspace_id' => $other->getKey(), 'creation_source' => CreationSource::IMPORT]);
 
-    expect(setupAgent($workspace, OnboardingDataSource::Spreadsheet)->dynamicInstructions())->not->toContain('arrived:');
+    expect(setupAgent($workspace)->dynamicInstructions())->not->toContain('arrived:');
 });
 
 it('counts arrived records by the owner day, not the UTC day', function (): void {
@@ -630,18 +634,18 @@ it('counts arrived records by the owner day, not the UTC day', function (): void
     People::factory()->create(['workspace_id' => $workspace->getKey(), 'creation_source' => CreationSource::IMPORT, 'created_at' => '2026-11-07 20:00:00']);
     People::factory()->create(['workspace_id' => $workspace->getKey(), 'creation_source' => CreationSource::IMPORT, 'created_at' => '2026-11-07 03:00:00']);
 
-    expect(setupAgent($workspace, OnboardingDataSource::Spreadsheet)->dynamicInstructions())
+    expect(setupAgent($workspace)->dynamicInstructions())
         ->toContain("arrived: 1 people and 0 companies from import today\n");
 
     $owner->forceFill(['timezone' => 'UTC'])->save();
 
-    expect(setupAgent($workspace->fresh(), OnboardingDataSource::Spreadsheet)->dynamicInstructions())
+    expect(setupAgent($workspace->fresh())->dynamicInstructions())
         ->not->toContain('arrived:');
 });
 
 it('lets rela assign follow-ups to the owner when nobody else is a member', function (): void {
     $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
-    $agent = setupAgent($workspace, OnboardingDataSource::Spreadsheet);
+    $agent = setupAgent($workspace);
 
     expect($agent->dynamicInstructions())->toContain("members: 1\n")
         ->and($agent->staticInstructions())
@@ -650,7 +654,7 @@ it('lets rela assign follow-ups to the owner when nobody else is a member', func
 
     $workspace->users()->attach(User::factory()->create(), ['role' => WorkspaceRole::Member->value]);
 
-    expect(setupAgent($workspace, OnboardingDataSource::Spreadsheet)->dynamicInstructions())
+    expect(setupAgent($workspace)->dynamicInstructions())
         ->toContain("members: 2\n")
         ->not->toContain("members: 1\n");
 });
@@ -659,11 +663,10 @@ it('gives rela the fixed prompt that has the users own assistant move their clie
     $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
     $prompt = __('onboarding/setup.assistant_prompt');
 
-    expect(setupAgent($workspace, OnboardingDataSource::Assistant)->dynamicInstructions())
+    expect(setupAgent($workspace)->dynamicInstructions())
         ->toContain("assistant_prompt: \"{$prompt}\"")
-        ->and(setupAgent($workspace, OnboardingDataSource::Memory)->dynamicInstructions())
-        ->not->toContain('assistant_prompt:')
         ->and(resolve(CrmAssistant::class)->staticInstructions())
+        ->toContain('When the user asks how to connect their assistant, such as Claude or ChatGPT, call GuideToPageTool with destination "connect_assistant"')
         ->toContain('give the assistant_prompt line verbatim')
         ->toContain('When they ask to see the prompt to paste into their assistant, give that same assistant_prompt line verbatim in a code block, with no rewording and no link.');
 });
@@ -672,7 +675,8 @@ it('tells rela to list only the companies that arrived and let the user pick', f
     $instructions = resolve(CrmAssistant::class)->staticInstructions();
 
     expect($instructions)
-        ->toContain('"creation_source": {"$in": [<each value on the pick_sources line, quoted>]}')
+        ->toContain('"creation_source": {"$in": ["import", "mailbox"]}')
+        ->toContain('so sample companies never appear')
         ->toContain('Never rank them')
         ->toContain('one opportunity per company')
         ->toContain('`$ref:<pending_action_id>#<index>`')
@@ -684,47 +688,12 @@ it('lets rela state the counts on the arrived line without a tool call', functio
         ->toContain('The one exception is the arrived line of the onboarding block: you may state its counts without a tool call.');
 });
 
-it('points the company pick at the creation sources the data source arrives from', function (OnboardingDataSource $source, string $line): void {
-    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
-
-    expect(setupAgent($workspace, $source)->dynamicInstructions())->toContain("pick_sources: {$line}\n");
-})->with([
-    'spreadsheet' => [OnboardingDataSource::Spreadsheet, 'import'],
-    'other crm' => [OnboardingDataSource::OtherCrm, 'import'],
-    'inbox without a mailbox' => [OnboardingDataSource::Inbox, 'import, mailbox'],
-    'memory' => [OnboardingDataSource::Memory, 'import, mailbox'],
-    'assistant' => [OnboardingDataSource::Assistant, 'import, mailbox'],
-]);
-
-it('points the company pick at the mailbox for an inbox answer with a connected mailbox', function (): void {
-    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
-    ConnectedAccount::factory()->create(['workspace_id' => $workspace->getKey(), 'user_id' => $workspace->owner->getKey()]);
-
-    expect(setupAgent($workspace, OnboardingDataSource::Inbox)->dynamicInstructions())->toContain("pick_sources: mailbox\n");
-});
-
-it('points the company pick at both sources when the user never answered', function (): void {
-    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
-
-    expect(setupAgent($workspace)->dynamicInstructions())->toContain("pick_sources: import, mailbox\n");
-});
-
-it('keeps the arrived branch for a workspace with no answer that later gets mailbox records', function (): void {
-    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
-
-    Company::factory()->count(2)->create(['workspace_id' => $workspace->getKey(), 'creator_id' => null, 'creation_source' => CreationSource::MAILBOX]);
-
-    expect(setupAgent($workspace)->dynamicInstructions())
-        ->toContain("data_source: none\n")
-        ->toContain("arrived: 0 people and 2 companies from mailbox today\n");
-});
-
 it('offers the company pick only when companies arrived', function (): void {
     $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
 
     People::factory()->count(3)->create(['workspace_id' => $workspace->getKey(), 'creation_source' => CreationSource::IMPORT]);
 
-    $agent = setupAgent($workspace, OnboardingDataSource::Spreadsheet)->withTurnOrigin(MessageOrigin::DataArrived);
+    $agent = setupAgent($workspace)->withTurnOrigin(MessageOrigin::DataArrived);
 
     expect($agent->dynamicInstructions())
         ->toContain("arrived: 3 people and 0 companies from import today\n")
@@ -740,16 +709,15 @@ it('offers the company pick only when companies arrived', function (): void {
 it('titles and links the follow-up proposals so rela asks for nothing', function (): void {
     expect(resolve(CrmAssistant::class)->staticInstructions())
         ->toContain("its `company_id` the picked company's id")
-        ->toContain('titled "Follow up with <company name>"')
-        ->toContain('when the user asks how to connect their assistant or accepts that offer');
+        ->toContain('titled "Follow up with <company name>"');
 });
 
-it('has the greeting open on where the data lives and the data arrived turn offer to pick', function (): void {
+it('has the greeting read the mailbox and arrived lines and the data arrived turn offer to pick', function (): void {
     $greeting = MessageOrigin::Greeting->directive();
     $arrived = MessageOrigin::DataArrived->directive();
 
     expect($greeting)
-        ->toContain('data_source')
+        ->toContain('mailbox line')
         ->toContain('arrived line')
         ->toContain('call no tools in this turn')
         ->not->toContain('contact')
@@ -761,7 +729,7 @@ it('has the greeting open on where the data lives and the data arrived turn offe
         ->and(MessageOrigin::DataArrived->getLabel())->toBe('Data arrived')
         ->and(MessageOrigin::DataArrived->isTyped())->toBeFalse();
 
-    $agent = setupAgent(User::factory()->withPersonalWorkspace()->create()->currentWorkspace, OnboardingDataSource::Spreadsheet)
+    $agent = setupAgent(User::factory()->withPersonalWorkspace()->create()->currentWorkspace)
         ->withTurnOrigin(MessageOrigin::DataArrived);
 
     expect($agent->dynamicInstructions())->toContain("<turn>\n{$arrived}\n</turn>");
@@ -980,7 +948,9 @@ it('emits the onboarding block with setup_mode even when the workspace has no us
     $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
     $agent = resolve(CrmAssistant::class)->withWorkspace($workspace)->withSetupMode(true);
 
-    expect($agent->instructions())->toContain("<onboarding>\ndata_source: none\nmembers: 1\npick_sources: import, mailbox\nsetup_mode: true\n</onboarding>");
+    $prompt = __('onboarding/setup.assistant_prompt');
+
+    expect($agent->instructions())->toContain("<onboarding>\nmailbox: not_connected\nmembers: 1\nassistant_prompt: \"{$prompt}\"\nsetup_mode: true\n</onboarding>");
 });
 
 it('drops update, delete and field definition tools in setup mode and keeps the rest', function (): void {
