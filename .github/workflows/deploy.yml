@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Deploy to Forge
     needs: [verify]
+    environment: production
 
     # `needs` carries an implicit success() gate, so a failed, cancelled or skipped
     # verify already blocks this job without any status function here. All that is
