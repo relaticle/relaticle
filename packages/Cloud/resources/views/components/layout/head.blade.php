@@ -32,7 +32,7 @@
 @php
     // Bump the version whenever public/images/open-graph.jpg is regenerated
     // so social caches re-scrape it.
-    $defaultOgImage = url('/images/open-graph.jpg').'?v=4';
+    $defaultOgImage = url('/images/open-graph.jpg').'?v=5';
     [$ogImageWidth, $ogImageHeight] = $ogImage === null ? [2400, 1260] : [1200, 630];
 @endphp
 

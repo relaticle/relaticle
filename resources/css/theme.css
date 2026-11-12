@@ -6,18 +6,18 @@
     --font-sans: var(--font-default);
 
     /* Primary Color Scale */
-    --color-primary-50: oklch(0.969 0.016 293.756);
-    --color-primary-100: oklch(0.943 0.028 294.588);
-    --color-primary-200: oklch(0.894 0.055 293.283);
-    --color-primary-300: oklch(0.811 0.101 293.571);
-    --color-primary-400: oklch(0.709 0.159 293.541);
-    --color-primary-500: oklch(0.606 0.219 292.717);
-    --color-primary-600: oklch(0.541 0.247 293.009);
-    --color-primary-700: oklch(0.491 0.241 292.581);
-    --color-primary-800: oklch(0.432 0.211 292.759);
-    --color-primary-900: oklch(0.380 0.178 293.745);
-    --color-primary-950: oklch(0.283 0.135 291.089);
-    --color-primary: oklch(0.541 0.247 293.009); /* DEFAULT: primary-600 */
+    --color-primary-50: oklch(0.969 0.014 279.186);
+    --color-primary-100: oklch(0.943 0.024 279.186);
+    --color-primary-200: oklch(0.894 0.048 279.186);
+    --color-primary-300: oklch(0.812 0.088 279.186);
+    --color-primary-400: oklch(0.711 0.139 279.186);
+    --color-primary-500: oklch(0.609 0.191 279.186);
+    --color-primary-600: oklch(0.544 0.216 279.186);
+    --color-primary-700: oklch(0.494 0.210 279.186);
+    --color-primary-800: oklch(0.435 0.184 279.186);
+    --color-primary-900: oklch(0.383 0.155 279.186);
+    --color-primary-950: oklch(0.285 0.118 279.186);
+    --color-primary: oklch(0.544 0.216 279.186); /* DEFAULT: primary-600 */
 
     /* Third-party brand marks: kept out of the primary scale since they
        represent an external provider's identity, not our own UI color. */

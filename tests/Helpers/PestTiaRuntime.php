@@ -30,6 +30,7 @@ final class PestTiaRuntime
         'resources/css/**' => 'tests/Arch',
         'resources/data/disposable-email-domains.json' => 'tests/Feature/Auth/RegistrationTest.php',
         'public/site.webmanifest' => 'tests/Feature/Filament/PanelWebAppMetaTest.php',
+        'public/web-app-manifest-*.png' => 'tests/Feature/Filament/PanelWebAppMetaTest.php',
         'phpstan*.neon' => 'tests/Arch',
         'phpunit*.xml' => 'tests/Arch',
     ];

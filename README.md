@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <img src="https://relaticle.com/images/github-preview-light.png?v=6" alt="Relaticle Home - Rela the AI assistant, chat history, and your open tasks in one view" />
+  <img src="https://relaticle.com/images/github-preview-light.png?v=7" alt="Relaticle Home - Rela the AI assistant, chat history, and your open tasks in one view" />
   <br>
   <sub>Clean, modern interface built with Filament 5 and Livewire 4</sub>
 </p>

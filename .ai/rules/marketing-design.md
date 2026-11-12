@@ -24,7 +24,7 @@ outside the roles.
 
 Three treatments sit on top of the tokens. A page has at most one dark moment: the `closing-band` on
 the homepage, `/ai` and `/email-and-calendar`. `bg-hero-panel` is the
-gradient in the logo's colours (`#4038CD` to `#5D54E8`) under the homepage hero's product window
+gradient in the logo's colours under the homepage hero's product window
 only; it never carries copy. `bg-cta-band` is the closing band's surface. `bg-warm` is a static radial wash for the
 human moments (the homepage email visual), never behind body text.
 

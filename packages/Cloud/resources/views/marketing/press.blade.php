@@ -5,7 +5,7 @@
         : __(':stars stars as of :date', ['stars' => number_format($facts['stars']), 'date' => \Illuminate\Support\Facades\Date::parse($facts['stars_verified'])->format('F j, Y')]);
     $factsVerifiedAt = \Illuminate\Support\Facades\Date::parse($facts['verified'])->format('F j, Y');
     $brand = json_decode(file_get_contents(public_path('brand/kit/manifest.json')), true, flags: JSON_THROW_ON_ERROR);
-    $avatarLabels = ['purple' => __('Purple'), 'light' => __('Light'), 'dark' => __('Dark')];
+    $avatarLabels = ['light' => __('Light'), 'purple' => __('Purple'), 'dark' => __('Dark')];
     $screenshots = [
         ['id' => 'pipeline', 'title' => __('Sales pipeline'), 'alt' => __('Relaticle opportunities board grouped by pipeline stage')],
         ['id' => 'companies', 'title' => __('Companies'), 'alt' => __('Relaticle companies list with account owners, ICP status, and website domains')],
@@ -84,7 +84,7 @@
 
     <x-cloud::marketing.frame id="social" aria-labelledby="social-title">
         <x-cloud::marketing.frame-header :label="__('Social avatars')" :lead="__('One identity. Every channel.')">
-            {{ __('Purple is the primary avatar. Upload the full square image and let the platform apply its crop.') }}
+            {{ __('Light is the primary avatar. Upload the full square image and let the platform apply its crop.') }}
         </x-cloud::marketing.frame-header>
         <div class="p-6 md:p-10">
             <h2 id="social-title" class="sr-only">{{ __('One identity. Every channel.') }}</h2>
@@ -93,7 +93,7 @@
                         <article class="rounded-2xl border border-gray-200 p-5 dark:border-gray-800">
                             <div class="flex min-h-7 items-center justify-between gap-2">
                                 <h3 class="text-sm font-semibold">{{ $avatarLabels[$avatar['id']] }}</h3>
-                                @if ($avatar['id'] === 'purple')
+                                @if ($avatar['id'] === 'light')
                                     <span class="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700 dark:bg-primary-950 dark:text-primary-300">{{ __('Primary') }}</span>
                                 @endif
                             </div>
@@ -113,7 +113,7 @@
                         </article>
                     @endforeach
                 </div>
-            <details class="group mt-5 rounded-2xl border border-gray-200 dark:border-gray-800" x-data="{ color: 'purple' }">
+            <details class="group mt-5 rounded-2xl border border-gray-200 dark:border-gray-800" x-data="{ color: 'light' }">
                     <summary class="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 rounded-2xl px-6 py-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary [&::-webkit-details-marker]:hidden">
                         <span class="text-sm font-semibold">{{ __('Choose a platform') }}<span class="ml-2 font-normal text-gray-500 dark:text-gray-400">{{ __(':count presets', ['count' => count($brand['platforms'])]) }}</span></span>
                         <x-lucide-plus class="size-5 shrink-0 transition group-open:rotate-45" aria-hidden="true"/>
@@ -130,7 +130,7 @@
                         </div>
                         <div class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                             @foreach ($brand['platforms'] as $platform)
-                                <a href="{{ asset('brand/kit/'.$platform['files']['purple']) }}" :href="{{ \Illuminate\Support\Js::from(collect($platform['files'])->map(fn (string $file): string => asset('brand/kit/'.$file))) }}[color]" download class="{{ $downloadClass }} justify-between py-3 text-left" data-platform="{{ $platform['id'] }}">
+                                <a href="{{ asset('brand/kit/'.$platform['files']['light']) }}" :href="{{ \Illuminate\Support\Js::from(collect($platform['files'])->map(fn (string $file): string => asset('brand/kit/'.$file))) }}[color]" download class="{{ $downloadClass }} justify-between py-3 text-left" data-platform="{{ $platform['id'] }}">
                                     <span>{{ $platform['name'] }}<span class="mt-0.5 block text-xs font-normal text-gray-500 dark:text-gray-400">{{ $platform['size'] }} × {{ $platform['size'] }}</span></span>
                                     <x-lucide-download class="size-4 shrink-0" aria-hidden="true"/>
                                 </a>
@@ -187,6 +187,7 @@
                     <a href="{{ $facts['source_urls']['repository'] }}" target="_blank" rel="noopener noreferrer" class="{{ $socialClass }}"><x-ri-github-fill class="size-4" aria-hidden="true"/>{{ __('GitHub') }}</a>
                     <a href="{{ route('discord') }}" target="_blank" rel="noopener noreferrer" class="{{ $socialClass }}"><x-ri-discord-fill class="size-4" aria-hidden="true"/>{{ __('Discord') }}</a>
                     <a href="https://x.com/relaticle" target="_blank" rel="noopener noreferrer" class="{{ $socialClass }}"><x-ri-twitter-x-fill class="size-4" aria-hidden="true"/>{{ __('X') }}</a>
+                    <a href="https://www.linkedin.com/company/relaticle" target="_blank" rel="noopener noreferrer" class="{{ $socialClass }}"><x-ri-linkedin-box-fill class="size-4" aria-hidden="true"/>{{ __('LinkedIn') }}</a>
                 </div>
             </div>
             <div class="bg-surface lg:col-span-8">
