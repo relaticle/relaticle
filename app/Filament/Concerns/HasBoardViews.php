@@ -44,15 +44,20 @@ trait HasBoardViews
     {
         $this->tableSearch = '';
 
-        if (filled($this->tableFilters) || filled($this->boardSort) || filled($this->groupBy)) {
-            $this->tableFilters = filled($this->tableFilters) ? $this->boardFilters($this->tableFilters) : null;
-            $this->groupBy = $this->knownGrouping($this->groupBy);
-            $this->boardStateHash = $this->boardStateSignature($this->currentBoardState());
-        } else {
+        $filters = $this->boardFilters($this->tableFilters);
+        $grouping = $this->knownGrouping($this->groupBy);
+        $sort = $this->offeredSort($this->boardSort);
+
+        if ($filters['conditions']['rules'] === [] && $grouping === null && $sort === null) {
             $this->applyBoardState($this->storedBoardState());
+
+            return;
         }
 
-        $this->rebuildBoard();
+        $this->tableFilters = $filters['conditions']['rules'] === [] ? null : $filters;
+        $this->groupBy = $grouping;
+        $this->boardSort = $sort;
+        $this->boardStateHash = $this->boardStateSignature($this->currentBoardState());
     }
 
     public function dehydrateHasBoardViews(): void
@@ -75,6 +80,8 @@ trait HasBoardViews
             ['filters' => $state->filters, 'sort' => $state->sort, 'grouping' => $state->grouping],
         );
 
+        $this->boardSort = $state->sort;
+        $this->groupBy = $state->grouping;
         $this->forgetStoredBoardState();
         $this->boardStateHash = $hash;
     }
@@ -101,15 +108,15 @@ trait HasBoardViews
         return BoardStateData::from([
             ...$this->storedBoardState()->toArray(),
             'filters' => $this->boardFilters($this->tableFilters),
-            'sort' => filled($this->boardSort) ? $this->boardSort : null,
-            'grouping' => $this->groupBy,
+            'sort' => $this->offeredSort($this->boardSort),
+            'grouping' => $this->knownGrouping($this->groupBy),
         ]);
     }
 
     protected function applyBoardState(BoardStateData $state): void
     {
         $this->tableFilters = $state->filters === [] ? null : $this->boardFilters($state->filters);
-        $this->boardSort = filled($state->sort) ? $state->sort : null;
+        $this->boardSort = $this->offeredSort($state->sort);
         $this->groupBy = $this->knownGrouping($state->grouping);
         $this->updatedGroupBy();
         $this->boardStateHash = $this->boardStateSignature($this->currentBoardState());
@@ -126,6 +133,11 @@ trait HasBoardViews
     private function boardFilters(mixed $filters): array
     {
         return [...$this->canonicalTableFilters($filters), 'trashed' => ['value' => null]];
+    }
+
+    private function offeredSort(?string $sort): ?string
+    {
+        return filled($sort) ? SortList::format(array_intersect_key(SortList::parse($sort), $this->boardSortableFields())) : null;
     }
 
     private function knownGrouping(?string $grouping): ?string

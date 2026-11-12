@@ -1074,8 +1074,12 @@ it('narrows the first render with the remembered filter', function (): void {
     $drop = opportunityInStage($this, 'Drop me', 'Prospecting');
     rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(filters: boardFiltersWithRule(['field' => 'name', 'condition' => 'contains', 'value' => 'Keep'])));
 
-    expect(opportunityStageCardIds(freshOpportunitiesBoard(), 'Prospecting'))->toBe([$keep->id])
-        ->and($drop->id)->not->toBeIn(opportunityStageCardIds(freshOpportunitiesBoard(), 'Prospecting'));
+    $first = freshOpportunitiesBoard();
+
+    $first->assertSee('Keep me')->assertDontSee('Drop me');
+
+    expect(opportunityStageCardIds($first, 'Prospecting'))->toBe([$keep->id])
+        ->and($drop->id)->not->toBeIn(opportunityStageCardIds($first, 'Prospecting'));
 });
 
 it('lets a filter in the url win for that visit and writes nothing on arrival', function (): void {
@@ -1209,3 +1213,67 @@ it('keeps stored keys the page does not own when a filter changes', function ():
         ->and($stored->filters)->toEqual($filters)
         ->and($stored->grouping)->toBe('company');
 });
+
+it('opens the remembered board when the url state normalises to nothing', function (array $query): void {
+    $filters = boardFiltersWithRule(['field' => 'name', 'condition' => 'contains', 'value' => 'Keep']);
+    $preference = rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(filters: $filters, grouping: 'company', sort: 'created_at:desc'));
+    $updatedAt = $preference->updated_at;
+
+    $this->travelTo(now()->addHour());
+    $component = Livewire::withQueryParams($query)->test(OpportunitiesBoard::class);
+
+    expect($component->get('groupBy'))->toBe('company')
+        ->and($component->get('boardSort'))->toBe('created_at:desc')
+        ->and($component->instance()->getFilterBarData()['rules'])->toHaveCount(1)
+        ->and($preference->refresh()->updated_at)->toEqual($updatedAt);
+
+    $component->call('setFilterBarSorts', [['column' => 'name', 'direction' => 'asc']]);
+
+    $stored = TablePreference::query()->sole()->board_state;
+    expect($stored->filters)->toEqual($filters)
+        ->and($stored->grouping)->toBe('company')
+        ->and($stored->sort)->toBe('name:asc');
+})->with([
+    'an unknown grouping' => [['groupBy' => 'stage']],
+    'a legacy filter key' => [['filters' => ['companies' => ['values' => ['x']]]]],
+    'an empty rule list' => [['filters' => ['conditions' => ['rules' => '']]]],
+    'a garbage sort' => [['sort' => 'garbage']],
+]);
+
+it('stores no sort and no lanes the board does not offer', function (): void {
+    $rule = ['field' => 'name', 'condition' => 'contains', 'value' => 'Acme'];
+    $component = Livewire::withQueryParams([
+        'sort' => 'x;drop',
+        'groupBy' => 'stage',
+        'filters' => ['conditions' => ['rules' => [$rule]]],
+    ])->test(OpportunitiesBoard::class);
+
+    $component->call('setFilterRules', [[...$rule, 'value' => 'Other']]);
+
+    $stored = TablePreference::query()->sole()->board_state;
+    expect($stored->sort)->toBeNull()
+        ->and($stored->grouping)->toBeNull()
+        ->and($component->get('boardSort'))->toBeNull()
+        ->and($component->get('groupBy'))->toBeNull();
+});
+
+it('keeps the stored sort while lanes are shown', function (): void {
+    rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(sort: 'created_at:desc'));
+
+    freshOpportunitiesBoard()->call('setBoardGrouping', 'company');
+
+    $stored = TablePreference::query()->sole()->board_state;
+    expect($stored->sort)->toBe('created_at:desc')
+        ->and($stored->grouping)->toBe('company');
+});
+
+it('writes nothing while the board mounts for the first time', function (bool $stored): void {
+    if ($stored) {
+        rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(grouping: 'company'));
+    }
+
+    $writes = boardPreferenceWrites(fn () => freshOpportunitiesBoard());
+
+    expect($writes)->toBe(0)
+        ->and(TablePreference::query()->count())->toBe($stored ? 1 : 0);
+})->with(['a member with no row' => false, 'a member with a stored row' => true]);

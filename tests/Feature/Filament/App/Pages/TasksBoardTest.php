@@ -1069,3 +1069,29 @@ it('keeps the filter when a sort is set', function (): void {
     expect($component->instance()->getFilterBarData()['rules'])->toHaveCount(1)
         ->and(taskStatusCardIds($component, 'To do'))->toBe([$keep->id]);
 });
+
+it('opens the remembered board when the url state normalises to nothing', function (array $query): void {
+    $filters = ['conditions' => ['match' => 'all', 'rules' => [['field' => 'title', 'condition' => 'contains', 'value' => 'Keep']]], 'trashed' => ['value' => null]];
+    $preference = rememberedTaskBoard($this, new BoardStateData(filters: $filters, grouping: 'assignee', sort: 'created_at:desc'));
+    $updatedAt = $preference->updated_at;
+
+    $this->travelTo(now()->addHour());
+    $component = Livewire::withQueryParams($query)->test(TasksBoard::class);
+
+    expect($component->get('groupBy'))->toBe('assignee')
+        ->and($component->get('boardSort'))->toBe('created_at:desc')
+        ->and($component->instance()->getFilterBarData()['rules'])->toHaveCount(1)
+        ->and($preference->refresh()->updated_at)->toEqual($updatedAt);
+
+    $component->call('setFilterBarSorts', [['column' => 'title', 'direction' => 'asc']]);
+
+    $stored = TablePreference::query()->sole()->board_state;
+    expect($stored->filters)->toEqual($filters)
+        ->and($stored->grouping)->toBe('assignee')
+        ->and($stored->sort)->toBe('title:asc');
+})->with([
+    'an unknown grouping' => [['groupBy' => 'status']],
+    'a legacy filter key' => [['filters' => ['assignees' => ['values' => ['x']]]]],
+    'an empty rule list' => [['filters' => ['conditions' => ['rules' => '']]]],
+    'a garbage sort' => [['sort' => 'garbage']],
+]);
