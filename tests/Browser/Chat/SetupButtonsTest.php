@@ -253,14 +253,18 @@ it('keeps the setup buttons hidden when they arrive before the turn stops stream
         (async () => {
             {$resolve}
             const rows = data.nextSteps;
+            const strip = document.querySelector('[aria-label="Suggested next steps"]');
             data.isStreaming = true;
             data.nextSteps = [];
-            await data.\$nextTick();
+            await new Promise((resolve) => {
+                const poll = () => getComputedStyle(strip).display === 'none' ? resolve() : setTimeout(poll, 25);
+                poll();
+            });
             data.nextSteps = rows;
             await data.\$nextTick();
             await new Promise((resolve) => requestAnimationFrame(() => resolve()));
 
-            return getComputedStyle(document.querySelector('[aria-label="Suggested next steps"]')).display;
+            return getComputedStyle(strip).display;
         })();
     JS);
 

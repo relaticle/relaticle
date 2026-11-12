@@ -613,7 +613,7 @@
                  button below), so the pre-Alpine hidden state is an inline
                  style; x-show clears it when it flips true. --}}
             style="display: none"
-            :style="showsSetupButtons() ? null : { marginTop: 'auto' }"
+            :style="{ marginTop: showsSetupButtons() ? '' : 'auto' }"
             x-transition:enter="motion-safe:transition motion-safe:duration-[var(--duration-base)] motion-safe:ease-[var(--ease-out-expo)]"
             x-transition:enter-start="motion-safe:translate-y-1 motion-safe:opacity-0"
             x-transition:enter-end="motion-safe:translate-y-0 motion-safe:opacity-100"
