@@ -102,8 +102,7 @@ trait HasBoardViews
         $this->applySavedView($viewId);
 
         if (! $this->activeBoardView() instanceof SavedView) {
-            $this->forgetStoredBoardState();
-            $this->rebuildBoard();
+            $this->applyOwnBoard();
         }
     }
 
@@ -441,7 +440,7 @@ trait HasBoardViews
     {
         $query = parent::getFilteredTableQuery();
 
-        return $query instanceof Builder ? $this->sortBoardQuery(clone $query) : $query;
+        return $query instanceof Builder ? $this->withoutHiddenColumnCards($this->sortBoardQuery(clone $query)) : $query;
     }
 
     public function moveCard(
@@ -538,4 +537,12 @@ trait HasBoardViews
         $this->board = $this->board($this->makeBoard());
         $this->table = $this->table($this->makeTable());
     }
+
+    /**
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     * @return Builder<TModel>
+     */
+    abstract protected function withoutHiddenColumnCards(Builder $query): Builder;
 }

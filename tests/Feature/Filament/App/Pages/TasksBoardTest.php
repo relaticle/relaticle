@@ -1000,7 +1000,7 @@ it('stores a status order once each and rejects an opportunity stage', function 
 
     $state = resolve(ReorderBoardStages::class)->execute($this->user, $this->workspace, CrmEntity::Task, [$order[1], $order[1], $order[0]]);
 
-    expect($state->orderStages($order))->toBe([$order[1], $order[0], $order[2]])
+    expect($state->stageOrder)->toBe([$order[1], $order[0], $order[2]])
         ->and(fn () => resolve(ReorderBoardStages::class)->execute($this->user, $this->workspace, CrmEntity::Task, statusIds($stage)))
         ->toThrow(HttpException::class);
 });
@@ -1410,7 +1410,7 @@ it('keeps a hidden column in its slot when the visible columns are dragged', fun
 
     $component->call('reorderBoardStages', [$ids[2], $ids[0]]);
 
-    expect(TablePreference::query()->sole()->board_state->orderStages($ids))->toBe([$ids[2], $ids[1], $ids[0]])
+    expect(TablePreference::query()->sole()->board_state->stageOrder)->toBe([$ids[2], $ids[1], $ids[0]])
         ->and(taskBoardColumnOrder($component))->toBe([$ids[2], $ids[0]]);
 });
 
@@ -1422,6 +1422,12 @@ it('draws, counts and offers no hidden column', function (): void {
 
     expect(taskBoardColumnOrder($component))->not->toContain($todo)
         ->and($component->instance()->getBoard()->getBatchedBoardRecordCounts())->not->toHaveKey($todo);
+
+    $other = taskInStatus($this, 'Other task', 'In progress');
+
+    $component->call('mountAction', 'moveTo', [], ['recordKey' => (string) $other->id])
+        ->assertMountedActionModalSee(['In progress', 'Done'])
+        ->assertMountedActionModalDontSee('To do');
 });
 
 it('refuses a card created or moved into a hidden column', function (): void {

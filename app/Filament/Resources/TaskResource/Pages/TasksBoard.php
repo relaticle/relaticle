@@ -86,13 +86,13 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
 
         return $board
             ->query(
-                $this->withoutHiddenColumnCards(Task::query()
+                Task::query()
                     ->leftJoin('custom_field_values as cfv', function (JoinClause $join) use ($columnField): void {
                         $join->on('tasks.id', '=', 'cfv.entity_id')
                             ->where('cfv.custom_field_id', '=', $columnField->getKey());
                     })
                     ->with(['assignees'])
-                    ->select('tasks.*', 'cfv.'.$valueColumn))
+                    ->select('tasks.*', 'cfv.'.$valueColumn)
             )
             ->recordTitleAttribute('title')
             ->columnIdentifier($valueColumn)

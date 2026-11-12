@@ -35,6 +35,13 @@
                 this.panel = 'main'
                 this.$nextTick(() => requestAnimationFrame(() => this.$root.querySelector(`[data-panel-trigger='${name}']`)?.focus()))
             },
+            syncSwitch(wrapper) {
+                const toggle = wrapper.querySelector('[data-board-column-toggle]')
+
+                if (toggle) {
+                    window.Alpine.$data(toggle).state = toggle.dataset.visible === 'true'
+                }
+            },
             rowStage: null,
             rowTrigger: null,
             rows() {
@@ -184,7 +191,7 @@
                                 <x-filament::icon icon="lucide-grip-vertical" />
                             </span>
 
-                            <span class="fi-board-stage" @class(['fi-board-stage-off' => ! $column['visible']])>
+                            <span @class(['fi-board-stage', 'fi-board-stage-off' => ! $column['visible']])>
                                 <span class="fi-board-stage-mark">
                                     @if ($dotColor)
                                         <span class="fi-board-stage-dot" style="{{ get_color_css_variables($dotColor, shades: [500]) }}"></span>
@@ -206,15 +213,20 @@
 
                             <span
                                 class="fi-board-stage-switch"
+                                x-on:click="$wire.setBoardColumnVisible({{ Js::from((string) $column['id']) }}, {{ $column['visible'] ? 'false' : 'true' }}).finally(() => syncSwitch($el))"
                                 @if ($isLastVisible) x-tooltip="{ content: {{ Js::from(__('filament/pages/boards.view_settings.last_column')) }}, theme: $store.theme }" @endif
                             >
                                 <x-filament::toggle
                                     :state="$column['visible'] ? 'true' : 'false'"
                                     :disabled="$isLastVisible"
                                     :aria-label="__('filament/pages/boards.view_settings.show_column', ['column' => $column['name']])"
+                                    :aria-describedby="$isLastVisible ? 'board-last-column-hint' : null"
+                                    :data-visible="$column['visible'] ? 'true' : 'false'"
                                     data-board-column-toggle
-                                    wire:click="setBoardColumnVisible({{ Js::from((string) $column['id']) }}, {{ $column['visible'] ? 'false' : 'true' }})"
                                 />
+                                @if ($isLastVisible)
+                                    <span id="board-last-column-hint" class="sr-only">{{ __('filament/pages/boards.view_settings.last_column') }}</span>
+                                @endif
                             </span>
                         </div>
                     @endforeach

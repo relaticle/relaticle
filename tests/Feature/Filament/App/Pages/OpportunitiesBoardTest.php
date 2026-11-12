@@ -1053,7 +1053,7 @@ it('stores an order made of the board\'s own stages once each', function (): voi
 
     $state = resolve(ReorderBoardStages::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, [$order[2], $order[0], $order[2]]);
 
-    expect($state->orderStages($order))->toBe([$order[2], $order[1], $order[0], ...array_slice($order, 3)])
+    expect($state->stageOrder)->toBe([$order[2], $order[1], $order[0], ...array_slice($order, 3)])
         ->and(TablePreference::query()->count())->toBe(1);
 });
 
@@ -1412,7 +1412,7 @@ it('keeps a hidden column in its slot when the visible columns are dragged', fun
 
     $component->call('reorderBoardStages', [$ids[2], $ids[0], ...array_slice($ids, 3)]);
 
-    expect(TablePreference::query()->sole()->board_state->orderStages($ids))->toBe([$ids[2], $ids[1], $ids[0], ...array_slice($ids, 3)])
+    expect(TablePreference::query()->sole()->board_state->stageOrder)->toBe([$ids[2], $ids[1], $ids[0], ...array_slice($ids, 3)])
         ->and(boardColumnOrder($component))->toBe([$ids[2], $ids[0], ...array_slice($ids, 3)]);
 });
 
@@ -1456,7 +1456,10 @@ it('refuses to hide the last visible column', function (): void {
         $component->call('setBoardColumnVisible', $id, false);
     }
 
-    $component->call('setBoardColumnVisible', $ids[0], false)->assertStatus(422);
+    $component->call('setBoardColumnVisible', $ids[0], false)->assertOk();
+
+    expect(fn () => resolve(SetBoardColumnVisibility::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, OpportunityField::STAGE->value, $ids[0], false))
+        ->toThrow(fn (HttpException $exception): bool => $exception->getStatusCode() === 422);
 
     expect(TablePreference::query()->sole()->board_state->hiddenColumns)->toHaveCount(count($ids) - 1);
 });
@@ -1513,4 +1516,51 @@ it('reads the visible count in view settings', function (): void {
     $html = (string) $component->instance()->boardViewSettings();
 
     expect($html)->toMatch('/data-board-columns-trigger.*?fi-board-settings-value-text">\s*'.(count($ids) - 1).'\s*</s');
+});
+
+it('keeps a card with no value for the column attribute while another column is hidden', function (): void {
+    $bare = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'No stage deal']);
+    $hiddenCard = opportunityInStage($this, 'Hidden stage deal', 'Prospecting');
+    $shownCard = opportunityInStage($this, 'Shown stage deal', 'Qualification');
+    $prospecting = (string) $this->stageField->options->firstWhere('name', 'Prospecting')->getKey();
+
+    $component = livewire(OpportunitiesBoard::class)->call('setBoardColumnVisible', $prospecting, false);
+    $names = $component->instance()->getFilteredTableQuery()->pluck('opportunities.name')->all();
+
+    expect($names)->toContain($bare->name, $shownCard->name)
+        ->and($names)->not->toContain($hiddenCard->name);
+});
+
+it('keeps the records of a hidden column in the board query and in the export query', function (): void {
+    $hiddenCard = opportunityInStage($this, 'Hidden stage deal', 'Prospecting');
+    $prospecting = (string) $this->stageField->options->firstWhere('name', 'Prospecting')->getKey();
+
+    $component = livewire(OpportunitiesBoard::class)->call('setBoardColumnVisible', $prospecting, false);
+
+    expect($component->instance()->getBoard()->getQuery()->pluck('opportunities.name')->all())->toContain($hiddenCard->name)
+        ->and($component->instance()->getTableQueryForExport()->pluck('opportunities.name')->all())->toContain($hiddenCard->name);
+});
+
+it('draws every column when the stored state hides every option', function (): void {
+    $ids = stageIds($this->stageField);
+    rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(hiddenColumns: $ids));
+
+    $component = livewire(OpportunitiesBoard::class);
+
+    expect(boardColumnOrder($component))->toBe($ids)
+        ->and((string) $component->instance()->boardViewSettings())->toMatch('/data-board-columns-trigger.*?fi-board-settings-value-text">\s*'.count($ids).'\s*</s')
+        ->and(TablePreference::query()->sole()->board_state->hiddenColumns)->toBe($ids);
+});
+
+it('ignores a hide that would leave no visible column or names an unknown option', function (): void {
+    $ids = stageIds($this->stageField);
+    rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(hiddenColumns: array_slice($ids, 1)));
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnVisible', $ids[0], false)
+        ->call('setBoardColumnVisible', 'not-an-option', false)
+        ->assertOk();
+
+    expect(boardColumnOrder($component))->toBe([$ids[0]])
+        ->and(TablePreference::query()->sole()->board_state->hiddenColumns)->toBe(array_slice($ids, 1));
 });

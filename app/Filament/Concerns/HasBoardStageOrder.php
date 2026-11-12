@@ -51,12 +51,14 @@ trait HasBoardStageOrder
 
     public function setBoardColumnVisible(mixed $optionId = null, mixed $visible = true): void
     {
-        if (! is_string($optionId)) {
+        $visible = filter_var($visible, FILTER_VALIDATE_BOOL);
+        $visibleIds = $this->visibleBoardColumnIds();
+
+        if (! is_string($optionId) || ! $this->boardColumnOptions()->contains('id', $optionId) || (! $visible && $visibleIds === [$optionId])) {
             return;
         }
 
         $fieldCode = $this->boardColumnField()->code;
-        $visible = filter_var($visible, FILTER_VALIDATE_BOOL);
         $saved = $this->writingBoardState(fn (?SavedView $view): BoardStateData => resolve(SetBoardColumnVisibility::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), $fieldCode, $optionId, $visible, $view));
 
         if (! $saved instanceof BoardStateData) {
@@ -157,14 +159,30 @@ trait HasBoardStageOrder
     /**
      * @return list<string>
      */
+    protected function hiddenBoardColumnIds(): array
+    {
+        $ids = array_values($this->boardColumnOptions()->pluck('id')->all());
+        $hidden = array_values(array_intersect($ids, $this->storedBoardState()->hiddenColumns));
+
+        return count($hidden) === count($ids) ? [] : $hidden;
+    }
+
+    /**
+     * @return list<string>
+     */
     protected function visibleBoardColumnIds(): array
     {
-        $hidden = $this->storedBoardState()->hiddenColumns;
+        $hidden = $this->hiddenBoardColumnIds();
 
         return array_values($this->boardColumnOptions()
             ->pluck('id')
             ->reject(static fn (string $id): bool => in_array($id, $hidden, true))
             ->all());
+    }
+
+    protected function boardColumnExpression(): string
+    {
+        return 'cfv.'.$this->boardColumnField()->getValueColumn();
     }
 
     /**
@@ -175,12 +193,12 @@ trait HasBoardStageOrder
      */
     protected function withoutHiddenColumnCards(Builder $query): Builder
     {
-        $hidden = $this->storedBoardState()->hiddenColumns;
-        $hiddenOfField = $this->boardColumnOptions()->pluck('id')->intersect($hidden)->values()->all();
+        $hidden = $this->hiddenBoardColumnIds();
+        $column = $this->boardColumnExpression();
 
-        return $hiddenOfField === []
+        return $hidden === []
             ? $query
-            : $query->whereNotIn('cfv.'.$this->boardColumnField()->getValueColumn(), $hiddenOfField);
+            : $query->where(static fn (Builder $inner): Builder => $inner->whereNull($column)->orWhereNotIn($column, $hidden));
     }
 
     /**
@@ -188,7 +206,7 @@ trait HasBoardStageOrder
      */
     protected function boardColumns(): array
     {
-        $hidden = $this->storedBoardState()->hiddenColumns;
+        $hidden = $this->hiddenBoardColumnIds();
 
         return array_values($this->boardColumnOptions()
             ->map(static fn (array $option): Column => Column::make($option['id'])

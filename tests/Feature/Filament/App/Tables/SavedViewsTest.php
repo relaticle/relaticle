@@ -2158,15 +2158,20 @@ it('shows the plain board with the same cards when the open view was deleted els
 
 it('draws the plain board\'s columns when the picked view is deleted while another view is open', function (): void {
     $tier = resolve(CreateCustomField::class)->execute($this->user, ['name' => 'Tier', 'type' => 'select', 'entity_type' => 'opportunity', 'options' => [['name' => 'Gold'], ['name' => 'Silver']]]);
-    $open = boardViewFor($this->user, ['state' => new BoardStateData(columnField: $tier->code)]);
+    $open = boardViewFor($this->user, ['state' => new BoardStateData(filters: boardFiltersFor('Keep'), sort: 'name:asc', columnField: $tier->code)]);
     $picked = boardViewFor($this->user);
     $component = openBoardWithView($open);
     $picked->delete();
 
     $component->set('activeSavedViewId', $picked->getKey());
+    $writes = boardViewStoreWrites(fn () => $component->call('$refresh'));
 
     expect($component->get('activeSavedViewId'))->toBeNull()
-        ->and($component->instance()->getBoard()->getColumnIdentifiers())->toBe(opportunityStageOptionIds());
+        ->and($component->instance()->getBoard()->getColumnIdentifiers())->toBe(opportunityStageOptionIds())
+        ->and($component->get('tableFilters'))->toBeNull()
+        ->and($component->get('boardSort'))->toBeNull()
+        ->and($writes)->toBe(0)
+        ->and(preferenceRow())->toBeNull();
 });
 
 it('treats a board view deleted before the save as gone and writes nothing', function (): void {
