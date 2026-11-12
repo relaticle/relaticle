@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
-use Laravel\Ai\Exceptions\RateLimitedException;
+use Laravel\Ai\Exceptions\InsufficientCreditsException;
 use Laravel\Ai\Prompts\TranscriptionPrompt;
 use Laravel\Ai\Transcription;
 use Relaticle\Chat\Http\Controllers\TranscribeController;
@@ -267,5 +267,5 @@ it('still reports an exhausted provider quota', function (): void {
     $this->postJson(route('chat.transcribe'), ['audio' => audioUpload()])
         ->assertStatus(500);
 
-    Exceptions::assertReported(RateLimitedException::class);
+    Exceptions::assertReported(InsufficientCreditsException::class);
 });

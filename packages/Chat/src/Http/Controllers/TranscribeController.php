@@ -55,11 +55,7 @@ final class TranscribeController
             $text = Transcription::fromUpload($audio)->generate()->text;
         } catch (RequestException $exception) {
             return $this->failedResponse($exception);
-        } catch (RateLimitedException $exception) {
-            throw_if($this->outOfQuota($exception), $exception);
-
-            return $this->busyResponse();
-        } catch (ProviderOverloadedException|ProviderConnectionException|ConnectionException) {
+        } catch (RateLimitedException|ProviderOverloadedException|ProviderConnectionException|ConnectionException) {
             return $this->busyResponse();
         }
 
@@ -82,14 +78,6 @@ final class TranscribeController
         throw_if($status < 500, $exception);
 
         return $this->busyResponse();
-    }
-
-    private function outOfQuota(RateLimitedException $exception): bool
-    {
-        $previous = $exception->getPrevious();
-
-        return $previous instanceof RequestException
-            && $previous->response->json('error.code') === 'insufficient_quota';
     }
 
     private function unreadableMessage(): string
