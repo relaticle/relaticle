@@ -35,8 +35,26 @@ final readonly class ReorderViews
                 ['user_id' => $user->getKey(), 'workspace_id' => $workspace->getKey(), 'entity' => $entity],
                 ['state' => new TableStateData],
             );
-        $preference->update(['view_order' => $keys]);
+        $preference->update(['view_order' => $this->keepUnpostedInPlace($preference->view_order ?? [], $keys, $allowed)]);
 
         return $preference;
+    }
+
+    /**
+     * @param  list<string>  $stored
+     * @param  list<string>  $posted
+     * @param  list<string>  $allowed
+     * @return list<string>
+     */
+    private function keepUnpostedInPlace(array $stored, array $posted, array $allowed): array
+    {
+        $queue = $posted;
+        $order = [];
+
+        foreach (array_filter($stored, static fn (string $key): bool => in_array($key, $allowed, true)) as $key) {
+            $order[] = in_array($key, $posted, true) ? array_shift($queue) : $key;
+        }
+
+        return array_values(array_unique([...$order, ...$queue]));
     }
 }

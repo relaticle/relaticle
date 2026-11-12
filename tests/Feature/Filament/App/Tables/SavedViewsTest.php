@@ -1461,14 +1461,20 @@ function boardViewFirst(): SavedView
 }
 
 it('never applies a board view to the list, also when it is first in the order', function (): void {
-    boardViewFirst();
+    $view = boardViewFirst();
+    $view->update(['state' => new BoardStateData(filters: ['conditions' => ['match' => 'all', 'rules' => [['field' => 'name', 'operator' => 'contains', 'value' => 'zzz']]]])]);
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
     livewire(ListOpportunities::class)->set('tableSort', 'created_at:desc');
-    $stored = preferenceRow()?->state->hash();
+    $before = preferenceRow();
 
+    $this->travelTo(now()->addHour());
     $component = livewire(ListOpportunities::class);
 
     expect($component->get('activeSavedViewId'))->toBeNull()
-        ->and(preferenceRow()?->state->hash())->toBe($stored);
+        ->and(preferenceRow()->updated_at)->toEqual($before->updated_at)
+        ->and(preferenceRow()->active_view_id)->toBeNull()
+        ->and(preferenceRow()->state->hash())->toBe($before->state->hash());
+    Livewire::withQueryParams(['view' => SavedView::BUILT_IN_LIST_LINK])->test(ListOpportunities::class)->assertCanSeeTableRecords([$opportunity]);
 });
 
 it('sends a bare list visit to a board view that is first in the order', function (): void {
@@ -1487,19 +1493,46 @@ it('sends a board view id on the list to the board', function (): void {
 
 it('lists a board view with the board icon and a link to the board', function (): void {
     $view = boardViewFor($this->user, ['name' => 'By company']);
+    $table = viewFor($this->user, ['entity' => CrmEntity::Opportunity, 'name' => 'Open deals']);
     $board = OpportunityResource::getUrl('board', ['view' => $view->getKey()]);
 
-    $html = Livewire::withQueryParams(['view' => SavedView::BUILT_IN_LIST_LINK])->test(ListOpportunities::class)->assertSeeHtml('data-view-key="'.$view->getKey().'"')->html();
+    $html = Livewire::withQueryParams(['view' => SavedView::BUILT_IN_LIST_LINK])->test(ListOpportunities::class)->html();
+    $row = fn (SavedView $v): string => preg_match('/data-view-key="'.$v->getKey().'".*?(?=data-view-key=|$)/s', $html, $m) === 1 ? $m[0] : '';
 
-    expect($html)->toContain('href="'.$board.'"')
-        ->and($html)->not->toContain("applySavedView('{$view->getKey()}')");
+    expect($row($view))->toContain('href="'.$board.'"')
+        ->and($row($view))->toContain('fi-view-tile-orange')
+        ->and($row($view))->not->toContain("applySavedView('{$view->getKey()}')")
+        ->and($row($table))->not->toContain('fi-view-tile-orange')
+        ->and($row($table))->toContain("applySavedView('{$table->getKey()}')");
 });
 
-it('offers no board views while the board page is not accessible', function (): void {
-    $view = boardViewFor($this->user, ['name' => 'By company']);
+function makeOpportunityBoardInaccessible(): void
+{
     CustomField::query()->forEntity(Opportunity::class)->where('code', CrmEntity::Opportunity->boardFieldCode())->update(['code' => 'retired_stage']);
     Once::flush();
+}
 
-    livewire(ListOpportunities::class)->assertOk()->assertDontSeeText('By company');
+function makeOpportunityBoardAccessible(): void
+{
+    CustomField::query()->forEntity(Opportunity::class)->where('code', 'retired_stage')->update(['code' => CrmEntity::Opportunity->boardFieldCode()]);
+    Once::flush();
+}
+
+it('offers no board views while the board page is not accessible', function (): void {
+    $view = boardViewFirst();
+    makeOpportunityBoardInaccessible();
+
+    livewire(ListOpportunities::class)->assertOk()->assertDontSeeHtml('data-view-key="'.$view->getKey().'"');
     $this->get(OpportunityResource::getUrl('index'))->assertOk();
+});
+
+it('keeps a hidden board view in place when the visible rows are reordered', function (): void {
+    $view = boardViewFirst();
+    $table = viewFor($this->user, ['entity' => CrmEntity::Opportunity, 'name' => 'Open deals']);
+    makeOpportunityBoardInaccessible();
+
+    livewire(ListOpportunities::class)->call('reorderViews', [$table->getKey(), 'list']);
+    makeOpportunityBoardAccessible();
+
+    expect(orderFor(CrmEntity::Opportunity))->toBe([$view->getKey(), $table->getKey(), 'board', 'list']);
 });
