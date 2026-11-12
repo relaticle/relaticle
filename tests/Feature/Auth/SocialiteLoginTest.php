@@ -348,6 +348,7 @@ test('a personal microsoft account never replaces an unclaimed account', functio
 test('the microsoft sign-in carries the tenant from the validated id token', function (): void {
     $squatter = User::factory()->unverified()->create(['email' => 'maya@example.com']);
     $driver = Mockery::mock(MicrosoftProvider::class);
+    $driver->shouldReceive('redirectUrl')->andReturnSelf();
     $driver->shouldReceive('user')->andReturn(makeMicrosoftUser('maya-microsoft-id', 'maya@example.com', null));
     $driver->shouldReceive('getClaims')->andReturn((object) ['tid' => 'a1b2c3d4-0000-0000-0000-000000000001']);
     Socialite::shouldReceive('driver')->with('microsoft')->andReturn($driver);

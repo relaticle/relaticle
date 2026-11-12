@@ -43,6 +43,15 @@ enum SocialiteProvider: string
             && filled(config("services.{$this->value}.client_id"));
     }
 
+    // Socialite 5.32 resolves a relative callback against app.url. Resolving it here keeps the host the
+    // sign-in started on, so a panel on its own subdomain keeps the redirect_uri its OAuth client registered.
+    public function callbackUrl(): ?string
+    {
+        $callback = config("services.{$this->value}.redirect");
+
+        return is_string($callback) && $callback !== '' ? url($callback) : null;
+    }
+
     public function vouchesForEmailOf(SocialiteUser $user): bool
     {
         if (blank($user->getEmail())) {

@@ -7,6 +7,9 @@ use App\Http\Middleware\DenyIndexingOnSecondaryHosts;
 use App\Http\Middleware\RedirectToPrimaryHost;
 use App\Models\Export;
 use App\Models\User;
+use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\GoogleProvider;
+use Laravel\Socialite\Two\InvalidStateException;
 
 mutates(RedirectToPrimaryHost::class, DenyIndexingOnSecondaryHosts::class);
 
@@ -77,6 +80,34 @@ describe('app plumbing on secondary hosts', function () {
 
         expect($location)->toStartWith('https://accounts.google.com/o/oauth2/auth');
         expect(urldecode($location))->toContain('redirect_uri=http://app.relaticle.test/auth/callback/google');
+    });
+
+    it('exchanges the socialite code with the redirect_uri of the requesting host', function (): void {
+        config([
+            'services.google.client_id' => 'test-client-id',
+            'services.google.redirect' => '/auth/callback/google',
+        ]);
+
+        $driver = Mockery::mock(GoogleProvider::class);
+        $driver->shouldReceive('redirectUrl')->once()->with('http://app.relaticle.test/auth/callback/google')->andReturnSelf();
+        $driver->shouldReceive('user')->once()->andThrow(new InvalidStateException);
+        Socialite::shouldReceive('driver')->with('google')->andReturn($driver);
+
+        $this->get('http://app.relaticle.test/auth/callback/google?code=accepted')
+            ->assertRedirect();
+    });
+
+    it('keeps an absolute socialite callback as configured', function (): void {
+        config([
+            'services.google.client_id' => 'test-client-id',
+            'services.google.redirect' => 'https://login.example.com/auth/callback/google',
+        ]);
+
+        $location = (string) $this->get('http://app.relaticle.test/auth/redirect/google')
+            ->assertStatus(302)
+            ->headers->get('Location');
+
+        expect(urldecode($location))->toContain('redirect_uri=https://login.example.com/auth/callback/google');
     });
 
     it('serves the guest passkey sign-in options on the app host so the ceremony stays same-origin', function (): void {
