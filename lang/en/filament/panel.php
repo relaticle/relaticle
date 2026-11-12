@@ -236,6 +236,12 @@ return [
                 'table' => 'Table',
                 'board' => 'Board',
             ],
+            'type' => 'View type',
+            'type_descriptions' => [
+                'table' => 'See your records in rows and columns',
+                'board' => 'Move your records through stages',
+            ],
+            'name_placeholder' => 'Name this view',
         ],
     ],
 

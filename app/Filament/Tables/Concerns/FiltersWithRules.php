@@ -241,6 +241,14 @@ trait FiltersWithRules
         return $this->filtersDeletedRecords() ? $state : [...$state, 'trashed' => ['value' => null]];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    protected function boardFilters(mixed $filters): array
+    {
+        return [...$this->canonicalTableFilters($filters), 'trashed' => ['value' => null]];
+    }
+
     private function filtersDeletedRecords(): bool
     {
         // Livewire mounts before the table is built, and the list's mount needs the URL's value kept.

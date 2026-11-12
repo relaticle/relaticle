@@ -1950,3 +1950,136 @@ it('refuses the same name for a board view and a list view of one member', funct
 
     expect(SavedView::query()->withoutGlobalScopes()->count())->toBe(1);
 });
+
+function openOpportunitiesList(): Testable
+{
+    return Livewire::withQueryParams(['view' => SavedView::BUILT_IN_LIST_LINK])->test(ListOpportunities::class);
+}
+
+function mountedFieldNames(Testable $component): array
+{
+    $instance = $component->instance();
+
+    return array_keys($instance->getSchema($instance->getMountedActionSchemaName())->getFlatFields());
+}
+
+function openPage(string $page): Testable
+{
+    return $page === ListOpportunities::class ? openOpportunitiesList() : openPlainBoard();
+}
+
+it('offers the view type first and preselects the page\'s own', function (string $page, SavedViewType $expected): void {
+    openPage($page)
+        ->mountAction('saveSavedViewAs')
+        ->assertActionDataSet(['type' => $expected->value]);
+})->with([
+    'the list' => [ListOpportunities::class, SavedViewType::Table],
+    'the board' => [OpportunitiesBoard::class, SavedViewType::Board],
+]);
+
+it('offers no view type where the resource has no board', function (): void {
+    expect(mountedFieldNames(livewire(ListCompanies::class)->mountAction('saveSavedViewAs')))->toBe(['name']);
+
+    livewire(ListCompanies::class)->callAction('saveSavedViewAs', ['name' => 'Plain', 'type' => SavedViewType::Board->value])->assertHasNoActionErrors();
+
+    expect(SavedView::query()->withoutGlobalScopes()->sole()->type)->toBe(SavedViewType::Table);
+});
+
+it('puts the view type above the name in the modal', function (): void {
+    $component = openOpportunitiesList()->mountAction('saveSavedViewAs');
+    $html = $component->instance()->getSchema($component->instance()->getMountedActionSchemaName())->toHtml();
+
+    expect(mountedFieldNames($component))->toBe(['type', 'name'])
+        ->and(strpos($html, 'View type'))->toBeLessThan(strpos($html, 'data.name'));
+});
+
+it('creates a board view from the list and sends the member to it', function (): void {
+    $component = openOpportunitiesList()->call('setFilterRules', [boardNameRule('Keep')]);
+
+    $component->callAction('saveSavedViewAs', ['type' => SavedViewType::Board->value, 'name' => 'Open pipeline'])->assertHasNoActionErrors();
+
+    $view = SavedView::query()->withoutGlobalScopes()->sole();
+    expect($view->type)->toBe(SavedViewType::Board)
+        ->and($view->boardState()->filters['conditions']['rules'])->toHaveCount(1)
+        ->and($view->boardState()->filters['trashed']['value'])->toBeNull()
+        ->and($view->boardState()->sort)->toBeNull()
+        ->and($view->boardState()->grouping)->toBeNull()
+        ->and($view->boardState()->stageOrder)->toBe([])
+        ->and($component->get('activeSavedViewId'))->toBeNull();
+    $component->assertRedirect(OpportunityResource::getUrl('board', ['view' => $view->getKey()]));
+});
+
+it('creates a list view from the board and sends the member to it', function (): void {
+    $component = livewire(OpportunitiesBoard::class)
+        ->call('setFilterRules', [boardNameRule('Keep')])
+        ->call('setFilterBarSorts', [['column' => 'created_at', 'direction' => 'desc']])
+        ->call('setBoardGrouping', 'company');
+
+    $component->callAction('saveSavedViewAs', ['type' => SavedViewType::Table->value, 'name' => 'Open table'])->assertHasNoActionErrors();
+
+    $view = SavedView::query()->withoutGlobalScopes()->sole();
+    expect($view->type)->toBe(SavedViewType::Table)
+        ->and($view->tableState()->filters['conditions']['rules'])->toHaveCount(1)
+        ->and($view->tableState()->sort)->toBeNull()
+        ->and($view->tableState()->grouping)->toBeNull()
+        ->and($view->tableState()->columns)->toBe([])
+        ->and($component->get('activeSavedViewId'))->toBeNull();
+    $component->assertRedirect(OpportunityResource::getUrl('index', ['view' => $view->getKey()]));
+});
+
+it('keeps the page\'s whole state when the type is the page\'s own', function (): void {
+    $order = array_reverse(opportunityStageOptionIds());
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->call('setFilterBarSorts', [['column' => 'created_at', 'direction' => 'desc']])
+        ->call('setBoardGrouping', 'company')
+        ->call('reorderBoardStages', $order)
+        ->callAction('saveSavedViewAs', ['type' => SavedViewType::Board->value, 'name' => 'Whole'])
+        ->assertHasNoActionErrors()
+        ->assertNoRedirect();
+
+    $view = SavedView::query()->withoutGlobalScopes()->sole();
+    expect($view->boardState()->sort)->toBe('created_at:desc')
+        ->and($view->boardState()->grouping)->toBe('company')
+        ->and($view->boardState()->stageOrder)->toBe($order);
+    $component->assertSet('activeSavedViewId', $view->getKey());
+});
+
+it('writes nothing to the page left when the other type is created', function (string $page, SavedViewType $type): void {
+    $preference = TablePreference::factory()->for($this->user)->for($this->workspace)->create([
+        'entity' => CrmEntity::Opportunity,
+        'board_state' => new BoardStateData(sort: 'name:asc'),
+    ]);
+    $updatedAt = $preference->updated_at;
+    $component = openPage($page);
+
+    $this->travelTo(now()->addHour());
+    $writes = boardViewStoreWrites(fn () => $component->callAction('saveSavedViewAs', ['type' => $type->value, 'name' => 'Elsewhere'])->call('$refresh'));
+
+    expect($writes)->toBe(1)
+        ->and($preference->refresh()->updated_at)->toEqual($updatedAt)
+        ->and($preference->board_state->sort)->toBe('name:asc')
+        ->and($preference->active_view_id)->toBeNull()
+        ->and($component->get('activeSavedViewId'))->toBeNull();
+})->with([
+    'from the list' => [ListOpportunities::class, SavedViewType::Board],
+    'from the board' => [OpportunitiesBoard::class, SavedViewType::Table],
+]);
+
+it('refuses a type the form does not offer', function (string $page, string $type): void {
+    openPage($page)
+        ->callAction('saveSavedViewAs', ['type' => $type, 'name' => 'Nope'])
+        ->assertHasActionErrors(['type']);
+
+    expect(SavedView::query()->withoutGlobalScopes()->count())->toBe(0);
+})->with([
+    'cards on the list' => [ListOpportunities::class, 'cards'],
+    'nonsense on the board' => [OpportunitiesBoard::class, 'nonsense'],
+]);
+
+it('keeps the type out of the rename modal', function (): void {
+    $view = viewFor($this->user, ['entity' => CrmEntity::Opportunity]);
+    $component = openOpportunitiesList()->mountAction('renameSavedView', ['view' => $view->getKey()]);
+
+    expect(mountedFieldNames($component))->toBe(['name']);
+});

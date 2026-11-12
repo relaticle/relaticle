@@ -35,8 +35,6 @@ use Relaticle\Flowforge\Contracts\HasBoard;
  */
 trait HasViewSwitcher
 {
-    private const array VIEW_ICONS = ['list' => 'lucide-table-2', 'board' => 'lucide-square-kanban', 'cards' => 'lucide-layout-grid'];
-
     private const array VIEW_TONES = ['list' => 'success', 'board' => 'orange', 'cards' => 'info'];
 
     /** @var array<string, list<string>> */
@@ -139,6 +137,13 @@ trait HasViewSwitcher
         if ($url !== null) {
             $this->redirect($url, navigate: FilamentView::hasSpaMode($url));
         }
+    }
+
+    protected function savedViewPageUrl(SavedView $view): string
+    {
+        $layout = $view->type === SavedViewType::Board ? 'board' : 'list';
+
+        return static::getResource()::getUrl($this->viewSwitcherPages()[$layout]['name'], ['view' => $view->getKey()]);
     }
 
     protected function boardViewUrl(SavedView $view): ?string
@@ -268,6 +273,15 @@ trait HasViewSwitcher
         };
     }
 
+    private function viewSwitcherIcon(string $kind): string
+    {
+        return match ($kind) {
+            'list' => SavedViewType::Table->getIcon(),
+            'board' => SavedViewType::Board->getIcon(),
+            default => 'lucide-layout-grid',
+        };
+    }
+
     private function builtInEntryAction(bool $canApply, string $kind): ?string
     {
         return match (true) {
@@ -308,7 +322,7 @@ trait HasViewSwitcher
                 'layout' => $kind,
                 'action' => $this->builtInEntryAction($canApply, $kind),
                 'label' => $page['label'],
-                'icon' => self::VIEW_ICONS[$kind],
+                'icon' => $this->viewSwitcherIcon($kind),
                 'tone' => self::VIEW_TONES[$kind],
                 'url' => $this->viewSwitcherEntryUrl($kind, $page),
                 'active' => $page['active'] && (! in_array($kind, ['list', 'board'], true) || $activeId === null || ! $views->contains('id', $activeId)),
@@ -332,7 +346,7 @@ trait HasViewSwitcher
                 'layout' => $layout,
                 'action' => $canApply && $pages[$layout]['active'] ? "applySavedView('{$view->getKey()}')" : null,
                 'label' => $view->name,
-                'icon' => self::VIEW_ICONS[$layout],
+                'icon' => $this->viewSwitcherIcon($layout),
                 'tone' => self::VIEW_TONES[$layout],
                 'url' => static::getResource()::getUrl($pages[$layout]['name'], ['view' => $view->getKey()]),
                 'active' => $view->getKey() === $activeId,

@@ -6,6 +6,7 @@ namespace App\Filament\Tables\Concerns;
 
 use App\Actions\Views\CreateSavedView;
 use App\Actions\Views\UpdateSavedView;
+use App\Data\BoardStateData;
 use App\Data\TableStateData;
 use App\Enums\CrmEntity;
 use App\Enums\SavedViewType;
@@ -29,14 +30,16 @@ trait HasSavedViews
         return $this->tableEntity();
     }
 
-    protected function createSavedViewFromCurrentState(string $name): SavedView
+    protected function createSavedViewFromCurrentState(string $name, SavedViewType $type): SavedView
     {
         return resolve(CreateSavedView::class)->execute(
             $this->savedViewUser(),
             $this->savedViewWorkspace(),
             $this->tableEntity(),
             $name,
-            $this->currentTableState(),
+            $type === SavedViewType::Table
+                ? $this->currentTableState()
+                : new BoardStateData(filters: $this->boardFilters($this->tableFilters)),
         );
     }
 

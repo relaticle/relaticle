@@ -7,6 +7,7 @@ namespace App\Filament\Concerns;
 use App\Actions\Views\CreateSavedView;
 use App\Actions\Views\SaveBoardState;
 use App\Data\BoardStateData;
+use App\Data\TableStateData;
 use App\Enums\CrmEntity;
 use App\Enums\SavedViewType;
 use App\Filament\Components\Tables\ColumnHeaderLabel;
@@ -134,14 +135,16 @@ trait HasBoardViews
         return $this->filterBarEntity();
     }
 
-    protected function createSavedViewFromCurrentState(string $name): SavedView
+    protected function createSavedViewFromCurrentState(string $name, SavedViewType $type): SavedView
     {
         return resolve(CreateSavedView::class)->execute(
             $this->viewSwitcherUser(),
             $this->viewSwitcherWorkspace(),
             $this->filterBarEntity(),
             $name,
-            $this->currentBoardState(),
+            $type === SavedViewType::Board
+                ? $this->currentBoardState()
+                : new TableStateData(filters: $this->canonicalTableFilters($this->tableFilters)),
         );
     }
 
@@ -194,7 +197,7 @@ trait HasBoardViews
 
     private function redirectToListView(SavedView $view): void
     {
-        $url = static::getResource()::getUrl($this->viewSwitcherPages()['list']['name'], ['view' => $view->getKey()]);
+        $url = $this->savedViewPageUrl($view);
 
         $this->redirect($url, navigate: FilamentView::hasSpaMode($url));
     }
@@ -272,14 +275,6 @@ trait HasBoardViews
     private function boardStateSignature(BoardStateData $state): string
     {
         return new BoardStateData(filters: $state->filters, grouping: $state->grouping, sort: $state->sort)->hash();
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function boardFilters(mixed $filters): array
-    {
-        return [...$this->canonicalTableFilters($filters), 'trashed' => ['value' => null]];
     }
 
     private function offeredSort(?string $sort): ?string

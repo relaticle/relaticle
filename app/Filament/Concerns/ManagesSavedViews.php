@@ -8,6 +8,7 @@ use App\Actions\Views\DeleteSavedView;
 use App\Actions\Views\DuplicateSavedView;
 use App\Actions\Views\UpdateSavedView;
 use App\Enums\CrmEntity;
+use App\Enums\SavedViewType;
 use App\Models\SavedView;
 use App\Models\User;
 use App\Models\Workspace;
@@ -15,14 +16,21 @@ use App\Queries\Views\VisibleSavedViewsQuery;
 use Closure;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Schema;
 use Filament\Support\Components\Attributes\Exposed;
+use Filament\Support\Enums\GridDirection;
+use Filament\Support\Facades\FilamentView;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Arr;
+use Illuminate\Support\HtmlString;
 use Illuminate\Validation\ValidationException;
+use Relaticle\Flowforge\Contracts\HasBoard;
+
+use function Filament\Support\generate_icon_html;
 
 trait ManagesSavedViews
 {
@@ -33,7 +41,7 @@ trait ManagesSavedViews
 
     abstract protected function savedViewEntity(): CrmEntity;
 
-    abstract protected function createSavedViewFromCurrentState(string $name): SavedView;
+    abstract protected function createSavedViewFromCurrentState(string $name, SavedViewType $type): SavedView;
 
     abstract protected function savedViewCreated(SavedView $view): void;
 
@@ -112,15 +120,27 @@ trait ManagesSavedViews
             ->modalWidth('md')
             ->modalSubmitActionLabel(__('filament/panel.tables.views.create_submit'))
             ->schema([
+                $this->savedViewTypeInput(),
                 $this->savedViewNameInput(),
             ])
             ->action(function (array $data, Schema $schema): void {
-                $view = $this->withViewNameErrors($schema, fn (): SavedView => $this->createSavedViewFromCurrentState($data['name']));
+                $type = $this->chosenSavedViewType($data);
+                $view = $this->withViewNameErrors($schema, fn (): SavedView => $this->createSavedViewFromCurrentState($data['name'], $type));
+                $opensHere = $type === $this->pageSavedViewType();
 
-                $this->savedViewCreated($view);
+                if ($opensHere) {
+                    $this->savedViewCreated($view);
+                }
+
                 $this->visibleSavedViews = null;
 
                 Notification::make()->success()->title(__('filament/panel.tables.views.created', ['name' => e($view->name)]))->send();
+
+                if (! $opensHere) {
+                    $url = $this->savedViewPageUrl($view);
+
+                    $this->redirect($url, navigate: FilamentView::hasSpaMode($url));
+                }
             });
     }
 
@@ -229,10 +249,55 @@ trait ManagesSavedViews
         $this->visibleSavedViews = null;
     }
 
+    private function savedViewTypeInput(): Radio
+    {
+        $types = SavedViewType::cases();
+
+        return Radio::make('type')
+            ->label(__('filament/panel.tables.views.type'))
+            ->options(fn (): array => collect($types)->mapWithKeys(fn (SavedViewType $type): array => [$type->value => $this->savedViewTypeLabel($type)])->all())
+            ->descriptions(collect($types)->mapWithKeys(fn (SavedViewType $type): array => [$type->value => $type->getDescription()])->all())
+            ->default($this->pageSavedViewType()->value)
+            ->required()
+            ->markAsRequired(false)
+            ->visible(fn (): bool => $this->offersSavedViewType())
+            ->columns(['default' => 1, 'sm' => 2])
+            ->gridDirection(GridDirection::Row)
+            ->extraAttributes(['class' => 'fi-view-type-radio']);
+    }
+
+    private function savedViewTypeLabel(SavedViewType $type): HtmlString
+    {
+        $icon = generate_icon_html($type->getIcon())?->toHtml();
+
+        return new HtmlString('<span class="fi-view-type-tile" aria-hidden="true">'.$icon.'</span><span class="fi-view-type-name">'.e($type->getLabel()).'</span>');
+    }
+
+    private function offersSavedViewType(): bool
+    {
+        $pages = $this->viewSwitcherPages();
+
+        return isset($pages['list'], $pages['board']);
+    }
+
+    private function pageSavedViewType(): SavedViewType
+    {
+        return $this instanceof HasBoard ? SavedViewType::Board : SavedViewType::Table;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function chosenSavedViewType(array $data): SavedViewType
+    {
+        return $this->offersSavedViewType() ? SavedViewType::from($data['type']) : $this->pageSavedViewType();
+    }
+
     private function savedViewNameInput(): TextInput
     {
         return TextInput::make('name')
             ->label(__('filament/panel.tables.views.name'))
+            ->placeholder(__('filament/panel.tables.views.name_placeholder'))
             ->required()
             ->maxLength(SavedView::NAME_MAX_LENGTH)
             ->autofocus();
