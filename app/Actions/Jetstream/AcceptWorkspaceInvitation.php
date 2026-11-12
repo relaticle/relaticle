@@ -14,9 +14,9 @@ use Laravel\Jetstream\Jetstream;
 
 /**
  * Callers confirm the invitation is valid and the email matches, because each
- * surface renders a mismatch differently. Deletion state and the revoked-or-
- * expired race are enforced here so no caller can report a join that did not
- * happen; both refuse with an HttpException the caller may catch.
+ * surface renders a mismatch differently. A verified email, deletion state and
+ * the revoked-or-expired race are enforced here so no caller can report a join
+ * that did not happen; each refuses with an HttpException the caller may catch.
  */
 final readonly class AcceptWorkspaceInvitation
 {
@@ -28,6 +28,7 @@ final readonly class AcceptWorkspaceInvitation
     {
         $workspace = $invitation->workspace;
 
+        abort_unless($user->hasVerifiedEmail(), 403, __('workspaces.accept.email_unverified'));
         abort_if($user->isScheduledForDeletion(), 403, __('workspaces.accept.account_deleting'));
         abort_if($workspace->isScheduledOnRequest(), 410, __('workspaces.accept.workspace_deleting'));
 

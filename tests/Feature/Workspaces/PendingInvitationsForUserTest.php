@@ -17,6 +17,8 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Laravel\Jetstream\Events\TeamMemberAdded;
 use Laravel\Jetstream\Jetstream;
+use Livewire\Livewire;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 mutates(PendingInvitationsForUser::class, AcceptWorkspaceInvitation::class, DeclineWorkspaceInvitation::class);
 
@@ -336,4 +338,80 @@ test('a user with no pending invitations sees an empty card', function (): void 
         ->assertOk()
         ->assertDontSee(__('workspaces.pending_for_user.accept'))
         ->assertDontSee(__('workspaces.pending_for_user.decline'));
+});
+
+test('an unverified account cannot accept an invitation from the card', function (): void {
+    $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
+    $invitation = $workspace->workspaceInvitations()->create([
+        'email' => 'newhire@acme.test',
+        'role' => 'admin',
+        'expires_at' => now()->addDays(7),
+    ]);
+
+    $intruder = User::factory()->unverified()->create(['email' => 'newhire@acme.test']);
+    $this->actingAs($intruder);
+
+    livewire(PendingInvitationsForUser::class)->call('accept', $invitation->id);
+
+    expect($intruder->fresh()->belongsToWorkspace($workspace))->toBeFalse()
+        ->and(WorkspaceInvitation::query()->whereKey($invitation->id)->exists())->toBeTrue();
+});
+
+test('an unverified account cannot accept by replaying a snapshot rendered for a verified user', function (): void {
+    $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
+    $invitation = $workspace->workspaceInvitations()->create([
+        'email' => 'newhire@acme.test',
+        'role' => 'admin',
+        'expires_at' => now()->addDays(7),
+    ]);
+
+    $attacker = User::factory()->create();
+    $this->actingAs($attacker);
+
+    $html = $this->get(route('filament.app.tenant.registration'))->assertOk()->getContent();
+    preg_match_all('/wire:snapshot="([^"]+)"/', $html, $matches);
+    $snapshot = collect($matches[1])
+        ->map(fn (string $value): string => html_entity_decode($value, ENT_QUOTES))
+        ->first(fn (string $value): bool => str_contains(
+            (string) json_decode($value, true, flags: JSON_THROW_ON_ERROR)['memo']['name'],
+            'pending-invitations',
+        ));
+
+    expect($snapshot)->not->toBeNull();
+
+    $intruder = User::factory()->unverified()->create(['email' => 'newhire@acme.test']);
+    auth()->logout();
+    $this->actingAs($intruder);
+
+    $this->postJson(Livewire::getUpdateUri(), [
+        'components' => [[
+            'snapshot' => $snapshot,
+            'updates' => [],
+            'calls' => [['path' => '', 'method' => 'accept', 'params' => [$invitation->id]]],
+        ]],
+    ], ['X-Livewire' => 'true']);
+
+    expect($intruder->fresh()->belongsToWorkspace($workspace))->toBeFalse()
+        ->and(WorkspaceInvitation::query()->whereKey($invitation->id)->exists())->toBeTrue();
+});
+
+test('an unverified account sees no invitations and cannot decline one', function (): void {
+    $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
+    $invitation = $workspace->workspaceInvitations()->create([
+        'email' => 'newhire@acme.test',
+        'role' => 'member',
+        'expires_at' => now()->addDays(7),
+    ]);
+
+    $intruder = User::factory()->unverified()->create(['email' => 'newhire@acme.test']);
+    $this->actingAs($intruder);
+
+    livewire(PendingInvitationsForUser::class)
+        ->assertDontSee($workspace->name)
+        ->call('decline', $invitation->id);
+
+    expect(fn () => resolve(DeclineWorkspaceInvitation::class)->decline($intruder, $invitation))
+        ->toThrow(HttpException::class);
+
+    expect(WorkspaceInvitation::query()->whereKey($invitation->id)->exists())->toBeTrue();
 });

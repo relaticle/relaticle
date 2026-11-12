@@ -25,7 +25,7 @@ Route::middleware('throttle:mcp-oauth')->group(static fn () => Mcp::oauthRoutes(
 // Defer registration until after Passport (which boots later) has registered its routes,
 // so our POST /oauth/authorize wins the dispatch slot in the route collection.
 app()->booted(static function (): void {
-    Route::middleware(['web', 'auth', 'throttle:mcp-oauth'])
+    Route::middleware(['web', 'auth', 'verified', 'throttle:mcp-oauth'])
         ->post('/oauth/authorize', [ApproveAuthorizationController::class, 'approve'])
         ->name('passport.authorizations.approve');
 

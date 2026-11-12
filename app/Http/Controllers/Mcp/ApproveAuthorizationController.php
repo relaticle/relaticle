@@ -35,6 +35,8 @@ final class ApproveAuthorizationController extends BaseApproveAuthorizationContr
         /** @var User $user */
         $user = $request->user();
 
+        abort_unless($user->hasVerifiedEmail(), 403, 'Verify your email address before connecting an AI assistant.');
+
         $workspace = Workspace::query()->find($validated['workspace_id']);
 
         abort_if(! $workspace instanceof Workspace, 422, 'Selected workspace does not exist.');

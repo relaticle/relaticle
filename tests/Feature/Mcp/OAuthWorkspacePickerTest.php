@@ -13,6 +13,7 @@ use App\Models\Passport\AuthCode;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Passport\WorkspaceBearerTokenResponse;
+use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Passport\Client;
@@ -302,6 +303,38 @@ it('rejects the approve POST when the user does not belong to the workspace', fu
     ]);
 
     $response->assertForbidden();
+});
+
+it('sends an account without a verified email to verify before it approves a connector', function (): void {
+    $this->user->forceFill(['email_verified_at' => null])->save();
+    $this->actingAs($this->user);
+
+    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use']));
+
+    $this->post('/oauth/authorize', [
+        'state' => 'test-state',
+        'client_id' => $this->client->getKey(),
+        'auth_token' => session('authToken'),
+        'workspace_id' => $this->otherWorkspace->getKey(),
+    ])->assertRedirect();
+
+    expect(AuthCode::query()->where('user_id', $this->user->getKey())->exists())->toBeFalse();
+});
+
+it('refuses an account without a verified email in the approve controller itself', function (): void {
+    $this->user->forceFill(['email_verified_at' => null])->save();
+    $this->actingAs($this->user)->withoutMiddleware(EnsureEmailIsVerified::class);
+
+    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use']));
+
+    $this->post('/oauth/authorize', [
+        'state' => 'test-state',
+        'client_id' => $this->client->getKey(),
+        'auth_token' => session('authToken'),
+        'workspace_id' => $this->otherWorkspace->getKey(),
+    ])->assertForbidden();
+
+    expect(AuthCode::query()->where('user_id', $this->user->getKey())->exists())->toBeFalse();
 });
 
 it('marks a billing-paused workspace as unselectable on the consent screen', function (): void {
