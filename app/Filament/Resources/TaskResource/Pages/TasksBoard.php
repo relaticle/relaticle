@@ -375,8 +375,7 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
                 $task->saveCustomFieldValue($this->boardColumnField(), $columnId);
             }
 
-            $task->order_column = (float) $this->getBoardPositionInColumn($columnId);
-            $task->saveQuietly();
+            $this->placeNewCard($task, $columnId);
         }
 
         return $task;

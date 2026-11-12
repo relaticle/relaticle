@@ -18,6 +18,7 @@ use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
+use Filament\Schemas\Schema;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -25,6 +26,7 @@ use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection;
 use Illuminate\Support\HtmlString;
 use LogicException;
+use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 use Relaticle\Flowforge\Column;
 
 trait HasBoardStageOrder
@@ -308,10 +310,51 @@ trait HasBoardStageOrder
     {
         return array_map(
             fn (Action|ActionGroup $action): Action|ActionGroup => $action instanceof CreateAction
-                ? $action->fillForm(fn (): array => ['custom_fields' => [$this->boardColumnField()->code => $this->visibleBoardColumnIds()[0] ?? null]])
+                ? $action
+                    ->mountUsing(fn (?Schema $schema) => $this->fillWithFirstVisibleColumn($schema))
+                    ->after(fn (Model $record) => $this->placeAtBottomOfItsColumn($record))
                 : $action,
             $actions,
         );
+    }
+
+    protected function placeNewCard(Model $card, string $columnId, string $edge = 'top'): void
+    {
+        $card->setAttribute('order_column', (float) $this->getBoardPositionInColumn($columnId, $edge));
+        $card->saveQuietly();
+    }
+
+    private function fillWithFirstVisibleColumn(?Schema $schema): void
+    {
+        if (! $schema instanceof Schema) {
+            return;
+        }
+
+        $schema->fill();
+
+        $state = $schema->getRawState();
+        data_set($state, 'custom_fields.'.$this->boardColumnField()->code, $this->visibleBoardColumnIds()[0] ?? null);
+        $schema->rawState($state);
+    }
+
+    private function placeAtBottomOfItsColumn(Model $record): void
+    {
+        if (! $record instanceof HasCustomFields) {
+            return;
+        }
+
+        $field = $this->boardColumnField();
+        $value = $record->customFieldValues()->where('custom_field_id', $field->getKey())->value($field->getValueColumn());
+
+        $columnId = match (true) {
+            is_string($value) && $this->boardColumnOptions()->contains('id', $value) => $value,
+            blank($value) && $this->showsNoValueColumn() => BoardStateData::NO_VALUE_COLUMN,
+            default => null,
+        };
+
+        if ($columnId !== null) {
+            $this->placeNewCard($record, $columnId, 'bottom');
+        }
     }
 
     abstract protected function defaultBoardColumnField(): ?CustomField;

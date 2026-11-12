@@ -340,8 +340,7 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
                 $opportunity->saveCustomFieldValue($this->boardColumnField(), $columnId);
             }
 
-            $opportunity->order_column = (float) $this->getBoardPositionInColumn($columnId);
-            $opportunity->saveQuietly();
+            $this->placeNewCard($opportunity, $columnId);
         }
 
         return $opportunity;

@@ -1554,6 +1554,22 @@ it('shows a viewer none of the header actions', function (): void {
         ->assertActionHidden('import');
 });
 
+function headerCreateTask(string $title, array $data = []): void
+{
+    livewire(TasksBoard::class)
+        ->mountAction('create')
+        ->setActionData(['title' => $title, ...$data])
+        ->callMountedAction()
+        ->assertHasNoActionErrors();
+}
+
+function headerTaskPosition(string $title): ?float
+{
+    $position = Task::query()->where('title', $title)->firstOrFail()->order_column;
+
+    return $position === null ? null : (float) $position;
+}
+
 it('creates a task from the header into the first visible status', function (): void {
     $ids = statusIds($this->statusField);
 
@@ -1568,15 +1584,75 @@ it('creates a task from the header into the first visible status', function (): 
 
     $cards = livewire(TasksBoard::class)->instance()->getBoard()->getBoardRecords($ids[1]);
 
-    expect($cards->pluck('title')->all())->toContain('Header task')
-        ->and($cards->last()->title)->toBe('Header task');
+    expect($cards->pluck('title')->all())->toContain('Header task');
 });
 
-it('exports the tasks the bar\'s filters match from the board', function (bool $noValueColumn): void {
-    taskInStatus($this, 'Acme brief', 'To do');
-    taskInStatus($this, 'Globex brief', 'To do');
+it('puts a task created from the header below the last card of its column', function (): void {
+    taskInStatus($this, 'Write brief', 'To do')->forceFill(['order_column' => 3000])->saveQuietly();
 
-    $component = livewire(TasksBoard::class);
+    headerCreateTask('Header task');
+
+    expect(headerTaskPosition('Header task'))->toBe((float) DecimalPosition::after('3000'));
+});
+
+it('gives the first task created from the header into an empty column the empty column position', function (): void {
+    headerCreateTask('Header task');
+
+    expect(headerTaskPosition('Header task'))->toBe((float) DecimalPosition::forEmptyColumn());
+});
+
+it('sorts a second task created from the header after the first', function (): void {
+    headerCreateTask('First header task');
+    headerCreateTask('Second header task');
+
+    expect(headerTaskPosition('Second header task'))->toBeGreaterThan(headerTaskPosition('First header task'));
+});
+
+it('positions a task created from the header in the status the form was changed to', function (): void {
+    taskInStatus($this, 'Write brief', 'To do')->forceFill(['order_column' => 3000])->saveQuietly();
+    taskInStatus($this, 'Ship it', 'In progress')->forceFill(['order_column' => 9000])->saveQuietly();
+    $inProgress = (string) $this->statusField->options->firstWhere('name', 'In progress')->getKey();
+
+    headerCreateTask('Header task', ['custom_fields' => [TaskField::STATUS->value => $inProgress]]);
+
+    expect(headerTaskPosition('Header task'))->toBe((float) DecimalPosition::after('9000'));
+});
+
+it('positions a task created from the header with no status in the no status column', function (): void {
+    Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Bare task'])->forceFill(['order_column' => 5000])->saveQuietly();
+
+    livewire(TasksBoard::class)
+        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
+        ->mountAction('create')
+        ->setActionData(['title' => 'Header task', 'custom_fields' => [TaskField::STATUS->value => null]])
+        ->callMountedAction()
+        ->assertHasNoActionErrors();
+
+    expect(headerTaskPosition('Header task'))->toBe((float) DecimalPosition::after('5000'));
+});
+
+it('creates no task when a viewer calls the header create action directly', function (): void {
+    $viewer = User::factory()->create();
+    $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
+    $viewer->switchWorkspace($this->workspace);
+    $this->actingAs($viewer);
+
+    livewire(TasksBoard::class)
+        ->call('mountAction', 'create')
+        ->set('mountedActions.0.data.title', 'Viewer task')
+        ->call('callMountedAction');
+
+    expect(Task::query()->where('title', 'Viewer task')->exists())->toBeFalse();
+});
+
+it('exports the tasks the bar\'s filters match from the board, hidden statuses and no status included', function (bool $noValueColumn): void {
+    taskInStatus($this, 'Acme hidden status', 'To do');
+    taskInStatus($this, 'Acme shown status', 'In progress');
+    Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Acme no status']);
+    taskInStatus($this, 'Globex brief', 'In progress');
+    $todo = (string) $this->statusField->options->firstWhere('name', 'To do')->getKey();
+
+    $component = livewire(TasksBoard::class)->call('setBoardColumnVisible', $todo, false);
 
     if ($noValueColumn) {
         $component->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true);
@@ -1586,7 +1662,7 @@ it('exports the tasks the bar\'s filters match from the board', function (bool $
         ->call('setFilterRules', [['field' => 'title', 'condition' => 'contains', 'value' => 'Acme']])
         ->callAction('export');
 
-    expect(Export::query()->sole()->total_rows)->toBe(1);
+    expect(Export::query()->sole()->total_rows)->toBe(3);
 })->with([
     'no status column off' => [false],
     'no status column on' => [true],

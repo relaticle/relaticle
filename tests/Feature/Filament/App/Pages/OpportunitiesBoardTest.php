@@ -1803,6 +1803,22 @@ it('shows a viewer none of the header actions', function (): void {
         ->assertActionHidden('import');
 });
 
+function headerCreateOpportunity(string $name, array $data = []): void
+{
+    livewire(OpportunitiesBoard::class)
+        ->mountAction('create')
+        ->setActionData(['name' => $name, ...$data])
+        ->callMountedAction()
+        ->assertHasNoActionErrors();
+}
+
+function headerOpportunityPosition(string $name): ?float
+{
+    $position = Opportunity::query()->where('name', $name)->firstOrFail()->order_column;
+
+    return $position === null ? null : (float) $position;
+}
+
 it('creates an opportunity from the header into the first visible stage', function (): void {
     $ids = stageIds($this->stageField);
 
@@ -1815,18 +1831,77 @@ it('creates an opportunity from the header into the first visible stage', functi
         ->callMountedAction()
         ->assertHasNoActionErrors();
 
-    $component = livewire(OpportunitiesBoard::class);
-    $cards = $component->instance()->getBoard()->getBoardRecords($ids[1]);
+    $cards = livewire(OpportunitiesBoard::class)->instance()->getBoard()->getBoardRecords($ids[1]);
 
-    expect($cards->pluck('name')->all())->toContain('Header deal')
-        ->and($cards->last()->name)->toBe('Header deal');
+    expect($cards->pluck('name')->all())->toContain('Header deal');
 });
 
-it('exports the opportunities the bar\'s filters match from the board', function (bool $noValueColumn): void {
-    opportunityInStage($this, 'Acme renewal', 'Prospecting');
-    opportunityInStage($this, 'Globex upsell', 'Prospecting');
+it('puts an opportunity created from the header below the last card of its column', function (): void {
+    opportunityInStage($this, 'Acme renewal', 'Prospecting')->forceFill(['order_column' => 3000])->saveQuietly();
 
-    $component = livewire(OpportunitiesBoard::class);
+    headerCreateOpportunity('Header deal');
+
+    expect(headerOpportunityPosition('Header deal'))->toBe((float) DecimalPosition::after('3000'));
+});
+
+it('gives the first opportunity created from the header into an empty column the empty column position', function (): void {
+    headerCreateOpportunity('Header deal');
+
+    expect(headerOpportunityPosition('Header deal'))->toBe((float) DecimalPosition::forEmptyColumn());
+});
+
+it('sorts a second opportunity created from the header after the first', function (): void {
+    headerCreateOpportunity('First header deal');
+    headerCreateOpportunity('Second header deal');
+
+    expect(headerOpportunityPosition('Second header deal'))->toBeGreaterThan(headerOpportunityPosition('First header deal'));
+});
+
+it('positions an opportunity created from the header in the stage the form was changed to', function (): void {
+    opportunityInStage($this, 'Acme renewal', 'Prospecting')->forceFill(['order_column' => 3000])->saveQuietly();
+    opportunityInStage($this, 'Globex upsell', 'Qualification')->forceFill(['order_column' => 9000])->saveQuietly();
+    $qualification = (string) $this->stageField->options->firstWhere('name', 'Qualification')->getKey();
+
+    headerCreateOpportunity('Header deal', ['custom_fields' => [OpportunityField::STAGE->value => $qualification]]);
+
+    expect(headerOpportunityPosition('Header deal'))->toBe((float) DecimalPosition::after('9000'));
+});
+
+it('positions an opportunity created from the header with no stage in the no stage column', function (): void {
+    noStageOpportunity($this, 'Globex upsell')->forceFill(['order_column' => 5000])->saveQuietly();
+
+    livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
+        ->mountAction('create')
+        ->setActionData(['name' => 'Header deal', 'custom_fields' => [OpportunityField::STAGE->value => null]])
+        ->callMountedAction()
+        ->assertHasNoActionErrors();
+
+    expect(headerOpportunityPosition('Header deal'))->toBe((float) DecimalPosition::after('5000'));
+});
+
+it('creates no opportunity when a viewer calls the header create action directly', function (): void {
+    $viewer = User::factory()->create();
+    $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
+    $viewer->switchWorkspace($this->workspace);
+    $this->actingAs($viewer);
+
+    livewire(OpportunitiesBoard::class)
+        ->call('mountAction', 'create')
+        ->set('mountedActions.0.data.name', 'Viewer deal')
+        ->call('callMountedAction');
+
+    expect(Opportunity::query()->where('name', 'Viewer deal')->exists())->toBeFalse();
+});
+
+it('exports the opportunities the bar\'s filters match from the board, hidden stages and no stage included', function (bool $noValueColumn): void {
+    opportunityInStage($this, 'Acme hidden stage', 'Prospecting');
+    opportunityInStage($this, 'Acme shown stage', 'Qualification');
+    noStageOpportunity($this, 'Acme no stage');
+    opportunityInStage($this, 'Globex upsell', 'Qualification');
+    $prospecting = (string) $this->stageField->options->firstWhere('name', 'Prospecting')->getKey();
+
+    $component = livewire(OpportunitiesBoard::class)->call('setBoardColumnVisible', $prospecting, false);
 
     if ($noValueColumn) {
         $component->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true);
@@ -1836,7 +1911,7 @@ it('exports the opportunities the bar\'s filters match from the board', function
         ->call('setFilterRules', [['field' => 'name', 'condition' => 'contains', 'value' => 'Acme']])
         ->callAction('export');
 
-    expect(Export::query()->sole()->total_rows)->toBe(1);
+    expect(Export::query()->sole()->total_rows)->toBe(3);
 })->with([
     'no stage column off' => [false],
     'no stage column on' => [true],
