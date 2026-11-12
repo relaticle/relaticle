@@ -6,6 +6,7 @@ namespace App\Filament\Resources\TaskResource\Pages;
 
 use App\Actions\Task\UpdateTask;
 use App\Contracts\OrdersBoardStages;
+use App\Enums\CrmEntity;
 use App\Enums\CustomFields\TaskField as TaskCustomField;
 use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Actions\EditTaskAction;
@@ -322,7 +323,7 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
             ->modalWidth(Width::TwoExtraLarge)
             ->slideOver(false)
             ->model(Task::class)
-            ->schema(fn (Schema $schema): Schema => TaskForm::get($schema, ['status']))
+            ->schema(fn (Schema $schema): Schema => TaskForm::get($schema, [CrmEntity::Task->boardFieldCode()]))
             ->using($this->createCard(...));
     }
 
@@ -401,7 +402,7 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
 
     private static function statusCustomField(): ?CustomField
     {
-        return self::cardCustomFields()->get(TaskCustomField::STATUS->value);
+        return self::cardCustomFields()->get(CrmEntity::Task->boardFieldCode());
     }
 
     /** @return Collection<string, CustomField> */
@@ -410,7 +411,7 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
         /** @var Collection<string, CustomField> */
         return once(fn (): Collection => CustomField::query()
             ->forEntity(Task::class)
-            ->whereIn('code', [TaskCustomField::STATUS, TaskCustomField::DESCRIPTION])
+            ->whereIn('code', [CrmEntity::Task->boardFieldCode(), TaskCustomField::DESCRIPTION])
             ->with('options')
             ->get()
             ->keyBy('code'));

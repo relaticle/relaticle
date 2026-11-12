@@ -6,6 +6,7 @@ namespace App\Filament\Resources\OpportunityResource\Pages;
 
 use App\Actions\Opportunity\UpdateOpportunity;
 use App\Contracts\OrdersBoardStages;
+use App\Enums\CrmEntity;
 use App\Enums\CustomFields\OpportunityField as OpportunityCustomField;
 use App\Filament\Actions\MoveCardAction;
 use App\Filament\Actions\PreviewRecordAction;
@@ -282,7 +283,7 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
                     ->searchable()
                     ->preload(),
                 CustomFields::form()
-                    ->except([OpportunityCustomField::STAGE])
+                    ->except([CrmEntity::Opportunity->boardFieldCode()])
                     ->build()
                     ->columnSpanFull()
                     ->columns(1),
@@ -370,7 +371,7 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
         /** @var CustomField|null */
         return once(fn () => CustomField::query()
             ->forEntity(Opportunity::class)
-            ->where('code', OpportunityCustomField::STAGE)
+            ->where('code', CrmEntity::Opportunity->boardFieldCode())
             ->first());
     }
 

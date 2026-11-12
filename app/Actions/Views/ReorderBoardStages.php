@@ -13,6 +13,7 @@ use App\Models\Scopes\WorkspaceScope;
 use App\Models\TablePreference;
 use App\Models\User;
 use App\Models\Workspace;
+use Relaticle\CustomFields\Models\Scopes\TenantScope;
 
 final readonly class ReorderBoardStages
 {
@@ -51,12 +52,12 @@ final readonly class ReorderBoardStages
         $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
 
         $ids = CustomFieldOption::query()
-            ->withoutGlobalScopes()
+            ->withoutGlobalScope(TenantScope::class)
             ->where($tenantKey, $workspace->getKey())
             ->whereIn('custom_field_id', CustomField::query()
-                ->withoutGlobalScopes()
+                ->withoutGlobalScope(TenantScope::class)
                 ->where($tenantKey, $workspace->getKey())
-                ->where('entity_type', $entity->value)
+                ->forEntity($entity->model())
                 ->where('code', $code)
                 ->select('id'))
             ->pluck('id')

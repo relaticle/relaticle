@@ -18,6 +18,8 @@ use Relaticle\CustomFields\Services\TenantContextService;
 
 mutates(TasksBoard::class, OpportunitiesBoard::class, MoveCardAction::class);
 
+pest()->group('webkit');
+
 it('scrolls a long column inside the board without scrolling the page', function (string $model, string $columnFieldCode, string $dateFieldCode, string $path): void {
     $this->withVite();
 
@@ -349,15 +351,6 @@ function waitForStoredStageOrder(mixed $page, User $user, CrmEntity $entity, arr
     }
 }
 
-function dragInSteps(mixed $page, string $from, string $to): void
-{
-    if (! $page->script('navigator.userAgent.includes("Chrome")')) {
-        test()->markTestSkipped('Playwright drives a WebKit drag through native drag events, which a pointer-based sortable never receives.');
-    }
-
-    $page->page()->locator($from)->dragTo($page->page()->locator($to), ['steps' => 25]);
-}
-
 const BOARD_COLUMN_IDS = '[...document.querySelectorAll(".ff-columns > .ff-column")].map((column) => column.dataset.columnRoot)';
 
 const BOARD_STAGE_ROW_IDS = '[...document.querySelectorAll("[data-board-view-settings] [data-stage-id]")].map((row) => row.dataset.stageId)';
@@ -377,7 +370,7 @@ it('drags a column header to reorder the columns and keeps the order after a rel
         ->assertVisible('.ff-column >> nth=0')
         ->assertScript(BOARD_COLUMN_IDS, $ids);
 
-    dragInSteps($page, "[data-column-root=\"{$ids[0]}\"] .ff-column-title", "[data-column-root=\"{$ids[1]}\"] .ff-column-title");
+    dragWithPointerEvents($page, "[data-column-root=\"{$ids[0]}\"] .ff-column-title", "[data-column-root=\"{$ids[1]}\"] .ff-column-title");
     waitForStoredStageOrder($page, $user, $entity, $expected);
 
     expect(storedStageOrder($user, $entity))->toBe($expected);
@@ -412,10 +405,12 @@ it('still moves a card between columns after the columns were reordered', functi
         ->navigate("/app/{$workspace->slug}/{$path}")
         ->assertVisible($card);
 
-    dragInSteps($page, "[data-column-root=\"{$ids[2]}\"] .ff-column-title", "[data-column-root=\"{$ids[0]}\"] .ff-column-title");
+    dragWithPointerEvents($page, "[data-column-root=\"{$ids[2]}\"] .ff-column-title", "[data-column-root=\"{$ids[0]}\"] .ff-column-title");
     waitForStoredStageOrder($page, $user, $entity, [$ids[2], $ids[0], $ids[1], ...array_slice($ids, 3)]);
 
-    dragInSteps($page, $card, "[data-column-root=\"{$to->getKey()}\"] .ff-cards");
+    expect(storedStageOrder($user, $entity))->toBe([$ids[2], $ids[0], $ids[1], ...array_slice($ids, 3)]);
+
+    dragCard($page, $card, "[data-column-root=\"{$to->getKey()}\"] .ff-cards");
 
     for ($attempt = 0; $attempt < 50 && $record->fresh()->customFieldValues()->where('custom_field_id', $field->getKey())->value($field->getValueColumn()) !== $to->getKey(); $attempt++) {
         $page->wait(0.1);
@@ -511,3 +506,260 @@ it('keeps the board view settings usable on a 390px phone', function (string $mo
     $page->assertScript(BOARD_COLUMN_IDS, [$ids[1], $ids[0], ...array_slice($ids, 2)])
         ->assertNoJavaScriptErrors();
 })->with('stage order boards');
+
+function dragWithPointerEvents(mixed $page, string $from, string $to): void
+{
+    $page->script(sprintf(<<<'JS'
+        (async () => {
+            const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+            const centre = (selector) => {
+                const box = document.querySelector(selector).getBoundingClientRect();
+
+                return [box.left + box.width / 2, box.top + box.height / 2];
+            };
+            const [fromX, fromY] = centre(%1$s);
+            const [toX, toY] = centre(%2$s);
+            const pointerEvents = navigator.userAgent.includes('Chrome');
+            const press = (name, x, y, target = document) => {
+                const type = (pointerEvents ? 'pointer' : 'mouse') + name;
+                const init = { bubbles: true, cancelable: true, button: 0, buttons: name === 'up' ? 0 : 1, clientX: x, clientY: y };
+
+                target.dispatchEvent(pointerEvents ? new PointerEvent(type, { ...init, pointerId: 1, isPrimary: true, pointerType: 'mouse' }) : new MouseEvent(type, init));
+            };
+
+            press('down', fromX, fromY, document.querySelector(%1$s));
+
+            for (let step = 1; step <= 20; step++) {
+                press('move', fromX + (toX - fromX) * step / 20, fromY + (toY - fromY) * step / 20);
+                await wait(30);
+            }
+
+            await wait(100);
+            press('up', toX, toY);
+
+            return true;
+        })()
+        JS, json_encode($from), json_encode($to)));
+}
+
+function dragCard(mixed $page, string $from, string $to): void
+{
+    if (! $page->script('navigator.userAgent.includes("Chrome")')) {
+        test()->markTestSkipped('Flowforge tracks a card drag through the pointer, and synthetic events never move one in WebKit.');
+    }
+
+    $page->page()->locator($from)->dragTo($page->page()->locator($to), ['steps' => 25]);
+}
+
+function boardHeaderTitle(string $id, string $container = '.ff-columns'): string
+{
+    return "{$container} > [data-column-root=\"{$id}\"] .ff-column-title";
+}
+
+function openBoard(User $user, string $path, int $width = 1440, string $query = ''): mixed
+{
+    $workspace = $user->ownedWorkspaces()->first();
+
+    return loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize($width, 900)
+        ->navigate("/app/{$workspace->slug}/{$path}{$query}")
+        ->assertVisible('.ff-column >> nth=0');
+}
+
+it('keeps header dragging alive after the page re-renders', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $ids = boardStageOptionIds($model, $fieldCode);
+    $first = [$ids[1], $ids[0], ...array_slice($ids, 2)];
+    $second = [$ids[2], $ids[1], $ids[0], ...array_slice($ids, 3)];
+    $third = [$ids[0], $ids[2], $ids[1], ...array_slice($ids, 3)];
+
+    $page = openBoard($user, $path);
+
+    dragWithPointerEvents($page, boardHeaderTitle($ids[0]), boardHeaderTitle($ids[1]));
+    waitForStoredStageOrder($page, $user, $entity, $first);
+    expect(storedStageOrder($user, $entity))->toBe($first);
+
+    $page->wait(1);
+    dragWithPointerEvents($page, boardHeaderTitle($ids[2]), boardHeaderTitle($ids[1]));
+    waitForStoredStageOrder($page, $user, $entity, $second);
+    expect(storedStageOrder($user, $entity))->toBe($second);
+
+    $page->wait(1);
+    dragWithPointerEvents($page, boardHeaderTitle($ids[0]), boardHeaderTitle($ids[2]));
+    waitForStoredStageOrder($page, $user, $entity, $third);
+    expect(storedStageOrder($user, $entity))->toBe($third);
+
+    $page->assertScript('document.querySelectorAll(".ff-columns > .ff-column").length', count($ids))
+        ->assertNoJavaScriptErrors();
+})->with('stage order boards');
+
+it('keeps header dragging alive after a card moved and after a card was opened', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    TenantContextService::setTenantId($workspace->getKey());
+
+    $field = CustomField::query()->forEntity($model)->where('code', $fieldCode)->firstOrFail();
+    $record = $model::factory()->recycle([$user, $workspace])->create();
+    $record->saveCustomFieldValue($field, $field->options->get(0)->getKey());
+
+    TenantContextService::setTenantId(null);
+
+    $ids = boardStageOptionIds($model, $fieldCode);
+    $card = "[data-card-id=\"{$record->getKey()}\"]";
+    $first = [$ids[1], $ids[0], ...array_slice($ids, 2)];
+    $second = [$ids[2], $ids[1], $ids[0], ...array_slice($ids, 3)];
+    $third = [$ids[0], $ids[2], $ids[1], ...array_slice($ids, 3)];
+
+    $page = openBoard($user, $path)->assertVisible($card);
+
+    dragWithPointerEvents($page, boardHeaderTitle($ids[0]), boardHeaderTitle($ids[1]));
+    waitForStoredStageOrder($page, $user, $entity, $first);
+
+    dragCard($page, $card, "[data-column-root=\"{$ids[1]}\"] .ff-cards");
+    $page->wait(1.5);
+
+    dragWithPointerEvents($page, boardHeaderTitle($ids[2]), boardHeaderTitle($ids[1]));
+    waitForStoredStageOrder($page, $user, $entity, $second);
+    expect(storedStageOrder($user, $entity))->toBe($second);
+
+    $page->click($card)->assertVisible('.fi-modal-window')->wait(0.5);
+    $page->script('document.querySelector(".fi-modal-window .fi-modal-close-btn")?.click()');
+    $page->wait(1);
+
+    dragWithPointerEvents($page, boardHeaderTitle($ids[0]), boardHeaderTitle($ids[2]));
+    waitForStoredStageOrder($page, $user, $entity, $third);
+    expect(storedStageOrder($user, $entity))->toBe($third);
+})->with('stage order boards');
+
+it('keeps a dragged column among the columns and never stores a partial order', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $ids = boardStageOptionIds($model, $fieldCode);
+
+    $page = openBoard($user, $path);
+
+    dragWithPointerEvents($page, boardHeaderTitle($ids[0]), "[data-column-root=\"{$ids[1]}\"] .ff-cards");
+    $page->wait(2);
+
+    $page->assertScript('document.querySelectorAll(".ff-columns > .ff-column").length', count($ids))
+        ->assertScript('document.querySelectorAll(".ff-cards .ff-column, .ff-tray .ff-column").length', 0)
+        ->assertScript('[...document.querySelectorAll(".ff-columns > .ff-column")].map((column) => column.dataset.columnRoot).sort().join()', collect($ids)->sort()->implode(','))
+        ->assertNoJavaScriptErrors();
+
+    $stored = storedStageOrder($user, $entity);
+
+    expect($stored === null || (count($stored) === count($ids) && collect($stored)->sort()->values()->all() === collect($ids)->sort()->values()->all()))->toBeTrue();
+})->with('stage order boards');
+
+it('keeps header dragging alive after leaving the board and coming back', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $ids = boardStageOptionIds($model, $fieldCode);
+    $expected = [$ids[1], $ids[0], ...array_slice($ids, 2)];
+
+    $page = openBoard($user, $path)
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->click('.fi-ta-views-row[data-view-key="list"] .fi-dropdown-list-item')
+        ->assertVisible('.fi-ta-table');
+
+    $page->script('history.back()');
+    $page->assertVisible('.ff-column >> nth=0')->wait(1);
+
+    dragWithPointerEvents($page, boardHeaderTitle($ids[0]), boardHeaderTitle($ids[1]));
+    waitForStoredStageOrder($page, $user, $entity, $expected);
+
+    expect(storedStageOrder($user, $entity))->toBe($expected);
+})->with('stage order boards');
+
+it('puts the columns back and says so when the order cannot be saved', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $ids = boardStageOptionIds($model, $fieldCode);
+
+    $page = openBoard($user, $path);
+    $page->script('window.fetch = ((original) => (input, init) => String(init?.body).includes("reorderBoardStages") ? Promise.resolve(new Response("{}", { status: 500 })) : original(input, init))(window.fetch)');
+
+    dragWithPointerEvents($page, boardHeaderTitle($ids[0]), boardHeaderTitle($ids[1]));
+    $page->wait(2);
+
+    $page->assertScript(BOARD_COLUMN_IDS, $ids)
+        ->assertScript('[...document.querySelectorAll(".fi-no-notification")].some((notification) => notification.textContent.includes('.json_encode(__('filament/pages/boards.stage_order_failed')).'))', true);
+
+    expect(storedStageOrder($user, $entity))->toBeNull();
+})->with('stage order boards');
+
+it('starts no drag and saves nothing from a column count or its add button', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $ids = boardStageOptionIds($model, $fieldCode);
+
+    $page = openBoard($user, $path);
+
+    foreach (['.ff-count', '.ff-column-actions button'] as $handle) {
+        dragWithPointerEvents($page, "[data-column-root=\"{$ids[0]}\"] {$handle}", boardHeaderTitle($ids[1]));
+        $page->wait(1);
+    }
+
+    $page->assertScript(BOARD_COLUMN_IDS, $ids);
+
+    expect(storedStageOrder($user, $entity))->toBeNull();
+})->with('stage order boards');
+
+it('reorders the columns of a grouped board by their header', function (string $model, string $fieldCode, string $path, CrmEntity $entity, string $groupBy): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $ids = boardStageOptionIds($model, $fieldCode);
+    $expected = [$ids[1], $ids[0], ...array_slice($ids, 2)];
+
+    $page = openBoard($user, $path, 1440, "?groupBy={$groupBy}")
+        ->assertVisible('.ff-lanes-heads');
+
+    dragWithPointerEvents($page, boardHeaderTitle($ids[0], '.ff-lanes-heads'), boardHeaderTitle($ids[1], '.ff-lanes-heads'));
+    waitForStoredStageOrder($page, $user, $entity, $expected);
+
+    expect(storedStageOrder($user, $entity))->toBe($expected);
+
+    $page->wait(1)->assertScript('[...document.querySelectorAll(".ff-lanes-heads > .ff-column")].map((column) => column.dataset.columnRoot)', $expected);
+})->with([
+    'tasks' => [Task::class, TaskField::STATUS->value, 'tasks/board', CrmEntity::Task, 'assignee'],
+    'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board', CrmEntity::Opportunity, 'company'],
+]);
+
+it('returns focus to the stage menu button when Escape closes its row menu', function (string $model, string $fieldCode, string $path): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $ids = boardStageOptionIds($model, $fieldCode);
+    $trigger = "[data-board-view-settings] [data-stage-id=\"{$ids[1]}\"] [data-stage-actions]";
+
+    $page = openBoard($user, $path)
+        ->click('.fi-view-settings-trigger')
+        ->click($trigger)
+        ->wait(0.5)
+        ->keys($trigger, 'Escape')
+        ->wait(0.5);
+
+    $page->assertScript("document.activeElement === document.querySelector('{$trigger}')", true)
+        ->assertVisible('[data-board-view-settings]')
+        ->assertNoJavaScriptErrors();
+
+    $page->keys($trigger, 'Enter')->wait(0.5)->assertScript('document.activeElement.closest(".fi-board-stages-row-menu") !== null', true);
+    $page->keys(':focus', 'Escape')->wait(0.5);
+
+    $page->assertScript("document.activeElement === document.querySelector('{$trigger}')", true)
+        ->assertVisible('[data-board-view-settings]');
+})->with([
+    'tasks' => [Task::class, TaskField::STATUS->value, 'tasks/board'],
+    'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board'],
+]);

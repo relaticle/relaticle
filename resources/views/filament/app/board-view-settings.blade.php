@@ -17,8 +17,10 @@
         data-board-view-settings
         role="group"
         aria-label="{{ __('filament/pages/boards.view_settings.panel') }}"
+        x-on:dropdown-escape="rowMenuShown() && ($event.preventDefault(), closeRowMenu(), escapeRowMenu())"
         x-data="{
             rowStage: null,
+            rowTrigger: null,
             rows() {
                 return [...this.$refs.list.querySelectorAll('[data-stage-id]')]
             },
@@ -48,7 +50,15 @@
             closeRowMenu() {
                 window.Alpine.$data(this.$refs.rowMenu.querySelector('.fi-dropdown')).close()
             },
+            rowMenuShown() {
+                return !! document.querySelector('.fi-board-stages-row-menu')?._x_isShown
+            },
+            escapeRowMenu() {
+                this.$nextTick(() => requestAnimationFrame(() => this.rowTrigger?.focus()))
+            },
             openRowMenu(trigger, event, stage) {
+                this.rowTrigger = trigger
+
                 const panel = document.querySelector('.fi-board-stages-row-menu')
 
                 if (panel._x_isShown && panel.trigger === trigger) {

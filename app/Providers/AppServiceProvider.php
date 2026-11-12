@@ -876,6 +876,7 @@ final class AppServiceProvider extends ServiceProvider
 
         FilamentAsset::registerScriptData([
             'payloadTooLarge' => __('filament/panel.payload_too_large'),
+            'boardStageOrderFailed' => __('filament/pages/boards.stage_order_failed'),
             'resizeColumnLabel' => __('filament/panel.tables.resize_column'),
             'resizeColumnHint' => __('filament/panel.tables.resize_column_hint'),
             'defaultColumnWidth' => ResizableColumns::DEFAULT_COLUMN_WIDTH,

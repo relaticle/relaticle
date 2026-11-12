@@ -23,6 +23,7 @@ use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Once;
 use Illuminate\Support\Str;
 use Livewire\Features\SupportTesting\Testable;
@@ -641,4 +642,22 @@ it('rejects a stage order the member may not store', function (string $case): vo
 it('refuses a stage order for an entity that has no board', function (): void {
     expect(fn () => resolve(ReorderBoardStages::class)->execute($this->user, $this->workspace, CrmEntity::Company, ['a']))
         ->toThrow(HttpException::class);
+});
+
+it('refuses a stage order while the stage field is inactive', function (): void {
+    $this->stageField->forceFill(['active' => false])->save();
+
+    expect(fn () => resolve(ReorderBoardStages::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, stageIds($this->stageField)))
+        ->toThrow(HttpException::class);
+});
+
+it('lists the stages in the field order for a member whose stored board state is empty', function (): void {
+    $preference = TablePreference::factory()->create([
+        'user_id' => $this->user->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
+        'entity' => CrmEntity::Opportunity,
+    ]);
+    DB::table('table_preferences')->where('id', $preference->getKey())->update(['board_state' => null]);
+
+    expect(boardColumnOrder(freshOpportunitiesBoard()))->toBe(stageIds($this->stageField));
 });

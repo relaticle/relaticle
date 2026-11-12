@@ -9,6 +9,8 @@ return [
         'opportunity_board' => 'Pipeline',
     ],
 
+    'stage_order_failed' => 'The stage order could not be saved.',
+
     'view_settings' => [
         'panel' => 'Board view settings',
         'stage_actions' => 'Actions for :stage',

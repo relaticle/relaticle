@@ -19,7 +19,7 @@ final class BoardStateData extends Data
     ) {}
 
     /**
-     * @param  list<string>  $optionIds  the field's options in settings order
+     * @param  list<string>  $optionIds
      * @return list<string>
      */
     public function orderStages(array $optionIds): array

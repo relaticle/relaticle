@@ -57,10 +57,14 @@ trait HasBoardStageOrder
 
     private function boardState(): BoardStateData
     {
-        $preference = resolve(StoredTablePreferenceQuery::class)
-            ->get($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity());
+        if (! $this->boardState instanceof BoardStateData) {
+            $preference = resolve(StoredTablePreferenceQuery::class)
+                ->get($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity());
 
-        return $this->boardState ??= $preference instanceof TablePreference ? $preference->board_state : new BoardStateData;
+            $this->boardState = $preference instanceof TablePreference ? $preference->board_state : new BoardStateData;
+        }
+
+        return $this->boardState;
     }
 
     /**

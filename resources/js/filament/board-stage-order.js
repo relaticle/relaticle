@@ -5,7 +5,6 @@ document.addEventListener('alpine:init', () => {
     window.Alpine.data('boardStageOrder', () => ({
         observer: null,
         frame: null,
-        sortables: [],
 
         init() {
             const page = this.$el.closest('.fi-page') ?? document.body
@@ -23,50 +22,59 @@ document.addEventListener('alpine:init', () => {
 
         destroy() {
             this.observer?.disconnect()
-            this.sortables.forEach((sortable) => sortable.destroy())
+            cancelAnimationFrame(this.frame)
+            document.querySelectorAll('.ff-columns, .ff-lanes-heads').forEach((container) => window.Sortable.get(container)?.destroy())
+        },
+
+        columnIds(container) {
+            return [...container.querySelectorAll(':scope > .ff-column:not(.ff-column-dragging)')].map((column) => column.dataset.columnRoot)
+        },
+
+        restore(container, ids) {
+            ids.forEach((id) => container.append(container.querySelector(`:scope > [data-column-root="${CSS.escape(id)}"]`)))
+
+            new window.FilamentNotification().title(window.filamentData?.boardStageOrderFailed ?? '').danger().send()
         },
 
         bind(page) {
             const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-            this.sortables = this.sortables.filter((sortable) => sortable.el.isConnected)
-
             page.querySelectorAll('.ff-columns, .ff-lanes-heads').forEach((container) => {
-                if (container.hasAttribute('data-columns-sortable')) {
+                if (window.Sortable.get(container)) {
                     return
                 }
 
-                container.setAttribute('data-columns-sortable', '')
+                let before = []
 
-                this.sortables.push(
-                    window.Sortable.create(container, {
-                        draggable: '.ff-column',
-                        handle: '.ff-column-header',
-                        filter: '.ff-column-actions, .ff-column-count',
-                        preventOnFilter: false,
-                        direction: 'horizontal',
-                        forceFallback: true,
-                        fallbackTolerance: 5,
-                        fallbackClass: 'ff-column-dragging',
-                        ghostClass: 'ff-column-placeholder',
-                        chosenClass: 'ff-column-chosen',
-                        delay: 200,
-                        delayOnTouchOnly: true,
-                        animation: reduceMotion ? 0 : 200,
-                        scrollSensitivity: 100,
-                        scrollSpeed: 15,
-                        forceAutoScrollFallback: true,
-                        onEnd: (event) => {
-                            if (event.oldDraggableIndex === event.newDraggableIndex) {
-                                return
-                            }
+                window.Sortable.create(container, {
+                    group: { name: 'board-columns', pull: false, put: false },
+                    draggable: '.ff-column',
+                    handle: '.ff-column-header',
+                    filter: '.ff-column-actions, .ff-count, .ff-column-header button',
+                    preventOnFilter: false,
+                    direction: 'horizontal',
+                    forceFallback: true,
+                    fallbackTolerance: 5,
+                    fallbackClass: 'ff-column-dragging',
+                    ghostClass: 'ff-column-placeholder',
+                    chosenClass: 'ff-column-chosen',
+                    delay: 200,
+                    delayOnTouchOnly: true,
+                    animation: reduceMotion ? 0 : 200,
+                    scrollSensitivity: 100,
+                    scrollSpeed: 15,
+                    forceAutoScrollFallback: true,
+                    onStart: () => {
+                        before = this.columnIds(container)
+                    },
+                    onEnd: (event) => {
+                        if (event.oldDraggableIndex === event.newDraggableIndex) {
+                            return
+                        }
 
-                            this.$wire.reorderBoardStages(
-                                [...container.querySelectorAll(':scope > .ff-column')].map((column) => column.dataset.columnRoot),
-                            )
-                        },
-                    }),
-                )
+                        this.$wire.reorderBoardStages(this.columnIds(container)).catch(() => this.restore(container, before))
+                    },
+                })
             })
         },
     }))

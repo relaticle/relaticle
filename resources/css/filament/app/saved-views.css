@@ -276,7 +276,7 @@
     @apply pointer-events-none opacity-50;
 }
 
-[data-columns-sortable] > .ff-column .ff-column-header {
+[data-column-root] > .ff-column-header {
     @apply cursor-grab;
 }
 
