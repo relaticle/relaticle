@@ -19,13 +19,11 @@ use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use App\Filament\Tables\FilterBar\ConditionsFilter;
 use App\Models\CustomField;
-use App\Models\CustomFieldOption;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\ChecklistHtml;
 use App\Support\PlainText;
-use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Infolists\Components\ImageEntry;
@@ -45,7 +43,6 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\Flowforge\Board;
-use Relaticle\Flowforge\Column;
 use Relaticle\Flowforge\Components\CardFlex;
 use Relaticle\Flowforge\Exceptions\CardMoveRejectedException;
 use Relaticle\Flowforge\Grouping;
@@ -75,8 +72,8 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
      */
     public function board(Board $board): Board
     {
-        $statusField = self::statusCustomField();
-        $valueColumn = $statusField->getValueColumn();
+        $columnField = $this->boardColumnField();
+        $valueColumn = $columnField->getValueColumn();
 
         $customFields = CustomFields::infolist()
             ->forModel(Task::class)
@@ -90,9 +87,9 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
         return $board
             ->query(
                 Task::query()
-                    ->leftJoin('custom_field_values as cfv', function (JoinClause $join) use ($statusField): void {
+                    ->leftJoin('custom_field_values as cfv', function (JoinClause $join) use ($columnField): void {
                         $join->on('tasks.id', '=', 'cfv.entity_id')
-                            ->where('cfv.custom_field_id', '=', $statusField->getKey());
+                            ->where('cfv.custom_field_id', '=', $columnField->getKey());
                     })
                     ->with(['assignees'])
                     ->select('tasks.*', 'cfv.'.$valueColumn)
@@ -100,7 +97,7 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
             ->recordTitleAttribute('title')
             ->columnIdentifier($valueColumn)
             ->positionIdentifier('order_column')
-            ->columns($this->getColumns())
+            ->columns($this->boardColumns())
             ->cardSchema(function (Schema $schema) use ($customFields): Schema {
                 $descriptionCustomField = $this->descriptionPreview($customFields->get('custom_fields.description'));
 
@@ -254,22 +251,7 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
         $card->update([$this->getBoard()->getPositionIdentifierAttribute() => $position]);
 
         /** @var Task $card */
-        $card->saveCustomFieldValue(self::statusCustomField(), $columnValue);
-    }
-
-    /**
-     * Get columns for the board.
-     *
-     * @return array<Column>
-     *
-     * @throws Exception
-     */
-    private function getColumns(): array
-    {
-        return $this->statuses()->map(fn (array $status): Column => Column::make((string) $status['id'])
-            ->color($status['color'])
-            ->label($status['name'])
-        )->toArray();
+        $card->saveCustomFieldValue($this->boardColumnField(), $columnValue);
     }
 
     /**
@@ -310,7 +292,7 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
             ->modalWidth(Width::TwoExtraLarge)
             ->slideOver(false)
             ->model(Task::class)
-            ->schema(fn (Schema $schema): Schema => TaskForm::get($schema, [CrmEntity::Task->boardFieldCode()]))
+            ->schema(fn (Schema $schema): Schema => TaskForm::get($schema, [$this->boardColumnField()->code]))
             ->using($this->createCard(...));
     }
 
@@ -369,7 +351,7 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
         $task = $currentWorkspace->tasks()->create($data);
 
         if (filled($columnId)) {
-            $task->saveCustomFieldValue(self::statusCustomField(), $columnId);
+            $task->saveCustomFieldValue($this->boardColumnField(), $columnId);
             $task->order_column = (float) $this->getBoardPositionInColumn($columnId);
             $task->saveQuietly();
         }
@@ -379,7 +361,7 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
 
     private function ownsColumn(string $id): bool
     {
-        return $this->statuses()->contains(fn (array $status): bool => (string) $status['id'] === $id);
+        return $this->boardColumnOptions()->contains(fn (array $option): bool => $option['id'] === $id);
     }
 
     private function descriptionCustomField(): ?CustomField
@@ -404,34 +386,9 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
             ->keyBy('code'));
     }
 
-    /**
-     * @return Collection<int, array{id: mixed, custom_field_id: mixed, name: mixed, color: string}>
-     */
-    private function statuses(): Collection
+    protected function defaultBoardColumnField(): ?CustomField
     {
-        $field = self::statusCustomField();
-
-        if (! $field instanceof CustomField) {
-            return collect();
-        }
-
-        // Check if color options are enabled for this field
-        $colorsEnabled = $field->settings->enable_option_colors ?? false;
-
-        return $this->inMemberOrder($field->options->map(fn (CustomFieldOption $option): array => [
-            'id' => $option->getKey(),
-            'custom_field_id' => $option->getAttribute('custom_field_id'),
-            'name' => $option->getAttribute('name'),
-            'color' => $colorsEnabled ? ($option->settings->color ?? 'gray') : 'gray',
-        ]));
-    }
-
-    /**
-     * @return Collection<int, array{id: mixed, custom_field_id: mixed, name: mixed, color: string}>
-     */
-    private function boardStageList(): Collection
-    {
-        return $this->statuses();
+        return self::statusCustomField();
     }
 
     private function boardStageHeading(): string

@@ -178,6 +178,12 @@ enum CustomFieldType: string
         };
     }
 
+    /** Whether one stored option can sort a record into a board column. */
+    public function makesBoardColumns(): bool
+    {
+        return in_array($this, [self::SELECT, self::RADIO, self::TOGGLE_BUTTONS], true);
+    }
+
     public function filterFieldKind(): ?FilterFieldKind
     {
         return match ($this) {

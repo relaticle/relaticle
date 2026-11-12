@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Actions\CustomFields\CreateCustomField;
+use App\Actions\CustomFields\DeleteCustomField;
 use App\Actions\Views\ReorderBoardStages;
+use App\Actions\Views\SetBoardColumnField;
 use App\Data\BoardStateData;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\TaskField;
@@ -23,6 +26,7 @@ use App\Models\SavedView;
 use App\Models\TablePreference;
 use App\Models\Task;
 use App\Models\User;
+use App\Queries\Views\BoardColumnFieldsQuery;
 use App\Support\ChecklistHtml;
 use Closure;
 use Filament\Actions\Testing\TestAction;
@@ -40,7 +44,7 @@ use Relaticle\Flowforge\Lane;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(ReorderBoardStages::class, TasksBoard::class, CreateTaskAction::class, ChecklistHtml::class, MoveCardAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
+mutates(ReorderBoardStages::class, SetBoardColumnField::class, BoardColumnFieldsQuery::class, TasksBoard::class, CreateTaskAction::class, ChecklistHtml::class, MoveCardAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -1181,4 +1185,178 @@ it('refuses a task board view id that is not the member\'s', function (): void {
     expect($component->get('activeSavedViewId'))->toBeNull()
         ->and($theirs->refresh()->updated_at)->toEqual($updatedAt)
         ->and(TablePreference::query()->sole()->board_state->grouping)->toBe('assignee');
+});
+
+function taskSelectField(object $test, string $name, array $options, string $type = 'select'): CustomField
+{
+    return resolve(CreateCustomField::class)->execute($test->user, ['name' => $name, 'type' => $type, 'entity_type' => 'task', 'options' => array_map(fn (string $option): array => ['name' => $option], $options)]);
+}
+
+/**
+ * @return list<string>
+ */
+function taskBoardColumnOrder(Testable $component): array
+{
+    return $component->instance()->getBoard()->getColumnIdentifiers();
+}
+
+function taskPriority(): CustomField
+{
+    return CustomField::query()->forEntity(Task::class)->where('code', TaskField::PRIORITY)->firstOrFail();
+}
+
+function taskValueOf(Task $task, CustomField $field): mixed
+{
+    return $task->customFieldValues()->where('custom_field_id', $field->getKey())->value($field->getValueColumn());
+}
+
+it('makes a column per priority in the same request the attribute is picked', function (): void {
+    $priority = taskPriority();
+    $high = $priority->options->firstWhere('name', 'High');
+    $task = taskInStatus($this, 'Ship it', 'To do');
+    $task->saveCustomFieldValue($priority, $high->getKey());
+
+    $component = livewire(TasksBoard::class)->call('setBoardColumnField', TaskField::PRIORITY->value);
+
+    expect(taskBoardColumnOrder($component))->toBe(statusIds($priority))
+        ->and($component->instance()->getBoard()->getBoardRecords((string) $high->getKey())->pluck('id')->all())->toBe([$task->id]);
+});
+
+it('writes the priority when a card moves between priority columns', function (): void {
+    $priority = taskPriority();
+    $task = taskInStatus($this, 'Ship it', 'To do');
+    $low = $priority->options->firstWhere('name', 'Low');
+
+    livewire(TasksBoard::class)
+        ->call('setBoardColumnField', TaskField::PRIORITY->value)
+        ->call('moveCard', (string) $task->id, (string) $low->getKey());
+
+    expect(taskValueOf($task, $priority))->toBe($low->getKey())
+        ->and(taskValueOf($task, $this->statusField))->toBe($this->statusField->options->firstWhere('name', 'To do')->getKey());
+});
+
+it('creates a card in a priority column with that priority and hides priority in its form', function (): void {
+    $priority = taskPriority();
+    $low = $priority->options->firstWhere('name', 'Low');
+
+    livewire(TasksBoard::class)
+        ->call('setBoardColumnField', TaskField::PRIORITY->value)
+        ->call('mountAction', 'create', ['column' => (string) $low->getKey()])
+        ->assertSchemaComponentDoesNotExist('custom_fields.priority', 'mountedActionSchema0')
+        ->assertSchemaComponentExists('custom_fields.status', 'mountedActionSchema0')
+        ->set('mountedActions.0.data.title', 'Low task')
+        ->call('callMountedAction');
+
+    expect(taskValueOf(Task::query()->where('title', 'Low task')->firstOrFail(), $priority))->toBe($low->getKey());
+});
+
+it('ignores an attribute that cannot make columns', function (string $case): void {
+    $other = User::factory()->withWorkspace()->create();
+    $otherField = taskSelectField((object) ['user' => $other], 'Tier', ['Gold']);
+    $inactive = taskSelectField($this, 'Dormant', ['A']);
+    $inactive->forceFill(['active' => false])->save();
+    $encrypted = taskSelectField($this, 'Secret', ['A']);
+    $encrypted->settings->encrypted = true;
+    $encrypted->save();
+    $empty = taskSelectField($this, 'Hollow', ['A']);
+    $empty->options()->delete();
+    $text = CustomField::query()->forEntity(Task::class)->where('code', TaskField::DESCRIPTION)->firstOrFail();
+
+    $code = match ($case) {
+        'another entity' => 'stage',
+        'another workspace' => $otherField->code,
+        'inactive' => $inactive->code,
+        'encrypted' => $encrypted->code,
+        'no options' => $empty->code,
+        'a text attribute' => $text->code,
+        'not a string' => ['x'],
+    };
+
+    $component = livewire(TasksBoard::class)->call('setBoardColumnField', $code);
+
+    expect(taskBoardColumnOrder($component))->toBe(statusIds($this->statusField))
+        ->and(TablePreference::query()->first()?->board_state->columnField)->toBeNull();
+})->with(['another entity', 'another workspace', 'inactive', 'encrypted', 'no options', 'a text attribute', 'not a string']);
+
+it('refuses an attribute that cannot make columns in the action', function (): void {
+    $other = User::factory()->withWorkspace()->create();
+    $otherField = taskSelectField((object) ['user' => $other], 'Tier', ['Gold']);
+
+    expect(fn () => resolve(SetBoardColumnField::class)->execute($this->user, $this->workspace, CrmEntity::Task, $otherField->code))
+        ->toThrow(HttpException::class);
+    expect(TablePreference::query()->withoutGlobalScopes()->count())->toBe(0);
+});
+
+it('falls back to the status columns when the stored attribute is gone', function (): void {
+    $tier = taskSelectField($this, 'Tier', ['Gold', 'Silver']);
+    rememberedTaskBoard($this, new BoardStateData(columnField: $tier->code));
+    resolve(DeleteCustomField::class)->execute($this->user, $tier);
+
+    $component = freshTasksBoard();
+
+    expect(taskBoardColumnOrder($component))->toBe(statusIds($this->statusField))
+        ->and(TablePreference::query()->sole()->board_state->columnField)->toBe($tier->code);
+});
+
+it('stores null when the default attribute is picked', function (): void {
+    livewire(TasksBoard::class)
+        ->call('setBoardColumnField', TaskField::PRIORITY->value)
+        ->call('setBoardColumnField', TaskField::STATUS->value);
+
+    expect(TablePreference::query()->sole()->board_state->columnField)->toBeNull();
+});
+
+it('keeps the status order while priority columns are reordered and the reverse', function (): void {
+    $priorityIds = statusIds(taskPriority());
+    $statusIds = statusIds($this->statusField);
+
+    livewire(TasksBoard::class)
+        ->call('reorderBoardStages', array_reverse($statusIds))
+        ->call('setBoardColumnField', TaskField::PRIORITY->value)
+        ->call('reorderBoardStages', array_reverse($priorityIds));
+
+    $stored = TablePreference::query()->sole()->board_state;
+
+    expect($stored->orderStages($statusIds))->toBe(array_reverse($statusIds))
+        ->and($stored->orderStages($priorityIds))->toBe(array_reverse($priorityIds));
+});
+
+it('lists the attributes that can make columns with the current one checked', function (): void {
+    $checked = fn (Testable $component, string $code): bool => preg_match('/data-board-column-field="'.$code.'"\s+role="menuitemradio"\s+aria-checked="true"/', $component->html()) === 1;
+
+    $component = livewire(TasksBoard::class)
+        ->assertSeeHtml('data-board-column-field="status"')
+        ->assertSeeHtml('data-board-column-field="priority"');
+
+    expect($checked($component, 'status'))->toBeTrue()
+        ->and($checked($component, 'priority'))->toBeFalse();
+
+    $component->call('setBoardColumnField', TaskField::PRIORITY->value);
+
+    expect($checked($component, 'priority'))->toBeTrue()
+        ->and($checked($component, 'status'))->toBeFalse();
+});
+
+it('moves a card between two cards that share a position after regrouping', function (): void {
+    $priority = taskPriority();
+    $high = $priority->options->firstWhere('name', 'High');
+    $first = taskInStatus($this, 'First', 'To do');
+    $second = taskInStatus($this, 'Second', 'Done');
+    $third = taskInStatus($this, 'Third', 'In progress');
+
+    foreach ([$first, $second, $third] as $task) {
+        $task->saveCustomFieldValue($priority, $high->getKey());
+    }
+
+    Task::query()->whereKey([$first->id, $second->id])->update(['order_column' => 1000]);
+    $third->forceFill(['order_column' => 3000])->saveQuietly();
+
+    $moved = livewire(TasksBoard::class)
+        ->call('setBoardColumnField', TaskField::PRIORITY->value)
+        ->instance()
+        ->moveCard((string) $third->id, (string) $high->getKey(), (string) $first->id, (string) $second->id);
+
+    expect($moved)->toBeTrue()
+        ->and(taskValueOf($third, $priority))->toBe($high->getKey())
+        ->and(Task::query()->whereKey([$first->id, $second->id, $third->id])->pluck('order_column')->unique())->toHaveCount(3);
 });

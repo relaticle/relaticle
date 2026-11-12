@@ -11,23 +11,26 @@ use App\Models\CustomFieldOption;
 use App\Models\SavedView;
 use App\Models\User;
 use App\Models\Workspace;
-use Relaticle\CustomFields\Models\Scopes\TenantScope;
+use App\Queries\Views\BoardColumnFieldsQuery;
 
 final readonly class ReorderBoardStages
 {
-    public function __construct(private SaveBoardState $saveBoardState) {}
+    public function __construct(
+        private SaveBoardState $saveBoardState,
+        private BoardColumnFieldsQuery $columnFields,
+    ) {}
 
     /**
      * @param  list<mixed>  $optionIds
      */
-    public function execute(User $user, Workspace $workspace, CrmEntity $entity, array $optionIds, ?SavedView $view = null): BoardStateData
+    public function execute(User $user, Workspace $workspace, CrmEntity $entity, array $optionIds, ?SavedView $view = null, ?string $fieldCode = null): BoardStateData
     {
         abort_unless($user->belongsToWorkspaceId($workspace->getKey()), 403);
         abort_unless(array_all($optionIds, static fn (mixed $id): bool => is_string($id)), 403);
 
         $optionIds = array_values(array_unique($optionIds));
 
-        $boardOptionIds = $this->boardOptionIds($workspace, $entity);
+        $boardOptionIds = $this->boardOptionIds($user, $workspace, $entity, $fieldCode ?? $entity->boardFieldCode());
 
         abort_if(array_diff($optionIds, $boardOptionIds) !== [], 403);
 
@@ -43,26 +46,14 @@ final readonly class ReorderBoardStages
     /**
      * @return list<string>
      */
-    private function boardOptionIds(Workspace $workspace, CrmEntity $entity): array
+    private function boardOptionIds(User $user, Workspace $workspace, CrmEntity $entity, ?string $code): array
     {
-        $code = $entity->boardFieldCode();
+        $field = $code === null ? null : $this->columnFields->get($user, $workspace, $entity)->get($code);
 
-        abort_if($code === null, 403);
+        abort_unless($field instanceof CustomField, 403);
 
-        $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
-
-        $ids = CustomFieldOption::query()
-            ->withoutGlobalScope(TenantScope::class)
-            ->where($tenantKey, $workspace->getKey())
-            ->whereIn('custom_field_id', CustomField::query()
-                ->withoutGlobalScope(TenantScope::class)
-                ->where($tenantKey, $workspace->getKey())
-                ->forEntity($entity->model())
-                ->where('code', $code)
-                ->select('id'))
-            ->pluck('id')
-            ->all();
-
-        return array_map(strval(...), array_values($ids));
+        return array_values($field->options
+            ->map(static fn (CustomFieldOption $option): string => (string) $option->getKey())
+            ->all());
     }
 }

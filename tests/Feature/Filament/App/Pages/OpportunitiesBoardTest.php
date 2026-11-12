@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\CustomFields\CreateCustomField;
 use App\Actions\Views\ReorderBoardStages;
+use App\Actions\Views\SetBoardColumnField;
 use App\Data\BoardStateData;
 use App\Enums\BoardCardSize;
 use App\Enums\BoardColumnWidth;
@@ -27,6 +28,7 @@ use App\Models\SavedView;
 use App\Models\TablePreference;
 use App\Models\Task;
 use App\Models\User;
+use App\Queries\Views\BoardColumnFieldsQuery;
 use Closure;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
@@ -43,7 +45,7 @@ use Relaticle\Flowforge\Lane;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(ReorderBoardStages::class, OpportunitiesBoard::class, MoveCardAction::class, PreviewRecordAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
+mutates(ReorderBoardStages::class, SetBoardColumnField::class, BoardColumnFieldsQuery::class, OpportunitiesBoard::class, MoveCardAction::class, PreviewRecordAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
 
 beforeEach(function () {
     $this->user = User::factory()->withWorkspace()->create();
@@ -1339,4 +1341,33 @@ it('narrows the first render with the open board view\'s filter and keeps its ow
     expect(opportunityStageCardIds($component, 'Prospecting'))->toBe([$keep->id])
         ->and(boardColumnOrder($component))->toBe($reversed)
         ->and(TablePreference::query()->count())->toBe(0);
+});
+
+it('groups the board by a custom select', function (): void {
+    $tier = opportunitySelectField($this, 'Tier', ['Gold', 'Silver']);
+    $gold = $tier->options->firstWhere('name', 'Gold');
+    $deal = opportunityInStage($this, 'Gold deal', 'Prospecting');
+    $deal->saveCustomFieldValue($tier, $gold->getKey());
+
+    $component = livewire(OpportunitiesBoard::class)->call('setBoardColumnField', $tier->code);
+
+    expect(boardColumnOrder($component))->toBe(stageIds($tier))
+        ->and($component->instance()->getBoard()->getBoardRecords((string) $gold->getKey())->pluck('id')->all())->toBe([$deal->id]);
+});
+
+it('remembers the column attribute inside a board view and leaves the plain board on stage', function (): void {
+    $tier = opportunitySelectField($this, 'Tier', ['Gold', 'Silver']);
+    $view = SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'entity' => CrmEntity::Opportunity,
+        'type' => SavedViewType::Board,
+        'state' => new BoardStateData,
+    ]);
+
+    $component = Livewire::withQueryParams(['view' => $view->getKey()])->test(OpportunitiesBoard::class)
+        ->call('setBoardColumnField', $tier->code);
+
+    expect($view->refresh()->boardState()->columnField)->toBe($tier->code)
+        ->and(TablePreference::query()->count())->toBe(0)
+        ->and(boardColumnOrder($component))->toBe(stageIds($tier))
+        ->and(boardColumnOrder(Livewire::withQueryParams([])->test(OpportunitiesBoard::class)))->toBe(stageIds($this->stageField));
 });

@@ -20,11 +20,9 @@ use App\Filament\Resources\OpportunityResource\Forms\OpportunityForm;
 use App\Filament\Tables\FilterBar\ConditionsFilter;
 use App\Models\Company;
 use App\Models\CustomField;
-use App\Models\CustomFieldOption;
 use App\Models\Opportunity;
 use App\Models\User;
 use App\Models\Workspace;
-use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Forms\Components\TextInput;
@@ -43,7 +41,6 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Gate;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\Flowforge\Board;
-use Relaticle\Flowforge\Column;
 use Relaticle\Flowforge\Components\CardFlex;
 use Relaticle\Flowforge\Exceptions\CardMoveRejectedException;
 use Relaticle\Flowforge\Grouping;
@@ -65,8 +62,8 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
 
     public function board(Board $board): Board
     {
-        $stageField = self::stageCustomField();
-        $valueColumn = $stageField->getValueColumn();
+        $columnField = $this->boardColumnField();
+        $valueColumn = $columnField->getValueColumn();
 
         $customFields = CustomFields::infolist()
             ->forModel(Opportunity::class)
@@ -80,9 +77,9 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
         return $board
             ->query(
                 Opportunity::query()
-                    ->leftJoin('custom_field_values as cfv', function (JoinClause $join) use ($stageField): void {
+                    ->leftJoin('custom_field_values as cfv', function (JoinClause $join) use ($columnField): void {
                         $join->on('opportunities.id', '=', 'cfv.entity_id')
-                            ->where('cfv.custom_field_id', '=', $stageField->getKey());
+                            ->where('cfv.custom_field_id', '=', $columnField->getKey());
                     })
                     ->select('opportunities.*', 'cfv.'.$valueColumn)
                     ->with(['company.media', 'contact'])
@@ -90,7 +87,7 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
             ->recordTitleAttribute('name')
             ->columnIdentifier($valueColumn)
             ->positionIdentifier('order_column')
-            ->columns($this->getColumns())
+            ->columns($this->boardColumns())
             ->cardSchema(fn (Schema $schema): Schema => $this->cardSchema($schema, $customFields))
             ->createCardAction($this->cardCreation())
             ->cardAction('edit')
@@ -201,7 +198,7 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
         $card->update([$this->getBoard()->getPositionIdentifierAttribute() => $position]);
 
         /** @var Opportunity $card */
-        $card->saveCustomFieldValue(self::stageCustomField(), $columnValue);
+        $card->saveCustomFieldValue($this->boardColumnField(), $columnValue);
     }
 
     private function cardCreation(): CreateAction
@@ -265,27 +262,12 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
                     ->searchable()
                     ->preload(),
                 CustomFields::form()
-                    ->except([CrmEntity::Opportunity->boardFieldCode()])
+                    ->except([$this->boardColumnField()->code])
                     ->build()
                     ->columnSpanFull()
                     ->columns(1),
             ])
             ->columns(2);
-    }
-
-    /**
-     * Get columns for the board.
-     *
-     * @return array<Column>
-     *
-     * @throws Exception
-     */
-    private function getColumns(): array
-    {
-        return $this->stages()->map(fn (array $stage): Column => Column::make((string) $stage['id'])
-            ->color($stage['color'])
-            ->label($stage['name'])
-        )->toArray();
     }
 
     /**
@@ -335,7 +317,7 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
         $opportunity = $currentWorkspace->opportunities()->create($data);
 
         if (filled($columnId)) {
-            $opportunity->saveCustomFieldValue(self::stageCustomField(), $columnId);
+            $opportunity->saveCustomFieldValue($this->boardColumnField(), $columnId);
             $opportunity->order_column = (float) $this->getBoardPositionInColumn($columnId);
             $opportunity->saveQuietly();
         }
@@ -345,7 +327,7 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
 
     private function ownsColumn(string $id): bool
     {
-        return $this->stages()->contains(fn (array $stage): bool => (string) $stage['id'] === $id);
+        return $this->boardColumnOptions()->contains(fn (array $option): bool => $option['id'] === $id);
     }
 
     private static function stageCustomField(): ?CustomField
@@ -357,33 +339,9 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
             ->first());
     }
 
-    /**
-     * @return Collection<int, array{id: mixed, custom_field_id: mixed, name: mixed, color: string}>
-     */
-    private function stages(): Collection
+    protected function defaultBoardColumnField(): ?CustomField
     {
-        $field = self::stageCustomField();
-
-        if (! $field instanceof CustomField) {
-            return collect();
-        }
-
-        $colorsEnabled = $field->settings->enable_option_colors ?? false;
-
-        return $this->inMemberOrder($field->options->map(fn (CustomFieldOption $option): array => [
-            'id' => $option->getKey(),
-            'custom_field_id' => $option->getAttribute('custom_field_id'),
-            'name' => $option->getAttribute('name'),
-            'color' => $colorsEnabled ? ($option->settings->color ?? 'gray') : 'gray',
-        ]));
-    }
-
-    /**
-     * @return Collection<int, array{id: mixed, custom_field_id: mixed, name: mixed, color: string}>
-     */
-    private function boardStageList(): Collection
-    {
-        return $this->stages();
+        return self::stageCustomField();
     }
 
     private function boardStageHeading(): string

@@ -248,6 +248,18 @@
     @apply size-menu-icon text-gray-400 dark:text-gray-500;
 }
 
+.fi-board-settings-value {
+    @apply flex min-w-0 items-center gap-1 text-gray-500 dark:text-gray-400;
+}
+
+.fi-board-settings-value-text {
+    @apply min-w-0 truncate;
+}
+
+.fi-board-panel-title {
+    @apply min-w-0 flex-1 truncate px-1 text-sm font-medium text-gray-950 dark:text-white;
+}
+
 .fi-board-stages-heading {
     @apply px-2 pb-1 pt-0.5 text-xs font-medium text-gray-500 dark:text-gray-400;
 }
