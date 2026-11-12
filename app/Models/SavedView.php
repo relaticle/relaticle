@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Casts\ViewStateCast;
+use App\Data\BoardStateData;
 use App\Data\TableStateData;
 use App\Enums\CrmEntity;
 use App\Enums\SavedViewType;
@@ -18,12 +20,13 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 
 /**
  * @property CrmEntity $entity
  * @property SavedViewType $type
  * @property string $name
- * @property TableStateData $state
+ * @property TableStateData|BoardStateData $state
  * @property string $user_id
  */
 #[ScopedBy(WorkspaceScope::class)]
@@ -48,8 +51,18 @@ final class SavedView extends Model
         return [
             'entity' => CrmEntity::class,
             'type' => SavedViewType::class,
-            'state' => TableStateData::class,
+            'state' => ViewStateCast::class,
         ];
+    }
+
+    public function tableState(): TableStateData
+    {
+        return $this->state instanceof TableStateData ? $this->state : throw new LogicException('This view holds a board state.');
+    }
+
+    public function boardState(): BoardStateData
+    {
+        return $this->state instanceof BoardStateData ? $this->state : throw new LogicException('This view holds a table state.');
     }
 
     /**

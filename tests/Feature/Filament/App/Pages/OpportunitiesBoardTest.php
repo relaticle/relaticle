@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\Views\ReorderBoardStages;
+use App\Data\BoardStateData;
 use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\OpportunityField;
@@ -606,12 +607,30 @@ it('puts a stage added after the reorder at the end and drops one that was delet
     expect(boardColumnOrder(freshOpportunitiesBoard()))->toBe([...array_slice($reversed, 1), (string) $added->getKey()]);
 });
 
+it('keeps the member\'s stored filters and lanes when stages are reordered', function (): void {
+    $filters = ['conditions' => ['match' => 'all', 'rules' => [['field' => 'name', 'condition' => 'contains', 'value' => 'Acme']]], 'trashed' => ['value' => null]];
+    TablePreference::factory()->create([
+        'user_id' => $this->user->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
+        'entity' => CrmEntity::Opportunity,
+        'board_state' => new BoardStateData(filters: $filters, grouping: 'company'),
+    ]);
+    $reversed = array_reverse(stageIds($this->stageField));
+
+    livewire(OpportunitiesBoard::class)->call('reorderBoardStages', $reversed);
+
+    $stored = TablePreference::query()->sole()->board_state;
+    expect($stored->stageOrder)->toBe($reversed)
+        ->and($stored->filters)->toEqual($filters)
+        ->and($stored->grouping)->toBe('company');
+});
+
 it('stores an order made of the board\'s own stages once each', function (): void {
     $order = stageIds($this->stageField);
 
-    $preference = resolve(ReorderBoardStages::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, [$order[2], $order[0], $order[2]]);
+    $state = resolve(ReorderBoardStages::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, [$order[2], $order[0], $order[2]]);
 
-    expect($preference->board_state->stageOrder)->toBe([$order[2], $order[0]])
+    expect($state->stageOrder)->toBe([$order[2], $order[0]])
         ->and(TablePreference::query()->count())->toBe(1);
 });
 

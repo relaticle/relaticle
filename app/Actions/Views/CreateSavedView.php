@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Views;
 
+use App\Data\BoardStateData;
 use App\Data\TableStateData;
 use App\Enums\CrmEntity;
 use App\Enums\SavedViewType;
@@ -18,7 +19,7 @@ final readonly class CreateSavedView
 {
     public function __construct(private EnsureSavedViewNameIsFree $ensureNameIsFree) {}
 
-    public function execute(User $user, Workspace $workspace, CrmEntity $entity, string $name, TableStateData $state): SavedView
+    public function execute(User $user, Workspace $workspace, CrmEntity $entity, string $name, TableStateData|BoardStateData $state): SavedView
     {
         abort_unless($user->belongsToWorkspaceId($workspace->getKey()), 403);
 
@@ -26,8 +27,8 @@ final readonly class CreateSavedView
             'workspace_id' => $workspace->getKey(),
             'user_id' => $user->getKey(),
             'entity' => $entity,
-            'type' => SavedViewType::Table,
-            'state' => $state->withoutWidths(),
+            'type' => $state instanceof BoardStateData ? SavedViewType::Board : SavedViewType::Table,
+            'state' => $state instanceof TableStateData ? $state->withoutWidths() : $state,
         ]);
         $view->name = $this->ensureNameIsFree->execute($user, $view, $name);
 

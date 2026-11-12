@@ -7,7 +7,9 @@ use App\Actions\Views\DeleteSavedView;
 use App\Actions\Views\DuplicateSavedView;
 use App\Actions\Views\EnsureSavedViewNameIsFree;
 use App\Actions\Views\ReorderViews;
+use App\Actions\Views\SaveBoardState;
 use App\Actions\Views\UpdateSavedView;
+use App\Data\BoardStateData;
 use App\Data\TableStateData;
 use App\Enums\CrmEntity;
 use App\Enums\SavedViewType;
@@ -45,6 +47,7 @@ mutates(
     DuplicateSavedView::class,
     ReorderViews::class,
     EnsureSavedViewNameIsFree::class,
+    SaveBoardState::class,
 );
 
 dataset('view list pages', [
@@ -1369,4 +1372,34 @@ it('leaves a cards link that names its page alone and links the cards from the l
     $this->get(NoteResource::getUrl('index').'?view=cards')->assertOk();
 
     openList(ManageNotes::class)->assertSeeHtml(e(NoteResource::getUrl('index', ['view' => 'cards'])));
+});
+
+it('stores a board view typed by the state it is given', function (): void {
+    $state = new BoardStateData(stageOrder: ['b', 'a'], filters: ['conditions' => ['match' => 'all', 'rules' => []]], grouping: 'company');
+
+    $view = resolve(CreateSavedView::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, 'Pipeline by company', $state);
+
+    expect($view->fresh()->type)->toBe(SavedViewType::Board)
+        ->and($view->fresh()->state)->toBeInstanceOf(BoardStateData::class)
+        ->and($view->fresh()->boardState()->grouping)->toBe('company')
+        ->and(fn () => $view->fresh()->tableState())->toThrow(LogicException::class);
+});
+
+it('refuses a state of the other type on a view', function (): void {
+    $view = viewFor($this->user);
+
+    expect(fn () => resolve(UpdateSavedView::class)->execute($this->user, $view, ['state' => new BoardStateData]))
+        ->toThrow(HttpException::class);
+});
+
+it('writes a board state to the member\'s own view and to nobody else\'s', function (): void {
+    $mine = viewFor($this->user, ['entity' => CrmEntity::Opportunity, 'type' => SavedViewType::Board, 'state' => new BoardStateData(grouping: 'company')]);
+    $other = savedViewMember(WorkspaceRole::Member);
+    $theirs = viewFor($other, ['entity' => CrmEntity::Opportunity, 'type' => SavedViewType::Board, 'state' => new BoardStateData]);
+
+    $saved = resolve(SaveBoardState::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, ['filters' => ['conditions' => ['match' => 'all', 'rules' => []]]], $mine);
+
+    expect($saved->grouping)->toBe('company')
+        ->and(fn () => resolve(SaveBoardState::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, ['grouping' => null], $theirs))->toThrow(HttpException::class)
+        ->and(fn () => resolve(SaveBoardState::class)->execute($this->user, $this->workspace, CrmEntity::Company, ['grouping' => null]))->toThrow(HttpException::class);
 });

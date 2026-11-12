@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Actions\Views;
 
+use App\Data\BoardStateData;
 use App\Data\TableStateData;
+use App\Enums\SavedViewType;
 use App\Models\SavedView;
 use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
@@ -17,7 +19,7 @@ final readonly class UpdateSavedView
     public function __construct(private EnsureSavedViewNameIsFree $ensureNameIsFree) {}
 
     /**
-     * @param  array{name?: string, state?: TableStateData}  $attributes
+     * @param  array{name?: string, state?: TableStateData|BoardStateData}  $attributes
      */
     public function execute(User $user, SavedView $view, array $attributes): SavedView
     {
@@ -28,7 +30,11 @@ final readonly class UpdateSavedView
         }
 
         if (array_key_exists('state', $attributes)) {
-            $attributes['state'] = $attributes['state']->withoutWidths();
+            $state = $attributes['state'];
+
+            abort_unless($state instanceof BoardStateData === ($view->type === SavedViewType::Board), 422);
+
+            $attributes['state'] = $state instanceof TableStateData ? $state->withoutWidths() : $state;
         }
 
         return DB::transaction(function () use ($view, $attributes): SavedView {

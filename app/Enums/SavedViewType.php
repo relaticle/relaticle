@@ -9,6 +9,7 @@ use Filament\Support\Contracts\HasLabel;
 enum SavedViewType: string implements HasLabel
 {
     case Table = 'table';
+    case Board = 'board';
 
     public function getLabel(): string
     {

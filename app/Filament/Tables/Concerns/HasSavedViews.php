@@ -132,7 +132,7 @@ trait HasSavedViews
             $this->rememberOwnTableState($this->currentTableState()->withoutWidths());
         }
 
-        $this->applyTableState($view->state);
+        $this->applyTableState($view->tableState());
         $this->activeSavedViewId = $view->getKey();
         $this->requestedSavedViewId = null;
         $this->markSavedViewApplied();

@@ -234,6 +234,7 @@ return [
             'unavailable' => 'That view is no longer available.',
             'types' => [
                 'table' => 'Table',
+                'board' => 'Board',
             ],
         ],
     ],

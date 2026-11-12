@@ -5,22 +5,22 @@ declare(strict_types=1);
 namespace App\Actions\Views;
 
 use App\Data\BoardStateData;
-use App\Data\TableStateData;
 use App\Enums\CrmEntity;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
-use App\Models\Scopes\WorkspaceScope;
-use App\Models\TablePreference;
+use App\Models\SavedView;
 use App\Models\User;
 use App\Models\Workspace;
 use Relaticle\CustomFields\Models\Scopes\TenantScope;
 
 final readonly class ReorderBoardStages
 {
+    public function __construct(private SaveBoardState $saveBoardState) {}
+
     /**
      * @param  list<mixed>  $optionIds
      */
-    public function execute(User $user, Workspace $workspace, CrmEntity $entity, array $optionIds): TablePreference
+    public function execute(User $user, Workspace $workspace, CrmEntity $entity, array $optionIds, ?SavedView $view = null): BoardStateData
     {
         abort_unless($user->belongsToWorkspaceId($workspace->getKey()), 403);
         abort_unless(array_all($optionIds, static fn (mixed $id): bool => is_string($id)), 403);
@@ -29,15 +29,7 @@ final readonly class ReorderBoardStages
 
         abort_if(array_diff($optionIds, $this->boardOptionIds($workspace, $entity)) !== [], 403);
 
-        $preference = TablePreference::query()
-            ->withoutGlobalScope(WorkspaceScope::class)
-            ->firstOrCreate(
-                ['user_id' => $user->getKey(), 'workspace_id' => $workspace->getKey(), 'entity' => $entity],
-                ['state' => new TableStateData],
-            );
-        $preference->update(['board_state' => new BoardStateData(stageOrder: $optionIds)]);
-
-        return $preference;
+        return $this->saveBoardState->execute($user, $workspace, $entity, ['stage_order' => $optionIds], $view);
     }
 
     /**

@@ -288,7 +288,7 @@ trait PersistsTableState
         $this->activeSavedViewId = $view->getKey();
         $this->seededFromSavedView = true;
 
-        return $view->state;
+        return $view->tableState();
     }
 
     private function seedFromPreference(TablePreference $preference, ?SavedView $active): TableStateData
@@ -301,11 +301,11 @@ trait PersistsTableState
 
     private function canonicalAppliedHash(SavedView $view, ?string $stored): ?string
     {
-        if ($stored === null || $stored !== $view->state->withoutWidths()->hash()) {
+        if ($stored === null || $stored !== $view->tableState()->withoutWidths()->hash()) {
             return $stored;
         }
 
-        $canonical = $view->state->withoutWidths();
+        $canonical = $view->tableState()->withoutWidths();
         $canonical->filters = $this->canonicalTableFilters($canonical->filters);
 
         return $canonical->hash();

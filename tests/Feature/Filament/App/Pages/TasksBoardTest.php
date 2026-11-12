@@ -621,9 +621,9 @@ it('stores a status order once each and rejects an opportunity stage', function 
     $order = statusIds($this->statusField);
     $stage = CustomField::query()->forEntity(Opportunity::class)->where('code', 'stage')->firstOrFail();
 
-    $preference = resolve(ReorderBoardStages::class)->execute($this->user, $this->workspace, CrmEntity::Task, [$order[1], $order[1], $order[0]]);
+    $state = resolve(ReorderBoardStages::class)->execute($this->user, $this->workspace, CrmEntity::Task, [$order[1], $order[1], $order[0]]);
 
-    expect($preference->board_state->stageOrder)->toBe([$order[1], $order[0]])
+    expect($state->stageOrder)->toBe([$order[1], $order[0]])
         ->and(fn () => resolve(ReorderBoardStages::class)->execute($this->user, $this->workspace, CrmEntity::Task, statusIds($stage)))
         ->toThrow(HttpException::class);
 });
