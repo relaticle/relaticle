@@ -189,7 +189,7 @@ it('omits the message block for a turn the user never typed', function (): void 
 it('tells the suggester to call record types what the app calls them', function (): void {
     expect(resolve(NextStepSuggester::class)->instructions())
         ->toContain('Call record types what the app calls them: companies, people, opportunities, tasks, notes')
-        ->toContain('Write "person", not "contact", unless the <message> used that word');
+        ->toContain('Write "person", not "contact", and "custom attribute", not "custom field", unless the <message> used that word');
 });
 
 it('caps the strip at three steps and drops blank or duplicate ones', function (): void {

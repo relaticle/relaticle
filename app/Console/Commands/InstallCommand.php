@@ -440,7 +440,7 @@ final class InstallCommand extends Command
             $this->line('  <options=bold>Demo data included:</>');
             $this->line('  • Sample companies and people');
             $this->line('  • Example opportunities and tasks');
-            $this->line('  • Pre-configured custom fields');
+            $this->line('  • Pre-configured custom attributes');
         }
 
         $this->newLine();

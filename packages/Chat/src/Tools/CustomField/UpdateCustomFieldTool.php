@@ -40,7 +40,7 @@ final class UpdateCustomFieldTool implements Tool
 
     public function description(): string
     {
-        return 'Propose renaming a custom field, toggling its active status, or changing its settings (decimal places, currency, currency display, list and view visibility, option colors, multiple values, uniqueness). Owners and admins only. System-defined fields keep their name and cannot be deactivated, but their settings can change and an inactive one can be reactivated. Call ListCustomFieldsTool first: it returns each field\'s current settings and which ones it accepts. Returns a proposal for user approval.';
+        return 'Propose renaming a custom attribute (custom field), toggling its active status, or changing its settings (decimal places, currency, currency display, list and view visibility, option colors, multiple values, uniqueness). Owners and admins only. System-defined fields keep their name and cannot be deactivated, but their settings can change and an inactive one can be reactivated. Call ListCustomFieldsTool first: it returns each field\'s current settings and which ones it accepts. Returns a proposal for user approval.';
     }
 
     public function schema(JsonSchema $schema): array
@@ -52,7 +52,7 @@ final class UpdateCustomFieldTool implements Tool
                         ->description('The CRM entity the field belongs to: company, people, opportunity, task, or note.')
                         ->required(),
                     'code' => $schema->string()
-                        ->description('The machine code of the custom field to update, as shown in the custom_fields field list for that entity (e.g. "industry").')
+                        ->description('The machine code of the custom attribute (custom field) to update, as shown in the custom_fields field list for that entity (e.g. "industry").')
                         ->required(),
                     'name' => $schema->string()
                         ->description('The new display name for the field.'),
@@ -117,7 +117,7 @@ final class UpdateCustomFieldTool implements Tool
             $field = $this->resolveOwnedCustomField($workspaceId, $entityType, $code);
 
             if (! $field instanceof CustomField) {
-                return (string) json_encode(['error' => "records[{$index}]: No custom field with code \"{$code}\" found on {$entityType}."], JSON_UNESCAPED_SLASHES);
+                return (string) json_encode(['error' => "records[{$index}]: No custom attribute (custom field) with code \"{$code}\" found on {$entityType}."], JSON_UNESCAPED_SLASHES);
             }
 
             try {
@@ -175,8 +175,8 @@ final class UpdateCustomFieldTool implements Tool
 
             $actionRecords[] = $actionData;
             $items[] = [
-                'title' => __('Update Custom Field'),
-                'summary' => "Update custom field \"{$field->name}\"",
+                'title' => __('Update Custom Attribute'),
+                'summary' => "Update custom attribute \"{$field->name}\"",
                 'fields' => $displayFields,
             ];
         }
@@ -192,8 +192,8 @@ final class UpdateCustomFieldTool implements Tool
             actionData: $isBatch ? ['_batch' => true, 'records' => $actionRecords] : $actionRecords[0],
             displayData: $isBatch
                 ? [
-                    'title' => __('Update Custom Fields'),
-                    'summary' => __('Update :count custom fields', ['count' => count($items)]),
+                    'title' => __('Update Custom Attributes'),
+                    'summary' => __('Update :count custom attributes', ['count' => count($items)]),
                     'items' => $items,
                 ]
                 : $items[0],

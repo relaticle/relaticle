@@ -296,7 +296,7 @@ it('batches several field definitions into one per-item proposal', function (): 
     expect($result['data']['_batch'])->toBeTrue()
         ->and($pending->action_data['records'])->toHaveCount(2)
         ->and($pending->action_data['records'][1]['_model_class'])->toBe(CustomField::class)
-        ->and($pending->display_data['summary'])->toBe('Update 2 custom fields');
+        ->and($pending->display_data['summary'])->toBe('Update 2 custom attributes');
 
     $service = resolve(PendingActionService::class);
     $service->approveItem($pending, $this->owner, 0);

@@ -21,7 +21,7 @@ final class UpdateCompanyTool extends BaseWriteUpdateTool
 
     public function description(): string
     {
-        return 'Propose updating an existing company (name, account owner, custom fields). Returns a proposal for user approval.';
+        return 'Propose updating an existing company (name, account owner, custom attributes (custom fields)). Returns a proposal for user approval.';
     }
 
     protected function entity(): CrmEntity

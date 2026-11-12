@@ -965,13 +965,13 @@ it('matches a partial operator against any value of a field and keeps an empty f
 it('rejects a custom field that takes no filter on the api and mcp', function (string $type): void {
     resolve(CreateCustomField::class)->execute($this->user, ['entity_type' => 'company', 'name' => 'Probe', 'code' => 'probe', 'type' => $type]);
 
-    expectErrorOnEverySurface($this, $this->user, 'companies', ['custom_fields' => ['probe' => ['$eq' => 'x']]], 'filter.custom_fields.probe', '"probe" is not a filterable custom field');
+    expectErrorOnEverySurface($this, $this->user, 'companies', ['custom_fields' => ['probe' => ['$eq' => 'x']]], 'filter.custom_fields.probe', '"probe" is not a filterable custom attribute');
 })->with(['textarea', 'color-picker']);
 
 it('names the node to fix under the same key on the api and in the same words on mcp', function (string $route, array $filter, string $key, string $message): void {
     expectErrorOnEverySurface($this, $this->user, $route, $filter, $key, $message);
 })->with([
-    'unknown custom field' => ['opportunities', ['custom_fields' => ['stagee' => ['$eq' => 'Won']]], 'filter.custom_fields.stagee', '"stagee" is not a filterable custom field'],
+    'unknown custom field' => ['opportunities', ['custom_fields' => ['stagee' => ['$eq' => 'Won']]], 'filter.custom_fields.stagee', '"stagee" is not a filterable custom attribute'],
     'operator of another type' => ['opportunities', ['custom_fields' => ['amount' => ['$contains' => '5']]], 'filter.custom_fields.amount.$contains', 'amount does not support $contains.'],
     'bare custom field operator' => ['opportunities', ['custom_fields' => ['stage' => ['eq' => 'Won']]], 'filter.custom_fields.stage.eq', 'Use $eq.'],
     'bare native operator' => ['companies', ['name' => ['contains' => 'Acme']], 'filter.name.contains', 'Use $contains.'],
@@ -981,7 +981,7 @@ it('names the node to fix under the same key on the api and in the same words on
     'unknown name' => ['companies', ['industry' => ['$eq' => 'x']], 'filter.industry', 'name, created_at, updated_at, creation_source, creator, accountOwner, people, opportunities, custom_fields, $and, $or, $not'],
     'unknown keyword' => ['companies', ['$nor' => [['name' => ['$eq' => 'x']]]], 'filter.$nor', 'Unknown filter $nor.'],
     'unknown name on a related record' => ['people', ['company' => ['title' => ['$eq' => 'x']]], 'filter.company.title', 'Unknown filter title.'],
-    'unknown custom field on a related record' => ['people', ['company' => ['custom_fields' => ['nope' => ['$eq' => 'x']]]], 'filter.company.custom_fields.nope', '"nope" is not a filterable custom field on company'],
+    'unknown custom field on a related record' => ['people', ['company' => ['custom_fields' => ['nope' => ['$eq' => 'x']]]], 'filter.company.custom_fields.nope', '"nope" is not a filterable custom attribute on company'],
     'unknown name inside a group' => ['companies', ['$or' => [['name' => ['$eq' => 'x']], ['industry' => ['$eq' => 'x']]]], 'filter.$or.1.industry', 'Unknown filter industry.'],
     'third relation hop' => ['people', ['$or' => [['name' => ['$eq' => 'x']], ['company' => ['people' => ['company' => ['name' => ['$eq' => 'x']]]]]]], 'filter.$or.1.company.people.company', 'nest at most 2 levels'],
     'fourth logic level' => ['companies', ['$not' => ['$or' => [['$and' => [['$not' => ['name' => ['$eq' => 'x']]]]]]]], 'filter.$not.$or.0.$and.0.$not', 'nest at most 3 levels'],

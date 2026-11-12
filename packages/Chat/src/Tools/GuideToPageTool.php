@@ -19,7 +19,7 @@ final readonly class GuideToPageTool implements Tool
     public function description(): string
     {
         return 'Get a direct link to the workspace page where the user can perform an action this assistant '
-            .'cannot do itself: creating, editing, or deleting custom field definitions; bulk-importing records '
+            .'cannot do itself: creating, editing, or deleting custom attribute (custom field) definitions; bulk-importing records '
             .'from a file; exporting records to a file; or managing workspace members; creating or revoking API '
             .'access tokens and connectors; connecting Claude, ChatGPT or another MCP client to the workspace; or connecting '
             .'their own mailbox for sending email; or reviewing saved email drafts and the email outbox. '
@@ -36,7 +36,7 @@ final readonly class GuideToPageTool implements Tool
                 ->required()
                 ->description(
                     'Where to send the user. One of: '
-                    .'"custom_fields" (create/edit/delete custom field definitions); '
+                    .'"custom_fields" (create/edit/delete custom attribute (custom field) definitions); '
                     .'"import_companies", "import_people", "import_opportunities", "import_tasks", "import_notes" '
                     .'(bulk-import many records of that type from a file); '
                     .'"export_companies", "export_people", "export_opportunities", "export_tasks", "export_notes" '

@@ -171,7 +171,7 @@ final readonly class CustomFieldOptionPlan
 
         if ($removed->isNotEmpty() && $field->settings->encrypted) {
             throw ValidationException::withMessages([
-                'options' => __('Options cannot be removed from an encrypted field here. Rename, reorder or add them instead, and remove them in Custom Fields settings.'),
+                'options' => __('Options cannot be removed from an encrypted attribute here. Rename, reorder or add them instead, and remove them in Custom attributes settings.'),
             ]);
         }
 

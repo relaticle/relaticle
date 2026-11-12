@@ -73,7 +73,7 @@ final readonly class SearchDocsTool implements Tool
         return 'Search Relaticle\'s own product documentation, both the help center and the developer guides, '
             .'and get back the matching sections plus a link to each. Covers connecting external AI assistants '
             .'and MCP clients (Claude, ChatGPT, Cursor, Codex), access tokens, the REST API, self-hosting, '
-            .'billing and plans, AI credits, imports, exports, custom fields, and every in-app feature. '
+            .'billing and plans, AI credits, imports, exports, custom attributes (custom fields), and every in-app feature. '
             .'Call this for any "how do I", "can Relaticle", or setup question instead of replying that you '
             .'only handle CRM data or have no information.';
     }

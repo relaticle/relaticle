@@ -97,7 +97,7 @@
         [
             __('What can :name change in my CRM?', ['name' => $assistantName]),
             __(
-                'Companies, people, opportunities, tasks, and notes, one record or a batch of up to :max, plus custom fields and member invitations.:emails Every write needs your approval first.',
+                'Companies, people, opportunities, tasks, and notes, one record or a batch of up to :max, plus custom attributes and member invitations.:emails Every write needs your approval first.',
                 ['max' => $maxBatchSize, 'emails' => $emailIntegrationActive ? ' '.__('It also proposes emails, and each one waits for its own Send.') : '']
             ),
         ],
@@ -186,7 +186,7 @@
                 :facts="[
                     __('Up to :steps linked steps in one plan', ['steps' => $maxPlanSteps]),
                     __('Companies, people, opportunities, tasks and notes'),
-                    __('Every active custom field, with options shown as text'),
+                    __('Every active custom attribute, with options shown as text'),
                 ]"
                 :link-label="__('How approvals work')"
                 :link-href="$documentationActive ? route('help.show', ['category' => 'ai-assistant', 'slug' => 'approve-what-the-assistant-changes']) : null"

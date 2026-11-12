@@ -38,7 +38,7 @@ final class SearchCrmTool implements Tool
     public function description(): string
     {
         return 'Search across all CRM entity types (companies, people, opportunities, tasks, notes) by keyword. '
-            .'Matches names, titles, and custom field values such as emails, phone numbers, and links. '
+            .'Matches names, titles, and custom attribute (custom field) values such as emails, phone numbers, and links. '
             .'Returns at most `limit` matches per entity type: when `truncated` is true for an entity there are more, '
             .'so never state a total from these results.';
     }

@@ -19,7 +19,7 @@ in bulk [by import](/help/import/what-each-record-type-needs).
 - **Emails**: one or more addresses, unique across people, which is what
   import matching and duplicate prevention key on.
 - **Phone Number**, **Job Title**, **LinkedIn**: the usual contact card.
-- Plus your workspace's custom fields for people.
+- Plus your workspace's custom attributes for people.
 
 ## The record page
 

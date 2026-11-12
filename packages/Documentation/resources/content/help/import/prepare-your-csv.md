@@ -38,9 +38,9 @@ Only one column is required per record type:
 
 Every other column is optional; a blank cell simply leaves that field empty.
 
-## Custom field columns
+## Custom attribute columns
 
-Name custom field columns with the prefix `custom_fields_` followed by the
+Name custom attribute columns with the prefix `custom_fields_` followed by the
 field's code:
 
 ```
@@ -49,7 +49,7 @@ custom_fields_emails
 custom_fields_website
 ```
 
-Find each field's code in **Settings → Custom Fields**, under the **Code**
+Find each field's code in **Settings → Custom attributes**, under the **Code**
 column. The wizard also auto-maps close names, so a column called "Industry"
 usually lands on the Industry field without the prefix. The prefix makes
 the match exact.
@@ -83,5 +83,5 @@ the match exact.
 ## Get a ready-made template
 
 Export a few existing records from any list. The exported file includes the
-`id` column and every custom field your workspace uses, already named
+`id` column and every custom attribute your workspace uses, already named
 correctly. Delete the rows, keep the headers, and fill in your data.

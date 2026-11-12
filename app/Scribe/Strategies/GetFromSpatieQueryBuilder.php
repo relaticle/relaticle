@@ -71,7 +71,7 @@ final class GetFromSpatieQueryBuilder extends Strategy
     private function customFieldFilterDescription(): string
     {
         return implode(' ', [
-            'Filter by a custom field value.',
+            'Filter by a custom attribute (custom field) value.',
             CustomFieldFilterSchema::operatorSummary(),
             'In a query string $is_empty also takes 1 or 0.',
             CustomFieldOptionMap::choiceRule(),

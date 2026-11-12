@@ -117,7 +117,7 @@ it('proposes deleting a field and removes it with its options on approval', func
         ->and($pending->operation)->toBe(PendingActionOperation::Delete)
         ->and($pending->status)->toBe(PendingActionStatus::Pending)
         ->and($pending->action_data)->toBe(['_record_ids' => [$select->getKey()], '_model_class' => CustomField::class])
-        ->and($pending->display_data['summary'])->toBe('Delete custom field "Tier"')
+        ->and($pending->display_data['summary'])->toBe('Delete custom attribute "Tier"')
         ->and(collect($pending->display_data['fields'])->pluck('value', 'label')->all())->toBe([
             'Name' => 'Tier',
             'Record type' => 'Company',
@@ -190,7 +190,7 @@ it('does not reach a field of another workspace', function (): void {
 
     $result = proposeFieldDelete($this->convId, [['entity_type' => 'company', 'code' => 'foreign_only']]);
 
-    expect($result['error'])->toContain('No custom field with code "foreign_only"')
+    expect($result['error'])->toContain('No custom attribute (custom field) with code "foreign_only"')
         ->and(fieldExists($foreign))->toBeTrue();
 });
 
@@ -248,7 +248,7 @@ it('batches several fields into one per-item proposal and deletes each on its ow
     expect($result['data']['records'])->toHaveCount(3)
         ->and($pending->action_data['_batch'])->toBeTrue()
         ->and($pending->action_data['records'][2])->toBe(['_record_id' => $legacy->getKey(), '_model_class' => CustomField::class])
-        ->and($pending->display_data['summary'])->toBe('Delete 3 custom fields')
+        ->and($pending->display_data['summary'])->toBe('Delete 3 custom attributes')
         ->and($pending->display_data['items'])->toHaveCount(3);
 
     DB::table('custom_fields')->where('id', $region->getKey())->delete();

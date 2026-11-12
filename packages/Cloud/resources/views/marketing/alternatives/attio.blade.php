@@ -12,7 +12,7 @@
         [__('Self-hosting'), $relaticle['self_host'], $competitor['self_host']],
         [__('Cloud pricing'), $relaticle['pricing'], $competitor['pricing']],
         [__('AI and MCP'), __('Built-in AI assistant and MCP server, available in the cloud and when self-hosted'), $competitor['ai']],
-        [__('Customization'), __('Custom fields, REST API and the AGPL source of everything you self-host'), $competitor['extensibility']],
+        [__('Customization'), __('Custom attributes, REST API and the AGPL source of everything you self-host'), $competitor['extensibility']],
     ];
 
     $faqs = [
@@ -167,7 +167,7 @@
             <ol class="bg-rail grid grid-cols-1 gap-px sm:grid-cols-2 lg:col-span-8">
                 @foreach ([
                     [__('Export the fields you need'), __('In Attio, include the columns you need and review the view filters. Click Save for everyone, then export the view as CSV.')],
-                    [__('Prepare your fields and relationships'), __('Create matching custom fields in Relaticle. Start with companies, then people, then deals. Use company domains and people\'s email addresses to link records.')],
+                    [__('Prepare your attributes and relationships'), __('Create matching custom attributes in Relaticle. Start with companies, then people, then deals. Use company domains and people\'s email addresses to link records.')],
                     [__('Map columns and review a sample'), __('Import five to ten rows first. Attio deals become Relaticle opportunities. Keep Attio record IDs out of Relaticle\'s Record ID mapping.')],
                     [__('Check the result before importing more'), __('Review which records will be created, updated or skipped. Check the imported relationships and field values. Then repeat with your remaining records.')],
                 ] as $index => [$heading, $body])

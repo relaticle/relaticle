@@ -90,6 +90,15 @@ test('workspace settings tabs live under the workspace url without duplicate sta
         ->and(Route::has('filament.app.pages.workspace.email'))->toBeTrue();
 });
 
+test('the custom attributes page reads custom attributes in its tab, title and heading', function (): void {
+    $response = $this->get(CustomFields::getUrl(tenant: $this->workspace))
+        ->assertSuccessful()
+        ->assertDontSee('Custom Fields');
+
+    expect($response->getContent())->toMatch('/<title[^>]*>\s*Custom attributes/')
+        ->and(__('workspaces.tabs.custom_fields'))->toBe('Custom attributes');
+});
+
 test('a workspace admin can open every tab', function (): void {
     foreach ([
         EditWorkspace::getUrl(tenant: $this->workspace),

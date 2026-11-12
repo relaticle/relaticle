@@ -22,7 +22,7 @@ use Laravel\Mcp\Server\Attributes\MimeType;
 use Laravel\Mcp\Server\Attributes\Uri;
 use Laravel\Mcp\Server\Resource;
 
-#[Description('Schema for opportunities including available custom fields. Read this before creating or updating opportunities.')]
+#[Description('Schema for opportunities including available custom attributes (custom fields). Read this before creating or updating opportunities.')]
 #[Uri('relaticle://schema/opportunity')]
 #[MimeType('application/json')]
 #[Cacheable(ttlMs: CustomFieldSchemaCache::TTL * 1000, scope: CacheScope::Private)]

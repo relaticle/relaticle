@@ -123,7 +123,7 @@ final class SetCustomFieldOptionsTool implements Tool
             $field = $this->resolveOwnedCustomField($workspaceId, $entityType, $code);
 
             if (! $field instanceof CustomField) {
-                return (string) json_encode(['error' => "records[{$index}]: No custom field with code \"{$code}\" found on {$entityType}."], JSON_UNESCAPED_SLASHES);
+                return (string) json_encode(['error' => "records[{$index}]: No custom attribute (custom field) with code \"{$code}\" found on {$entityType}."], JSON_UNESCAPED_SLASHES);
             }
 
             if (in_array($field->getKey(), $fieldIds, true)) {

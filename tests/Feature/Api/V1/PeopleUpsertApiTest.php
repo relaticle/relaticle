@@ -464,7 +464,7 @@ it('rejects a match field that is not marked unique and names the fields it acce
         'name' => 'Grace Hopper',
     ])
         ->assertUnprocessable()
-        ->assertInvalid(['match.field' => 'The match.field must be a custom field marked unique: emails.']);
+        ->assertInvalid(['match.field' => 'The match.field must be a custom attribute (custom field) marked unique: emails.']);
 });
 
 it('rejects the emails field once its uniqueness is switched off', function (): void {

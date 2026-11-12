@@ -19,7 +19,7 @@ Only the name is required. Everything else can arrive later.
 - **Domains**: one or more web domains. Domains are unique across companies,
   which is what lets the CSV import match rows to existing companies.
 - **LinkedIn**: the company's profile URL.
-- Plus every custom field your workspace has added for companies.
+- Plus every custom attribute your workspace has added for companies.
 
 **The logo takes care of itself.** When a company has a domain and no logo
 yet, Relaticle fetches the site's icon in the background and keeps it.
@@ -52,7 +52,7 @@ and **Delete record**.
 ## The list
 
 **Companies** in the sidebar lists every company with sortable columns for
-owner, creator, and dates, plus a column for each custom field marked
+owner, creator, and dates, plus a column for each custom attribute marked
 visible in lists. Filter by **Creation Source** (the app, an import, the API,
 or Rela, whichever created the record) or show
 **Deleted records** to [restore one](/help/records/restore-deleted-records).

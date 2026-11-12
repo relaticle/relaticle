@@ -294,7 +294,7 @@ final readonly class CustomFieldDefinitionValidator
                 ->count();
 
             if ($existing + $proposedAlongside >= $max) {
-                $fail("Cannot create more than {$max} custom fields for entity type \"{$entityType}\".");
+                $fail("Cannot create more than {$max} custom attributes for entity type \"{$entityType}\".");
             }
         };
     }

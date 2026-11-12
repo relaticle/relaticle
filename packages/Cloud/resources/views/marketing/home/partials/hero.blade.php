@@ -82,7 +82,7 @@
                 'ai-agent' => [__('Ask'), __('Ask :name', ['name' => (string) config('chat.assistant_name')])],
                 'pipeline' => [__('Pipeline'), __('Pipeline')],
                 'companies' => [__('Companies'), __('Companies')],
-                'custom-fields' => [__('Fields'), __('Custom fields')],
+                'custom-fields' => [__('Attributes'), __('Custom attributes')],
             ];
 
         @endphp
@@ -124,7 +124,7 @@
                             $heroScreenshots = [
                                 'pipeline' => ['widths' => [380, 640, 832, 1652], 'alt' => __('Relaticle opportunities board grouped into pipeline stages, showing amount and close date')],
                                 'companies' => ['widths' => [1652], 'alt' => __('Relaticle companies list showing account owner, ICP status, and website domain for each company')],
-                                'custom-fields' => ['widths' => [1652], 'alt' => __('Relaticle custom fields settings showing field name, type, constraints, and properties for Opportunities')],
+                                'custom-fields' => ['widths' => [1652], 'alt' => __('Relaticle custom attributes settings showing attribute name, type, constraints, and properties for Opportunities')],
                             ];
 
                             // 1652w fills the 1056px desktop frame at 1x; a 2x display takes the 2880w original.

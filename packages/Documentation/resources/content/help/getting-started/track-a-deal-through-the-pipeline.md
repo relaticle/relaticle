@@ -49,8 +49,8 @@ You can also change a deal's stage from its own record: open it, click
 ## If the stage names don't match your sales process, then edit them
 
 Stage is a field like any other. Click your workspace name at the top of the
-sidebar, click **Custom Fields**, select the **Opportunities** tab, and open
+sidebar, click **Custom attributes**, select the **Opportunities** tab, and open
 **Stage** from its **Actions** menu. You can rename stages, recolor them,
 reorder them, or add new ones. See
-[Use custom fields](/help/getting-started/use-custom-fields) for how field
+[Use custom attributes](/help/getting-started/use-custom-fields) for how field
 settings work.

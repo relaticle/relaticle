@@ -25,5 +25,5 @@ company's **People** tab if you assigned one.
 ## If you don't see the fields you expect
 
 Your team may have added or removed fields for people. Ask a workspace
-admin. Fields configured on the **Custom Fields** page show up on the create
+admin. Attributes configured on the **Custom attributes** page show up on the create
 form automatically.

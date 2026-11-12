@@ -15,7 +15,7 @@ joined or not.
 ## A recent change to roles
 
 The Administrator role is now called Admin, and Editor is now called Member.
-Admins can now manage custom fields, which only the owner could do before.
+Admins can now manage custom attributes, which only the owner could do before.
 Check your **Members** list if you granted the Admin role earlier. Viewers
 can no longer export data, so give anyone who still needs exports the
 Member role. A Viewer can still read records through an access token for the
@@ -34,14 +34,14 @@ API or MCP.
 | Export data | Yes | Yes | Yes | No |
 | Invite, remove, and change member roles | Yes | Yes | No | No |
 | Promote someone to Admin | Yes | No | No | No |
-| Manage custom fields | Yes | Yes | No | No |
+| Manage custom attributes | Yes | Yes | No | No |
 | Manage workspace email settings | Yes | Yes | No | No |
 | Send email through an AI assistant | Yes | Yes | Yes | No |
 | Manage billing | Yes | No | No | No |
 | Rename or delete the workspace | Yes | No | No | No |
 | View the activity log | Yes | Yes | No | No |
 
-Admins manage members, custom fields, and workspace email settings alongside working with records. A
+Admins manage members, custom attributes, and workspace email settings alongside working with records. A
 few things stay with the **workspace owner** alone, whatever anyone's role:
 promoting someone *to* Admin, renaming or deleting the workspace, and
 billing.

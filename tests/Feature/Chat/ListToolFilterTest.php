@@ -274,7 +274,7 @@ it('rejects an unknown custom field code instead of silently returning everythin
     ])), true);
 
     expect($result)->toHaveKey('error')
-        ->and($result['error'])->toContain('not a filterable custom field');
+        ->and($result['error'])->toContain('not a filterable custom attribute');
 });
 
 it('rejects an unknown option label instead of silently returning everything', function (): void {
@@ -389,7 +389,7 @@ it('stops offering a custom field for filtering once it is deactivated', functio
     ])), true);
 
     expect($result)->toHaveKey('error')
-        ->and($result['error'])->toContain('not a filterable custom field');
+        ->and($result['error'])->toContain('not a filterable custom attribute');
 });
 
 it('can filter by an option added to an existing custom field', function (): void {

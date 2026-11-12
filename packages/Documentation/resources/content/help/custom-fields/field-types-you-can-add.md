@@ -1,13 +1,13 @@
 ---
-title: Field types you can add
-description: Every field type available for your records, from plain text to currency, rich editors, and record links.
+title: Attribute types you can add
+description: Every attribute type available for your records, from plain text to currency, rich editors, and record links.
 order: 1
 updated: "2026-09-12"
 related: [help/custom-fields/add-and-manage-fields, help/custom-fields/edit-the-options-in-a-select-field]
 ---
 
-When you add a field you pick its type, and the type decides how the field is
-entered, displayed, filtered, and validated. Choose carefully, because a field's
+When you add an attribute you pick its type, and the type decides how the attribute is
+entered, displayed, filtered, and validated. Choose carefully, because an attribute's
 type is locked once it's created.
 
 ## Text and numbers
@@ -48,8 +48,8 @@ type is locked once it's created.
 | Toggle Buttons | One value, shown as buttons |
 | Tags Input | Free-form tags, typed and reusable |
 
-Choice fields carry their own option lists. See
-[Edit the options in a select field](/help/custom-fields/edit-the-options-in-a-select-field).
+Choice attributes carry their own option lists. See
+[Edit the options in a select attribute](/help/custom-fields/edit-the-options-in-a-select-field).
 
 ## Special
 
@@ -59,5 +59,5 @@ Choice fields carry their own option lists. See
 | Record | A link to another record: relate a company to a company, a person to an opportunity |
 
 Email, Link, and a few other types can also hold **multiple values** per
-record when you enable it in the field's settings. That's how the built-in
-Emails field stores several addresses for one person.
+record when you enable it in the attribute's settings. That's how the built-in
+Emails attribute stores several addresses for one person.

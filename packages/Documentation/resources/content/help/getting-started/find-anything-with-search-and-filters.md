@@ -82,12 +82,12 @@ The view at the top is the one a page opens on when you visit it with no link at
 
 ## If you can't find a field in the filter list
 
-Every custom field can be filtered except Textarea, Rich Editor, and Color
+Every custom attribute can be filtered except Textarea, Rich Editor, and Color
 Picker fields. Encrypted fields can't be filtered either, and neither can a
 field that's turned off. A field doesn't need **Visible in List** to be
-filtered. See [Use custom fields](/help/getting-started/use-custom-fields)
+filtered. See [Use custom attributes](/help/getting-started/use-custom-fields)
 for every field setting.
 
 ## Filter through the API, MCP or Rela
 
-The filter row is one way to narrow a list. The REST API, the MCP server and Rela, the built-in AI assistant, use a `filter` object instead. It filters by native fields and custom fields, combines conditions with AND, OR and NOT, and follows links between records. Read [the MCP guide](/developers/mcp) for the full grammar.
+The filter row is one way to narrow a list. The REST API, the MCP server and Rela, the built-in AI assistant, use a `filter` object instead. It filters by native fields and custom attributes, combines conditions with AND, OR and NOT, and follows links between records. Read [the MCP guide](/developers/mcp) for the full grammar.

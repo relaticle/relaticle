@@ -1,6 +1,6 @@
 ---
 title: Export your data
-description: Download any record type as CSV or Excel. Full lists or selected rows, custom fields included.
+description: Download any record type as CSV or Excel. Full lists or selected rows, custom attributes included.
 order: 5
 updated: "2026-11-12"
 related: [help/import/update-existing-records, help/import/prepare-your-csv]
@@ -25,7 +25,7 @@ button in the bar at the bottom of the list.
 The export runs in the background. When it finishes, a notification appears
 with a **Download .csv** (or **.xlsx**) link. The file contains each record's
 ID, its core fields, the workspace, who created it and how, timestamps, and
-a column per custom field. Company exports also include the account owner
+a column per custom attribute. Company exports also include the account owner
 and the number of linked people and opportunities.
 
 ## Exports as backup

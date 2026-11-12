@@ -25,7 +25,7 @@ return [
     'title' => 'Relaticle API',
 
     // A short description of your API. Will be included in the docs webpage, Postman collection and OpenAPI spec.
-    'description' => 'REST API reference for Relaticle records and custom fields, with personal access token setup, filtering, sorting and request limits.',
+    'description' => 'REST API reference for Relaticle records and custom attributes (custom fields), with personal access token setup, filtering, sorting and request limits.',
 
     // Text to place in the "Introduction" section, right after the `description`. Markdown and HTML are supported.
     'intro_text' => <<<'INTRO'

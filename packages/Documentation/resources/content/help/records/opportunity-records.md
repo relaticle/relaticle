@@ -20,7 +20,7 @@ your pipeline board.
 - **Stage**: a select whose options *are* your pipeline;
   [rename or reorder the stages](/help/custom-fields/edit-the-options-in-a-select-field)
   to match your sales process.
-- Plus your custom fields for opportunities.
+- Plus your custom attributes for opportunities.
 
 ## List and board
 

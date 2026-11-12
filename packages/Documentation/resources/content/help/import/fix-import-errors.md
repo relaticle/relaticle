@@ -23,7 +23,7 @@ symptom below; each fix is something you can do yourself.
 | Problem | Fix |
 |---------|----------|
 | A column didn't auto-map | Pick the field from the **Map To** dropdown yourself |
-| A custom field is missing from the dropdown | Check the field's code in **Settings → Custom Fields** |
+| A custom attribute is missing from the dropdown | Check the field's code in **Settings → Custom attributes** |
 | A required field shows red | Map one of your CSV columns to it |
 
 ## Validation problems
