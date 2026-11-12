@@ -38,7 +38,6 @@ use App\Models\SavedView;
 use App\Models\TablePreference;
 use App\Models\User;
 use App\Policies\SavedViewPolicy;
-use Closure;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Events\QueryExecuted;
