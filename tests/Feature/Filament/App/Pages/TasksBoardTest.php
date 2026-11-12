@@ -6,15 +6,20 @@ use App\Actions\Views\ReorderBoardStages;
 use App\Data\BoardStateData;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\TaskField;
+use App\Enums\SavedViewType;
 use App\Enums\WorkspaceRole;
 use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Actions\MoveCardAction;
+use App\Filament\Concerns\HasBoardStageOrder;
+use App\Filament\Concerns\HasBoardViews;
+use App\Filament\Concerns\HasViewSwitcher;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\Opportunity;
+use App\Models\SavedView;
 use App\Models\TablePreference;
 use App\Models\Task;
 use App\Models\User;
@@ -35,7 +40,7 @@ use Relaticle\Flowforge\Lane;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(ReorderBoardStages::class, TasksBoard::class, CreateTaskAction::class, ChecklistHtml::class, MoveCardAction::class);
+mutates(ReorderBoardStages::class, TasksBoard::class, CreateTaskAction::class, ChecklistHtml::class, MoveCardAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -1095,3 +1100,85 @@ it('opens the remembered board when the url state normalises to nothing', functi
     'an empty rule list' => [['filters' => ['conditions' => ['rules' => '']]]],
     'a garbage sort' => [['sort' => 'garbage']],
 ]);
+
+function taskBoardView(object $test, array $state = []): SavedView
+{
+    return SavedView::factory()->for($test->user)->for($test->workspace)->create([
+        'entity' => CrmEntity::Task,
+        'type' => SavedViewType::Board,
+        'state' => new BoardStateData(...$state),
+    ]);
+}
+
+it('saves the current task board as a view and opens it', function (): void {
+    $order = array_reverse(statusIds($this->statusField));
+
+    $component = livewire(TasksBoard::class)
+        ->call('setFilterRules', [['field' => 'title', 'condition' => 'contains', 'value' => 'Keep']])
+        ->call('setBoardGrouping', 'assignee')
+        ->call('reorderBoardStages', $order)
+        ->callAction('saveSavedViewAs', ['name' => 'My tasks'])
+        ->assertHasNoActionErrors();
+
+    $view = SavedView::query()->withoutGlobalScopes()->sole();
+
+    expect($view->type)->toBe(SavedViewType::Board)
+        ->and($view->entity)->toBe(CrmEntity::Task)
+        ->and($view->boardState()->grouping)->toBe('assignee')
+        ->and($view->boardState()->stageOrder)->toBe($order)
+        ->and($view->boardState()->filters['conditions']['rules'][0]['value'])->toBe('Keep');
+    $component->assertSet('activeSavedViewId', $view->getKey());
+});
+
+it('opens a task board view from its link and writes nothing', function (): void {
+    $keep = taskInStatus($this, 'Keep me', 'To do');
+    taskInStatus($this, 'Drop me', 'To do');
+    $rule = ['field' => 'title', 'condition' => 'contains', 'value' => 'Keep'];
+    $view = taskBoardView($this, ['filters' => ['conditions' => ['match' => 'all', 'rules' => [$rule]], 'trashed' => ['value' => null]], 'grouping' => 'assignee']);
+    $updatedAt = $view->updated_at;
+    $this->travelTo(now()->addHour());
+
+    $component = Livewire::withQueryParams(['view' => $view->getKey()])->test(TasksBoard::class);
+    $component->call('$refresh');
+
+    expect($component->get('activeSavedViewId'))->toBe($view->getKey())
+        ->and($component->get('groupBy'))->toBe('assignee')
+        ->and(taskStatusCardIds($component, 'To do'))->toBe([$keep->id])
+        ->and($view->refresh()->updated_at)->toEqual($updatedAt)
+        ->and(TablePreference::query()->count())->toBe(0);
+});
+
+it('stores a task board change on the open view and none on the plain board', function (): void {
+    $view = taskBoardView($this, ['grouping' => 'assignee']);
+    $reversed = array_reverse(statusIds($this->statusField));
+
+    Livewire::withQueryParams(['view' => $view->getKey()])->test(TasksBoard::class)
+        ->call('setBoardGrouping', null)
+        ->call('reorderBoardStages', $reversed);
+
+    $state = $view->refresh()->boardState();
+
+    expect($state->grouping)->toBeNull()
+        ->and($state->stageOrder)->toBe($reversed)
+        ->and(TablePreference::query()->count())->toBe(0);
+});
+
+it('refuses a task board view id that is not the member\'s', function (): void {
+    $other = User::factory()->create();
+    $this->workspace->users()->attach($other, ['role' => WorkspaceRole::Member->value]);
+    $theirs = SavedView::factory()->for($other)->for($this->workspace)->create([
+        'entity' => CrmEntity::Task,
+        'type' => SavedViewType::Board,
+        'state' => new BoardStateData(grouping: 'assignee'),
+    ]);
+    $updatedAt = $theirs->updated_at;
+    $this->travelTo(now()->addHour());
+
+    $component = Livewire::withQueryParams(['view' => $theirs->getKey()])->test(TasksBoard::class)
+        ->assertNotified(__('filament/panel.tables.views.unavailable'))
+        ->call('setBoardGrouping', 'assignee');
+
+    expect($component->get('activeSavedViewId'))->toBeNull()
+        ->and($theirs->refresh()->updated_at)->toEqual($updatedAt)
+        ->and(TablePreference::query()->sole()->board_state->grouping)->toBe('assignee');
+});

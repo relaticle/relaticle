@@ -14,6 +14,9 @@ use App\Data\TableStateData;
 use App\Enums\CrmEntity;
 use App\Enums\SavedViewType;
 use App\Enums\WorkspaceRole;
+use App\Filament\Concerns\HasBoardStageOrder;
+use App\Filament\Concerns\HasBoardViews;
+use App\Filament\Concerns\HasViewSwitcher;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\NoteResource;
 use App\Filament\Resources\NoteResource\Pages\ManageNotes;
@@ -26,6 +29,7 @@ use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Tables\Concerns\HasSavedViews;
 use App\Filament\Tables\Concerns\PersistsTableState;
 use App\Models\CustomField;
+use App\Models\CustomFieldOption;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\SavedView;
@@ -37,6 +41,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Once;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -51,6 +56,10 @@ mutates(
     ReorderViews::class,
     EnsureSavedViewNameIsFree::class,
     SaveBoardState::class,
+    OpportunitiesBoard::class,
+    HasBoardViews::class,
+    HasBoardStageOrder::class,
+    HasViewSwitcher::class,
 );
 
 dataset('view list pages', [
@@ -1442,9 +1451,11 @@ it('refuses a board state for an entity without a board', function (): void {
 
     expect(SavedView::query()->count())->toBe(0);
 
-    $company = viewFor($this->user);
-    expect(fn () => resolve(UpdateSavedView::class)->execute($this->user, $company, ['state' => new BoardStateData]))
+    $company = viewFor($this->user, ['type' => SavedViewType::Board, 'state' => new BoardStateData]);
+    expect(fn () => resolve(UpdateSavedView::class)->execute($this->user, $company, ['state' => new BoardStateData(grouping: 'company')]))
         ->toThrow(HttpException::class);
+
+    expect($company->fresh()->boardState()->grouping)->toBeNull();
 });
 
 function boardViewFor(User $owner, array $attributes = []): SavedView
@@ -1535,4 +1546,407 @@ it('keeps a hidden board view in place when the visible rows are reordered', fun
     makeOpportunityBoardAccessible();
 
     expect(orderFor(CrmEntity::Opportunity))->toBe([$view->getKey(), $table->getKey(), 'board', 'list']);
+});
+
+function opportunityStageOptionIds(): array
+{
+    $field = CustomField::query()->forEntity(Opportunity::class)->where('code', CrmEntity::Opportunity->boardFieldCode())->firstOrFail();
+
+    return CustomFieldOption::query()->withoutGlobalScopes()->where('custom_field_id', $field->getKey())->orderBy('sort_order')->pluck('id')->map(strval(...))->all();
+}
+
+function boardNameRule(string $value): array
+{
+    return ['field' => 'name', 'condition' => 'contains', 'value' => $value];
+}
+
+function boardFiltersFor(string $value): array
+{
+    return ['conditions' => ['match' => 'all', 'rules' => [boardNameRule($value)]], 'trashed' => ['value' => null]];
+}
+
+function boardCardNames(Testable $component): array
+{
+    return $component->instance()->getFilteredTableQuery()->orderBy('opportunities.name')->pluck('opportunities.name')->all();
+}
+
+function boardViewStoreWrites(callable $callback): int
+{
+    $writes = 0;
+    DB::listen(function (QueryExecuted $query) use (&$writes): void {
+        if (preg_match('/^(update|insert into) "(saved_views|table_preferences)"/', $query->sql) === 1) {
+            $writes++;
+        }
+    });
+    $callback();
+
+    return $writes;
+}
+
+function plainBoardState(BoardStateData $state): TablePreference
+{
+    return TablePreference::factory()->create([
+        'user_id' => test()->user->getKey(),
+        'workspace_id' => test()->workspace->getKey(),
+        'entity' => CrmEntity::Opportunity,
+        'board_state' => $state,
+    ]);
+}
+
+function openBoardWithView(string|SavedView $view): Testable
+{
+    return Livewire::withQueryParams(['view' => $view instanceof SavedView ? $view->getKey() : $view])->test(OpportunitiesBoard::class);
+}
+
+function openPlainBoard(): Testable
+{
+    return Livewire::withQueryParams([])->test(OpportunitiesBoard::class);
+}
+
+function switcherRowHtml(string $html, string $key): string
+{
+    return preg_match('/data-view-key="'.preg_quote($key, '/').'".*?(?=data-view-key=|$)/s', $html, $match) === 1 ? $match[0] : '';
+}
+
+it('saves the current board as a view and opens it', function (): void {
+    $order = array_reverse(opportunityStageOptionIds());
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->call('setFilterRules', [boardNameRule('Keep')])
+        ->call('setFilterBarSorts', [['column' => 'created_at', 'direction' => 'desc']])
+        ->call('setBoardGrouping', 'company')
+        ->call('reorderBoardStages', $order)
+        ->callAction('saveSavedViewAs', ['name' => 'Big deals'])
+        ->assertHasNoActionErrors();
+
+    $view = SavedView::query()->withoutGlobalScopes()->sole();
+    $state = $view->boardState();
+
+    expect($view->type)->toBe(SavedViewType::Board)
+        ->and($view->name)->toBe('Big deals')
+        ->and($state->filters['conditions']['rules'][0]['value'])->toBe('Keep')
+        ->and($state->sort)->toBe('created_at:desc')
+        ->and($state->grouping)->toBe('company')
+        ->and($state->stageOrder)->toBe($order);
+    $component->assertSet('activeSavedViewId', $view->getKey());
+});
+
+it('carries every stored key of the board into the view it creates', function (): void {
+    plainBoardState(new BoardStateData(stageOrder: array_reverse(opportunityStageOptionIds()), grouping: 'company'));
+
+    livewire(OpportunitiesBoard::class)->callAction('saveSavedViewAs', ['name' => 'Copy']);
+
+    expect(SavedView::query()->withoutGlobalScopes()->sole()->boardState()->stageOrder)->toBe(array_reverse(opportunityStageOptionIds()));
+});
+
+it('writes nothing to the plain board when a view is created from it', function (): void {
+    $preference = plainBoardState(new BoardStateData(sort: 'name:asc'));
+    $updatedAt = $preference->updated_at;
+    $component = livewire(OpportunitiesBoard::class);
+
+    $this->travelTo(now()->addHour());
+    $writes = boardViewStoreWrites(fn () => $component->callAction('saveSavedViewAs', ['name' => 'Copy'])->call('$refresh'));
+
+    expect($writes)->toBe(1)
+        ->and($preference->refresh()->updated_at)->toEqual($updatedAt)
+        ->and($preference->board_state->sort)->toBe('name:asc');
+});
+
+it('opens a board view from its link over the filters in the url', function (): void {
+    $keep = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Keep me']);
+    Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Drop me']);
+    $view = boardViewFor($this->user, ['state' => new BoardStateData(filters: boardFiltersFor('Keep'))]);
+    $updatedAt = $view->updated_at;
+    $this->travelTo(now()->addHour());
+
+    $component = Livewire::withQueryParams([
+        'view' => $view->getKey(),
+        'groupBy' => 'company',
+        'filters' => ['conditions' => ['match' => 'all', 'rules' => [boardNameRule('Drop')]]],
+    ])->test(OpportunitiesBoard::class);
+    $component->call('$refresh');
+
+    expect($component->get('activeSavedViewId'))->toBe($view->getKey())
+        ->and($component->get('groupBy'))->toBeNull()
+        ->and($component->instance()->getFilterBarData()['rules'][0]['value'])->toBe('Keep')
+        ->and(boardCardNames($component))->toBe([$keep->name])
+        ->and($view->refresh()->updated_at)->toEqual($updatedAt)
+        ->and(preferenceRow())->toBeNull();
+});
+
+it('lists the stages in the order a board view stores', function (): void {
+    $order = array_reverse(opportunityStageOptionIds());
+    $view = boardViewFor($this->user, ['state' => new BoardStateData(stageOrder: $order)]);
+
+    expect(openBoardWithView($view)->instance()->getBoard()->getColumnIdentifiers())->toBe($order)
+        ->and(openPlainBoard()->instance()->getBoard()->getColumnIdentifiers())->toBe(opportunityStageOptionIds());
+});
+
+it('stores a change on the open board view and leaves the plain board alone', function (): void {
+    $plain = plainBoardState(new BoardStateData(sort: 'name:asc'));
+    $seed = $plain->board_state->hash();
+    $view = boardViewFor($this->user);
+    $this->travelTo(now()->addHour());
+
+    openBoardWithView($view)->call('setBoardGrouping', null);
+
+    expect($view->refresh()->boardState()->grouping)->toBeNull()
+        ->and($plain->refresh()->board_state->hash())->toBe($seed)
+        ->and($plain->updated_at)->toEqual($plain->created_at);
+});
+
+it('stores a change on the plain board and leaves a board view alone when none is open', function (): void {
+    $view = boardViewFor($this->user);
+    $updatedAt = $view->updated_at;
+    $this->travelTo(now()->addHour());
+
+    livewire(OpportunitiesBoard::class)->call('setBoardGrouping', 'company')->call('setFilterRules', [boardNameRule('a')]);
+
+    expect($view->refresh()->updated_at)->toEqual($updatedAt)
+        ->and(preferenceRow()->board_state->grouping)->toBe('company');
+});
+
+it('writes nothing to a board view when it opens', function (): void {
+    $view = boardViewFor($this->user, ['state' => new BoardStateData(filters: boardFiltersFor('Keep'), grouping: 'company', sort: 'name:asc')]);
+    $updatedAt = $view->updated_at;
+    $this->travelTo(now()->addHour());
+
+    $writes = boardViewStoreWrites(fn () => openBoardWithView($view)->call('$refresh'));
+
+    expect($writes)->toBe(0)
+        ->and($view->refresh()->updated_at)->toEqual($updatedAt);
+});
+
+it('reorders stages inside a view without touching the member\'s own order, and the reverse', function (): void {
+    $reversed = array_reverse(opportunityStageOptionIds());
+    $view = boardViewFor($this->user);
+
+    openBoardWithView($view)->call('reorderBoardStages', $reversed);
+
+    expect($view->refresh()->boardState()->stageOrder)->toBe($reversed)
+        ->and(preferenceRow())->toBeNull();
+
+    $other = boardViewFor($this->user, ['name' => 'Other']);
+    openPlainBoard()->call('reorderBoardStages', $reversed);
+
+    expect(preferenceRow()->board_state->stageOrder)->toBe($reversed)
+        ->and($other->refresh()->boardState()->stageOrder)->toBe([]);
+});
+
+it('keeps a view\'s filters when its stages are reordered and its stage order when a filter changes', function (string $first): void {
+    $reversed = array_reverse(opportunityStageOptionIds());
+    $view = boardViewFor($this->user, ['state' => new BoardStateData(grouping: 'company')]);
+    $component = openBoardWithView($view);
+
+    $steps = [
+        'reorder' => fn () => $component->call('reorderBoardStages', $reversed),
+        'filter' => fn () => $component->call('setFilterRules', [boardNameRule('Keep')]),
+    ];
+    $steps[$first]();
+    $steps[$first === 'reorder' ? 'filter' : 'reorder']();
+
+    $state = $view->refresh()->boardState();
+
+    expect($state->stageOrder)->toBe($reversed)
+        ->and($state->filters['conditions']['rules'][0]['value'])->toBe('Keep')
+        ->and($state->grouping)->toBe('company')
+        ->and(preferenceRow())->toBeNull();
+})->with(['reorder first' => 'reorder', 'filter first' => 'filter']);
+
+it('refuses a board view id that is not the member\'s', function (string $case): void {
+    $stranger = User::factory()->withWorkspace()->create();
+    $theirs = match ($case) {
+        'another member' => boardViewFor(savedViewMember(WorkspaceRole::Member), ['name' => 'Theirs']),
+        'another workspace' => SavedView::factory()->for($stranger)->for($stranger->currentWorkspace)->create(['entity' => CrmEntity::Opportunity, 'type' => SavedViewType::Board, 'state' => new BoardStateData(grouping: 'company')]),
+        'unknown' => null,
+    };
+    Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Keep me']);
+    Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Drop me']);
+    $before = $theirs?->updated_at;
+    $this->travelTo(now()->addHour());
+
+    $component = Livewire::withQueryParams([
+        'view' => $theirs?->getKey() ?? '01JZZZZZZZZZZZZZZZZZZZZZZZ',
+        'filters' => ['conditions' => ['match' => 'all', 'rules' => [boardNameRule('Keep')]]],
+    ])->test(OpportunitiesBoard::class);
+
+    $component->assertNotified(__('filament/panel.tables.views.unavailable'));
+    expect($component->get('activeSavedViewId'))->toBeNull()
+        ->and(boardCardNames($component))->toBe(['Keep me']);
+
+    $component->call('setFilterRules', [boardNameRule('Drop')]);
+
+    expect(preferenceRow()->board_state->filters['conditions']['rules'][0]['value'])->toBe('Drop');
+
+    if ($theirs instanceof SavedView) {
+        $theirs->refresh();
+
+        expect($theirs->updated_at)->toEqual($before)
+            ->and($theirs->boardState()->filters)->toBe([])
+            ->and($theirs->boardState()->grouping)->toBe('company');
+    }
+})->with(['another member', 'another workspace', 'unknown']);
+
+it('refuses a board view id the browser sets after the board opened', function (): void {
+    $theirs = boardViewFor(savedViewMember(WorkspaceRole::Member), ['name' => 'Theirs']);
+    $before = $theirs->updated_at;
+    $this->travelTo(now()->addHour());
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->set('activeSavedViewId', $theirs->getKey())
+        ->assertSet('activeSavedViewId', null)
+        ->assertNotified(__('filament/panel.tables.views.unavailable'))
+        ->call('setFilterRules', [boardNameRule('Drop')])
+        ->call('reorderBoardStages', array_reverse(opportunityStageOptionIds()));
+
+    expect($theirs->refresh()->updated_at)->toEqual($before)
+        ->and($component->get('activeSavedViewId'))->toBeNull()
+        ->and(preferenceRow()->board_state->filters['conditions']['rules'][0]['value'])->toBe('Drop');
+});
+
+it('refuses a view of another entity on the board', function (): void {
+    $company = viewFor($this->user, ['type' => SavedViewType::Board, 'state' => new BoardStateData(grouping: 'company')]);
+
+    $component = openBoardWithView($company);
+
+    $component->assertNotified(__('filament/panel.tables.views.unavailable'));
+    expect($component->get('activeSavedViewId'))->toBeNull();
+});
+
+it('sends a list view id on the board to the list', function (): void {
+    $table = viewFor($this->user, ['entity' => CrmEntity::Opportunity, 'name' => 'Open deals']);
+
+    openBoardWithView($table)->assertRedirect(OpportunityResource::getUrl('index', ['view' => $table->getKey()]));
+    openPlainBoard()->call('applySavedView', $table->getKey())->assertRedirect(OpportunityResource::getUrl('index', ['view' => $table->getKey()]));
+});
+
+it('ignores a built-in view key on the board', function (string $key): void {
+    plainBoardState(new BoardStateData(grouping: 'company'));
+
+    $component = openBoardWithView($key);
+
+    $component->assertNotNotified();
+    expect($component->get('activeSavedViewId'))->toBeNull()
+        ->and($component->get('groupBy'))->toBe('company');
+})->with(['all', 'board', 'cards']);
+
+it('switches between board views in place and back to the plain board', function (): void {
+    $plain = plainBoardState(new BoardStateData(sort: 'created_at:asc'));
+    $first = boardViewFor($this->user, ['name' => 'First', 'state' => new BoardStateData(grouping: 'company', sort: 'created_at:desc')]);
+    $second = boardViewFor($this->user, ['name' => 'Second', 'state' => new BoardStateData(sort: 'name:asc')]);
+    $before = [$plain->updated_at, $first->updated_at, $second->updated_at];
+    $component = livewire(OpportunitiesBoard::class);
+    $this->travelTo(now()->addHour());
+
+    $writes = boardViewStoreWrites(function () use ($component, $first, $second): void {
+        $component->call('applySavedView', $first->getKey())
+            ->assertSet('activeSavedViewId', $first->getKey())
+            ->assertSet('groupBy', 'company')
+            ->assertSet('boardSort', 'created_at:desc')
+            ->call('applySavedView', $second->getKey())
+            ->assertSet('activeSavedViewId', $second->getKey())
+            ->assertSet('groupBy', null)
+            ->assertSet('boardSort', 'name:asc')
+            ->call('applyOwnBoard')
+            ->assertSet('activeSavedViewId', null)
+            ->assertSet('groupBy', null)
+            ->assertSet('boardSort', 'created_at:asc');
+    });
+
+    expect($writes)->toBe(0)
+        ->and([$plain->refresh()->updated_at, $first->refresh()->updated_at, $second->refresh()->updated_at])->toEqual($before);
+});
+
+it('applies the stage order of the view it opens in place', function (): void {
+    $order = array_reverse(opportunityStageOptionIds());
+    $view = boardViewFor($this->user, ['state' => new BoardStateData(stageOrder: $order)]);
+
+    $component = livewire(OpportunitiesBoard::class)->call('applySavedView', $view->getKey());
+
+    expect($component->instance()->getBoard()->getColumnIdentifiers())->toBe($order);
+
+    $component->call('applyOwnBoard');
+
+    expect($component->instance()->getBoard()->getColumnIdentifiers())->toBe(opportunityStageOptionIds());
+});
+
+it('leaves the member on the plain board with the same cards when the open view is deleted', function (): void {
+    $keep = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Keep me']);
+    Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Drop me']);
+    $plain = plainBoardState(new BoardStateData(sort: 'name:asc'));
+    $seed = $plain->board_state->hash();
+    $view = boardViewFor($this->user, ['state' => new BoardStateData(filters: boardFiltersFor('Keep'), grouping: 'company')]);
+    $this->travelTo(now()->addHour());
+
+    $component = openBoardWithView($view)
+        ->callAction('deleteSavedView', arguments: ['view' => $view->getKey()])
+        ->call('$refresh')
+        ->assertSet('activeSavedViewId', null)
+        ->assertSet('groupBy', 'company')
+        ->assertNotNotified(__('filament/panel.tables.views.unavailable'));
+
+    expect(boardCardNames($component))->toBe([$keep->name])
+        ->and($plain->refresh()->board_state->hash())->toBe($seed)
+        ->and($plain->updated_at)->toEqual($plain->created_at);
+
+    $component->call('setBoardGrouping', null);
+
+    expect($plain->refresh()->board_state->grouping)->toBeNull()
+        ->and($plain->board_state->filters['conditions']['rules'][0]['value'])->toBe('Keep');
+});
+
+it('renames and duplicates a board view from the board', function (): void {
+    $view = boardViewFor($this->user, ['name' => 'Old name']);
+
+    livewire(OpportunitiesBoard::class)
+        ->callAction('renameSavedView', ['name' => 'New name'], ['view' => $view->getKey()])
+        ->call('duplicateSavedView', $view->getKey());
+
+    $views = SavedView::query()->withoutGlobalScopes()->orderBy('name')->get();
+
+    expect($views->pluck('name')->first())->toBe('New name')
+        ->and($views)->toHaveCount(2)
+        ->and($views->pluck('type')->unique()->all())->toBe([SavedViewType::Board]);
+});
+
+it('marks the open board view in the switcher, and the plain board when none is open', function (): void {
+    $view = boardViewFor($this->user, ['name' => 'Big deals']);
+
+    $plain = livewire(OpportunitiesBoard::class)->html();
+    $open = openBoardWithView($view)->html();
+
+    expect(switcherRowHtml($plain, 'board'))->toContain('aria-current="true"')
+        ->and(switcherRowHtml($plain, $view->getKey()))->not->toContain('aria-current')
+        ->and(switcherRowHtml($open, 'board'))->not->toContain('aria-current')
+        ->and(switcherRowHtml($open, $view->getKey()))->toContain('aria-current="true"');
+});
+
+it('lets the board switcher create, rename, duplicate and delete views', function (): void {
+    $view = boardViewFor($this->user, ['name' => 'Big deals']);
+    $table = viewFor($this->user, ['entity' => CrmEntity::Opportunity, 'name' => 'Open deals']);
+
+    $html = livewire(OpportunitiesBoard::class)->html();
+    $row = switcherRowHtml($html, $view->getKey());
+
+    expect($html)->toContain('fi-ta-views-save-current')
+        ->and($html)->toContain("mountAction('renameSavedView'")
+        ->and($html)->toContain('duplicateSavedView(rowView.key)')
+        ->and($html)->toContain("mountAction('deleteSavedView'")
+        ->and($row)->toContain('isView')
+        ->and($row)->toContain('\u0022isView\u0022:true')
+        ->and($row)->toContain("applySavedView('{$view->getKey()}')")
+        ->and(switcherRowHtml($html, 'board'))->toContain('applyOwnBoard')
+        ->and(switcherRowHtml($html, 'list'))->not->toContain('applyOwnTable')
+        ->and(switcherRowHtml($html, $table->getKey()))->toContain('href="'.OpportunityResource::getUrl('index', ['view' => $table->getKey()]).'"')
+        ->and(switcherRowHtml($html, $table->getKey()))->not->toContain('applySavedView');
+});
+
+it('refuses the same name for a board view and a list view of one member', function (): void {
+    viewFor($this->user, ['entity' => CrmEntity::Opportunity, 'name' => 'Big deals']);
+
+    livewire(OpportunitiesBoard::class)
+        ->callAction('saveSavedViewAs', ['name' => 'big DEALS'])
+        ->assertHasActionErrors(['name']);
+
+    expect(SavedView::query()->withoutGlobalScopes()->count())->toBe(1);
 });

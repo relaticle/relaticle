@@ -9,7 +9,6 @@ use App\Contracts\OrdersBoardStages;
 use App\Enums\CrmEntity;
 use App\Enums\SavedViewType;
 use App\Filament\Resources\NoteResource\Pages\NotesCards;
-use App\Filament\Tables\Concerns\HasSavedViews;
 use App\Models\SavedView;
 use App\Models\User;
 use App\Models\Workspace;
@@ -90,7 +89,7 @@ trait HasViewSwitcher
         $current = collect($entries)->firstWhere('active', true) ?? $entries[0];
 
         return new HtmlString(view('filament.app.view-switcher', [
-            'canApply' => in_array(HasSavedViews::class, class_uses_recursive($this), true),
+            'canApply' => in_array(ManagesSavedViews::class, class_uses_recursive($this), true),
             'activeName' => $current['label'],
             'activeTone' => $current['tone'],
             'activeIcon' => $current['icon'],
@@ -269,6 +268,16 @@ trait HasViewSwitcher
         };
     }
 
+    private function builtInEntryAction(bool $canApply, string $kind): ?string
+    {
+        return match (true) {
+            ! $canApply => null,
+            $kind === 'list' && method_exists($this, 'applyOwnTable') => 'applyOwnTable',
+            $kind === 'board' && method_exists($this, 'applyOwnBoard') => 'applyOwnBoard',
+            default => null,
+        };
+    }
+
     private function viewSwitcherLabel(string $kind): string
     {
         $records = str(static::getResource()::getPluralModelLabel())->lower()->toString();
@@ -289,7 +298,7 @@ trait HasViewSwitcher
     {
         $views = $this->viewSwitcherSavedViews();
         $activeId = property_exists($this, 'activeSavedViewId') ? $this->activeSavedViewId : null;
-        $canApply = in_array(HasSavedViews::class, class_uses_recursive($this), true);
+        $canApply = in_array(ManagesSavedViews::class, class_uses_recursive($this), true);
         $entries = [];
 
         foreach ($pages as $kind => $page) {
@@ -297,12 +306,12 @@ trait HasViewSwitcher
                 'key' => $kind,
                 'kind' => $kind,
                 'layout' => $kind,
-                'action' => $canApply && $kind === 'list' ? 'applyOwnTable' : null,
+                'action' => $this->builtInEntryAction($canApply, $kind),
                 'label' => $page['label'],
                 'icon' => self::VIEW_ICONS[$kind],
                 'tone' => self::VIEW_TONES[$kind],
                 'url' => $this->viewSwitcherEntryUrl($kind, $page),
-                'active' => $page['active'] && ($kind !== 'list' || $activeId === null || ! $views->contains('id', $activeId)),
+                'active' => $page['active'] && (! in_array($kind, ['list', 'board'], true) || $activeId === null || ! $views->contains('id', $activeId)),
                 'canUpdate' => false,
                 'createdLabel' => null,
             ];
@@ -321,7 +330,7 @@ trait HasViewSwitcher
                 'key' => (string) $view->getKey(),
                 'kind' => 'view',
                 'layout' => $layout,
-                'action' => $canApply && ! $isBoard ? "applySavedView('{$view->getKey()}')" : null,
+                'action' => $canApply && $pages[$layout]['active'] ? "applySavedView('{$view->getKey()}')" : null,
                 'label' => $view->name,
                 'icon' => self::VIEW_ICONS[$layout],
                 'tone' => self::VIEW_TONES[$layout],

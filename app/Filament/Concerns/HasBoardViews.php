@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace App\Filament\Concerns;
 
+use App\Actions\Views\CreateSavedView;
 use App\Actions\Views\SaveBoardState;
 use App\Data\BoardStateData;
 use App\Enums\CrmEntity;
+use App\Enums\SavedViewType;
 use App\Filament\Components\Tables\ColumnHeaderLabel;
 use App\Filament\Tables\Concerns\FiltersWithRules;
 use App\Filament\Tables\FilterBar\FilterField;
 use App\Filament\Tables\FilterBar\FilterFieldCatalog;
 use App\Filament\Tables\FilterBar\SortList;
+use App\Models\SavedView;
 use App\Models\TablePreference;
 use App\Models\User;
 use App\Queries\CustomFieldFilterSchema;
@@ -19,6 +22,7 @@ use App\Queries\Sorts\CustomFieldSort;
 use App\Queries\Views\StoredTablePreferenceQuery;
 use Filament\Facades\Filament;
 use Filament\Support\Components\Attributes\Unexposed;
+use Filament\Support\Facades\FilamentView;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
@@ -29,11 +33,15 @@ use Relaticle\Flowforge\Exceptions\CardMoveRejectedException;
 trait HasBoardViews
 {
     use FiltersWithRules;
+    use ManagesSavedViews;
 
     private const array GROUPING_FIELDS = ['company' => 'company', 'assignee' => 'assignees'];
 
     #[Url(as: 'sort')]
     public ?string $boardSort = null;
+
+    #[Url(as: 'view')]
+    public ?string $activeSavedViewId = null;
 
     #[Locked]
     public ?string $boardStateHash = null;
@@ -43,6 +51,13 @@ trait HasBoardViews
     public function mountHasBoardViews(): void
     {
         $this->tableSearch = '';
+
+        $requested = $this->activeSavedViewId;
+        $this->activeSavedViewId = null;
+
+        if ($requested !== null && $this->openRequestedBoardView($requested)) {
+            return;
+        }
 
         $filters = $this->boardFilters($this->tableFilters);
         $grouping = $this->knownGrouping($this->groupBy);
@@ -58,6 +73,130 @@ trait HasBoardViews
         $this->groupBy = $grouping;
         $this->boardSort = $sort;
         $this->boardStateHash = $this->boardStateSignature($this->currentBoardState());
+    }
+
+    public function hydrateHasBoardViews(): void
+    {
+        if ($this->activeSavedViewId !== null && ! $this->activeBoardView() instanceof SavedView) {
+            $this->handleMissingSavedView($this->activeSavedViewId);
+        }
+    }
+
+    public function updatedActiveSavedViewId(): void
+    {
+        $viewId = $this->activeSavedViewId;
+        $this->activeSavedViewId = null;
+
+        $viewId === null ? $this->applyOwnBoard() : $this->applySavedView($viewId);
+    }
+
+    public function applySavedView(string $viewId): void
+    {
+        $view = $this->getVisibleSavedViews()->find($viewId);
+
+        if (! $view instanceof SavedView) {
+            $this->handleMissingSavedView($viewId);
+
+            return;
+        }
+
+        if ($view->type === SavedViewType::Table) {
+            $this->redirectToListView($view);
+
+            return;
+        }
+
+        $this->openBoardView($view);
+        $this->rebuildBoard();
+    }
+
+    public function applyOwnBoard(): void
+    {
+        $this->activeSavedViewId = null;
+        $this->forgetStoredBoardState();
+        $this->applyBoardState($this->storedBoardState());
+        $this->rebuildBoard();
+    }
+
+    protected function activeBoardView(): ?SavedView
+    {
+        if ($this->activeSavedViewId === null) {
+            return null;
+        }
+
+        $view = $this->getVisibleSavedViews()->find($this->activeSavedViewId);
+
+        return $view instanceof SavedView && $view->type === SavedViewType::Board ? $view : null;
+    }
+
+    protected function savedViewEntity(): CrmEntity
+    {
+        return $this->filterBarEntity();
+    }
+
+    protected function createSavedViewFromCurrentState(string $name): SavedView
+    {
+        return resolve(CreateSavedView::class)->execute(
+            $this->viewSwitcherUser(),
+            $this->viewSwitcherWorkspace(),
+            $this->filterBarEntity(),
+            $name,
+            $this->currentBoardState(),
+        );
+    }
+
+    protected function savedViewCreated(SavedView $view): void
+    {
+        $this->visibleSavedViews = null;
+        $this->activeSavedViewId = $view->getKey();
+        $this->boardStateHash = $this->boardStateSignature($this->currentBoardState());
+    }
+
+    protected function clearActiveSavedView(): void
+    {
+        $this->activeSavedViewId = null;
+        $this->visibleSavedViews = null;
+        $this->forgetStoredBoardState();
+        $this->boardStateHash = $this->boardStateSignature($this->currentBoardState());
+        $this->rebuildBoard();
+    }
+
+    private function openRequestedBoardView(string $viewId): bool
+    {
+        if (in_array($viewId, [SavedView::BUILT_IN_LIST_LINK, 'board', 'cards'], true)) {
+            return false;
+        }
+
+        $view = $this->getVisibleSavedViews()->find($viewId);
+
+        if (! $view instanceof SavedView) {
+            $this->handleMissingSavedView($viewId);
+
+            return false;
+        }
+
+        if ($view->type === SavedViewType::Table) {
+            $this->redirectToListView($view);
+
+            return true;
+        }
+
+        $this->openBoardView($view);
+
+        return true;
+    }
+
+    private function openBoardView(SavedView $view): void
+    {
+        $this->activeSavedViewId = $view->getKey();
+        $this->applyBoardState($view->boardState());
+    }
+
+    private function redirectToListView(SavedView $view): void
+    {
+        $url = static::getResource()::getUrl($this->viewSwitcherPages()['list']['name'], ['view' => $view->getKey()]);
+
+        $this->redirect($url, navigate: FilamentView::hasSpaMode($url));
     }
 
     public function dehydrateHasBoardViews(): void
@@ -78,6 +217,7 @@ trait HasBoardViews
             $this->viewSwitcherWorkspace(),
             $this->filterBarEntity(),
             ['filters' => $state->filters, 'sort' => $state->sort, 'grouping' => $state->grouping],
+            $this->activeBoardView(),
         );
 
         $this->boardSort = $state->sort;
@@ -88,6 +228,12 @@ trait HasBoardViews
 
     protected function storedBoardState(): BoardStateData
     {
+        $view = $this->activeBoardView();
+
+        if ($view instanceof SavedView) {
+            return $view->boardState();
+        }
+
         if (! $this->storedBoardState instanceof BoardStateData) {
             $preference = resolve(StoredTablePreferenceQuery::class)
                 ->get($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->filterBarEntity());
@@ -101,6 +247,7 @@ trait HasBoardViews
     protected function forgetStoredBoardState(): void
     {
         $this->storedBoardState = null;
+        $this->visibleSavedViews = null;
     }
 
     protected function currentBoardState(): BoardStateData
@@ -152,7 +299,7 @@ trait HasBoardViews
 
     protected function filterBarViewKey(): ?string
     {
-        return null;
+        return $this->activeBoardView()?->getKey();
     }
 
     /**

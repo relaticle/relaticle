@@ -6,6 +6,7 @@ namespace App\Filament\Concerns;
 
 use App\Actions\Views\ReorderBoardStages;
 use App\Data\BoardStateData;
+use App\Models\SavedView;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\HtmlString;
@@ -24,7 +25,7 @@ trait HasBoardStageOrder
             return;
         }
 
-        resolve(ReorderBoardStages::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), $known);
+        resolve(ReorderBoardStages::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), $known, $this->activeBoardView());
 
         $this->forgetStoredBoardState();
         $this->board = $this->board($this->makeBoard());
@@ -68,4 +69,6 @@ trait HasBoardStageOrder
     abstract protected function storedBoardState(): BoardStateData;
 
     abstract protected function forgetStoredBoardState(): void;
+
+    abstract protected function activeBoardView(): ?SavedView;
 }

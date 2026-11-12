@@ -6,9 +6,13 @@ use App\Actions\Views\ReorderBoardStages;
 use App\Data\BoardStateData;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\OpportunityField;
+use App\Enums\SavedViewType;
 use App\Enums\WorkspaceRole;
 use App\Filament\Actions\MoveCardAction;
 use App\Filament\Actions\PreviewRecordAction;
+use App\Filament\Concerns\HasBoardStageOrder;
+use App\Filament\Concerns\HasBoardViews;
+use App\Filament\Concerns\HasViewSwitcher;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
@@ -16,6 +20,7 @@ use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\Opportunity;
+use App\Models\SavedView;
 use App\Models\TablePreference;
 use App\Models\Task;
 use App\Models\User;
@@ -35,7 +40,7 @@ use Relaticle\Flowforge\Lane;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(ReorderBoardStages::class, OpportunitiesBoard::class, MoveCardAction::class, PreviewRecordAction::class);
+mutates(ReorderBoardStages::class, OpportunitiesBoard::class, MoveCardAction::class, PreviewRecordAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
 
 beforeEach(function () {
     $this->user = User::factory()->withWorkspace()->create();
@@ -1277,3 +1282,22 @@ it('writes nothing while the board mounts for the first time', function (bool $s
     expect($writes)->toBe(0)
         ->and(TablePreference::query()->count())->toBe($stored ? 1 : 0);
 })->with(['a member with no row' => false, 'a member with a stored row' => true]);
+
+it('narrows the first render with the open board view\'s filter and keeps its own stage order', function (): void {
+    $keep = opportunityInStage($this, 'Keep me', 'Prospecting');
+    opportunityInStage($this, 'Drop me', 'Prospecting');
+    $reversed = array_reverse(stageIds($this->stageField));
+    $view = SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'entity' => CrmEntity::Opportunity,
+        'type' => SavedViewType::Board,
+        'state' => new BoardStateData(stageOrder: $reversed, filters: boardFiltersWithRule(['field' => 'name', 'condition' => 'contains', 'value' => 'Keep'])),
+    ]);
+
+    $component = Livewire::withQueryParams(['view' => $view->getKey()])->test(OpportunitiesBoard::class);
+
+    $component->assertSee('Keep me')->assertDontSee('Drop me');
+
+    expect(opportunityStageCardIds($component, 'Prospecting'))->toBe([$keep->id])
+        ->and(boardColumnOrder($component))->toBe($reversed)
+        ->and(TablePreference::query()->count())->toBe(0);
+});
