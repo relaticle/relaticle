@@ -9,6 +9,11 @@ return [
         'opportunity_board' => 'Pipeline',
     ],
 
+    'view_settings' => [
+        'panel' => 'Board view settings',
+        'stage_actions' => 'Actions for :stage',
+    ],
+
     'move_denied' => 'You do not have permission to move this card.',
 
     'move_to' => [
@@ -23,6 +28,7 @@ return [
 
     'opportunities' => [
         'title' => 'Opportunities',
+        'stage_order' => 'Stage order',
         'actions' => [
             'add' => 'Add Opportunity',
             'edit' => 'Edit',
@@ -42,6 +48,7 @@ return [
     ],
 
     'tasks' => [
+        'stage_order' => 'Status order',
         'title' => 'Tasks',
         'actions' => [
             'add' => 'Add Task',

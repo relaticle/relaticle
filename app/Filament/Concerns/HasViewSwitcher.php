@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Concerns;
 
 use App\Actions\Views\ReorderViews;
+use App\Contracts\OrdersBoardStages;
 use App\Enums\CrmEntity;
 use App\Filament\Resources\NoteResource\Pages\NotesCards;
 use App\Filament\Tables\Concerns\HasSavedViews;
@@ -55,6 +56,7 @@ trait HasViewSwitcher
             'boardToolbar' => $header,
             'heading' => $this->getHeading(),
             'viewSwitcher' => $this->getViewSwitcher(),
+            'viewSettings' => $this->getViewSettings(),
         ]);
     }
 
@@ -168,6 +170,10 @@ trait HasViewSwitcher
 
     public function getViewSettings(): ?Htmlable
     {
+        if ($this instanceof OrdersBoardStages && $this->canSwitchViews()) {
+            return $this->boardViewSettings();
+        }
+
         $isList = $this->viewSwitcherPages()['list']['active'] ?? false;
 
         if (! $isList || ! method_exists($this, 'viewSettingsColumns') || ! auth()->user() instanceof User || ! Filament::getTenant() instanceof Workspace) {

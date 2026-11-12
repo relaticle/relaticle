@@ -434,10 +434,12 @@ it('leaves a collapse toggle that rests expanded looking the same as when it is 
             const look = (element) => { const style = getComputedStyle(element); return [style.backgroundColor, style.color].join(' | '); };
 
             const drifted = toggles.filter((element) => {
+                element.style.transition = 'none';
                 const expanded = look(element);
                 element.setAttribute('aria-expanded', 'false');
                 const collapsed = look(element);
                 element.setAttribute('aria-expanded', 'true');
+                element.style.transition = '';
 
                 return expanded !== collapsed;
             }).map((element) => element.className);
@@ -448,3 +450,38 @@ it('leaves a collapse toggle that rests expanded looking the same as when it is 
 
     expect($drift)->toBe(['toggles' => true, 'drifted' => []]);
 })->with([false, true]);
+
+it('draws the board view settings with the shared row, icon and corner spec', function (string $path): void {
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/{$path}")
+        ->click('.fi-view-settings-trigger')
+        ->assertVisible('[data-board-view-settings]');
+
+    expect($page->script(menuMetrics('[data-board-view-settings]', '.fi-ta-views-row', '.fi-ta-views-row-actions svg')))->toBe([
+        'rows' => [32],
+        'pitch' => [32],
+        'icons' => [16],
+        'panelRadius' => '10px',
+        'rowRadius' => ['6px'],
+    ]);
+    $page->assertNoJavaScriptErrors();
+})->with(['tasks/board', 'opportunities/board']);
+
+it('keeps the board view settings above the window edge and scrolls only its list', function (): void {
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 320)
+        ->navigate("/app/{$this->workspace->slug}/opportunities/board")
+        ->click('.fi-view-settings-trigger')
+        ->assertVisible('[data-board-view-settings]');
+
+    expect($page->script(menuRoom('[data-board-view-settings]', '.fi-ta-views-scroll')))->toBe([
+        'height' => true,
+        'bottom' => true,
+        'listScrolls' => true,
+        'panelScrolls' => false,
+    ]);
+    $page->assertNoJavaScriptErrors();
+});

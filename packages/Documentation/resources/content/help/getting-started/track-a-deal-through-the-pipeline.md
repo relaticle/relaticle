@@ -29,6 +29,15 @@ each deal shown as a card underneath it.
 
 ![The Opportunities board with deals grouped into Prospecting, Qualification, Needs Analysis, and Value Proposition columns](/help-assets/getting-started/track-a-deal-through-the-pipeline-1.png)
 
+## Put the stages in your own order
+
+Drag a column header left or right to move that stage. You can also click
+**View settings** at the top of the board and drag the stages in the list, or
+use **Move up** and **Move down** from a stage's menu. The order is saved for
+you alone, so teammates keep theirs. It never changes the order in the
+**Stage** field's settings, which stays the starting order for everyone. A
+stage added later joins the end of your order.
+
 ## Move a deal forward
 
 Drag a deal's card from its current column into the column for its next

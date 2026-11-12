@@ -869,6 +869,7 @@ final class AppServiceProvider extends ServiceProvider
             Js::make('payload-guard', resource_path('js/filament/payload-guard.js')),
             Js::make('linked-records-picker', resource_path('js/filament/linked-records-picker.js')),
             Js::make('resizable-columns', resource_path('js/filament/resizable-columns.js')),
+            Js::make('board-stage-order', resource_path('js/filament/board-stage-order.js')),
             Js::make('filter-bar', resource_path('js/filament/filter-bar.js')),
             Js::make('sheet-backdrop', resource_path('js/filament/sheet-backdrop.js')),
         ]);

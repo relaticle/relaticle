@@ -247,3 +247,43 @@
 .fi-view-settings-add-chevron {
     @apply size-menu-icon text-gray-400 dark:text-gray-500;
 }
+
+.fi-board-stages-heading {
+    @apply px-2 pb-1 pt-0.5 text-xs font-medium text-gray-500 dark:text-gray-400;
+}
+
+.fi-board-stage {
+    @apply flex h-menu-row min-w-0 flex-1 items-center gap-2 ps-2 text-sm text-gray-950 dark:text-white;
+}
+
+.fi-board-stage-mark {
+    @apply flex size-menu-icon shrink-0 items-center justify-center;
+}
+
+.fi-board-stage-dot {
+    @apply size-2 rounded-full bg-(--color-500);
+}
+
+.fi-board-stage-name {
+    @apply min-w-0 truncate;
+}
+
+.fi-board-stages-row-menu {
+    @apply max-w-56!;
+}
+
+.fi-board-stages-row-menu .fi-dropdown-list-item:disabled {
+    @apply pointer-events-none opacity-50;
+}
+
+[data-columns-sortable] > .ff-column .ff-column-header {
+    @apply cursor-grab;
+}
+
+.ff-column-placeholder {
+    @apply opacity-40;
+}
+
+.ff-column-dragging {
+    @apply cursor-grabbing rounded-xl bg-gray-50 opacity-95 shadow-lg dark:bg-gray-900;
+}

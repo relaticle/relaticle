@@ -8,7 +8,9 @@ use App\Actions\Views\ReorderBoardStages;
 use App\Data\BoardStateData;
 use App\Models\TablePreference;
 use App\Queries\Views\StoredTablePreferenceQuery;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\HtmlString;
 
 trait HasBoardStageOrder
 {
@@ -30,6 +32,14 @@ trait HasBoardStageOrder
 
         $this->boardState = null;
         $this->board = $this->board($this->makeBoard());
+    }
+
+    public function boardViewSettings(): Htmlable
+    {
+        return new HtmlString(view('filament.app.board-view-settings', [
+            'stages' => $this->boardStageList(),
+            'heading' => $this->boardStageHeading(),
+        ])->render());
     }
 
     /**
@@ -57,4 +67,6 @@ trait HasBoardStageOrder
      * @return Collection<int, array{id: mixed, custom_field_id: mixed, name: mixed, color: string}>
      */
     abstract private function boardStageList(): Collection;
+
+    abstract private function boardStageHeading(): string;
 }

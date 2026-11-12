@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources\OpportunityResource\Pages;
 
 use App\Actions\Opportunity\UpdateOpportunity;
+use App\Contracts\OrdersBoardStages;
 use App\Enums\CustomFields\OpportunityField as OpportunityCustomField;
 use App\Filament\Actions\MoveCardAction;
 use App\Filament\Actions\PreviewRecordAction;
@@ -47,7 +48,7 @@ use Relaticle\Flowforge\Grouping;
 use Relaticle\Flowforge\Lane;
 use Relaticle\Flowforge\Modern\BoardResourcePage;
 
-final class OpportunitiesBoard extends BoardResourcePage
+final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardStages
 {
     use HasBoardStageOrder;
     use HasViewSwitcher;
@@ -400,6 +401,11 @@ final class OpportunitiesBoard extends BoardResourcePage
     private function boardStageList(): Collection
     {
         return $this->stages();
+    }
+
+    private function boardStageHeading(): string
+    {
+        return __('filament/pages/boards.opportunities.stage_order');
     }
 
     /**

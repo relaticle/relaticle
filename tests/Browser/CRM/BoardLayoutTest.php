@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\CrmEntity;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\CustomFields\TaskField;
 use App\Filament\Actions\MoveCardAction;
@@ -10,6 +11,7 @@ use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Opportunity;
+use App\Models\TablePreference;
 use App\Models\Task;
 use App\Models\User;
 use Relaticle\CustomFields\Services\TenantContextService;
@@ -317,3 +319,195 @@ it('swaps the open preview for the next card instead of stacking a second one', 
         ->assertScript('document.querySelector(".fi-modal-window.fi-record-preview .fi-record-preview-title").innerText.trim()', 'Fleet renewal')
         ->assertNoJavaScriptErrors();
 });
+
+dataset('stage order boards', [
+    'tasks' => [Task::class, TaskField::STATUS->value, 'tasks/board', CrmEntity::Task],
+    'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board', CrmEntity::Opportunity],
+]);
+
+/**
+ * @return list<string>
+ */
+function boardStageOptionIds(string $model, string $fieldCode): array
+{
+    return CustomField::query()->withoutGlobalScopes()->where('entity_type', (new $model)->getMorphClass())->where('code', $fieldCode)->firstOrFail()
+        ->options()->withoutGlobalScopes()->orderBy('sort_order')->pluck('id')->map(strval(...))->all();
+}
+
+/**
+ * @return ?list<string>
+ */
+function storedStageOrder(User $user, CrmEntity $entity): ?array
+{
+    return TablePreference::query()->withoutGlobalScopes()->whereBelongsTo($user)->where('entity', $entity)->first()?->board_state->stageOrder;
+}
+
+function waitForStoredStageOrder(mixed $page, User $user, CrmEntity $entity, array $expected): void
+{
+    for ($attempt = 0; $attempt < 50 && storedStageOrder($user, $entity) !== $expected; $attempt++) {
+        $page->wait(0.1);
+    }
+}
+
+function dragInSteps(mixed $page, string $from, string $to): void
+{
+    if (! $page->script('navigator.userAgent.includes("Chrome")')) {
+        test()->markTestSkipped('Playwright drives a WebKit drag through native drag events, which a pointer-based sortable never receives.');
+    }
+
+    $page->page()->locator($from)->dragTo($page->page()->locator($to), ['steps' => 25]);
+}
+
+const BOARD_COLUMN_IDS = '[...document.querySelectorAll(".ff-columns > .ff-column")].map((column) => column.dataset.columnRoot)';
+
+const BOARD_STAGE_ROW_IDS = '[...document.querySelectorAll("[data-board-view-settings] [data-stage-id]")].map((row) => row.dataset.stageId)';
+
+it('drags a column header to reorder the columns and keeps the order after a reload', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $ids = boardStageOptionIds($model, $fieldCode);
+    $expected = [$ids[1], $ids[0], ...array_slice($ids, 2)];
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/{$path}")
+        ->assertVisible('.ff-column >> nth=0')
+        ->assertScript(BOARD_COLUMN_IDS, $ids);
+
+    dragInSteps($page, "[data-column-root=\"{$ids[0]}\"] .ff-column-title", "[data-column-root=\"{$ids[1]}\"] .ff-column-title");
+    waitForStoredStageOrder($page, $user, $entity, $expected);
+
+    expect(storedStageOrder($user, $entity))->toBe($expected);
+
+    $page->navigate("/app/{$workspace->slug}/{$path}")
+        ->assertVisible('.ff-column >> nth=0')
+        ->assertScript(BOARD_COLUMN_IDS, $expected)
+        ->assertNoJavaScriptErrors();
+})->with('stage order boards');
+
+it('still moves a card between columns after the columns were reordered', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    TenantContextService::setTenantId($workspace->getKey());
+
+    $field = CustomField::query()->forEntity($model)->where('code', $fieldCode)->firstOrFail();
+    [$from, $to] = [$field->options->get(0), $field->options->get(1)];
+    $record = $model::factory()->recycle([$user, $workspace])->create();
+    $record->saveCustomFieldValue($field, $from->getKey());
+
+    TenantContextService::setTenantId(null);
+
+    $ids = boardStageOptionIds($model, $fieldCode);
+    $card = "[data-card-id=\"{$record->getKey()}\"]";
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/{$path}")
+        ->assertVisible($card);
+
+    dragInSteps($page, "[data-column-root=\"{$ids[2]}\"] .ff-column-title", "[data-column-root=\"{$ids[0]}\"] .ff-column-title");
+    waitForStoredStageOrder($page, $user, $entity, [$ids[2], $ids[0], $ids[1], ...array_slice($ids, 3)]);
+
+    dragInSteps($page, $card, "[data-column-root=\"{$to->getKey()}\"] .ff-cards");
+
+    for ($attempt = 0; $attempt < 50 && $record->fresh()->customFieldValues()->where('custom_field_id', $field->getKey())->value($field->getValueColumn()) !== $to->getKey(); $attempt++) {
+        $page->wait(0.1);
+    }
+
+    expect($record->fresh()->customFieldValues()->where('custom_field_id', $field->getKey())->value($field->getValueColumn()))->toBe($to->getKey());
+
+    $page->assertScript("document.querySelector('{$card}').closest('[data-column-root]').dataset.columnRoot", (string) $to->getKey())
+        ->assertNoJavaScriptErrors();
+})->with('stage order boards');
+
+it('lists the stages in the board view settings and reorders them by dragging a row', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $ids = boardStageOptionIds($model, $fieldCode);
+    $expected = [$ids[1], $ids[0], ...array_slice($ids, 2)];
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/{$path}")
+        ->assertVisible('.fi-view-settings-trigger')
+        ->click('.fi-view-settings-trigger')
+        ->assertVisible('[data-board-view-settings]')
+        ->assertScript(BOARD_STAGE_ROW_IDS, $ids);
+
+    $page->drag("[data-board-view-settings] [data-stage-id=\"{$ids[0]}\"] .fi-board-stage", "[data-board-view-settings] [data-stage-id=\"{$ids[1]}\"] .fi-board-stage");
+    waitForStoredStageOrder($page, $user, $entity, $expected);
+
+    expect(storedStageOrder($user, $entity))->toBe($expected);
+
+    $page->assertScript(BOARD_COLUMN_IDS, $expected)
+        ->assertNoJavaScriptErrors();
+})->with('stage order boards');
+
+it('moves a stage from its menu, keeps focus on its menu button and disables the moves with nowhere to go', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $ids = boardStageOptionIds($model, $fieldCode);
+    $item = fn (string $label): string => '[...document.querySelectorAll(".fi-board-stages-row-menu .fi-dropdown-list-item")].find((item) => item.textContent.trim() === "'.$label.'")';
+    $trigger = fn (string $id): string => "[data-board-view-settings] [data-stage-id=\"{$id}\"] [data-stage-actions]";
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/{$path}")
+        ->click('.fi-view-settings-trigger');
+
+    $page->click($trigger($ids[0]))->wait(0.5);
+    $page->assertScript($item('Move up').'.disabled', true)
+        ->assertScript($item('Move down').'.disabled', false);
+
+    $page->script($item('Move down').'.click()');
+    waitForStoredStageOrder($page, $user, $entity, [$ids[1], $ids[0], ...array_slice($ids, 2)]);
+
+    $page->assertScript(BOARD_STAGE_ROW_IDS, [$ids[1], $ids[0], ...array_slice($ids, 2)])
+        ->assertScript(BOARD_COLUMN_IDS, [$ids[1], $ids[0], ...array_slice($ids, 2)])
+        ->assertScript("document.activeElement === document.querySelector('{$trigger($ids[0])}')", true);
+
+    $page->wait(0.5)->click($trigger($ids[0]))->wait(0.5);
+    $page->assertScript($item('Move up').'.disabled', false);
+
+    $page->click('.fi-board-stages-heading')->wait(0.5)->click($trigger(last($ids)))->wait(0.5);
+    $page->assertScript($item('Move down').'.disabled', true)
+        ->assertNoJavaScriptErrors();
+})->with('stage order boards');
+
+it('keeps the board view settings usable on a 390px phone', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $ids = boardStageOptionIds($model, $fieldCode);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(390, 844)
+        ->navigate("/app/{$workspace->slug}/{$path}")
+        ->click('.fi-view-settings-trigger')
+        ->assertVisible('[data-board-view-settings]')
+        ->assertScript('(() => { const box = document.querySelector("[data-board-view-settings]").closest(".fi-dropdown-panel").getBoundingClientRect(); return box.left >= 0 && box.right <= innerWidth && box.bottom <= innerHeight; })()', true);
+
+    $page->click("[data-board-view-settings] [data-stage-id=\"{$ids[1]}\"] [data-stage-actions]");
+    $page->script('[...document.querySelectorAll(".fi-board-stages-row-menu .fi-dropdown-list-item")].find((item) => item.textContent.trim() === "Move up").click()');
+    waitForStoredStageOrder($page, $user, $entity, [$ids[1], $ids[0], ...array_slice($ids, 2)]);
+
+    expect(storedStageOrder($user, $entity))->toBe([$ids[1], $ids[0], ...array_slice($ids, 2)]);
+
+    $page->assertScript(BOARD_COLUMN_IDS, [$ids[1], $ids[0], ...array_slice($ids, 2)])
+        ->assertNoJavaScriptErrors();
+})->with('stage order boards');

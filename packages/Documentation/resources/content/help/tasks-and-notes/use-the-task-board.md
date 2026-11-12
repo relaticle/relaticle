@@ -29,9 +29,17 @@ Filter the whole board by **Assignee** to see one person's plate.
   status is pre-set to that column.
 - **Edit or delete** a card from the menu on the card itself.
 
+## Reorder the columns for yourself
+
+Drag a column header left or right to move that status. You can also click
+**View settings** at the top of the board and drag the statuses in the list,
+or use **Move up** and **Move down** from a status's menu. The order is saved
+for you alone, so teammates keep theirs. It leaves the **Status** field's own
+order untouched, and a status added later joins the end of your order.
+
 ## The columns are yours
 
 Columns mirror the task **Status** field's options: To do, In progress, and
 Done out of the box. The workspace owner or an Admin can rename them, add
-more, or reorder them on the Custom Fields page, and the board follows:
+more, or reorder them on the Custom Fields page. That order is where every member's board starts:
 [edit the options in a select field](/help/custom-fields/edit-the-options-in-a-select-field).
