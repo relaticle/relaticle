@@ -18,6 +18,7 @@ use App\Queries\CustomFieldFilterSchema;
 use App\Queries\Sorts\CustomFieldSort;
 use App\Queries\Views\StoredTablePreferenceQuery;
 use Filament\Facades\Filament;
+use Filament\Support\Components\Attributes\Unexposed;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
@@ -149,7 +150,6 @@ trait HasBoardViews
     protected function filterBarOrdering(array $catalog): array
     {
         $fields = $this->boardSortableFields();
-        $lanesShown = $this->groupBy !== null;
 
         return [
             'sorts' => array_map(
@@ -157,7 +157,7 @@ trait HasBoardViews
                 array_keys($this->activeBoardSorts()),
                 $this->activeBoardSorts(),
             ),
-            'sortable' => $lanesShown ? [] : array_map(
+            'sortable' => $this->lanesShown() ? [] : array_map(
                 fn (string $key, array $field): array => ['key' => $key, ...$field],
                 array_keys($fields),
                 $fields,
@@ -197,7 +197,12 @@ trait HasBoardViews
      */
     private function activeBoardSorts(): array
     {
-        return $this->groupBy === null ? array_intersect_key(SortList::parse($this->boardSort), $this->boardSortableFields()) : [];
+        return $this->lanesShown() ? [] : array_intersect_key(SortList::parse($this->boardSort), $this->boardSortableFields());
+    }
+
+    protected function lanesShown(): bool
+    {
+        return $this->getBoard()->getActiveGrouping() !== null;
     }
 
     public function setFilterBarSorts(mixed $sorts = []): void
@@ -233,6 +238,48 @@ trait HasBoardViews
         }
 
         return $query;
+    }
+
+    /**
+     * @return Builder<Model>|null
+     */
+    #[Unexposed]
+    public function getFilteredTableQuery(): ?Builder
+    {
+        $query = parent::getFilteredTableQuery();
+
+        return $query instanceof Builder ? $this->sortBoardQuery(clone $query) : $query;
+    }
+
+    public function moveCard(
+        string $cardId,
+        string $targetColumnId,
+        ?string $afterCardId = null,
+        ?string $beforeCardId = null,
+        ?string $fromLaneId = null,
+        ?string $toLaneId = null,
+    ): bool {
+        if ($this->activeBoardSorts() !== []) {
+            $afterCardId = null;
+            $beforeCardId = $this->topCardKey($targetColumnId, $cardId);
+        }
+
+        return parent::moveCard($cardId, $targetColumnId, $afterCardId, $beforeCardId, $fromLaneId, $toLaneId);
+    }
+
+    private function topCardKey(string $columnId, string $exceptCardId): ?string
+    {
+        $board = $this->getBoard();
+        $position = $board->getPositionIdentifierAttribute();
+        $card = (clone $board->getQuery())
+            ->where($board->getColumnIdentifierAttribute(), $columnId)
+            ->whereKeyNot($exceptCardId)
+            ->whereNotNull($position)
+            ->orderBy($position)
+            ->orderBy($board->getQuery()->getModel()->getKeyName())
+            ->first();
+
+        return $card?->getKey();
     }
 
     protected function refuseReorderWhileSorted(Model $card, string $targetColumnId): void

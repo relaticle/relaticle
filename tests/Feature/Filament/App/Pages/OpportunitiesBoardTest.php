@@ -347,6 +347,81 @@ it('still reorders a column by hand when no sort is set', function (): void {
     expect((float) $card->fresh()->order_column)->toBeGreaterThan(3000.0);
 });
 
+it('drops a card between two cards of another column while sorted', function (): void {
+    opportunitiesToSort($this);
+    $mover = opportunityInStage($this, 'Mover', 'Qualification');
+    $alpha = Opportunity::query()->where('name', 'Alpha')->firstOrFail();
+    $bravo = Opportunity::query()->where('name', 'Bravo')->firstOrFail();
+    $prospecting = (string) $this->stageField->options->firstWhere('name', 'Prospecting')->getKey();
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->call('setFilterBarSorts', [['column' => 'created_at', 'direction' => 'desc']])
+        ->call('moveCard', (string) $mover->id, $prospecting, (string) $alpha->id, (string) $bravo->id)
+        ->assertDispatched('kanban-card-moved');
+
+    expect((float) $mover->fresh()->order_column)->toBeLessThan(1000.0)
+        ->and(opportunityStageNames($component->call('setFilterBarSorts', []), 'Prospecting'))->toBe(['Mover', 'Bravo', 'Charlie', 'Alpha']);
+});
+
+it('puts a card created while sorted at the top of the hand order', function (): void {
+    opportunitiesToSort($this);
+    Opportunity::query()->where('name', 'Charlie')->update(['order_column' => 200000]);
+    $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');
+
+    livewire(OpportunitiesBoard::class)
+        ->call('setFilterBarSorts', [['column' => 'name', 'direction' => 'desc']])
+        ->call('mountAction', 'create', ['column' => (string) $prospecting->getKey()])
+        ->set('mountedActions.0.data.name', 'Fresh deal')
+        ->call('callMountedAction')
+        ->assertOk();
+
+    expect((float) Opportunity::query()->where('name', 'Fresh deal')->firstOrFail()->order_column)->toBeLessThan(1000.0);
+});
+
+it('leaves the hand order of a column untouched by moves made while sorted', function (): void {
+    opportunitiesToSort($this);
+    $mover = opportunityInStage($this, 'Mover', 'Qualification');
+    $prospecting = (string) $this->stageField->options->firstWhere('name', 'Prospecting')->getKey();
+    $before = Opportunity::query()->whereIn('name', ['Bravo', 'Charlie', 'Alpha'])->pluck('order_column', 'name')->map(fn ($value): float => (float) $value)->all();
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->call('setFilterBarSorts', [['column' => 'created_at', 'direction' => 'desc']])
+        ->call('moveCard', (string) $mover->id, $prospecting)
+        ->call('setFilterBarSorts', []);
+
+    $after = Opportunity::query()->whereIn('name', ['Bravo', 'Charlie', 'Alpha'])->pluck('order_column', 'name')->map(fn ($value): float => (float) $value)->all();
+
+    expect($after)->toBe($before)
+        ->and(opportunityStageNames($component, 'Prospecting'))->toBe(['Mover', 'Bravo', 'Charlie', 'Alpha']);
+});
+
+it('keeps the counts right while sorted', function (string $column): void {
+    opportunitiesToSort($this);
+    $prospecting = (string) $this->stageField->options->firstWhere('name', 'Prospecting')->getKey();
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->call('setFilterRules', [['field' => 'name', 'condition' => 'contains', 'value' => 'Alp']])
+        ->call('setFilterBarSorts', [['column' => $column, 'direction' => 'desc']]);
+
+    $board = $component->instance()->getBoard();
+
+    expect($board->getBoardRecordCount($prospecting))->toBe(1)
+        ->and($board->getBatchedBoardRecordCounts()[$prospecting])->toBe(1)
+        ->and(opportunityStageNames($component, 'Prospecting'))->toBe(['Alpha']);
+})->with(['a native field' => 'created_at', 'a custom attribute' => 'custom_fields.amount']);
+
+it('keeps sorting when a garbage grouping arrives after mount', function (): void {
+    opportunitiesToSort($this);
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->call('setFilterBarSorts', [['column' => 'created_at', 'direction' => 'desc']])
+        ->set('groupBy', 'stage');
+
+    expect($component->instance()->getFilterBarData()['sortable'])->not->toBe([])
+        ->and($component->instance()->getFilterBarData()['sorts'])->toHaveCount(1)
+        ->and(opportunityStageNames($component, 'Prospecting'))->toBe(['Charlie', 'Alpha', 'Bravo']);
+});
+
 it('still moves a card to another stage while sorted', function (): void {
     opportunitiesToSort($this);
     $card = Opportunity::query()->where('name', 'Bravo')->firstOrFail();

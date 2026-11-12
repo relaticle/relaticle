@@ -79,13 +79,13 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
 
         return $board
             ->query(
-                $this->sortBoardQuery(Opportunity::query()
+                Opportunity::query()
                     ->leftJoin('custom_field_values as cfv', function (JoinClause $join) use ($stageField): void {
                         $join->on('opportunities.id', '=', 'cfv.entity_id')
                             ->where('cfv.custom_field_id', '=', $stageField->getKey());
                     })
                     ->select('opportunities.*', 'cfv.'.$valueColumn)
-                    ->with(['company.media', 'contact']))
+                    ->with(['company.media', 'contact'])
             )
             ->recordTitleAttribute('name')
             ->columnIdentifier($valueColumn)

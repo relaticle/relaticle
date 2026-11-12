@@ -29,8 +29,9 @@ opportunities** is the full sortable table. **Pipeline** is the board: it groups
 deals into a column per stage, and it is the view the page opens on until you
 move another view to the top of the switcher. Dragging a card is how you
 [move a deal forward](/help/getting-started/track-a-deal-through-the-pipeline).
-Click **Filter** above the board to narrow it by most attributes. Click **Group**
-to split it into a lane per company. Every column has its own add button for
+Click **Filter** above the board to narrow it by most attributes. Click **Sort**
+to order the cards in every column. Open **View settings** and pick **Company**
+under **Lanes** to split the board into a lane per company. Every column has its own add button for
 creating a deal directly in that stage. Drag a
 column header, or use **View settings**, to put the stages in your own order.
 Only you see that order, and the stage field's settings stay as they are. Hover

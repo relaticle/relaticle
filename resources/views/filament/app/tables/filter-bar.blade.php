@@ -74,7 +74,9 @@
         </div>
         </template>
 
-        <span class="fi-filter-sep" aria-hidden="true"></span>
+        <template x-if="sortable.length > 0 || groups.length > 0">
+            <span class="fi-filter-sep" aria-hidden="true"></span>
+        </template>
 
         <template x-for="chip in chips" x-bind:key="chip.id">
             <div

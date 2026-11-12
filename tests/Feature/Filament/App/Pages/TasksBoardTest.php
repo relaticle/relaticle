@@ -790,6 +790,79 @@ it('refuses a drop inside the same column while sorted', function (): void {
     expect((float) $card->fresh()->order_column)->toBe(1000.0);
 });
 
+it('drops a card between two cards of another column while sorted', function (): void {
+    tasksToSort($this);
+    $mover = taskInStatus($this, 'Mover', 'In progress');
+    $alpha = Task::query()->where('title', 'Alpha')->firstOrFail();
+    $bravo = Task::query()->where('title', 'Bravo')->firstOrFail();
+    $todo = (string) $this->statusField->options->firstWhere('name', 'To do')->getKey();
+
+    $component = livewire(TasksBoard::class)
+        ->call('setFilterBarSorts', [['column' => 'created_at', 'direction' => 'desc']])
+        ->call('moveCard', (string) $mover->id, $todo, (string) $alpha->id, (string) $bravo->id)
+        ->assertDispatched('kanban-card-moved');
+
+    expect((float) $mover->fresh()->order_column)->toBeLessThan(1000.0)
+        ->and(taskStatusTitles($component->call('setFilterBarSorts', []), 'To do'))->toBe(['Mover', 'Bravo', 'Charlie', 'Alpha']);
+});
+
+it('puts a card created while sorted at the top of the hand order', function (): void {
+    tasksToSort($this);
+    Task::query()->where('title', 'Charlie')->update(['order_column' => 200000]);
+    $todo = $this->statusField->options->firstWhere('name', 'To do');
+
+    livewire(TasksBoard::class)
+        ->call('setFilterBarSorts', [['column' => 'title', 'direction' => 'desc']])
+        ->call('mountAction', 'create', ['column' => (string) $todo->getKey()])
+        ->set('mountedActions.0.data.title', 'Fresh task')
+        ->call('callMountedAction')
+        ->assertOk();
+
+    expect((float) Task::query()->where('title', 'Fresh task')->firstOrFail()->order_column)->toBeLessThan(1000.0);
+});
+
+it('leaves the hand order of a column untouched by moves made while sorted', function (): void {
+    tasksToSort($this);
+    $mover = taskInStatus($this, 'Mover', 'In progress');
+    $todo = (string) $this->statusField->options->firstWhere('name', 'To do')->getKey();
+    $positions = fn (): array => Task::query()->whereIn('title', ['Bravo', 'Charlie', 'Alpha'])->pluck('order_column', 'title')->map(fn ($value): float => (float) $value)->all();
+    $before = $positions();
+
+    $component = livewire(TasksBoard::class)
+        ->call('setFilterBarSorts', [['column' => 'created_at', 'direction' => 'desc']])
+        ->call('moveCard', (string) $mover->id, $todo)
+        ->call('setFilterBarSorts', []);
+
+    expect($positions())->toBe($before)
+        ->and(taskStatusTitles($component, 'To do'))->toBe(['Mover', 'Bravo', 'Charlie', 'Alpha']);
+});
+
+it('keeps the counts right while sorted', function (string $column): void {
+    tasksToSort($this);
+    $todo = (string) $this->statusField->options->firstWhere('name', 'To do')->getKey();
+
+    $component = livewire(TasksBoard::class)
+        ->call('setFilterRules', [['field' => 'title', 'condition' => 'contains', 'value' => 'Alp']])
+        ->call('setFilterBarSorts', [['column' => $column, 'direction' => 'desc']]);
+
+    $board = $component->instance()->getBoard();
+
+    expect($board->getBoardRecordCount($todo))->toBe(1)
+        ->and($board->getBatchedBoardRecordCounts()[$todo])->toBe(1)
+        ->and(taskStatusTitles($component, 'To do'))->toBe(['Alpha']);
+})->with(['a native field' => 'created_at', 'a custom attribute' => 'custom_fields.due_date']);
+
+it('keeps sorting when a garbage grouping arrives after mount', function (): void {
+    tasksToSort($this);
+
+    $component = livewire(TasksBoard::class)
+        ->call('setFilterBarSorts', [['column' => 'created_at', 'direction' => 'desc']])
+        ->set('groupBy', 'status');
+
+    expect($component->instance()->getFilterBarData()['sortable'])->not->toBe([])
+        ->and(taskStatusTitles($component, 'To do'))->toBe(['Charlie', 'Alpha', 'Bravo']);
+});
+
 it('still moves a card to another status while sorted', function (): void {
     tasksToSort($this);
     $card = Task::query()->where('title', 'Bravo')->firstOrFail();

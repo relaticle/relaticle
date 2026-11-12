@@ -36,7 +36,7 @@ trait HasBoardStageOrder
             'stages' => $this->boardStageList(),
             'heading' => $this->boardStageHeading(),
             'groupings' => $this->boardGroupings(),
-            'grouping' => $this->groupBy,
+            'grouping' => $this->getBoard()->getActiveGrouping()?->getName(),
         ])->render());
     }
 

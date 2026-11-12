@@ -17,7 +17,7 @@ for **Priority**, a **Due Date** badge that turns into "Due Today",
 "Due Tomorrow", or "(Overdue)" as the date approaches, and the assignees'
 avatars.
 
-Click **Filter** to narrow the whole board by most attributes. Filter by **Assignees** to see one person's plate. Click **Group** to split the board into a lane per assignee.
+Click **Filter** to narrow the whole board by most attributes. Filter by **Assignees** to see one person's plate. Click **Sort** to order the cards in every column. Open **View settings** and pick **Assignee** under **Lanes** to split the board into a lane per assignee.
 
 ![The task board with To do, In progress, and Done columns, cards showing priority flags, due-date badges, and assignee avatars](/help-assets/tasks-and-notes/use-the-task-board-1.png)
 
