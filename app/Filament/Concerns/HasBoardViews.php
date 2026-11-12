@@ -20,7 +20,7 @@ trait HasBoardViews
         $this->tableSearch = '';
 
         if (filled($this->tableFilters)) {
-            $this->tableFilters = $this->canonicalTableFilters($this->tableFilters);
+            $this->tableFilters = [...$this->canonicalTableFilters($this->tableFilters), 'trashed' => ['value' => null]];
         }
     }
 

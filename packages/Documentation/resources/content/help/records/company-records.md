@@ -15,7 +15,7 @@ Only the name is required. Everything else can arrive later.
 - **Name**: required, and the only built-in column.
 - **Account Owner**: the teammate responsible; pick anyone in the workspace.
 - **ICP**: a toggle for "matches our ideal customer profile", handy as a
-  board and list filter.
+  list filter.
 - **Domains**: one or more web domains. Domains are unique across companies,
   which is what lets the CSV import match rows to existing companies.
 - **LinkedIn**: the company's profile URL.

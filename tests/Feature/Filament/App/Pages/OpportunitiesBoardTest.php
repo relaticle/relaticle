@@ -186,6 +186,13 @@ it('leaves the deleted records half of the bar inert on a board', function (): v
         ->and($fromUrl->instance()->hasFilterBarState())->toBeFalse();
 });
 
+it('keeps the deleted filter out of the stored filters from the first request', function (): void {
+    Livewire::withQueryParams(['filters' => ['trashed' => ['value' => '1']]])->test(OpportunitiesBoard::class)
+        ->assertSet('tableFilters.trashed.value', null)
+        ->call('setDeletedRecordsFilter', 'included')
+        ->assertSet('tableFilters.trashed.value', null);
+});
+
 it('labels every field on the board as the list does', function (): void {
     $board = collect(livewire(OpportunitiesBoard::class)->instance()->getFilterBarData()['fields'])->pluck('label', 'key');
     $list = collect(Livewire::withQueryParams(['view' => 'all'])->test(ListOpportunities::class)->instance()->getFilterBarData()['fields'])->pluck('label', 'key');

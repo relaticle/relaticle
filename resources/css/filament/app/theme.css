@@ -474,10 +474,6 @@ html.fi-chat-docked .fi-app-main-wrapper {
     display: contents;
 }
 
-.fi-board-header .fi-header-heading {
-    display: none;
-}
-
 @media (width < 64rem) {
     body:has([data-page-heading]) .fi-topbar-start {
         @apply flex min-w-0 flex-1;
