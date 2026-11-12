@@ -402,7 +402,8 @@ it('lists the stages in the board view settings and reorders them by dragging a 
         ->assertScript(BOARD_STAGE_ROW_IDS, $ids);
 
     $page->assertScript('(async () => { const bound = () => Object.keys(document.querySelector("[data-board-view-settings] .fi-ta-views-list")).some((key) => key.startsWith("Sortable")); for (let attempt = 0; ! bound() && attempt < 50; attempt++) { await new Promise((resolve) => setTimeout(resolve, 100)); } return bound(); })()', true);
-    $page->drag("[data-board-view-settings] [data-stage-id=\"{$ids[0]}\"] .fi-board-stage", "[data-board-view-settings] [data-stage-id=\"{$ids[1]}\"] .fi-board-stage");
+    $page->page()->locator("[data-board-view-settings] [data-stage-id=\"{$ids[0]}\"] .fi-board-stage")
+        ->dragTo($page->page()->locator("[data-board-view-settings] [data-stage-id=\"{$ids[1]}\"] .fi-board-stage"), ['steps' => 10]);
     waitForStoredStageOrder($page, $user, $entity, $expected);
 
     expect(storedStageOrder($user, $entity))->toBe($expected);
