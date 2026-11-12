@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\CustomFields\CreateCustomField;
 use App\Actions\CustomFields\DeleteCustomField;
+use App\Actions\Views\PlaceBoardCard;
 use App\Actions\Views\ReorderBoardStages;
 use App\Actions\Views\SetBoardColumnField;
 use App\Actions\Views\SetBoardColumnVisibility;
@@ -24,6 +25,7 @@ use App\Filament\Concerns\HasViewSwitcher;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
+use App\Filament\Tables\Concerns\CreatesTableAttribute;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\Export;
@@ -53,7 +55,7 @@ use Relaticle\Flowforge\Services\DecimalPosition;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(SetCardAttributes::class, BoardCardAttributesQuery::class, HasBoardCards::class, ReorderBoardStages::class, SetBoardColumnField::class, SetBoardColumnVisibility::class, BoardColumnFieldsQuery::class, TasksBoard::class, CreateTaskAction::class, ChecklistHtml::class, MoveCardAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
+mutates(SetCardAttributes::class, PlaceBoardCard::class, CreatesTableAttribute::class, BoardCardAttributesQuery::class, HasBoardCards::class, ReorderBoardStages::class, SetBoardColumnField::class, SetBoardColumnVisibility::class, BoardColumnFieldsQuery::class, TasksBoard::class, CreateTaskAction::class, ChecklistHtml::class, MoveCardAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -1693,9 +1695,10 @@ function countTaskBoardQueries(): array
 
 it('reads every attribute a card can show without a query per card', function (): void {
     $keys = resolve(BoardCardAttributesQuery::class)->get($this->user, $this->workspace, CrmEntity::Task);
-    livewire(TasksBoard::class)->call('setCardAttributes', $keys);
+    rememberedTaskCard($this, $keys);
 
     taskWithEveryRelation($this);
+    countTaskBoardQueries();
     $withOneCard = count(countTaskBoardQueries());
 
     foreach (range(1, 4) as $ignored) {
@@ -1768,7 +1771,8 @@ it('draws the chosen task attributes in their order', function (): void {
     $task = tasksBoardCardWithDescription($this, '<p>Plan the visit</p>'.tasksBoardChecklistHtml());
     $task->assignees()->attach($this->user);
 
-    $component = livewire(TasksBoard::class)->call('setCardAttributes', ['assignees', 'checklist']);
+    rememberedTaskCard($this, ['assignees', 'checklist']);
+    $component = livewire(TasksBoard::class);
 
     expect($component->html())->toMatch('/'.preg_quote($this->user->profile_photo_url, '/').'.*data-checklist-progress/s')
         ->not->toContain('Plan the visit');
@@ -1822,6 +1826,16 @@ it('draws neither the description nor the checklist of a stored card once the de
         ->and($preference->board_state->cardAttributes)->toBe(['description', 'checklist', 'creator']);
 });
 
+function rememberedTaskCard(object $test, array $keys): TablePreference
+{
+    return TablePreference::factory()->create([
+        'user_id' => $test->user->getKey(),
+        'workspace_id' => $test->workspace->getKey(),
+        'entity' => CrmEntity::Task,
+        'board_state' => new BoardStateData(cardAttributes: $keys),
+    ]);
+}
+
 it('lists the task card attributes in order with the two switches', function (): void {
     livewire(TasksBoard::class)
         ->assertSeeHtmlInOrder([
@@ -1861,5 +1875,36 @@ it('offers a viewer the task card settings but no create row', function (): void
     livewire(TasksBoard::class)
         ->assertSeeHtml('data-board-add-attribute')
         ->assertDontSeeHtml('data-view-settings-create')
+        ->assertDontSeeHtml('createTableAttribute')
         ->assertActionHidden('createTableAttribute');
+});
+
+it('keeps the priority on the card across a write while priority makes the columns', function (string $change): void {
+    $priority = taskPriority();
+    $task = tasksBoardCardWithDescription($this, '<p>Plan</p>');
+    $task->saveCustomFieldValue($priority, $priority->options->firstWhere('name', 'High')->getKey());
+    $drawnBefore = substr_count(livewire(TasksBoard::class)->html(), 'High');
+
+    $component = livewire(TasksBoard::class)->call('setBoardColumnField', TaskField::PRIORITY->value);
+
+    match ($change) {
+        'create' => $component->callAction('createTableAttribute', data: ['name' => 'Effort', 'type' => 'text']),
+        'reorder' => $component->call('reorderCardAttributes', ['assignees', 'custom_fields.due_date']),
+        'remove' => $component->call('removeCardAttribute', 'assignees'),
+    };
+
+    $component->call('setBoardColumnField', TaskField::STATUS->value);
+
+    expect(TablePreference::query()->sole()->board_state->cardAttributes)->toContain('custom_fields.priority')
+        ->and(substr_count($component->html(), 'High'))->toBe($drawnBefore);
+})->with(['create', 'reorder', 'remove']);
+
+it('says a text attribute was added and a rich text attribute was only created', function (): void {
+    livewire(TasksBoard::class)
+        ->callAction('createTableAttribute', data: ['name' => 'Effort', 'type' => 'text'])
+        ->assertNotified('Effort added to this view')
+        ->callAction('createTableAttribute', data: ['name' => 'Plan notes', 'type' => 'rich-editor'])
+        ->assertNotified('Plan notes created. This type of attribute does not show on a card.');
+
+    expect(TablePreference::query()->sole()->board_state->cardAttributes)->toContain('custom_fields.effort')->not->toContain('custom_fields.plan_notes');
 });

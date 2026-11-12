@@ -63,7 +63,7 @@
                 return this.rows(kind).map((row) => row.dataset[this.kinds[kind].key])
             },
             reorder(kind) {
-                return kind === 'stage' ? this.$wire.reorderBoardStages(this.ids(kind)) : this.$wire.setCardAttributes(this.ids(kind))
+                return kind === 'stage' ? this.$wire.reorderBoardStages(this.ids(kind)) : this.$wire.reorderCardAttributes(this.ids(kind))
             },
             move(kind, id, step) {
                 const rows = this.rows(kind)
@@ -87,7 +87,7 @@
                 const index = rows.findIndex((row) => row.dataset.cardAttribute === id)
                 const neighbour = rows[index + 1] ?? rows[index - 1]
                 const focusNext = () => (neighbour?.isConnected ? neighbour.querySelector(this.kinds.attribute.trigger) : this.$root.querySelector('[data-panel-trigger=add]'))?.focus()
-                const saved = this.$wire.setCardAttributes(this.ids('attribute').filter((key) => key !== id))
+                const saved = this.$wire.removeCardAttribute(id)
 
                 this.closeRowMenu()
                 saved.then(() => this.$nextTick(focusNext), focusNext)
@@ -169,16 +169,13 @@
                 this.pending.push(key)
 
                 try {
-                    await this.$wire.setCardAttributes([...this.ids('attribute'), key])
+                    await this.$wire.addCardAttribute(key)
                 } finally {
                     this.pending = this.pending.filter((pending) => pending !== key)
                     this.revision++
                 }
 
                 this.$nextTick(() => this.focusAddStart())
-            },
-            createAttribute() {
-                this.$wire.mountAction('createTableAttribute')
             },
         }"
     >
@@ -570,7 +567,7 @@
                         role="button"
                         tabindex="0"
                         data-view-settings-create
-                        x-on:click="createAttribute(); close()"
+                        x-on:click="$wire.mountAction('createTableAttribute'); close()"
                     >
                         {{ __('filament/panel.tables.views.create_attribute') }}
                     </x-filament::dropdown.list.item>

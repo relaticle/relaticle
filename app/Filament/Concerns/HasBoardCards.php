@@ -19,6 +19,7 @@ use App\Queries\Views\BoardCardAttributesQuery;
 use Closure;
 use Filament\Infolists\Components\Entry;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Text;
 use Filament\Support\Enums\TextSize;
@@ -38,29 +39,49 @@ trait HasBoardCards
     /** @var Collection<string, CustomField>|null */
     private ?Collection $cardAttributeFieldList = null;
 
-    public function setCardAttributes(mixed $keys = []): void
+    public function addCardAttribute(mixed $key = null): void
     {
-        if (! is_array($keys)) {
+        if (! is_string($key) || ! in_array($key, $this->offeredCardAttributes(), true)) {
             return;
         }
 
-        $strings = array_values(array_filter($keys, is_string(...)));
+        $this->changeCardAttributes(static fn (array $stored): array => [...$stored, $key]);
+    }
 
-        if (count($strings) !== count($keys)) {
+    public function removeCardAttribute(mixed $key = null): void
+    {
+        if (is_string($key)) {
+            $this->changeCardAttributes(static fn (array $stored): array => array_values(array_diff($stored, [$key])));
+        }
+    }
+
+    public function reorderCardAttributes(mixed $keys = null): void
+    {
+        if (! is_array($keys) || ! array_all($keys, static fn (mixed $key): bool => is_string($key))) {
             return;
         }
 
-        $offered = resolve(BoardCardAttributesQuery::class)->get($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity());
+        $this->changeCardAttributes(static fn (array $stored): array => BoardStateData::reorderColumns($stored, array_values(array_intersect(array_unique($keys), $stored))));
+    }
 
-        if (array_diff($strings, $offered) !== []) {
-            return;
-        }
-
-        $saved = $this->writingBoardState(fn (?SavedView $view): BoardStateData => resolve(SetCardAttributes::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), $strings, $view));
+    /**
+     * @param  Closure(list<string>): list<string>  $change
+     */
+    private function changeCardAttributes(Closure $change): void
+    {
+        $saved = $this->writingBoardState(fn (?SavedView $view): BoardStateData => resolve(SetCardAttributes::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), $change, $view));
 
         if ($saved instanceof BoardStateData) {
             $this->boardStateWritten($saved);
         }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function offeredCardAttributes(): array
+    {
+        return resolve(BoardCardAttributesQuery::class)->get($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity());
     }
 
     public function setBoardCardSize(mixed $size = null): void
@@ -89,10 +110,13 @@ trait HasBoardCards
 
     protected function attributeCreated(CustomField $field): void
     {
-        if (CustomFieldType::tryFrom($field->type)?->fitsOnCard() === true) {
-            $this->setCardAttributes([...$this->cardAttributeKeys(), FilterFieldCatalog::CUSTOM_FIELD_PREFIX.$field->code]);
+        if (CustomFieldType::tryFrom($field->type)?->fitsOnCard() !== true) {
+            Notification::make()->success()->title(__('filament/pages/boards.view_settings.attribute_created_off_card', ['name' => e($field->name)]))->send();
+
+            return;
         }
 
+        $this->addCardAttribute(FilterFieldCatalog::CUSTOM_FIELD_PREFIX.$field->code);
         $this->notifyTableAttributeAdded($field);
     }
 
@@ -102,7 +126,7 @@ trait HasBoardCards
     protected function cardSettingsView(): array
     {
         $shown = $this->cardAttributeKeys();
-        $offered = resolve(BoardCardAttributesQuery::class)->get($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity());
+        $offered = $this->offeredCardAttributes();
         $columnKey = FilterFieldCatalog::CUSTOM_FIELD_PREFIX.$this->boardColumnField()->code;
         $state = $this->storedBoardState();
 
@@ -148,7 +172,7 @@ trait HasBoardCards
     {
         $entity = $this->viewSwitcherEntity();
         $chosen = $this->storedBoardState()->cardAttributes ?? $entity->defaultCardAttributes();
-        $offered = resolve(BoardCardAttributesQuery::class)->get($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $entity);
+        $offered = $this->offeredCardAttributes();
         $columnKey = FilterFieldCatalog::CUSTOM_FIELD_PREFIX.$this->boardColumnField()->code;
 
         return array_values(array_filter(

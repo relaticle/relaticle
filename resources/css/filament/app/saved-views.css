@@ -261,7 +261,7 @@
 }
 
 .fi-board-stage-grip {
-    @apply flex size-6 shrink-0 cursor-grab touch-none items-center justify-center text-gray-400 opacity-0 dark:text-gray-500;
+    @apply flex size-6 shrink-0 cursor-grab touch-none items-center justify-center text-gray-400 dark:text-gray-500;
 
     & .fi-icon {
         @apply size-menu-icon;
@@ -269,7 +269,7 @@
 
     .fi-board-stage-row:hover &,
     .fi-board-stage-row:has(:focus-visible) & {
-        @apply opacity-100;
+        @apply text-gray-700 dark:text-gray-200;
     }
 }
 
@@ -310,11 +310,11 @@
 }
 
 .fi-board-main-view {
-    @apply overflow-y-auto;
+    @apply overflow-y-auto overscroll-contain;
 }
 
 .fi-board-attributes-scroll {
-    @apply min-h-16;
+    @apply min-h-16 overscroll-contain;
 }
 
 .fi-board-section-heading {
@@ -334,7 +334,7 @@
 }
 
 .fi-board-no-value-row {
-    @apply flex items-center gap-2;
+    @apply flex items-center;
 }
 
 .fi-board-stage-divider {

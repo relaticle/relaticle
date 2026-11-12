@@ -28,6 +28,7 @@ return [
         'visible_attributes' => 'Visible attributes',
         'attribute_actions' => 'Actions for :attribute',
         'remove_attribute' => 'Remove from card',
+        'attribute_created_off_card' => ':name created. This type of attribute does not show on a card.',
         'add_attribute' => 'Add attribute to view',
         'search_attributes' => 'Search :entity attributes',
         'all_attributes_shown' => 'Every attribute is on the card',

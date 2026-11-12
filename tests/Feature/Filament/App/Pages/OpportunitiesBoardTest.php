@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\CustomFields\CreateCustomField;
+use App\Actions\Views\PlaceBoardCard;
 use App\Actions\Views\ReorderBoardStages;
 use App\Actions\Views\SetBoardColumnField;
 use App\Actions\Views\SetBoardColumnVisibility;
@@ -23,6 +24,7 @@ use App\Filament\Concerns\HasViewSwitcher;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
+use App\Filament\Tables\Concerns\CreatesTableAttribute;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
@@ -53,7 +55,7 @@ use Relaticle\Flowforge\Services\DecimalPosition;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(SetCardAttributes::class, BoardCardAttributesQuery::class, HasBoardCards::class, ReorderBoardStages::class, SetBoardColumnField::class, SetBoardColumnVisibility::class, BoardColumnFieldsQuery::class, OpportunitiesBoard::class, MoveCardAction::class, PreviewRecordAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
+mutates(SetCardAttributes::class, PlaceBoardCard::class, CreatesTableAttribute::class, BoardCardAttributesQuery::class, HasBoardCards::class, ReorderBoardStages::class, SetBoardColumnField::class, SetBoardColumnVisibility::class, BoardColumnFieldsQuery::class, OpportunitiesBoard::class, MoveCardAction::class, PreviewRecordAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
 
 beforeEach(function () {
     $this->user = User::factory()->withWorkspace()->create();
@@ -1932,8 +1934,9 @@ it('draws the chosen attributes in their order', function (): void {
     $opportunity = opportunityWithCardValues($this, 'Order deal');
     $opportunity->update(['contact_id' => People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Priya Contact'])->getKey()]);
 
+    rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(cardAttributes: ['custom_fields.close_date', 'contact', 'created_at']));
+
     livewire(OpportunitiesBoard::class)
-        ->call('setCardAttributes', ['custom_fields.close_date', 'contact', 'created_at'])
         ->assertSeeInOrder(['Mar 4', 'Priya Contact'])
         ->assertDontSee('5,000');
 });
@@ -1965,7 +1968,9 @@ it('draws a card with its title only when every attribute is removed', function 
     opportunityWithCardValues($this, 'Title only deal');
 
     livewire(OpportunitiesBoard::class)
-        ->call('setCardAttributes', [])
+        ->call('removeCardAttribute', 'company')
+        ->call('removeCardAttribute', 'custom_fields.amount')
+        ->call('removeCardAttribute', 'custom_fields.close_date')
         ->assertSee('Title only deal')
         ->assertDontSee('5,000')
         ->assertDontSee('Mar 4');
@@ -2057,21 +2062,20 @@ it('ignores a key the card cannot show without an error', function (string $case
     $record = resolve(CreateCustomField::class)->execute($this->user, ['name' => 'Employer', 'type' => 'record', 'entity_type' => 'opportunity', 'lookup_type' => 'company']);
     $secret = CustomField::factory()->create(['tenant_id' => $this->workspace->getKey(), 'entity_type' => 'opportunity', 'code' => 'secret', 'name' => 'Secret', 'type' => 'text', 'settings' => new CustomFieldSettingsData(encrypted: true)]);
 
-    $keys = match ($case) {
-        'another entity' => ['assignees'],
-        'another workspace' => ['custom_fields.'.$foreignField->code],
-        'rich editor' => ['custom_fields.'.$richText->code],
-        'record' => ['custom_fields.'.$record->code],
-        'encrypted' => ['custom_fields.'.$secret->code],
-        'unknown' => ['bogus'],
-        'not a string' => [['x']],
-        'a good key beside a bad one' => ['company', 'bogus'],
+    $key = match ($case) {
+        'another entity' => 'assignees',
+        'another workspace' => 'custom_fields.'.$foreignField->code,
+        'rich editor' => 'custom_fields.'.$richText->code,
+        'record' => 'custom_fields.'.$record->code,
+        'encrypted' => 'custom_fields.'.$secret->code,
+        'unknown' => 'bogus',
+        'not a string' => ['x'],
     };
 
-    livewire(OpportunitiesBoard::class)->call('setCardAttributes', $keys)->assertOk();
+    livewire(OpportunitiesBoard::class)->call('addCardAttribute', $key)->assertOk();
 
     expect(TablePreference::query()->withoutGlobalScopes()->count())->toBe(0);
-})->with(['another entity', 'another workspace', 'rich editor', 'record', 'encrypted', 'unknown', 'not a string', 'a good key beside a bad one']);
+})->with(['another entity', 'another workspace', 'rich editor', 'record', 'encrypted', 'unknown', 'not a string']);
 
 it('answers 422 when the action is given a key the card cannot show', function (array $keys): void {
     expect(cardAttributesStatus(fn () => resolve(SetCardAttributes::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, $keys)))->toBe(422);
@@ -2114,33 +2118,33 @@ it('offers the column attribute to no card while it makes the columns', function
     $deal->saveCustomFieldValue($tier, $tier->options->firstWhere('name', 'Gold')->getKey());
     $tierKey = 'custom_fields.'.$tier->code;
 
-    $component = livewire(OpportunitiesBoard::class)->call('setCardAttributes', [$tierKey]);
+    $component = livewire(OpportunitiesBoard::class)->call('addCardAttribute', $tierKey);
 
     expect($component->html())->toContain('Gold');
 
-    $component->call('setBoardColumnField', $tier->code)->call('setCardAttributes', []);
-    $withoutTier = substr_count($component->html(), 'Gold');
+    $component->call('setBoardColumnField', $tier->code);
+    $skipped = substr_count($component->html(), 'Gold');
 
-    $component->call('setCardAttributes', [$tierKey]);
+    $component->call('removeCardAttribute', $tierKey);
 
-    expect(substr_count($component->html(), 'Gold'))->toBe($withoutTier);
+    expect(substr_count($component->html(), 'Gold'))->toBe($skipped);
 });
 
 it('keeps card settings inside a board view and leaves the plain board alone', function (): void {
     $view = SavedView::factory()->for($this->user)->for($this->workspace)->create([
         'entity' => CrmEntity::Opportunity,
         'type' => SavedViewType::Board,
-        'state' => new BoardStateData,
+        'state' => new BoardStateData(cardAttributes: ['company']),
     ]);
 
     Livewire::withQueryParams(['view' => $view->getKey()])->test(OpportunitiesBoard::class)
-        ->call('setCardAttributes', ['contact'])
+        ->call('addCardAttribute', 'contact')
         ->call('setCardLabels', true)
         ->call('setHideEmptyAttributes', false);
 
     $stored = $view->refresh()->boardState();
 
-    expect($stored->cardAttributes)->toBe(['contact'])
+    expect($stored->cardAttributes)->toBe(['company', 'contact'])
         ->and($stored->showLabels)->toBeTrue()
         ->and($stored->hideEmpty)->toBeFalse()
         ->and(TablePreference::query()->count())->toBe(0);
@@ -2167,9 +2171,10 @@ function countBoardQueries(): array
 
 it('reads every attribute a card can show without a query per card', function (): void {
     $keys = resolve(BoardCardAttributesQuery::class)->get($this->user, $this->workspace, CrmEntity::Opportunity);
-    livewire(OpportunitiesBoard::class)->call('setCardAttributes', $keys);
+    rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(cardAttributes: $keys));
 
     opportunityWithEveryRelation($this);
+    countBoardQueries();
     $withOneCard = count(countBoardQueries());
 
     foreach (range(1, 4) as $ignored) {
@@ -2254,7 +2259,7 @@ it('creates a rich text attribute from the board without putting it on the card'
     livewire(OpportunitiesBoard::class)
         ->callAction('createTableAttribute', data: ['name' => 'Deal notes', 'type' => 'rich-editor'])
         ->assertHasNoActionErrors()
-        ->assertNotified('Deal notes added to this view');
+        ->assertNotified('Deal notes created. This type of attribute does not show on a card.');
 
     $stored = TablePreference::query()->first()?->board_state->cardAttributes ?? [];
 
@@ -2272,7 +2277,87 @@ it('offers a viewer the card settings but no create row', function (): void {
         ->assertSeeHtml('data-board-add-attribute')
         ->assertDontSeeHtml('data-view-settings-create')
         ->assertActionHidden('createTableAttribute')
+        ->assertDontSeeHtml('createTableAttribute')
         ->call('setCardLabels', true);
 
     expect(TablePreference::query()->sole()->board_state->showLabels)->toBeTrue();
+});
+
+it('keeps the column attribute on the card across a write while it makes the columns', function (string $change): void {
+    $tier = opportunitySelectField($this, 'Tier', ['Gold', 'Silver']);
+    $tierKey = 'custom_fields.'.$tier->code;
+    $deal = opportunityInStage($this, 'Tiered deal', 'Prospecting');
+    $deal->saveCustomFieldValue($tier, $tier->options->firstWhere('name', 'Gold')->getKey());
+    rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(cardAttributes: ['company', $tierKey, 'custom_fields.amount']));
+
+    $component = livewire(OpportunitiesBoard::class)->call('setBoardColumnField', $tier->code);
+
+    match ($change) {
+        'create' => $component->callAction('createTableAttribute', data: ['name' => 'Lead score', 'type' => 'text']),
+        'reorder' => $component->call('reorderCardAttributes', ['custom_fields.amount', 'company']),
+        'remove' => $component->call('removeCardAttribute', 'company'),
+        'add' => $component->call('addCardAttribute', 'contact'),
+    };
+
+    $component->call('setBoardColumnField', OpportunityField::STAGE->value);
+
+    expect(TablePreference::query()->sole()->board_state->cardAttributes)->toContain($tierKey);
+})->with(['create', 'reorder', 'remove', 'add']);
+
+it('stores two adds in a row from one rendered page', function (): void {
+    $component = livewire(OpportunitiesBoard::class);
+
+    $component->call('addCardAttribute', 'contact')->call('addCardAttribute', 'creator');
+
+    expect(TablePreference::query()->sole()->board_state->cardAttributes)->toBe([...CrmEntity::Opportunity->defaultCardAttributes(), 'contact', 'creator']);
+});
+
+it('refills only the drawn slots when the order changes', function (): void {
+    $tier = opportunitySelectField($this, 'Tier', ['Gold', 'Silver']);
+    $tierKey = 'custom_fields.'.$tier->code;
+    rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(cardAttributes: ['company', $tierKey, 'custom_fields.amount']));
+
+    livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnField', $tier->code)
+        ->call('reorderCardAttributes', ['custom_fields.amount', 'company']);
+
+    expect(TablePreference::query()->sole()->board_state->cardAttributes)->toBe(['custom_fields.amount', $tierKey, 'company']);
+});
+
+it('keeps a deactivated attribute on the stored card and draws it again once it is active', function (): void {
+    $score = resolve(CreateCustomField::class)->execute($this->user, ['name' => 'Lead score', 'type' => 'text', 'entity_type' => 'opportunity']);
+    $scoreKey = 'custom_fields.'.$score->code;
+    opportunityInStage($this, 'Scored deal', 'Prospecting')->saveCustomFieldValue($score, 'Hot 87');
+    rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(cardAttributes: ['company', $scoreKey]));
+
+    $score->forceFill(['active' => false])->save();
+    resolve(WorkspaceCustomFields::class)->forget($this->workspace->getKey());
+
+    livewire(OpportunitiesBoard::class)->assertDontSee('Hot 87')->call('addCardAttribute', 'contact');
+
+    expect(TablePreference::query()->sole()->board_state->cardAttributes)->toBe(['company', $scoreKey, 'contact']);
+
+    $score->forceFill(['active' => true])->save();
+    resolve(WorkspaceCustomFields::class)->forget($this->workspace->getKey());
+
+    livewire(OpportunitiesBoard::class)->assertSee('Hot 87');
+});
+
+it('stores an empty card when the last drawn attribute is removed', function (): void {
+    rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(cardAttributes: ['company']));
+
+    livewire(OpportunitiesBoard::class)->call('removeCardAttribute', 'company');
+
+    expect(TablePreference::query()->sole()->board_state->cardAttributes)->toBe([]);
+});
+
+it('ignores a remove or a reorder that is not a list of strings', function (): void {
+    rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(cardAttributes: ['company', 'contact']));
+
+    livewire(OpportunitiesBoard::class)
+        ->call('removeCardAttribute', ['company'])
+        ->call('reorderCardAttributes', 'contact')
+        ->call('reorderCardAttributes', ['contact', 7]);
+
+    expect(TablePreference::query()->sole()->board_state->cardAttributes)->toBe(['company', 'contact']);
 });
