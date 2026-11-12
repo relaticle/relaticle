@@ -177,8 +177,7 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
             ->columnSpanFull()
             ->html(false)
             ->state(fn (Task $record): string => $this->cardSummary($record)['preview'])
-            ->visible(fn (?string $state): bool => filled($state))
-            ->extraAttributes(['class' => 'mb-4']);
+            ->visible(fn (?string $state): bool => filled($state));
     }
 
     /** @return array{preview: string, progress: array{checked: int, total: int}|null} */

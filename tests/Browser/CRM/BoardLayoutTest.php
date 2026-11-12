@@ -8,6 +8,7 @@ use App\Enums\CustomFields\TaskField;
 use App\Filament\Actions\MoveCardAction;
 use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
+use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Opportunity;
 use App\Models\TablePreference;
@@ -193,6 +194,170 @@ it('fills the viewport with a grouped board and lines its headers up with the fl
     expect($page->script($layout))->toBe(['pageScrolls' => false, 'lanesScroll' => true, 'gapBelowLanes' => 0])
         ->and($page->script($headerTop))->toBe($flatHeaderTop);
 });
+
+it('gives cards the same inset and gap in a flat column and in a lane cell', function (string $model, string $columnFieldCode, string $groupBy): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    TenantContextService::setTenantId($workspace->getKey());
+
+    $columnField = CustomField::query()->forEntity($model)->where('code', $columnFieldCode)->firstOrFail();
+    $firstColumn = $columnField->options->first();
+    $company = Company::factory()->recycle([$user, $workspace])->create();
+
+    $records = $model::factory()->recycle([$user, $workspace])->count(2)
+        ->create($model === Opportunity::class ? ['company_id' => $company->getKey()] : []);
+
+    $records->each(function (Task|Opportunity $record) use ($columnField, $firstColumn, $user): void {
+        $record->saveCustomFieldValue($columnField, $firstColumn->getKey());
+
+        if ($record instanceof Task) {
+            $record->assignees()->attach($user);
+        }
+    });
+
+    TenantContextService::setTenantId(null);
+
+    $path = $model === Opportunity::class ? 'opportunities' : 'tasks';
+
+    $flat = <<<'JS'
+        (() => {
+            const rect = (element) => element.getBoundingClientRect();
+            const round = (value) => Math.round(value * 10) / 10;
+            const column = document.querySelector('.ff-columns > .ff-column');
+            const tray = rect(column.querySelector('.ff-tray'));
+            const [first, second] = [...column.querySelectorAll('.ff-card')].map(rect);
+            const heading = rect(column.querySelector('.ff-column-heading').firstElementChild);
+            const actions = rect(column.querySelector('.ff-column-actions'));
+            const addIcon = rect(column.querySelector('.ff-add-row-icon'));
+            const cardPadding = parseFloat(getComputedStyle(column.querySelector('.ff-card-body')).paddingLeft);
+
+            return {
+                left: round(first.left - tray.left),
+                right: round(tray.right - first.right),
+                top: round(first.top - tray.top),
+                gap: round(second.top - first.bottom),
+                headerLeft: round(heading.left - first.left),
+                headerRight: round(actions.right - first.right),
+                addIcon: round(addIcon.left - first.left - cardPadding),
+            };
+        })();
+    JS;
+
+    $laneCell = <<<'JS'
+        (() => {
+            const rect = (element) => element.getBoundingClientRect();
+            const round = (value) => Math.round(value * 10) / 10;
+            const cell = [...document.querySelectorAll('.ff-cell')].find((candidate) => candidate.querySelectorAll('.ff-card').length === 2);
+            const box = rect(cell);
+            const [first, second] = [...cell.querySelectorAll('.ff-card')].map(rect);
+
+            return {
+                left: round(first.left - box.left),
+                right: round(box.right - first.right),
+                top: round(first.top - box.top),
+                bottom: round(box.bottom - second.bottom),
+                gap: round(second.top - first.bottom),
+            };
+        })();
+    JS;
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/{$path}/board")
+        ->assertVisible('.ff-columns > .ff-column .ff-card >> nth=1')
+        ->assertNoJavaScriptErrors();
+
+    $column = $page->script($flat);
+
+    expect($column['right'])->toBe($column['left'])
+        ->and($column['top'])->toBe($column['left'])
+        ->and($column['headerLeft'])->toBe(0)
+        ->and($column['headerRight'])->toBe(0)
+        ->and($column['addIcon'])->toBe(0);
+
+    $page->navigate("/app/{$workspace->slug}/{$path}/board?groupBy={$groupBy}")
+        ->assertVisible('.ff-cell .ff-card >> nth=1')
+        ->assertNoJavaScriptErrors();
+
+    $cell = $page->script($laneCell);
+
+    expect($cell['left'])->toBe($column['left'])
+        ->and($cell['right'])->toBe($column['left'])
+        ->and($cell['top'])->toBe($column['left'])
+        ->and($cell['bottom'])->toBe($column['left'])
+        ->and($cell['gap'])->toBe($column['gap']);
+})->with([
+    'tasks' => [Task::class, TaskField::STATUS->value, 'assignee'],
+    'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'company'],
+]);
+
+it('puts one row gap between the title and every row of a default card', function (string $model, string $columnFieldCode): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    TenantContextService::setTenantId($workspace->getKey());
+
+    $columnField = CustomField::query()->forEntity($model)->where('code', $columnFieldCode)->firstOrFail();
+
+    if ($model === Opportunity::class) {
+        $company = Company::factory()->recycle([$user, $workspace])->create();
+        $record = Opportunity::factory()->recycle([$user, $workspace])->create(['company_id' => $company->getKey()]);
+        $amount = CustomField::query()->forEntity($model)->where('code', OpportunityField::AMOUNT->value)->firstOrFail();
+        $closeDate = CustomField::query()->forEntity($model)->where('code', OpportunityField::CLOSE_DATE->value)->firstOrFail();
+        $record->saveCustomFieldValue($amount, 5000);
+        $record->saveCustomFieldValue($closeDate, now()->addWeek());
+    } else {
+        $record = Task::factory()->recycle([$user, $workspace])->create();
+        $description = CustomField::query()->forEntity($model)->where('code', TaskField::DESCRIPTION->value)->firstOrFail();
+        $record->saveCustomFieldValue($description, '<p>Short</p>');
+        $record->assignees()->attach($user);
+    }
+
+    $record->saveCustomFieldValue($columnField, $columnField->options->first()->getKey());
+
+    TenantContextService::setTenantId(null);
+
+    $path = $model === Opportunity::class ? 'opportunities' : 'tasks';
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/{$path}/board")
+        ->assertVisible("[data-card-id=\"{$record->getKey()}\"] .ff-card-body")
+        ->assertNoJavaScriptErrors();
+
+    $rows = $page->script(<<<JS
+        (() => {
+            const body = document.querySelector('[data-card-id="{$record->getKey()}"] .ff-card-body');
+            const rows = [...body.querySelectorAll(':scope > .ff-card-title, :scope > .fi-sc > .fi-grid-col')]
+                .map((row) => row.getBoundingClientRect())
+                .filter((box) => box.height > 0);
+
+            const margins = [...body.querySelectorAll('*:not(.fi-sr-only)')]
+                .filter((element) => element.getBoundingClientRect().height > 0)
+                .map((element) => parseFloat(getComputedStyle(element).marginTop) + parseFloat(getComputedStyle(element).marginBottom));
+
+            return {
+                rowGap: parseFloat(getComputedStyle(body).rowGap),
+                gaps: rows.slice(1).map((box, index) => Math.round((box.top - rows[index].bottom) * 10) / 10),
+                margin: Math.max(...margins),
+            };
+        })();
+    JS);
+
+    expect($rows['gaps'])->toHaveCount(2)
+        ->and(array_unique($rows['gaps']))->toBe([$rows['rowGap']])
+        ->and($rows['margin'])->toBe(0);
+})->with([
+    'tasks' => [Task::class, TaskField::STATUS->value],
+    'opportunities' => [Opportunity::class, OpportunityField::STAGE->value],
+]);
 
 it('lets the next board column peek past the first on a 320px phone', function (string $path): void {
     $this->withVite();

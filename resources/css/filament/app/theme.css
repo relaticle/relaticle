@@ -1922,7 +1922,7 @@ html.fi-record-stacked .fi-record-layout {
         @apply flex items-center gap-x-3 border-b border-gray-200/60 pe-4 lg:pe-6 dark:border-white/10;
 
         & > .fi-filter-bar {
-            @apply min-w-0 flex-1 border-b-0;
+            @apply min-w-0 flex-1 border-b-0 pe-0;
         }
     }
 
@@ -2290,10 +2290,52 @@ html.fi-record-stacked .fi-record-layout {
     --ff-card-bg: var(--surface-block-bg);
     --ff-card-ring: var(--surface-block-border);
     --ff-gap: 0.75rem;
+    --ff-inset: 0.5rem;
+    --ff-card-padding: 0.75rem;
 
     @media (width < 40rem) {
         --ff-column-width: min(300px, calc(100vw - 3.5rem));
     }
+}
+
+.ff-board :is(.ff-cards, .ff-cell) {
+    padding: var(--ff-inset);
+}
+
+.ff-board :is(.ff-cards, .ff-cell-cards) {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ff-inset);
+}
+
+.ff-board .ff-card {
+    margin-bottom: 0;
+}
+
+.ff-board .ff-column-header {
+    padding-inline: var(--ff-inset);
+}
+
+.ff-board .ff-add-row {
+    padding-inline: var(--ff-card-padding);
+}
+
+.ff-board .ff-cell {
+    min-height: 3.5rem;
+}
+
+.ff-board .ff-cell-cards {
+    min-height: 0;
+}
+
+.ff-board .ff-lane-header {
+    padding-top: var(--ff-inset);
+    padding-inline-start: calc(var(--ff-inset) + 0.25rem);
+}
+
+/* The schema's own 1.5rem gap is not a row gap; its entries take the card body's gap instead. */
+.ff-board .ff-card-body > .fi-sc {
+    display: contents;
 }
 
 .fi-page:has(.fi-board-header[data-board-column-width='narrow']) .ff-board {

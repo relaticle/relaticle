@@ -307,7 +307,7 @@ trait HasBoardCards
             return [...$components, ...$body];
         }
 
-        return [...$components, CardFlex::make($body)->wrap(false)->align('stretch')->extraAttributes(['class' => 'flex-col! gap-y-1.5'])];
+        return [...$components, CardFlex::make($body)->wrap(false)->align('stretch')->extraAttributes(['class' => 'flex-col! gap-y-2'])];
     }
 
     /**
