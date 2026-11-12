@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\CustomFields\OpportunityField;
+use App\Enums\CustomFields\TaskField;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -139,6 +141,15 @@ enum CrmEntity: string
             self::Task => ['list', 'board'],
             self::Note => ['cards', 'list'],
             self::Company, self::People => ['list'],
+        };
+    }
+
+    public function boardFieldCode(): ?string
+    {
+        return match ($this) {
+            self::Opportunity => OpportunityField::STAGE->value,
+            self::Task => TaskField::STATUS->value,
+            self::Company, self::People, self::Note => null,
         };
     }
 

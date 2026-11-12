@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Views\ReorderBoardStages;
 use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\OpportunityField;
@@ -13,19 +14,25 @@ use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
 use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\CustomFieldOption;
 use App\Models\Opportunity;
+use App\Models\TablePreference;
+use App\Models\Task;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Once;
 use Illuminate\Support\Str;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Relaticle\Flowforge\Board;
 use Relaticle\Flowforge\Grouping;
 use Relaticle\Flowforge\Lane;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(OpportunitiesBoard::class, MoveCardAction::class, PreviewRecordAction::class);
+mutates(ReorderBoardStages::class, OpportunitiesBoard::class, MoveCardAction::class, PreviewRecordAction::class);
 
 beforeEach(function () {
     $this->user = User::factory()->withWorkspace()->create();
@@ -521,4 +528,117 @@ it('does not walk a close date back a day for a viewer west of utc', function ()
     livewire(OpportunitiesBoard::class)
         ->assertSee('Closes Today')
         ->assertDontSee('Overdue');
+});
+
+/**
+ * @return list<string>
+ */
+function stageIds(CustomField $field): array
+{
+    return CustomFieldOption::query()->withoutGlobalScopes()->where('custom_field_id', $field->getKey())->orderBy('sort_order')->pluck('id')->map(strval(...))->all();
+}
+
+/**
+ * @return list<string>
+ */
+function boardColumnOrder(Testable $component): array
+{
+    return $component->instance()->getBoard()->getColumnIdentifiers();
+}
+
+function freshOpportunitiesBoard(): Testable
+{
+    Once::flush();
+
+    return livewire(OpportunitiesBoard::class);
+}
+
+it('lists the stages in the order the field settings give them by default', function (): void {
+    expect(boardColumnOrder(freshOpportunitiesBoard()))->toBe(stageIds($this->stageField));
+});
+
+it('keeps a reordered stage list for the member on the same page and on a new visit', function (): void {
+    $reversed = array_reverse(stageIds($this->stageField));
+
+    $component = livewire(OpportunitiesBoard::class)->call('reorderBoardStages', $reversed);
+
+    expect(boardColumnOrder($component))->toBe($reversed)
+        ->and(boardColumnOrder(freshOpportunitiesBoard()))->toBe($reversed);
+});
+
+it('leaves another member\'s board in the field order', function (): void {
+    $other = User::factory()->create();
+    $this->workspace->users()->attach($other, ['role' => WorkspaceRole::Member->value]);
+    $other->switchWorkspace($this->workspace);
+
+    livewire(OpportunitiesBoard::class)->call('reorderBoardStages', array_reverse(stageIds($this->stageField)));
+
+    $this->actingAs($other);
+
+    expect(boardColumnOrder(freshOpportunitiesBoard()))->toBe(stageIds($this->stageField));
+});
+
+it('never writes the field options when stages are reordered', function (): void {
+    $before = CustomFieldOption::query()->where('custom_field_id', $this->stageField->getKey())->pluck('sort_order', 'id')->all();
+    $fieldBefore = $this->stageField->fresh()->only(['sort_order', 'settings']);
+
+    livewire(OpportunitiesBoard::class)->call('reorderBoardStages', array_reverse(stageIds($this->stageField)));
+
+    expect(CustomFieldOption::query()->where('custom_field_id', $this->stageField->getKey())->pluck('sort_order', 'id')->all())->toBe($before)
+        ->and($this->stageField->fresh()->only(['sort_order', 'settings']))->toEqual($fieldBefore);
+});
+
+it('puts a stage added after the reorder at the end and drops one that was deleted', function (): void {
+    $order = stageIds($this->stageField);
+    $reversed = array_reverse($order);
+
+    livewire(OpportunitiesBoard::class)->call('reorderBoardStages', $reversed);
+
+    $added = CustomFieldOption::query()->create([
+        'custom_field_id' => $this->stageField->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
+        'name' => 'Negotiation round two',
+        'sort_order' => 99,
+    ]);
+    CustomFieldOption::query()->whereKey($reversed[0])->delete();
+
+    expect(boardColumnOrder(freshOpportunitiesBoard()))->toBe([...array_slice($reversed, 1), (string) $added->getKey()]);
+});
+
+it('stores an order made of the board\'s own stages once each', function (): void {
+    $order = stageIds($this->stageField);
+
+    $preference = resolve(ReorderBoardStages::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, [$order[2], $order[0], $order[2]]);
+
+    expect($preference->board_state->stageOrder)->toBe([$order[2], $order[0]])
+        ->and(TablePreference::query()->count())->toBe(1);
+});
+
+it('rejects a stage order the member may not store', function (string $case): void {
+    $foreign = User::factory()->withWorkspace()->create();
+    $foreignField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $foreign->currentWorkspace->getKey())
+        ->where('entity_type', 'opportunity')
+        ->where('code', OpportunityField::STAGE)
+        ->firstOrFail();
+    $taskStatus = CustomField::query()->forEntity(Task::class)->where('code', 'status')->firstOrFail();
+    $outsider = User::factory()->create();
+
+    [$user, $ids] = match ($case) {
+        'another workspace' => [$this->user, [stageIds($this->stageField)[0], ...stageIds($foreignField)]],
+        'another field' => [$this->user, [...stageIds($this->stageField), ...stageIds($taskStatus)]],
+        'unknown id' => [$this->user, [stageIds($this->stageField)[0], 'not-an-option']],
+        'non member' => [$outsider, stageIds($this->stageField)],
+    };
+
+    expect(fn () => resolve(ReorderBoardStages::class)->execute($user, $this->workspace, CrmEntity::Opportunity, $ids))
+        ->toThrow(HttpException::class);
+
+    expect(TablePreference::query()->withoutGlobalScopes()->count())->toBe(0);
+})->with(['another workspace', 'another field', 'unknown id', 'non member']);
+
+it('refuses a stage order for an entity that has no board', function (): void {
+    expect(fn () => resolve(ReorderBoardStages::class)->execute($this->user, $this->workspace, CrmEntity::Company, ['a']))
+        ->toThrow(HttpException::class);
 });

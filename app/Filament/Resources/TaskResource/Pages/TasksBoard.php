@@ -11,6 +11,7 @@ use App\Filament\Actions\EditTaskAction;
 use App\Filament\Actions\MoveCardAction;
 use App\Filament\Components\Forms\WorkspaceMemberSelect;
 use App\Filament\Components\Tables\Filters\RecordSelectFilter;
+use App\Filament\Concerns\HasBoardStageOrder;
 use App\Filament\Concerns\HasViewSwitcher;
 use App\Filament\Concerns\KeepsOpenTaskInUrl;
 use App\Filament\Resources\TaskResource;
@@ -52,6 +53,7 @@ use WeakMap;
 
 final class TasksBoard extends BoardResourcePage
 {
+    use HasBoardStageOrder;
     use HasViewSwitcher;
     use KeepsOpenTaskInUrl;
 
@@ -427,12 +429,20 @@ final class TasksBoard extends BoardResourcePage
         // Check if color options are enabled for this field
         $colorsEnabled = $field->settings->enable_option_colors ?? false;
 
-        return $field->options->map(fn (CustomFieldOption $option): array => [
+        return $this->inMemberOrder($field->options->map(fn (CustomFieldOption $option): array => [
             'id' => $option->getKey(),
             'custom_field_id' => $option->getAttribute('custom_field_id'),
             'name' => $option->getAttribute('name'),
             'color' => $colorsEnabled ? ($option->settings->color ?? 'gray') : 'gray',
-        ]);
+        ]));
+    }
+
+    /**
+     * @return Collection<int, array{id: mixed, custom_field_id: mixed, name: mixed, color: string}>
+     */
+    private function boardStageList(): Collection
+    {
+        return $this->statuses();
     }
 
     /**

@@ -11,6 +11,7 @@ use App\Filament\Actions\PreviewRecordAction;
 use App\Filament\Components\Forms\RecordSelect;
 use App\Filament\Components\Infolists\RecordChipEntry;
 use App\Filament\Components\Tables\Filters\RecordSelectFilter;
+use App\Filament\Concerns\HasBoardStageOrder;
 use App\Filament\Concerns\HasViewSwitcher;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\OpportunityResource\Forms\OpportunityForm;
@@ -48,6 +49,7 @@ use Relaticle\Flowforge\Modern\BoardResourcePage;
 
 final class OpportunitiesBoard extends BoardResourcePage
 {
+    use HasBoardStageOrder;
     use HasViewSwitcher;
 
     protected static string $resource = OpportunityResource::class;
@@ -384,12 +386,20 @@ final class OpportunitiesBoard extends BoardResourcePage
 
         $colorsEnabled = $field->settings->enable_option_colors ?? false;
 
-        return $field->options->map(fn (CustomFieldOption $option): array => [
+        return $this->inMemberOrder($field->options->map(fn (CustomFieldOption $option): array => [
             'id' => $option->getKey(),
             'custom_field_id' => $option->getAttribute('custom_field_id'),
             'name' => $option->getAttribute('name'),
             'color' => $colorsEnabled ? ($option->settings->color ?? 'gray') : 'gray',
-        ]);
+        ]));
+    }
+
+    /**
+     * @return Collection<int, array{id: mixed, custom_field_id: mixed, name: mixed, color: string}>
+     */
+    private function boardStageList(): Collection
+    {
+        return $this->stages();
     }
 
     /**

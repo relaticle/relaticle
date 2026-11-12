@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Data\BoardStateData;
 use App\Data\TableStateData;
 use App\Enums\CrmEntity;
 use App\Models\Concerns\HasWorkspace;
@@ -23,10 +24,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $user_id
  * @property ?string $active_view_id
  * @property ?list<string> $view_order
+ * @property BoardStateData $board_state
  * @property ?string $applied_view_hash
  */
 #[ScopedBy(WorkspaceScope::class)]
-#[Fillable(['workspace_id', 'user_id', 'entity', 'state', 'own_state', 'active_view_id', 'view_order', 'applied_view_hash'])]
+#[Fillable(['workspace_id', 'user_id', 'entity', 'state', 'own_state', 'active_view_id', 'view_order', 'board_state', 'applied_view_hash'])]
 final class TablePreference extends Model
 {
     /** @use HasFactory<TablePreferenceFactory> */
@@ -45,6 +47,7 @@ final class TablePreference extends Model
             'state' => TableStateData::class,
             'own_state' => TableStateData::class,
             'view_order' => 'array',
+            'board_state' => BoardStateData::class.':default',
         ];
     }
 

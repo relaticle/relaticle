@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Actions\Views\ReorderBoardStages;
+use App\Enums\CrmEntity;
 use App\Enums\CustomFields\TaskField;
 use App\Enums\WorkspaceRole;
 use App\Filament\Actions\CreateTaskAction;
@@ -10,6 +12,8 @@ use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Models\CustomField;
+use App\Models\CustomFieldOption;
+use App\Models\Opportunity;
 use App\Models\Task;
 use App\Models\User;
 use App\Support\ChecklistHtml;
@@ -18,11 +22,14 @@ use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Once;
+use Livewire\Features\SupportTesting\Testable;
 use Relaticle\Flowforge\Board;
 use Relaticle\Flowforge\Grouping;
 use Relaticle\Flowforge\Lane;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(TasksBoard::class, CreateTaskAction::class, ChecklistHtml::class, MoveCardAction::class);
+mutates(ReorderBoardStages::class, TasksBoard::class, CreateTaskAction::class, ChecklistHtml::class, MoveCardAction::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -560,4 +567,63 @@ it('reads checklist progress without a query per card', function (): void {
     }
 
     expect($countQueries())->toBe($withOneCard);
+});
+
+/**
+ * @return list<string>
+ */
+function statusIds(CustomField $field): array
+{
+    return CustomFieldOption::query()->withoutGlobalScopes()->where('custom_field_id', $field->getKey())->orderBy('sort_order')->pluck('id')->map(strval(...))->all();
+}
+
+function freshTasksBoard(): Testable
+{
+    Once::flush();
+
+    return livewire(TasksBoard::class);
+}
+
+it('lists the statuses in the order the field settings give them by default', function (): void {
+    expect(freshTasksBoard()->instance()->getBoard()->getColumnIdentifiers())->toBe(statusIds($this->statusField));
+});
+
+it('keeps a reordered status list for the member on the same page and on a new visit', function (): void {
+    $reversed = array_reverse(statusIds($this->statusField));
+
+    $component = livewire(TasksBoard::class)->call('reorderBoardStages', $reversed);
+
+    expect($component->instance()->getBoard()->getColumnIdentifiers())->toBe($reversed)
+        ->and(freshTasksBoard()->instance()->getBoard()->getColumnIdentifiers())->toBe($reversed);
+});
+
+it('leaves another member\'s task board in the field order', function (): void {
+    $other = User::factory()->create();
+    $this->workspace->users()->attach($other, ['role' => WorkspaceRole::Member->value]);
+    $other->switchWorkspace($this->workspace);
+
+    livewire(TasksBoard::class)->call('reorderBoardStages', array_reverse(statusIds($this->statusField)));
+
+    $this->actingAs($other);
+
+    expect(freshTasksBoard()->instance()->getBoard()->getColumnIdentifiers())->toBe(statusIds($this->statusField));
+});
+
+it('never writes the status options when statuses are reordered', function (): void {
+    $before = CustomFieldOption::query()->where('custom_field_id', $this->statusField->getKey())->pluck('sort_order', 'id')->all();
+
+    livewire(TasksBoard::class)->call('reorderBoardStages', array_reverse(statusIds($this->statusField)));
+
+    expect(CustomFieldOption::query()->where('custom_field_id', $this->statusField->getKey())->pluck('sort_order', 'id')->all())->toBe($before);
+});
+
+it('stores a status order once each and rejects an opportunity stage', function (): void {
+    $order = statusIds($this->statusField);
+    $stage = CustomField::query()->forEntity(Opportunity::class)->where('code', 'stage')->firstOrFail();
+
+    $preference = resolve(ReorderBoardStages::class)->execute($this->user, $this->workspace, CrmEntity::Task, [$order[1], $order[1], $order[0]]);
+
+    expect($preference->board_state->stageOrder)->toBe([$order[1], $order[0]])
+        ->and(fn () => resolve(ReorderBoardStages::class)->execute($this->user, $this->workspace, CrmEntity::Task, statusIds($stage)))
+        ->toThrow(HttpException::class);
 });

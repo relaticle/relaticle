@@ -14,6 +14,7 @@ use App\Filament\Tables\Concerns\CreatesTableAttribute;
 use App\Filament\Tables\Concerns\HasColumnMenu;
 use App\Filament\Tables\ResizableColumns;
 use App\Models\CustomField;
+use App\Models\CustomFieldOption;
 use App\Models\SavedView;
 use App\Models\TablePreference;
 use App\Models\User;
@@ -89,6 +90,20 @@ it('moves a column before another and keeps the order on a new visit', function 
     session()->flush();
 
     expect(columnOrder(openList($page)))->toBe($order);
+})->with('column menu pages');
+
+it('never writes a custom field\'s sort order or its options\' order when a column moves', function (string $page, CrmEntity $entity): void {
+    $snapshot = fn (): array => [
+        CustomField::query()->withoutGlobalScopes()->orderBy('id')->pluck('sort_order', 'id')->all(),
+        CustomFieldOption::query()->withoutGlobalScopes()->orderBy('id')->pluck('sort_order', 'id')->all(),
+    ];
+    $before = $snapshot();
+
+    $component = openList($page);
+    $movable = columnsBesideTitle($component, $entity);
+    $component->call('moveTableColumn', end($movable), $movable[0])->call('moveTableColumn', $movable[0], null);
+
+    expect($snapshot())->toBe($before);
 })->with('column menu pages');
 
 it('moves a column to the end when nothing follows it', function (string $page, CrmEntity $entity): void {
