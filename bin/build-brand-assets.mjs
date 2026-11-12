@@ -134,6 +134,7 @@ try {
     const maskableIcon = svg(`<rect width="1024" height="1024" fill="${brandColor}"/><g transform="${placed(0.6)}">${whiteMark}</g>`);
     writeSite('brand/email-logo.png', rasterize(svg(lockupArt(colorMark, ink, brandColor), '0 0 240 64', 240, 64), 720));
     writeSite('brand/email-logo-dark.png', rasterize(svg(lockupArt(colorMark, '#FFFFFF', brandColor), '0 0 240 64', 240, 64), 720));
+    writeSite('brand/logo-white.png', rasterize(svg(lockupArt(colorMark, ink, brandColor), '0 0 240 64', 240, 64), 960));
     writeSite('favicon.svg', favicon);
     writeSite('favicon-96x96.png', rasterize(favicon, 96));
     writeSite('favicon.ico', ico([16, 32, 48], favicon));

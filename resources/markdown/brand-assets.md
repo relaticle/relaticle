@@ -13,7 +13,7 @@
 - `public/favicon.svg`, `favicon-96x96.png`, `favicon.ico`: The color mark for browser tabs.
 - `public/apple-touch-icon.png` and `public/web-app-manifest-*.png`: The purple avatar for home screens, installs, and the MCP server icon. The `maskable` pair keeps the mark inside the 80% safe circle.
 - `public/brand/email-logo*.png`: Email headers for light and dark mode, generated from the lockup.
-- `public/brand/logo-white.png`: Emails sent before the dark mode redesign still load it by URL, so keep it. It is not regenerated.
+- `public/brand/logo-white.png`: Emails sent before the dark mode redesign still load it by URL, so keep the name and its 960 by 256 size. It is generated from the light lockup.
 
 ## Regenerating Downloads
 
