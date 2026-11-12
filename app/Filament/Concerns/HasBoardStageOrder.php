@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Concerns;
 
+use App\Actions\Views\PlaceBoardCard;
 use App\Actions\Views\ReorderBoardStages;
 use App\Actions\Views\SetBoardColumnField;
 use App\Actions\Views\SetBoardColumnVisibility;
@@ -321,8 +322,7 @@ trait HasBoardStageOrder
 
     protected function placeNewCard(Model $card, string $columnId, string $edge = 'top'): void
     {
-        $card->setAttribute('order_column', (float) $this->getBoardPositionInColumn($columnId, $edge));
-        $card->saveQuietly();
+        resolve(PlaceBoardCard::class)->execute($this->viewSwitcherUser(), $card, (float) $this->getBoardPositionInColumn($columnId, $edge));
     }
 
     private function fillWithFirstVisibleColumn(?Schema $schema): void
