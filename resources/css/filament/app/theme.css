@@ -701,6 +701,16 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
             @apply bg-color-500/10 dark:bg-color-600/10;
         }
     }
+
+    :where(.fi-dropdown-trigger) > .fi-icon-btn:where([aria-expanded='true']:not(.fi-disabled):not([disabled])) {
+        &:not(.fi-color) {
+            @apply text-gray-600 dark:text-gray-400;
+        }
+
+        &.fi-color {
+            @apply text-(--hover-text) dark:text-(--dark-hover-text);
+        }
+    }
 }
 
 /* Icon Buttons */
@@ -1102,6 +1112,7 @@ a.fi-linked-records-chip {
 }
 
 @media (hover: hover) {
+    .fi-ta-row:has([aria-expanded='true']) .fi-record-preview-trigger,
     .ff-card:has([aria-expanded='true']) .fi-board-card-preview-trigger {
         @apply opacity-100;
     }
