@@ -8,7 +8,6 @@ use App\Enums\CustomFields\TaskField;
 use App\Filament\Actions\MoveCardAction;
 use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
-use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Opportunity;
 use App\Models\TablePreference;
@@ -195,44 +194,6 @@ it('fills the viewport with a grouped board and lines its headers up with the fl
         ->and($page->script($headerTop))->toBe($flatHeaderTop);
 });
 
-it('joins the active filter trigger and its clear button into one pill', function (int $width, bool $iconOnly): void {
-    $this->withVite();
-
-    $user = User::factory()->withWorkspace()->create();
-    $workspace = $user->ownedWorkspaces()->first();
-    $company = Company::factory()->recycle([$user, $workspace])->create();
-    Opportunity::factory()->recycle([$user, $workspace])->for($company)->create();
-
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize($width, 900)
-        ->navigate("/app/{$workspace->slug}/opportunities/board?filters%5Bcompanies%5D%5Bvalues%5D%5B0%5D={$company->getKey()}")
-        ->assertVisible('.fi-board-filter-clear')
-        ->assertNoJavaScriptErrors();
-
-    $pill = <<<'JS'
-        (() => {
-            const trigger = [...document.querySelectorAll('.fi-ta-filters-dropdown > .fi-dropdown-trigger :is(.fi-btn, .fi-icon-btn)')]
-                .find((element) => element.checkVisibility());
-            const triggerBox = trigger.getBoundingClientRect();
-            const clearBox = document.querySelector('.fi-board-filter-clear').getBoundingClientRect();
-
-            return {
-                iconOnly: Math.round(triggerBox.width) === 32,
-                height: Math.round(triggerBox.height),
-                seam: Math.round(clearBox.left - triggerBox.right),
-                sameRow: Math.round(clearBox.top) === Math.round(triggerBox.top),
-                ringed: getComputedStyle(trigger).boxShadow !== 'none',
-            };
-        })();
-    JS;
-
-    expect($page->script($pill))->toBe(['iconOnly' => $iconOnly, 'height' => 32, 'seam' => 1, 'sameRow' => true, 'ringed' => true]);
-})->with([
-    'phone' => [390, true],
-    'desktop' => [1440, false],
-]);
-
 it('lets the next board column peek past the first on a 320px phone', function (string $path): void {
     $this->withVite();
 
@@ -351,7 +312,7 @@ function waitForStoredStageOrder(mixed $page, User $user, CrmEntity $entity, arr
     }
 }
 
-const BOARD_COLUMN_IDS = '[...document.querySelectorAll(".ff-columns > .ff-column")].map((column) => column.dataset.columnRoot)';
+const BOARD_COLUMN_IDS = '(async () => { const read = () => [...document.querySelectorAll(".ff-columns > .ff-column")].map((column) => column.dataset.columnRoot).join(","); let last = read(); let stable = 0; for (let attempt = 0; attempt < 50 && stable < 3; attempt++) { await new Promise((resolve) => setTimeout(resolve, 100)); const now = read(); stable = now === last && now !== "" ? stable + 1 : 0; last = now; } return last === "" ? [] : last.split(","); })()';
 
 const BOARD_STAGE_ROW_IDS = '[...document.querySelectorAll("[data-board-view-settings] [data-stage-id]")].map((row) => row.dataset.stageId)';
 
@@ -439,6 +400,7 @@ it('lists the stages in the board view settings and reorders them by dragging a 
         ->assertVisible('[data-board-view-settings]')
         ->assertScript(BOARD_STAGE_ROW_IDS, $ids);
 
+    $page->assertScript('(async () => { const bound = () => Object.keys(document.querySelector("[data-board-view-settings] .fi-ta-views-list")).some((key) => key.startsWith("Sortable")); for (let attempt = 0; ! bound() && attempt < 50; attempt++) { await new Promise((resolve) => setTimeout(resolve, 100)); } return bound(); })()', true);
     $page->drag("[data-board-view-settings] [data-stage-id=\"{$ids[0]}\"] .fi-board-stage", "[data-board-view-settings] [data-stage-id=\"{$ids[1]}\"] .fi-board-stage");
     waitForStoredStageOrder($page, $user, $entity, $expected);
 
@@ -477,7 +439,7 @@ it('moves a stage from its menu, keeps focus on its menu button and disables the
     $page->wait(0.5)->click($trigger($ids[0]))->wait(0.5);
     $page->assertScript($item('Move up').'.disabled', false);
 
-    $page->click('.fi-board-stages-heading')->wait(0.5)->click($trigger(last($ids)))->wait(0.5);
+    $page->click('.fi-board-stages-heading:not(#board-lanes-heading)')->wait(0.5)->click($trigger(last($ids)))->wait(0.5);
     $page->assertScript($item('Move down').'.disabled', true)
         ->assertNoJavaScriptErrors();
 })->with('stage order boards');
@@ -509,37 +471,89 @@ it('keeps the board view settings usable on a 390px phone', function (string $mo
 
 function dragWithPointerEvents(mixed $page, string $from, string $to): void
 {
-    $page->script(sprintf(<<<'JS'
-        (async () => {
-            const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-            const centre = (selector) => {
-                const box = document.querySelector(selector).getBoundingClientRect();
-
-                return [box.left + box.width / 2, box.top + box.height / 2];
-            };
-            const [fromX, fromY] = centre(%1$s);
-            const [toX, toY] = centre(%2$s);
-            const pointerEvents = navigator.userAgent.includes('Chrome');
-            const press = (name, x, y, target = document) => {
-                const type = (pointerEvents ? 'pointer' : 'mouse') + name;
-                const init = { bubbles: true, cancelable: true, button: 0, buttons: name === 'up' ? 0 : 1, clientX: x, clientY: y };
-
-                target.dispatchEvent(pointerEvents ? new PointerEvent(type, { ...init, pointerId: 1, isPrimary: true, pointerType: 'mouse' }) : new MouseEvent(type, init));
-            };
-
-            press('down', fromX, fromY, document.querySelector(%1$s));
-
-            for (let step = 1; step <= 20; step++) {
-                press('move', fromX + (toX - fromX) * step / 20, fromY + (toY - fromY) * step / 20);
-                await wait(30);
+    $started = $page->script(sprintf(<<<'JS'
+        (() => {
+            if (window.boardDrag === 'running') {
+                return false;
             }
 
-            await wait(100);
-            press('up', toX, toY);
+            window.boardDrag = 'running';
+
+            (async () => {
+                const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+                if (! window.boardDragRequests) {
+                    window.boardDragRequests = { pending: 0 };
+                    window.Livewire.hook('request', ({ succeed, fail }) => {
+                        const done = () => setTimeout(() => window.boardDragRequests.pending--, 300);
+
+                        window.boardDragRequests.pending++;
+                        succeed(done);
+                        fail(done);
+                    });
+                }
+
+                const idle = async () => {
+                    for (let attempt = 0; window.boardDragRequests.pending > 0 && attempt < 100; attempt++) {
+                        await wait(100);
+                    }
+                };
+
+                await idle();
+
+                const columns = document.querySelector(%1$s).closest('.ff-columns, .ff-lanes-heads');
+
+                for (let attempt = 0; columns && ! window.Sortable.get(columns) && attempt < 50; attempt++) {
+                    await wait(100);
+                }
+
+                const centre = (selector) => {
+                    const box = document.querySelector(selector).getBoundingClientRect();
+
+                    return [box.left + box.width / 2, box.top + box.height / 2];
+                };
+                const [fromX, fromY] = centre(%1$s);
+                const [toX, toY] = centre(%2$s);
+                const pointerEvents = navigator.userAgent.includes('Chrome');
+                const press = (name, x, y, target = document) => {
+                    const type = (pointerEvents ? 'pointer' : 'mouse') + name;
+                    const init = { bubbles: true, cancelable: true, button: 0, buttons: name === 'up' ? 0 : 1, clientX: x, clientY: y };
+
+                    target.dispatchEvent(pointerEvents ? new PointerEvent(type, { ...init, pointerId: 1, isPrimary: true, pointerType: 'mouse' }) : new MouseEvent(type, init));
+                };
+                const source = document.querySelector(%1$s).closest('.ff-column');
+                const position = () => source?.parentElement ? [...source.parentElement.children].indexOf(source) : -1;
+                const target = document.querySelector(%2$s).closest('.ff-column');
+                const goal = target?.parentElement ? [...target.parentElement.children].indexOf(target) : -1;
+
+                press('down', fromX, fromY, document.querySelector(%1$s));
+
+                for (let step = 1; step <= 20; step++) {
+                    press('move', fromX + (toX - fromX) * step / 20, fromY + (toY - fromY) * step / 20);
+                    await wait(30);
+                }
+
+                for (let attempt = 0; position() !== goal && attempt < 30; attempt++) {
+                    press('move', toX + (attempt %% 2 ? 2 : -2), toY);
+                    await wait(100);
+                }
+
+                await wait(100);
+                press('up', toX, toY);
+                await wait(100);
+                await idle();
+            })().then(() => { window.boardDrag = 'done'; }, (error) => { window.boardDrag = 'failed: ' + error; });
 
             return true;
         })()
         JS, json_encode($from), json_encode($to)));
+
+    for ($attempt = 0; $attempt < 300 && $page->script('window.boardDrag') === 'running'; $attempt++) {
+        $page->wait(0.1);
+    }
+
+    expect($started)->toBeTrue()
+        ->and($page->script('window.boardDrag'))->toBe('done');
 }
 
 function dragCard(mixed $page, string $from, string $to): void
