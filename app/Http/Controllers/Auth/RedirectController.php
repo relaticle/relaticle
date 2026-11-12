@@ -15,6 +15,11 @@ final readonly class RedirectController
     {
         /** @var AbstractProvider $driver */
         $driver = Socialite::driver($provider->value);
+        $callbackUrl = $provider->callbackUrl();
+
+        if ($callbackUrl !== null) {
+            $driver->redirectUrl($callbackUrl);
+        }
 
         return $driver->redirect();
     }

@@ -43,7 +43,7 @@ final readonly class CallbackController
         }
 
         try {
-            $socialUser = $this->retrieveSocialUser($provider->value);
+            $socialUser = $this->retrieveSocialUser($provider->value, $provider->callbackUrl());
             $account = $this->resolveUser($provider, $socialUser, $creator);
 
             if (! $account instanceof UserSocialAccount) {
