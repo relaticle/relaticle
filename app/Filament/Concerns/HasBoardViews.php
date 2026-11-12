@@ -165,9 +165,8 @@ trait HasBoardViews
 
     protected function savedViewCreated(SavedView $view): void
     {
-        $this->visibleSavedViews = null;
-        $this->resolvedBoardColumnField = null;
         $this->activeSavedViewId = $view->getKey();
+        $this->forgetStoredBoardState();
         $this->boardStateHash = $this->boardStateSignature($this->currentBoardState());
     }
 
@@ -207,8 +206,8 @@ trait HasBoardViews
 
     private function openBoardView(SavedView $view): void
     {
-        $this->resolvedBoardColumnField = null;
         $this->activeSavedViewId = $view->getKey();
+        $this->forgetStoredBoardState();
         $this->applyBoardState($view->boardState());
     }
 

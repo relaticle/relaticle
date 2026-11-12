@@ -9,6 +9,7 @@ use App\Actions\Views\SetBoardColumnField;
 use App\Actions\Views\SetBoardColumnVisibility;
 use App\Actions\Views\SetCardAttributes;
 use App\Data\BoardStateData;
+use App\Enums\BoardCardSize;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\TaskField;
 use App\Enums\SavedViewType;
@@ -33,6 +34,7 @@ use App\Models\User;
 use App\Queries\Views\BoardCardAttributesQuery;
 use App\Queries\Views\BoardColumnFieldsQuery;
 use App\Support\ChecklistHtml;
+use App\Support\CustomFields\WorkspaceCustomFields;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Collection;
@@ -1668,27 +1670,56 @@ it('exports the tasks the bar\'s filters match from the board, hidden statuses a
     'no status column on' => [true],
 ]);
 
+function taskWithEveryRelation(object $test): Task
+{
+    $task = tasksBoardCardWithDescription($test, tasksBoardChecklistHtml());
+    $task->update(['creator_id' => $test->user->getKey()]);
+    $task->assignees()->attach(User::factory()->create());
+
+    return $task;
+}
+
+function countTaskBoardQueries(): array
+{
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+    freshTasksBoard()->assertOk();
+    $queries = array_column(DB::getQueryLog(), 'query');
+    DB::disableQueryLog();
+
+    return $queries;
+}
+
 it('reads every attribute a card can show without a query per card', function (): void {
     $keys = resolve(BoardCardAttributesQuery::class)->get($this->user, $this->workspace, CrmEntity::Task);
     livewire(TasksBoard::class)->call('setCardAttributes', $keys);
-    $countQueries = function (): int {
-        DB::flushQueryLog();
-        DB::enableQueryLog();
-        freshTasksBoard()->assertOk();
-        $count = count(DB::getQueryLog());
-        DB::disableQueryLog();
 
-        return $count;
-    };
-
-    tasksBoardCardWithDescription($this, tasksBoardChecklistHtml());
-    $withOneCard = $countQueries();
+    taskWithEveryRelation($this);
+    $withOneCard = count(countTaskBoardQueries());
 
     foreach (range(1, 4) as $ignored) {
-        tasksBoardCardWithDescription($this, tasksBoardChecklistHtml())->assignees()->attach($this->user);
+        taskWithEveryRelation($this);
     }
 
-    expect($countQueries())->toBe($withOneCard);
+    expect(countTaskBoardQueries())->toHaveCount($withOneCard);
+});
+
+it('loads no card relations for a compact card', function (): void {
+    $keys = resolve(BoardCardAttributesQuery::class)->get($this->user, $this->workspace, CrmEntity::Task);
+    $preference = TablePreference::factory()->create([
+        'user_id' => $this->user->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
+        'entity' => CrmEntity::Task,
+        'board_state' => new BoardStateData(cardAttributes: $keys),
+    ]);
+    taskWithEveryRelation($this);
+
+    $full = implode("\n", countTaskBoardQueries());
+    $preference->update(['board_state' => new BoardStateData(cardAttributes: $keys, cardSize: BoardCardSize::Compact)]);
+    $compact = implode("\n", countTaskBoardQueries());
+
+    expect($full)->toContain('"task_user"')
+        ->and($compact)->not->toContain('"task_user"');
 });
 
 it('draws a task card as before when nothing is chosen', function (): void {
@@ -1728,11 +1759,34 @@ it('refuses a key the task card cannot show', function (string $key): void {
 
 it('offers no description or checklist while the description attribute is inactive', function (): void {
     CustomField::query()->forEntity(Task::class)->where('code', TaskField::DESCRIPTION)->firstOrFail()->forceFill(['active' => false])->save();
+    resolve(WorkspaceCustomFields::class)->forget($this->workspace->getKey());
 
     $keys = resolve(BoardCardAttributesQuery::class)->get($this->user, $this->workspace, CrmEntity::Task);
 
     expect($keys)->not->toContain('description', 'checklist')
         ->and($keys)->toContain('assignees', 'creator');
+});
 
-    freshTasksBoard()->assertOk();
+it('draws neither the description nor the checklist of a stored card once the description attribute is inactive', function (): void {
+    tasksBoardCardWithDescription($this, '<p>Plan the visit</p>'.tasksBoardChecklistHtml());
+    $preference = TablePreference::factory()->create([
+        'user_id' => $this->user->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
+        'entity' => CrmEntity::Task,
+        'board_state' => new BoardStateData(cardAttributes: ['description', 'checklist', 'creator'], hideEmpty: false),
+    ]);
+    $updatedAt = $preference->updated_at;
+
+    freshTasksBoard()->assertSee('Plan the visit')->assertSeeHtml('data-checklist-progress');
+
+    CustomField::query()->forEntity(Task::class)->where('code', TaskField::DESCRIPTION)->firstOrFail()->forceFill(['active' => false])->save();
+    resolve(WorkspaceCustomFields::class)->forget($this->workspace->getKey());
+
+    $html = freshTasksBoard()->assertOk()->html();
+
+    expect($html)->not->toContain('Plan the visit')
+        ->not->toContain('data-checklist-progress')
+        ->not->toMatch('/fi-sc-text[^>]*>\s*(Description preview|Checklist progress)\s*</')
+        ->and($preference->refresh()->updated_at)->toEqual($updatedAt)
+        ->and($preference->board_state->cardAttributes)->toBe(['description', 'checklist', 'creator']);
 });

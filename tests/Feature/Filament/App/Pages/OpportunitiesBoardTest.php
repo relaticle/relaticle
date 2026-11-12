@@ -35,6 +35,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Queries\Views\BoardCardAttributesQuery;
 use App\Queries\Views\BoardColumnFieldsQuery;
+use App\Support\CustomFields\WorkspaceCustomFields;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Events\QueryExecuted;
@@ -1972,7 +1973,18 @@ it('draws a card with its title only when every attribute is removed', function 
     expect(TablePreference::query()->sole()->board_state->cardAttributes)->toBe([]);
 });
 
-it('refuses a key the card cannot show', function (string $case): void {
+function cardAttributesStatus(Closure $call): ?int
+{
+    try {
+        $call();
+    } catch (HttpException $exception) {
+        return $exception->getStatusCode();
+    }
+
+    return null;
+}
+
+it('ignores a key the card cannot show without an error', function (string $case): void {
     $foreign = User::factory()->withWorkspace()->create();
     $foreignField = resolve(CreateCustomField::class)->execute($foreign, ['name' => 'Foreign tier', 'type' => 'text', 'entity_type' => 'opportunity']);
     $richText = resolve(CreateCustomField::class)->execute($this->user, ['name' => 'Notes', 'type' => 'rich-editor', 'entity_type' => 'opportunity']);
@@ -1990,39 +2002,44 @@ it('refuses a key the card cannot show', function (string $case): void {
         'a good key beside a bad one' => ['company', 'bogus'],
     };
 
-    $component = livewire(OpportunitiesBoard::class);
-
-    try {
-        $component->call('setCardAttributes', $keys);
-    } catch (HttpException $exception) {
-        expect($exception->getStatusCode())->toBe(422);
-    }
+    livewire(OpportunitiesBoard::class)->call('setCardAttributes', $keys)->assertOk();
 
     expect(TablePreference::query()->withoutGlobalScopes()->count())->toBe(0);
 })->with(['another entity', 'another workspace', 'rich editor', 'record', 'encrypted', 'unknown', 'not a string', 'a good key beside a bad one']);
 
-it('refuses a card key the action does not offer', function (): void {
-    expect(fn () => resolve(SetCardAttributes::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, ['assignees']))
-        ->toThrow(fn (HttpException $exception): bool => $exception->getStatusCode() === 422);
+it('answers 422 when the action is given a key the card cannot show', function (array $keys): void {
+    expect(cardAttributesStatus(fn () => resolve(SetCardAttributes::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, $keys)))->toBe(422);
+})->with([
+    'another entity' => [['assignees']],
+    'not a string' => [[['x']]],
+    'a good key beside a bad one' => [['company', 'bogus']],
+]);
 
-    expect(fn () => resolve(SetCardAttributes::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, [['x']]))
-        ->toThrow(fn (HttpException $exception): bool => $exception->getStatusCode() === 422);
-});
-
-it('skips a stored attribute that was deleted or encrypted since', function (): void {
-    $tier = opportunitySelectField($this, 'Tier', ['Gold', 'Silver']);
+it('skips a stored attribute that was deleted, deactivated or encrypted since', function (): void {
+    $fields = collect(['Gone' => 'GONE-VALUE', 'Off' => 'OFF-VALUE', 'Locked' => 'LOCKED-VALUE'])
+        ->map(fn (string $value, string $name): CustomField => resolve(CreateCustomField::class)->execute($this->user, ['name' => $name, 'type' => 'text', 'entity_type' => 'opportunity']));
     $company = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Stale Corp']);
     $opportunity = opportunityInStage($this, 'Stale deal', 'Prospecting', $company);
-    $opportunity->saveCustomFieldValue($tier, $tier->options->first()->getKey());
-    $preference = rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(cardAttributes: ['custom_fields.'.$tier->code, 'company']));
+
+    foreach (['Gone' => 'GONE-VALUE', 'Off' => 'OFF-VALUE', 'Locked' => 'LOCKED-VALUE'] as $name => $value) {
+        $opportunity->saveCustomFieldValue($fields[$name], $value);
+    }
+
+    $keys = [...$fields->map(fn (CustomField $field): string => 'custom_fields.'.$field->code)->values()->all(), 'company'];
+    $preference = rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(cardAttributes: $keys));
     $updatedAt = $preference->updated_at;
 
-    $tier->delete();
+    freshOpportunitiesBoard()->assertSee(['GONE-VALUE', 'OFF-VALUE', 'LOCKED-VALUE']);
 
-    freshOpportunitiesBoard()->assertOk()->assertSee('Stale Corp');
+    $fields['Gone']->delete();
+    $fields['Off']->forceFill(['active' => false])->save();
+    $fields['Locked']->forceFill(['settings' => new CustomFieldSettingsData(encrypted: true)])->save();
+    resolve(WorkspaceCustomFields::class)->forget($this->workspace->getKey());
+
+    freshOpportunitiesBoard()->assertOk()->assertSee('Stale Corp')->assertDontSee(['GONE-VALUE', 'OFF-VALUE', 'LOCKED-VALUE']);
 
     expect($preference->refresh()->updated_at)->toEqual($updatedAt)
-        ->and($preference->board_state->cardAttributes)->toBe(['custom_fields.'.$tier->code, 'company']);
+        ->and($preference->board_state->cardAttributes)->toBe($keys);
 });
 
 it('offers the column attribute to no card while it makes the columns', function (): void {
@@ -2063,27 +2080,66 @@ it('keeps card settings inside a board view and leaves the plain board alone', f
         ->and(TablePreference::query()->count())->toBe(0);
 });
 
+function opportunityWithEveryRelation(object $test): Opportunity
+{
+    $opportunity = opportunityInStage($test, 'Related deal', 'Prospecting', Company::factory()->recycle([$test->user, $test->workspace])->create());
+    $opportunity->update(['contact_id' => People::factory()->recycle([$test->user, $test->workspace])->create()->getKey(), 'creator_id' => $test->user->getKey()]);
+
+    return $opportunity;
+}
+
+function countBoardQueries(): array
+{
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+    freshOpportunitiesBoard()->assertOk();
+    $queries = array_column(DB::getQueryLog(), 'query');
+    DB::disableQueryLog();
+
+    return $queries;
+}
+
 it('reads every attribute a card can show without a query per card', function (): void {
     $keys = resolve(BoardCardAttributesQuery::class)->get($this->user, $this->workspace, CrmEntity::Opportunity);
     livewire(OpportunitiesBoard::class)->call('setCardAttributes', $keys);
 
-    $countQueries = function (): int {
-        DB::flushQueryLog();
-        DB::enableQueryLog();
-        freshOpportunitiesBoard()->assertOk();
-        $count = count(DB::getQueryLog());
-        DB::disableQueryLog();
-
-        return $count;
-    };
-
-    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
-    opportunityInStage($this, 'First', 'Prospecting', $company);
-    $withOneCard = $countQueries();
+    opportunityWithEveryRelation($this);
+    $withOneCard = count(countBoardQueries());
 
     foreach (range(1, 4) as $ignored) {
-        opportunityInStage($this, 'Another', 'Prospecting', Company::factory()->recycle([$this->user, $this->workspace])->create());
+        opportunityWithEveryRelation($this);
     }
 
-    expect($countQueries())->toBe($withOneCard);
+    expect(countBoardQueries())->toHaveCount($withOneCard);
+});
+
+it('loads no card relations for a compact card', function (): void {
+    $keys = resolve(BoardCardAttributesQuery::class)->get($this->user, $this->workspace, CrmEntity::Opportunity);
+    $preference = rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(cardAttributes: $keys));
+    opportunityWithEveryRelation($this);
+
+    $full = implode("\n", countBoardQueries());
+    $preference->update(['board_state' => new BoardStateData(cardAttributes: $keys, cardSize: BoardCardSize::Compact)]);
+    $compact = implode("\n", countBoardQueries());
+
+    expect($full)->toContain('from "media"')->toContain('from "people"')
+        ->and($compact)->not->toContain('from "media"')->not->toContain('from "people"');
+});
+
+it('shows the new view\'s card settings in the same request that opens it', function (): void {
+    $workspaceId = $this->workspace->getKey();
+    $opportunity = opportunityInStage($this, 'Switch deal', 'Prospecting');
+    $opportunity->saveCustomFieldValue(WorkspaceCustomField::byCode($workspaceId, 'opportunity', 'amount'), 5000);
+    rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(cardAttributes: ['contact']));
+    $view = SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'entity' => CrmEntity::Opportunity,
+        'type' => SavedViewType::Board,
+        'state' => new BoardStateData,
+    ]);
+
+    $component = livewire(OpportunitiesBoard::class)->assertDontSee('$5,000.00');
+
+    $component->call('applySavedView', $view->getKey())->assertSee('$5,000.00');
+
+    $component->call('applyOwnBoard')->assertDontSee('$5,000.00');
 });

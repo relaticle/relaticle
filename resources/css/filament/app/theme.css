@@ -1119,11 +1119,6 @@ a.fi-linked-records-chip {
     @apply contents;
 }
 
-/* A value longer than the card shrinks and wraps. Labels and badges keep their size. */
-.ff-card-body .ff-card-flex-item--fixed:has(.fi-in-entry) {
-    @apply max-w-full min-w-0 shrink;
-}
-
 /* Flowforge lifts the card on :hover only. */
 @media (hover: hover) {
     .ff-card:has([aria-expanded='true']) {

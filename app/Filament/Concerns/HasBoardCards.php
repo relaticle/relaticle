@@ -15,6 +15,7 @@ use App\Filament\Tables\FilterBar\FilterFieldCatalog;
 use App\Models\CustomField;
 use App\Models\SavedView;
 use App\Queries\Views\BoardCardAttributesQuery;
+use Closure;
 use Filament\Infolists\Components\Entry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Component;
@@ -44,6 +45,12 @@ trait HasBoardCards
         $strings = array_values(array_filter($keys, is_string(...)));
 
         if (count($strings) !== count($keys)) {
+            return;
+        }
+
+        $offered = resolve(BoardCardAttributesQuery::class)->get($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity());
+
+        if (array_diff($strings, $offered) !== []) {
             return;
         }
 
@@ -120,6 +127,10 @@ trait HasBoardCards
      */
     protected function cardEagerLoads(): array
     {
+        if ($this->storedBoardState()->cardSize === BoardCardSize::Compact) {
+            return [];
+        }
+
         $loads = ['company' => 'company.media', 'contact' => 'contact', 'creator' => 'creator', 'assignees' => 'assignees'];
 
         return array_values(array_intersect_key($loads, array_flip($this->cardAttributeKeys())));
@@ -176,46 +187,78 @@ trait HasBoardCards
 
         $packageEntries = $this->cardPackageEntries();
         $blocks = $this->blockCardAttributes();
+        $state = $this->storedBoardState();
+        $body = [];
         $inline = [];
+        $empties = [];
 
         foreach ($this->cardAttributeKeys() as $key) {
-            $unit = $this->cardUnit($key, $packageEntries->get($key), in_array($key, $blocks, true));
+            $entry = $this->cardEntry($key, $packageEntries->get($key)) ?? $this->cardNativeEntry($key) ?? $this->cardCustomEntry($packageEntries->get($key));
 
-            if (! $unit instanceof Component) {
+            if (! $entry instanceof Component) {
                 continue;
             }
 
-            if (! in_array($key, $blocks, true)) {
-                $inline[] = $unit;
+            $block = in_array($key, $blocks, true);
+
+            if ($state->showLabels) {
+                $body = [...$body, ...$this->flushInlineCardUnits($inline, $empties), $this->cardRow($key, $entry, $block, $state)];
+                [$inline, $empties] = [[], []];
 
                 continue;
             }
 
-            if ($inline !== []) {
-                $components[] = $this->inlineCardRow($inline);
-                $inline = [];
+            $emptyRow = $state->hideEmpty ? null : $this->cardRow($key, null, $block, $state);
+
+            if ($block) {
+                $body = [...$body, ...$this->flushInlineCardUnits($inline, $empties), $entry, ...($emptyRow instanceof CardFlex ? [$emptyRow] : [])];
+                [$inline, $empties] = [[], []];
+
+                continue;
             }
 
-            $components[] = $unit;
+            $inline[] = $entry;
+
+            if ($emptyRow instanceof CardFlex) {
+                $empties[] = $emptyRow;
+            }
         }
 
-        if ($inline !== []) {
-            $components[] = $this->inlineCardRow($inline);
+        $body = [...$body, ...$this->flushInlineCardUnits($inline, $empties)];
+
+        if ($state->hideEmpty && ! $state->showLabels) {
+            return [...$components, ...$body];
         }
 
-        return $components;
+        return [...$components, CardFlex::make($body)->wrap(false)->align('stretch')->extraAttributes(['class' => 'flex-col! gap-y-1.5'])];
     }
 
     /**
      * @param  list<Component>  $units
+     * @param  list<Component>  $empties
+     * @return list<Component>
      */
-    private function inlineCardRow(array $units): CardFlex
+    private function flushInlineCardUnits(array $units, array $empties): array
     {
-        $state = $this->storedBoardState();
+        return [...($units === [] ? [] : [CardFlex::make($units)->align('center')]), ...$empties];
+    }
 
-        $row = CardFlex::make($units)->align('center');
+    private function cardRow(string $key, ?Component $entry, bool $block, BoardStateData $state): CardFlex
+    {
+        $field = $this->cardCustomField($key);
+        $shown = fn (Model $record): bool => $state->showLabels
+            ? ! $state->hideEmpty || ! $this->cardAttributeIsEmpty($record, $key, $field)
+            : $this->cardAttributeIsEmpty($record, $key, $field);
 
-        return $state->hideEmpty && ! $state->showLabels ? $row : $row->extraAttributes(['style' => 'column-gap: 0.75rem']);
+        $row = CardFlex::make([
+            $this->cardLabel($key, $shown),
+            $this->cardEmptyText($key, $state->hideEmpty),
+            ...($entry instanceof Component ? [$entry] : []),
+        ])->visible($shown);
+
+        return $block
+            ? $row->wrap(false)->align('stretch')->extraAttributes(['class' => 'flex-col! gap-y-0.5'])
+            : $row->align('baseline')->extraAttributes(['class' => 'grid! grid-cols-[calc(var(--spacing)*26)_minmax(0,1fr)] gap-x-2 *:min-w-0']);
     }
 
     /**
@@ -243,23 +286,6 @@ trait HasBoardCards
             ->keyBy(fn (mixed $entry): string => $entry->getName());
     }
 
-    private function cardUnit(string $key, ?Entry $customEntry, bool $block): ?Component
-    {
-        $entry = $this->cardEntry($key, $customEntry) ?? $this->cardNativeEntry($key) ?? $this->cardCustomEntry($customEntry);
-
-        $state = $this->storedBoardState();
-
-        if (! $entry instanceof Component || ($state->hideEmpty && ! $state->showLabels)) {
-            return $entry;
-        }
-
-        return CardFlex::make([
-            $this->cardLabel($key, $state->showLabels, $state->hideEmpty),
-            $this->cardEmptyText($key, $state->hideEmpty),
-            $entry,
-        ])->wrap($block)->align('center')->grow(false);
-    }
-
     private function cardCustomEntry(?Entry $entry): ?Entry
     {
         if (! $entry instanceof Entry) {
@@ -267,7 +293,7 @@ trait HasBoardCards
         }
 
         if ($entry instanceof TextEntry) {
-            $entry->size(TextSize::ExtraSmall)->wrap();
+            return $entry->size(TextSize::ExtraSmall)->wrap()->grow();
         }
 
         return $entry->grow(false);
@@ -302,17 +328,16 @@ trait HasBoardCards
         };
     }
 
-    private function cardLabel(string $key, bool $showLabels, bool $hideEmpty): Text
+    private function cardLabel(string $key, Closure $shown): Text
     {
-        $field = $this->cardCustomField($key);
+        $label = $this->cardAttributeLabel($key);
 
-        return Text::make($this->cardAttributeLabel($key))
+        return Text::make($label)
             ->color('gray')
             ->size(TextSize::ExtraSmall)
+            ->extraAttributes(['class' => 'block truncate', 'title' => $label])
             ->grow(false)
-            ->visible(fn (Model $record): bool => $showLabels
-                ? ! $hideEmpty || ! $this->cardAttributeIsEmpty($record, $key, $field)
-                : $this->cardAttributeIsEmpty($record, $key, $field));
+            ->visible($shown);
     }
 
     private function cardEmptyText(string $key, bool $hideEmpty): Text
