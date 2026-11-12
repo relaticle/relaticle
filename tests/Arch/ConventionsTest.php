@@ -874,6 +874,48 @@ it('keeps the retired contact and deal words out of record copy', function (): v
     );
 });
 
+it('keeps the retired custom field words out of published copy', function (): void {
+    $root = dirname(__DIR__, 2);
+
+    $pathsNamingThePackage = [
+        'packages/Documentation/resources/content/docs/guides/contributing.md',
+    ];
+
+    $offenders = [];
+
+    foreach (['lang', 'resources/views', 'resources/js', 'packages'] as $directory) {
+        $files = new RegexIterator(
+            new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root.'/'.$directory)),
+            '/\.(php|md|js|json)$/',
+        );
+
+        /** @var SplFileInfo $file */
+        foreach ($files as $file) {
+            $relativePath = str_replace($root.'/', '', $file->getPathname());
+
+            $isPublishedCopy = preg_match('#^(lang|resources/views|resources/js|packages/\w+/(resources|lang))/#', $relativePath) === 1
+                && ! in_array($relativePath, $pathsNamingThePackage, true);
+
+            if (! $isPublishedCopy) {
+                continue;
+            }
+
+            foreach (explode("\n", (string) file_get_contents($file->getPathname())) as $index => $line) {
+                if (preg_match('/\bcustom fields?\b/i', $line) === 1 && preg_match('/custom attribute/i', $line) !== 1) {
+                    $offenders[] = $relativePath.':'.($index + 1);
+                }
+            }
+        }
+    }
+
+    expect($offenders)->toBe(
+        [],
+        'A property a record carries beyond the built-in ones is a custom attribute in published copy (.ai/guidelines/relaticle/architecture.md, '.
+        'Business language). "Custom field" survives in code, the API and tool names, and as a synonym on a line that also says "custom attribute". '.
+        'Offending lines: '.implode(', ', array_slice($offenders, 0, 40)),
+    );
+});
+
 it('names the assistant one way and keeps the documented MCP tool count true', function (): void {
     $root = dirname(__DIR__, 2);
     $registered = count((new ReflectionClass(RelaticleServer::class))->getProperty('tools')->getDefaultValue());
