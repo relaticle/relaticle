@@ -31,7 +31,9 @@ document.addEventListener('alpine:init', () => {
         },
 
         restore(container, ids) {
-            ids.forEach((id) => container.append(container.querySelector(`:scope > [data-column-root="${CSS.escape(id)}"]`)))
+            ids.map((id) => container.querySelector(`:scope > [data-column-root="${CSS.escape(id)}"]`))
+                .filter((column) => column !== null)
+                .forEach((column) => container.append(column))
 
             new window.FilamentNotification().title(window.filamentData?.boardStageOrderFailed ?? '').danger().send()
         },
