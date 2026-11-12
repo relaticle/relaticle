@@ -29,7 +29,6 @@ use App\Models\TablePreference;
 use App\Models\Task;
 use App\Models\User;
 use App\Queries\Views\BoardColumnFieldsQuery;
-use Closure;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Events\QueryExecuted;

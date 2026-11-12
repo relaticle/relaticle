@@ -15,6 +15,7 @@ use App\Filament\Tables\Concerns\FiltersWithRules;
 use App\Filament\Tables\FilterBar\FilterField;
 use App\Filament\Tables\FilterBar\FilterFieldCatalog;
 use App\Filament\Tables\FilterBar\SortList;
+use App\Models\CustomField;
 use App\Models\SavedView;
 use App\Models\TablePreference;
 use App\Models\User;
@@ -50,6 +51,8 @@ trait HasBoardViews
     public ?string $boardStateHash = null;
 
     private ?BoardStateData $storedBoardState = null;
+
+    private ?CustomField $resolvedBoardColumnField = null;
 
     public function mountHasBoardViews(): void
     {
@@ -153,6 +156,7 @@ trait HasBoardViews
     protected function savedViewCreated(SavedView $view): void
     {
         $this->visibleSavedViews = null;
+        $this->resolvedBoardColumnField = null;
         $this->activeSavedViewId = $view->getKey();
         $this->boardStateHash = $this->boardStateSignature($this->currentBoardState());
     }
@@ -193,6 +197,7 @@ trait HasBoardViews
 
     private function openBoardView(SavedView $view): void
     {
+        $this->resolvedBoardColumnField = null;
         $this->activeSavedViewId = $view->getKey();
         $this->applyBoardState($view->boardState());
     }
@@ -272,6 +277,7 @@ trait HasBoardViews
     protected function forgetStoredBoardState(): void
     {
         $this->storedBoardState = null;
+        $this->resolvedBoardColumnField = null;
         $this->visibleSavedViews = null;
     }
 

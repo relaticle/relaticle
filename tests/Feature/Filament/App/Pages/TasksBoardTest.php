@@ -28,7 +28,6 @@ use App\Models\Task;
 use App\Models\User;
 use App\Queries\Views\BoardColumnFieldsQuery;
 use App\Support\ChecklistHtml;
-use Closure;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Collection;
@@ -38,6 +37,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Once;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
+use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\Flowforge\Board;
 use Relaticle\Flowforge\Grouping;
 use Relaticle\Flowforge\Lane;
@@ -1283,7 +1283,7 @@ it('refuses an attribute that cannot make columns in the action', function (): v
     $otherField = taskSelectField((object) ['user' => $other], 'Tier', ['Gold']);
 
     expect(fn () => resolve(SetBoardColumnField::class)->execute($this->user, $this->workspace, CrmEntity::Task, $otherField->code))
-        ->toThrow(HttpException::class);
+        ->toThrow(fn (HttpException $exception): bool => $exception->getStatusCode() === 403);
     expect(TablePreference::query()->withoutGlobalScopes()->count())->toBe(0);
 });
 
@@ -1319,10 +1319,23 @@ it('keeps the status order while priority columns are reordered and the reverse'
 
     expect($stored->orderStages($statusIds))->toBe(array_reverse($statusIds))
         ->and($stored->orderStages($priorityIds))->toBe(array_reverse($priorityIds));
+
+    livewire(TasksBoard::class)
+        ->call('setBoardColumnField', TaskField::STATUS->value)
+        ->call('reorderBoardStages', $statusIds);
+
+    $stored = TablePreference::query()->sole()->board_state;
+
+    expect($stored->orderStages($statusIds))->toBe($statusIds)
+        ->and($stored->orderStages($priorityIds))->toBe(array_reverse($priorityIds));
 });
 
 it('lists the attributes that can make columns with the current one checked', function (): void {
-    $checked = fn (Testable $component, string $code): bool => preg_match('/data-board-column-field="'.$code.'"\s+role="menuitemradio"\s+aria-checked="true"/', $component->html()) === 1;
+    $checked = function (Testable $component, string $code): bool {
+        preg_match('/<button[^>]*data-board-column-field="'.$code.'"[^>]*>/', $component->html(), $row);
+
+        return str_contains($row[0] ?? '', 'role="radio"') && str_contains($row[0], 'aria-checked="true"');
+    };
 
     $component = livewire(TasksBoard::class)
         ->assertSeeHtml('data-board-column-field="status"')
@@ -1360,3 +1373,31 @@ it('moves a card between two cards that share a position after regrouping', func
         ->and(taskValueOf($third, $priority))->toBe($high->getKey())
         ->and(Task::query()->whereKey([$first->id, $second->id, $third->id])->pluck('order_column')->unique())->toHaveCount(3);
 });
+
+it('refuses a field code or ids that do not belong together when stages are reordered', function (string $case): void {
+    $other = User::factory()->withWorkspace()->create();
+    $otherTier = taskSelectField((object) ['user' => $other], 'Tier', ['Gold']);
+    $priorityIds = statusIds(taskPriority());
+    $statusIds = statusIds($this->statusField);
+
+    [$ids, $code] = match ($case) {
+        'a field of another workspace' => [statusIds($otherTier), $otherTier->code],
+        'a field of another entity' => [$statusIds, 'stage'],
+        'ids of another field' => [$statusIds, TaskField::PRIORITY->value],
+    };
+
+    expect(fn () => resolve(ReorderBoardStages::class)->execute($this->user, $this->workspace, CrmEntity::Task, $ids, null, $code))
+        ->toThrow(fn (HttpException $exception): bool => $exception->getStatusCode() === 403)
+        ->and(TablePreference::query()->withoutGlobalScopes()->count())->toBe(0)
+        ->and($priorityIds)->not->toBe($statusIds);
+})->with(['a field of another workspace', 'a field of another entity', 'ids of another field']);
+
+it('lists the board column fields with their options whatever custom attribute tenant is bound', function (?string $tenant): void {
+    $other = User::factory()->withWorkspace()->create();
+    TenantContextService::setTenantId($tenant === 'other' ? $other->currentWorkspace->getKey() : null);
+
+    $fields = resolve(BoardColumnFieldsQuery::class)->get($this->user, $this->workspace, CrmEntity::Task);
+
+    expect($fields->keys()->all())->toBe(['status', 'priority'])
+        ->and($fields->get('status')->options)->toHaveCount(count(statusIds($this->statusField)));
+})->with(['no tenant' => null, 'another workspace' => 'other']);

@@ -17,9 +17,24 @@
         data-board-view-settings
         role="group"
         aria-label="{{ __('filament/pages/boards.view_settings.panel') }}"
-        x-on:dropdown-escape="rowMenuShown() ? ($event.preventDefault(), closeRowMenu(), escapeRowMenu()) : panel !== 'main' && ($event.preventDefault(), panel = 'main')"
+        x-on:dropdown-escape="rowMenuShown() ? ($event.preventDefault(), closeRowMenu(), escapeRowMenu()) : panel !== 'main' && ($event.preventDefault(), closePanel())"
+        x-init="$el.closest('.fi-dropdown-panel')?.addEventListener('dropdown-opened', () => panel = 'main')"
         x-data="{
             panel: 'main',
+            openPanel(name) {
+                this.panel = name
+                this.$nextTick(() => requestAnimationFrame(() => {
+                    const view = this.$root.querySelector(`[data-board-panel='${name}']`)
+
+                    ;(view.querySelector('[aria-checked=true]') ?? view.querySelector('[data-view-settings-back]'))?.focus()
+                }))
+            },
+            closePanel() {
+                const name = this.panel
+
+                this.panel = 'main'
+                this.$nextTick(() => requestAnimationFrame(() => this.$root.querySelector(`[data-panel-trigger='${name}']`)?.focus()))
+            },
             rowStage: null,
             rowTrigger: null,
             rows() {
@@ -87,8 +102,9 @@
                     role="button"
                     tabindex="0"
                     data-board-column-field-trigger
+                    data-panel-trigger="grouping"
                     x-bind:aria-expanded="(panel === 'grouping').toString()"
-                    x-on:click="panel = 'grouping'"
+                    x-on:click="openPanel('grouping')"
                 >
                     <span class="fi-view-settings-add">
                         {{ __('filament/pages/boards.view_settings.grouped_by') }}
@@ -104,8 +120,9 @@
                     role="button"
                     tabindex="0"
                     data-board-lanes-trigger
+                    data-panel-trigger="lanes"
                     x-bind:aria-expanded="(panel === 'lanes').toString()"
-                    x-on:click="panel = 'lanes'"
+                    x-on:click="openPanel('lanes')"
                 >
                     <span class="fi-view-settings-add">
                         {{ __('filament/pages/boards.view_settings.lanes') }}
@@ -163,18 +180,18 @@
                     size="sm"
                     :label="__('filament/panel.tables.views.back')"
                     data-view-settings-back
-                    x-on:click="panel = 'main'"
+                    x-on:click="closePanel()"
                 />
-                <p class="fi-board-panel-title">{{ __('filament/pages/boards.view_settings.grouped_by_heading') }}</p>
+                <p class="fi-board-panel-title" id="board-column-field-heading">{{ __('filament/pages/boards.view_settings.grouped_by_heading') }}</p>
             </div>
 
             <div class="fi-view-settings-scroll">
-                <div class="fi-dropdown-list" role="menu" aria-label="{{ __('filament/pages/boards.view_settings.grouped_by_heading') }}">
+                <div class="fi-dropdown-list" role="radiogroup" aria-labelledby="board-column-field-heading">
                     @foreach ($columnFields as $candidate)
                         <button
                             type="button"
                             data-board-column-field="{{ $candidate['code'] }}"
-                            role="menuitemradio"
+                            role="radio"
                             aria-checked="{{ $columnField === $candidate['code'] ? 'true' : 'false' }}"
                             class="fi-dropdown-list-item"
                             wire:key="board-column-field.{{ $candidate['code'] }}"
@@ -199,7 +216,7 @@
                     size="sm"
                     :label="__('filament/panel.tables.views.back')"
                     data-view-settings-back
-                    x-on:click="panel = 'main'"
+                    x-on:click="closePanel()"
                 />
                 <p class="fi-board-panel-title" id="board-lanes-heading">{{ __('filament/pages/boards.view_settings.lanes') }}</p>
             </div>

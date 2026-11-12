@@ -97,6 +97,11 @@ trait HasBoardStageOrder
 
     protected function boardColumnField(): CustomField
     {
+        return $this->resolvedBoardColumnField ??= $this->resolveBoardColumnField();
+    }
+
+    private function resolveBoardColumnField(): CustomField
+    {
         $stored = $this->storedBoardState()->columnField;
 
         return ($stored === null ? null : $this->boardColumnFields()->get($stored))
