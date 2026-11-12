@@ -135,8 +135,8 @@ Decisions 2, 3, 6 and 8 below are replaced. The rest stands.
 5. **Target:** 15% and 6% as above.
 6. **Path buttons in the setup chat.** Each landing message carries one to three buttons for the
    next steps of the user's path, picked by the server from the routing answer and the
-   workspace's state, with fixed, tested prompts. They render as bordered buttons with an icon,
-   directly under Rela's message, and a button either sends a prompt or opens a page. Chips
+   workspace's state, with fixed, tested prompts. They render like the suggestion rows, one per row,
+   each with its own icon, directly under Rela's message. A button either sends a prompt or opens a page. Chips
    elsewhere stay as they are. Examples (final copy is reviewed in the PR):
    - In my head: "Add a client", "Add a deal".
    - Inbox: "Show my synced companies", "Add someone not in my email".

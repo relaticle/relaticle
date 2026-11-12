@@ -18,7 +18,7 @@ final readonly class SetupOption
         'lucide-mail',
         'lucide-user-plus',
         'lucide-upload',
-        'lucide-sparkles',
+        'lucide-plug',
     ];
 
     public function __construct(

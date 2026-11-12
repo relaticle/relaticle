@@ -617,8 +617,8 @@
             x-transition:enter="motion-safe:transition motion-safe:duration-[var(--duration-base)] motion-safe:ease-[var(--ease-out-expo)]"
             x-transition:enter-start="motion-safe:translate-y-1 motion-safe:opacity-0"
             x-transition:enter-end="motion-safe:translate-y-0 motion-safe:opacity-100"
-            class="flex"
-            :class="showsSetupButtons() ? 'flex-row flex-wrap items-center gap-2 pt-0' : 'flex-col items-start gap-0.5 pt-5'"
+            class="flex flex-col items-start gap-0.5"
+            :class="showsSetupButtons() ? 'pt-0' : 'pt-5'"
             role="group"
             aria-label="{{ __('Suggested next steps') }}"
         >
@@ -642,9 +642,9 @@
                             type="button"
                             data-next-step
                             x-on:click="sendNextStep(step)"
-                            class="inline-flex max-w-full items-center gap-2 rounded-lg border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] px-3 py-2 text-start text-sm font-medium text-gray-700 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-200 dark:hover:border-white/20 dark:hover:bg-white/5"
+                            class="group/step flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm text-gray-500 transition hover:bg-[var(--surface-card-bg)] hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:text-gray-100"
                         >
-                            <span class="contents text-gray-400 dark:text-gray-500" aria-hidden="true" x-html="setupButtonIcons[step.icon] ?? ''"></span>
+                            <span class="contents text-gray-400 transition group-hover/step:text-primary-500 dark:text-gray-500" aria-hidden="true" x-html="setupButtonIcons[step.icon] ?? ''"></span>
 
                             <span class="truncate" x-text="step.label"></span>
                         </button>
@@ -656,9 +656,9 @@
                             :href="nextStepLink(step).href"
                             :target="nextStepLink(step).external ? '_blank' : null"
                             :rel="nextStepLink(step).external ? 'noopener noreferrer' : null"
-                            class="inline-flex max-w-full items-center gap-2 rounded-lg border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] px-3 py-2 text-start text-sm font-medium text-gray-700 no-underline shadow-sm transition hover:border-gray-300 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-200 dark:hover:border-white/20 dark:hover:bg-white/5"
+                            class="group/step flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm text-gray-500 transition hover:bg-[var(--surface-card-bg)] hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:text-gray-100 no-underline"
                         >
-                            <span class="contents text-gray-400 dark:text-gray-500" aria-hidden="true" x-html="setupButtonIcons[step.icon] ?? ''"></span>
+                            <span class="contents text-gray-400 transition group-hover/step:text-primary-500 dark:text-gray-500" aria-hidden="true" x-html="setupButtonIcons[step.icon] ?? ''"></span>
 
                             <span class="truncate" x-text="step.label"></span>
 

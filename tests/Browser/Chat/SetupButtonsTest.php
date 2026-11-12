@@ -52,11 +52,11 @@ function setupButtonRows(string $appUrl): array
     return [
         (new SetupOption('pick_first', SetupOption::KIND_PROMPT, 'Pick who to work on first', 'lucide-flag', prompt: 'Pick who to work on first'))->toArray(),
         (new SetupOption('upload_file', SetupOption::KIND_LINK, 'Upload a file', 'lucide-upload', url: $appUrl))->toArray(),
-        (new SetupOption('connect_assistant', SetupOption::KIND_LINK, 'Connect Claude or ChatGPT', 'lucide-sparkles', url: 'https://relaticle.example/help/connect'))->toArray(),
+        (new SetupOption('connect_assistant', SetupOption::KIND_LINK, 'Connect Claude or ChatGPT', 'lucide-plug', url: 'https://relaticle.example/help/connect'))->toArray(),
     ];
 }
 
-it('renders the setup buttons bordered with their icons under the latest reply', function (): void {
+it('renders the setup buttons one per row with their own icons under the latest reply', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
@@ -78,6 +78,8 @@ it('renders the setup buttons bordered with their icons under the latest reply',
                 gap: Math.round(steps[0].getBoundingClientRect().top - bubble.getBoundingClientRect().bottom),
                 tags: steps.map((el) => el.tagName),
                 borders: steps.map((el) => parseFloat(getComputedStyle(el).borderTopWidth)),
+                lefts: steps.map((el) => Math.round(el.getBoundingClientRect().left)),
+                tops: steps.map((el) => Math.round(el.getBoundingClientRect().top)),
                 iconWidths: steps.map((el) => Math.round(el.querySelector('svg')?.getBoundingClientRect().width ?? 0)),
                 belowLastAnswer: steps[0].getBoundingClientRect().top >= bubble.getBoundingClientRect().bottom,
             };
@@ -86,7 +88,10 @@ it('renders the setup buttons bordered with their icons under the latest reply',
 
     expect($layout['labels'])->toBe(['Pick who to work on first', 'Upload a file', 'Connect Claude or ChatGPT'])
         ->and($layout['tags'])->toBe(['BUTTON', 'A', 'A'])
-        ->and(min($layout['borders']))->toBeGreaterThan(0.0)
+        ->and(array_sum($layout['borders']))->toEqual(0)
+        ->and(array_unique($layout['lefts']))->toHaveCount(1)
+        ->and($layout['tops'][1])->toBeGreaterThan($layout['tops'][0])
+        ->and($layout['tops'][2])->toBeGreaterThan($layout['tops'][1])
         ->and(min($layout['iconWidths']))->toBeGreaterThan(0)
         ->and($layout['belowLastAnswer'])->toBeTrue()
         ->and($layout['gap'])->toBeLessThan(32);

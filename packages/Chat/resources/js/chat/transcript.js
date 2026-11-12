@@ -253,8 +253,8 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         });
     },
 
-    // The setup chat offers its options as bordered buttons. Plain suggester
-    // chips in the same conversation carry no id and keep the quiet list.
+    // Setup options carry an id, their own icon and sit under the reply.
+    // Plain suggester chips in the same conversation carry no id.
     showsSetupButtons() {
         return this.isSetupConversation
             && this.nextSteps.length > 0
