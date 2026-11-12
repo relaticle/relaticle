@@ -19,8 +19,10 @@ use App\Models\Opportunity;
 use App\Models\TablePreference;
 use App\Models\Task;
 use App\Models\User;
+use Closure;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Once;
@@ -945,4 +947,190 @@ it('lists the stages in the field order for a member whose stored board state is
     DB::table('table_preferences')->where('id', $preference->getKey())->update(['board_state' => null]);
 
     expect(boardColumnOrder(freshOpportunitiesBoard()))->toBe(stageIds($this->stageField));
+});
+
+function rememberedBoard(object $test, CrmEntity $entity, BoardStateData $state, ?User $user = null): TablePreference
+{
+    return TablePreference::factory()->create([
+        'user_id' => ($user ?? $test->user)->getKey(),
+        'workspace_id' => $test->workspace->getKey(),
+        'entity' => $entity,
+        'board_state' => $state,
+    ]);
+}
+
+function boardFiltersWithRule(array $rule): array
+{
+    return ['conditions' => ['match' => 'all', 'rules' => [$rule]], 'trashed' => ['value' => null]];
+}
+
+function boardPreferenceWrites(Closure $callback): int
+{
+    $writes = 0;
+    DB::listen(function (QueryExecuted $query) use (&$writes): void {
+        if (preg_match('/^(update|insert into) "table_preferences"/', $query->sql) === 1) {
+            $writes++;
+        }
+    });
+    $callback();
+
+    return $writes;
+}
+
+it('remembers a filter and the lanes set on the plain board for the next visit', function (): void {
+    opportunitiesToSort($this);
+    $rule = ['field' => 'name', 'condition' => 'contains', 'value' => 'a'];
+
+    livewire(OpportunitiesBoard::class)
+        ->call('setFilterRules', [$rule])
+        ->call('setFilterBarSorts', [['column' => 'created_at', 'direction' => 'desc']])
+        ->call('setBoardGrouping', 'company');
+
+    $next = freshOpportunitiesBoard();
+
+    expect($next->get('groupBy'))->toBe('company')
+        ->and($next->get('boardSort'))->toBe('created_at:desc')
+        ->and($next->instance()->getFilterBarData()['rules'])->toHaveCount(1)
+        ->and(TablePreference::query()->sole()->board_state->grouping)->toBe('company');
+});
+
+it('narrows the first render with the remembered filter', function (): void {
+    $keep = opportunityInStage($this, 'Keep me', 'Prospecting');
+    $drop = opportunityInStage($this, 'Drop me', 'Prospecting');
+    rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(filters: boardFiltersWithRule(['field' => 'name', 'condition' => 'contains', 'value' => 'Keep'])));
+
+    expect(opportunityStageCardIds(freshOpportunitiesBoard(), 'Prospecting'))->toBe([$keep->id])
+        ->and($drop->id)->not->toBeIn(opportunityStageCardIds(freshOpportunitiesBoard(), 'Prospecting'));
+});
+
+it('lets a filter in the url win for that visit and writes nothing on arrival', function (): void {
+    $remembered = new BoardStateData(filters: boardFiltersWithRule(['field' => 'name', 'condition' => 'contains', 'value' => 'A']));
+    $preference = rememberedBoard($this, CrmEntity::Opportunity, $remembered);
+    $updatedAt = $preference->updated_at;
+    $urlRule = ['field' => 'name', 'condition' => 'contains', 'value' => 'B'];
+
+    $this->travelTo(now()->addHour());
+    $component = Livewire::withQueryParams(['filters' => ['conditions' => ['match' => 'all', 'rules' => [$urlRule]]]])->test(OpportunitiesBoard::class);
+    $component->call('$refresh');
+
+    expect($component->instance()->getFilterBarData()['rules'][0]['value'])->toBe('B')
+        ->and($preference->refresh()->updated_at)->toEqual($updatedAt)
+        ->and($preference->board_state->filters['conditions']['rules'][0]['value'])->toBe('A');
+});
+
+it('remembers the url filter once the member changes something', function (): void {
+    rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(filters: boardFiltersWithRule(['field' => 'name', 'condition' => 'contains', 'value' => 'A'])));
+    $urlRule = ['field' => 'name', 'condition' => 'contains', 'value' => 'B'];
+
+    Livewire::withQueryParams(['filters' => ['conditions' => ['match' => 'all', 'rules' => [$urlRule]]]])->test(OpportunitiesBoard::class)
+        ->call('setBoardGrouping', 'company');
+
+    $stored = TablePreference::query()->sole()->board_state;
+    expect($stored->filters['conditions']['rules'][0]['value'])->toBe('B')
+        ->and($stored->grouping)->toBe('company');
+});
+
+it('writes nothing for a request that changes nothing', function (): void {
+    $preference = rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(grouping: 'company'));
+    $updatedAt = $preference->updated_at;
+    $component = freshOpportunitiesBoard();
+
+    $this->travelTo(now()->addHour());
+    $writes = boardPreferenceWrites(function () use ($component): void {
+        $component->call('$refresh')->call('setBoardGrouping', 'company')->call('setFilterBarSorts', []);
+    });
+
+    expect($writes)->toBe(0)
+        ->and($preference->refresh()->updated_at)->toEqual($updatedAt);
+});
+
+it('writes once when stages are reordered', function (): void {
+    rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(grouping: 'company'));
+    $component = freshOpportunitiesBoard();
+
+    $writes = boardPreferenceWrites(fn () => $component->call('reorderBoardStages', array_reverse(stageIds($this->stageField))));
+
+    expect($writes)->toBe(1);
+});
+
+it('keeps each member\'s remembered board apart', function (): void {
+    $other = User::factory()->create();
+    $this->workspace->users()->attach($other, ['role' => WorkspaceRole::Member->value]);
+    $other->switchWorkspace($this->workspace);
+
+    livewire(OpportunitiesBoard::class)->call('setBoardGrouping', 'company');
+
+    $this->actingAs($other);
+
+    expect(freshOpportunitiesBoard()->get('groupBy'))->toBeNull();
+});
+
+it('renders a board whose remembered filter names a deleted custom attribute or option', function (): void {
+    rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(filters: [
+        'conditions' => ['match' => 'all', 'rules' => [
+            ['field' => 'custom_fields.gone', 'condition' => 'is_not_empty'],
+            ['field' => 'custom_fields.stage', 'condition' => 'is_any_of', 'value' => ['01jgone0000000000000000000']],
+        ]],
+        'trashed' => ['value' => null],
+    ]));
+
+    freshOpportunitiesBoard()->assertOk();
+
+    expect(freshOpportunitiesBoard()->instance()->getFilterBarData()['rules'])->toBe([]);
+});
+
+it('drops a grouping the board does not have, from the url and from the stored state', function (): void {
+    Livewire::withQueryParams(['groupBy' => 'stage'])->test(OpportunitiesBoard::class)->assertSet('groupBy', null);
+
+    rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(grouping: 'stage'));
+
+    freshOpportunitiesBoard()->assertSet('groupBy', null);
+});
+
+it('keeps the filter when a sort is set', function (): void {
+    opportunitiesToSort($this);
+    $rule = ['field' => 'name', 'condition' => 'contains', 'value' => 'a'];
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->call('setFilterRules', [$rule])
+        ->call('setFilterBarSorts', [['column' => 'created_at', 'direction' => 'desc']]);
+
+    expect($component->instance()->getFilterBarData()['rules'])->toHaveCount(1)
+        ->and(opportunityStageNames($component, 'Prospecting'))->toBe(['Charlie', 'Alpha', 'Bravo']);
+
+    $component->call('setFilterRules', [['field' => 'name', 'condition' => 'contains', 'value' => 'Alp']])
+        ->call('setFilterBarSorts', [['column' => 'name', 'direction' => 'asc']]);
+
+    expect(opportunityStageNames($component, 'Prospecting'))->toBe(['Alpha']);
+});
+
+it('keeps the filter when lanes are switched on and off', function (): void {
+    $keep = opportunityInStage($this, 'Keep me', 'Prospecting');
+    opportunityInStage($this, 'Drop me', 'Prospecting');
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->call('setFilterRules', [['field' => 'name', 'condition' => 'contains', 'value' => 'Keep']]);
+
+    foreach (['company', null] as $grouping) {
+        $component->call('setBoardGrouping', $grouping);
+
+        expect($component->instance()->getFilterBarData()['rules'])->toHaveCount(1);
+    }
+
+    expect(opportunityStageCardIds($component, 'Prospecting'))->toBe([$keep->id]);
+});
+
+it('keeps stored keys the page does not own when a filter changes', function (): void {
+    $order = array_reverse(stageIds($this->stageField));
+    $filters = boardFiltersWithRule(['field' => 'name', 'condition' => 'contains', 'value' => 'Acme']);
+    rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(stageOrder: $order, filters: $filters));
+    $component = freshOpportunitiesBoard();
+
+    $writes = boardPreferenceWrites(fn () => $component->call('setBoardGrouping', 'company'));
+
+    $stored = TablePreference::query()->sole()->board_state;
+    expect($writes)->toBe(1)
+        ->and($stored->stageOrder)->toBe($order)
+        ->and($stored->filters)->toEqual($filters)
+        ->and($stored->grouping)->toBe('company');
 });

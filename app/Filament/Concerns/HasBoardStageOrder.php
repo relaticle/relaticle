@@ -6,16 +6,12 @@ namespace App\Filament\Concerns;
 
 use App\Actions\Views\ReorderBoardStages;
 use App\Data\BoardStateData;
-use App\Models\TablePreference;
-use App\Queries\Views\StoredTablePreferenceQuery;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\HtmlString;
 
 trait HasBoardStageOrder
 {
-    private ?BoardStateData $boardState = null;
-
     /**
      * @param  list<mixed>  $optionIds
      */
@@ -30,7 +26,7 @@ trait HasBoardStageOrder
 
         resolve(ReorderBoardStages::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), $known);
 
-        $this->boardState = null;
+        $this->forgetStoredBoardState();
         $this->board = $this->board($this->makeBoard());
     }
 
@@ -50,23 +46,11 @@ trait HasBoardStageOrder
      */
     protected function inMemberOrder(Collection $stages): Collection
     {
-        $order = $this->boardState()->orderStages(array_values($stages->map(static fn (array $stage): string => (string) $stage['id'])->all()));
+        $order = $this->storedBoardState()->orderStages(array_values($stages->map(static fn (array $stage): string => (string) $stage['id'])->all()));
 
         return $stages
             ->sortBy(static fn (array $stage): int|false => array_search((string) $stage['id'], $order, true))
             ->values();
-    }
-
-    private function boardState(): BoardStateData
-    {
-        if (! $this->boardState instanceof BoardStateData) {
-            $preference = resolve(StoredTablePreferenceQuery::class)
-                ->get($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity());
-
-            $this->boardState = $preference instanceof TablePreference ? $preference->board_state : new BoardStateData;
-        }
-
-        return $this->boardState;
     }
 
     /**
@@ -80,4 +64,8 @@ trait HasBoardStageOrder
      * @return list<array{id: string, label: string, icon: ?string}>
      */
     abstract protected function boardGroupings(): array;
+
+    abstract protected function storedBoardState(): BoardStateData;
+
+    abstract protected function forgetStoredBoardState(): void;
 }

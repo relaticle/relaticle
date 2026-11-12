@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\Views\ReorderBoardStages;
+use App\Data\BoardStateData;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\TaskField;
 use App\Enums\WorkspaceRole;
@@ -14,12 +15,15 @@ use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\Opportunity;
+use App\Models\TablePreference;
 use App\Models\Task;
 use App\Models\User;
 use App\Support\ChecklistHtml;
+use Closure;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Once;
@@ -916,4 +920,79 @@ it('stores a status order once each and rejects an opportunity stage', function 
     expect($state->stageOrder)->toBe([$order[1], $order[0]])
         ->and(fn () => resolve(ReorderBoardStages::class)->execute($this->user, $this->workspace, CrmEntity::Task, statusIds($stage)))
         ->toThrow(HttpException::class);
+});
+
+function taskBoardPreferenceWrites(Closure $callback): int
+{
+    $writes = 0;
+    DB::listen(function (QueryExecuted $query) use (&$writes): void {
+        if (preg_match('/^(update|insert into) "table_preferences"/', $query->sql) === 1) {
+            $writes++;
+        }
+    });
+    $callback();
+
+    return $writes;
+}
+
+function rememberedTaskBoard(object $test, BoardStateData $state): TablePreference
+{
+    return TablePreference::factory()->create([
+        'user_id' => $test->user->getKey(),
+        'workspace_id' => $test->workspace->getKey(),
+        'entity' => CrmEntity::Task,
+        'board_state' => $state,
+    ]);
+}
+
+it('remembers a filter and the lanes set on the plain board for the next visit', function (): void {
+    taskInStatus($this, 'Keep me', 'To do');
+    $rule = ['field' => 'title', 'condition' => 'contains', 'value' => 'Keep'];
+
+    livewire(TasksBoard::class)
+        ->call('setFilterRules', [$rule])
+        ->call('setFilterBarSorts', [['column' => 'created_at', 'direction' => 'desc']])
+        ->call('setBoardGrouping', 'assignee');
+
+    $next = freshTasksBoard();
+
+    expect($next->get('groupBy'))->toBe('assignee')
+        ->and($next->get('boardSort'))->toBe('created_at:desc')
+        ->and($next->instance()->getFilterBarData()['rules'])->toHaveCount(1)
+        ->and(TablePreference::query()->sole()->board_state->grouping)->toBe('assignee');
+});
+
+it('writes nothing for a request that changes nothing', function (): void {
+    $preference = rememberedTaskBoard($this, new BoardStateData(grouping: 'assignee'));
+    $updatedAt = $preference->updated_at;
+    $component = freshTasksBoard();
+
+    $this->travelTo(now()->addHour());
+    $writes = taskBoardPreferenceWrites(function () use ($component): void {
+        $component->call('$refresh')->call('setBoardGrouping', 'assignee')->call('setFilterBarSorts', []);
+    });
+
+    expect($writes)->toBe(0)
+        ->and($preference->refresh()->updated_at)->toEqual($updatedAt);
+});
+
+it('writes once when statuses are reordered', function (): void {
+    rememberedTaskBoard($this, new BoardStateData(grouping: 'assignee'));
+    $component = freshTasksBoard();
+
+    $writes = taskBoardPreferenceWrites(fn () => $component->call('reorderBoardStages', array_reverse(statusIds($this->statusField))));
+
+    expect($writes)->toBe(1);
+});
+
+it('keeps the filter when a sort is set', function (): void {
+    $keep = taskInStatus($this, 'Keep me', 'To do');
+    taskInStatus($this, 'Drop me', 'To do');
+
+    $component = livewire(TasksBoard::class)
+        ->call('setFilterRules', [['field' => 'title', 'condition' => 'contains', 'value' => 'Keep']])
+        ->call('setFilterBarSorts', [['column' => 'created_at', 'direction' => 'desc']]);
+
+    expect($component->instance()->getFilterBarData()['rules'])->toHaveCount(1)
+        ->and(taskStatusCardIds($component, 'To do'))->toBe([$keep->id]);
 });

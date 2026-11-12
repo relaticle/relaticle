@@ -4,19 +4,24 @@ declare(strict_types=1);
 
 namespace App\Filament\Concerns;
 
+use App\Actions\Views\SaveBoardState;
+use App\Data\BoardStateData;
 use App\Enums\CrmEntity;
 use App\Filament\Components\Tables\ColumnHeaderLabel;
 use App\Filament\Tables\Concerns\FiltersWithRules;
 use App\Filament\Tables\FilterBar\FilterField;
 use App\Filament\Tables\FilterBar\FilterFieldCatalog;
 use App\Filament\Tables\FilterBar\SortList;
+use App\Models\TablePreference;
 use App\Models\User;
 use App\Queries\CustomFieldFilterSchema;
 use App\Queries\Sorts\CustomFieldSort;
+use App\Queries\Views\StoredTablePreferenceQuery;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Relaticle\Flowforge\Exceptions\CardMoveRejectedException;
 
@@ -29,13 +34,102 @@ trait HasBoardViews
     #[Url(as: 'sort')]
     public ?string $boardSort = null;
 
+    #[Locked]
+    public ?string $boardStateHash = null;
+
+    private ?BoardStateData $storedBoardState = null;
+
     public function mountHasBoardViews(): void
     {
         $this->tableSearch = '';
 
-        if (filled($this->tableFilters)) {
-            $this->tableFilters = [...$this->canonicalTableFilters($this->tableFilters), 'trashed' => ['value' => null]];
+        if (filled($this->tableFilters) || filled($this->boardSort) || filled($this->groupBy)) {
+            $this->tableFilters = filled($this->tableFilters) ? $this->boardFilters($this->tableFilters) : null;
+            $this->groupBy = $this->knownGrouping($this->groupBy);
+            $this->boardStateHash = $this->boardStateSignature($this->currentBoardState());
+        } else {
+            $this->applyBoardState($this->storedBoardState());
         }
+
+        $this->rebuildBoard();
+    }
+
+    public function dehydrateHasBoardViews(): void
+    {
+        if ($this->boardStateHash === null) {
+            return;
+        }
+
+        $state = $this->currentBoardState();
+        $hash = $this->boardStateSignature($state);
+
+        if ($hash === $this->boardStateHash) {
+            return;
+        }
+
+        resolve(SaveBoardState::class)->execute(
+            $this->viewSwitcherUser(),
+            $this->viewSwitcherWorkspace(),
+            $this->filterBarEntity(),
+            ['filters' => $state->filters, 'sort' => $state->sort, 'grouping' => $state->grouping],
+        );
+
+        $this->forgetStoredBoardState();
+        $this->boardStateHash = $hash;
+    }
+
+    protected function storedBoardState(): BoardStateData
+    {
+        if (! $this->storedBoardState instanceof BoardStateData) {
+            $preference = resolve(StoredTablePreferenceQuery::class)
+                ->get($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->filterBarEntity());
+
+            $this->storedBoardState = $preference instanceof TablePreference ? $preference->board_state : new BoardStateData;
+        }
+
+        return $this->storedBoardState;
+    }
+
+    protected function forgetStoredBoardState(): void
+    {
+        $this->storedBoardState = null;
+    }
+
+    protected function currentBoardState(): BoardStateData
+    {
+        return BoardStateData::from([
+            ...$this->storedBoardState()->toArray(),
+            'filters' => $this->boardFilters($this->tableFilters),
+            'sort' => filled($this->boardSort) ? $this->boardSort : null,
+            'grouping' => $this->groupBy,
+        ]);
+    }
+
+    protected function applyBoardState(BoardStateData $state): void
+    {
+        $this->tableFilters = $state->filters === [] ? null : $this->boardFilters($state->filters);
+        $this->boardSort = filled($state->sort) ? $state->sort : null;
+        $this->groupBy = $this->knownGrouping($state->grouping);
+        $this->updatedGroupBy();
+        $this->boardStateHash = $this->boardStateSignature($this->currentBoardState());
+    }
+
+    private function boardStateSignature(BoardStateData $state): string
+    {
+        return new BoardStateData(filters: $state->filters, grouping: $state->grouping, sort: $state->sort)->hash();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function boardFilters(mixed $filters): array
+    {
+        return [...$this->canonicalTableFilters($filters), 'trashed' => ['value' => null]];
+    }
+
+    private function knownGrouping(?string $grouping): ?string
+    {
+        return $grouping !== null && array_key_exists($grouping, $this->getBoard()->getGroupings()) ? $grouping : null;
     }
 
     protected function filterBarEntity(): CrmEntity
@@ -189,6 +283,6 @@ trait HasBoardViews
     private function rebuildBoard(): void
     {
         $this->board = $this->board($this->makeBoard());
-        $this->resetTable();
+        $this->table = $this->table($this->makeTable());
     }
 }
