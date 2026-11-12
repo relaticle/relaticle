@@ -21,11 +21,13 @@ use App\Models\User;
 use App\Queries\CustomFieldFilterSchema;
 use App\Queries\Sorts\CustomFieldSort;
 use App\Queries\Views\StoredTablePreferenceQuery;
+use Closure;
 use Filament\Facades\Filament;
 use Filament\Support\Components\Attributes\Unexposed;
 use Filament\Support\Facades\FilamentView;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
@@ -215,18 +217,38 @@ trait HasBoardViews
             return;
         }
 
-        resolve(SaveBoardState::class)->execute(
+        $saved = $this->writingBoardState(fn (?SavedView $view): BoardStateData => resolve(SaveBoardState::class)->execute(
             $this->viewSwitcherUser(),
             $this->viewSwitcherWorkspace(),
             $this->filterBarEntity(),
             ['filters' => $state->filters, 'sort' => $state->sort, 'grouping' => $state->grouping],
-            $this->activeBoardView(),
-        );
+            $view,
+        ));
+
+        if (! $saved instanceof BoardStateData) {
+            return;
+        }
 
         $this->boardSort = $state->sort;
         $this->groupBy = $state->grouping;
         $this->forgetStoredBoardState();
         $this->boardStateHash = $hash;
+    }
+
+    /**
+     * @param  Closure(?SavedView): BoardStateData  $write
+     */
+    protected function writingBoardState(Closure $write): ?BoardStateData
+    {
+        try {
+            return $write($this->activeBoardView());
+        } catch (ModelNotFoundException $exception) {
+            throw_unless($exception->getModel() === SavedView::class, $exception);
+
+            $this->handleMissingSavedView($this->activeSavedViewId);
+
+            return null;
+        }
     }
 
     protected function storedBoardState(): BoardStateData

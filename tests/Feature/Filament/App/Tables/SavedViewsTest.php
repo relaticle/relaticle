@@ -2083,3 +2083,77 @@ it('keeps the type out of the rename modal', function (): void {
 
     expect(mountedFieldNames($component))->toBe(['name']);
 });
+
+function deleteSavedViewAfterNextRead(SavedView $view): void
+{
+    $done = false;
+
+    DB::listen(function (QueryExecuted $query) use (&$done, $view): void {
+        if ($done || ! str_starts_with($query->sql, 'select') || ! str_contains($query->sql, '"saved_views"')) {
+            return;
+        }
+
+        $done = true;
+        DB::table('saved_views')->where('id', $view->getKey())->delete();
+    });
+}
+
+it('shows the plain board with the same cards when the open view was deleted elsewhere', function (): void {
+    $keep = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Keep me']);
+    Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Drop me']);
+    $view = boardViewFor($this->user, ['state' => new BoardStateData(filters: boardFiltersFor('Keep'), grouping: 'company')]);
+    $component = openBoardWithView($view);
+    $view->delete();
+    $this->travelTo(now()->addHour());
+
+    $writes = boardViewStoreWrites(fn () => $component->call('$refresh'));
+
+    $component->assertNotified(__('filament/panel.tables.views.unavailable'));
+    expect($component->get('activeSavedViewId'))->toBeNull()
+        ->and($component->instance()->getFilterBarData()['rules'][0]['value'])->toBe('Keep')
+        ->and(boardCardNames($component))->toBe([$keep->name])
+        ->and($writes)->toBe(0)
+        ->and(preferenceRow())->toBeNull();
+
+    $component->call('setFilterRules', [boardNameRule('Drop')]);
+
+    expect(preferenceRow()->board_state->filters['conditions']['rules'][0]['value'])->toBe('Drop');
+});
+
+it('treats a board view deleted before the save as gone and writes nothing', function (): void {
+    $view = boardViewFor($this->user);
+    $component = openBoardWithView($view);
+    deleteSavedViewAfterNextRead($view);
+
+    $component->call('setFilterRules', [boardNameRule('Keep')]);
+
+    $component->assertNotified(__('filament/panel.tables.views.unavailable'));
+    expect($component->get('activeSavedViewId'))->toBeNull()
+        ->and(preferenceRow())->toBeNull();
+});
+
+it('treats a board view deleted before a stage reorder as gone and writes nothing', function (): void {
+    $view = boardViewFor($this->user);
+    $component = openBoardWithView($view);
+    deleteSavedViewAfterNextRead($view);
+
+    $component->call('reorderBoardStages', array_reverse(opportunityStageOptionIds()));
+
+    $component->assertNotified(__('filament/panel.tables.views.unavailable'));
+    expect($component->get('activeSavedViewId'))->toBeNull()
+        ->and(preferenceRow())->toBeNull();
+});
+
+it('keeps the open board view when a list view is deleted from the board', function (): void {
+    $open = boardViewFor($this->user, ['name' => 'Open one']);
+    $table = viewFor($this->user, ['entity' => CrmEntity::Opportunity, 'name' => 'Open deals']);
+    $updatedAt = $open->updated_at;
+    $this->travelTo(now()->addHour());
+
+    openBoardWithView($open)
+        ->callAction('deleteSavedView', arguments: ['view' => $table->getKey()])
+        ->assertSet('activeSavedViewId', $open->getKey());
+
+    expect(SavedView::query()->withoutGlobalScopes()->whereKey($table->getKey())->exists())->toBeFalse()
+        ->and($open->refresh()->updated_at)->toEqual($updatedAt);
+});
