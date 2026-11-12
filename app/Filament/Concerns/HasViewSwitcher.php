@@ -39,6 +39,9 @@ trait HasViewSwitcher
 
     private const array VIEW_TONES = ['list' => 'success', 'board' => 'orange', 'cards' => 'info'];
 
+    /** @var array<string, list<string>> */
+    private array $viewOrderCache = [];
+
     public function mountHasViewSwitcher(): void
     {
         $this->redirectToFirstView();
@@ -72,6 +75,7 @@ trait HasViewSwitcher
         }
 
         resolve(ReorderViews::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), $known);
+        $this->viewOrderCache = [];
     }
 
     public function getViewSwitcher(): ?Htmlable
@@ -99,12 +103,15 @@ trait HasViewSwitcher
      */
     protected function viewOrder(): array
     {
-        return resolve(ViewOrderQuery::class)->get(
+        $kinds = array_keys($this->viewSwitcherPages());
+        $views = $this->viewSwitcherSavedViews();
+
+        return $this->viewOrderCache[implode(',', [...$kinds, ...$views->modelKeys()])] ??= resolve(ViewOrderQuery::class)->get(
             $this->viewSwitcherUser(),
             $this->viewSwitcherWorkspace(),
             $this->viewSwitcherEntity(),
-            array_keys($this->viewSwitcherPages()),
-            $this->viewSwitcherSavedViews(),
+            $kinds,
+            $views,
         );
     }
 
