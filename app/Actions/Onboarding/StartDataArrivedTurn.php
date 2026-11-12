@@ -28,7 +28,7 @@ final readonly class StartDataArrivedTurn
 
     public function execute(Workspace $workspace, string $sourceKey): bool
     {
-        if (! Feature::active(SetupConversation::class) || ! $workspace->isPersonalWorkspace()) {
+        if (! Feature::active(SetupConversation::class) || ! $workspace->isPersonalWorkspace() || ! $workspace->isInSetupWindow()) {
             return false;
         }
 

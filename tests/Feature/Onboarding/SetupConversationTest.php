@@ -394,6 +394,21 @@ it('opens a data arrived turn in the setup chat when an onboarding import finish
     expect(TurnPresence::current($workspace->setupConversation->id))->not->toBeNull();
 });
 
+it('opens a data arrived turn only in the first 14 days of a workspace', function (int $daysOld, int $turns): void {
+    Queue::fake([ProcessChatMessage::class]);
+    $user = User::factory()->create();
+    $workspace = setupWorkspaceWithGreeting($user);
+    $workspace->forceFill(['created_at' => now()->subDays($daysOld)->addMinute()])->save();
+
+    $user->notifyNow(new ImportFinishedNotification(finishedImport($user, $workspace), ImportOutcome::Completed), ['database']);
+
+    assertDataArrivedPushed($turns);
+})->with([
+    'day 13' => [13, 1],
+    'the last minute of day 14' => [14, 1],
+    'day 15' => [15, 0],
+]);
+
 it('opens one data arrived turn per import', function (): void {
     Queue::fake([ProcessChatMessage::class]);
     $user = User::factory()->create();

@@ -98,8 +98,9 @@ Decisions 2, 3, 6 and 8 below are replaced. The rest stands.
   data source line, and the greeting gives the next step for each state.
 - **No samples when the setup chat is the landing.** An owner who connected a mailbox at the
   wizard step gets none either, as on main. An install without the setup chat keeps main's rule.
-- **Still open:** how long after signup the data arrived turn and "Continue with Rela" stay on,
-  and what happens when data arrives while a proposal is pending or the greeting is streaming.
+- **A 14-day window.** The data arrived turn and "Continue with Rela" stay on for the first 14
+  days after the workspace is created, the window the goal checks return in.
+- **Still open:** what happens when data arrives while a proposal is pending.
 
 ## What was decided (2026-11-07)
 

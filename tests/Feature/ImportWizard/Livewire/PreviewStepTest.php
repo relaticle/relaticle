@@ -821,6 +821,20 @@ it('shows no continue button to a workspace that has no setup chat', function ()
     mountPreviewStep($this)->assertDontSee('Continue with Rela');
 });
 
+it('shows continue with rela only in the first 14 days of a workspace', function (int $daysOld, bool $shown): void {
+    onboardingWorkspaceWithSetupChat($this);
+    $this->workspace->forceFill(['created_at' => now()->subDays($daysOld)->addMinute()])->save();
+    completePreviewImport($this);
+
+    $step = mountPreviewStep($this);
+
+    $shown ? $step->assertSee('Continue with Rela') : $step->assertDontSee('Continue with Rela');
+})->with([
+    'day 13' => [13, true],
+    'the last minute of day 14' => [14, true],
+    'day 15' => [15, false],
+]);
+
 it('shows no continue button to a teammate of the workspace owner', function (): void {
     onboardingWorkspaceWithSetupChat($this);
     completePreviewImport($this);

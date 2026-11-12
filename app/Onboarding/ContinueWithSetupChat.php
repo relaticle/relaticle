@@ -14,7 +14,9 @@ final readonly class ContinueWithSetupChat
     {
         $workspace = $import->workspace;
 
-        if (! $workspace instanceof Workspace || (string) $workspace->user_id !== (string) auth()->id()) {
+        if (! $workspace instanceof Workspace
+            || ! $workspace->isInSetupWindow()
+            || (string) $workspace->user_id !== (string) auth()->id()) {
             return null;
         }
 
