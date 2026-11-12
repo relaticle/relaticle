@@ -1,14 +1,16 @@
 <div class="fi-board-header">
-    @include('filament.app.topbar-page-heading', ['heading' => $heading])
+    <div class="fi-board-header-row">
+        @include('filament.app.topbar-page-heading', ['heading' => $heading])
 
-    @if (filled($viewSwitcher))
-        <div class="fi-view-controls">
-            {{ $viewSwitcher }}
-            {{ $viewSettings }}
-        </div>
-    @endif
+        @if (filled($viewSwitcher))
+            <div class="fi-view-controls">
+                {{ $viewSwitcher }}
+                {{ $viewSettings }}
+            </div>
+        @endif
 
-    <span x-data="boardStageOrder" hidden></span>
+        <span x-data="boardStageOrder" hidden></span>
+    </div>
 
-    {!! $boardToolbar !!}
+    @include('filament.app.tables.filter-bar')
 </div>

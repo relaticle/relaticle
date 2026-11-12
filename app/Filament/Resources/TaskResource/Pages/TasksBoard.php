@@ -11,13 +11,13 @@ use App\Enums\CustomFields\TaskField as TaskCustomField;
 use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Actions\EditTaskAction;
 use App\Filament\Actions\MoveCardAction;
-use App\Filament\Components\Forms\WorkspaceMemberSelect;
-use App\Filament\Components\Tables\Filters\RecordSelectFilter;
 use App\Filament\Concerns\HasBoardStageOrder;
+use App\Filament\Concerns\HasBoardViews;
 use App\Filament\Concerns\HasViewSwitcher;
 use App\Filament\Concerns\KeepsOpenTaskInUrl;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
+use App\Filament\Tables\FilterBar\ConditionsFilter;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\Task;
@@ -31,9 +31,9 @@ use Filament\Actions\ActionGroup;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Schema;
-use Filament\Support\Enums\Size;
 use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentTimezone;
+use Filament\Tables\Enums\FiltersLayout;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\JoinClause;
@@ -56,6 +56,7 @@ use WeakMap;
 final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
 {
     use HasBoardStageOrder;
+    use HasBoardViews;
     use HasViewSwitcher;
     use KeepsOpenTaskInUrl;
 
@@ -99,7 +100,6 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
             ->recordTitleAttribute('title')
             ->columnIdentifier($valueColumn)
             ->positionIdentifier('order_column')
-            ->searchable(['title'])
             ->columns($this->getColumns())
             ->cardSchema(function (Schema $schema) use ($customFields): Schema {
                 $descriptionCustomField = $this->descriptionPreview($customFields->get('custom_fields.description'));
@@ -136,9 +136,9 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
             ->cardAction('edit')
             ->cardActions($this->cardActions())
             ->groupings([$this->assigneeGrouping()])
-            ->filters($this->boardFilters())
-            ->filtersFormWidth(Width::Medium)
-            ->filtersTriggerAction(fn (Action $action): Action => $action->button()->labeledFrom('sm')->size(Size::Small)->label(__('filament/pages/boards.filters_button.label')))
+            ->filters([ConditionsFilter::make($this->healedFilterRules(...))])
+            ->deferFilters(false)
+            ->filtersLayout(FiltersLayout::Hidden)
             ->headerToolbar();
     }
 
@@ -237,21 +237,6 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
                 ->action(function (Task $record): void {
                     $record->delete();
                 }),
-        ];
-    }
-
-    /**
-     * @return array<int, RecordSelectFilter>
-     */
-    private function boardFilters(): array
-    {
-        return [
-            RecordSelectFilter::make('assignees')
-                ->label(__('filament/pages/boards.tasks.filters.assignee'))
-                ->relationship('assignees', 'name', WorkspaceMemberSelect::currentWorkspaceMembers())
-                ->searchable()
-                ->preload()
-                ->multiple(),
         ];
     }
 

@@ -1787,7 +1787,6 @@ html.fi-record-stacked .fi-record-layout {
 /* Toolbar fields are flat and 2rem tall, the height of a small button, so a row shares one height. */
 .fi-resource-list-records-page:not(.fi-page-has-sub-navigation),
 .fi-edge-to-edge-page,
-.fi-board-header,
 .fi-record-pane {
     .fi-ta-grouping-settings-fields .fi-input-wrp {
         @apply h-8 shadow-none ring-gray-950/10 dark:ring-white/10;
@@ -1912,87 +1911,11 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-board-header {
-        @apply flex items-center gap-x-4 border-b border-gray-200/60 bg-white px-4 py-3 lg:px-6 dark:border-white/10 dark:bg-gray-900;
-
-        /* Filament floors table toolbar items at 36px, which would make this row taller than the list's. */
-        & .fi-ta-header-toolbar > * {
-            @apply min-h-0;
-        }
-
-        /* Contents puts the clear filters button on the toolbar line, right after the filter trigger. */
-        & > .ff-header {
-            @apply contents;
-        }
-
-        & > .ff-header > .ff-header-row {
-            @apply min-w-0 flex-1;
-        }
-
-        /* The package reserves this slot for a heading the topbar already shows. */
-        & > div:not(.fi-view-switcher) > .ff-header-row > :first-child:not(:has(.ff-header-subheading)) {
-            @apply hidden;
-        }
-
-        & > div:not(.fi-view-switcher) > .ff-header-row,
-        & > div:not(.fi-view-switcher) > .ff-header-row > :last-child {
-            @apply flex-nowrap;
-        }
-
-        & > div:not(.fi-view-switcher) > .ff-header-row > :last-child {
-            @apply min-w-0 flex-1 flex-row-reverse justify-between gap-x-3;
-        }
-
-        .fi-ta-search-field {
-            @apply me-auto min-w-0 shrink;
-        }
-
-        /* The row is reversed, so a lower order sits further right: the filter keeps the edge. */
-        .fi-ta-filters-dropdown,
-        .fi-ta-filters-modal {
-            @apply -order-1;
-        }
+        @apply bg-white dark:bg-gray-900;
     }
 
-    /* Below sm the trigger is an icon button; give it the same box as the toolbar's gray buttons. */
-    .fi-board-header .fi-ta-filters-dropdown > .fi-dropdown-trigger .fi-icon-btn {
-        @apply m-0 bg-white text-gray-700 ring-1 ring-gray-950/10 hover:bg-gray-50 dark:bg-white/5 dark:text-gray-200 dark:ring-white/10 dark:hover:bg-white/10;
-    }
-
-    /* The clear button is a sibling of the toolbar row, so the active trigger and it join into one pill. */
-    &:has(.fi-board-filter-clear) .fi-ta-filters-dropdown > .fi-dropdown-trigger :is(.fi-btn, .fi-icon-btn) {
-        @apply rounded-e-none bg-primary-50 text-primary-700 ring-primary-200 hover:bg-primary-100 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-400/30 dark:hover:bg-primary-500/20;
-
-        @media (hover: hover) {
-            &[aria-expanded='true'] {
-                @apply bg-primary-100 dark:bg-primary-500/20;
-            }
-        }
-
-        .fi-icon {
-            @apply text-primary-500 dark:text-primary-400;
-        }
-    }
-
-    .fi-board-header .fi-ta-filters-dropdown > .fi-dropdown-trigger .fi-btn-badge-ctn {
-        @apply static translate-none bg-transparent;
-    }
-
-    .fi-board-header .fi-ta-filters-dropdown > .fi-dropdown-trigger .fi-icon-btn-badge-ctn {
-        @apply rounded-full;
-    }
-
-    .fi-board-header .fi-ta-filters-dropdown > .fi-dropdown-trigger :is(.fi-btn-badge-ctn, .fi-icon-btn-badge-ctn) {
-        .fi-badge {
-            @apply min-w-[1.125rem] justify-center rounded-full bg-primary-600 px-1.5 text-white ring-0 dark:bg-primary-500 dark:text-white;
-        }
-    }
-
-    .fi-board-filter-clear {
-        @apply -ms-[calc(1rem-1px)] flex h-8 items-center rounded-e-lg bg-primary-50 px-2 text-primary-500 ring-1 ring-primary-200 transition hover:bg-primary-100 hover:text-primary-700 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-400/30 dark:hover:bg-primary-500/20;
-    }
-
-    .fi-board-filter-clear-icon {
-        @apply size-4;
+    .fi-board-header-row {
+        @apply flex items-center gap-x-4 border-b border-gray-200/60 px-4 py-3 lg:px-6 dark:border-white/10;
     }
 
     .fi-page-main {

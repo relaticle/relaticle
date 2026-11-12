@@ -1083,7 +1083,7 @@ it('words a fallback label as the column header', function (): void {
         ->and($company['creator']->label)->toBe('Created By')
         ->and($company['accountOwner']->label)->toBe('Account Owner')
         ->and($task['title']->label)->toBe('Title')
-        ->and($task['created_at']->label)->toBe('Created At')
+        ->and($task['created_at']->label)->toBe('Created at')
         ->and($task['assignees']->label)->toBe('Assignees');
 });
 

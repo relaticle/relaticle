@@ -23,11 +23,6 @@ return [
         'moved' => 'Moved to :column',
     ],
 
-    'filters_button' => [
-        'label' => 'Filters',
-        'clear' => 'Clear filters',
-    ],
-
     'opportunities' => [
         'title' => 'Opportunities',
         'stage_order' => 'Stage order',
@@ -35,10 +30,6 @@ return [
             'add' => 'Add Opportunity',
             'edit' => 'Edit',
             'delete' => 'Delete',
-        ],
-        'filters' => [
-            'company' => 'Company',
-            'contact' => 'Point of Contact',
         ],
         'form' => [
             'name_placeholder' => 'Enter opportunity title',
@@ -56,9 +47,6 @@ return [
             'add' => 'Add Task',
             'edit' => 'Edit',
             'delete' => 'Delete',
-        ],
-        'filters' => [
-            'assignee' => 'Assignee',
         ],
         'groupings' => [
             'assignee' => 'Assignee',

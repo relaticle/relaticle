@@ -6,7 +6,6 @@ use App\Enums\CrmEntity;
 use App\Filament\Components\Forms\RecordSelect;
 use App\Filament\Components\Infolists\RecordChipEntry;
 use App\Filament\Components\RecordChip;
-use App\Filament\Components\Tables\Filters\RecordSelectFilter;
 use App\Filament\Components\Tables\RecordChipColumn;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
@@ -14,7 +13,6 @@ use App\Filament\Resources\NoteResource\Pages\ManageNotes;
 use App\Filament\Resources\PeopleResource;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
-use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\People;
@@ -29,7 +27,6 @@ mutates(
     RecordChipColumn::class,
     RecordChipEntry::class,
     RecordSelect::class,
-    RecordSelectFilter::class,
 );
 
 beforeEach(function (): void {
@@ -54,37 +51,6 @@ function peoplePicker(string $name): Select
     }
 
     throw new RuntimeException("No `{$name}` picker on the people form.");
-}
-
-function assigneesFilterField(TasksBoard $page): Select
-{
-    foreach ($page->getTableFiltersForm()->getComponents(withHidden: true) as $component) {
-        foreach ($component->getChildComponentContainers() as $container) {
-            foreach ($container->getComponents(withHidden: true) as $child) {
-                if ($child instanceof Select && $child->hasRelationship() && $child->getRelationshipName() === 'assignees') {
-                    return $child;
-                }
-            }
-        }
-    }
-
-    throw new RuntimeException('No assignees filter field on the tasks board.');
-}
-
-/**
- * @param  array<string|int, string>  $options
- * @return array<int, string>
- */
-function pickerLabelText(array $options): array
-{
-    return array_values(array_map(
-        fn (string $label): string => html_entity_decode(
-            trim((string) preg_replace('/\s+/', ' ', strip_tags($label))),
-            ENT_QUOTES,
-            'UTF-8',
-        ),
-        $options,
-    ));
 }
 
 function mediaQueryCount(): int
@@ -187,21 +153,6 @@ it('loads company logos in one query on the people list', function (): void {
     livewire(ListPeople::class)->assertOk();
 
     expect(mediaQueryCount())->toBeLessThanOrEqual(1);
-});
-
-it('renders member chips in the assignees filter and lets the caller order win', function (): void {
-    $this->user->update(['name' => "Sheila O'Kon"]);
-    $mate = User::factory()->create(['name' => 'Aaron Ant']);
-    $this->workspace->users()->attach($mate, ['role' => 'member']);
-
-    $page = livewire(TasksBoard::class)->instance();
-    $field = assigneesFilterField($page);
-
-    expect($field->isHtmlAllowed())->toBeTrue()
-        ->and($field->getOptionLabelFromRecord($this->user))->toContain($this->user->getFilamentAvatarUrl());
-
-    expect(pickerLabelText($field->getOptionsFromRelationship()))
-        ->toBe(["Sheila O'Kon", 'Aaron Ant']);
 });
 
 it('falls back to the shared entity icon for a company with no logo', function (): void {

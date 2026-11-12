@@ -1,3 +1,4 @@
+<template x-if="sortable.length > 0">
 <div class="fi-filter-part">
     <button
         type="button"
@@ -160,3 +161,4 @@
         </div>
     </template>
 </div>
+</template>

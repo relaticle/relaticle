@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Actions\Views\ReorderBoardStages;
 use App\Data\BoardStateData;
-use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\WorkspaceRole;
@@ -22,7 +21,6 @@ use App\Models\Task;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
-use Filament\Forms\Components\Select;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Once;
@@ -33,6 +31,7 @@ use Relaticle\Flowforge\Board;
 use Relaticle\Flowforge\Grouping;
 use Relaticle\Flowforge\Lane;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Tests\Helpers\WorkspaceCustomField;
 
 mutates(ReorderBoardStages::class, OpportunitiesBoard::class, MoveCardAction::class, PreviewRecordAction::class);
 
@@ -96,64 +95,140 @@ it('renders the company entity icon on a board card', function (): void {
         ->assertSee(CrmEntity::Company->iconPath(), escape: false);
 });
 
-it('orders the company filter alphabetically and chips each option', function (): void {
-    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Zeta Industries']);
+function opportunityInStage(object $test, string $name, string $stage, ?Company $company = null): Opportunity
+{
+    $opportunity = Opportunity::factory()->recycle([$test->user, $test->workspace])->create(['name' => $name, 'company_id' => $company?->getKey()]);
+    $opportunity->saveCustomFieldValue($test->stageField, $test->stageField->options->firstWhere('name', $stage)->getKey());
+
+    return $opportunity;
+}
+
+function opportunityStageCardIds(Testable $component, string $stage): array
+{
+    $option = CustomFieldOption::query()->withoutGlobalScopes()->where('name', $stage)->firstOrFail();
+
+    return $component->instance()->getBoard()->getBoardRecords((string) $option->getKey())->pluck('id')->all();
+}
+
+it('narrows the cards with a rule from the bar', function (string $field): void {
     $acme = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme Corp']);
+    $keep = opportunityInStage($this, 'Keep me', 'Prospecting', $acme);
+    $drop = opportunityInStage($this, 'Drop me', 'Prospecting');
+    $keep->saveCustomFieldValue(WorkspaceCustomField::byCode($this->workspace->getKey(), 'opportunity', 'amount'), 5000);
 
-    $field = null;
+    $rule = match ($field) {
+        'name' => ['field' => 'name', 'condition' => 'contains', 'value' => 'Keep'],
+        'company' => ['field' => 'company', 'condition' => 'is_any_of', 'value' => [$acme->getKey()]],
+        'custom_fields.amount' => ['field' => 'custom_fields.amount', 'condition' => 'greater_than', 'value' => 1000],
+    };
 
-    foreach (livewire(OpportunitiesBoard::class)->instance()->getTableFiltersForm()->getComponents(withHidden: true) as $component) {
-        foreach ($component->getChildComponentContainers() as $container) {
-            foreach ($container->getComponents(withHidden: true) as $child) {
-                if ($child instanceof Select && $child->hasRelationship() && $child->getRelationshipName() === 'company') {
-                    $field = $child;
-                }
-            }
-        }
-    }
+    $component = livewire(OpportunitiesBoard::class);
 
-    expect($field)->not->toBeNull()
-        ->and($field->isHtmlAllowed())->toBeTrue()
-        ->and($field->getOptionLabelFromRecord($acme))->toContain(CrmEntity::Company->iconPath());
+    expect(opportunityStageCardIds($component, 'Prospecting'))->toContain($keep->id, $drop->id);
 
-    $labels = array_values(array_map(
-        fn (string $label): string => trim((string) preg_replace('/\s+/', ' ', strip_tags($label))),
-        $field->getOptionsFromRelationship(),
-    ));
+    $component->call('setFilterRules', [$rule]);
 
-    expect($labels)->toBe(['Acme Corp', 'Zeta Industries']);
+    expect(opportunityStageCardIds($component, 'Prospecting'))->toBe([$keep->id]);
+})->with(['a native field' => 'name', 'a relation' => 'company', 'a custom attribute' => 'custom_fields.amount']);
+
+it('shows every card again when the bar is cleared', function (): void {
+    $keep = opportunityInStage($this, 'Keep me', 'Prospecting');
+    $drop = opportunityInStage($this, 'Drop me', 'Prospecting');
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->call('setFilterRules', [['field' => 'name', 'condition' => 'contains', 'value' => 'Keep']]);
+
+    expect($component->instance()->hasFilterBarState())->toBeTrue();
+
+    $component->call('clearFilterBar');
+
+    expect(opportunityStageCardIds($component, 'Prospecting'))->toContain($keep->id, $drop->id)
+        ->and($component->instance()->hasFilterBarState())->toBeFalse();
 });
 
-it('labels the filter trigger and offers a clear button only while a filter is active', function (): void {
-    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+it('makes company lanes when the bar groups by company', function (): void {
+    livewire(OpportunitiesBoard::class)
+        ->call('setFilterBarGrouping', 'company')
+        ->assertSet('groupBy', 'company');
+});
+
+it('removes the lanes when the grouping is cleared', function (): void {
+    livewire(OpportunitiesBoard::class)
+        ->call('setFilterBarGrouping', 'company')
+        ->call('setFilterBarGrouping', null)
+        ->assertSet('groupBy', null);
+});
+
+it('ignores a grouping the board does not have', function (): void {
+    livewire(OpportunitiesBoard::class)
+        ->call('setFilterBarGrouping', 'stage')
+        ->assertSet('groupBy', null);
+});
+
+it('offers the bar no sort, no deleted control and no direction', function (): void {
+    $data = livewire(OpportunitiesBoard::class)->instance()->getFilterBarData();
+
+    expect($data['sortable'])->toBe([])
+        ->and($data['deletable'])->toBeFalse()
+        ->and($data['groupDirections'])->toBeFalse()
+        ->and(array_column($data['groups'], 'id'))->toBe(['company']);
+});
+
+it('leaves the deleted records half of the bar inert on a board', function (): void {
+    $component = livewire(OpportunitiesBoard::class)->call('setDeletedRecordsFilter', 'included');
+
+    expect($component->instance()->getFilterBarData()['deleted'])->toBeNull()
+        ->and($component->instance()->hasFilterBarState())->toBeFalse();
+
+    $fromUrl = Livewire::withQueryParams(['filters' => ['trashed' => ['value' => '1']]])->test(OpportunitiesBoard::class);
+
+    expect($fromUrl->instance()->getFilterBarData()['deleted'])->toBeNull()
+        ->and($fromUrl->instance()->hasFilterBarState())->toBeFalse();
+});
+
+it('labels every field on the board as the list does', function (): void {
+    $board = collect(livewire(OpportunitiesBoard::class)->instance()->getFilterBarData()['fields'])->pluck('label', 'key');
+    $list = collect(Livewire::withQueryParams(['view' => 'all'])->test(ListOpportunities::class)->instance()->getFilterBarData()['fields'])->pluck('label', 'key');
+
+    expect($board->all())->toEqual($list->all());
+});
+
+it('draws the bar and none of the old toolbar', function (): void {
     Filament::setCurrentPanel(Filament::getPanel('app'));
     Filament::bootCurrentPanel();
 
     livewire(OpportunitiesBoard::class)
-        ->assertSeeText(__('filament/pages/boards.filters_button.label'))
-        ->assertDontSeeHtml('fi-board-filter-clear')
-        ->set('tableFilters.companies.values', [$company->getKey()])
-        ->assertSeeHtml('fi-board-filter-clear')
-        ->assertSeeHtml('wire:click="removeTableFilters"')
-        ->call('removeTableFilters')
-        ->assertSet('tableFilters.companies.values', [])
-        ->assertDontSeeHtml('fi-board-filter-clear');
+        ->assertSeeHtml('data-filter-bar')
+        ->assertDontSeeHtml('ff-grouping')
+        ->assertDontSeeHtml('fi-ta-search-field')
+        ->assertDontSeeHtml('fi-ta-filters-dropdown');
 });
 
-it('keeps the board clear button off the opportunity list table', function (): void {
-    Filament::setCurrentPanel(Filament::getPanel('app'));
-    Filament::bootCurrentPanel();
+it('ignores a search that arrives in the url', function (): void {
+    $card = opportunityInStage($this, 'Findable', 'Prospecting');
 
-    $web = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['creation_source' => CreationSource::WEB]);
-    $api = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['creation_source' => CreationSource::API]);
-    $rules = [['field' => 'creation_source', 'condition' => 'is_any_of', 'value' => [CreationSource::WEB->value]]];
+    $component = Livewire::withQueryParams(['search' => 'zzqx-no-match'])->test(OpportunitiesBoard::class);
 
-    Livewire::withQueryParams(['view' => 'all'])->test(ListOpportunities::class)
-        ->set('tableFilters.conditions.rules', $rules)
-        ->assertSet('tableFilters.conditions.rules', $rules)
-        ->assertCanSeeTableRecords([$web])
-        ->assertCanNotSeeTableRecords([$api])
-        ->assertDontSeeHtml('fi-board-filter-clear');
+    expect(opportunityStageCardIds($component, 'Prospecting'))->toContain($card->id);
+});
+
+it('renders a board whose url carries garbage filters', function (string $query): void {
+    $this->get(OpportunitiesBoard::getUrl(['tenant' => $this->workspace]).'?'.$query)->assertSuccessful();
+})->with([
+    'trashed scalar' => 'filters[trashed]=x',
+    'whole value a string' => 'filters=x',
+    'conditions scalar' => 'filters[conditions]=x',
+    'creation source nested junk' => 'filters[creation_source][values]=x',
+]);
+
+it('drops the removed company filter from an old link', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $card = opportunityInStage($this, 'Unrelated', 'Prospecting');
+
+    $component = Livewire::withQueryParams(['filters' => ['companies' => ['values' => [$company->getKey()]]]])->test(OpportunitiesBoard::class);
+
+    expect($component->instance()->getFilterBarData()['rules'])->toBe([])
+        ->and(opportunityStageCardIds($component, 'Prospecting'))->toContain($card->id);
 });
 
 it('offers a company lane only for companies with an opportunity on the board', function (): void {

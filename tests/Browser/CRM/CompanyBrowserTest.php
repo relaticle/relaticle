@@ -118,7 +118,7 @@ it('keeps app page headings in the topbar across navigation and viewport sizes',
         ->assertPathIs("/app/{$workspace->slug}/tasks/board")
         ->assertVisible('[data-page-heading]')
         ->assertSeeIn('[data-page-heading]', 'Tasks')
-        ->assertVisible('.fi-board-header .fi-ta-search-field')
+        ->assertVisible('.fi-board-header [data-filter-bar]')
         ->assertNoJavaScriptErrors()
         ->assertScript('(() => document.querySelectorAll("[data-page-heading]").length === 1)()')
         ->assertScript('(() => document.querySelector("[data-page-heading] h1")?.textContent.trim() === "Tasks")()')
@@ -146,7 +146,7 @@ it('keeps the header row and its controls in place when switching between the li
 
     $headerRow = <<<'JS'
         (() => {
-            const row = document.querySelector('.fi-board-header') ?? document.querySelector('main .fi-header');
+            const row = document.querySelector('.fi-board-header-row') ?? document.querySelector('main .fi-header');
             const controlTops = [...row.querySelectorAll('button, input')]
                 .filter((control) => control.getClientRects().length > 0)
                 .map((control) => control.getBoundingClientRect().top);
@@ -166,7 +166,7 @@ it('keeps the header row and its controls in place when switching between the li
     $page->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->click(".fi-view-switcher a[href$='/app/{$workspace->slug}/opportunities/board']")
         ->assertPathIs("/app/{$workspace->slug}/opportunities/board")
-        ->assertVisible('.fi-board-header .fi-ta-search-field');
+        ->assertVisible('.fi-board-header [data-filter-bar]');
 
     $board = $page->script($headerRow);
 

@@ -57,7 +57,6 @@ trait HasViewSwitcher
         }
 
         return view('filament.app.board-header', [
-            'boardToolbar' => $header,
             'heading' => $this->getHeading(),
             'viewSwitcher' => $this->getViewSwitcher(),
             'viewSettings' => $this->getViewSettings(),

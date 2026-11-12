@@ -23,13 +23,13 @@
                 data-pop-trigger
                 x-bind:class="{ 'fi-set': grouping, 'fi-open': isOpen('group', 'main') }"
                 x-bind:aria-expanded="isOpen('group', 'main').toString()"
-                x-bind:aria-label="grouping ? @js(__('filament/panel.tables.filters.group_set')).replace(':group', grouping.label).replace(':direction', grouping.direction === 'asc' ? @js(__('filament/panel.tables.filters.sort_ascending')) : @js(__('filament/panel.tables.filters.sort_descending'))) : @js(__('filament/panel.tables.filters.group'))"
+                x-bind:aria-label="grouping ? (groupDirections ? @js(__('filament/panel.tables.filters.group_set')) : @js(__('filament/panel.tables.filters.group_set_lanes'))).replace(':group', grouping.label).replace(':direction', grouping.direction === 'asc' ? @js(__('filament/panel.tables.filters.sort_ascending')) : @js(__('filament/panel.tables.filters.sort_descending'))) : @js(__('filament/panel.tables.filters.group'))"
                 aria-haspopup="menu"
                 x-on:click="toggle('group', 'main', $event)"
             >
-                <x-filament::icon icon="lucide-layers" x-show="! grouping" />
-                <x-filament::icon icon="lucide-arrow-up" x-show="grouping?.direction === 'asc'" />
-                <x-filament::icon icon="lucide-arrow-down" x-show="grouping?.direction === 'desc'" />
+                <x-filament::icon icon="lucide-layers" x-show="! grouping || ! groupDirections" />
+                <x-filament::icon icon="lucide-arrow-up" x-show="groupDirections && grouping?.direction === 'asc'" />
+                <x-filament::icon icon="lucide-arrow-down" x-show="groupDirections && grouping?.direction === 'desc'" />
                 <span x-text="grouping ? grouping.label : @js(__('filament/panel.tables.filters.group'))"></span>
             </button>
 
@@ -51,18 +51,21 @@
                         >
                             <svg x-show="group.icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path x-bind:d="group.icon"></path></svg>
                             <span class="fi-filter-label" x-text="group.label"></span>
-                            <x-filament::icon icon="lucide-arrow-up" class="fi-menu-check" x-show="grouping?.id === group.id && grouping.direction === 'asc'" />
-                            <x-filament::icon icon="lucide-arrow-down" class="fi-menu-check" x-show="grouping?.id === group.id && grouping.direction === 'desc'" />
+                            <x-filament::icon icon="lucide-check" class="fi-menu-check" x-show="! groupDirections && grouping?.id === group.id" />
+                            <x-filament::icon icon="lucide-arrow-up" class="fi-menu-check" x-show="groupDirections && grouping?.id === group.id && grouping.direction === 'asc'" />
+                            <x-filament::icon icon="lucide-arrow-down" class="fi-menu-check" x-show="groupDirections && grouping?.id === group.id && grouping.direction === 'desc'" />
                         </button>
                     </template>
                 </div>
                 <template x-if="grouping">
                     <div>
                         <div class="fi-filter-rule" aria-hidden="true"></div>
-                        <button type="button" tabindex="0" role="menuitem" class="fi-filter-item" data-pop-item data-group-flip x-on:click="flipGrouping()">
-                            <x-filament::icon icon="lucide-arrow-up-down" />
-                            <span x-text="grouping.direction === 'asc' ? @js(__('filament/panel.tables.filters.sort_flip_to_descending')) : @js(__('filament/panel.tables.filters.sort_flip_to_ascending'))"></span>
-                        </button>
+                        <template x-if="groupDirections">
+                            <button type="button" tabindex="0" role="menuitem" class="fi-filter-item" data-pop-item data-group-flip x-on:click="flipGrouping()">
+                                <x-filament::icon icon="lucide-arrow-up-down" />
+                                <span x-text="grouping.direction === 'asc' ? @js(__('filament/panel.tables.filters.sort_flip_to_descending')) : @js(__('filament/panel.tables.filters.sort_flip_to_ascending'))"></span>
+                            </button>
+                        </template>
                         <button type="button" tabindex="0" role="menuitem" class="fi-filter-item fi-danger" data-pop-item data-group-clear x-on:click="clearGrouping()">
                             <x-filament::icon icon="lucide-x" />
                             {{ __('filament/panel.tables.filters.group_clear') }}

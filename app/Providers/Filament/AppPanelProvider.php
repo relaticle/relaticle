@@ -28,11 +28,9 @@ use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\NoteResource\Pages\ManageNotes;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
-use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
-use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Http\Controllers\SyncUserTimezoneController;
 use App\Http\Middleware\ApplyTenantScopes;
 use App\Http\Middleware\CheckScheduledDeletion;
@@ -411,11 +409,6 @@ final class AppPanelProvider extends PanelProvider
                 TablesRenderHook::TOOLBAR_BEFORE,
                 fn (): View|Factory => view('filament.app.tables.column-menu'),
                 scopes: $listPages,
-            )
-            ->renderHook(
-                TablesRenderHook::FILTER_INDICATORS,
-                fn (): View|Factory => view('filament.app.board-filter-clear'),
-                scopes: [OpportunitiesBoard::class, TasksBoard::class],
             );
     }
 

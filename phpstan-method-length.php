@@ -14,7 +14,7 @@ return [
                 'App\Console\Commands\ResetDemoAccountCommand::shapeTasks' => 73,
                 'App\Filament\Actions\ConfirmIdentityAction::identityFields' => 66,
                 'App\Filament\Actions\ConfirmIdentityAction::setUp' => 88,
-                'App\Filament\Resources\TaskResource\Pages\TasksBoard::board' => 69,
+                'App\Filament\Resources\TaskResource\Pages\TasksBoard::board' => 68,
                 'App\Livewire\App\Workspaces\InviteWorkspaceMembers::manageInviteLinkAction' => 84,
                 'App\Mcp\Tools\BaseListTool::handle' => 79,
                 'App\Mcp\Tools\BaseShowTool::handle' => 119,

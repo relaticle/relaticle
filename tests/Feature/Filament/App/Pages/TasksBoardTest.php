@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Once;
 use Livewire\Features\SupportTesting\Testable;
+use Livewire\Livewire;
 use Relaticle\Flowforge\Board;
 use Relaticle\Flowforge\Grouping;
 use Relaticle\Flowforge\Lane;
@@ -567,6 +568,149 @@ it('reads checklist progress without a query per card', function (): void {
     }
 
     expect($countQueries())->toBe($withOneCard);
+});
+
+function taskInStatus(object $test, string $title, string $status): Task
+{
+    $task = Task::factory()->recycle([$test->user, $test->workspace])->create(['title' => $title]);
+    $task->saveCustomFieldValue($test->statusField, $test->statusField->options->firstWhere('name', $status)->getKey());
+
+    return $task;
+}
+
+function taskStatusCardIds(Testable $component, string $status): array
+{
+    $option = CustomFieldOption::query()->withoutGlobalScopes()->where('name', $status)->firstOrFail();
+
+    return $component->instance()->getBoard()->getBoardRecords((string) $option->getKey())->pluck('id')->all();
+}
+
+it('narrows the cards with a rule from the bar', function (string $field): void {
+    $mate = User::factory()->create();
+    $this->workspace->users()->attach($mate->id, ['role' => 'member']);
+    $priority = CustomField::query()->forEntity(Task::class)->where('code', TaskField::PRIORITY)->firstOrFail();
+
+    $keep = taskInStatus($this, 'Keep me', 'To do');
+    $drop = taskInStatus($this, 'Drop me', 'To do');
+    $keep->assignees()->attach($mate);
+    $keep->saveCustomFieldValue($priority, $priority->options->first()->getKey());
+
+    $rule = match ($field) {
+        'title' => ['field' => 'title', 'condition' => 'contains', 'value' => 'Keep'],
+        'assignees' => ['field' => 'assignees', 'condition' => 'is_any_of', 'value' => [$mate->getKey()]],
+        'custom_fields.priority' => ['field' => 'custom_fields.priority', 'condition' => 'is_not_empty'],
+    };
+
+    $component = livewire(TasksBoard::class);
+
+    expect(taskStatusCardIds($component, 'To do'))->toContain($keep->id, $drop->id);
+
+    $component->call('setFilterRules', [$rule]);
+
+    expect(taskStatusCardIds($component, 'To do'))->toBe([$keep->id]);
+})->with(['a native field' => 'title', 'a relation' => 'assignees', 'a custom attribute' => 'custom_fields.priority']);
+
+it('shows every card again when the bar is cleared', function (): void {
+    $keep = taskInStatus($this, 'Keep me', 'To do');
+    $drop = taskInStatus($this, 'Drop me', 'To do');
+
+    $component = livewire(TasksBoard::class)
+        ->call('setFilterRules', [['field' => 'title', 'condition' => 'contains', 'value' => 'Keep']]);
+
+    expect($component->instance()->hasFilterBarState())->toBeTrue();
+
+    $component->call('clearFilterBar');
+
+    expect(taskStatusCardIds($component, 'To do'))->toContain($keep->id, $drop->id)
+        ->and($component->instance()->hasFilterBarState())->toBeFalse();
+});
+
+it('makes assignee lanes when the bar groups by assignee', function (): void {
+    livewire(TasksBoard::class)
+        ->call('setFilterBarGrouping', 'assignee')
+        ->assertSet('groupBy', 'assignee');
+});
+
+it('removes the lanes when the grouping is cleared', function (): void {
+    livewire(TasksBoard::class)
+        ->call('setFilterBarGrouping', 'assignee')
+        ->call('setFilterBarGrouping', null)
+        ->assertSet('groupBy', null);
+});
+
+it('ignores a grouping the board does not have', function (): void {
+    livewire(TasksBoard::class)
+        ->call('setFilterBarGrouping', 'status')
+        ->assertSet('groupBy', null);
+});
+
+it('offers the bar no sort, no deleted control and no direction', function (): void {
+    $data = livewire(TasksBoard::class)->instance()->getFilterBarData();
+
+    expect($data['sortable'])->toBe([])
+        ->and($data['deletable'])->toBeFalse()
+        ->and($data['groupDirections'])->toBeFalse()
+        ->and(array_column($data['groups'], 'id'))->toBe(['assignee']);
+});
+
+it('leaves the deleted records half of the bar inert on a board', function (): void {
+    $component = livewire(TasksBoard::class)->call('setDeletedRecordsFilter', 'only');
+
+    expect($component->instance()->getFilterBarData()['deleted'])->toBeNull()
+        ->and($component->instance()->hasFilterBarState())->toBeFalse();
+
+    $fromUrl = Livewire::withQueryParams(['filters' => ['trashed' => ['value' => '0']]])->test(TasksBoard::class);
+
+    expect($fromUrl->instance()->getFilterBarData()['deleted'])->toBeNull()
+        ->and($fromUrl->instance()->hasFilterBarState())->toBeFalse();
+});
+
+it('labels every field on the board as the list does', function (): void {
+    $board = collect(livewire(TasksBoard::class)->instance()->getFilterBarData()['fields'])->pluck('label', 'key');
+    $list = collect(livewire(ManageTasks::class)->instance()->getFilterBarData()['fields'])->pluck('label', 'key');
+
+    expect($board->all())->toEqual($list->all());
+});
+
+it('draws the bar and none of the old toolbar', function (): void {
+    Filament::setCurrentPanel(Filament::getPanel('app'));
+    Filament::bootCurrentPanel();
+
+    livewire(TasksBoard::class)
+        ->assertSeeHtml('data-filter-bar')
+        ->assertDontSeeHtml('ff-grouping')
+        ->assertDontSeeHtml('fi-ta-search-field')
+        ->assertDontSeeHtml('fi-ta-filters-dropdown');
+});
+
+it('ignores a search that arrives in the url', function (): void {
+    $card = taskInStatus($this, 'Findable', 'To do');
+
+    $component = Livewire::withQueryParams(['search' => 'zzqx-no-match'])->test(TasksBoard::class);
+
+    expect(taskStatusCardIds($component, 'To do'))->toContain($card->id);
+});
+
+it('renders a board whose url carries garbage filters', function (string $query): void {
+    $this->get(TasksBoard::getUrl(['tenant' => $this->workspace]).'?'.$query)->assertSuccessful();
+})->with([
+    'trashed scalar' => 'filters[trashed]=x',
+    'whole value a string' => 'filters=x',
+    'conditions scalar' => 'filters[conditions]=x',
+    'creation source nested junk' => 'filters[creation_source][values]=x',
+]);
+
+it('turns an old assignees link into a chip', function (): void {
+    $mate = User::factory()->create();
+    $this->workspace->users()->attach($mate->id, ['role' => 'member']);
+    $keep = taskInStatus($this, 'Keep me', 'To do');
+    $drop = taskInStatus($this, 'Drop me', 'To do');
+    $keep->assignees()->attach($mate);
+
+    $component = Livewire::withQueryParams(['filters' => ['assignees' => ['values' => [$mate->getKey()]]]])->test(TasksBoard::class);
+
+    expect(array_column($component->instance()->getFilterBarData()['rules'], 'field'))->toBe(['assignees'])
+        ->and(taskStatusCardIds($component, 'To do'))->toBe([$keep->id]);
 });
 
 /**

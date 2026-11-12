@@ -12,11 +12,12 @@ use App\Filament\Actions\MoveCardAction;
 use App\Filament\Actions\PreviewRecordAction;
 use App\Filament\Components\Forms\RecordSelect;
 use App\Filament\Components\Infolists\RecordChipEntry;
-use App\Filament\Components\Tables\Filters\RecordSelectFilter;
 use App\Filament\Concerns\HasBoardStageOrder;
+use App\Filament\Concerns\HasBoardViews;
 use App\Filament\Concerns\HasViewSwitcher;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\OpportunityResource\Forms\OpportunityForm;
+use App\Filament\Tables\FilterBar\ConditionsFilter;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
@@ -29,10 +30,10 @@ use Filament\Actions\CreateAction;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
-use Filament\Support\Enums\Size;
 use Filament\Support\Enums\TextSize;
 use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentTimezone;
+use Filament\Tables\Enums\FiltersLayout;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\JoinClause;
@@ -52,6 +53,7 @@ use Relaticle\Flowforge\Modern\BoardResourcePage;
 final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardStages
 {
     use HasBoardStageOrder;
+    use HasBoardViews;
     use HasViewSwitcher;
 
     protected static string $resource = OpportunityResource::class;
@@ -88,16 +90,15 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
             ->recordTitleAttribute('name')
             ->columnIdentifier($valueColumn)
             ->positionIdentifier('order_column')
-            ->searchable(['name'])
             ->columns($this->getColumns())
             ->cardSchema(fn (Schema $schema): Schema => $this->cardSchema($schema, $customFields))
             ->createCardAction($this->cardCreation())
             ->cardAction('edit')
             ->cardActions($this->cardActions())
             ->groupings([$this->companyGrouping()])
-            ->filters($this->boardFilters())
-            ->filtersFormWidth(Width::Medium)
-            ->filtersTriggerAction(fn (Action $action): Action => $action->button()->labeledFrom('sm')->size(Size::Small)->label(__('filament/pages/boards.filters_button.label')))
+            ->filters([ConditionsFilter::make($this->healedFilterRules(...))])
+            ->deferFilters(false)
+            ->filtersLayout(FiltersLayout::Hidden)
             ->headerToolbar();
     }
 
@@ -183,27 +184,6 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
                 ->action(function (Opportunity $record): void {
                     $record->delete();
                 }),
-        ];
-    }
-
-    /**
-     * @return array<int, RecordSelectFilter>
-     */
-    private function boardFilters(): array
-    {
-        return [
-            RecordSelectFilter::make('companies')
-                ->label(__('filament/pages/boards.opportunities.filters.company'))
-                ->relationship('company', 'name')
-                ->searchable()
-                ->preload()
-                ->multiple(),
-            RecordSelectFilter::make('contacts')
-                ->label(__('filament/pages/boards.opportunities.filters.contact'))
-                ->relationship('contact', 'name')
-                ->searchable()
-                ->preload()
-                ->multiple(),
         ];
     }
 

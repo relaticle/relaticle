@@ -122,7 +122,7 @@ trait FiltersWithRules
                 $described,
             ),
             'deleted' => FilterRules::deletedMode($state['trashed']['value']),
-            'deletable' => $this->getTable()->getFilter('trashed')?->isVisible() ?? false,
+            'deletable' => $this->filtersDeletedRecords(),
             ...$this->filterBarOrdering($catalog),
             'periodUnits' => array_map(fn (PeriodUnit $unit): array => [
                 'value' => $unit->value,
@@ -200,6 +200,10 @@ trait FiltersWithRules
 
     public function setDeletedRecordsFilter(mixed $mode = null): void
     {
+        if (! $this->filtersDeletedRecords()) {
+            return;
+        }
+
         $mode = is_string($mode) ? $mode : null;
 
         $this->tableFilters = [
@@ -232,7 +236,15 @@ trait FiltersWithRules
     {
         $legacy = FilterRules::fromLegacy(is_array($filters) ? $filters : [], $this->filterFieldCatalog());
 
-        return [...$legacy, ConditionsFilter::NAME => $this->healedFilterRules($legacy['conditions'])];
+        $state = [...$legacy, ConditionsFilter::NAME => $this->healedFilterRules($legacy['conditions'])];
+
+        return $this->filtersDeletedRecords() ? $state : [...$state, 'trashed' => ['value' => null]];
+    }
+
+    private function filtersDeletedRecords(): bool
+    {
+        // Livewire mounts before the table is built, and the list's mount needs the URL's value kept.
+        return ! isset($this->table) || ($this->getTable()->getFilter('trashed')?->isVisible() ?? false);
     }
 
     /**
