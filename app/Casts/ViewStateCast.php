@@ -32,9 +32,7 @@ final readonly class ViewStateCast implements CastsAttributes
      */
     public function set(Model $model, string $key, mixed $value, array $attributes): string
     {
-        if (! $value instanceof TableStateData && ! $value instanceof BoardStateData) {
-            throw new InvalidArgumentException('A view state is a table state or a board state.');
-        }
+        throw_if(! $value instanceof TableStateData && ! $value instanceof BoardStateData, InvalidArgumentException::class, 'A view state is a table state or a board state.');
 
         return $value->toJson();
     }
