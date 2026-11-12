@@ -12,6 +12,7 @@ use App\Http\Middleware\ValidateMcpOrigin;
 use App\Mcp\Servers\RelaticleServer;
 use Illuminate\Support\Facades\Route;
 use Laravel\Mcp\Facades\Mcp;
+use Laravel\Mcp\Server\Middleware\ValidateOrigin;
 use Laravel\Passport\Http\Controllers\AuthorizationController;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -52,7 +53,10 @@ if (is_string($challengeHost) && $challengeHost !== '') {
 }
 
 Route::group(array_filter(['domain' => $mcpDomain]), static function () use ($mcpPath, $mcpMiddleware): void {
+    // ValidateMcpOrigin owns the Origin check: the package's ValidateOrigin ignores
+    // MCP_ALLOWED_ORIGINS, MCP_DOMAIN and forwarded ports, and lets any localhost through.
     Mcp::web($mcpPath, RelaticleServer::class)
+        ->withoutMiddleware(ValidateOrigin::class)
         ->middleware($mcpMiddleware);
 
     Route::put(rtrim($mcpPath, '/').'/uploads/{upload}', ReceiveUploadController::class)
