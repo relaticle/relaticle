@@ -18,6 +18,13 @@ return [
         'no_lanes' => 'No lanes',
     ],
 
+    'layout' => [
+        'narrow' => 'Narrow columns',
+        'wide' => 'Wide columns',
+        'compact' => 'Compact cards',
+        'full' => 'Full cards',
+    ],
+
     'move_denied' => 'You do not have permission to move this card.',
 
     'sorted_no_reorder' => 'Cards are sorted by :field. Clear the sort to arrange them by hand.',

@@ -32,8 +32,7 @@ trait HasBoardStageOrder
             return;
         }
 
-        $this->forgetStoredBoardState();
-        $this->board = $this->board($this->makeBoard());
+        $this->boardStateWritten($saved);
     }
 
     public function boardViewSettings(): Htmlable
@@ -73,7 +72,7 @@ trait HasBoardStageOrder
 
     abstract protected function storedBoardState(): BoardStateData;
 
-    abstract protected function forgetStoredBoardState(): void;
+    abstract protected function boardStateWritten(BoardStateData $state): void;
 
     abstract protected function activeBoardView(): ?SavedView;
 

@@ -27,9 +27,17 @@ final readonly class ReorderBoardStages
 
         $optionIds = array_values(array_unique($optionIds));
 
-        abort_if(array_diff($optionIds, $this->boardOptionIds($workspace, $entity)) !== [], 403);
+        $boardOptionIds = $this->boardOptionIds($workspace, $entity);
 
-        return $this->saveBoardState->execute($user, $workspace, $entity, ['stage_order' => $optionIds], $view);
+        abort_if(array_diff($optionIds, $boardOptionIds) !== [], 403);
+
+        return $this->saveBoardState->execute(
+            $user,
+            $workspace,
+            $entity,
+            fn (BoardStateData $stored): array => ['stage_order' => BoardStateData::withColumnIds($stored->stageOrder, $boardOptionIds, $optionIds)],
+            $view,
+        );
     }
 
     /**

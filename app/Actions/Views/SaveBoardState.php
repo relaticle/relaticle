@@ -13,16 +13,24 @@ use App\Models\Scopes\WorkspaceScope;
 use App\Models\TablePreference;
 use App\Models\User;
 use App\Models\Workspace;
+use Closure;
 use Illuminate\Support\Facades\DB;
 
 final readonly class SaveBoardState
 {
+    public const array KEYS = [
+        'stage_order', 'filters', 'grouping', 'sort', 'column_field', 'hidden_columns',
+        'no_value_columns', 'card_attributes', 'show_labels', 'hide_empty', 'column_width', 'card_size',
+    ];
+
     /**
-     * @param  array{stage_order?: list<string>, filters?: array<string, mixed>, grouping?: ?string, sort?: ?string}  $changes
+     * @param  array<string, mixed>|Closure(BoardStateData): array<string, mixed>  $changes
      */
-    public function execute(User $user, Workspace $workspace, CrmEntity $entity, array $changes, ?SavedView $view = null): BoardStateData
+    public function execute(User $user, Workspace $workspace, CrmEntity $entity, array|Closure $changes, ?SavedView $view = null): BoardStateData
     {
-        abort_if(array_diff(array_keys($changes), ['stage_order', 'filters', 'grouping', 'sort']) !== [], 422);
+        if (is_array($changes)) {
+            $this->assertKnownKeys($changes);
+        }
         abort_unless($user->belongsToWorkspaceId($workspace->getKey()), 403);
         abort_if($entity->boardFieldCode() === null, 403);
 
@@ -55,8 +63,21 @@ final readonly class SaveBoardState
     /**
      * @param  array<string, mixed>  $changes
      */
-    private function write(SavedView|TablePreference $store, string $column, BoardStateData $stored, array $changes): BoardStateData
+    private function assertKnownKeys(array $changes): void
     {
+        abort_if(array_diff(array_keys($changes), self::KEYS) !== [], 422);
+    }
+
+    /**
+     * @param  array<string, mixed>|Closure(BoardStateData): array<string, mixed>  $changes
+     */
+    private function write(SavedView|TablePreference $store, string $column, BoardStateData $stored, array|Closure $changes): BoardStateData
+    {
+        if ($changes instanceof Closure) {
+            $changes = $changes($stored);
+            $this->assertKnownKeys($changes);
+        }
+
         $state = BoardStateData::from([...$stored->toArray(), ...$changes]);
         $store->update([$column => $state]);
 

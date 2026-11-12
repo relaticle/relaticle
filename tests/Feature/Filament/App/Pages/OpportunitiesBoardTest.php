@@ -2,8 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Actions\CustomFields\CreateCustomField;
 use App\Actions\Views\ReorderBoardStages;
 use App\Data\BoardStateData;
+use App\Enums\BoardCardSize;
+use App\Enums\BoardColumnWidth;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\SavedViewType;
@@ -971,6 +974,42 @@ it('keeps the member\'s stored filters and lanes when stages are reordered', fun
     expect($stored->stageOrder)->toBe($reversed)
         ->and($stored->filters)->toEqual($filters)
         ->and($stored->grouping)->toBe('company');
+});
+
+function opportunitySelectField(object $test, string $name, array $options): CustomField
+{
+    return resolve(CreateCustomField::class)->execute($test->user, ['name' => $name, 'type' => 'select', 'entity_type' => 'opportunity', 'options' => array_map(fn (string $option): array => ['name' => $option], $options)]);
+}
+
+it('keeps every board setting when stages are reordered', function (): void {
+    $tier = opportunitySelectField($this, 'Tier', ['Gold', 'Silver']);
+    $tierIds = $tier->options->pluck('id')->map(strval(...))->all();
+    rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(stageOrder: array_reverse($tierIds), hiddenColumns: [$tierIds[0]], noValueColumns: ['stage'], cardAttributes: ['company'], showLabels: true, hideEmpty: false, columnWidth: BoardColumnWidth::Narrow, cardSize: BoardCardSize::Compact));
+    $reversed = array_reverse(stageIds($this->stageField));
+
+    livewire(OpportunitiesBoard::class)->call('reorderBoardStages', $reversed);
+
+    $stored = TablePreference::query()->sole()->board_state;
+    expect($stored->orderStages($tierIds))->toBe(array_reverse($tierIds))
+        ->and($stored->orderStages(stageIds($this->stageField)))->toBe($reversed)
+        ->and($stored->hiddenColumns)->toBe([$tierIds[0]])
+        ->and($stored->noValueColumns)->toBe(['stage'])
+        ->and($stored->cardAttributes)->toBe(['company'])
+        ->and($stored->showLabels)->toBeTrue()
+        ->and($stored->hideEmpty)->toBeFalse()
+        ->and($stored->columnWidth)->toBe(BoardColumnWidth::Narrow)
+        ->and($stored->cardSize)->toBe(BoardCardSize::Compact);
+});
+
+it('writes nothing on arrival when Part 2 settings are stored', function (): void {
+    $preference = rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(cardAttributes: ['company'], showLabels: true, columnWidth: BoardColumnWidth::Narrow));
+    $updatedAt = $preference->updated_at;
+    $this->travelTo(now()->addHour());
+
+    $writes = boardPreferenceWrites(fn () => freshOpportunitiesBoard()->call('$refresh'));
+
+    expect($writes)->toBe(0)
+        ->and($preference->refresh()->updated_at)->toEqual($updatedAt);
 });
 
 it('stores an order made of the board\'s own stages once each', function (): void {

@@ -503,7 +503,21 @@ trait HasBoardViews
         return $groupings;
     }
 
-    private function rebuildBoard(): void
+    protected function boardStateWritten(BoardStateData $state): void
+    {
+        $this->forgetStoredBoardState();
+
+        if (! $this->activeBoardView() instanceof SavedView) {
+            $this->storedBoardState = $state;
+        }
+
+        $this->boardStateHash = $this->boardStateSignature($this->currentBoardState());
+        $this->columnCardLimits = [];
+        $this->cellCardLimits = [];
+        $this->rebuildBoard();
+    }
+
+    protected function rebuildBoard(): void
     {
         $this->board = $this->board($this->makeBoard());
         $this->table = $this->table($this->makeTable());

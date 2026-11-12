@@ -11,6 +11,8 @@ use App\Actions\Views\SaveBoardState;
 use App\Actions\Views\UpdateSavedView;
 use App\Data\BoardStateData;
 use App\Data\TableStateData;
+use App\Enums\BoardCardSize;
+use App\Enums\BoardColumnWidth;
 use App\Enums\CrmEntity;
 use App\Enums\SavedViewType;
 use App\Enums\WorkspaceRole;
@@ -36,6 +38,7 @@ use App\Models\SavedView;
 use App\Models\TablePreference;
 use App\Models\User;
 use App\Policies\SavedViewPolicy;
+use Closure;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Events\QueryExecuted;
@@ -1637,6 +1640,28 @@ it('carries every stored key of the board into the view it creates', function ()
     livewire(OpportunitiesBoard::class)->callAction('saveSavedViewAs', ['name' => 'Copy']);
 
     expect(SavedView::query()->withoutGlobalScopes()->sole()->boardState()->stageOrder)->toBe(array_reverse(opportunityStageOptionIds()));
+});
+
+it('merges a closure change under the lock and refuses an unknown key from it', function (): void {
+    $view = boardViewFor($this->user, ['state' => new BoardStateData(hiddenColumns: ['a'])]);
+    $save = fn (Closure $changes): BoardStateData => resolve(SaveBoardState::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, $changes, $view);
+
+    $state = $save(fn (BoardStateData $stored): array => ['hidden_columns' => [...$stored->hiddenColumns, 'x']]);
+
+    expect($state->hiddenColumns)->toBe(['a', 'x'])
+        ->and($view->refresh()->boardState()->hiddenColumns)->toBe(['a', 'x'])
+        ->and(fn () => $save(fn (BoardStateData $stored): array => ['bogus' => 1]))->toThrow(HttpException::class, '', 422);
+});
+
+it('saves every Part 2 setting with a new board view and reopens it', function (): void {
+    plainBoardState(new BoardStateData(cardAttributes: ['company'], columnWidth: BoardColumnWidth::Narrow, cardSize: BoardCardSize::Compact));
+
+    livewire(OpportunitiesBoard::class)->callAction('saveSavedViewAs', ['name' => 'Dense']);
+
+    $state = SavedView::query()->withoutGlobalScopes()->sole()->boardState();
+    expect($state->cardAttributes)->toBe(['company'])
+        ->and($state->columnWidth)->toBe(BoardColumnWidth::Narrow)
+        ->and($state->cardSize)->toBe(BoardCardSize::Compact);
 });
 
 it('writes nothing to the plain board when a view is created from it', function (): void {
