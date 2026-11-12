@@ -127,6 +127,7 @@ trait HasBoardStageOrder
                 ->all(),
             'columnField' => $field->code,
             'columnFieldName' => $field->name,
+            ...$this->cardSettingsView(),
         ])->render());
     }
 
@@ -358,6 +359,11 @@ trait HasBoardStageOrder
     }
 
     abstract protected function defaultBoardColumnField(): ?CustomField;
+
+    /**
+     * @return array<string, mixed>
+     */
+    abstract protected function cardSettingsView(): array;
 
     /**
      * @return list<array{id: string, label: string, icon: ?string}>

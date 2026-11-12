@@ -8,6 +8,7 @@ use App\Actions\Views\SaveBoardState;
 use App\Actions\Views\SetCardAttributes;
 use App\Data\BoardStateData;
 use App\Enums\BoardCardSize;
+use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
 use App\Filament\Components\Infolists\RecordChipEntry;
 use App\Filament\Tables\FilterBar\FilterField;
@@ -24,6 +25,7 @@ use Filament\Support\Enums\TextSize;
 use Filament\Support\Facades\FilamentTimezone;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 use Relaticle\Flowforge\Components\CardFlex;
@@ -69,6 +71,48 @@ trait HasBoardCards
     public function setHideEmptyAttributes(mixed $hide = true): void
     {
         $this->saveCardSetting('hide_empty', filter_var($hide, FILTER_VALIDATE_BOOL));
+    }
+
+    protected function attributeEntity(): CrmEntity
+    {
+        return $this->viewSwitcherEntity();
+    }
+
+    protected function attributeCreated(CustomField $field): void
+    {
+        if (CustomFieldType::tryFrom($field->type)?->fitsOnCard() === true) {
+            $this->setCardAttributes([...$this->cardAttributeKeys(), FilterFieldCatalog::CUSTOM_FIELD_PREFIX.$field->code]);
+        }
+
+        $this->notifyTableAttributeAdded($field);
+    }
+
+    /**
+     * @return array{cardAttributes: list<array{key: string, label: string, icon: string}>, addableAttributes: list<array{key: string, label: string, icon: string}>, entityLabel: string, showLabels: bool, hideEmpty: bool, canCreateAttribute: bool}
+     */
+    protected function cardSettingsView(): array
+    {
+        $shown = $this->cardAttributeKeys();
+        $offered = resolve(BoardCardAttributesQuery::class)->get($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity());
+        $columnKey = FilterFieldCatalog::CUSTOM_FIELD_PREFIX.$this->boardColumnField()->code;
+        $state = $this->storedBoardState();
+
+        return [
+            'cardAttributes' => array_map($this->cardAttributeRow(...), $shown),
+            'addableAttributes' => array_map($this->cardAttributeRow(...), array_values(array_diff($offered, $shown, [$columnKey]))),
+            'entityLabel' => Str::lower(static::getResource()::getModelLabel()),
+            'showLabels' => $state->showLabels,
+            'hideEmpty' => $state->hideEmpty,
+            'canCreateAttribute' => $this->canCreateTableAttribute(),
+        ];
+    }
+
+    /**
+     * @return array{key: string, label: string, icon: string}
+     */
+    private function cardAttributeRow(string $key): array
+    {
+        return ['key' => $key, 'label' => $this->cardAttributeLabel($key), 'icon' => $this->cardAttributeIcon($key)];
     }
 
     private function saveCardSetting(string $key, bool $value): void

@@ -19,6 +19,7 @@ use App\Filament\Concerns\HasViewSwitcher;
 use App\Filament\Concerns\KeepsOpenTaskInUrl;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
+use App\Filament\Tables\Concerns\CreatesTableAttribute;
 use App\Filament\Tables\FilterBar\ConditionsFilter;
 use App\Models\CustomField;
 use App\Models\Task;
@@ -53,6 +54,7 @@ use WeakMap;
 
 final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
 {
+    use CreatesTableAttribute;
     use HasBoardCards;
     use HasBoardStageOrder;
     use HasBoardViews;

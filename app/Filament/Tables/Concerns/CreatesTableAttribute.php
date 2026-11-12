@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Tables\Concerns;
 
 use App\Actions\CustomFields\CreateCustomField;
+use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
 use App\Enums\WorkspaceCapability;
 use App\Models\CustomField;
@@ -27,6 +28,10 @@ use Relaticle\CustomFields\Facades\Entities;
 trait CreatesTableAttribute
 {
     public const int ATTRIBUTE_NAME_MAX_LENGTH = 50;
+
+    abstract protected function attributeEntity(): CrmEntity;
+
+    abstract protected function attributeCreated(CustomField $field): void;
 
     public function createTableAttributeAction(): Action
     {
@@ -122,13 +127,13 @@ trait CreatesTableAttribute
         try {
             $field = resolve(CreateCustomField::class)->execute($this->attributeCreator(), [
                 ...$this->tableAttributePayload($data),
-                'entity_type' => $this->tableEntity()->value,
+                'entity_type' => $this->attributeEntity()->value,
             ]);
         } catch (ValidationException $exception) {
             throw ValidationException::withMessages($this->tableAttributeErrors($exception, $schema, $data));
         }
 
-        $this->showCreatedTableAttribute($field);
+        $this->attributeCreated($field);
     }
 
     /**
@@ -204,21 +209,9 @@ trait CreatesTableAttribute
         return implode('.', $segments);
     }
 
-    private function showCreatedTableAttribute(CustomField $field): void
+    protected function notifyTableAttributeAdded(CustomField $field): void
     {
-        $this->rebuildTableColumns();
-
         Notification::make()->success()->title(__('filament/panel.tables.views.attribute_added', ['name' => e($field->name)]))->send();
-    }
-
-    // The table is built once per request, before the field exists, so it is built again to carry the new column.
-    private function rebuildTableColumns(): void
-    {
-        $this->table = $this->table($this->makeTable());
-        $this->cachedDefaultTableColumnState = null;
-        $this->declaredTableColumnNames = null;
-
-        $this->applyTableColumnManager($this->tableColumns, wasReordered: true);
     }
 
     private function attributeCreator(): User

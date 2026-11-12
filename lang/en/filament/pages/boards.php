@@ -23,11 +23,20 @@ return [
         'show_column' => 'Show :column',
         'last_column' => 'One column stays visible.',
         'no_value_column' => 'No :attribute',
+        'show_labels' => 'Show attribute labels',
+        'hide_empty' => 'Hide empty attributes',
+        'visible_attributes' => 'Visible attributes',
+        'attribute_actions' => 'Actions for :attribute',
+        'remove_attribute' => 'Remove from card',
+        'add_attribute' => 'Add attribute to view',
+        'search_attributes' => 'Search :entity attributes',
+        'all_attributes_shown' => 'Every attribute is on the card',
+        'no_attribute_matches' => 'No attribute matches',
     ],
 
     'card_attributes' => [
-        'description' => 'Description preview',
-        'checklist' => 'Checklist progress',
+        'description' => 'Description',
+        'checklist' => 'Checklist',
         'empty' => 'Empty',
     ],
 

@@ -293,6 +293,34 @@
     @apply flex size-menu-icon shrink-0 items-center justify-center;
 }
 
+.fi-board-stage-mark .fi-icon {
+    @apply size-menu-icon text-gray-400 dark:text-gray-500;
+}
+
+.fi-board-switch-row {
+    @apply flex min-h-menu-row cursor-pointer items-center gap-2 rounded-menu-item ps-2 pe-1 text-sm text-gray-950 hover:bg-gray-100 dark:text-white dark:hover:bg-white/5;
+
+    & > .fi-icon {
+        @apply size-menu-icon shrink-0 text-gray-400 dark:text-gray-500;
+    }
+}
+
+.fi-board-switch-label {
+    @apply min-w-0 flex-1 truncate;
+}
+
+.fi-board-main-view {
+    @apply overflow-y-auto;
+}
+
+.fi-board-attributes-scroll {
+    @apply min-h-16;
+}
+
+.fi-board-section-heading {
+    @apply mt-1 shrink-0 border-t border-gray-100 px-2 pb-1 pt-2 text-xs font-medium text-gray-500 dark:border-white/10 dark:text-gray-400;
+}
+
 .fi-board-stage-dot {
     @apply size-2 rounded-full bg-(--color-500);
 }
@@ -324,6 +352,10 @@
 
 .fi-board-stages-row-menu {
     @apply max-w-56!;
+}
+
+.fi-board-stages-row-menu .fi-dropdown-list + .fi-dropdown-list {
+    @apply mt-1 border-t border-gray-100 pt-1 dark:border-white/10;
 }
 
 .fi-board-stages-row-menu .fi-dropdown-list-item:disabled {

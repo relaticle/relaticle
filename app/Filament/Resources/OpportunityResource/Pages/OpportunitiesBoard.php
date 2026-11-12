@@ -19,6 +19,7 @@ use App\Filament\Concerns\HasBoardViews;
 use App\Filament\Concerns\HasViewSwitcher;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\OpportunityResource\Forms\OpportunityForm;
+use App\Filament\Tables\Concerns\CreatesTableAttribute;
 use App\Filament\Tables\FilterBar\ConditionsFilter;
 use App\Models\Company;
 use App\Models\CustomField;
@@ -52,6 +53,7 @@ use Relaticle\Flowforge\Modern\BoardResourcePage;
 
 final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardStages
 {
+    use CreatesTableAttribute;
     use HasBoardCards;
     use HasBoardStageOrder;
     use HasBoardViews;

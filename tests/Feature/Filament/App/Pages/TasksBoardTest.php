@@ -1747,7 +1747,7 @@ it('draws an empty task attribute with its label when empty attributes are kept'
     tasksBoardCardWithDescription($this, '<p>Plain</p>');
     $component = livewire(TasksBoard::class)->call('setHideEmptyAttributes', false);
 
-    expect($component->html())->toMatch('/fi-sc-text[^>]*>\s*Checklist progress\s*<.*fi-sc-text[^>]*>\s*Empty\s*</s');
+    expect($component->html())->toMatch('/fi-sc-text[^>]*>\s*Checklist\s*<.*fi-sc-text[^>]*>\s*Empty\s*</s');
 });
 
 it('refuses a key the task card cannot show', function (string $key): void {
@@ -1786,7 +1786,49 @@ it('draws neither the description nor the checklist of a stored card once the de
 
     expect($html)->not->toContain('Plan the visit')
         ->not->toContain('data-checklist-progress')
-        ->not->toMatch('/fi-sc-text[^>]*>\s*(Description preview|Checklist progress)\s*</')
+        ->not->toMatch('/fi-sc-text[^>]*>\s*(Description|Checklist)\s*</')
         ->and($preference->refresh()->updated_at)->toEqual($updatedAt)
         ->and($preference->board_state->cardAttributes)->toBe(['description', 'checklist', 'creator']);
+});
+
+it('lists the task card attributes in order with the two switches', function (): void {
+    livewire(TasksBoard::class)
+        ->assertSeeHtmlInOrder([
+            'data-board-show-labels',
+            'data-board-hide-empty',
+            'data-card-attribute="description"',
+            'data-card-attribute="checklist"',
+            'data-card-attribute="custom_fields.priority"',
+            'data-card-attribute="custom_fields.due_date"',
+            'data-card-attribute="assignees"',
+            'data-board-add-attribute',
+        ]);
+});
+
+it('offers every task attribute the card does not show in the add panel', function (): void {
+    livewire(TasksBoard::class)
+        ->assertSeeHtml('data-board-add-item="creator"')
+        ->assertDontSeeHtml('data-board-add-item="assignees"')
+        ->assertDontSeeHtml('data-board-add-item="custom_fields.'.TaskField::STATUS->value.'"');
+});
+
+it('creates an attribute from the task board and puts it on the card', function (): void {
+    livewire(TasksBoard::class)
+        ->callAction('createTableAttribute', data: ['name' => 'Effort', 'type' => 'text'])
+        ->assertHasNoActionErrors()
+        ->assertNotified('Effort added to this view');
+
+    expect(TablePreference::query()->sole()->board_state->cardAttributes)->toBe([...CrmEntity::Task->defaultCardAttributes(), 'custom_fields.effort']);
+});
+
+it('offers a viewer the task card settings but no create row', function (): void {
+    $viewer = User::factory()->create();
+    $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
+    $viewer->switchWorkspace($this->workspace);
+    $this->actingAs($viewer);
+
+    livewire(TasksBoard::class)
+        ->assertSeeHtml('data-board-add-attribute')
+        ->assertDontSeeHtml('data-view-settings-create')
+        ->assertActionHidden('createTableAttribute');
 });

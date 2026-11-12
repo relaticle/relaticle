@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Concerns;
 
+use App\Enums\CrmEntity;
 use App\Filament\Components\Tables\ColumnHeaderLabel;
 use App\Filament\Tables\Concerns\CreatesTableAttribute;
 use App\Filament\Tables\Concerns\HasColumnMenu;
@@ -88,5 +89,32 @@ trait HasCustomFieldColumns
 
         // Stacked rows print the label in every cell, so each label is built once per request.
         return $this->columnHeaderLabels["{$columnName}\0{$label}"] ??= ColumnHeaderLabel::make($label, $icon);
+    }
+
+    protected function attributeEntity(): CrmEntity
+    {
+        return $this->tableEntity();
+    }
+
+    protected function attributeCreated(CustomField $field): void
+    {
+        $this->showCreatedTableAttribute($field);
+    }
+
+    private function showCreatedTableAttribute(CustomField $field): void
+    {
+        $this->rebuildTableColumns();
+
+        $this->notifyTableAttributeAdded($field);
+    }
+
+    // The table is built once per request, before the field exists, so it is built again to carry the new column.
+    private function rebuildTableColumns(): void
+    {
+        $this->table = $this->table($this->makeTable());
+        $this->cachedDefaultTableColumnState = null;
+        $this->declaredTableColumnNames = null;
+
+        $this->applyTableColumnManager($this->tableColumns, wasReordered: true);
     }
 }

@@ -18,13 +18,17 @@
         role="group"
         aria-label="{{ __('filament/pages/boards.view_settings.panel') }}"
         x-on:dropdown-escape="rowMenuShown() ? ($event.preventDefault(), closeRowMenu(), escapeRowMenu()) : panel !== 'main' && ($event.preventDefault(), closePanel())"
-        x-init="$el.closest('.fi-dropdown-panel')?.addEventListener('dropdown-opened', () => panel = 'main')"
+        x-init="$el.closest('.fi-dropdown-panel')?.addEventListener('dropdown-opened', () => (panel = 'main', query = ''))"
         x-data="{
             panel: 'main',
             openPanel(name) {
                 this.panel = name
                 this.$nextTick(() => requestAnimationFrame(() => {
                     const view = this.$root.querySelector(`[data-board-panel='${name}']`)
+
+                    if (name === 'add') {
+                        return this.focusAddStart()
+                    }
 
                     ;(view.querySelector('[aria-checked=true]') ?? view.querySelector('[data-view-settings-back]'))?.focus()
                 }))
@@ -33,29 +37,37 @@
                 const name = this.panel
 
                 this.panel = 'main'
+                this.query = ''
                 this.$nextTick(() => requestAnimationFrame(() => this.$root.querySelector(`[data-panel-trigger='${name}']`)?.focus()))
             },
             syncSwitch(wrapper) {
-                const toggle = wrapper.querySelector('[data-board-column-toggle]')
+                const toggle = wrapper.querySelector('[data-visible]')
 
                 if (toggle) {
                     window.Alpine.$data(toggle).state = toggle.dataset.visible === 'true'
                 }
             },
+            kinds: {
+                stage: { list: 'list', row: '[data-stage-id]', key: 'stageId', trigger: '[data-stage-actions]' },
+                attribute: { list: 'attributeList', row: '[data-card-attribute]', key: 'cardAttribute', trigger: '[data-attribute-actions]' },
+            },
+            query: '',
+            pending: [],
+            revision: 0,
             rowStage: null,
             rowTrigger: null,
-            rows() {
-                return [...this.$refs.list.querySelectorAll('[data-stage-id]')]
+            rows(kind) {
+                return [...this.$refs[this.kinds[kind].list].querySelectorAll(this.kinds[kind].row)]
             },
-            ids() {
-                return this.rows().map((row) => row.dataset.stageId)
+            ids(kind) {
+                return this.rows(kind).map((row) => row.dataset[this.kinds[kind].key])
             },
-            reorder() {
-                return this.$wire.reorderBoardStages(this.ids())
+            reorder(kind) {
+                return kind === 'stage' ? this.$wire.reorderBoardStages(this.ids(kind)) : this.$wire.setCardAttributes(this.ids(kind))
             },
-            move(id, step) {
-                const rows = this.rows()
-                const index = rows.findIndex((row) => row.dataset.stageId === id)
+            move(kind, id, step) {
+                const rows = this.rows(kind)
+                const index = rows.findIndex((row) => row.dataset[this.kinds[kind].key] === id)
                 const target = rows[index + step]
 
                 if (! target) {
@@ -63,12 +75,22 @@
                 }
 
                 step < 0 ? target.before(rows[index]) : target.after(rows[index])
-                const saved = this.reorder()
-                const focusRow = () => rows[index].querySelector('[data-stage-actions]')?.focus()
+                const saved = this.reorder(kind)
+                const focusRow = () => rows[index].querySelector(this.kinds[kind].trigger)?.focus()
 
                 this.closeRowMenu()
                 this.$nextTick(focusRow)
                 saved.then(focusRow, focusRow)
+            },
+            remove(id) {
+                const rows = this.rows('attribute')
+                const index = rows.findIndex((row) => row.dataset.cardAttribute === id)
+                const neighbour = rows[index + 1] ?? rows[index - 1]
+                const focusNext = () => (neighbour?.isConnected ? neighbour.querySelector(this.kinds.attribute.trigger) : this.$root.querySelector('[data-panel-trigger=add]'))?.focus()
+                const saved = this.$wire.setCardAttributes(this.ids('attribute').filter((key) => key !== id))
+
+                this.closeRowMenu()
+                saved.then(() => this.$nextTick(focusNext), focusNext)
             },
             closeRowMenu() {
                 window.Alpine.$data(this.$refs.rowMenu.querySelector('.fi-dropdown')).close()
@@ -79,7 +101,7 @@
             escapeRowMenu() {
                 this.$nextTick(() => requestAnimationFrame(() => this.rowTrigger?.focus()))
             },
-            openRowMenu(trigger, event, stage) {
+            openRowMenu(trigger, event, kind, id) {
                 this.rowTrigger = trigger
 
                 const panel = document.querySelector('.fi-board-stages-row-menu')
@@ -88,9 +110,9 @@
                     return
                 }
 
-                const ids = this.ids()
+                const ids = this.ids(kind)
 
-                this.rowStage = { ...stage, isFirst: ids[0] === stage.id, isLast: ids.at(-1) === stage.id }
+                this.rowStage = { kind, id, isFirst: ids[0] === id, isLast: ids.at(-1) === id }
 
                 setTimeout(() => {
                     panel.open(trigger)
@@ -100,10 +122,68 @@
                     }
                 })
             },
+            matches(text) {
+                return text.toLowerCase().includes(this.query.trim().toLowerCase())
+            },
+            isCandidate(item) {
+                this.revision
+
+                return ! this.pending.includes(item.dataset.boardAddItem) && this.matches(item.dataset.text)
+            },
+            addItems() {
+                return [...this.$root.querySelectorAll('[data-board-add-item]')].filter((item) => this.isCandidate(item))
+            },
+            stepAdd(delta) {
+                const items = [...this.addItems(), ...(this.$refs.createRow?.querySelectorAll('.fi-dropdown-list-item') ?? [])]
+
+                if (items.length === 0) {
+                    return
+                }
+
+                const index = items.indexOf(document.activeElement)
+                const next = index === -1 ? (delta > 0 ? 0 : items.length - 1) : index + delta
+
+                if (next < 0) {
+                    this.$refs.addSearch.focus()
+                } else {
+                    items[Math.min(next, items.length - 1)].focus()
+                }
+            },
+            pickFirst() {
+                const first = this.pending.length === 0 ? this.addItems()[0] : null
+
+                if (first) {
+                    this.add(first.dataset.boardAddItem)
+                }
+            },
+            focusAddStart() {
+                const compact = window.matchMedia('(width < 40rem), (pointer: coarse)').matches
+
+                ;(compact ? this.$root.querySelector('[data-board-panel=add] [data-view-settings-back]') : this.$refs.addSearch).focus()
+            },
+            async add(key) {
+                if (this.pending.includes(key)) {
+                    return
+                }
+
+                this.pending.push(key)
+
+                try {
+                    await this.$wire.setCardAttributes([...this.ids('attribute'), key])
+                } finally {
+                    this.pending = this.pending.filter((pending) => pending !== key)
+                    this.revision++
+                }
+
+                this.$nextTick(() => this.focusAddStart())
+            },
+            createAttribute() {
+                this.$wire.mountAction('createTableAttribute')
+            },
         }"
     >
-        <div class="fi-view-settings-view" x-show="panel === 'main'">
-            <div class="fi-dropdown-list">
+        <div class="fi-view-settings-view fi-board-main-view" x-show="panel === 'main'">
+            <div class="fi-dropdown-list shrink-0">
                 <x-filament::dropdown.list.item
                     icon="lucide-columns-3"
                     role="button"
@@ -117,6 +197,24 @@
                         {{ __('filament/pages/boards.view_settings.grouped_by') }}
                         <span class="fi-board-settings-value">
                             <span class="fi-board-settings-value-text">{{ $columnFieldName }}</span>
+                            <x-filament::icon icon="lucide-chevron-right" class="fi-view-settings-add-chevron" />
+                        </span>
+                    </span>
+                </x-filament::dropdown.list.item>
+
+                <x-filament::dropdown.list.item
+                    icon="lucide-eye"
+                    role="button"
+                    tabindex="0"
+                    data-board-columns-trigger
+                    data-panel-trigger="columns"
+                    x-bind:aria-expanded="(panel === 'columns').toString()"
+                    x-on:click="openPanel('columns')"
+                >
+                    <span class="fi-view-settings-add">
+                        {{ __('filament/pages/boards.view_settings.visible_columns') }}
+                        <span class="fi-board-settings-value">
+                            <span class="fi-board-settings-value-text">{{ $visibleCount }}</span>
                             <x-filament::icon icon="lucide-chevron-right" class="fi-view-settings-add-chevron" />
                         </span>
                     </span>
@@ -140,21 +238,83 @@
                     </span>
                 </x-filament::dropdown.list.item>
 
+                <div class="fi-board-switch-row" x-on:click="$wire.setCardLabels({{ $showLabels ? 'false' : 'true' }}).finally(() => syncSwitch($el))">
+                    <x-filament::icon icon="lucide-tag" />
+                    <span class="fi-board-switch-label">{{ __('filament/pages/boards.view_settings.show_labels') }}</span>
+                    <span class="fi-board-stage-switch">
+                        <x-filament::toggle
+                            :state="$showLabels ? 'true' : 'false'"
+                            :aria-label="__('filament/pages/boards.view_settings.show_labels')"
+                            data-board-show-labels
+                            :data-visible="$showLabels ? 'true' : 'false'"
+                        />
+                    </span>
+                </div>
+
+                <div class="fi-board-switch-row" x-on:click="$wire.setHideEmptyAttributes({{ $hideEmpty ? 'false' : 'true' }}).finally(() => syncSwitch($el))">
+                    <x-filament::icon icon="lucide-eye" />
+                    <span class="fi-board-switch-label">{{ __('filament/pages/boards.view_settings.hide_empty') }}</span>
+                    <span class="fi-board-stage-switch">
+                        <x-filament::toggle
+                            :state="$hideEmpty ? 'true' : 'false'"
+                            :aria-label="__('filament/pages/boards.view_settings.hide_empty')"
+                            data-board-hide-empty
+                            :data-visible="$hideEmpty ? 'true' : 'false'"
+                        />
+                    </span>
+                </div>
+            </div>
+
+            <p class="fi-board-section-heading" id="board-card-attributes-heading">{{ __('filament/pages/boards.view_settings.visible_attributes') }}</p>
+
+            <div class="fi-view-settings-scroll fi-board-attributes-scroll">
+                <div class="fi-ta-views-list" x-ref="attributeList" role="group" aria-labelledby="board-card-attributes-heading" x-sort="reorder('attribute')" x-sort:config="{ draggable: '.fi-ta-views-draggable', filter: '.fi-ta-views-row-actions', preventOnFilter: false, delay: 200, delayOnTouchOnly: true, animation: 150 }">
+                    @foreach ($cardAttributes as $attribute)
+                        <div
+                            class="fi-ta-views-row fi-ta-views-draggable fi-board-stage-row"
+                            x-sort:item="{{ Js::from($attribute['key']) }}"
+                            data-card-attribute="{{ $attribute['key'] }}"
+                            wire:key="card-attribute.{{ $attribute['key'] }}"
+                        >
+                            <span class="fi-board-stage-grip" aria-hidden="true">
+                                <x-filament::icon icon="lucide-grip-vertical" />
+                            </span>
+
+                            <span class="fi-board-stage">
+                                <span class="fi-board-stage-mark">
+                                    <x-filament::icon :icon="$attribute['icon']" />
+                                </span>
+                                <span class="fi-board-stage-name" title="{{ $attribute['label'] }}">{{ $attribute['label'] }}</span>
+                            </span>
+
+                            <div class="fi-ta-views-row-actions">
+                                <x-filament::icon-button
+                                    icon="lucide-ellipsis-vertical"
+                                    color="gray"
+                                    size="sm"
+                                    :label="__('filament/pages/boards.view_settings.attribute_actions', ['attribute' => $attribute['label']])"
+                                    data-attribute-actions
+                                    x-on:click="openRowMenu($el, $event, 'attribute', {{ Js::from($attribute['key']) }})"
+                                />
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+
+            <div class="fi-dropdown-list fi-view-settings-footer">
                 <x-filament::dropdown.list.item
-                    icon="lucide-eye"
+                    icon="lucide-plus"
                     role="button"
                     tabindex="0"
-                    data-board-columns-trigger
-                    data-panel-trigger="columns"
-                    x-bind:aria-expanded="(panel === 'columns').toString()"
-                    x-on:click="openPanel('columns')"
+                    data-board-add-attribute
+                    data-panel-trigger="add"
+                    x-bind:aria-expanded="(panel === 'add').toString()"
+                    x-on:click="openPanel('add')"
                 >
                     <span class="fi-view-settings-add">
-                        {{ __('filament/pages/boards.view_settings.visible_columns') }}
-                        <span class="fi-board-settings-value">
-                            <span class="fi-board-settings-value-text">{{ $visibleCount }}</span>
-                            <x-filament::icon icon="lucide-chevron-right" class="fi-view-settings-add-chevron" />
-                        </span>
+                        {{ __('filament/pages/boards.view_settings.add_attribute') }}
+                        <x-filament::icon icon="lucide-chevron-right" class="fi-view-settings-add-chevron" />
                     </span>
                 </x-filament::dropdown.list.item>
             </div>
@@ -199,7 +359,7 @@
 
                 <hr class="fi-board-stage-divider" />
 
-                <div class="fi-ta-views-list" x-ref="list" x-sort="reorder" x-sort:config="{ draggable: '.fi-ta-views-draggable', filter: '.fi-ta-views-row-actions, .fi-board-stage-switch', preventOnFilter: false, delay: 200, delayOnTouchOnly: true, animation: 150 }">
+                <div class="fi-ta-views-list" x-ref="list" x-sort="reorder('stage')" x-sort:config="{ draggable: '.fi-ta-views-draggable', filter: '.fi-ta-views-row-actions, .fi-board-stage-switch', preventOnFilter: false, delay: 200, delayOnTouchOnly: true, animation: 150 }">
                     @foreach ($columns as $column)
                         @php
                             $dotColor = ColorResolver::resolve($column['color']);
@@ -232,7 +392,7 @@
                                     size="sm"
                                     :label="__('filament/pages/boards.view_settings.stage_actions', ['stage' => $column['name']])"
                                     data-stage-actions
-                                    x-on:click="openRowMenu($el, $event, {{ Js::from(['id' => (string) $column['id']]) }})"
+                                    x-on:click="openRowMenu($el, $event, 'stage', {{ Js::from((string) $column['id']) }})"
                                 />
                             </div>
 
@@ -348,6 +508,76 @@
             </div>
         </div>
 
+        <div class="fi-view-settings-view" x-show="panel === 'add'" x-cloak data-board-panel="add">
+            <div class="fi-view-settings-search">
+                <x-filament::icon-button
+                    icon="lucide-chevron-left"
+                    color="gray"
+                    size="sm"
+                    :label="__('filament/panel.tables.views.back')"
+                    data-view-settings-back
+                    x-on:click="closePanel()"
+                />
+                <input
+                    type="search"
+                    x-ref="addSearch"
+                    x-model="query"
+                    autocomplete="off"
+                    placeholder="{{ __('filament/pages/boards.view_settings.search_attributes', ['entity' => $entityLabel]) }}"
+                    aria-label="{{ __('filament/pages/boards.view_settings.search_attributes', ['entity' => $entityLabel]) }}"
+                    class="fi-view-settings-search-input"
+                    data-view-settings-search
+                    x-on:keydown.enter.prevent="pickFirst()"
+                    x-on:keydown.arrow-down.prevent="stepAdd(1)"
+                    x-on:keydown.arrow-up.prevent="stepAdd(-1)"
+                />
+            </div>
+
+            <div class="fi-view-settings-scroll" x-on:keydown.arrow-down.prevent="stepAdd(1)" x-on:keydown.arrow-up.prevent="stepAdd(-1)">
+                <div class="fi-dropdown-list">
+                    @foreach ($addableAttributes as $attribute)
+                        <x-filament::dropdown.list.item
+                            :wire:key="'board-add.'.$attribute['key']"
+                            :icon="$attribute['icon']"
+                            role="button"
+                            tabindex="0"
+                            :data-board-add-item="$attribute['key']"
+                            :data-text="$attribute['label']"
+                            x-show="isCandidate($el)"
+                            x-on:click="add($el.dataset.boardAddItem)"
+                        >
+                            {{ $attribute['label'] }}
+                        </x-filament::dropdown.list.item>
+                    @endforeach
+                </div>
+
+                @if ($addableAttributes === [])
+                    <p class="fi-view-settings-note">
+                        <x-filament::icon icon="lucide-check" />
+                        {{ __('filament/pages/boards.view_settings.all_attributes_shown') }}
+                    </p>
+                @else
+                    <p class="fi-view-settings-note" x-cloak x-show="addItems().length === 0">
+                        {{ __('filament/pages/boards.view_settings.no_attribute_matches') }}
+                    </p>
+                @endif
+            </div>
+
+            @if ($canCreateAttribute)
+                <div class="fi-dropdown-list fi-view-settings-footer" x-ref="createRow" x-on:keydown.arrow-down.prevent="stepAdd(1)" x-on:keydown.arrow-up.prevent="stepAdd(-1)">
+                    <x-filament::dropdown.list.item
+                        icon="lucide-plus"
+                        role="button"
+                        tabindex="0"
+                        data-view-settings-create
+                        x-on:click="createAttribute(); close()"
+                    >
+                        {{ __('filament/panel.tables.views.create_attribute') }}
+                    </x-filament::dropdown.list.item>
+                </div>
+            @endif
+        </div>
+
         <div x-ref="rowMenu">
             <x-filament::dropdown placement="right-start" :offset="16" width="fi-board-stages-row-menu" shift teleport>
                 <x-slot name="trigger">
@@ -355,12 +585,18 @@
                 </x-slot>
 
                 <x-filament::dropdown.list>
-                    <x-filament::dropdown.list.item icon="lucide-arrow-up" x-bind:disabled="!! rowStage?.isFirst" x-on:click.stop="move(rowStage.id, -1)">
+                    <x-filament::dropdown.list.item icon="lucide-arrow-up" x-bind:disabled="!! rowStage?.isFirst" x-on:click.stop="move(rowStage.kind, rowStage.id, -1)">
                         {{ __('filament/panel.tables.views.move_up') }}
                     </x-filament::dropdown.list.item>
 
-                    <x-filament::dropdown.list.item icon="lucide-arrow-down" x-bind:disabled="!! rowStage?.isLast" x-on:click.stop="move(rowStage.id, 1)">
+                    <x-filament::dropdown.list.item icon="lucide-arrow-down" x-bind:disabled="!! rowStage?.isLast" x-on:click.stop="move(rowStage.kind, rowStage.id, 1)">
                         {{ __('filament/panel.tables.views.move_down') }}
+                    </x-filament::dropdown.list.item>
+                </x-filament::dropdown.list>
+
+                <x-filament::dropdown.list x-show="rowStage?.kind === 'attribute'" x-cloak>
+                    <x-filament::dropdown.list.item icon="lucide-eye-off" x-on:click.stop="remove(rowStage.id)">
+                        {{ __('filament/pages/boards.view_settings.remove_attribute') }}
                     </x-filament::dropdown.list.item>
                 </x-filament::dropdown.list>
             </x-filament::dropdown>

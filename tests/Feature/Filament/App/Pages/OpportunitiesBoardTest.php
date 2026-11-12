@@ -2143,3 +2143,70 @@ it('shows the new view\'s card settings in the same request that opens it', func
 
     $component->call('applyOwnBoard')->assertDontSee('$5,000.00');
 });
+
+it('lists the card attributes in order with the two switches', function (): void {
+    livewire(OpportunitiesBoard::class)
+        ->assertSeeHtmlInOrder([
+            'data-board-show-labels',
+            'data-board-hide-empty',
+            'data-card-attribute="company"',
+            'data-card-attribute="custom_fields.amount"',
+            'data-card-attribute="custom_fields.close_date"',
+            'data-board-add-attribute',
+        ]);
+});
+
+it('offers every attribute the card does not show in the add panel', function (): void {
+    livewire(OpportunitiesBoard::class)
+        ->assertSeeHtml('data-board-add-item="contact"')
+        ->assertDontSeeHtml('data-board-add-item="company"')
+        ->assertDontSeeHtml('data-board-add-item="custom_fields.'.OpportunityField::STAGE->value.'"');
+});
+
+it('reads the two switches from the stored card settings', function (): void {
+    $html = (string) livewire(OpportunitiesBoard::class)->call('setCardLabels', true)->call('setHideEmptyAttributes', false)->instance()->boardViewSettings();
+
+    expect($html)->toMatch('/data-board-show-labels[^>]*data-visible="true"/s')
+        ->toMatch('/data-board-hide-empty[^>]*data-visible="false"/s');
+});
+
+it('creates an attribute from the board and puts it on the card', function (): void {
+    livewire(OpportunitiesBoard::class)
+        ->callAction('createTableAttribute', data: ['name' => 'Lead score', 'type' => 'text'])
+        ->assertHasNoActionErrors()
+        ->assertNotified('Lead score added to this view');
+
+    $opportunity = opportunityInStage($this, 'Scored deal', 'Prospecting');
+    $opportunity->saveCustomFieldValue(WorkspaceCustomField::byCode($this->workspace->getKey(), 'opportunity', 'lead_score'), 'Hot 87');
+
+    expect(TablePreference::query()->sole()->board_state->cardAttributes)->toBe([...CrmEntity::Opportunity->defaultCardAttributes(), 'custom_fields.lead_score']);
+
+    livewire(OpportunitiesBoard::class)->assertSee('Hot 87');
+});
+
+it('creates a rich text attribute from the board without putting it on the card', function (): void {
+    livewire(OpportunitiesBoard::class)
+        ->callAction('createTableAttribute', data: ['name' => 'Deal notes', 'type' => 'rich-editor'])
+        ->assertHasNoActionErrors()
+        ->assertNotified('Deal notes added to this view');
+
+    $stored = TablePreference::query()->first()?->board_state->cardAttributes ?? [];
+
+    expect(CustomField::query()->where('entity_type', 'opportunity')->where('name', 'Deal notes')->exists())->toBeTrue()
+        ->and($stored)->not->toContain('custom_fields.deal_notes');
+});
+
+it('offers a viewer the card settings but no create row', function (): void {
+    $viewer = User::factory()->create();
+    $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
+    $viewer->switchWorkspace($this->workspace);
+    $this->actingAs($viewer);
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->assertSeeHtml('data-board-add-attribute')
+        ->assertDontSeeHtml('data-view-settings-create')
+        ->assertActionHidden('createTableAttribute')
+        ->call('setCardLabels', true);
+
+    expect(TablePreference::query()->sole()->board_state->showLabels)->toBeTrue();
+});
