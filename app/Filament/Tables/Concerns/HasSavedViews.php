@@ -9,6 +9,7 @@ use App\Actions\Views\DeleteSavedView;
 use App\Actions\Views\DuplicateSavedView;
 use App\Actions\Views\UpdateSavedView;
 use App\Data\TableStateData;
+use App\Enums\SavedViewType;
 use App\Models\SavedView;
 use App\Models\User;
 use App\Models\Workspace;
@@ -20,6 +21,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Schema;
 use Filament\Support\Components\Attributes\Exposed;
+use Filament\Support\Facades\FilamentView;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Arr;
@@ -73,9 +75,30 @@ trait HasSavedViews
             ->get($this->savedViewUser(), $this->savedViewWorkspace(), $this->tableEntity());
     }
 
+    /**
+     * @return Collection<int, SavedView>
+     */
+    protected function tableSavedViews(): Collection
+    {
+        return $this->getVisibleSavedViews()->filter(static fn (SavedView $view): bool => $view->type === SavedViewType::Table)->values();
+    }
+
     protected function getActiveSavedView(): ?SavedView
     {
-        return $this->getVisibleSavedViews()->find($this->activeSavedViewId);
+        return $this->tableSavedViews()->find($this->activeSavedViewId);
+    }
+
+    private function redirectToBoardView(SavedView $view): void
+    {
+        $url = $this->boardViewUrl($view);
+
+        if ($url === null) {
+            $this->handleMissingSavedView($view->getKey());
+
+            return;
+        }
+
+        $this->redirect($url, navigate: FilamentView::hasSpaMode($url));
     }
 
     private function saveActiveSavedView(): void
@@ -124,6 +147,12 @@ trait HasSavedViews
 
         if (! $view instanceof SavedView) {
             $this->handleMissingSavedView($viewId);
+
+            return;
+        }
+
+        if ($view->type === SavedViewType::Board) {
+            $this->redirectToBoardView($view);
 
             return;
         }
@@ -194,13 +223,20 @@ trait HasSavedViews
             return;
         }
 
-        if (! $this->getVisibleSavedViews()->contains('id', $viewId)) {
+        $view = $this->getVisibleSavedViews()->find($viewId);
+
+        if (! $view instanceof SavedView) {
             Notification::make()->warning()->title(__('filament/panel.tables.views.unavailable'))->send();
 
             return;
         }
 
         $this->applySavedView($viewId);
+
+        if ($view->type === SavedViewType::Board) {
+            return;
+        }
+
         $this->seededFromSavedView = true;
         $this->savesTableStateOnOpen = true;
     }

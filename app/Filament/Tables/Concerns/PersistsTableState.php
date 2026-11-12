@@ -228,8 +228,8 @@ trait PersistsTableState
         }
 
         $preference = $this->storedTablePreference();
-        $active = $this->getVisibleSavedViews()->find($preference?->active_view_id);
-        $default = $this->getVisibleSavedViews()->find($this->viewOrder()[0] ?? null);
+        $active = $this->tableSavedViews()->find($preference?->active_view_id);
+        $default = $this->tableSavedViews()->find($this->viewOrder()[0] ?? null);
 
         $hasSavedState = $preference !== null && $preference->state->columns !== [];
         $isCleanCopy = $hasSavedState && $active instanceof SavedView && $preference->state->withoutWidths()->hash() === $preference->applied_view_hash;

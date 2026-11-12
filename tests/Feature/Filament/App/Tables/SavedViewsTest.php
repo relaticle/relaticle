@@ -25,7 +25,9 @@ use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Tables\Concerns\HasSavedViews;
 use App\Filament\Tables\Concerns\PersistsTableState;
+use App\Models\CustomField;
 use App\Models\Note;
+use App\Models\Opportunity;
 use App\Models\SavedView;
 use App\Models\TablePreference;
 use App\Models\User;
@@ -34,6 +36,7 @@ use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Once;
 use Livewire\Livewire;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -1402,4 +1405,61 @@ it('writes a board state to the member\'s own view and to nobody else\'s', funct
     expect($saved->grouping)->toBe('company')
         ->and(fn () => resolve(SaveBoardState::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, ['grouping' => null], $theirs))->toThrow(HttpException::class)
         ->and(fn () => resolve(SaveBoardState::class)->execute($this->user, $this->workspace, CrmEntity::Company, ['grouping' => null]))->toThrow(HttpException::class);
+});
+
+function boardViewFor(User $owner, array $attributes = []): SavedView
+{
+    return viewFor($owner, ['entity' => CrmEntity::Opportunity, 'type' => SavedViewType::Board, 'state' => new BoardStateData(grouping: 'company'), ...$attributes]);
+}
+
+function boardViewFirst(): SavedView
+{
+    $view = boardViewFor(test()->user);
+    resolve(ReorderViews::class)->execute(test()->user, test()->workspace, CrmEntity::Opportunity, [$view->getKey(), 'list', 'board']);
+
+    return $view;
+}
+
+it('never applies a board view to the list, also when it is first in the order', function (): void {
+    boardViewFirst();
+    livewire(ListOpportunities::class)->set('tableSort', 'created_at:desc');
+    $stored = preferenceRow()?->state->hash();
+
+    $component = livewire(ListOpportunities::class);
+
+    expect($component->get('activeSavedViewId'))->toBeNull()
+        ->and(preferenceRow()?->state->hash())->toBe($stored);
+});
+
+it('sends a bare list visit to a board view that is first in the order', function (): void {
+    $view = boardViewFirst();
+
+    $this->get(OpportunityResource::getUrl('index'))->assertRedirect(OpportunityResource::getUrl('board', ['view' => $view->getKey()]));
+});
+
+it('sends a board view id on the list to the board', function (): void {
+    $view = boardViewFor($this->user);
+    $board = OpportunityResource::getUrl('board', ['view' => $view->getKey()]);
+
+    Livewire::withQueryParams(['view' => $view->getKey()])->test(ListOpportunities::class)->assertRedirect($board);
+    Livewire::withQueryParams(['view' => SavedView::BUILT_IN_LIST_LINK])->test(ListOpportunities::class)->call('applySavedView', $view->getKey())->assertRedirect($board);
+});
+
+it('lists a board view with the board icon and a link to the board', function (): void {
+    $view = boardViewFor($this->user, ['name' => 'By company']);
+    $board = OpportunityResource::getUrl('board', ['view' => $view->getKey()]);
+
+    $html = Livewire::withQueryParams(['view' => SavedView::BUILT_IN_LIST_LINK])->test(ListOpportunities::class)->assertSeeHtml('data-view-key="'.$view->getKey().'"')->html();
+
+    expect($html)->toContain('href="'.$board.'"')
+        ->and($html)->not->toContain("applySavedView('{$view->getKey()}')");
+});
+
+it('offers no board views while the board page is not accessible', function (): void {
+    $view = boardViewFor($this->user, ['name' => 'By company']);
+    CustomField::query()->forEntity(Opportunity::class)->where('code', CrmEntity::Opportunity->boardFieldCode())->update(['code' => 'retired_stage']);
+    Once::flush();
+
+    livewire(ListOpportunities::class)->assertOk()->assertDontSeeText('By company');
+    $this->get(OpportunityResource::getUrl('index'))->assertOk();
 });

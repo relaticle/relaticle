@@ -106,21 +106,12 @@
                         x-bind:class="! query && 'fi-ta-views-draggable'"
                         wire:key="view-switcher.{{ $entry['key'] }}"
                     >
-                        @if ($canApply && $entry['kind'] === 'list')
+                        @if ($entry['action'])
                             <x-filament::dropdown.list.item
                                 color="gray"
                                 :aria-current="$entry['active'] ? 'true' : null"
                                 class="min-w-0 flex-1"
-                                wire:click="applyOwnTable"
-                            >
-                                @include('filament.app.view-switcher-entry', ['entry' => $entry])
-                            </x-filament::dropdown.list.item>
-                        @elseif ($canApply && $entry['kind'] === 'view')
-                            <x-filament::dropdown.list.item
-                                color="gray"
-                                :aria-current="$entry['active'] ? 'true' : null"
-                                class="min-w-0 flex-1"
-                                wire:click="applySavedView('{{ $entry['key'] }}')"
+                                wire:click="{{ $entry['action'] }}"
                             >
                                 @include('filament.app.view-switcher-entry', ['entry' => $entry])
                             </x-filament::dropdown.list.item>

@@ -7,6 +7,7 @@ namespace App\Filament\Concerns;
 use App\Actions\Views\ReorderViews;
 use App\Contracts\OrdersBoardStages;
 use App\Enums\CrmEntity;
+use App\Enums\SavedViewType;
 use App\Filament\Resources\NoteResource\Pages\NotesCards;
 use App\Filament\Tables\Concerns\HasSavedViews;
 use App\Models\SavedView;
@@ -130,11 +131,23 @@ trait HasViewSwitcher
         }
 
         $first = $this->viewOrder()[0] ?? $current;
+        $firstView = $this->viewSwitcherSavedViews()->find($first);
         $target = isset($pages[$first]) ? $first : 'list';
 
-        if ($target !== $current) {
-            $this->redirect($pages[$target]['url'], navigate: FilamentView::hasSpaMode($pages[$target]['url']));
+        $url = $firstView?->type === SavedViewType::Board
+            ? $this->boardViewUrl($firstView)
+            : ($target !== $current ? $pages[$target]['url'] : null);
+
+        if ($url !== null) {
+            $this->redirect($url, navigate: FilamentView::hasSpaMode($url));
         }
+    }
+
+    protected function boardViewUrl(SavedView $view): ?string
+    {
+        $board = $this->viewSwitcherPages()['board'] ?? null;
+
+        return $board === null ? null : static::getResource()::getUrl($board['name'], ['view' => $view->getKey()]);
     }
 
     private function canSwitchViews(): bool
@@ -170,9 +183,15 @@ trait HasViewSwitcher
      */
     private function viewSwitcherSavedViews(): Collection
     {
-        return method_exists($this, 'getVisibleSavedViews')
+        $views = method_exists($this, 'getVisibleSavedViews')
             ? $this->getVisibleSavedViews()
             : once(fn (): Collection => resolve(VisibleSavedViewsQuery::class)->get($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity()));
+
+        if (isset($this->viewSwitcherPages()['board'])) {
+            return $views;
+        }
+
+        return $views->reject(static fn (SavedView $view): bool => $view->type === SavedViewType::Board)->values();
     }
 
     public function getViewSettings(): ?Htmlable
@@ -265,18 +284,21 @@ trait HasViewSwitcher
 
     /**
      * @param  array<string, array{name: string, url: string, active: bool, label: string}>  $pages
-     * @return list<array{key: string, kind: string, label: string, icon: string, tone: string, url: string, active: bool, canUpdate: bool, createdLabel: array<array-key, mixed>|string|null}>
+     * @return list<array{key: string, kind: string, layout: string, action: ?string, label: string, icon: string, tone: string, url: string, active: bool, canUpdate: bool, createdLabel: array<array-key, mixed>|string|null}>
      */
     private function viewSwitcherEntries(array $pages): array
     {
         $views = $this->viewSwitcherSavedViews();
         $activeId = property_exists($this, 'activeSavedViewId') ? $this->activeSavedViewId : null;
+        $canApply = in_array(HasSavedViews::class, class_uses_recursive($this), true);
         $entries = [];
 
         foreach ($pages as $kind => $page) {
             $entries[$kind] = [
                 'key' => $kind,
                 'kind' => $kind,
+                'layout' => $kind,
+                'action' => $canApply && $kind === 'list' ? 'applyOwnTable' : null,
                 'label' => $page['label'],
                 'icon' => self::VIEW_ICONS[$kind],
                 'tone' => self::VIEW_TONES[$kind],
@@ -293,13 +315,18 @@ trait HasViewSwitcher
         foreach ($views as $view) {
             $date = $view->created_at?->setTimezone($zone)->translatedFormat('M j, Y');
 
+            $isBoard = $view->type === SavedViewType::Board;
+            $layout = $isBoard ? 'board' : 'list';
+
             $entries[$view->getKey()] = [
                 'key' => (string) $view->getKey(),
                 'kind' => 'view',
+                'layout' => $layout,
+                'action' => $canApply && ! $isBoard ? "applySavedView('{$view->getKey()}')" : null,
                 'label' => $view->name,
-                'icon' => self::VIEW_ICONS['list'],
-                'tone' => self::VIEW_TONES['list'],
-                'url' => static::getResource()::getUrl($pages['list']['name'], ['view' => $view->getKey()]),
+                'icon' => self::VIEW_ICONS[$layout],
+                'tone' => self::VIEW_TONES[$layout],
+                'url' => static::getResource()::getUrl($pages[$layout]['name'], ['view' => $view->getKey()]),
                 'active' => $view->getKey() === $activeId,
                 'canUpdate' => $user->can('update', $view),
                 'createdLabel' => __('filament/panel.tables.views.created_on', ['date' => $date]),
