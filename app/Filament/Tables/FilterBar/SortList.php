@@ -26,6 +26,26 @@ final readonly class SortList
     }
 
     /**
+     * @param  array<string, mixed>  $allowed
+     * @return array<string, 'asc'|'desc'>
+     */
+    public static function fromClient(mixed $sorts, array $allowed): array
+    {
+        $list = [];
+
+        foreach (is_array($sorts) ? $sorts : [] as $sort) {
+            $column = is_array($sort) ? ($sort['column'] ?? null) : null;
+            $direction = is_array($sort) ? ($sort['direction'] ?? 'asc') : null;
+
+            if (is_string($column) && isset($allowed[$column]) && ! isset($list[$column]) && in_array($direction, ['asc', 'desc'], true)) {
+                $list[$column] = $direction;
+            }
+        }
+
+        return $list;
+    }
+
+    /**
      * @param  array<string, string>  $sorts
      */
     public static function format(array $sorts): ?string

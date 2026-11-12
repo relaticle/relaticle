@@ -30,7 +30,6 @@
                 sortTarget: null,
                 grouping: null,
                 groups: [],
-                groupDirections: true,
                 deleted: null,
                 deletable: false,
                 view: null,
@@ -92,7 +91,6 @@
                     this.sortable = state.sortable
                     this.grouping = state.grouping
                     this.groups = state.groups
-                    this.groupDirections = state.groupDirections
                     this.deleted = state.deleted
                     this.deletable = state.deletable
                     this.view = state.view
@@ -578,7 +576,7 @@
                 },
 
                 async groupBy(group) {
-                    const flipped = this.groupDirections && this.grouping?.id === group.id && this.grouping.direction === 'asc' ? 'desc' : 'asc'
+                    const flipped = this.grouping?.id === group.id && this.grouping.direction === 'asc' ? 'desc' : 'asc'
 
                     await this.$wire.setFilterBarGrouping(group.id, flipped)
                 },

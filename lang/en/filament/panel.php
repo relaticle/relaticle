@@ -76,7 +76,6 @@ return [
             'group' => 'Group',
             'group_by' => 'Group by',
             'group_set' => 'Grouped by :group, :direction',
-            'group_set_lanes' => 'Grouped by :group',
             'group_clear' => 'Clear grouping',
             'deleted_records' => 'Deleted records',
             'deleted_included' => 'included',

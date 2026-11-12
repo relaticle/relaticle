@@ -29,6 +29,7 @@ use Relaticle\Flowforge\Board;
 use Relaticle\Flowforge\Grouping;
 use Relaticle\Flowforge\Lane;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Tests\Helpers\WorkspaceCustomField;
 
 mutates(ReorderBoardStages::class, TasksBoard::class, CreateTaskAction::class, ChecklistHtml::class, MoveCardAction::class);
 
@@ -625,32 +626,177 @@ it('shows every card again when the bar is cleared', function (): void {
         ->and($component->instance()->hasFilterBarState())->toBeFalse();
 });
 
-it('makes assignee lanes when the bar groups by assignee', function (): void {
+it('makes assignee lanes when view settings groups by assignee', function (): void {
     livewire(TasksBoard::class)
-        ->call('setFilterBarGrouping', 'assignee')
+        ->call('setBoardGrouping', 'assignee')
         ->assertSet('groupBy', 'assignee');
 });
 
 it('removes the lanes when the grouping is cleared', function (): void {
     livewire(TasksBoard::class)
-        ->call('setFilterBarGrouping', 'assignee')
-        ->call('setFilterBarGrouping', null)
+        ->call('setBoardGrouping', 'assignee')
+        ->call('setBoardGrouping', null)
         ->assertSet('groupBy', null);
 });
 
 it('ignores a grouping the board does not have', function (): void {
     livewire(TasksBoard::class)
-        ->call('setFilterBarGrouping', 'status')
+        ->call('setBoardGrouping', 'status')
         ->assertSet('groupBy', null);
 });
 
-it('offers the bar no sort, no deleted control and no direction', function (): void {
-    $data = livewire(TasksBoard::class)->instance()->getFilterBarData();
+it('offers the bar no deleted control and no groups, and lists the lanes in view settings', function (): void {
+    $component = livewire(TasksBoard::class);
+    $data = $component->instance()->getFilterBarData();
 
-    expect($data['sortable'])->toBe([])
-        ->and($data['deletable'])->toBeFalse()
-        ->and($data['groupDirections'])->toBeFalse()
-        ->and(array_column($data['groups'], 'id'))->toBe(['assignee']);
+    expect($data['deletable'])->toBeFalse()
+        ->and($data['groups'])->toBe([])
+        ->and($data['grouping'])->toBeNull();
+
+    $component->assertSeeHtml('data-board-grouping="assignee"')
+        ->assertSeeHtml('data-board-grouping="none"')
+        ->assertSee(__('filament/pages/boards.view_settings.lanes'))
+        ->assertSee(__('filament/pages/boards.view_settings.no_lanes'));
+});
+
+function tasksToSort(object $test): void
+{
+    $dueDate = WorkspaceCustomField::byCode($test->workspace->getKey(), 'task', 'due_date');
+
+    foreach ([
+        ['Bravo', Date::parse('2026-01-01'), '2026-03-03', 1000],
+        ['Charlie', Date::parse('2026-01-03'), '2026-03-01', 2000],
+        ['Alpha', Date::parse('2026-01-02'), '2026-03-02', 3000],
+    ] as [$title, $createdAt, $due, $position]) {
+        $task = taskInStatus($test, $title, 'To do');
+        $task->forceFill(['created_at' => $createdAt, 'order_column' => $position])->saveQuietly();
+        $task->saveCustomFieldValue($dueDate, $due);
+    }
+}
+
+function taskStatusTitles(Testable $component, string $status): array
+{
+    $option = CustomFieldOption::query()->withoutGlobalScopes()->where('name', $status)->firstOrFail();
+
+    return $component->instance()->getBoard()->getBoardRecords((string) $option->getKey())->pluck('title')->all();
+}
+
+it('orders the cards of a column by the sort from the bar', function (string $column, string $direction, array $expected): void {
+    tasksToSort($this);
+
+    $component = livewire(TasksBoard::class)
+        ->call('setFilterBarSorts', [['column' => $column, 'direction' => $direction]]);
+
+    expect(taskStatusTitles($component, 'To do'))->toBe($expected);
+})->with([
+    'newest first' => ['created_at', 'desc', ['Charlie', 'Alpha', 'Bravo']],
+    'title a to z' => ['title', 'asc', ['Alpha', 'Bravo', 'Charlie']],
+    'latest due date first' => ['custom_fields.due_date', 'desc', ['Bravo', 'Alpha', 'Charlie']],
+    'earliest due date first' => ['custom_fields.due_date', 'asc', ['Charlie', 'Alpha', 'Bravo']],
+]);
+
+it('keeps the hand order while no sort is set', function (): void {
+    tasksToSort($this);
+
+    $component = livewire(TasksBoard::class);
+
+    expect(taskStatusTitles($component, 'To do'))->toBe(['Bravo', 'Charlie', 'Alpha']);
+
+    $component->call('setFilterBarSorts', [['column' => 'title', 'direction' => 'asc']])->call('setFilterBarSorts', []);
+
+    expect(taskStatusTitles($component, 'To do'))->toBe(['Bravo', 'Charlie', 'Alpha'])
+        ->and($component->get('boardSort'))->toBeNull();
+});
+
+it('offers the sort fields the shared sort language allows', function (): void {
+    $keys = array_column(livewire(TasksBoard::class)->instance()->getFilterBarData()['sortable'], 'key');
+
+    expect($keys)->toContain('title', 'created_at', 'updated_at', 'custom_fields.due_date', 'custom_fields.priority')
+        ->and($keys)->not->toContain('order_column');
+});
+
+it('gives each sort field the label and icon the filter catalog gives it', function (): void {
+    $data = livewire(TasksBoard::class)->instance()->getFilterBarData();
+    $fields = collect($data['fields'])->keyBy('key');
+
+    foreach ($data['sortable'] as $sortable) {
+        expect($fields->get($sortable['key']))->not->toBeNull()
+            ->and($sortable['label'])->toBe($fields[$sortable['key']]['label'])
+            ->and($sortable['icon'])->toBe($fields[$sortable['key']]['icon']);
+    }
+});
+
+it('ignores a sort the board does not offer', function (array $sorts): void {
+    livewire(TasksBoard::class)
+        ->call('setFilterBarSorts', $sorts)
+        ->assertSet('boardSort', null);
+})->with([
+    'a column the board does not offer' => [[['column' => 'order_column', 'direction' => 'asc']]],
+    'a direction that is not one' => [[['column' => 'title', 'direction' => 'sideways']]],
+    'not a list of sorts' => [['title']],
+]);
+
+it('reads the sort from the url and ignores a garbage one', function (): void {
+    tasksToSort($this);
+
+    $sorted = Livewire::withQueryParams(['sort' => 'created_at:desc'])->test(TasksBoard::class);
+
+    expect(taskStatusTitles($sorted, 'To do'))->toBe(['Charlie', 'Alpha', 'Bravo']);
+
+    foreach (['x;drop', 'order_column:asc', 'title:sideways', ':', 'custom_fields.gone:asc'] as $garbage) {
+        $component = Livewire::withQueryParams(['sort' => $garbage])->test(TasksBoard::class)->assertOk();
+
+        expect(taskStatusTitles($component, 'To do'))->toBe(['Bravo', 'Charlie', 'Alpha'])
+            ->and($component->instance()->getFilterBarData()['sorts'])->toBe([]);
+    }
+});
+
+it('keeps the hand order and offers no sort while lanes are shown', function (): void {
+    tasksToSort($this);
+    Task::query()->get()->each(fn (Task $task) => $task->assignees()->attach($this->user));
+
+    $component = livewire(TasksBoard::class)
+        ->call('setFilterBarSorts', [['column' => 'title', 'direction' => 'asc']])
+        ->call('setBoardGrouping', 'assignee');
+
+    $board = $component->instance()->getBoard();
+    $lane = collect($board->getLanes($board->getActiveGrouping()))->first(fn (Lane $lane): bool => $lane->getName() === (string) $this->user->getKey());
+
+    expect($component->instance()->getFilterBarData()['sortable'])->toBe([])
+        ->and($component->get('boardSort'))->toBe('title:asc')
+        ->and($board->getLaneRecords($lane, 50)->pluck('title')->all())->toBe(['Bravo', 'Charlie', 'Alpha']);
+
+    $component->call('setBoardGrouping', null);
+
+    expect(taskStatusTitles($component, 'To do'))->toBe(['Alpha', 'Bravo', 'Charlie']);
+});
+
+it('refuses a drop inside the same column while sorted', function (): void {
+    tasksToSort($this);
+    $card = Task::query()->where('title', 'Bravo')->firstOrFail();
+    $status = (string) $this->statusField->options->firstWhere('name', 'To do')->getKey();
+    $others = Task::query()->whereKeyNot($card->getKey())->pluck('id');
+
+    livewire(TasksBoard::class)
+        ->call('setFilterBarSorts', [['column' => 'created_at', 'direction' => 'desc']])
+        ->call('moveCard', (string) $card->id, $status, (string) $others[0], (string) $others[1])
+        ->assertNotified(__('filament/pages/boards.sorted_no_reorder', ['field' => 'Created at']))
+        ->assertNotDispatched('kanban-card-moved');
+
+    expect((float) $card->fresh()->order_column)->toBe(1000.0);
+});
+
+it('still moves a card to another status while sorted', function (): void {
+    tasksToSort($this);
+    $card = Task::query()->where('title', 'Bravo')->firstOrFail();
+    $inProgress = $this->statusField->options->firstWhere('name', 'In progress');
+
+    $component = livewire(TasksBoard::class)
+        ->call('setFilterBarSorts', [['column' => 'created_at', 'direction' => 'desc']])
+        ->call('moveCard', (string) $card->id, (string) $inProgress->getKey())
+        ->assertDispatched('kanban-card-moved');
+
+    expect(taskStatusTitles($component, 'In progress'))->toBe(['Bravo']);
 });
 
 it('leaves the deleted records half of the bar inert on a board', function (): void {

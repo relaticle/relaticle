@@ -146,32 +146,216 @@ it('shows every card again when the bar is cleared', function (): void {
         ->and($component->instance()->hasFilterBarState())->toBeFalse();
 });
 
-it('makes company lanes when the bar groups by company', function (): void {
+it('makes company lanes when view settings groups by company', function (): void {
     livewire(OpportunitiesBoard::class)
-        ->call('setFilterBarGrouping', 'company')
+        ->call('setBoardGrouping', 'company')
         ->assertSet('groupBy', 'company');
 });
 
 it('removes the lanes when the grouping is cleared', function (): void {
     livewire(OpportunitiesBoard::class)
-        ->call('setFilterBarGrouping', 'company')
-        ->call('setFilterBarGrouping', null)
+        ->call('setBoardGrouping', 'company')
+        ->call('setBoardGrouping', null)
         ->assertSet('groupBy', null);
 });
 
 it('ignores a grouping the board does not have', function (): void {
     livewire(OpportunitiesBoard::class)
-        ->call('setFilterBarGrouping', 'stage')
+        ->call('setBoardGrouping', 'stage')
         ->assertSet('groupBy', null);
 });
 
-it('offers the bar no sort, no deleted control and no direction', function (): void {
-    $data = livewire(OpportunitiesBoard::class)->instance()->getFilterBarData();
+it('offers the bar no deleted control and no groups, and lists the lanes in view settings', function (): void {
+    $component = livewire(OpportunitiesBoard::class);
+    $data = $component->instance()->getFilterBarData();
 
-    expect($data['sortable'])->toBe([])
-        ->and($data['deletable'])->toBeFalse()
-        ->and($data['groupDirections'])->toBeFalse()
-        ->and(array_column($data['groups'], 'id'))->toBe(['company']);
+    expect($data['deletable'])->toBeFalse()
+        ->and($data['groups'])->toBe([])
+        ->and($data['grouping'])->toBeNull();
+
+    $component->assertSeeHtml('data-board-grouping="company"')
+        ->assertSeeHtml('data-board-grouping="none"')
+        ->assertSee(__('filament/pages/boards.view_settings.lanes'))
+        ->assertSee(__('filament/pages/boards.view_settings.no_lanes'));
+});
+
+it('marks the current lane grouping in view settings', function (): void {
+    $none = livewire(OpportunitiesBoard::class)->html();
+    $lanes = livewire(OpportunitiesBoard::class, ['groupBy' => 'company'])->html();
+
+    expect(preg_match('/aria-checked="true"[^>]*data-board-grouping="none"/s', $none))->toBe(1)
+        ->and(preg_match('/aria-checked="true"[^>]*data-board-grouping="company"/s', $none))->toBe(0)
+        ->and(preg_match('/aria-checked="true"[^>]*data-board-grouping="company"/s', $lanes))->toBe(1)
+        ->and(preg_match('/aria-checked="true"[^>]*data-board-grouping="none"/s', $lanes))->toBe(0);
+});
+
+function opportunitiesToSort(object $test): void
+{
+    $amount = WorkspaceCustomField::byCode($test->workspace->getKey(), 'opportunity', 'amount');
+
+    foreach ([
+        ['Bravo', Date::parse('2026-01-01'), 300, 1000],
+        ['Charlie', Date::parse('2026-01-03'), 100, 2000],
+        ['Alpha', Date::parse('2026-01-02'), 200, 3000],
+    ] as [$name, $createdAt, $value, $position]) {
+        $opportunity = opportunityInStage($test, $name, 'Prospecting');
+        $opportunity->forceFill(['created_at' => $createdAt, 'order_column' => $position])->saveQuietly();
+        $opportunity->saveCustomFieldValue($amount, $value);
+    }
+}
+
+function opportunityStageNames(Testable $component, string $stage): array
+{
+    $option = CustomFieldOption::query()->withoutGlobalScopes()->where('name', $stage)->firstOrFail();
+
+    return $component->instance()->getBoard()->getBoardRecords((string) $option->getKey())->pluck('name')->all();
+}
+
+it('orders the cards of a column by the sort from the bar', function (string $column, string $direction, array $expected): void {
+    opportunitiesToSort($this);
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->call('setFilterBarSorts', [['column' => $column, 'direction' => $direction]]);
+
+    expect(opportunityStageNames($component, 'Prospecting'))->toBe($expected);
+})->with([
+    'newest first' => ['created_at', 'desc', ['Charlie', 'Alpha', 'Bravo']],
+    'oldest first' => ['created_at', 'asc', ['Bravo', 'Alpha', 'Charlie']],
+    'name a to z' => ['name', 'asc', ['Alpha', 'Bravo', 'Charlie']],
+    'largest amount first' => ['custom_fields.amount', 'desc', ['Bravo', 'Alpha', 'Charlie']],
+    'smallest amount first' => ['custom_fields.amount', 'asc', ['Charlie', 'Alpha', 'Bravo']],
+]);
+
+it('keeps the hand order while no sort is set', function (): void {
+    opportunitiesToSort($this);
+
+    $component = livewire(OpportunitiesBoard::class);
+
+    expect(opportunityStageNames($component, 'Prospecting'))->toBe(['Bravo', 'Charlie', 'Alpha']);
+
+    $component->call('setFilterBarSorts', [['column' => 'name', 'direction' => 'asc']])->call('setFilterBarSorts', []);
+
+    expect(opportunityStageNames($component, 'Prospecting'))->toBe(['Bravo', 'Charlie', 'Alpha'])
+        ->and($component->get('boardSort'))->toBeNull();
+});
+
+it('puts a card without a value last when sorting by a custom attribute', function (): void {
+    opportunitiesToSort($this);
+    opportunityInStage($this, 'Delta', 'Prospecting')->forceFill(['order_column' => 500])->saveQuietly();
+
+    foreach (['asc', 'desc'] as $direction) {
+        $component = livewire(OpportunitiesBoard::class)
+            ->call('setFilterBarSorts', [['column' => 'custom_fields.amount', 'direction' => $direction]]);
+
+        expect(last(opportunityStageNames($component, 'Prospecting')))->toBe('Delta');
+    }
+});
+
+it('offers the sort fields the shared sort language allows', function (): void {
+    $keys = array_column(livewire(OpportunitiesBoard::class)->instance()->getFilterBarData()['sortable'], 'key');
+
+    expect($keys)->toContain('name', 'created_at', 'updated_at', 'custom_fields.amount', 'custom_fields.close_date')
+        ->and($keys)->not->toContain('order_column');
+});
+
+it('gives each sort field the label and icon the filter catalog gives it', function (): void {
+    $data = livewire(OpportunitiesBoard::class)->instance()->getFilterBarData();
+    $fields = collect($data['fields'])->keyBy('key');
+
+    foreach ($data['sortable'] as $sortable) {
+        expect($fields->get($sortable['key']))->not->toBeNull()
+            ->and($sortable['label'])->toBe($fields[$sortable['key']]['label'])
+            ->and($sortable['icon'])->toBe($fields[$sortable['key']]['icon']);
+    }
+});
+
+it('ignores a sort the board does not offer', function (array $sorts): void {
+    livewire(OpportunitiesBoard::class)
+        ->call('setFilterBarSorts', $sorts)
+        ->assertSet('boardSort', null);
+})->with([
+    'a column the board does not offer' => [[['column' => 'order_column', 'direction' => 'asc']]],
+    'a direction that is not one' => [[['column' => 'name', 'direction' => 'sideways']]],
+    'not a list of sorts' => [['name']],
+]);
+
+it('reads the sort from the url and ignores a garbage one', function (): void {
+    opportunitiesToSort($this);
+
+    $sorted = Livewire::withQueryParams(['sort' => 'created_at:desc'])->test(OpportunitiesBoard::class);
+
+    expect(opportunityStageNames($sorted, 'Prospecting'))->toBe(['Charlie', 'Alpha', 'Bravo'])
+        ->and($sorted->instance()->getFilterBarData()['sorts'][0])->toMatchArray(['column' => 'created_at', 'direction' => 'desc']);
+
+    foreach (['x;drop', 'order_column:asc', 'name:sideways', ':', 'custom_fields.gone:asc'] as $garbage) {
+        $component = Livewire::withQueryParams(['sort' => $garbage])->test(OpportunitiesBoard::class)->assertOk();
+
+        expect(opportunityStageNames($component, 'Prospecting'))->toBe(['Bravo', 'Charlie', 'Alpha'])
+            ->and($component->instance()->getFilterBarData()['sorts'])->toBe([]);
+    }
+});
+
+it('keeps the hand order and offers no sort while lanes are shown', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    opportunitiesToSort($this);
+    Opportunity::query()->update(['company_id' => $company->getKey()]);
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->call('setFilterBarSorts', [['column' => 'name', 'direction' => 'asc']])
+        ->call('setBoardGrouping', 'company');
+
+    $board = $component->instance()->getBoard();
+    $lane = $board->getLanes($board->getActiveGrouping())[0];
+
+    expect($component->instance()->getFilterBarData()['sortable'])->toBe([])
+        ->and($component->instance()->getFilterBarData()['sorts'])->toBe([])
+        ->and($component->get('boardSort'))->toBe('name:asc')
+        ->and($board->getLaneRecords($lane, 50)->pluck('name')->all())->toBe(['Bravo', 'Charlie', 'Alpha']);
+
+    $component->call('setBoardGrouping', null);
+
+    expect(opportunityStageNames($component, 'Prospecting'))->toBe(['Alpha', 'Bravo', 'Charlie']);
+});
+
+it('refuses a drop inside the same column while sorted', function (): void {
+    opportunitiesToSort($this);
+    $card = Opportunity::query()->where('name', 'Bravo')->firstOrFail();
+    $stage = (string) $this->stageField->options->firstWhere('name', 'Prospecting')->getKey();
+    $others = Opportunity::query()->whereKeyNot($card->getKey())->pluck('id');
+
+    livewire(OpportunitiesBoard::class)
+        ->call('setFilterBarSorts', [['column' => 'created_at', 'direction' => 'desc']])
+        ->call('moveCard', (string) $card->id, $stage, (string) $others[0], (string) $others[1])
+        ->assertNotified(__('filament/pages/boards.sorted_no_reorder', ['field' => 'Created at']))
+        ->assertNotDispatched('kanban-card-moved');
+
+    expect((float) $card->fresh()->order_column)->toBe(1000.0);
+});
+
+it('still reorders a column by hand when no sort is set', function (): void {
+    opportunitiesToSort($this);
+    $card = Opportunity::query()->where('name', 'Bravo')->firstOrFail();
+    $stage = (string) $this->stageField->options->firstWhere('name', 'Prospecting')->getKey();
+    $last = Opportunity::query()->where('name', 'Alpha')->firstOrFail();
+
+    livewire(OpportunitiesBoard::class)
+        ->call('moveCard', (string) $card->id, $stage, (string) $last->id, null)
+        ->assertDispatched('kanban-card-moved');
+
+    expect((float) $card->fresh()->order_column)->toBeGreaterThan(3000.0);
+});
+
+it('still moves a card to another stage while sorted', function (): void {
+    opportunitiesToSort($this);
+    $card = Opportunity::query()->where('name', 'Bravo')->firstOrFail();
+    $qualification = $this->stageField->options->firstWhere('name', 'Qualification');
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->call('setFilterBarSorts', [['column' => 'created_at', 'direction' => 'desc']])
+        ->call('moveCard', (string) $card->id, (string) $qualification->getKey())
+        ->assertDispatched('kanban-card-moved');
+
+    expect(opportunityStageNames($component, 'Qualification'))->toBe(['Bravo']);
 });
 
 it('leaves the deleted records half of the bar inert on a board', function (): void {

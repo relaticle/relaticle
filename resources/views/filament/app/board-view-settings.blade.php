@@ -116,6 +116,45 @@
             </div>
         </div>
 
+        <div class="fi-dropdown-list" data-board-lanes role="radiogroup" aria-labelledby="board-lanes-heading">
+            <p class="fi-board-stages-heading" id="board-lanes-heading">{{ __('filament/pages/boards.view_settings.lanes') }}</p>
+
+            <button
+                type="button"
+                role="radio"
+                aria-checked="{{ $grouping === null ? 'true' : 'false' }}"
+                class="fi-dropdown-list-item"
+                data-board-grouping="none"
+                x-on:click="$wire.setBoardGrouping(null)"
+            >
+                <x-filament::icon icon="lucide-ban" />
+                <span class="fi-dropdown-list-item-label">{{ __('filament/pages/boards.view_settings.no_lanes') }}</span>
+                @if ($grouping === null)
+                    <x-filament::icon icon="lucide-check" class="fi-menu-check" />
+                @endif
+            </button>
+
+            @foreach ($groupings as $group)
+                <button
+                    type="button"
+                    role="radio"
+                    aria-checked="{{ $grouping === $group['id'] ? 'true' : 'false' }}"
+                    class="fi-dropdown-list-item"
+                    data-board-grouping="{{ $group['id'] }}"
+                    wire:key="board-grouping.{{ $group['id'] }}"
+                    x-on:click="$wire.setBoardGrouping({{ Js::from($group['id']) }})"
+                >
+                    @if ($group['icon'])
+                        <svg class="size-menu-icon shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ $group['icon'] }}"></path></svg>
+                    @endif
+                    <span class="fi-dropdown-list-item-label">{{ $group['label'] }}</span>
+                    @if ($grouping === $group['id'])
+                        <x-filament::icon icon="lucide-check" class="fi-menu-check" />
+                    @endif
+                </button>
+            @endforeach
+        </div>
+
         <div x-ref="rowMenu">
             <x-filament::dropdown placement="right-start" :offset="16" width="fi-board-stages-row-menu" shift teleport>
                 <x-slot name="trigger">

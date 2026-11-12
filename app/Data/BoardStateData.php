@@ -19,6 +19,7 @@ final class BoardStateData extends Data
         public readonly array $stageOrder = [],
         public readonly array $filters = [],
         public readonly ?string $grouping = null,
+        public readonly ?string $sort = null,
     ) {}
 
     // jsonb reorders object keys, so a stored state only hashes like the live one with keys sorted.

@@ -220,7 +220,7 @@ final readonly class CustomFieldFilterSchema
     /**
      * @return Collection<string, CustomField>
      */
-    private function sortableFields(User $user, string $entityType): Collection
+    public function sortableFields(User $user, string $entityType): Collection
     {
         // Postgres has no ordering operator for the json column that holds list values.
         return collect(resolve(WorkspaceCustomFields::class)->remember(

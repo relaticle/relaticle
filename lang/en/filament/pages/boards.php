@@ -14,9 +14,13 @@ return [
     'view_settings' => [
         'panel' => 'Board view settings',
         'stage_actions' => 'Actions for :stage',
+        'lanes' => 'Lanes',
+        'no_lanes' => 'No lanes',
     ],
 
     'move_denied' => 'You do not have permission to move this card.',
+
+    'sorted_no_reorder' => 'Cards are sorted by :field. Clear the sort to arrange them by hand.',
 
     'move_to' => [
         'label' => 'Move to',

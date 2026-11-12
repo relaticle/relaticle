@@ -18,7 +18,9 @@ final readonly class CustomFieldSort implements Sort
     public function __construct(private CustomField $field) {}
 
     /**
-     * @param  Builder<Model>  $query
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
      */
     public function __invoke(Builder $query, bool $descending, string $property): void
     {

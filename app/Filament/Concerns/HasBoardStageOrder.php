@@ -39,6 +39,8 @@ trait HasBoardStageOrder
         return new HtmlString(view('filament.app.board-view-settings', [
             'stages' => $this->boardStageList(),
             'heading' => $this->boardStageHeading(),
+            'groupings' => $this->boardGroupings(),
+            'grouping' => $this->groupBy,
         ])->render());
     }
 
@@ -73,4 +75,9 @@ trait HasBoardStageOrder
     abstract private function boardStageList(): Collection;
 
     abstract private function boardStageHeading(): string;
+
+    /**
+     * @return list<array{id: string, label: string, icon: ?string}>
+     */
+    abstract protected function boardGroupings(): array;
 }

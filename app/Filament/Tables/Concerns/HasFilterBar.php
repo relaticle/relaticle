@@ -8,6 +8,7 @@ use App\Enums\CrmEntity;
 use App\Filament\Components\Tables\ColumnHeaderLabel;
 use App\Filament\Tables\FilterBar\FilterField;
 use App\Filament\Tables\FilterBar\FilterFieldCatalog;
+use App\Filament\Tables\FilterBar\SortList;
 use Filament\Support\Components\Attributes\Unexposed;
 use Filament\Tables\Grouping\Group;
 use Illuminate\Database\Eloquent\Builder;
@@ -45,7 +46,7 @@ trait HasFilterBar
 
     /**
      * @param  array<string, FilterField>  $catalog
-     * @return array{sorts: list<array{column: string, direction: string, label: string}>, sortable: list<array{key: string, label: string, icon: string}>, groups: list<array{id: string, label: string, icon: ?string}>, grouping: ?array{id: string, direction: string, label: string}, groupDirections: bool}
+     * @return array{sorts: list<array{column: string, direction: string, label: string}>, sortable: list<array{key: string, label: string, icon: string}>, groups: list<array{id: string, label: string, icon: ?string}>, grouping: ?array{id: string, direction: string, label: string}}
      */
     protected function filterBarOrdering(array $catalog): array
     {
@@ -73,7 +74,6 @@ trait HasFilterBar
             'grouping' => $group instanceof Group
                 ? ['id' => $group->getId(), 'direction' => $this->getTableGroupingDirection() ?? 'asc', 'label' => $groups[$group->getId()]]
                 : null,
-            'groupDirections' => true,
         ];
     }
 
@@ -117,17 +117,7 @@ trait HasFilterBar
 
     public function setFilterBarSorts(mixed $sorts = []): void
     {
-        $sortable = $this->sortableTableColumns();
-        $list = [];
-
-        foreach (is_array($sorts) ? $sorts : [] as $sort) {
-            $column = is_array($sort) ? ($sort['column'] ?? null) : null;
-            $direction = is_array($sort) ? ($sort['direction'] ?? 'asc') : null;
-
-            if (is_string($column) && isset($sortable[$column]) && ! isset($list[$column]) && in_array($direction, ['asc', 'desc'], true)) {
-                $list[$column] = $direction;
-            }
-        }
+        $list = SortList::fromClient($sorts, $this->sortableTableColumns());
 
         $this->writeTableSorts($list);
         $this->updatedTableSort();
