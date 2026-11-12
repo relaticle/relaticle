@@ -41,6 +41,8 @@ return [
     ],
 
     'layout' => [
+        'column_width' => 'Column width',
+        'card_size' => 'Card size',
         'narrow' => 'Narrow columns',
         'wide' => 'Wide columns',
         'compact' => 'Compact cards',

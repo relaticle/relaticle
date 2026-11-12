@@ -6,9 +6,11 @@ namespace App\Filament\Concerns;
 
 use App\Actions\Views\PlaceBoardCard;
 use App\Actions\Views\ReorderBoardStages;
+use App\Actions\Views\SaveBoardState;
 use App\Actions\Views\SetBoardColumnField;
 use App\Actions\Views\SetBoardColumnVisibility;
 use App\Data\BoardStateData;
+use App\Enums\BoardColumnWidth;
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
@@ -101,6 +103,31 @@ trait HasBoardStageOrder
         }
 
         $this->boardStateWritten($saved);
+    }
+
+    public function setBoardColumnWidth(mixed $width = null): void
+    {
+        $width = is_string($width) ? BoardColumnWidth::tryFrom($width) : null;
+
+        if (! $width instanceof BoardColumnWidth) {
+            return;
+        }
+
+        $saved = $this->writingBoardState(fn (?SavedView $view): BoardStateData => resolve(SaveBoardState::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), ['column_width' => $width->value], $view));
+
+        if ($saved instanceof BoardStateData) {
+            $this->boardStateWritten($saved);
+        }
+    }
+
+    public function boardLayoutToggles(): Htmlable
+    {
+        $state = $this->storedBoardState();
+
+        return new HtmlString(view('filament.app.board-layout-toggles', [
+            'columnWidth' => $state->columnWidth,
+            'cardSize' => $state->cardSize,
+        ])->render());
     }
 
     public function boardViewSettings(): Htmlable

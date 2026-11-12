@@ -63,6 +63,15 @@ trait HasBoardCards
         }
     }
 
+    public function setBoardCardSize(mixed $size = null): void
+    {
+        $size = is_string($size) ? BoardCardSize::tryFrom($size) : null;
+
+        if ($size instanceof BoardCardSize) {
+            $this->saveCardSetting('card_size', $size->value);
+        }
+    }
+
     public function setCardLabels(mixed $show = false): void
     {
         $this->saveCardSetting('show_labels', filter_var($show, FILTER_VALIDATE_BOOL));
@@ -115,7 +124,7 @@ trait HasBoardCards
         return ['key' => $key, 'label' => $this->cardAttributeLabel($key), 'icon' => $this->cardAttributeIcon($key)];
     }
 
-    private function saveCardSetting(string $key, bool $value): void
+    private function saveCardSetting(string $key, bool|string $value): void
     {
         $saved = $this->writingBoardState(fn (?SavedView $view): BoardStateData => resolve(SaveBoardState::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), [$key => $value], $view));
 

@@ -14,4 +14,6 @@ interface OrdersBoardStages
     public function reorderBoardStages(array $optionIds): void;
 
     public function boardViewSettings(): Htmlable;
+
+    public function boardLayoutToggles(): Htmlable;
 }

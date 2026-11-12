@@ -6,6 +6,8 @@ namespace App\Filament\Concerns;
 
 use App\Actions\Views\ReorderViews;
 use App\Contracts\OrdersBoardStages;
+use App\Enums\BoardCardSize;
+use App\Enums\BoardColumnWidth;
 use App\Enums\CrmEntity;
 use App\Enums\SavedViewType;
 use App\Filament\Resources\NoteResource\Pages\NotesCards;
@@ -53,10 +55,15 @@ trait HasViewSwitcher
             return $header;
         }
 
+        $hasLayout = $this instanceof OrdersBoardStages && $this->canSwitchViews();
+
         return view('filament.app.board-header', [
             'heading' => $this->getHeading(),
             'viewSwitcher' => $this->getViewSwitcher(),
             'viewSettings' => $this->getViewSettings(),
+            'layoutToggles' => $hasLayout ? $this->boardLayoutToggles() : null,
+            'columnWidth' => $hasLayout ? $this->storedBoardState()->columnWidth : BoardColumnWidth::Wide,
+            'cardSize' => $hasLayout ? $this->storedBoardState()->cardSize : BoardCardSize::Full,
             'actions' => $this->getCachedHeaderActions(),
         ]);
     }

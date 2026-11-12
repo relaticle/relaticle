@@ -10,6 +10,7 @@ use App\Actions\Views\SetBoardColumnVisibility;
 use App\Actions\Views\SetCardAttributes;
 use App\Data\BoardStateData;
 use App\Enums\BoardCardSize;
+use App\Enums\BoardColumnWidth;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\TaskField;
 use App\Enums\SavedViewType;
@@ -1731,6 +1732,36 @@ it('draws a task card as before when nothing is chosen', function (): void {
 
     livewire(TasksBoard::class)
         ->assertSeeInOrder(['Plan the visit', '1/2', 'High', 'Mar 4, 2031', $this->user->profile_photo_url]);
+});
+
+it('draws a compact task card with its title only', function (): void {
+    $priority = taskPriority();
+    $task = tasksBoardCardWithDescription($this, '<p>Plan the visit</p>'.tasksBoardChecklistHtml());
+    $task->saveCustomFieldValue($priority, $priority->options->firstWhere('name', 'High')->getKey());
+    $task->saveCustomFieldValue(WorkspaceCustomField::byCode($this->workspace->getKey(), 'task', 'due_date'), Date::parse('2031-03-04', 'UTC'));
+
+    livewire(TasksBoard::class)
+        ->assertSee('Mar 4, 2031')
+        ->call('setBoardCardSize', 'compact')
+        ->assertSee($task->title)
+        ->assertDontSee('Mar 4, 2031')
+        ->assertDontSee('1/2');
+});
+
+it('marks the task board narrow and compact once both toggles are set', function (): void {
+    $component = livewire(TasksBoard::class)
+        ->call('setBoardColumnWidth', 'narrow')
+        ->call('setBoardCardSize', 'compact')
+        ->assertSeeHtml('data-board-column-width="narrow"')
+        ->assertSeeHtml('data-board-card-size="compact"');
+
+    expect($component->html())
+        ->toMatch('/data-board-column-width-option="narrow"[^>]*aria-pressed="true"|aria-pressed="true"[^>]*data-board-column-width-option="narrow"/');
+
+    $state = TablePreference::query()->sole()->board_state;
+
+    expect($state->columnWidth)->toBe(BoardColumnWidth::Narrow)
+        ->and($state->cardSize)->toBe(BoardCardSize::Compact);
 });
 
 it('draws the chosen task attributes in their order', function (): void {
