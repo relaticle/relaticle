@@ -100,6 +100,34 @@ it('draws every menu with the shared row, icon and corner spec', function (strin
     'column header' => ["th[x-data^=\"resizableColumn('created_at'\"] [data-column-menu-trigger]", '.fi-ta-column-menu', '.fi-dropdown-list-item', '.fi-dropdown-list-item > svg'],
 ]);
 
+it('draws a rule only between the groups a menu shows', function (array $steps, string $panel): void {
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies");
+
+    foreach ($steps as [$action, $selector]) {
+        $page->{$action}($selector);
+    }
+
+    $page->assertVisible($panel);
+
+    expect($page->script(<<<JS
+        (() => {
+            const groups = [...document.querySelector('{$panel}').children].filter((group) => group.getClientRects().length > 0);
+            const first = getComputedStyle(groups[0]);
+            const last = getComputedStyle(groups.at(-1));
+
+            return { top: first.paddingTop, bottom: last.paddingBottom, rule: last.borderBottomWidth };
+        })()
+        JS))->toBe(['top' => '0px', 'bottom' => '0px', 'rule' => '0px']);
+    $page->assertNoJavaScriptErrors();
+})->with([
+    'view settings on a column that cannot hide' => [[['click', '.fi-view-settings-trigger'], ['click', '[data-column-locked] [data-view-settings-menu]']], '.fi-view-settings-row-menu'],
+    'views on the default list' => [[['click', '.fi-view-switcher .fi-dropdown-trigger button'], ['hover', '.fi-ta-views-row[data-view-kind=list]'], ['click', '.fi-ta-views-row[data-view-kind=list] [data-view-actions]']], '.fi-ta-views-row-menu'],
+    'column header that cannot sort' => [[['click', "th[x-data^=\"resizableColumn('custom_fields.domains'\"] [data-column-menu-trigger]"]], '.fi-ta-column-menu'],
+]);
+
 it('keeps a long menu above the window edge and scrolls only its list', function (string $open, string $panel, string $list): void {
     foreach (range(1, 8) as $index) {
         SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => "Pipeline {$index}"]);

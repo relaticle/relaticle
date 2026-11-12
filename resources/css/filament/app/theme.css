@@ -2005,6 +2005,19 @@ html.fi-record-stacked .fi-record-layout {
     @apply pt-1;
 }
 
+/* `x-show` hides a group with an inline style, which `:first-child` and `:last-child` still count. */
+:where(.fi-dropdown-panel > :not(:has(~ :not([style*='display: none'])))) {
+    @apply border-b-0;
+}
+
+.fi-dropdown-list:not(:has(~ :not([style*='display: none']))) {
+    @apply pb-0;
+}
+
+.fi-dropdown-list:not(:not([style*='display: none']) ~ *) {
+    @apply pt-0;
+}
+
 .fi-dropdown-list-item {
     @apply flex min-h-menu-row w-full items-center gap-2 rounded-menu-item px-2 py-1.5 text-sm;
 }
