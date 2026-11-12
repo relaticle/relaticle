@@ -104,8 +104,9 @@ Decisions 2, 3, 6 and 8 below are replaced. The rest stands.
   discards it. The turn is dropped at the time, remembered for 24 hours, and opened again when
   Rela's reply to the decision ends.
 - **An expired proposal** opens the dropped turn too, from the command that expires proposals.
-- **Data that arrives while the first greeting streams** is remembered and announced when the
-  greeting ends. A chat that was never opened stays with the greeting, which reads what arrived.
+- **Data that arrives while the first greeting streams** is announced when the greeting ends,
+  but only when records landed after the greeting began. Records already in are in its prompt, so
+  the greeting covers them, as it does for a chat that was never opened.
 
 ## What was decided (2026-11-07)
 

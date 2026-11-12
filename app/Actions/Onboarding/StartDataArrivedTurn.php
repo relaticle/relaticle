@@ -7,7 +7,9 @@ namespace App\Actions\Onboarding;
 use App\Features\SetupConversation;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Queries\Onboarding\ArrivedRecordsQuery;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\MessageOrigin;
@@ -26,6 +28,7 @@ final readonly class StartDataArrivedTurn
     public function __construct(
         private CreditService $credits,
         private AiModelResolver $models,
+        private ArrivedRecordsQuery $arrived,
     ) {}
 
     public function execute(Workspace $workspace, ?string $sourceKey = null): bool
@@ -44,7 +47,7 @@ final readonly class StartDataArrivedTurn
         }
 
         if (! $conversation->messages()->exists()) {
-            $this->rememberWhileGreeting($conversation->id, $sourceKey);
+            $this->rememberWhileGreeting($owner, $workspace, $conversation->id, $sourceKey);
 
             return false;
         }
@@ -112,11 +115,19 @@ final readonly class StartDataArrivedTurn
         return $sourceKey;
     }
 
-    // A chat with no stored message and a turn in flight is mid-greeting. That greeting
-    // was prompted before these records landed, so it cannot have announced them.
-    private function rememberWhileGreeting(string $conversationId, ?string $sourceKey): void
+    // No stored message and a turn in flight means the first greeting is streaming. Only records
+    // that landed after it began are missing from its prompt, so only those wait for its end.
+    private function rememberWhileGreeting(User $owner, Workspace $workspace, string $conversationId, ?string $sourceKey): void
     {
-        if ($sourceKey !== null && TurnPresence::current($conversationId) !== null) {
+        $greeting = TurnPresence::current($conversationId);
+
+        if ($sourceKey === null || $greeting === null) {
+            return;
+        }
+
+        $began = Date::parse($greeting['started_at'])->startOfSecond();
+
+        if ($this->arrived->anySince($owner, $workspace, $began)) {
             $this->remember($conversationId, $sourceKey);
         }
     }

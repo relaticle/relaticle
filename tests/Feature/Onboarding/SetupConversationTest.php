@@ -692,14 +692,17 @@ it('opens no data arrived turn when a proposal expires and nothing arrived', fun
     assertDataArrivedPushed(0);
 });
 
-it('opens an arrival that landed while the greeting was streaming once the greeting ends', function (): void {
+it('opens an arrival whose records landed while the greeting was streaming once the greeting ends', function (): void {
     Queue::fake([ProcessChatMessage::class]);
+    $this->travelTo('2026-11-12 10:00:00');
     $user = User::factory()->create();
     $workspace = personalWorkspaceFor($user, ['onboarding_use_case' => OnboardingUseCase::Sales]);
     $this->actingAs($user);
 
     expect(resolve(StartSetupGreeting::class)->execute($user, $workspace->setupConversation->id))->toBeTrue();
 
+    $this->travel(5)->seconds();
+    Company::factory()->create(['workspace_id' => $workspace->getKey(), 'creator_id' => null, 'creation_source' => CreationSource::IMPORT]);
     $user->notifyNow(new ImportFinishedNotification(finishedImport($user, $workspace), ImportOutcome::Completed), ['database']);
 
     assertDataArrivedPushed(0);
@@ -708,6 +711,25 @@ it('opens an arrival that landed while the greeting was streaming once the greet
     Queue::pushed(ProcessChatMessage::class)->first()->handle(resolve(CreditService::class));
 
     assertDataArrivedPushed(1);
+});
+
+it('leaves an arrival to the greeting when its records landed before the greeting began', function (): void {
+    Queue::fake([ProcessChatMessage::class]);
+    $this->travelTo('2026-11-12 10:00:00');
+    $user = User::factory()->create();
+    $workspace = personalWorkspaceFor($user, ['onboarding_use_case' => OnboardingUseCase::Sales]);
+    $this->actingAs($user);
+    Company::factory()->create(['workspace_id' => $workspace->getKey(), 'creator_id' => null, 'creation_source' => CreationSource::IMPORT]);
+
+    $this->travel(5)->seconds();
+    resolve(StartSetupGreeting::class)->execute($user, $workspace->setupConversation->id);
+    $this->travel(5)->seconds();
+    $user->notifyNow(new ImportFinishedNotification(finishedImport($user, $workspace), ImportOutcome::Completed), ['database']);
+
+    CrmAssistant::fake(['Hi, one company arrived.']);
+    Queue::pushed(ProcessChatMessage::class)->first()->handle(resolve(CreditService::class));
+
+    assertDataArrivedPushed(0);
 });
 
 it('does not repeat an arrival the greeting already covered', function (): void {
