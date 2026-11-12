@@ -64,7 +64,7 @@ final readonly class SearchDocsTool implements Tool
     ];
 
     /**
-     * Copy retired "field" for "attribute"; members still type the old word.
+     * Copy retired "custom field" for "custom attribute"; members still type it. A built-in field stays a field.
      *
      * @var array<string, string>
      */
@@ -352,8 +352,15 @@ final readonly class SearchDocsTool implements Tool
     {
         $words = preg_split('/[^\p{L}\p{N}.]+/u', mb_strtolower(trim($query)), -1, PREG_SPLIT_NO_EMPTY) ?: [];
 
+        $words = array_map(fn (string $word): string => trim($word, '.'), $words);
+        $words = array_map(
+            fn (string $word, int $index): string => ($words[$index - 1] ?? null) === 'custom' ? (self::RETIRED_WORDS[$word] ?? $word) : $word,
+            $words,
+            array_keys($words),
+        );
+
         $terms = array_filter(
-            array_map(fn (string $word): string => self::RETIRED_WORDS[trim($word, '.')] ?? trim($word, '.'), $words),
+            $words,
             fn (string $word): bool => mb_strlen($word) >= self::MIN_TERM_LENGTH
                 && ! in_array($word, self::STOP_WORDS, true),
         );

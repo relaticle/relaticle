@@ -54,6 +54,12 @@ it('reads the retired word field as attribute', function (string $query): void {
     expect(searchDocs($query)['results'][0]['title'])->toContain('attributes');
 })->with(['custom fields', 'how do I add a custom field']);
 
+it('keeps the word field for a question about built-in fields', function (): void {
+    $sections = array_map(fn (array $result): string => $result['title'].' | '.$result['section'], searchDocs('what fields does a company record have')['results']);
+
+    expect($sections)->toContain('Company records | The fields');
+});
+
 it('matches a stemmed term in both directions', function (): void {
     $sections = array_column(searchDocs('connectors')['results'], 'section');
 
