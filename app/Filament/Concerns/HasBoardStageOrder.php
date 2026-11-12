@@ -6,6 +6,7 @@ namespace App\Filament\Concerns;
 
 use App\Actions\Views\ReorderBoardStages;
 use App\Actions\Views\SetBoardColumnField;
+use App\Actions\Views\SetBoardColumnVisibility;
 use App\Data\BoardStateData;
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
@@ -14,6 +15,8 @@ use App\Models\SavedView;
 use App\Queries\Views\BoardColumnFieldsQuery;
 use Closure;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\HtmlString;
 use LogicException;
@@ -46,6 +49,23 @@ trait HasBoardStageOrder
         $this->boardStateWritten($saved);
     }
 
+    public function setBoardColumnVisible(mixed $optionId = null, mixed $visible = true): void
+    {
+        if (! is_string($optionId)) {
+            return;
+        }
+
+        $fieldCode = $this->boardColumnField()->code;
+        $visible = filter_var($visible, FILTER_VALIDATE_BOOL);
+        $saved = $this->writingBoardState(fn (?SavedView $view): BoardStateData => resolve(SetBoardColumnVisibility::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), $fieldCode, $optionId, $visible, $view));
+
+        if (! $saved instanceof BoardStateData) {
+            return;
+        }
+
+        $this->boardStateWritten($saved);
+    }
+
     public function setBoardColumnField(mixed $code = null): void
     {
         if ($code !== null && (! is_string($code) || ! $this->boardColumnFields()->has($code))) {
@@ -65,9 +85,13 @@ trait HasBoardStageOrder
     {
         $field = $this->boardColumnField();
 
+        $visible = $this->visibleBoardColumnIds();
+
         return new HtmlString(view('filament.app.board-view-settings', [
-            'stages' => $this->boardColumnOptions(),
-            'heading' => $field->code === $this->viewSwitcherEntity()->boardFieldCode() ? $this->boardStageHeading() : $field->name,
+            'columns' => $this->boardColumnOptions()
+                ->map(static fn (array $option): array => [...$option, 'visible' => in_array($option['id'], $visible, true)])
+                ->all(),
+            'visibleCount' => count($visible),
             'groupings' => $this->boardGroupings(),
             'grouping' => $this->getBoard()->getActiveGrouping()?->getName(),
             'columnFields' => $this->boardColumnFields()
@@ -131,18 +155,50 @@ trait HasBoardStageOrder
     }
 
     /**
+     * @return list<string>
+     */
+    protected function visibleBoardColumnIds(): array
+    {
+        $hidden = $this->storedBoardState()->hiddenColumns;
+
+        return array_values($this->boardColumnOptions()
+            ->pluck('id')
+            ->reject(static fn (string $id): bool => in_array($id, $hidden, true))
+            ->all());
+    }
+
+    /**
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     * @return Builder<TModel>
+     */
+    protected function withoutHiddenColumnCards(Builder $query): Builder
+    {
+        $hidden = $this->storedBoardState()->hiddenColumns;
+        $hiddenOfField = $this->boardColumnOptions()->pluck('id')->intersect($hidden)->values()->all();
+
+        return $hiddenOfField === []
+            ? $query
+            : $query->whereNotIn('cfv.'.$this->boardColumnField()->getValueColumn(), $hiddenOfField);
+    }
+
+    /**
      * @return list<Column>
      */
     protected function boardColumns(): array
     {
+        $hidden = $this->storedBoardState()->hiddenColumns;
+
         return array_values($this->boardColumnOptions()
-            ->map(static fn (array $option): Column => Column::make($option['id'])->color($option['color'])->label($option['name']))
+            ->map(static fn (array $option): Column => Column::make($option['id'])
+                ->color($option['color'])
+                ->label($option['name'])
+                ->hidden(in_array($option['id'], $hidden, true)))
             ->all());
     }
 
     abstract protected function defaultBoardColumnField(): ?CustomField;
-
-    abstract private function boardStageHeading(): string;
 
     /**
      * @return list<array{id: string, label: string, icon: ?string}>

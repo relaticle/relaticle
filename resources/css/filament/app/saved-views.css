@@ -260,12 +260,33 @@
     @apply min-w-0 flex-1 truncate px-1 text-sm font-medium text-gray-950 dark:text-white;
 }
 
-.fi-board-stages-heading {
-    @apply px-2 pb-1 pt-0.5 text-xs font-medium text-gray-500 dark:text-gray-400;
+.fi-board-stage-grip {
+    @apply flex size-6 shrink-0 cursor-grab touch-none items-center justify-center text-gray-400 opacity-0 dark:text-gray-500;
+
+    & .fi-icon {
+        @apply size-menu-icon;
+    }
+
+    .fi-board-stage-row:hover &,
+    .fi-board-stage-row:has(:focus-visible) & {
+        @apply opacity-100;
+    }
+}
+
+.fi-board-stage-switch {
+    @apply flex shrink-0 items-center pe-1;
+
+    & .fi-toggle:disabled {
+        @apply cursor-not-allowed opacity-50;
+    }
 }
 
 .fi-board-stage {
-    @apply flex h-menu-row min-w-0 flex-1 items-center gap-2 ps-2 text-sm text-gray-950 dark:text-white;
+    @apply flex h-menu-row min-w-0 flex-1 items-center gap-2 text-sm text-gray-950 dark:text-white;
+}
+
+.fi-board-stage-off {
+    @apply text-gray-500 dark:text-gray-400;
 }
 
 .fi-board-stage-mark {

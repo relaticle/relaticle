@@ -398,6 +398,7 @@ it('lists the stages in the board view settings and reorders them by dragging a 
         ->assertVisible('.fi-view-settings-trigger')
         ->click('.fi-view-settings-trigger')
         ->assertVisible('[data-board-view-settings]')
+        ->click('[data-board-columns-trigger]')
         ->assertScript(BOARD_STAGE_ROW_IDS, $ids);
 
     $page->assertScript('(async () => { const bound = () => Object.keys(document.querySelector("[data-board-view-settings] .fi-ta-views-list")).some((key) => key.startsWith("Sortable")); for (let attempt = 0; ! bound() && attempt < 50; attempt++) { await new Promise((resolve) => setTimeout(resolve, 100)); } return bound(); })()', true);
@@ -423,7 +424,8 @@ it('moves a stage from its menu, keeps focus on its menu button and disables the
         ->assertPathIs("/app/{$workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$workspace->slug}/{$path}")
-        ->click('.fi-view-settings-trigger');
+        ->click('.fi-view-settings-trigger')
+        ->click('[data-board-columns-trigger]');
 
     $page->click($trigger($ids[0]))->wait(0.5);
     $page->assertScript($item('Move up').'.disabled', true)
@@ -439,7 +441,7 @@ it('moves a stage from its menu, keeps focus on its menu button and disables the
     $page->wait(0.5)->click($trigger($ids[0]))->wait(0.5);
     $page->assertScript($item('Move up').'.disabled', false);
 
-    $page->click('.fi-board-stages-heading:not(#board-lanes-heading)')->wait(0.5)->click($trigger(last($ids)))->wait(0.5);
+    $page->click('[data-board-panel="columns"] .fi-board-panel-title')->wait(0.5)->click($trigger(last($ids)))->wait(0.5);
     $page->assertScript($item('Move down').'.disabled', true)
         ->assertNoJavaScriptErrors();
 })->with('stage order boards');
@@ -457,7 +459,8 @@ it('keeps the board view settings usable on a 390px phone', function (string $mo
         ->navigate("/app/{$workspace->slug}/{$path}")
         ->click('.fi-view-settings-trigger')
         ->assertVisible('[data-board-view-settings]')
-        ->assertScript('(() => { const box = document.querySelector("[data-board-view-settings]").closest(".fi-dropdown-panel").getBoundingClientRect(); return box.left >= 0 && box.right <= innerWidth && box.bottom <= innerHeight; })()', true);
+        ->assertScript('(() => { const box = document.querySelector("[data-board-view-settings]").closest(".fi-dropdown-panel").getBoundingClientRect(); return box.left >= 0 && box.right <= innerWidth && box.bottom <= innerHeight; })()', true)
+        ->click('[data-board-columns-trigger]');
 
     $page->click("[data-board-view-settings] [data-stage-id=\"{$ids[1]}\"] [data-stage-actions]");
     $page->script('[...document.querySelectorAll(".fi-board-stages-row-menu .fi-dropdown-list-item")].find((item) => item.textContent.trim() === "Move up").click()');
@@ -759,6 +762,7 @@ it('returns focus to the stage menu button when Escape closes its row menu', fun
 
     $page = openBoard($user, $path)
         ->click('.fi-view-settings-trigger')
+        ->click('[data-board-columns-trigger]')
         ->click($trigger)
         ->wait(0.5)
         ->keys($trigger, 'Escape')

@@ -48,6 +48,23 @@ final class BoardStateData extends Data
         return [...array_values(array_diff($current, $fieldOptionIds)), ...$ids];
     }
 
+    /**
+     * @param  list<string>  $order
+     * @param  list<string>  $moved
+     * @return list<string>
+     */
+    public static function reorderColumns(array $order, array $moved): array
+    {
+        $refilled = [];
+        $next = 0;
+
+        foreach ($order as $id) {
+            $refilled[] = in_array($id, $moved, true) ? $moved[$next++] : $id;
+        }
+
+        return $refilled;
+    }
+
     // jsonb reorders object keys, so a stored state only hashes like the live one with keys sorted.
     public function hash(): string
     {

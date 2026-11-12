@@ -7,6 +7,7 @@ namespace App\Queries\Views;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
+use App\Models\CustomFieldOption;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CustomFields\WorkspaceCustomFields;
@@ -34,5 +35,17 @@ final readonly class BoardColumnFieldsQuery
                 && $field->options->isNotEmpty())
             ->sortBy(static fn (CustomField $field): int => $field->code === $default ? 0 : 1)
             ->keyBy('code');
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    public function optionIds(User $user, Workspace $workspace, CrmEntity $entity, ?string $code): ?array
+    {
+        $field = $code === null ? null : $this->get($user, $workspace, $entity)->get($code);
+
+        return $field instanceof CustomField
+            ? array_values($field->options->map(static fn (CustomFieldOption $option): string => (string) $option->getKey())->all())
+            : null;
     }
 }

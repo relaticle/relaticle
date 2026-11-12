@@ -76,13 +76,13 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
 
         return $board
             ->query(
-                Opportunity::query()
+                $this->withoutHiddenColumnCards(Opportunity::query()
                     ->leftJoin('custom_field_values as cfv', function (JoinClause $join) use ($columnField): void {
                         $join->on('opportunities.id', '=', 'cfv.entity_id')
                             ->where('cfv.custom_field_id', '=', $columnField->getKey());
                     })
                     ->select('opportunities.*', 'cfv.'.$valueColumn)
-                    ->with(['company.media', 'contact'])
+                    ->with(['company.media', 'contact']))
             )
             ->recordTitleAttribute('name')
             ->columnIdentifier($valueColumn)
@@ -327,7 +327,7 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
 
     private function ownsColumn(string $id): bool
     {
-        return $this->boardColumnOptions()->contains(fn (array $option): bool => $option['id'] === $id);
+        return in_array($id, $this->visibleBoardColumnIds(), true);
     }
 
     private static function stageCustomField(): ?CustomField
@@ -342,11 +342,6 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
     protected function defaultBoardColumnField(): ?CustomField
     {
         return self::stageCustomField();
-    }
-
-    private function boardStageHeading(): string
-    {
-        return __('filament/pages/boards.opportunities.stage_order');
     }
 
     /**

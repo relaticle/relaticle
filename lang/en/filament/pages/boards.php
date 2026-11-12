@@ -19,6 +19,9 @@ return [
         'lanes' => 'Lanes',
         'no_lanes' => 'No lanes',
         'no_lanes_short' => 'None',
+        'visible_columns' => 'Visible columns',
+        'show_column' => 'Show :column',
+        'last_column' => 'One column stays visible.',
     ],
 
     'layout' => [
@@ -39,7 +42,6 @@ return [
 
     'opportunities' => [
         'title' => 'Opportunities',
-        'stage_order' => 'Stage order',
         'actions' => [
             'add' => 'Add Opportunity',
             'edit' => 'Edit',
@@ -55,7 +57,6 @@ return [
     ],
 
     'tasks' => [
-        'stage_order' => 'Status order',
         'title' => 'Tasks',
         'actions' => [
             'add' => 'Add Task',

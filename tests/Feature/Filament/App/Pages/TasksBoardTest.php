@@ -6,6 +6,7 @@ use App\Actions\CustomFields\CreateCustomField;
 use App\Actions\CustomFields\DeleteCustomField;
 use App\Actions\Views\ReorderBoardStages;
 use App\Actions\Views\SetBoardColumnField;
+use App\Actions\Views\SetBoardColumnVisibility;
 use App\Data\BoardStateData;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\TaskField;
@@ -44,7 +45,7 @@ use Relaticle\Flowforge\Lane;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(ReorderBoardStages::class, SetBoardColumnField::class, BoardColumnFieldsQuery::class, TasksBoard::class, CreateTaskAction::class, ChecklistHtml::class, MoveCardAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
+mutates(ReorderBoardStages::class, SetBoardColumnField::class, SetBoardColumnVisibility::class, BoardColumnFieldsQuery::class, TasksBoard::class, CreateTaskAction::class, ChecklistHtml::class, MoveCardAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -999,7 +1000,7 @@ it('stores a status order once each and rejects an opportunity stage', function 
 
     $state = resolve(ReorderBoardStages::class)->execute($this->user, $this->workspace, CrmEntity::Task, [$order[1], $order[1], $order[0]]);
 
-    expect($state->stageOrder)->toBe([$order[1], $order[0]])
+    expect($state->orderStages($order))->toBe([$order[1], $order[0], $order[2]])
         ->and(fn () => resolve(ReorderBoardStages::class)->execute($this->user, $this->workspace, CrmEntity::Task, statusIds($stage)))
         ->toThrow(HttpException::class);
 });
@@ -1401,3 +1402,39 @@ it('lists the board column fields with their options whatever custom attribute t
     expect($fields->keys()->all())->toBe(['status', 'priority'])
         ->and($fields->get('status')->options)->toHaveCount(count(statusIds($this->statusField)));
 })->with(['no tenant' => null, 'another workspace' => 'other']);
+
+it('keeps a hidden column in its slot when the visible columns are dragged', function (): void {
+    $ids = statusIds($this->statusField);
+    $component = livewire(TasksBoard::class)->call('setBoardColumnVisible', $ids[1], false);
+
+    $component->call('reorderBoardStages', [$ids[2], $ids[0]]);
+
+    expect(TablePreference::query()->sole()->board_state->orderStages($ids))->toBe([$ids[2], $ids[1], $ids[0]])
+        ->and(taskBoardColumnOrder($component))->toBe([$ids[2], $ids[0]]);
+});
+
+it('draws, counts and offers no hidden column', function (): void {
+    $todo = (string) $this->statusField->options->firstWhere('name', 'To do')->getKey();
+    taskInStatus($this, 'Hidden task', 'To do');
+
+    $component = livewire(TasksBoard::class)->call('setBoardColumnVisible', $todo, false);
+
+    expect(taskBoardColumnOrder($component))->not->toContain($todo)
+        ->and($component->instance()->getBoard()->getBatchedBoardRecordCounts())->not->toHaveKey($todo);
+});
+
+it('refuses a card created or moved into a hidden column', function (): void {
+    $todo = (string) $this->statusField->options->firstWhere('name', 'To do')->getKey();
+    $card = taskInStatus($this, 'Moving task', 'In progress');
+
+    $component = livewire(TasksBoard::class)->call('setBoardColumnVisible', $todo, false);
+
+    $component->call('mountAction', 'create', ['column' => $todo])
+        ->set('mountedActions.0.data.title', 'Hidden column task')
+        ->call('callMountedAction');
+
+    $component->call('moveCard', (string) $card->id, $todo)->assertReturned(false);
+
+    expect(Task::query()->where('title', 'Hidden column task')->exists())->toBeFalse()
+        ->and(taskValueOf($card->fresh(), $this->statusField))->toBe($this->statusField->options->firstWhere('name', 'In progress')->getKey());
+});

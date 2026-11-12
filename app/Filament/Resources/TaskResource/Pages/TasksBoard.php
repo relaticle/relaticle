@@ -86,13 +86,13 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
 
         return $board
             ->query(
-                Task::query()
+                $this->withoutHiddenColumnCards(Task::query()
                     ->leftJoin('custom_field_values as cfv', function (JoinClause $join) use ($columnField): void {
                         $join->on('tasks.id', '=', 'cfv.entity_id')
                             ->where('cfv.custom_field_id', '=', $columnField->getKey());
                     })
                     ->with(['assignees'])
-                    ->select('tasks.*', 'cfv.'.$valueColumn)
+                    ->select('tasks.*', 'cfv.'.$valueColumn))
             )
             ->recordTitleAttribute('title')
             ->columnIdentifier($valueColumn)
@@ -361,7 +361,7 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
 
     private function ownsColumn(string $id): bool
     {
-        return $this->boardColumnOptions()->contains(fn (array $option): bool => $option['id'] === $id);
+        return in_array($id, $this->visibleBoardColumnIds(), true);
     }
 
     private function descriptionCustomField(): ?CustomField
@@ -389,11 +389,6 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
     protected function defaultBoardColumnField(): ?CustomField
     {
         return self::statusCustomField();
-    }
-
-    private function boardStageHeading(): string
-    {
-        return __('filament/pages/boards.tasks.stage_order');
     }
 
     /**

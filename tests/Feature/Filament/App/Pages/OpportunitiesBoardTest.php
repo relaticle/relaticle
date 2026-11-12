@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\CustomFields\CreateCustomField;
 use App\Actions\Views\ReorderBoardStages;
 use App\Actions\Views\SetBoardColumnField;
+use App\Actions\Views\SetBoardColumnVisibility;
 use App\Data\BoardStateData;
 use App\Enums\BoardCardSize;
 use App\Enums\BoardColumnWidth;
@@ -44,7 +45,7 @@ use Relaticle\Flowforge\Lane;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(ReorderBoardStages::class, SetBoardColumnField::class, BoardColumnFieldsQuery::class, OpportunitiesBoard::class, MoveCardAction::class, PreviewRecordAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
+mutates(ReorderBoardStages::class, SetBoardColumnField::class, SetBoardColumnVisibility::class, BoardColumnFieldsQuery::class, OpportunitiesBoard::class, MoveCardAction::class, PreviewRecordAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
 
 beforeEach(function () {
     $this->user = User::factory()->withWorkspace()->create();
@@ -194,9 +195,9 @@ it('marks the current lane grouping in view settings', function (): void {
     $none = livewire(OpportunitiesBoard::class)->html();
     $lanes = livewire(OpportunitiesBoard::class, ['groupBy' => 'company'])->html();
 
-    expect(preg_match('/aria-checked="true"[^>]*data-board-grouping="none"/s', $none))->toBe(1)
+    expect($none)->toMatch('/aria-checked="true"[^>]*data-board-grouping="none"/s')
         ->and(preg_match('/aria-checked="true"[^>]*data-board-grouping="company"/s', $none))->toBe(0)
-        ->and(preg_match('/aria-checked="true"[^>]*data-board-grouping="company"/s', $lanes))->toBe(1)
+        ->and($lanes)->toMatch('/aria-checked="true"[^>]*data-board-grouping="company"/s')
         ->and(preg_match('/aria-checked="true"[^>]*data-board-grouping="none"/s', $lanes))->toBe(0);
 });
 
@@ -1052,7 +1053,7 @@ it('stores an order made of the board\'s own stages once each', function (): voi
 
     $state = resolve(ReorderBoardStages::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, [$order[2], $order[0], $order[2]]);
 
-    expect($state->stageOrder)->toBe([$order[2], $order[0]])
+    expect($state->orderStages($order))->toBe([$order[2], $order[1], $order[0], ...array_slice($order, 3)])
         ->and(TablePreference::query()->count())->toBe(1);
 });
 
@@ -1403,4 +1404,113 @@ it('remembers the column attribute inside a board view and leaves the plain boar
         ->and(TablePreference::query()->count())->toBe(0)
         ->and(boardColumnOrder($component))->toBe(stageIds($tier))
         ->and(boardColumnOrder(Livewire::withQueryParams([])->test(OpportunitiesBoard::class)))->toBe(stageIds($this->stageField));
+});
+
+it('keeps a hidden column in its slot when the visible columns are dragged', function (): void {
+    $ids = stageIds($this->stageField);
+    $component = livewire(OpportunitiesBoard::class)->call('setBoardColumnVisible', $ids[1], false);
+
+    $component->call('reorderBoardStages', [$ids[2], $ids[0], ...array_slice($ids, 3)]);
+
+    expect(TablePreference::query()->sole()->board_state->orderStages($ids))->toBe([$ids[2], $ids[1], $ids[0], ...array_slice($ids, 3)])
+        ->and(boardColumnOrder($component))->toBe([$ids[2], $ids[0], ...array_slice($ids, 3)]);
+});
+
+it('draws, counts and offers no hidden column', function (): void {
+    $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');
+    opportunityInStage($this, 'Hidden deal', 'Prospecting');
+    $other = opportunityInStage($this, 'Other deal', 'Qualification');
+
+    $component = livewire(OpportunitiesBoard::class)->call('setBoardColumnVisible', (string) $prospecting->getKey(), false);
+
+    expect(boardColumnOrder($component))->not->toContain((string) $prospecting->getKey())
+        ->and($component->instance()->getBoard()->getBatchedBoardRecordCounts())->not->toHaveKey((string) $prospecting->getKey());
+
+    $component->call('mountAction', 'moveTo', [], ['recordKey' => (string) $other->id])
+        ->assertMountedActionModalSee(['Qualification', 'Closed Won'])
+        ->assertMountedActionModalDontSee('Prospecting');
+});
+
+it('refuses a card created or moved into a hidden column', function (): void {
+    $prospecting = (string) $this->stageField->options->firstWhere('name', 'Prospecting')->getKey();
+    $card = opportunityInStage($this, 'Moving deal', 'Qualification');
+
+    $component = livewire(OpportunitiesBoard::class)->call('setBoardColumnVisible', $prospecting, false);
+
+    $component->call('mountAction', 'create', ['column' => $prospecting])
+        ->set('mountedActions.0.data.name', 'Hidden column deal')
+        ->call('callMountedAction');
+
+    $component->call('moveCard', (string) $card->id, $prospecting)->assertReturned(false);
+
+    expect(Opportunity::query()->where('name', 'Hidden column deal')->exists())->toBeFalse()
+        ->and($card->fresh()->customFieldValues()->where('custom_field_id', $this->stageField->getKey())->value($this->stageField->getValueColumn()))
+        ->toBe($this->stageField->options->firstWhere('name', 'Qualification')->getKey());
+});
+
+it('refuses to hide the last visible column', function (): void {
+    $ids = stageIds($this->stageField);
+    $component = livewire(OpportunitiesBoard::class);
+
+    foreach (array_slice($ids, 1) as $id) {
+        $component->call('setBoardColumnVisible', $id, false);
+    }
+
+    $component->call('setBoardColumnVisible', $ids[0], false)->assertStatus(422);
+
+    expect(TablePreference::query()->sole()->board_state->hiddenColumns)->toHaveCount(count($ids) - 1);
+});
+
+it('refuses an option of another attribute or workspace', function (string $case): void {
+    $foreign = User::factory()->withWorkspace()->create();
+    $tier = opportunitySelectField($this, 'Tier', ['Gold', 'Silver']);
+    $foreignStage = CustomField::query()->withoutGlobalScopes()->where('tenant_id', $foreign->currentWorkspace->getKey())->where('entity_type', 'opportunity')->where('code', OpportunityField::STAGE)->firstOrFail();
+
+    $optionId = match ($case) {
+        'another attribute' => (string) $tier->options->first()->getKey(),
+        'another workspace' => stageIds($foreignStage)[0],
+        'unknown' => 'not-an-option',
+    };
+
+    expect(fn () => resolve(SetBoardColumnVisibility::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, OpportunityField::STAGE->value, $optionId, false))
+        ->toThrow(HttpException::class);
+
+    expect(TablePreference::query()->withoutGlobalScopes()->count())->toBe(0);
+})->with(['another attribute', 'another workspace', 'unknown']);
+
+it('keeps hidden columns per attribute', function (): void {
+    $tier = opportunitySelectField($this, 'Tier', ['Gold', 'Silver']);
+    $gold = (string) $tier->options->firstWhere('name', 'Gold')->getKey();
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnField', $tier->code)
+        ->call('setBoardColumnVisible', $gold, false);
+
+    expect(boardColumnOrder($component))->not->toContain($gold);
+
+    $component->call('setBoardColumnField', null);
+    expect(boardColumnOrder($component))->toBe(stageIds($this->stageField));
+
+    $component->call('setBoardColumnField', $tier->code);
+    expect(boardColumnOrder($component))->not->toContain($gold);
+});
+
+it('shows a column again in the slot it had', function (): void {
+    $ids = stageIds($this->stageField);
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnVisible', $ids[1], false)
+        ->call('setBoardColumnVisible', $ids[1], true);
+
+    expect(boardColumnOrder($component))->toBe($ids)
+        ->and(TablePreference::query()->sole()->board_state->hiddenColumns)->toBe([]);
+});
+
+it('reads the visible count in view settings', function (): void {
+    $ids = stageIds($this->stageField);
+    $component = livewire(OpportunitiesBoard::class)->call('setBoardColumnVisible', $ids[0], false);
+
+    $html = (string) $component->instance()->boardViewSettings();
+
+    expect($html)->toMatch('/data-board-columns-trigger.*?fi-board-settings-value-text">\s*'.(count($ids) - 1).'\s*</s');
 });

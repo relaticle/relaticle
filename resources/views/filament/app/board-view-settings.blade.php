@@ -132,28 +132,65 @@
                         </span>
                     </span>
                 </x-filament::dropdown.list.item>
+
+                <x-filament::dropdown.list.item
+                    icon="lucide-eye"
+                    role="button"
+                    tabindex="0"
+                    data-board-columns-trigger
+                    data-panel-trigger="columns"
+                    x-bind:aria-expanded="(panel === 'columns').toString()"
+                    x-on:click="openPanel('columns')"
+                >
+                    <span class="fi-view-settings-add">
+                        {{ __('filament/pages/boards.view_settings.visible_columns') }}
+                        <span class="fi-board-settings-value">
+                            <span class="fi-board-settings-value-text">{{ $visibleCount }}</span>
+                            <x-filament::icon icon="lucide-chevron-right" class="fi-view-settings-add-chevron" />
+                        </span>
+                    </span>
+                </x-filament::dropdown.list.item>
+            </div>
+        </div>
+
+        <div class="fi-view-settings-view" x-show="panel === 'columns'" x-cloak data-board-panel="columns">
+            <div class="fi-view-settings-search">
+                <x-filament::icon-button
+                    icon="lucide-chevron-left"
+                    color="gray"
+                    size="sm"
+                    :label="__('filament/panel.tables.views.back')"
+                    data-view-settings-back
+                    x-on:click="closePanel()"
+                />
+                <p class="fi-board-panel-title">{{ __('filament/pages/boards.view_settings.visible_columns') }}</p>
             </div>
 
-            <p class="fi-board-stages-heading">{{ $heading }}</p>
-
             <div class="fi-ta-views-scroll">
-                <div class="fi-ta-views-list" x-ref="list" x-sort="reorder" x-sort:config="{ draggable: '.fi-ta-views-draggable', filter: '.fi-ta-views-row-actions', preventOnFilter: false, delay: 200, delayOnTouchOnly: true, animation: 150 }">
-                    @foreach ($stages as $stage)
-                        @php $dotColor = ColorResolver::resolve($stage['color']); @endphp
+                <div class="fi-ta-views-list" x-ref="list" x-sort="reorder" x-sort:config="{ draggable: '.fi-ta-views-draggable', filter: '.fi-ta-views-row-actions, .fi-board-stage-switch', preventOnFilter: false, delay: 200, delayOnTouchOnly: true, animation: 150 }">
+                    @foreach ($columns as $column)
+                        @php
+                            $dotColor = ColorResolver::resolve($column['color']);
+                            $isLastVisible = $column['visible'] && $visibleCount <= 1;
+                        @endphp
 
                         <div
-                            class="fi-ta-views-row fi-ta-views-draggable"
-                            x-sort:item="{{ Js::from((string) $stage['id']) }}"
-                            data-stage-id="{{ $stage['id'] }}"
-                            wire:key="board-stage.{{ $stage['id'] }}"
+                            class="fi-ta-views-row fi-ta-views-draggable fi-board-stage-row"
+                            x-sort:item="{{ Js::from((string) $column['id']) }}"
+                            data-stage-id="{{ $column['id'] }}"
+                            wire:key="board-stage.{{ $column['id'] }}"
                         >
-                            <span class="fi-board-stage">
+                            <span class="fi-board-stage-grip" aria-hidden="true">
+                                <x-filament::icon icon="lucide-grip-vertical" />
+                            </span>
+
+                            <span class="fi-board-stage" @class(['fi-board-stage-off' => ! $column['visible']])>
                                 <span class="fi-board-stage-mark">
                                     @if ($dotColor)
                                         <span class="fi-board-stage-dot" style="{{ get_color_css_variables($dotColor, shades: [500]) }}"></span>
                                     @endif
                                 </span>
-                                <span class="fi-board-stage-name" title="{{ $stage['name'] }}">{{ $stage['name'] }}</span>
+                                <span class="fi-board-stage-name" title="{{ $column['name'] }}">{{ $column['name'] }}</span>
                             </span>
 
                             <div class="fi-ta-views-row-actions">
@@ -161,11 +198,24 @@
                                     icon="lucide-ellipsis-vertical"
                                     color="gray"
                                     size="sm"
-                                    :label="__('filament/pages/boards.view_settings.stage_actions', ['stage' => $stage['name']])"
+                                    :label="__('filament/pages/boards.view_settings.stage_actions', ['stage' => $column['name']])"
                                     data-stage-actions
-                                    x-on:click="openRowMenu($el, $event, {{ Js::from(['id' => (string) $stage['id']]) }})"
+                                    x-on:click="openRowMenu($el, $event, {{ Js::from(['id' => (string) $column['id']]) }})"
                                 />
                             </div>
+
+                            <span
+                                class="fi-board-stage-switch"
+                                @if ($isLastVisible) x-tooltip="{ content: {{ Js::from(__('filament/pages/boards.view_settings.last_column')) }}, theme: $store.theme }" @endif
+                            >
+                                <x-filament::toggle
+                                    :state="$column['visible'] ? 'true' : 'false'"
+                                    :disabled="$isLastVisible"
+                                    :aria-label="__('filament/pages/boards.view_settings.show_column', ['column' => $column['name']])"
+                                    data-board-column-toggle
+                                    wire:click="setBoardColumnVisible({{ Js::from((string) $column['id']) }}, {{ $column['visible'] ? 'false' : 'true' }})"
+                                />
+                            </span>
                         </div>
                     @endforeach
                 </div>
