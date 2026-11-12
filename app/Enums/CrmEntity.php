@@ -153,6 +153,26 @@ enum CrmEntity: string
         };
     }
 
+    /** @return list<string> */
+    public function nativeCardAttributes(): array
+    {
+        return match ($this) {
+            self::Opportunity => ['company', 'contact', 'creator', 'created_at', 'updated_at'],
+            self::Task => ['description', 'checklist', 'assignees', 'creator', 'created_at', 'updated_at'],
+            self::Company, self::People, self::Note => [],
+        };
+    }
+
+    /** @return list<string> */
+    public function defaultCardAttributes(): array
+    {
+        return match ($this) {
+            self::Opportunity => ['company', 'custom_fields.amount', 'custom_fields.close_date'],
+            self::Task => ['description', 'checklist', 'custom_fields.priority', 'custom_fields.due_date', 'assignees'],
+            self::Company, self::People, self::Note => [],
+        };
+    }
+
     /** @return list<self> */
     public static function linkable(): array
     {

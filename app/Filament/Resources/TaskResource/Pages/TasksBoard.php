@@ -12,6 +12,7 @@ use App\Enums\CustomFields\TaskField as TaskCustomField;
 use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Actions\EditTaskAction;
 use App\Filament\Actions\MoveCardAction;
+use App\Filament\Concerns\HasBoardCards;
 use App\Filament\Concerns\HasBoardStageOrder;
 use App\Filament\Concerns\HasBoardViews;
 use App\Filament\Concerns\HasViewSwitcher;
@@ -27,8 +28,10 @@ use App\Support\ChecklistHtml;
 use App\Support\PlainText;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
+use Filament\Infolists\Components\Entry;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Schemas\Components\Component;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentTimezone;
@@ -41,9 +44,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
-use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\Flowforge\Board;
-use Relaticle\Flowforge\Components\CardFlex;
 use Relaticle\Flowforge\Exceptions\CardMoveRejectedException;
 use Relaticle\Flowforge\Grouping;
 use Relaticle\Flowforge\Lane;
@@ -52,6 +53,7 @@ use WeakMap;
 
 final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
 {
+    use HasBoardCards;
     use HasBoardStageOrder;
     use HasBoardViews;
     use HasViewSwitcher;
@@ -72,59 +74,18 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
         return $this->prefillingFirstVisibleColumn(TaskResource::collectionActions());
     }
 
-    /**
-     * Configure the board using the new Filament V4 architecture.
-     */
     public function board(Board $board): Board
     {
         $columnField = $this->boardColumnField();
-
-        $customFields = CustomFields::infolist()
-            ->forModel(Task::class)
-            ->only(['description', 'priority', 'due_date'])
-            ->hiddenLabels()
-            ->visibleWhenFilled()
-            ->withoutSections()
-            ->values()
-            ->keyBy(fn (mixed $field): string => $field->getName());
+        $card = $this->boardCardComponents();
 
         return $board
-            ->query($this->boardColumnQuery(Task::query()->with(['assignees']), $columnField))
+            ->query($this->boardColumnQuery(Task::query()->with($this->cardEagerLoads()), $columnField))
             ->recordTitleAttribute('title')
             ->columnIdentifier($this->boardColumnIdentifier())
             ->positionIdentifier('order_column')
             ->columns($this->boardColumns())
-            ->cardSchema(function (Schema $schema) use ($customFields): Schema {
-                $descriptionCustomField = $this->descriptionPreview($customFields->get('custom_fields.description'));
-
-                $priorityField = $customFields->get('custom_fields.priority')
-                    ?->visible(fn (?string $state): bool => filled($state))
-                    ->grow(false)
-                    ->badge()
-                    ->hiddenLabel()
-                    ->icon('lucide-flag');
-
-                $dueDateField = $customFields->get('custom_fields.due_date')
-                    ?->visible(fn (?string $state): bool => filled($state))
-                    ->badge()
-                    ->color('gray')
-                    ->icon('lucide-calendar')
-                    ->grow(false)
-                    ->hiddenLabel()
-                    ->formatStateUsing(fn (?string $state): string => $this->formatDueDateBadge($state));
-
-                return $schema
-                    ->gap(false)
-                    ->components([
-                        $descriptionCustomField,
-                        CardFlex::make([
-                            $this->checklistProgressEntry(),
-                            $priorityField,
-                            $dueDateField,
-                            $this->assigneeAvatarsEntry(),
-                        ])->align('center'),
-                    ]);
-            })
+            ->cardSchema(fn (Schema $schema): Schema => $schema->gap(false)->components($card))
             ->createCardAction($this->cardCreation())
             ->cardAction('edit')
             ->cardActions($this->cardActions())
@@ -133,6 +94,67 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
             ->deferFilters(false)
             ->filtersLayout(FiltersLayout::Hidden)
             ->headerToolbar();
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function blockCardAttributes(): array
+    {
+        return ['description'];
+    }
+
+    protected function cardEntry(string $key, ?Entry $customEntry): ?Component
+    {
+        return match ($key) {
+            'description' => $this->descriptionPreview(),
+            'checklist' => $this->checklistProgressEntry(),
+            'assignees' => $this->assigneeAvatarsEntry(),
+            'custom_fields.'.TaskCustomField::PRIORITY->value => $this->priorityBadge($customEntry),
+            'custom_fields.'.TaskCustomField::DUE_DATE->value => $this->dueDateBadge($customEntry),
+            default => null,
+        };
+    }
+
+    private function priorityBadge(?Entry $entry): ?TextEntry
+    {
+        return $entry instanceof TextEntry
+            ? $entry
+                ->visible(fn (?string $state): bool => filled($state))
+                ->grow(false)
+                ->badge()
+                ->hiddenLabel()
+                ->icon('lucide-flag')
+            : null;
+    }
+
+    private function dueDateBadge(?Entry $entry): ?TextEntry
+    {
+        return $entry instanceof TextEntry
+            ? $entry
+                ->visible(fn (?string $state): bool => filled($state))
+                ->badge()
+                ->color('gray')
+                ->icon('lucide-calendar')
+                ->grow(false)
+                ->hiddenLabel()
+                ->formatStateUsing(fn (?string $state): string => $this->formatDueDateBadge($state))
+            : null;
+    }
+
+    protected function derivedCardAttributeIsEmpty(Model $record, string $key): bool
+    {
+        if (! $record instanceof Task) {
+            return false;
+        }
+
+        $summary = $this->cardSummary($record);
+
+        return match ($key) {
+            'description' => blank($summary['preview']),
+            'checklist' => $summary['progress'] === null,
+            default => false,
+        };
     }
 
     private function assigneeAvatarsEntry(): ImageEntry
@@ -146,9 +168,11 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
             ->stacked();
     }
 
-    private function descriptionPreview(?TextEntry $entry): ?TextEntry
+    private function descriptionPreview(): TextEntry
     {
-        return $entry?->columnSpanFull()
+        return TextEntry::make('description')
+            ->hiddenLabel()
+            ->columnSpanFull()
             ->html(false)
             ->state(fn (Task $record): string => $this->cardSummary($record)['preview'])
             ->visible(fn (?string $state): bool => filled($state))

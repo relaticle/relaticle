@@ -13,6 +13,7 @@ use App\Filament\Actions\MoveCardAction;
 use App\Filament\Actions\PreviewRecordAction;
 use App\Filament\Components\Forms\RecordSelect;
 use App\Filament\Components\Infolists\RecordChipEntry;
+use App\Filament\Concerns\HasBoardCards;
 use App\Filament\Concerns\HasBoardStageOrder;
 use App\Filament\Concerns\HasBoardViews;
 use App\Filament\Concerns\HasViewSwitcher;
@@ -27,6 +28,9 @@ use App\Models\Workspace;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Forms\Components\TextInput;
+use Filament\Infolists\Components\Entry;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\TextSize;
@@ -35,7 +39,6 @@ use Filament\Support\Facades\FilamentTimezone;
 use Filament\Tables\Enums\FiltersLayout;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Gate;
@@ -49,6 +52,7 @@ use Relaticle\Flowforge\Modern\BoardResourcePage;
 
 final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardStages
 {
+    use HasBoardCards;
     use HasBoardStageOrder;
     use HasBoardViews;
     use HasViewSwitcher;
@@ -68,23 +72,15 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
     public function board(Board $board): Board
     {
         $columnField = $this->boardColumnField();
-
-        $customFields = CustomFields::infolist()
-            ->forModel(Opportunity::class)
-            ->only([OpportunityCustomField::AMOUNT, OpportunityCustomField::CLOSE_DATE])
-            ->hiddenLabels()
-            ->visibleWhenFilled()
-            ->withoutSections()
-            ->values()
-            ->keyBy(fn (mixed $field): string => $field->getName());
+        $card = $this->boardCardComponents();
 
         return $board
-            ->query($this->boardColumnQuery(Opportunity::query()->with(['company.media', 'contact']), $columnField))
+            ->query($this->boardColumnQuery(Opportunity::query()->with($this->cardEagerLoads()), $columnField))
             ->recordTitleAttribute('name')
             ->columnIdentifier($this->boardColumnIdentifier())
             ->positionIdentifier('order_column')
             ->columns($this->boardColumns())
-            ->cardSchema(fn (Schema $schema): Schema => $this->cardSchema($schema, $customFields))
+            ->cardSchema(fn (Schema $schema): Schema => $schema->components($card))
             ->createCardAction($this->cardCreation())
             ->cardAction('edit')
             ->cardActions($this->cardActions())
@@ -96,47 +92,74 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
     }
 
     /**
-     * @param  Collection<string, mixed>  $customFields
+     * @return list<Component>
      */
-    private function cardSchema(Schema $schema, Collection $customFields): Schema
+    protected function cardLeadingComponents(): array
     {
-        $amountField = $customFields->get('custom_fields.'.OpportunityCustomField::AMOUNT->value)
-            ?->visible(fn (?string $state): bool => filled($state))
-            ->badge()
-            ->color('success')
-            ->icon('lucide-circle-dollar-sign')
-            ->grow(false)
-            ->hiddenLabel();
-
-        $closeDateField = $customFields->get('custom_fields.'.OpportunityCustomField::CLOSE_DATE->value)
-            ?->visible(fn (?string $state): bool => filled($state))
-            ->badge()
-            ->color('gray')
-            ->icon('lucide-calendar')
-            ->grow(false)
-            ->hiddenLabel()
-            ->formatStateUsing(fn (?string $state): string => $this->formatCloseDateBadge($state));
-
-        return $schema
-            ->components([
-                View::make('filament.app.board-card-preview-trigger')
-                    ->viewData(fn (Opportunity $record): array => [
-                        'open' => PreviewRecordAction::openForRecord($record),
-                    ]),
-                CardFlex::make([
-                    RecordChipEntry::make('company.name')
-                        ->chipSize('sm')
-                        ->hiddenLabel()
-                        ->visible(fn (?string $state): bool => filled($state))
-                        ->color('gray')
-                        ->size(TextSize::ExtraSmall)
-                        ->grow(),
+        return [
+            View::make('filament.app.board-card-preview-trigger')
+                ->viewData(fn (Opportunity $record): array => [
+                    'open' => PreviewRecordAction::openForRecord($record),
                 ]),
-                CardFlex::make([
-                    $amountField,
-                    $closeDateField,
-                ])->align('center'),
-            ]);
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function blockCardAttributes(): array
+    {
+        return ['company'];
+    }
+
+    protected function cardEntry(string $key, ?Entry $customEntry): ?Component
+    {
+        return match ($key) {
+            'company' => $this->companyChip(),
+            'custom_fields.'.OpportunityCustomField::AMOUNT->value => $this->amountBadge($customEntry),
+            'custom_fields.'.OpportunityCustomField::CLOSE_DATE->value => $this->closeDateBadge($customEntry),
+            default => null,
+        };
+    }
+
+    private function companyChip(): CardFlex
+    {
+        return CardFlex::make([
+            RecordChipEntry::make('company.name')
+                ->chipSize('sm')
+                ->hiddenLabel()
+                ->visible(fn (?string $state): bool => filled($state))
+                ->color('gray')
+                ->size(TextSize::ExtraSmall)
+                ->grow(),
+        ]);
+    }
+
+    private function amountBadge(?Entry $entry): ?TextEntry
+    {
+        return $entry instanceof TextEntry
+            ? $entry
+                ->visible(fn (?string $state): bool => filled($state))
+                ->badge()
+                ->color('success')
+                ->icon('lucide-circle-dollar-sign')
+                ->grow(false)
+                ->hiddenLabel()
+            : null;
+    }
+
+    private function closeDateBadge(?Entry $entry): ?TextEntry
+    {
+        return $entry instanceof TextEntry
+            ? $entry
+                ->visible(fn (?string $state): bool => filled($state))
+                ->badge()
+                ->color('gray')
+                ->icon('lucide-calendar')
+                ->grow(false)
+                ->hiddenLabel()
+                ->formatStateUsing(fn (?string $state): string => $this->formatCloseDateBadge($state))
+            : null;
     }
 
     public function previewAction(): PreviewRecordAction

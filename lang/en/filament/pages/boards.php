@@ -25,6 +25,12 @@ return [
         'no_value_column' => 'No :attribute',
     ],
 
+    'card_attributes' => [
+        'description' => 'Description preview',
+        'checklist' => 'Checklist progress',
+        'empty' => 'Empty',
+    ],
+
     'layout' => [
         'narrow' => 'Narrow columns',
         'wide' => 'Wide columns',

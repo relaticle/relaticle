@@ -183,6 +183,17 @@ enum CustomFieldType: string
         return in_array($this, [self::SELECT, self::RADIO, self::TOGGLE_BUTTONS], true);
     }
 
+    public function fitsOnCard(): bool
+    {
+        return match ($this) {
+            self::TEXTAREA, self::RICH_EDITOR, self::RECORD, self::FILE_UPLOAD => false,
+            self::TEXT, self::NUMBER, self::EMAIL, self::PHONE, self::LINK, self::DOMAIN,
+            self::CHECKBOX, self::CHECKBOX_LIST, self::RADIO, self::TAGS_INPUT, self::COLOR_PICKER,
+            self::TOGGLE, self::TOGGLE_BUTTONS, self::CURRENCY, self::DATE, self::DATE_TIME,
+            self::SELECT, self::MULTI_SELECT => true,
+        };
+    }
+
     public function filterFieldKind(): ?FilterFieldKind
     {
         return match ($this) {

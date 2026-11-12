@@ -7,6 +7,7 @@ use App\Actions\CustomFields\DeleteCustomField;
 use App\Actions\Views\ReorderBoardStages;
 use App\Actions\Views\SetBoardColumnField;
 use App\Actions\Views\SetBoardColumnVisibility;
+use App\Actions\Views\SetCardAttributes;
 use App\Data\BoardStateData;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\TaskField;
@@ -14,6 +15,7 @@ use App\Enums\SavedViewType;
 use App\Enums\WorkspaceRole;
 use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Actions\MoveCardAction;
+use App\Filament\Concerns\HasBoardCards;
 use App\Filament\Concerns\HasBoardStageOrder;
 use App\Filament\Concerns\HasBoardViews;
 use App\Filament\Concerns\HasViewSwitcher;
@@ -28,6 +30,7 @@ use App\Models\SavedView;
 use App\Models\TablePreference;
 use App\Models\Task;
 use App\Models\User;
+use App\Queries\Views\BoardCardAttributesQuery;
 use App\Queries\Views\BoardColumnFieldsQuery;
 use App\Support\ChecklistHtml;
 use Filament\Actions\Testing\TestAction;
@@ -47,7 +50,7 @@ use Relaticle\Flowforge\Services\DecimalPosition;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(ReorderBoardStages::class, SetBoardColumnField::class, SetBoardColumnVisibility::class, BoardColumnFieldsQuery::class, TasksBoard::class, CreateTaskAction::class, ChecklistHtml::class, MoveCardAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
+mutates(SetCardAttributes::class, BoardCardAttributesQuery::class, HasBoardCards::class, ReorderBoardStages::class, SetBoardColumnField::class, SetBoardColumnVisibility::class, BoardColumnFieldsQuery::class, TasksBoard::class, CreateTaskAction::class, ChecklistHtml::class, MoveCardAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -1588,3 +1591,72 @@ it('exports the tasks the bar\'s filters match from the board', function (bool $
     'no status column off' => [false],
     'no status column on' => [true],
 ]);
+
+it('reads every attribute a card can show without a query per card', function (): void {
+    $keys = resolve(BoardCardAttributesQuery::class)->get($this->user, $this->workspace, CrmEntity::Task);
+    livewire(TasksBoard::class)->call('setCardAttributes', $keys);
+    $countQueries = function (): int {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        freshTasksBoard()->assertOk();
+        $count = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        return $count;
+    };
+
+    tasksBoardCardWithDescription($this, tasksBoardChecklistHtml());
+    $withOneCard = $countQueries();
+
+    foreach (range(1, 4) as $ignored) {
+        tasksBoardCardWithDescription($this, tasksBoardChecklistHtml())->assignees()->attach($this->user);
+    }
+
+    expect($countQueries())->toBe($withOneCard);
+});
+
+it('draws a task card as before when nothing is chosen', function (): void {
+    $priority = taskPriority();
+    $task = tasksBoardCardWithDescription($this, '<p>Plan the visit</p>'.tasksBoardChecklistHtml());
+    $task->saveCustomFieldValue($priority, $priority->options->firstWhere('name', 'High')->getKey());
+    $task->saveCustomFieldValue(WorkspaceCustomField::byCode($this->workspace->getKey(), 'task', 'due_date'), Date::parse('2031-03-04', 'UTC'));
+    $task->assignees()->attach($this->user);
+
+    livewire(TasksBoard::class)
+        ->assertSeeInOrder(['Plan the visit', '1/2', 'High', 'Mar 4, 2031', $this->user->profile_photo_url]);
+});
+
+it('draws the chosen task attributes in their order', function (): void {
+    $task = tasksBoardCardWithDescription($this, '<p>Plan the visit</p>'.tasksBoardChecklistHtml());
+    $task->assignees()->attach($this->user);
+
+    $component = livewire(TasksBoard::class)->call('setCardAttributes', ['assignees', 'checklist']);
+
+    expect($component->html())->toMatch('/'.preg_quote($this->user->profile_photo_url, '/').'.*data-checklist-progress/s')
+        ->not->toContain('Plan the visit');
+});
+
+it('draws an empty task attribute with its label when empty attributes are kept', function (): void {
+    tasksBoardCardWithDescription($this, '<p>Plain</p>');
+    $component = livewire(TasksBoard::class)->call('setHideEmptyAttributes', false);
+
+    expect($component->html())->toMatch('/fi-sc-text[^>]*>\s*Checklist progress\s*<.*fi-sc-text[^>]*>\s*Empty\s*</s');
+});
+
+it('refuses a key the task card cannot show', function (string $key): void {
+    expect(fn () => resolve(SetCardAttributes::class)->execute($this->user, $this->workspace, CrmEntity::Task, [$key]))
+        ->toThrow(fn (HttpException $exception): bool => $exception->getStatusCode() === 422);
+
+    expect(TablePreference::query()->withoutGlobalScopes()->count())->toBe(0);
+})->with(['company', 'contact', 'bogus', 'custom_fields.description']);
+
+it('offers no description or checklist while the description attribute is inactive', function (): void {
+    CustomField::query()->forEntity(Task::class)->where('code', TaskField::DESCRIPTION)->firstOrFail()->forceFill(['active' => false])->save();
+
+    $keys = resolve(BoardCardAttributesQuery::class)->get($this->user, $this->workspace, CrmEntity::Task);
+
+    expect($keys)->not->toContain('description', 'checklist')
+        ->and($keys)->toContain('assignees', 'creator');
+
+    freshTasksBoard()->assertOk();
+});

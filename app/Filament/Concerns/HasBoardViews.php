@@ -289,6 +289,7 @@ trait HasBoardViews
         $this->storedBoardState = null;
         $this->resolvedBoardColumnField = null;
         $this->visibleSavedViews = null;
+        $this->forgetBoardCards();
     }
 
     protected function currentBoardState(): BoardStateData
@@ -545,4 +546,6 @@ trait HasBoardViews
      * @return Builder<TModel>
      */
     abstract protected function withoutHiddenColumnCards(Builder $query): Builder;
+
+    abstract protected function forgetBoardCards(): void;
 }
