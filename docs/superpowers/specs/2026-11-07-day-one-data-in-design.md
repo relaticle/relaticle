@@ -103,6 +103,9 @@ Decisions 2, 3, 6 and 8 below are replaced. The rest stands.
 - **Data that arrives behind a pending proposal** is announced after the owner approves or
   discards it. The turn is dropped at the time, remembered for 24 hours, and opened again when
   Rela's reply to the decision ends.
+- **An expired proposal** opens the dropped turn too, from the command that expires proposals.
+- **Data that arrives while the first greeting streams** is remembered and announced when the
+  greeting ends. A chat that was never opened stays with the greeting, which reads what arrived.
 
 ## What was decided (2026-11-07)
 

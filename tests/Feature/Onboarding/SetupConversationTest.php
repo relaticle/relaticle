@@ -374,11 +374,10 @@ function endRunningTurn(Workspace $workspace): void
 
 function assertDataArrivedPushed(int $times): void
 {
-    Queue::assertPushed(
+    expect(Queue::pushed(
         ProcessChatMessage::class,
-        $times,
         fn (ProcessChatMessage $job): bool => $job->origin === MessageOrigin::DataArrived,
-    );
+    ))->toHaveCount($times);
 }
 
 it('opens a data arrived turn in the setup chat when an onboarding import finishes', function (): void {
@@ -663,6 +662,66 @@ it('opens the dropped data arrived turn only after a decision, not after a typed
     runSetupChatTurn($user, $workspace, MessageOrigin::Typed);
 
     assertDataArrivedPushed(1);
+});
+
+it('opens the dropped data arrived turn once the pending proposal expires', function (): void {
+    Queue::fake([ProcessChatMessage::class]);
+    $user = User::factory()->create();
+    $workspace = setupWorkspaceWithGreeting($user);
+    $proposal = pendingProposalIn($workspace, $user);
+
+    $user->notifyNow(new ImportFinishedNotification(finishedImport($user, $workspace), ImportOutcome::Completed), ['database']);
+    Queue::pushed(ProcessChatMessage::class)->first()->handle(resolve(CreditService::class));
+
+    $this->travelTo(now()->addMinutes(16));
+    $this->artisan('chat:expire-pending-actions')->assertSuccessful();
+
+    expect($proposal->fresh()->status)->toBe(PendingActionStatus::Expired);
+    assertDataArrivedPushed(2);
+});
+
+it('opens no data arrived turn when a proposal expires and nothing arrived', function (): void {
+    Queue::fake([ProcessChatMessage::class]);
+    $user = User::factory()->create();
+    $workspace = setupWorkspaceWithGreeting($user);
+    pendingProposalIn($workspace, $user);
+
+    $this->travelTo(now()->addMinutes(16));
+    $this->artisan('chat:expire-pending-actions')->assertSuccessful();
+
+    assertDataArrivedPushed(0);
+});
+
+it('opens an arrival that landed while the greeting was streaming once the greeting ends', function (): void {
+    Queue::fake([ProcessChatMessage::class]);
+    $user = User::factory()->create();
+    $workspace = personalWorkspaceFor($user, ['onboarding_use_case' => OnboardingUseCase::Sales]);
+    $this->actingAs($user);
+
+    expect(resolve(StartSetupGreeting::class)->execute($user, $workspace->setupConversation->id))->toBeTrue();
+
+    $user->notifyNow(new ImportFinishedNotification(finishedImport($user, $workspace), ImportOutcome::Completed), ['database']);
+
+    assertDataArrivedPushed(0);
+
+    CrmAssistant::fake(['Hi, your workspace is ready.']);
+    Queue::pushed(ProcessChatMessage::class)->first()->handle(resolve(CreditService::class));
+
+    assertDataArrivedPushed(1);
+});
+
+it('does not repeat an arrival the greeting already covered', function (): void {
+    Queue::fake([ProcessChatMessage::class]);
+    $user = User::factory()->create();
+    $workspace = personalWorkspaceFor($user, ['onboarding_use_case' => OnboardingUseCase::Sales]);
+    $this->actingAs($user);
+
+    $user->notifyNow(new ImportFinishedNotification(finishedImport($user, $workspace), ImportOutcome::Completed), ['database']);
+    resolve(StartSetupGreeting::class)->execute($user, $workspace->setupConversation->id);
+    CrmAssistant::fake(['Hi, twelve people arrived.']);
+    Queue::pushed(ProcessChatMessage::class)->first()->handle(resolve(CreditService::class));
+
+    assertDataArrivedPushed(0);
 });
 
 it('still dispatches the data arrived turn while another turn is running in the setup chat', function (): void {

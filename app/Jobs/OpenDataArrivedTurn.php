@@ -20,7 +20,7 @@ final class OpenDataArrivedTurn implements ShouldQueueAfterCommit
 
     public function __construct(
         private readonly string $workspaceId,
-        private readonly string $sourceKey,
+        private readonly ?string $sourceKey = null,
     ) {}
 
     /** @return list<BindWorkspace> */

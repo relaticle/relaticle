@@ -44,6 +44,8 @@ final readonly class StartDataArrivedTurn
         }
 
         if (! $conversation->messages()->exists()) {
+            $this->rememberWhileGreeting($conversation->id, $sourceKey);
+
             return false;
         }
 
@@ -99,16 +101,33 @@ final readonly class StartDataArrivedTurn
 
     private function sourceKeyToAnnounce(string $conversationId, ?string $sourceKey): ?string
     {
-        $cacheKey = "chat:data-arrived-last:{$conversationId}";
-
         if ($sourceKey === null) {
-            $remembered = Cache::get($cacheKey);
+            $remembered = Cache::get($this->rememberedKey($conversationId));
 
             return is_string($remembered) ? $remembered : null;
         }
 
-        Cache::put($cacheKey, $sourceKey, now()->addHours(self::REMEMBERED_HOURS));
+        $this->remember($conversationId, $sourceKey);
 
         return $sourceKey;
+    }
+
+    // A chat with no stored message and a turn in flight is mid-greeting. That greeting
+    // was prompted before these records landed, so it cannot have announced them.
+    private function rememberWhileGreeting(string $conversationId, ?string $sourceKey): void
+    {
+        if ($sourceKey !== null && TurnPresence::current($conversationId) !== null) {
+            $this->remember($conversationId, $sourceKey);
+        }
+    }
+
+    private function remember(string $conversationId, string $sourceKey): void
+    {
+        Cache::put($this->rememberedKey($conversationId), $sourceKey, now()->addHours(self::REMEMBERED_HOURS));
+    }
+
+    private function rememberedKey(string $conversationId): string
+    {
+        return "chat:data-arrived-last:{$conversationId}";
     }
 }

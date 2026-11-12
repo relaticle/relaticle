@@ -1215,7 +1215,7 @@ final class ProcessChatMessage implements ShouldQueue
     {
         TurnPresence::clear($this->conversationId, $this->turnId);
 
-        if ($this->origin === MessageOrigin::Resume && $this->isSetupConversation()) {
+        if (in_array($this->origin, [MessageOrigin::Resume, MessageOrigin::Greeting], true) && $this->isSetupConversation()) {
             resolve(StartDataArrivedTurn::class)->execute($this->workspace);
         }
     }
