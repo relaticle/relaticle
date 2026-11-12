@@ -100,7 +100,9 @@ Decisions 2, 3, 6 and 8 below are replaced. The rest stands.
   wizard step gets none either, as on main. An install without the setup chat keeps main's rule.
 - **A 14-day window.** The data arrived turn and "Continue with Rela" stay on for the first 14
   days after the workspace is created, the window the goal checks return in.
-- **Still open:** what happens when data arrives while a proposal is pending.
+- **Data that arrives behind a pending proposal** is announced after the owner approves or
+  discards it. The turn is dropped at the time, remembered for 24 hours, and opened again when
+  Rela's reply to the decision ends.
 
 ## What was decided (2026-11-07)
 

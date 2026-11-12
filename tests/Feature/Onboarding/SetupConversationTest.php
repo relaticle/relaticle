@@ -562,6 +562,109 @@ it('opens the turn again after the first one failed', function (): void {
     assertDataArrivedPushed(2);
 });
 
+function pendingProposalIn(Workspace $workspace, User $user): PendingAction
+{
+    return PendingAction::query()->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $user->getKey(),
+        'conversation_id' => $workspace->setupConversation->id,
+        'action_class' => CreateCompany::class,
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'company',
+        'action_data' => ['name' => 'Acme'],
+        'display_data' => ['title' => 'Create Company', 'summary' => 'Create company "Acme"', 'fields' => []],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+}
+
+function runSetupChatTurn(User $user, Workspace $workspace, MessageOrigin $origin): void
+{
+    (new ProcessChatMessage(
+        user: $user->fresh(),
+        workspace: $workspace->fresh(),
+        message: $origin->isTyped() ? 'Hello' : '',
+        conversationId: $workspace->setupConversation->id,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'id' => 'claude-sonnet-5', 'source' => 'auto'],
+        turnId: (string) Str::ulid(),
+        origin: $origin,
+    ))->handle(resolve(CreditService::class));
+}
+
+it('opens the dropped data arrived turn once the owner decides the pending proposal', function (PendingActionStatus $decision): void {
+    Queue::fake([ProcessChatMessage::class]);
+    $user = User::factory()->create();
+    $workspace = setupWorkspaceWithGreeting($user);
+    $proposal = pendingProposalIn($workspace, $user);
+
+    $user->notifyNow(new ImportFinishedNotification(finishedImport($user, $workspace), ImportOutcome::Completed), ['database']);
+    Queue::pushed(ProcessChatMessage::class)->first()->handle(resolve(CreditService::class));
+
+    assertDataArrivedPushed(1);
+
+    $proposal->update(['status' => $decision]);
+    CrmAssistant::fake(['Done.']);
+    runSetupChatTurn($user, $workspace, MessageOrigin::Resume);
+
+    assertDataArrivedPushed(2);
+    expect(TurnPresence::current($workspace->setupConversation->id)['origin'] ?? null)->toBe(MessageOrigin::DataArrived->value);
+})->with([PendingActionStatus::Approved, PendingActionStatus::Rejected]);
+
+it('keeps the dropped data arrived turn waiting while another proposal is still pending', function (): void {
+    Queue::fake([ProcessChatMessage::class]);
+    $user = User::factory()->create();
+    $workspace = setupWorkspaceWithGreeting($user);
+    pendingProposalIn($workspace, $user);
+
+    $user->notifyNow(new ImportFinishedNotification(finishedImport($user, $workspace), ImportOutcome::Completed), ['database']);
+    Queue::pushed(ProcessChatMessage::class)->first()->handle(resolve(CreditService::class));
+    runSetupChatTurn($user, $workspace, MessageOrigin::Resume);
+
+    assertDataArrivedPushed(1);
+});
+
+it('announces an arrival once, however many decisions follow it', function (): void {
+    Queue::fake([ProcessChatMessage::class]);
+    $user = User::factory()->create();
+    $workspace = setupWorkspaceWithGreeting($user);
+
+    $user->notifyNow(new ImportFinishedNotification(finishedImport($user, $workspace), ImportOutcome::Completed), ['database']);
+    CrmAssistant::fake(['Twelve people arrived.', 'Done.', 'Done again.']);
+    Queue::pushed(ProcessChatMessage::class)->first()->handle(resolve(CreditService::class));
+
+    runSetupChatTurn($user, $workspace, MessageOrigin::Resume);
+    runSetupChatTurn($user, $workspace, MessageOrigin::Resume);
+
+    assertDataArrivedPushed(1);
+});
+
+it('opens no data arrived turn after a decision when nothing arrived', function (): void {
+    Queue::fake([ProcessChatMessage::class]);
+    $user = User::factory()->create();
+    $workspace = setupWorkspaceWithGreeting($user);
+    CrmAssistant::fake(['Done.']);
+
+    runSetupChatTurn($user, $workspace, MessageOrigin::Resume);
+
+    assertDataArrivedPushed(0);
+});
+
+it('opens the dropped data arrived turn only after a decision, not after a typed message', function (): void {
+    Queue::fake([ProcessChatMessage::class]);
+    $user = User::factory()->create();
+    $workspace = setupWorkspaceWithGreeting($user);
+    $proposal = pendingProposalIn($workspace, $user);
+
+    $user->notifyNow(new ImportFinishedNotification(finishedImport($user, $workspace), ImportOutcome::Completed), ['database']);
+    Queue::pushed(ProcessChatMessage::class)->first()->handle(resolve(CreditService::class));
+    $proposal->update(['status' => PendingActionStatus::Rejected]);
+    CrmAssistant::fake(['Hello.']);
+
+    runSetupChatTurn($user, $workspace, MessageOrigin::Typed);
+
+    assertDataArrivedPushed(1);
+});
+
 it('still dispatches the data arrived turn while another turn is running in the setup chat', function (): void {
     Queue::fake([ProcessChatMessage::class]);
     $user = User::factory()->create();

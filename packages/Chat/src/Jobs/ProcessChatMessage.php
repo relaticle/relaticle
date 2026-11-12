@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Jobs;
 
+use App\Actions\Onboarding\StartDataArrivedTurn;
 use App\Contracts\Entitlements;
 use App\Features\SetupConversation;
 use App\Models\User;
@@ -383,7 +384,7 @@ final class ProcessChatMessage implements ShouldQueue
                 // then() ran before this one), so a reload can rebuild the turn
                 // from the database. Any throw above lands in failed(), which
                 // clears too.
-                TurnPresence::clear($this->conversationId, $this->turnId);
+                $this->closeCompletedTurn();
             });
         } catch (Throwable $e) {
             // Rate-limit, overloaded, dropped-connection and provider stream errors are
@@ -1208,6 +1209,15 @@ final class ProcessChatMessage implements ShouldQueue
     private function modelLabel(): ?string
     {
         return resolve(ModelRegistry::class)->find((string) ($this->resolved['id'] ?? ''))?->displayLabel();
+    }
+
+    private function closeCompletedTurn(): void
+    {
+        TurnPresence::clear($this->conversationId, $this->turnId);
+
+        if ($this->origin === MessageOrigin::Resume && $this->isSetupConversation()) {
+            resolve(StartDataArrivedTurn::class)->execute($this->workspace);
+        }
     }
 
     private function isSetupConversation(): bool
