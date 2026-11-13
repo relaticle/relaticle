@@ -162,7 +162,7 @@ button.fi-filter-seg {
     @apply flex h-menu-row w-full items-center gap-2 rounded-menu-item px-2 text-start text-sm whitespace-nowrap hover:bg-gray-50 focus-visible:bg-gray-50 focus-visible:outline-0 dark:hover:bg-white/5 dark:focus-visible:bg-white/5;
 
     & svg:not(.fi-menu-check) {
-        @apply size-menu-icon shrink-0 text-gray-500 dark:text-gray-400;
+        @apply size-menu-icon shrink-0 text-gray-400 dark:text-gray-500;
     }
 
     &.fi-danger,
@@ -203,7 +203,7 @@ button.fi-filter-seg {
     @apply flex h-8 min-w-0 items-center gap-2 rounded-lg px-2.5 text-sm whitespace-nowrap ring-1 ring-gray-950/10 hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:outline-0 dark:ring-white/15 dark:hover:bg-white/5 dark:focus-visible:ring-primary-500;
 
     & svg {
-        @apply size-4 shrink-0 text-gray-500 dark:text-gray-400;
+        @apply size-4 shrink-0 text-gray-400 dark:text-gray-500;
     }
 }
 
