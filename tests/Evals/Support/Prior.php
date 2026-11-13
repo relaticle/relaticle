@@ -9,13 +9,16 @@ use App\Enums\WorkspaceRole;
 use App\Models\Company;
 use App\Models\Task;
 use App\Models\User;
+use App\Services\WorkspaceActivationFacts;
 use App\Support\CurrentWorkspace;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Agents\CrmAssistant;
+use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AgentConversationMessage;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\PendingActionEnvelope;
@@ -66,6 +69,37 @@ final readonly class Prior
                 ->where('workspace_id', $w->workspace->getKey())
                 ->update(['creation_source' => CreationSource::SAMPLE->value]);
         }
+    }
+
+    public static function noRecords(EvalWorkspace $w): void
+    {
+        foreach (['companies', 'people', 'tasks', 'notes', 'opportunities'] as $table) {
+            DB::table($table)->where('workspace_id', $w->workspace->getKey())->delete();
+        }
+
+        resolve(WorkspaceActivationFacts::class)->forget($w->workspace);
+    }
+
+    public static function greetedInAnEmptyWorkspace(EvalWorkspace $w): string
+    {
+        self::noRecords($w);
+
+        $conversationId = (string) $w->conversation(AgentConversation::PURPOSE_SETUP)->getKey();
+
+        self::userRow($w, $conversationId, (string) MessageOrigin::Greeting->opener());
+        self::assistantRow($w, $conversationId, "Welcome, Olive! Your workspace is ready to track deals from Prospecting through Closed Won.\n\n**How do you want to bring your clients in?** Pick a choice below, or a pasted list works too.", []);
+
+        return $conversationId;
+    }
+
+    public static function askedForOneCompany(EvalWorkspace $w): string
+    {
+        $conversationId = self::greetedInAnEmptyWorkspace($w);
+
+        self::userRow($w, $conversationId, 'hi');
+        self::assistantRow($w, $conversationId, 'Hi! What is one company you work with right now? Its name alone is enough to get started.', []);
+
+        return $conversationId;
     }
 
     public static function viewer(EvalWorkspace $w): EvalWorkspace

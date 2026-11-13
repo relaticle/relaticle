@@ -244,7 +244,33 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         if (!step?.prompt || this.isStreaming || this.rateLimit) return;
         this.input = step.prompt;
         this.localEditor()?.setText(step.prompt);
-        this.$nextTick(() => this.sendMessage());
+        this.$nextTick(() => {
+            // sendMessage() reads the id before its first await, so clearing it
+            // right after the call keeps a send it refused from tagging the next one.
+            this.pendingNextStepId = step.id ?? null;
+            this.sendMessage();
+            this.pendingNextStepId = null;
+        });
+    },
+
+    // Setup options carry an id, their own icon and sit under the reply.
+    // Plain suggester chips in the same conversation carry no id.
+    showsSetupButtons() {
+        return this.isSetupConversation
+            && this.nextSteps.length > 0
+            && this.nextSteps.every((step) => !!step.id);
+    },
+
+    // Only an http(s) address becomes a link: the row comes from stored meta.
+    nextStepLink(step) {
+        if (step?.kind !== 'link' || !step.url) return null;
+        try {
+            const url = new URL(step.url, window.location.href);
+            if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+            return { href: step.url, external: url.origin !== window.location.origin };
+        } catch {
+            return null;
+        }
     },
 
     // Normalizes a server-fetched message row for the transcript: stable
@@ -1184,6 +1210,45 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
             this.copiedKey = msg.clientKey;
             clearTimeout(this._copiedTimer);
             this._copiedTimer = setTimeout(() => { this.copiedKey = null; }, 1500);
+        } catch (_) { /* clipboard blocked, silently ignore */ }
+    },
+
+    // Runs after sanitizing, which drops every <button> and every `target` a
+    // reply carries: the copy button and the new-tab links are ours alone.
+    decorateReply(root) {
+        root.querySelectorAll('a[href]').forEach((link) => {
+            if (new URL(link.href, window.location.href).origin === window.location.origin) return;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+        });
+
+        root.querySelectorAll('pre').forEach((pre) => {
+            if (pre.querySelector('[data-code-copy]')) return;
+
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.dataset.codeCopy = '';
+            button.className = 'absolute end-1.5 top-1.5 inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500';
+            this.showCodeCopyState(button, false);
+            button.addEventListener('click', () => this.copyCode(pre, button));
+
+            pre.classList.add('relative', 'pe-10');
+            pre.append(button);
+        });
+    },
+
+    showCodeCopyState(button, copied) {
+        const label = copied ? this.codeCopy.copied : this.codeCopy.copy;
+        button.setAttribute('aria-label', label);
+        button.title = label;
+        button.innerHTML = copied ? this.codeCopy.copiedIcon : this.codeCopy.copyIcon;
+    },
+
+    async copyCode(pre, button) {
+        try {
+            await navigator.clipboard.writeText((pre.querySelector('code')?.innerText ?? '').trimEnd());
+            this.showCodeCopyState(button, true);
+            setTimeout(() => this.showCodeCopyState(button, false), 1500);
         } catch (_) { /* clipboard blocked, silently ignore */ }
     },
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Livewire;
 
+use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
@@ -49,6 +50,20 @@ final class ImportWizard extends Component implements HasActions, HasForms
     public int $columnCount = 0;
 
     public bool $importStarted = false;
+
+    /** @var (Closure(Import): ?string)|null */
+    private static ?Closure $continueUrlResolver = null;
+
+    /** @param  (Closure(Import): ?string)|null  $resolver */
+    public static function continueUrlUsing(?Closure $resolver): void
+    {
+        self::$continueUrlResolver = $resolver;
+    }
+
+    public static function continueUrl(Import $import): ?string
+    {
+        return self::$continueUrlResolver?->__invoke($import);
+    }
 
     public function mount(ImportEntityType $entityType, ?string $returnUrl = null): void
     {

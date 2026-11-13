@@ -32,6 +32,7 @@ use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
 use App\Notifications\Channels\InboxChannel;
 use App\Onboarding\ActivationSteps;
+use App\Onboarding\ContinueWithSetupChat;
 use App\Services\NoBilling;
 use App\Services\SelfHostedEntitlements;
 use App\Services\WorkspaceActivationFacts;
@@ -110,6 +111,7 @@ use Relaticle\ActivityLog\Facades\Timeline;
 use Relaticle\Chat\Support\ChatTelemetry;
 use Relaticle\CustomFields\CustomFields;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
+use Relaticle\ImportWizard\Livewire\ImportWizard;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\Ink\Filament\Resources\PostResource;
 use Relaticle\Ink\Ink;
@@ -538,6 +540,8 @@ final class AppServiceProvider extends ServiceProvider
 
         // Livewire matches persistent middleware by class, so the panel's alias alone skips update requests.
         Livewire::addPersistentMiddleware(ReadAcrossWorkspaces::class);
+
+        ImportWizard::continueUrlUsing((new ContinueWithSetupChat)(...));
     }
 
     private function rateLimitTokenId(?object $token): ?string

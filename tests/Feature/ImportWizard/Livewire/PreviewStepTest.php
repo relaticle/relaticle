@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Actions\Onboarding\CreateSetupConversation;
 use App\Events\WorkspaceCreated;
+use App\Features\SetupConversation;
+use App\Filament\Pages\ChatConversation;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
@@ -14,6 +17,7 @@ use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
+use Laravel\Pennant\Feature;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Relaticle\ImportWizard\Data\ColumnData;
@@ -764,6 +768,91 @@ it('downloadFailedRows action is hidden when there are no failed rows', function
     $component = mountPreviewStep($this);
 
     $component->assertDontSee('Download Failed Rows');
+});
+
+function completePreviewImport(object $context): void
+{
+    createPreviewReadyStore($context, ['Name'], [
+        makePreviewRow(2, ['Name' => 'John']),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    $context->import->update([
+        'status' => ImportStatus::Completed,
+        'created_rows' => 1,
+        'updated_rows' => 0,
+        'skipped_rows' => 0,
+        'failed_rows' => 0,
+    ]);
+}
+
+function onboardingWorkspaceWithSetupChat(object $context): string
+{
+    Feature::define(SetupConversation::class, true);
+
+    $context->workspace->forceFill(['personal_workspace' => true])->save();
+
+    return resolve(CreateSetupConversation::class)->execute($context->workspace->fresh());
+}
+
+it('shows continue with rela after an onboarding import completes', function (): void {
+    $conversationId = onboardingWorkspaceWithSetupChat($this);
+    completePreviewImport($this);
+
+    mountPreviewStep($this)
+        ->assertSee('Continue with Rela')
+        ->assertSeeHtml('href="'.ChatConversation::getUrl(['conversationId' => $conversationId, 'tenant' => $this->workspace]).'"');
+});
+
+it('names the configured assistant on the continue button', function (): void {
+    config()->set('chat.assistant_name', 'Aria');
+    onboardingWorkspaceWithSetupChat($this);
+    completePreviewImport($this);
+
+    mountPreviewStep($this)
+        ->assertSee('Continue with Aria')
+        ->assertDontSee('Continue with Rela');
+});
+
+it('shows no continue button to a workspace that has no setup chat', function (): void {
+    completePreviewImport($this);
+
+    mountPreviewStep($this)->assertDontSee('Continue with Rela');
+});
+
+it('shows continue with rela only in the first 14 days of a workspace', function (int $daysOld, bool $shown): void {
+    onboardingWorkspaceWithSetupChat($this);
+    $this->workspace->forceFill(['created_at' => now()->subDays($daysOld)->addMinute()])->save();
+    completePreviewImport($this);
+
+    $step = mountPreviewStep($this);
+
+    $shown ? $step->assertSee('Continue with Rela') : $step->assertDontSee('Continue with Rela');
+})->with([
+    'day 13' => [13, true],
+    'the last minute of day 14' => [14, true],
+    'day 15' => [15, false],
+]);
+
+it('shows no continue button to a teammate of the workspace owner', function (): void {
+    onboardingWorkspaceWithSetupChat($this);
+    completePreviewImport($this);
+
+    $this->actingAs(User::factory()->create());
+
+    mountPreviewStep($this)->assertDontSee('Continue with Rela');
+});
+
+it('shows no continue button before the import completes', function (): void {
+    onboardingWorkspaceWithSetupChat($this);
+    createPreviewReadyStore($this, ['Name'], [
+        makePreviewRow(2, ['Name' => 'John']),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    mountPreviewStep($this)->assertDontSee('Continue with Rela');
 });
 
 describe('on a remote store disk', function (): void {

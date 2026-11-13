@@ -403,6 +403,22 @@ it('seeds sample data at the use case step when no mailbox is connected', functi
     expect(Company::query()->where('workspace_id', $workspace->getKey())->where('creation_source', CreationSource::SAMPLE)->count())->toBe(4);
 });
 
+it('seeds no sample data for an owner who lands in the setup chat', function (): void {
+    Feature::define(OnboardSeed::class, true);
+    Feature::define(SetupConversation::class, true);
+
+    $user = User::factory()->create();
+    $workspace = workspaceInSetup($user);
+
+    livewire(SetupWorkspace::class)
+        ->fillForm(['onboarding_use_case' => OnboardingUseCase::Sales->value, 'onboarding_context' => ['outbound']])
+        ->call('saveUseCase')
+        ->assertHasNoFormErrors();
+
+    expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Invite)
+        ->and(Company::query()->where('workspace_id', $workspace->getKey())->exists())->toBeFalse();
+});
+
 it('seeds no sample data for an owner who connected a mailbox', function (): void {
     Feature::define(OnboardSeed::class, true);
 

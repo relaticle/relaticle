@@ -345,6 +345,7 @@
                                                 <template x-if="seg.type === 'html'">
                                                     <div
                                                         x-html="seg.html"
+                                                        x-effect="seg.html; $nextTick(() => decorateReply($el))"
                                                         class="{{ $proseClasses }}"
                                                     ></div>
                                                 </template>
@@ -608,29 +609,66 @@
              out-specifies a margin utility on one of its children; x-show only
              ever writes `display`, so it leaves this alone. --}}
         <div
-            x-show="!hasPendingProposal && nextSteps.length > 0"
+            x-show="!hasPendingProposal && !isStreaming && nextSteps.length > 0"
             {{-- The panel ships no `[x-cloak]` rule (see the jump-to-latest
                  button below), so the pre-Alpine hidden state is an inline
                  style; x-show clears it when it flips true. --}}
-            style="display: none; margin-top: auto"
+            style="display: none"
+            :style="{ marginTop: showsSetupButtons() ? '' : 'auto' }"
             x-transition:enter="motion-safe:transition motion-safe:duration-[var(--duration-base)] motion-safe:ease-[var(--ease-out-expo)]"
             x-transition:enter-start="motion-safe:translate-y-1 motion-safe:opacity-0"
             x-transition:enter-end="motion-safe:translate-y-0 motion-safe:opacity-100"
-            class="flex flex-col items-start gap-0.5 pt-5"
+            class="flex flex-col items-start gap-0.5"
+            :class="showsSetupButtons() ? 'pt-0' : 'pt-5'"
             role="group"
             aria-label="{{ __('Suggested next steps') }}"
         >
-            <template x-for="step in nextSteps" :key="step.prompt">
-                <button
-                    type="button"
-                    data-next-step
-                    x-on:click="sendNextStep(step)"
-                    class="group/step flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm text-gray-500 transition hover:bg-[var(--surface-card-bg)] hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:text-gray-100"
-                >
-                    <x-lucide-corner-down-right class="h-4 w-4 shrink-0 text-gray-400 transition group-hover/step:text-primary-500 dark:text-gray-500" aria-hidden="true" />
+            <template x-for="step in nextSteps" :key="step.id ?? step.prompt ?? step.url">
+                <div class="contents">
+                    <template x-if="!showsSetupButtons()">
+                        <button
+                            type="button"
+                            data-next-step
+                            x-on:click="sendNextStep(step)"
+                            class="group/step flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm text-gray-500 transition hover:bg-[var(--surface-card-bg)] hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:text-gray-100"
+                        >
+                            <x-lucide-corner-down-right class="h-4 w-4 shrink-0 text-gray-400 transition group-hover/step:text-primary-500 dark:text-gray-500" aria-hidden="true" />
 
-                    <span class="truncate" x-text="step.label"></span>
-                </button>
+                            <span class="truncate" x-text="step.label"></span>
+                        </button>
+                    </template>
+
+                    <template x-if="showsSetupButtons() && step.kind !== 'link'">
+                        <button
+                            type="button"
+                            data-next-step
+                            x-on:click="sendNextStep(step)"
+                            class="group/step flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm text-gray-500 transition hover:bg-[var(--surface-card-bg)] hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:text-gray-100"
+                        >
+                            <span class="contents text-gray-400 transition group-hover/step:text-primary-500 dark:text-gray-500" aria-hidden="true" x-html="setupButtonIcons[step.icon] ?? ''"></span>
+
+                            <span class="truncate" x-text="step.label"></span>
+                        </button>
+                    </template>
+
+                    <template x-if="showsSetupButtons() && nextStepLink(step)">
+                        <a
+                            data-next-step
+                            :href="nextStepLink(step).href"
+                            :target="nextStepLink(step).external ? '_blank' : null"
+                            :rel="nextStepLink(step).external ? 'noopener noreferrer' : null"
+                            class="group/step flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm text-gray-500 transition hover:bg-[var(--surface-card-bg)] hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:text-gray-100 no-underline"
+                        >
+                            <span class="contents text-gray-400 transition group-hover/step:text-primary-500 dark:text-gray-500" aria-hidden="true" x-html="setupButtonIcons[step.icon] ?? ''"></span>
+
+                            <span class="truncate" x-text="step.label"></span>
+
+                            <template x-if="nextStepLink(step).external">
+                                <span class="sr-only">{{ __('onboarding/setup.opens_in_new_tab') }}</span>
+                            </template>
+                        </a>
+                    </template>
+                </div>
             </template>
         </div>
     </div>

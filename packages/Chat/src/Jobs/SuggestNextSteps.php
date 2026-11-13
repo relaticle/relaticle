@@ -8,10 +8,9 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\MaxExceptions;
 use Illuminate\Queue\Attributes\Timeout;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Relaticle\Chat\Actions\RecordNextSteps;
 use Relaticle\Chat\Agents\NextStepSuggester;
-use Relaticle\Chat\Events\NextStepsSuggested;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Support\ChatTelemetry;
 use Throwable;
@@ -70,26 +69,7 @@ final class SuggestNextSteps implements ShouldQueue
             return;
         }
 
-        // The message row is the durable home: a reload reads them back through
-        // ConversationMessagesQuery, so the strip survives a refresh exactly as
-        // the transcript above it does.
-        if (! $this->persist($steps)) {
-            return;
-        }
-
-        // Already persisted; a Reverb hiccup must not fail the job over it. The
-        // client's turn-end reconcile pulls what a dropped broadcast missed.
-        try {
-            broadcast(new NextStepsSuggested(
-                conversationId: $this->conversationId,
-                steps: $steps,
-            ));
-        } catch (Throwable $e) {
-            ChatTelemetry::breadcrumb('broadcast.dropped', [
-                'event' => NextStepsSuggested::class,
-                'reason' => $e->getMessage(),
-            ]);
-        }
+        resolve(RecordNextSteps::class)->execute($this->conversationId, $this->messageId, $steps);
     }
 
     /**
@@ -167,33 +147,6 @@ final class SuggestNextSteps implements ShouldQueue
         }
 
         return $steps;
-    }
-
-    /**
-     * @param  list<array{label: string, prompt: string}>  $steps
-     */
-    private function persist(array $steps): bool
-    {
-        $row = DB::table('agent_conversation_messages')
-            ->where('id', $this->messageId)
-            ->first(['meta']);
-
-        // Regenerating or editing a message deletes the row this job was
-        // dispatched for. Writing the steps to whatever assistant row is latest
-        // instead would attach them to a different answer.
-        if ($row === null) {
-            return false;
-        }
-
-        $existing = json_decode((string) $row->meta, associative: true);
-        $meta = is_array($existing) ? $existing : [];
-        $meta['next_steps'] = $steps;
-
-        DB::table('agent_conversation_messages')
-            ->where('id', $this->messageId)
-            ->update(['meta' => json_encode($meta, JSON_THROW_ON_ERROR)]);
-
-        return true;
     }
 
     private function buildPrompt(): string
