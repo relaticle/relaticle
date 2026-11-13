@@ -422,7 +422,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Download timings
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: junit-*
           path: junit
