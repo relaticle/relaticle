@@ -549,8 +549,10 @@ it('has the greeting give the next step for each mailbox state and ask no questi
     $greeting = MessageOrigin::Greeting->directive();
 
     expect($greeting)
-        ->toContain('With no arrived line and the mailbox line connected, say their mailbox is connected and the people and companies they email appear here as it syncs')
-        ->toContain('With no arrived line and the mailbox line not_connected, ask how they want to bring their clients in and point them to the choices below')
+        ->toContain('With no arrived line and the mailbox line connected, the fact is that their mailbox is connected and the people and companies they email appear here as it syncs')
+        ->toContain('With no arrived line and the mailbox line not_connected, the fact is what their workspace is ready for')
+        ->toContain('the question asks how they want to bring their clients in')
+        ->toContain('the closing sentence only points them to the choices below and says a pasted list works too')
         ->toContain('call no tools in this turn')
         ->not->toContain('data_source')
         ->not->toContain('where their clients live')

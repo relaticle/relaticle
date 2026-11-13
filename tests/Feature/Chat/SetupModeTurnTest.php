@@ -106,8 +106,16 @@ it('runs the greeting on the opener and carries its instructions in the turn blo
 
 it('says a pasted list works in the greeting and never calls records contacts', function (): void {
     expect(MessageOrigin::Greeting->directive())
-        ->toContain('say a pasted list works too')
+        ->toContain('says a pasted list works too')
         ->not->toContain('contacts');
+});
+
+it('keeps the greeting to two short paragraphs with one bold question', function (): void {
+    expect(MessageOrigin::Greeting->directive())
+        ->toContain('Write two short paragraphs, 40 words at most in total')
+        ->toContain('The second paragraph is one question in bold, then one short plain sentence')
+        ->toContain('Bold the question and nothing else')
+        ->not->toContain('Three short paragraphs');
 });
 
 it('saves the greeting as its opener with a greeting origin', function (): void {

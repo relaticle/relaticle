@@ -10,14 +10,19 @@ use Tests\Evals\Support\EvalWorkspace;
 use Tests\Evals\Support\Prior;
 use Tests\Evals\Support\RelaTurn;
 
-it('greets a new sales workspace with people and companies, briefly, without tools', function (): void {
+it('greets a new sales workspace in two short paragraphs with one bold question, without tools', function (): void {
     $greet = function (string $prompt): string {
         $w = EvalWorkspace::seed();
         $w->workspace->forceFill(['onboarding_use_case' => OnboardingUseCase::Sales])->save();
 
         $reply = (new RelaTurn($w, conversationId: (string) $w->conversation('setup')->getKey(), origin: MessageOrigin::Greeting))($prompt);
 
-        expect(mb_strlen(RelaTurn::$last->text))->toBeLessThan(600);
+        $text = trim(RelaTurn::$last->text);
+
+        expect(mb_strlen($text))->toBeLessThan(320)
+            ->and(preg_split('/\n\s*\n/', $text))->toHaveCount(2)
+            ->and(preg_match_all('/\*\*[^*]+\?\*\*/', $text))->toBe(1)
+            ->and(substr_count($text, '**'))->toBe(2);
 
         return $reply;
     };
@@ -26,8 +31,7 @@ it('greets a new sales workspace with people and companies, briefly, without too
         ->prompt('')
         ->repeat(3)
         ->toMatch('/"tool_calls":\[\]/')
-        ->toPassScorer(new TextMatches('/people/i'))
-        ->toPassScorer(new TextMatches('/compan/i'))
+        ->toPassScorer(new TextMatches('/choices|options?/i'))
         ->toPassScorer(new NoContactWord);
 });
 
