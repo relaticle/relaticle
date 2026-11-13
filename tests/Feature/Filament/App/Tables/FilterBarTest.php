@@ -310,8 +310,8 @@ dataset('compiled conditions', [
     'multi choice has any of' => ['tags', [['field' => 'custom_fields.palette', 'condition' => 'has_any_of', 'value' => ['option:1']]], ['Blue']],
     'multi choice has none of keeps unset' => ['tags', [['field' => 'custom_fields.palette', 'condition' => 'has_none_of', 'value' => ['option:1']]], ['Red', 'Plain']],
     'multi choice is empty' => ['tags', [['field' => 'custom_fields.palette', 'condition' => 'is_empty']], ['Plain']],
-    'checkbox is checked' => ['icp', [['field' => 'custom_fields.fit_score', 'condition' => 'is_checked']], ['Marked']],
-    'checkbox is not checked keeps never stored' => ['icp', [['field' => 'custom_fields.fit_score', 'condition' => 'is_not_checked']], ['Unmarked', 'Never']],
+    'checkbox is checked' => ['icp', [['field' => 'custom_fields.icp', 'condition' => 'is_checked']], ['Marked']],
+    'checkbox is not checked keeps never stored' => ['icp', [['field' => 'custom_fields.icp', 'condition' => 'is_not_checked']], ['Unmarked', 'Never']],
     'multi text contains' => ['emails', [['field' => 'custom_fields.emails', 'condition' => 'contains', 'value' => 'acme']], ['Ann', 'Bob']],
     'multi text does not contain' => ['emails', [['field' => 'custom_fields.emails', 'condition' => 'does_not_contain', 'value' => 'acme.org']], ['Ann', 'Cy']],
     'multi text starts with' => ['emails', [['field' => 'custom_fields.emails', 'condition' => 'starts_with', 'value' => 'robert']], ['Bob']],
@@ -1784,7 +1784,7 @@ it('keeps a deleted record that is not checked and drops one that is, when delet
     collect([$marked, $unmarked, $never])->each->delete();
 
     livewire(ListCompanies::class)
-        ->call('setFilterRules', [['field' => 'custom_fields.fit_score', 'condition' => 'is_not_checked']])
+        ->call('setFilterRules', [['field' => 'custom_fields.icp', 'condition' => 'is_not_checked']])
         ->call('setDeletedRecordsFilter', 'included')
         ->assertCanSeeTableRecords([$markedLive[1], $markedLive[2], $unmarked, $never])
         ->assertCanNotSeeTableRecords([$markedLive[0], $marked]);
