@@ -283,15 +283,14 @@ final readonly class CustomFieldFilter implements Filter
             '$contains', '$starts_with', '$ends_with' => in_array($field->type, self::LIST_STORED_TYPES, true)
                 ? $this->partialListMatch($query, $field, $operator, (string) $operand)
                 : $this->partialTextMatch($query, $field, $valueColumn, $operator, (string) $operand),
-            default => $query->whereHas('customFieldValues', function (Builder $q) use ($field, $valueColumn, $operator, $operand): void {
+            '$in' => $query->whereHas('customFieldValues', fn (Builder $q): Builder => $q
+                ->where('custom_field_id', $field->getKey())
+                ->whereIn($valueColumn, $operand)),
+            '$has_any' => $query->whereHas('customFieldValues', function (Builder $q) use ($field, $operand): void {
                 $q->where('custom_field_id', $field->getKey());
-
-                match ($operator) {
-                    '$in' => $q->whereIn($valueColumn, $operand),
-                    '$has_any' => $this->containsAny($q, $field, $operand),
-                    default => throw new \LogicException("Unsupported custom field filter operator [{$operator}]."),
-                };
+                $this->containsAny($q, $field, $operand);
             }),
+            default => throw new \LogicException("Unsupported custom field filter operator [{$operator}]."),
         };
     }
 
