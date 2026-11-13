@@ -27,6 +27,10 @@ final class PendingInvitationsForUser extends BaseLivewireComponent
     #[Computed]
     public function invitations(): Collection
     {
+        if (! $this->authUser()->hasVerifiedEmail()) {
+            return collect();
+        }
+
         return WorkspaceInvitation::query()
             ->with(['workspace', 'inviter'])
             ->whereRaw('lower(email) = ?', [Str::lower($this->authUser()->email)])

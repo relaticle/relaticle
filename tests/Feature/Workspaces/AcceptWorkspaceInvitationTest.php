@@ -415,6 +415,20 @@ test('a revoked invitation shows the expired state rather than a false success b
     expect($this->workspace->users()->where('users.id', $invitee->id)->exists())->toBeFalse();
 });
 
+test('an unverified account is refused by the accept action itself', function (): void {
+    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'admin']);
+    $invitation->issueToken();
+    $invitation->save();
+
+    $invitee = User::factory()->unverified()->create(['email' => 'invitee@example.test']);
+
+    expect(fn () => resolve(AcceptWorkspaceInvitation::class)->execute($invitee, $invitation))
+        ->toThrow(HttpException::class, __('workspaces.accept.email_unverified'));
+
+    expect($this->workspace->users()->where('users.id', $invitee->id)->exists())->toBeFalse()
+        ->and(WorkspaceInvitation::query()->whereKey($invitation->id)->exists())->toBeTrue();
+});
+
 test('an expired-in-flight invitation refuses even though the caller saw it as valid', function (): void {
     $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
     $invitation->issueToken();

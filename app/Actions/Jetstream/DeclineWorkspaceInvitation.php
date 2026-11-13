@@ -12,6 +12,7 @@ final readonly class DeclineWorkspaceInvitation
 {
     public function decline(User $user, WorkspaceInvitation $invitation): void
     {
+        abort_unless($user->hasVerifiedEmail(), 403);
         abort_unless(
             Str::lower($user->email) === Str::lower($invitation->email),
             403,

@@ -391,6 +391,7 @@ return [
         'joined' => 'You have joined :workspace.',
         'already_member' => 'You are already a member of :workspace.',
         'no_longer_valid' => 'That invitation is no longer valid. It may have been revoked or it may have expired.',
+        'email_unverified' => 'Verify your email address before you join a workspace.',
         'account_deleting' => 'You cannot accept invitations while your account is scheduled for deletion.',
         'workspace_deleting' => 'This workspace is scheduled for deletion and is not accepting new members.',
         'deleting' => [
