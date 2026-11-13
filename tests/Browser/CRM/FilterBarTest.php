@@ -250,6 +250,17 @@ it('closes a list on Escape and a click away without trapping focus', function (
         ->assertNoJavaScriptErrors();
 });
 
+it('keeps the phone keyboard closed and the search at 16px when a filter menu opens', function (): void {
+    $page = ($this->open)(390, 664);
+
+    $page->click('[data-filter-add]')
+        ->assertVisible('[data-filter-find]')
+        ->assertScript('getComputedStyle(document.querySelector("[data-filter-find]")).fontSize', '16px')
+        ->assertScript(filterBarWaitFor('document.activeElement.closest("[data-pop-item]") !== null'), true)
+        ->assertScript('document.activeElement.tagName !== "INPUT"', true)
+        ->assertNoJavaScriptErrors();
+});
+
 it('opens a chip list as a sheet on a phone with every option inside it', function (): void {
     $page = ($this->open)(390, 664);
 
