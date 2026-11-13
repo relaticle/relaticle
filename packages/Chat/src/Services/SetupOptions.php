@@ -42,7 +42,7 @@ final readonly class SetupOptions
         return array_values(array_filter([
             $this->link($user, $workspace, 'upload_file', 'import_people', 'lucide-upload'),
             $this->prompt('add_client', 'lucide-building-2'),
-            $this->link($user, $workspace, 'connect_assistant', 'connect_assistant', 'lucide-plug'),
+            $this->prompt('connect_assistant', 'lucide-plug'),
         ]));
     }
 

@@ -77,11 +77,12 @@ it('offers three ways in to an owner with no mailbox', function (): void {
     $options = resolve(SetupOptions::class)->for($this->user, $this->workspace->fresh());
 
     expect(array_map(fn (SetupOption $option): string => $option->id, $options))->toBe(['upload_file', 'add_client', 'connect_assistant'])
-        ->and(array_map(fn (SetupOption $option): string => $option->kind, $options))->toBe(['link', 'prompt', 'link'])
+        ->and(array_map(fn (SetupOption $option): string => $option->kind, $options))->toBe(['link', 'prompt', 'prompt'])
         ->and($options[0]->url)->toBe(resolve(DestinationResolver::class)->resolve('import_people', $this->workspace))
         ->and($options[1]->prompt)->toBeString()
         ->and($options[1]->url)->toBeNull()
-        ->and($options[2]->url)->toBe(resolve(DestinationResolver::class)->resolve('connect_assistant', $this->workspace));
+        ->and($options[2]->prompt)->toBe(__('onboarding/setup.buttons.connect_assistant.prompt'))
+        ->and($options[2]->url)->toBeNull();
 });
 
 it('offers the mailbox buttons once the owner connected a mailbox', function (): void {
@@ -142,11 +143,11 @@ it('never offers an import button to a member without data import', function ():
         ->and(optionIds($this->user))->toBe(['upload_file', 'add_client', 'connect_assistant']);
 });
 
-it('drops a link whose page is unavailable', function (): void {
+it('keeps the connect option when the help page is unavailable', function (): void {
     config()->set('documentation.public_url', null);
 
     expect(resolve(DestinationResolver::class)->resolve('connect_assistant', $this->workspace))->toBeNull()
-        ->and(optionIds())->toBe(['upload_file', 'add_client']);
+        ->and(optionIds())->toBe(['upload_file', 'add_client', 'connect_assistant']);
 });
 
 /**

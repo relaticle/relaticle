@@ -24,6 +24,7 @@ return [
         ],
         'connect_assistant' => [
             'label' => 'Connect Claude or ChatGPT',
+            'prompt' => 'How do I connect Claude or ChatGPT to this workspace?',
         ],
         'pick_first' => [
             'label' => 'Pick who to work on first',

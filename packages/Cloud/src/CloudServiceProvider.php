@@ -68,6 +68,7 @@ use Relaticle\Cloud\Billing\StripeBilling;
 use Relaticle\Cloud\Entitlements\PlanEntitlements;
 use Relaticle\Cloud\Marketing\Console\Commands\GenerateSitemapCommand;
 use Relaticle\Cloud\Marketing\Console\Commands\ReportStaleCompetitorFactsCommand;
+use Relaticle\Cloud\Marketing\Http\Controllers\AssistantPagesController;
 use Relaticle\Cloud\Marketing\Http\Middleware\AddVaryAcceptHeader;
 use Relaticle\Cloud\Marketing\Mail\NewContactSubmissionMail;
 use Relaticle\Cloud\Marketing\Services\DiscordService;
@@ -211,6 +212,7 @@ final class CloudServiceProvider extends ServiceProvider
             'relaticle.legal.terms_url' => config('relaticle.legal.terms_url') ?: url()->getPublicUrl('terms-of-service'),
             'relaticle.legal.contact_url' => config('relaticle.legal.contact_url') ?: url()->getPublicUrl('contact'),
             'documentation.public_url' => url()->getPublicUrl(),
+            'chat.chatgpt_plugin_url' => config('chat.chatgpt_plugin_url') ?: AssistantPagesController::CHATGPT_PLUGIN_URL,
         ]);
     }
 

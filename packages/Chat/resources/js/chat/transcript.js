@@ -1213,6 +1213,45 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         } catch (_) { /* clipboard blocked, silently ignore */ }
     },
 
+    // Runs after sanitizing, which drops every <button> and every `target` a
+    // reply carries: the copy button and the new-tab links are ours alone.
+    decorateReply(root) {
+        root.querySelectorAll('a[href]').forEach((link) => {
+            if (new URL(link.href, window.location.href).origin === window.location.origin) return;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+        });
+
+        root.querySelectorAll('pre').forEach((pre) => {
+            if (pre.querySelector('[data-code-copy]')) return;
+
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.dataset.codeCopy = '';
+            button.className = 'absolute end-1.5 top-1.5 inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500';
+            this.showCodeCopyState(button, false);
+            button.addEventListener('click', () => this.copyCode(pre, button));
+
+            pre.classList.add('relative', 'pe-10');
+            pre.append(button);
+        });
+    },
+
+    showCodeCopyState(button, copied) {
+        const label = copied ? this.codeCopy.copied : this.codeCopy.copy;
+        button.setAttribute('aria-label', label);
+        button.title = label;
+        button.innerHTML = copied ? this.codeCopy.copiedIcon : this.codeCopy.copyIcon;
+    },
+
+    async copyCode(pre, button) {
+        try {
+            await navigator.clipboard.writeText((pre.querySelector('code')?.innerText ?? '').trimEnd());
+            this.showCodeCopyState(button, true);
+            setTimeout(() => this.showCodeCopyState(button, false), 1500);
+        } catch (_) { /* clipboard blocked, silently ignore */ }
+    },
+
     // Injected translated labels (chat-interface.blade.php); defaults keep the
     // module standalone.
     feedbackCategories: feedbackCategories || [

@@ -345,6 +345,7 @@
                                                 <template x-if="seg.type === 'html'">
                                                     <div
                                                         x-html="seg.html"
+                                                        x-effect="seg.html; $nextTick(() => decorateReply($el))"
                                                         class="{{ $proseClasses }}"
                                                     ></div>
                                                 </template>

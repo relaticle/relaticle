@@ -22,6 +22,7 @@ use App\Services\NoBilling;
 use App\Services\SelfHostedEntitlements;
 use App\Services\WorkspaceActivationFacts;
 use Illuminate\JsonSchema\JsonSchemaTypeFactory;
+use Illuminate\Support\Facades\URL;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\EmailReach;
@@ -498,7 +499,7 @@ it('carries the referral source so the model can offer to connect their assistan
     $agent = resolve(CrmAssistant::class)->withWorkspace($workspace->fresh())->withSetupMode(true);
 
     expect($agent->dynamicInstructions())->toContain('referral: AI')
-        ->and($agent->instructions())->toContain('destination "connect_assistant"');
+        ->and($agent->instructions())->toContain('offering to connect their assistant is a good next action for them, and the Setup mode section says how.');
 });
 
 it('leaves the referral line out when the workspace never answered', function (): void {
@@ -668,8 +669,11 @@ it('gives rela the fixed prompt that has the users own assistant move their clie
     expect(setupAgent($workspace)->dynamicInstructions())
         ->toContain("assistant_prompt: \"{$prompt}\"")
         ->and(resolve(CrmAssistant::class)->staticInstructions())
-        ->toContain('When the user asks how to connect their assistant, such as Claude or ChatGPT, call GuideToPageTool with destination "connect_assistant"')
-        ->toContain('give the assistant_prompt line verbatim')
+        ->toContain('When the user asks how to connect their assistant, such as Claude or ChatGPT, give the steps in this conversation and call no tool.')
+        ->toContain('then the connector_url line verbatim in a code block')
+        ->toContain('With no chatgpt_plugin line, leave the ChatGPT line out.')
+        ->toContain('Then the assistant_prompt line verbatim in a code block they can paste into their assistant, and end there with no closing question.')
+        ->toContain('with those two words linked to the chatgpt_plugin line, which the Citations rules allow here')
         ->toContain('When they ask to see the prompt to paste into their assistant, give that same assistant_prompt line verbatim in a code block, with no rewording and no link.');
 });
 
@@ -952,7 +956,19 @@ it('emits the onboarding block with setup_mode even when the workspace has no us
 
     $prompt = __('onboarding/setup.assistant_prompt');
 
-    expect($agent->instructions())->toContain("<onboarding>\nmailbox: not_connected\nmembers: 1\nassistant_prompt: \"{$prompt}\"\nsetup_mode: true\n</onboarding>");
+    $connector = URL::getMcpUrl();
+    $plugin = config('chat.chatgpt_plugin_url');
+
+    expect($agent->instructions())->toContain("<onboarding>\nmailbox: not_connected\nmembers: 1\nassistant_prompt: \"{$prompt}\"\nconnector_url: {$connector}\nchatgpt_plugin: {$plugin}\nsetup_mode: true\n</onboarding>");
+});
+
+it('leaves the chatgpt plugin line out when the install has no plugin', function (): void {
+    config()->set('chat.chatgpt_plugin_url', null);
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+
+    expect(setupAgent($workspace)->dynamicInstructions())
+        ->toContain('connector_url: '.URL::getMcpUrl()."\n")
+        ->not->toContain('chatgpt_plugin:');
 });
 
 it('drops update, delete and field definition tools in setup mode and keeps the rest', function (): void {
