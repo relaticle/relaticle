@@ -31,6 +31,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Override;
+use Relaticle\ImportWizard\Filament\Pages\ImportNotes;
 
 final class NoteResource extends Resource
 {
@@ -133,6 +134,14 @@ final class NoteResource extends Resource
                 ->toggleable()
                 ->toggledHiddenByDefault(),
         ];
+    }
+
+    /**
+     * @return array<string>
+     */
+    public static function getNavigationItemActiveRoutePattern(): array
+    {
+        return [self::getRouteBaseName().'.*', ImportNotes::getRouteName()];
     }
 
     #[Override]

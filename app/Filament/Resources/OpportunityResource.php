@@ -140,6 +140,14 @@ final class OpportunityResource extends Resource
         ];
     }
 
+    /**
+     * @return array<string>
+     */
+    public static function getNavigationItemActiveRoutePattern(): array
+    {
+        return [self::getRouteBaseName().'.*', ImportOpportunities::getRouteName()];
+    }
+
     #[Override]
     public static function getPages(): array
     {

@@ -19,7 +19,8 @@ it('can navigate the import wizard and upload a CSV file', function (): void {
     loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")
         ->navigate("/app/{$workspace->slug}/companies/import")
-        ->assertSee('Import Companies')
+        ->assertSeeIn('[data-page-heading]', 'Companies')
+        ->assertSeeIn('.fi-topbar-page-title', 'Import')
         ->assertSee('Drop your .CSV file onto this area to upload');
 
     // The full upload + wizard flow involves Livewire file uploads and complex

@@ -211,6 +211,14 @@ final class TaskResource extends Resource
         return Filament::getTenant();
     }
 
+    /**
+     * @return array<string>
+     */
+    public static function getNavigationItemActiveRoutePattern(): array
+    {
+        return [self::getRouteBaseName().'.*', ImportTasks::getRouteName()];
+    }
+
     public static function getPages(): array
     {
         return [

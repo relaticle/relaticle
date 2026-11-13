@@ -44,6 +44,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\EmailIntegration\Filament\Actions\MassSendBulkAction;
+use Relaticle\ImportWizard\Filament\Pages\ImportPeople;
 
 final class PeopleResource extends Resource
 {
@@ -173,6 +174,14 @@ final class PeopleResource extends Resource
             EmailsRelationManager::class,
             MeetingsRelationManager::class,
         ];
+    }
+
+    /**
+     * @return array<string>
+     */
+    public static function getNavigationItemActiveRoutePattern(): array
+    {
+        return [self::getRouteBaseName().'.*', ImportPeople::getRouteName()];
     }
 
     public static function getPages(): array
