@@ -672,7 +672,7 @@ it('darkens the row menu button and fills the row on hover', function (): void {
     $resting = $page->script($color);
 
     $page->hover(settingsRow('created_at', '.fi-view-settings-label'))
-        ->assertScript(sprintf('getComputedStyle(document.querySelector(`%s`)).backgroundColor', settingsRow('created_at')), $page->script('(() => { const probe = document.createElement("div"); probe.style.backgroundColor = "var(--color-gray-100)"; document.body.append(probe); const color = getComputedStyle(probe).backgroundColor; probe.remove(); return color; })()'));
+        ->assertScript(sprintf('getComputedStyle(document.querySelector(`%s`)).backgroundColor', settingsRow('created_at')), $page->script('(() => { const probe = document.createElement("div"); probe.style.backgroundColor = "var(--color-gray-50)"; document.body.append(probe); const color = getComputedStyle(probe).backgroundColor; probe.remove(); return color; })()'));
 
     expect($page->script($color))->not->toBe($resting);
 });
