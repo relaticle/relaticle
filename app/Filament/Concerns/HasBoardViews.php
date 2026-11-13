@@ -21,7 +21,6 @@ use App\Models\TablePreference;
 use App\Models\User;
 use App\Queries\CustomFieldFilterSchema;
 use App\Queries\Sorts\CustomFieldSort;
-use App\Queries\Views\StoredTablePreferenceQuery;
 use Closure;
 use Filament\Facades\Filament;
 use Filament\Support\Components\Attributes\Unexposed;
@@ -274,8 +273,7 @@ trait HasBoardViews
         }
 
         if (! $this->storedBoardState instanceof BoardStateData) {
-            $preference = resolve(StoredTablePreferenceQuery::class)
-                ->get($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->filterBarEntity());
+            $preference = $this->storedTablePreference();
 
             $this->storedBoardState = $preference instanceof TablePreference ? $preference->board_state : new BoardStateData;
         }
@@ -286,6 +284,7 @@ trait HasBoardViews
     protected function forgetStoredBoardState(): void
     {
         $this->storedBoardState = null;
+        $this->forgetStoredTablePreference();
         $this->resolvedBoardColumnField = null;
         $this->visibleSavedViews = null;
         $this->forgetBoardCards();

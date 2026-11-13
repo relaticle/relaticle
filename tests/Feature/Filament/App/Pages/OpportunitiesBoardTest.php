@@ -82,6 +82,17 @@ it('can render the board page', function (): void {
         ->assertOk();
 });
 
+it('reads the stored table preference of the member once per board render', function (): void {
+    $reads = 0;
+    DB::listen(function (QueryExecuted $query) use (&$reads): void {
+        $reads += preg_match('/^select .* from "table_preferences"/', $query->sql);
+    });
+
+    livewire(OpportunitiesBoard::class)->assertOk();
+
+    expect($reads)->toBe(1);
+});
+
 it('displays opportunities in the correct board columns', function (): void {
     $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');
     $closedWon = $this->stageField->options->firstWhere('name', 'Closed Won');
