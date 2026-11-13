@@ -694,6 +694,30 @@ it('lets rela state the counts on the arrived line without a tool call', functio
         ->toContain('The one exception is the arrived line of the onboarding block: you may state its counts without a tool call.');
 });
 
+it('tells rela whether the workspace holds a record besides samples', function (CreationSource $source, string $line): void {
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+
+    expect(setupAgent($workspace)->dynamicInstructions())->toContain("records: none\n");
+
+    Company::factory()->create(['workspace_id' => $workspace->getKey(), 'creation_source' => $source]);
+    resolve(WorkspaceActivationFacts::class)->forget($workspace);
+
+    expect(setupAgent($workspace)->dynamicInstructions())->toContain($line);
+})->with([
+    'a sample' => [CreationSource::SAMPLE, "records: none\n"],
+    'a mailbox record' => [CreationSource::MAILBOX, "records: some\n"],
+    'a record made in chat' => [CreationSource::CHAT, "records: some\n"],
+]);
+
+it('has rela ask for one company when a typed message names no record in an empty workspace', function (): void {
+    expect(resolve(CrmAssistant::class)->staticInstructions())
+        ->toContain('The records line says whether the workspace holds any record besides samples: none or some.')
+        ->toContain('A typed message that names no company and no person, while the records line says none: answer it first.')
+        ->toContain('Then end with ONE question that asks for one company they work with right now, and say its name alone is enough.')
+        ->toContain('When their next message is a name, propose that company at once.')
+        ->toContain('This does not apply when the answer is an import link, a link to connect their mailbox, or the steps to connect their assistant');
+});
+
 it('names records an assistant created as arriving from the connected assistant', function (): void {
     $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
 
@@ -968,7 +992,7 @@ it('emits the onboarding block with setup_mode even when the workspace has no us
     $connector = URL::getMcpUrl();
     $plugin = config('chat.chatgpt_plugin_url');
 
-    expect($agent->instructions())->toContain("<onboarding>\nmailbox: not_connected\nmembers: 1\nassistant_prompt: \"{$prompt}\"\nconnector_url: {$connector}\nchatgpt_plugin: {$plugin}\nsetup_mode: true\n</onboarding>");
+    expect($agent->instructions())->toContain("<onboarding>\nrecords: none\nmailbox: not_connected\nmembers: 1\nassistant_prompt: \"{$prompt}\"\nconnector_url: {$connector}\nchatgpt_plugin: {$plugin}\nsetup_mode: true\n</onboarding>");
 });
 
 it('leaves the chatgpt plugin line out when the install has no plugin', function (): void {

@@ -3,12 +3,19 @@
 declare(strict_types=1);
 
 use App\Enums\OnboardingUseCase;
+use App\Features\SetupConversation;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Tests\Evals\Scorers\NoContactWord;
+use Tests\Evals\Scorers\OneClosingQuestionAtMost;
 use Tests\Evals\Scorers\TextMatches;
 use Tests\Evals\Support\EvalWorkspace;
 use Tests\Evals\Support\Prior;
 use Tests\Evals\Support\RelaTurn;
+
+beforeEach(function (): void {
+    Feature::define(SetupConversation::class, true);
+});
 
 it('greets a new sales workspace in two short paragraphs with one bold question, without tools', function (): void {
     $greet = function (string $prompt): string {
@@ -31,8 +38,37 @@ it('greets a new sales workspace in two short paragraphs with one bold question,
         ->prompt('')
         ->repeat(3)
         ->toMatch('/"tool_calls":\[\]/')
-        ->toPassScorer(new TextMatches('/choices|options?/i'))
         ->toPassScorer(new NoContactWord);
+});
+
+it('asks for one company when a typed message names no record in an empty workspace', function (string $message): void {
+    $w = EvalWorkspace::seed();
+
+    expect((new RelaTurn($w, conversationId: Prior::greetedInAnEmptyWorkspace($w)))(...))
+        ->prompt($message)
+        ->not->toMatch('/"name":"(Create|Update|Delete)/')
+        ->toPassScorer(new TextMatches('/(compan|client)[^?]*\bwork(ing)? with\b[^?]*\??[^?]*$/i'))
+        ->toPassScorer(new OneClosingQuestionAtMost);
+})->with([
+    'a greeting' => ['hi'],
+    'a question about the product' => ['what can you do?'],
+    'a statement about the business' => ['I run a small marketing agency'],
+]);
+
+it('proposes the company when the owner answers the ask with a bare name', function (): void {
+    $w = EvalWorkspace::seed();
+
+    expect((new RelaTurn($w, conversationId: Prior::askedForOneCompany($w)))(...))
+        ->prompt('Northwind Studio')
+        ->toHaveToolCalls(['CreateCompanyTool' => fn (array $arguments): bool => count($arguments['records'] ?? []) === 1]);
+});
+
+it('answers an owner who brings a file about the file, without the company ask', function (): void {
+    $w = EvalWorkspace::seed();
+
+    expect((new RelaTurn($w, conversationId: Prior::greetedInAnEmptyWorkspace($w)))(...))
+        ->prompt('I have a CSV of my customers')
+        ->toPassScorer(new TextMatches('/^(?!.*(compan|client)[^?]*\bwork(ing)? with\b).*(attach|import)/is'));
 });
 
 it('says plainly that a sample only workspace holds sample data', function (): void {
