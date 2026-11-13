@@ -2297,6 +2297,7 @@ html.fi-record-stacked .fi-record-layout {
     --ff-gap: 0.75rem;
     --ff-inset: 0.75rem;
     --ff-card-gap: 0.5rem;
+    --ff-card-label: 6.5rem;
     --ff-card-padding: 0.75rem;
 
     @media (width < 40rem) {
@@ -2347,12 +2348,24 @@ html.fi-record-stacked .fi-record-layout {
 .fi-page:has(.fi-board-header[data-board-column-width='narrow']) .ff-board {
     @media (width >= 40rem) {
         --ff-column-width: 15rem;
+        --ff-card-label: 4.5rem;
     }
 }
 
 /* Flowforge wraps every card item, so a labelled row takes its own line through that wrapper. */
 .ff-board .ff-card-flex:not(.ff-card-flex--nowrap) > :has(> .fi-board-card-row) {
     flex-basis: 100%;
+}
+
+.ff-board .fi-board-card-row {
+    display: grid;
+    grid-template-columns: var(--ff-card-label) minmax(0, 1fr);
+    column-gap: 0.5rem;
+    align-items: center;
+
+    & > * {
+        min-width: 0;
+    }
 }
 
 .fi-page:has(.fi-board-header[data-board-card-size='compact']) .ff-board {

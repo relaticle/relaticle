@@ -366,7 +366,7 @@ it('puts one row gap between the title and every row of a default card', functio
     'opportunities' => [Opportunity::class, OpportunityField::STAGE->value],
 ]);
 
-it('gives an empty attribute its own line and labelled rows one gap', function (string $model, string $columnFieldCode, string $path, CrmEntity $entity): void {
+it('gives an empty attribute its own line and labelled rows one gap, one line and room for their values', function (string $model, string $columnFieldCode, string $path, CrmEntity $entity, array $inRows): void {
     $this->withVite();
 
     $user = User::factory()->withWorkspace()->create();
@@ -380,11 +380,13 @@ it('gives an empty attribute its own line and labelled rows one gap', function (
         $company = Company::factory()->recycle([$user, $workspace])->create();
         $record = Opportunity::factory()->recycle([$user, $workspace])->create(['company_id' => $company->getKey()]);
         $amount = CustomField::query()->forEntity($model)->where('code', OpportunityField::AMOUNT->value)->firstOrFail();
-        $record->saveCustomFieldValue($amount, 5000);
+        $record->saveCustomFieldValue($amount, 20000);
     } else {
         $record = Task::factory()->recycle([$user, $workspace])->create();
         $priority = CustomField::query()->forEntity($model)->where('code', TaskField::PRIORITY->value)->firstOrFail();
+        $description = CustomField::query()->forEntity($model)->where('code', TaskField::DESCRIPTION->value)->firstOrFail();
         $record->saveCustomFieldValue($priority, $priority->options->first()->getKey());
+        $record->saveCustomFieldValue($description, '<p>Short</p>');
         $record->assignees()->attach($user);
     }
 
@@ -433,10 +435,34 @@ it('gives an empty attribute its own line and labelled rows one gap', function (
     expect($rows['rowGap'])->toEqual(8)
         ->and($rows['gaps'])->not->toBeEmpty()
         ->and(array_unique($rows['gaps']))->toEqual([8]);
+
+    $page->click('.fi-topbar-page-title');
+    pressLayout($page, 'column-width', 'narrow', 'boardColumnWidth');
+
+    $labelled = $page->script(<<<JS
+        (() => {
+            const rows = [...document.querySelectorAll('{$card} .fi-board-card-row')].filter((row) => row.getBoundingClientRect().height > 0);
+
+            return {
+                labels: rows.map((row) => row.querySelector('.fi-sc-text').textContent.trim()),
+                cut: rows.filter((row) => [...row.querySelectorAll('.fi-badge, img')].some((value) => value.getBoundingClientRect().right > row.getBoundingClientRect().right + 0.5)).length,
+                apart: rows.filter((row) => {
+                    const [label, value] = [row.querySelector('.fi-sc-text'), row.querySelector('.fi-badge, img') ?? row.children[1]].map((part) => part.getBoundingClientRect());
+
+                    return Math.abs((label.top + label.bottom) - (value.top + value.bottom)) / 2 > 2;
+                }).length,
+            };
+        })();
+    JS);
+
+    expect($labelled['cut'])->toBe(0)
+        ->and($labelled['apart'])->toBe(0)
+        ->and($labelled['labels'])->toContain(...$inRows)
+        ->and($labelled['labels'])->not->toContain('Description');
     $page->assertNoJavaScriptErrors();
 })->with([
-    'tasks' => [Task::class, TaskField::STATUS->value, 'tasks/board', CrmEntity::Task],
-    'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board', CrmEntity::Opportunity],
+    'tasks' => [Task::class, TaskField::STATUS->value, 'tasks/board', CrmEntity::Task, ['Priority', 'Assignees']],
+    'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board', CrmEntity::Opportunity, ['Company', 'Amount']],
 ]);
 
 it('lets the next board column peek past the first on a 320px phone', function (string $path): void {
@@ -1270,6 +1296,12 @@ it('narrows columns and compacts cards flat and with lanes, every time it is pre
     $page->resize(1440, 900)->assertVisible('.ff-card');
     $wide = $page->script($flat);
 
+    $page->script('(() => { const press = (value) => document.querySelector(`[data-board-column-width-option="${value}"]`).click(); press("narrow"); setTimeout(() => press("wide"), 60); })()');
+    waitForPage($page, fn (): bool => storedBoardState($user, $entity)?->columnWidth === BoardColumnWidth::Wide);
+    expect(storedBoardState($user, $entity)?->columnWidth)->toBe(BoardColumnWidth::Wide);
+    $page->assertScript(boardLayoutIs('boardColumnWidth', 'wide'), true);
+    expect($page->script($flat))->toBe($wide);
+
     pressLayout($page, 'column-width', 'narrow', 'boardColumnWidth');
     $narrow = $page->script($flat);
     expect($narrow['column'])->toBeLessThan($wide['column']);
@@ -1296,12 +1328,6 @@ it('narrows columns and compacts cards flat and with lanes, every time it is pre
 
     $laneCompact = $page->script($lanes);
     expect($laneCompact['column'])->toBe($narrow['column']);
-    $page->script('(() => { const press = (value) => document.querySelector(`[data-board-column-width-option="${value}"]`).click(); press("narrow"); setTimeout(() => press("wide"), 60); })()');
-    waitForPage($page, fn (): bool => storedBoardState($user, $entity)?->columnWidth === BoardColumnWidth::Wide);
-    expect(storedBoardState($user, $entity)?->columnWidth)->toBe(BoardColumnWidth::Wide);
-    $page->assertScript(boardLayoutIs('boardColumnWidth', 'wide'), true);
-    expect($page->script($flat))->toBe($wide);
-
 
     pressLayout($page, 'column-width', 'wide', 'boardColumnWidth');
     $laneWide = $page->script($lanes);

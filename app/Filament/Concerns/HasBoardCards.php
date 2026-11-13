@@ -264,6 +264,7 @@ trait HasBoardCards
 
         $packageEntries = $this->cardPackageEntries();
         $blocks = $this->blockCardAttributes();
+        $stacked = $this->stackedCardAttributes();
         $state = $this->storedBoardState();
         $body = [];
         $inline = [];
@@ -278,13 +279,13 @@ trait HasBoardCards
             $block = in_array($key, $blocks, true);
 
             if ($state->showLabels) {
-                $body = [...$body, ...$this->flushInlineCardUnits($inline), $this->cardRow($key, $entry, $block, $state)];
+                $body = [...$body, ...$this->flushInlineCardUnits($inline), $this->cardRow($key, $entry, in_array($key, $stacked, true), $state)];
                 $inline = [];
 
                 continue;
             }
 
-            $emptyRow = $state->hideEmpty ? null : $this->cardRow($key, null, $block, $state);
+            $emptyRow = $state->hideEmpty ? null : $this->cardRow($key, null, in_array($key, $stacked, true), $state);
 
             if ($block) {
                 $body = [...$body, ...$this->flushInlineCardUnits($inline), $entry, ...($emptyRow instanceof CardFlex ? [$emptyRow] : [])];
@@ -314,7 +315,7 @@ trait HasBoardCards
         return $units === [] ? [] : [CardFlex::make($units)->align('center')];
     }
 
-    private function cardRow(string $key, ?Component $entry, bool $block, BoardStateData $state): CardFlex
+    private function cardRow(string $key, ?Component $entry, bool $stacked, BoardStateData $state): CardFlex
     {
         $field = $this->cardCustomField($key);
         $shown = fn (Model $record): bool => $state->showLabels
@@ -327,9 +328,9 @@ trait HasBoardCards
             ...($entry instanceof Component ? [$entry] : []),
         ])->visible($shown);
 
-        return $block
+        return $stacked
             ? $row->wrap(false)->align('stretch')->extraAttributes(['class' => 'flex-col! gap-y-0.5'])
-            : $row->align('baseline')->extraAttributes(['class' => 'fi-board-card-row grid! grid-cols-[calc(var(--spacing)*26)_minmax(0,1fr)] gap-x-2 *:min-w-0']);
+            : $row->align('center')->extraAttributes(['class' => 'fi-board-card-row']);
     }
 
     /**
@@ -451,4 +452,12 @@ trait HasBoardCards
      * @return list<string>
      */
     abstract protected function blockCardAttributes(): array;
+
+    /**
+     * @return list<string>
+     */
+    protected function stackedCardAttributes(): array
+    {
+        return [];
+    }
 }

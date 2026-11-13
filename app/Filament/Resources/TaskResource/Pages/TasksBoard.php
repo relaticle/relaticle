@@ -106,6 +106,14 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
         return ['description'];
     }
 
+    /**
+     * @return list<string>
+     */
+    protected function stackedCardAttributes(): array
+    {
+        return ['description'];
+    }
+
     protected function cardEntry(string $key, ?Entry $customEntry): ?Component
     {
         return match ($key) {
