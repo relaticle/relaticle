@@ -8,6 +8,7 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Gate;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Cloud\Admin\Actions\ResetCreditPeriod;
+use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -40,4 +41,42 @@ it('refuses a reset the policy denies when the action is called directly', funct
         ->toThrow(HttpException::class);
 
     expect($workspace->refresh()->plan)->toBe($plan);
+});
+
+it('resets credits on each workspace current plan when no plan is chosen', function (): void {
+    withHostedBilling();
+
+    $free = Workspace::factory()->create(['plan' => Plan::Free]);
+    $pro = Workspace::factory()->create(['plan' => Plan::Pro]);
+    $administrator = SystemAdministrator::factory()->create(['role' => SystemAdministratorRole::Administrator]);
+
+    resolve(ResetCreditPeriod::class)->execute($administrator, null, [$free, $pro]);
+
+    expect($free->refresh()->plan)->toBe(Plan::Free)
+        ->and($pro->refresh()->plan)->toBe(Plan::Pro)
+        ->and(AiCreditBalance::query()->where('workspace_id', $pro->getKey())->sole()->credits_remaining)->toBe(Plan::Pro->credits());
+});
+
+it('lets a plain administrator name the plan a workspace already has', function (): void {
+    withHostedBilling();
+
+    $workspace = Workspace::factory()->create(['plan' => Plan::Pro]);
+    $administrator = SystemAdministrator::factory()->create(['role' => SystemAdministratorRole::Administrator]);
+
+    resolve(ResetCreditPeriod::class)->execute($administrator, Plan::Pro, [$workspace]);
+
+    expect($workspace->refresh()->plan)->toBe(Plan::Pro);
+});
+
+it('changes no workspace when one plan in the batch needs a super administrator', function (): void {
+    withHostedBilling();
+
+    $pro = Workspace::factory()->create(['plan' => Plan::Pro]);
+    $free = Workspace::factory()->create(['plan' => Plan::Free]);
+    $administrator = SystemAdministrator::factory()->create(['role' => SystemAdministratorRole::Administrator]);
+
+    expect(fn () => resolve(ResetCreditPeriod::class)->execute($administrator, Plan::Pro, [$pro, $free]))
+        ->toThrow(HttpException::class);
+
+    expect($free->refresh()->plan)->toBe(Plan::Free);
 });

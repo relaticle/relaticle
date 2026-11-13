@@ -23,16 +23,25 @@ final readonly class ResetCreditPeriod
     /**
      * @param  iterable<Workspace>  $workspaces
      */
-    public function execute(SystemAdministrator $admin, Plan $plan, iterable $workspaces): void
+    public function execute(SystemAdministrator $admin, ?Plan $plan, iterable $workspaces): void
     {
         abort_unless(Gate::forUser($admin)->allows('update', AiCreditBalance::class), 403);
 
+        $workspaces = collect($workspaces);
+
+        foreach ($workspaces as $workspace) {
+            abort_if(
+                $plan instanceof Plan && $plan !== $workspace->plan && Gate::forUser($admin)->denies('manageManagedPlan', $workspace),
+                403,
+            );
+        }
+
         DB::transaction(function () use ($admin, $plan, $workspaces): void {
             foreach ($workspaces as $workspace) {
-                $workspace->plan = $plan;
+                $workspace->plan = $plan ?? $workspace->plan;
                 $workspace->save();
 
-                if ($plan !== Plan::default()) {
+                if ($workspace->plan !== Plan::default()) {
                     $this->cancelInactivityDeletion->execute($workspace);
                 }
 
