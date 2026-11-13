@@ -7,13 +7,12 @@ namespace App\Filament\Tables\FilterBar;
 use App\Enums\FilterCondition;
 use App\Enums\FilterFieldKind;
 use App\Enums\PeriodUnit;
+use App\Queries\CustomFieldFilterSchema;
 use App\Queries\Operand;
 
 final readonly class FilterValueShape
 {
-    public const int MAX_VALUES = 100;
-
-    public const int MAX_TEXT_LENGTH = 255;
+    private const int MAX_TEXT_LENGTH = 255;
 
     /** @return string|int|float|list<string>|array{amount?: int, unit: string}|null */
     public static function of(FilterCondition $condition, FilterFieldKind $kind, mixed $value): string|int|float|array|null
@@ -46,7 +45,7 @@ final readonly class FilterValueShape
         return is_int($value) || (is_float($value) && is_finite($value)) ? $value : $text;
     }
 
-    public static function text(mixed $value): ?string
+    private static function text(mixed $value): ?string
     {
         $isSafe = is_string($value) && trim($value) !== '' && mb_strlen($value) <= self::MAX_TEXT_LENGTH
             && ! str_contains($value, "\0") && mb_check_encoding($value, 'UTF-8');
@@ -57,7 +56,7 @@ final readonly class FilterValueShape
     /** @return list<string>|null */
     public static function list(mixed $value): ?array
     {
-        if (! is_array($value) || $value === [] || count($value) > self::MAX_VALUES) {
+        if (! is_array($value) || $value === [] || count($value) > CustomFieldFilterSchema::MAX_LIST_VALUES) {
             return null;
         }
 
