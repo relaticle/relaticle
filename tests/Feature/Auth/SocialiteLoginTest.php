@@ -14,6 +14,7 @@ use App\Http\Controllers\Auth\LinkSocialAccountCallbackController;
 use App\Http\Controllers\Auth\LinkSocialAccountRedirectController;
 use App\Http\Controllers\Auth\RedirectController;
 use App\Http\Middleware\EnsureSocialiteProviderIsAvailable;
+use App\Models\ActivityLog\Activity;
 use App\Models\User;
 use App\Models\UserSocialAccount;
 use App\Support\Auth\AuthenticationSession;
@@ -27,6 +28,7 @@ use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Laravel\Pennant\Feature;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\InvalidStateException;
 use Laravel\Socialite\Two\User as SocialiteUser;
@@ -93,6 +95,23 @@ test('callback from socialite provider creates new user when user does not exist
     $this->assertAuthenticated();
 
     $response->assertRedirect(url()->getAppUrl());
+});
+
+test('a provider signup records which provider it used', function (): void {
+    config(['relaticle.features.signup_challenge' => true]);
+    Feature::flushCache();
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('recorded-1', 'Recorded User', 'recorded@example.com'),
+    );
+
+    $this->get(route('auth.socialite.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'test-code']));
+
+    $record = Activity::query()->withoutGlobalScopes()->where('log_name', Activity::SIGNUP_LOG)->sole();
+
+    expect($record->subject?->is(User::where('email', 'recorded@example.com')->sole()))->toBeTrue()
+        ->and($record->workspace_id)->toBeNull()
+        ->and($record->properties?->all())->toMatchArray(['method' => 'google', 'ip' => '127.0.0.1', 'challenged' => false]);
 });
 
 test('callback from socialite provider logs in existing user when social account exists', function () {

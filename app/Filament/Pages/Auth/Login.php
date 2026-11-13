@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Filament\Pages\Auth;
 
 use App\Actions\Auth\AuthenticatePassword;
+use App\Actions\Auth\RecordSignup;
 use App\Actions\Fortify\CreateNewUser;
 use App\Concerns\DetectsWorkspaceInvitation;
+use App\Enums\AuthMethod;
 use App\Enums\SocialiteProvider;
 use App\Features\SignupChallenge;
 use App\Models\User;
@@ -226,7 +228,7 @@ final class Login extends \Filament\Auth\Pages\Login
 
         $email = EmailAddress::canonicalize((string) $data['email']);
         $user = $this->createAccount($email, (string) $data['password']);
-        $this->countTowardSignupCeiling();
+        $this->recordSignup($user);
 
         $invitation = $this->getWorkspaceInvitationFromSession();
 
@@ -308,11 +310,13 @@ final class Login extends \Filament\Auth\Pages\Login
         ]);
     }
 
-    private function countTowardSignupCeiling(): void
+    private function recordSignup(User $user): void
     {
         if (Feature::active(SignupChallenge::class)) {
             resolve(SignupCeiling::class)->recordSignup((string) request()->ip());
         }
+
+        resolve(RecordSignup::class)->execute($user, AuthMethod::PASSWORD, request()->ip(), request()->userAgent(), TurnstileChallenge::isEnabled());
     }
 
     private function createAccount(string $email, #[SensitiveParameter] string $hashedPassword): User

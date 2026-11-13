@@ -25,6 +25,8 @@ final class Activity extends SpatieActivity
 
     public const string EMAIL_ACCESS_LOG = 'email_access';
 
+    public const string SIGNUP_LOG = 'signup';
+
     /** @param  array<array-key, mixed>  $properties */
     public static function sourceFrom(array $properties): ?CreationSource
     {
@@ -81,7 +83,7 @@ final class Activity extends SpatieActivity
         self::addGlobalScope(new WorkspaceScope);
 
         self::creating(function (self $activity): void {
-            if ($activity->workspace_id !== null || $activity->log_name === Impersonator::LOG_NAME) {
+            if ($activity->workspace_id !== null || in_array($activity->log_name, [Impersonator::LOG_NAME, self::SIGNUP_LOG], true)) {
                 return;
             }
 
