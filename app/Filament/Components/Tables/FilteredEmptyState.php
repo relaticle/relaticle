@@ -36,7 +36,7 @@ final class FilteredEmptyState
             });
     }
 
-    private static function isFilteredByBar(HasTable $livewire): bool
+    public static function isFilteredByBar(HasTable $livewire): bool
     {
         return method_exists($livewire, 'hasFilterBarState') && $livewire->hasFilterBarState();
     }

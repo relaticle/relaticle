@@ -14,13 +14,8 @@ final class EmptyListDescription
      */
     public static function unlessFiltered(string $description): Closure
     {
-        return fn (HasTable $livewire): ?string => $livewire->hasTableSearch() || $livewire->getTable()->isFiltered() || self::hasFilterBarState($livewire)
+        return fn (HasTable $livewire): ?string => $livewire->hasTableSearch() || $livewire->getTable()->isFiltered() || FilteredEmptyState::isFilteredByBar($livewire)
             ? null
             : $description;
-    }
-
-    private static function hasFilterBarState(HasTable $livewire): bool
-    {
-        return method_exists($livewire, 'hasFilterBarState') && $livewire->hasFilterBarState();
     }
 }
