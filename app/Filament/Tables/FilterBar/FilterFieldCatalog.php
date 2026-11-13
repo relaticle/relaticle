@@ -46,12 +46,11 @@ final readonly class FilterFieldCatalog
             ...self::customFields($entity, $workspace),
         ]);
 
-        return array_map(
-            static fn (FilterField $field): FilterField => isset($columnLabels[self::columnFor($field->key)])
-                ? $field->labelled($columnLabels[self::columnFor($field->key)])
-                : $field,
-            $fields,
-        );
+        return array_map(static function (FilterField $field) use ($columnLabels): FilterField {
+            $label = $columnLabels[self::columnFor($field->key)] ?? null;
+
+            return $label === null || $label === $field->label ? $field : $field->labelled($label);
+        }, $fields);
     }
 
     public static function columnFor(string $key): string
