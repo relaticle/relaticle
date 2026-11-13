@@ -149,6 +149,10 @@ it('keeps the greeting to two short paragraphs with one bold question', function
         ->not->toContain('Three short paragraphs');
 });
 
+it('leaves a count of zero out of the greeting and the data arrived message', function (MessageOrigin $origin): void {
+    expect($origin->directive())->toContain('Name only what arrived: leave out a count of zero');
+})->with([MessageOrigin::Greeting, MessageOrigin::DataArrived]);
+
 it('saves the greeting as its opener with a greeting origin', function (): void {
     CrmAssistant::fake(['Hi Jane, your workspace is ready.']);
 
