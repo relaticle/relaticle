@@ -60,15 +60,60 @@ it('starts a pro trial for an eligible owner', function (): void {
         ->and($balance->credits_remaining)->toBeLessThan(Plan::Pro->credits());
 });
 
-it('starts a separate trial for each workspace the user creates', function (): void {
+function laterWorkspaceOf(User $user): Workspace
+{
+    return Workspace::factory()->create(['user_id' => $user->getKey(), 'personal_workspace' => false])->refresh();
+}
+
+it('starts no trial on a later workspace while the owner pays for none', function (): void {
     [$user, $workspace] = trialOwnerAndWorkspace();
     app(StartProTrial::class)->execute($user, $workspace);
 
-    $otherWorkspace = Workspace::factory()->create(['user_id' => $user->getKey(), 'personal_workspace' => false]);
+    $later = laterWorkspaceOf($user);
 
-    expect(app(StartProTrial::class)->execute($user, $otherWorkspace->refresh()))->toBeTrue()
-        ->and($otherWorkspace->refresh()->plan)->toBe(Plan::Pro)
-        ->and($otherWorkspace->trial_ends_at?->isSameDay(now()->addDays(14)))->toBeTrue();
+    expect(app(StartProTrial::class)->execute($user, $later))->toBeFalse()
+        ->and($later->refresh()->plan)->toBe(Plan::Free)
+        ->and($later->trial_ends_at)->toBeNull()
+        ->and($later->pro_trial_used_at)->toBeNull();
+});
+
+it('starts a trial on a later workspace once the owner pays for another', function (string $status, bool $starts): void {
+    [$user, $workspace] = trialOwnerAndWorkspace();
+    app(StartProTrial::class)->execute($user, $workspace);
+    $workspace->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_first_workspace',
+        'stripe_status' => $status,
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+        'trial_ends_at' => $status === 'trialing' ? now()->addDays(10) : null,
+    ]);
+
+    $later = laterWorkspaceOf($user);
+
+    expect(app(StartProTrial::class)->execute($user, $later))->toBe($starts)
+        ->and($later->refresh()->onGenericTrial())->toBe($starts);
+})->with([
+    'charged subscription' => ['active', true],
+    'card on file, not yet charged' => ['trialing', false],
+    'payment failed' => ['past_due', false],
+    'canceled' => ['canceled', false],
+]);
+
+it('starts a trial on a later workspace of an Enterprise owner', function (): void {
+    [$user, $workspace] = trialOwnerAndWorkspace();
+    $workspace->forceFill(['plan' => Plan::Enterprise, 'pro_trial_used_at' => now()->subMonth()])->save();
+
+    expect(app(StartProTrial::class)->execute($user, laterWorkspaceOf($user)))->toBeTrue();
+});
+
+it('starts the first trial of an owner whose other workspaces never had one', function (): void {
+    [$user] = trialOwnerAndWorkspace();
+
+    $later = laterWorkspaceOf($user);
+
+    expect(app(StartProTrial::class)->execute($user, $later))->toBeTrue()
+        ->and($later->refresh()->onGenericTrial())->toBeTrue();
 });
 
 it('does not start a second trial on a workspace that already used one', function (): void {

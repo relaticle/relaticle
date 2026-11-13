@@ -26,12 +26,13 @@ final readonly class StartProTrial
         );
 
         $started = DB::transaction(function () use ($workspace): bool {
+            // Two workspaces of one owner starting at once would each read the other as untrialed.
+            User::query()->whereKey($workspace->user_id)->lockForUpdate()->first();
+
             /** @var Workspace $lockedWorkspace */
             $lockedWorkspace = Workspace::query()->whereKey($workspace)->lockForUpdate()->firstOrFail();
 
-            if ($lockedWorkspace->pro_trial_used_at !== null
-                || $lockedWorkspace->plan !== Plan::Free
-                || $lockedWorkspace->subscriptions()->exists()) {
+            if (! $lockedWorkspace->canStartTrial()) {
                 return false;
             }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Jetstream\CreateWorkspace as CreateWorkspaceAction;
 use App\Actions\User\UpdateUserName;
+use App\Contracts\Entitlements;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\Plan;
 use App\Enums\WorkspaceRole;
@@ -844,7 +845,7 @@ it('automatically starts one 14-day Cloud Pro trial after hosted onboarding', fu
         ->and($balance->credits_remaining)->toBe(Plan::trialCredits());
 });
 
-it('starts a fresh trial for each additional hosted workspace', function (): void {
+it('starts no trial for an additional hosted workspace while the owner pays for none', function (): void {
     withHostedBilling();
 
     $user = User::factory()->withPersonalWorkspace()->create();
@@ -861,10 +862,41 @@ it('starts a fresh trial for each additional hosted workspace', function (): voi
     /** @var Workspace $workspace */
     $workspace = $user->refresh()->currentWorkspace;
 
-    expect($workspace->plan)->toBe(Plan::Pro)
+    expect($workspace->name)->toBe('Second Workspace')
+        ->and($workspace->plan)->toBe(Plan::Free)
+        ->and($workspace->onGenericTrial())->toBeFalse()
+        ->and($workspace->pro_trial_used_at)->toBeNull()
+        ->and(resolve(Entitlements::class)->allowsAccess($workspace))->toBeFalse();
+});
+
+it('starts a trial for an additional hosted workspace of an owner who pays for another', function (): void {
+    withHostedBilling();
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $user->currentWorkspace?->forceFill(['plan' => Plan::Pro, 'pro_trial_used_at' => now()->subMonth()])->save();
+    $user->currentWorkspace?->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_paying_owner',
+        'stripe_status' => 'active',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+    ]);
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm([
+            'name' => 'Second Workspace',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    /** @var Workspace $workspace */
+    $workspace = $user->refresh()->currentWorkspace;
+
+    expect($workspace->name)->toBe('Second Workspace')
+        ->and($workspace->plan)->toBe(Plan::Pro)
         ->and($workspace->onGenericTrial())->toBeTrue()
-        ->and($workspace->pro_trial_used_at)->not->toBeNull()
-        ->and($workspace->hosted_free_grandfathered_at)->toBeNull();
+        ->and($workspace->pro_trial_used_at)->not->toBeNull();
 });
 
 it('starts no trial when billing is off', function (): void {
