@@ -365,7 +365,7 @@ trait HasBoardStageOrder
 
     protected function placeNewCard(Model $card, string $columnId, string $edge = 'top'): void
     {
-        resolve(PlaceBoardCard::class)->execute($this->viewSwitcherUser(), $card, $this->getBoardPositionInColumn($columnId, $edge));
+        resolve(PlaceBoardCard::class)->execute($this->viewSwitcherUser(), $card, $this->getBoard()->getPositionIdentifierAttribute(), $this->getBoardPositionInColumn($columnId, $edge));
     }
 
     protected function authorizeCardMove(Model $card, string $targetColumnId, ?string $toLaneId = null): void

@@ -9,11 +9,11 @@ use Illuminate\Database\Eloquent\Model;
 
 final readonly class PlaceBoardCard
 {
-    public function execute(User $user, Model $card, string $position): void
+    public function execute(User $user, Model $card, string $positionAttribute, string $position): void
     {
         abort_unless($user->can('update', $card), 403);
 
-        $card->setAttribute('order_column', $position);
+        $card->setAttribute($positionAttribute, $position);
         $card->saveQuietly();
     }
 }
