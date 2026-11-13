@@ -133,7 +133,7 @@ it('redacts the path token of a transaction name and its trace data', function (
 
 it('configures sentry to send no request body and scrub through static callables', function (): void {
     expect(config('sentry.max_request_body_size'))->toBe('none')
-        ->and(is_callable(config('sentry.before_send')))->toBeTrue()
-        ->and(is_callable(config('sentry.before_send_transaction')))->toBeTrue()
+        ->and(config('sentry.before_send'))->toBeCallable()
+        ->and(config('sentry.before_send_transaction'))->toBeCallable()
         ->and(config('sentry.before_send'))->not->toBeInstanceOf(Closure::class);
 });
