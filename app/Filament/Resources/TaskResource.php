@@ -20,6 +20,7 @@ use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Filament\Tables\BulkBar;
 use App\Filament\Tables\FilterBar\ConditionsFilter;
+use App\Filament\Tables\FilterBar\FilterRuleCompiler;
 use App\Filament\Tables\RowActions;
 use App\Models\CustomField;
 use App\Models\Task;
@@ -84,7 +85,7 @@ final class TaskResource extends Resource
         return self::getUrl('index', [
             'filters' => [ConditionsFilter::NAME => [
                 'match' => 'all',
-                'rules' => [['field' => 'assignees', 'condition' => FilterCondition::IsAnyOf->value, 'value' => ['@me']]],
+                'rules' => [['field' => 'assignees', 'condition' => FilterCondition::IsAnyOf->value, 'value' => [FilterRuleCompiler::ME]]],
             ]],
         ], panel: 'app', tenant: $tenant);
     }
