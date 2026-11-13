@@ -22,7 +22,7 @@ return [
                 'App\Mcp\Tools\ListCustomFieldsTool::handle' => 64,
                 'App\Mcp\Tools\SearchTool::handle' => 77,
                 'App\Providers\AppServiceProvider::configureFilament' => 88,
-                'App\Providers\AppServiceProvider::register' => 68,
+                'App\Providers\AppServiceProvider::register' => 67,
                 'App\Providers\Filament\AppPanelProvider::panel' => 251,
                 'App\Providers\HealthServiceProvider::boot' => 63,
                 'App\Services\AvatarService::getInitials' => 70,

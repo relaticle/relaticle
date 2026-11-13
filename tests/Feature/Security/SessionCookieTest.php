@@ -58,3 +58,28 @@ it('sends the session cookie without Secure over plain http when configured inse
 
     expect(sessionCookieOn('/app/login')->isSecure())->toBeFalse();
 });
+
+function cookieNamesOn(string $uri): array
+{
+    return collect(test()->get($uri)->baseResponse->headers->getCookies())
+        ->map(fn (Cookie $cookie): string => $cookie->getName())
+        ->all();
+}
+
+it('sends no readable XSRF-TOKEN cookie on the app panel login page', function (): void {
+    expect(cookieNamesOn('/app/login'))
+        ->toContain(config('session.cookie'))
+        ->not->toContain('XSRF-TOKEN');
+});
+
+it('sends no readable XSRF-TOKEN cookie on the system admin login page', function (): void {
+    expect(cookieNamesOn('/sysadmin/login'))
+        ->toContain(config('session.cookie'))
+        ->not->toContain('XSRF-TOKEN');
+});
+
+it('sends no readable XSRF-TOKEN cookie on the marketing home page', function (): void {
+    expect(cookieNamesOn('/'))
+        ->toContain(config('session.cookie'))
+        ->not->toContain('XSRF-TOKEN');
+});
