@@ -41,6 +41,7 @@ use App\Support\IconPath;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Support\Colors\Color;
+use Filament\Support\Enums\IconSize;
 use Filament\Support\Facades\FilamentColor;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -50,6 +51,8 @@ use Livewire\Livewire;
 use Relaticle\CustomFields\Data\CustomFieldOptionSettingsData;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Tests\Helpers\WorkspaceCustomField;
+
+use function Filament\Support\generate_icon_html;
 
 mutates(
     ConditionsFilter::class,
@@ -2274,3 +2277,16 @@ it('labels a renamed custom attribute the same in the header, the sort picker an
     expect($filterLabel)->toBe('Ideal customer fit')
         ->and($sortLabel)->toBe('Ideal customer fit');
 });
+
+it('draws the column header of a custom attribute with the icon the filter picker gives it', function (string $type, array $options): void {
+    filterBarField($this->user, 'company', 'header_icon', $type, $options);
+
+    $component = livewire(ListCompanies::class);
+    $icon = collect($component->instance()->filterFieldCatalog())->get('custom_fields.header_icon')->icon;
+    $header = (string) $component->instance()->getTable()->getColumn('custom_fields.header_icon')->getLabel();
+
+    expect($header)->toContain(generate_icon_html($icon, size: IconSize::Small)->toHtml());
+})->with([
+    'a toggle' => [CustomFieldType::TOGGLE->value, []],
+    'a select' => [CustomFieldType::SELECT->value, ['One', 'Two']],
+]);
