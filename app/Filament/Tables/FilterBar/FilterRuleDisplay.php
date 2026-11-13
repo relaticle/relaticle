@@ -7,6 +7,7 @@ namespace App\Filament\Tables\FilterBar;
 use App\Data\LinkOption;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
+use App\Enums\FilterCondition;
 use App\Enums\FilterFieldKind;
 use App\Enums\PeriodUnit;
 use App\Models\CustomField;
@@ -20,8 +21,6 @@ use Throwable;
 
 final readonly class FilterRuleDisplay
 {
-    private const string ME = '@me';
-
     private const int SHOWN_VALUES = 2;
 
     private const int MAX_DECIMALS = 10;
@@ -53,7 +52,7 @@ final readonly class FilterRuleDisplay
 
     private static function withViewerOnce(mixed $value, FilterField $field, User $user): mixed
     {
-        if ($field->kind !== FilterFieldKind::Member || ! is_array($value) || ! in_array(self::ME, $value, true)) {
+        if ($field->kind !== FilterFieldKind::Member || ! is_array($value) || ! in_array(FilterRuleCompiler::ME, $value, true)) {
             return $value;
         }
 
@@ -140,7 +139,7 @@ final readonly class FilterRuleDisplay
             return '';
         }
 
-        return $condition === 'this'
+        return $condition === FilterCondition::This->value
             ? __("filament/panel.tables.filters.this_unit.{$unit->value}")
             : trans_choice("filament/panel.tables.filters.periods.{$unit->value}", (int) ($value['amount'] ?? 0));
     }
@@ -171,7 +170,7 @@ final readonly class FilterRuleDisplay
             $field = $catalog[$rule['field']];
 
             if ($field->kind->holdsRecordIds() && is_array($rule['value'] ?? null)) {
-                $ids = array_filter($rule['value'], fn (mixed $id): bool => $id !== self::ME);
+                $ids = array_filter($rule['value'], fn (mixed $id): bool => $id !== FilterRuleCompiler::ME);
                 $wanted[$field->key] = [...($wanted[$field->key] ?? []), ...$ids];
             }
         }
@@ -189,7 +188,7 @@ final readonly class FilterRuleDisplay
                 continue;
             }
 
-            foreach ([self::ME, (string) $user->getKey()] as $id) {
+            foreach ([FilterRuleCompiler::ME, (string) $user->getKey()] as $id) {
                 if (in_array($id, array_map(strval(...), $rule['value']), true)) {
                     $names[$field->key][$id] = self::viewer($user, $id);
                 }
@@ -199,7 +198,7 @@ final readonly class FilterRuleDisplay
         return $names;
     }
 
-    public static function viewer(User $user, string $id = self::ME): LinkOption
+    public static function viewer(User $user, string $id = FilterRuleCompiler::ME): LinkOption
     {
         return new LinkOption(
             id: $id,

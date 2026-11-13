@@ -7,6 +7,8 @@ namespace App\Filament\Tables\FilterBar;
 // Filament stores one `column:direction`, so a list joins those with commas and a single sort reads as before.
 final readonly class SortList
 {
+    public const array DIRECTIONS = ['asc', 'desc'];
+
     /**
      * @return array<string, 'asc'|'desc'>
      */
@@ -17,7 +19,7 @@ final readonly class SortList
         foreach (explode(',', (string) $value) as $segment) {
             [$column, $direction] = array_pad(explode(':', trim($segment), 2), 2, 'asc');
 
-            if ($column !== '' && ! isset($sorts[$column]) && in_array($direction, ['asc', 'desc'], true)) {
+            if ($column !== '' && ! isset($sorts[$column]) && in_array($direction, self::DIRECTIONS, true)) {
                 $sorts[$column] = $direction;
             }
         }
@@ -37,7 +39,7 @@ final readonly class SortList
             $column = is_array($sort) ? ($sort['column'] ?? null) : null;
             $direction = is_array($sort) ? ($sort['direction'] ?? 'asc') : null;
 
-            if (is_string($column) && isset($allowed[$column]) && ! isset($list[$column]) && in_array($direction, ['asc', 'desc'], true)) {
+            if (is_string($column) && isset($allowed[$column]) && ! isset($list[$column]) && in_array($direction, self::DIRECTIONS, true)) {
                 $list[$column] = $direction;
             }
         }

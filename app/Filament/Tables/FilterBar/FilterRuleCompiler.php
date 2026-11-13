@@ -19,7 +19,7 @@ use Illuminate\Support\Str;
 
 final readonly class FilterRuleCompiler
 {
-    private const string ME = '@me';
+    public const string ME = '@me';
 
     /**
      * @param  array<array-key, mixed>  $rules

@@ -162,7 +162,7 @@ trait HasFilterBar
     {
         if (! is_string($group)) {
             $this->tableGrouping = null;
-        } elseif (array_key_exists($group, $this->getTable()->getGroups()) && in_array($direction ??= 'asc', ['asc', 'desc'], true)) {
+        } elseif (array_key_exists($group, $this->getTable()->getGroups()) && in_array($direction ??= 'asc', SortList::DIRECTIONS, true)) {
             $this->tableGrouping = "{$group}:{$direction}";
         } else {
             return;

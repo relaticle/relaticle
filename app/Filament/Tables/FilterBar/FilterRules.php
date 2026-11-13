@@ -20,8 +20,6 @@ final readonly class FilterRules
 {
     public const int MAX_EXAMINED_RULES = 50;
 
-    private const string ME = '@me';
-
     private const array DELETED_MODES = ['included' => 1, 'only' => 0];
 
     /**
@@ -90,7 +88,7 @@ final readonly class FilterRules
         if ($key === 'assigned_to_me') {
             $active = is_array($state) && filter_var($state['isActive'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
-            return $active ? [['field' => 'assignees', 'condition' => FilterCondition::IsAnyOf->value, 'value' => ['@me']]] : [];
+            return $active ? [['field' => 'assignees', 'condition' => FilterCondition::IsAnyOf->value, 'value' => [FilterRuleCompiler::ME]]] : [];
         }
 
         if ($key === 'custom_fields' && is_array($state)) {
@@ -201,7 +199,7 @@ final readonly class FilterRules
 
         $kept = array_values(array_filter(
             $value,
-            fn (string $id): bool => ($field->kind === FilterFieldKind::Member && $id === self::ME) || in_array($id, $known[$field->key], true),
+            fn (string $id): bool => ($field->kind === FilterFieldKind::Member && $id === FilterRuleCompiler::ME) || in_array($id, $known[$field->key], true),
         ));
 
         return $kept === [] ? null : [...$rule, 'value' => $kept];
