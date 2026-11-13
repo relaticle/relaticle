@@ -28,9 +28,9 @@ there arrive already linked to the record.
 
 - The **Home** page shows your next open tasks, ordered by due date, with
   overdue ones in red.
-- On the **Tasks** list, click **Filter**, pick **Assignees**, then pick your
-  own name, marked **(me)**. You can also group rows by **Status** or
-  **Priority**.
+- On the **Tasks** list, click **Filter**, pick **Assignees**, choose **is any
+  of**, then pick your own name, marked **(me)**. You can also group rows by
+  **Status** or **Priority**.
 - Ask Rela; "what's overdue?" works.
 
 ## Stay notified
