@@ -550,6 +550,19 @@ it('opens one data arrived turn for what an assistant brought in', function (): 
     assertDataArrivedPushed(1);
 });
 
+it('announces what an assistant brought in once per setup window', function (): void {
+    Queue::fake([ProcessChatMessage::class]);
+    $user = User::factory()->create();
+    $workspace = setupWorkspaceWithGreeting($user);
+
+    Company::factory()->create(['workspace_id' => $workspace->getKey(), 'creator_id' => null, 'creation_source' => CreationSource::MCP]);
+    endRunningTurn($workspace);
+    $this->travel(8)->days();
+    Company::factory()->create(['workspace_id' => $workspace->getKey(), 'creator_id' => null, 'creation_source' => CreationSource::MCP]);
+
+    assertDataArrivedPushed(1);
+});
+
 it('opens no data arrived turn for a mailbox that imported nothing', function (): void {
     Queue::fake([ProcessChatMessage::class]);
     $user = User::factory()->create();

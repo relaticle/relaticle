@@ -21,8 +21,6 @@ use Relaticle\Chat\Support\TurnPresence;
 
 final readonly class StartDataArrivedTurn
 {
-    private const int CLAIM_DAYS = 7;
-
     private const int REMEMBERED_HOURS = 24;
 
     public function __construct(
@@ -60,7 +58,7 @@ final readonly class StartDataArrivedTurn
 
         $claimKey = "chat:data-arrived:{$conversation->id}:{$sourceKey}";
 
-        if (! Cache::add($claimKey, true, now()->addDays(self::CLAIM_DAYS))) {
+        if (! Cache::add($claimKey, true, now()->addDays(Workspace::SETUP_WINDOW_DAYS))) {
             return false;
         }
 
