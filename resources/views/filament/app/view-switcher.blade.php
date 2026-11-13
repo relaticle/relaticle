@@ -14,9 +14,10 @@
             class="fi-view-switcher-trigger"
             :aria-label="__('filament/panel.tables.views.switch', ['name' => $activeName])"
             :data-active-view="$activeName"
+            :title="$activeName"
         >
             <span class="fi-view-tile fi-view-tile-{{ $activeTone }}"><x-filament::icon :icon="$activeIcon" /></span>
-            <span class="fi-view-switcher-label" title="{{ $activeName }}">{{ $activeName }}</span>
+            <span class="fi-view-switcher-label">{{ $activeName }}</span>
             <x-filament::icon icon="lucide-chevron-down" class="fi-view-switcher-chevron" />
         </x-filament::button>
     </x-slot>

@@ -131,6 +131,14 @@ it('names a chip after an attribute whose name holds a replacement pattern', fun
         ->assertNoJavaScriptErrors();
 });
 
+it('gives a chip value the full text it shows', function (): void {
+    $page = ($this->open)();
+
+    addChip($page, 'name', 'contains')->type(valueInput(), 'Quarterly enterprise renewals across every region');
+    $page->assertScript(filterBarWaitFor('document.querySelector("[data-filter-segment=value]").getAttribute("title") === "Quarterly enterprise renewals across every region"'), true)
+        ->assertNoJavaScriptErrors();
+});
+
 it('draws a dashed sort and a dashed filter button when no filter is set', function (): void {
     ($this->open)()
         ->assertSeeIn('[data-filter-bar]', 'Sort')

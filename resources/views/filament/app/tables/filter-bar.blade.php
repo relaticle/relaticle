@@ -156,6 +156,7 @@
                             class="fi-filter-seg fi-filter-val"
                             data-filter-segment="value"
                             x-bind:class="{ 'fi-placeholder': ! complete(chip), 'fi-open': isOpen(chip.id, 'val') }"
+                            x-bind:title="complete(chip) ? chip.display : null"
                             x-bind:aria-expanded="isOpen(chip.id, 'val').toString()"
                             aria-haspopup="dialog"
                             data-pop-trigger

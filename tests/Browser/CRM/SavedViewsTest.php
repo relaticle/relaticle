@@ -259,6 +259,21 @@ it('keeps a long view name truncated and opens its row menu inside the viewport'
         ->assertNoJavaScriptErrors();
 });
 
+it('gives the switcher trigger the full name of a long view', function (): void {
+    $name = str_repeat('Renewals ', 9).'end';
+    SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => $name]);
+
+    loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->click('.fi-ta-views-row:has([title^="Renewals"]) .fi-dropdown-list-item')
+        ->assertScript(savedViewsWaitFor('document.querySelector(".fi-view-switcher-trigger").dataset.activeView === '.json_encode($name)), true)
+        ->assertAttribute('.fi-view-switcher-trigger', 'title', $name)
+        ->assertNoJavaScriptErrors();
+});
+
 it('lands on the list with a saved view applied when it is picked from the board', function (): void {
     SavedView::factory()->for($this->user)->for($this->workspace)->create([
         'entity' => CrmEntity::Opportunity,
