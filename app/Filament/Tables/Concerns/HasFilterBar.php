@@ -38,7 +38,7 @@ trait HasFilterBar
      */
     protected function filterBarColumnLabels(): array
     {
-        return [...$this->originalTableColumnLabels, ...$this->tableColumnLabels];
+        return $this->mergedTableColumnLabels();
     }
 
     /**

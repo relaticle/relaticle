@@ -72,8 +72,6 @@ trait HasColumnMenu
 
     protected function tableColumnLabel(string $columnName, string $original): string
     {
-        $this->originalTableColumnLabels[$columnName] = $original;
-
         return $this->tableColumnLabels[$columnName] ?? $original;
     }
 
@@ -203,9 +201,17 @@ trait HasColumnMenu
         $this->stampResizableColumns($this->getTable());
     }
 
+    /**
+     * @return array<string, string>
+     */
+    protected function mergedTableColumnLabels(): array
+    {
+        return [...$this->originalTableColumnLabels, ...$this->tableColumnLabels];
+    }
+
     private function currentTableColumnLabel(string $columnName): ?string
     {
-        return $this->tableColumnLabels[$columnName] ?? $this->originalTableColumnLabels[$columnName] ?? null;
+        return $this->mergedTableColumnLabels()[$columnName] ?? null;
     }
 
     private function isMovableTableColumn(string $columnName, ?string $beforeColumnName): bool
