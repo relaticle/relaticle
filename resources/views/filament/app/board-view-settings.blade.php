@@ -403,12 +403,12 @@
                 </div>
 
                 @if ($addableAttributes === [])
-                    <p class="fi-view-settings-note">
+                    <p class="fi-menu-empty fi-view-settings-note">
                         <x-filament::icon icon="lucide-check" />
                         {{ __('filament/pages/boards.view_settings.all_attributes_shown') }}
                     </p>
                 @else
-                    <p class="fi-view-settings-note" x-cloak x-show="addItems().length === 0">
+                    <p class="fi-menu-empty fi-view-settings-note" x-cloak x-show="addItems().length === 0">
                         {{ __('filament/pages/boards.view_settings.no_attribute_matches') }}
                     </p>
                 @endif

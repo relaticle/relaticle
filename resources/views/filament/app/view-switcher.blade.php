@@ -143,7 +143,7 @@
                 @endforeach
             </div>
 
-            <p class="fi-ta-views-empty" x-show="query && ! hasMatch()" x-cloak>{{ __('filament/panel.tables.views.no_match') }}</p>
+            <p class="fi-menu-empty" x-show="query && ! hasMatch()" x-cloak>{{ __('filament/panel.tables.views.no_match') }}</p>
         </div>
 
         <div x-ref="rowMenu">

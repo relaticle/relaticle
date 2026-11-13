@@ -217,7 +217,7 @@ it('opens each view row menu with that view own options and acts on that view', 
 it('tells the member when the search matches no view', function (): void {
     SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => 'Alpha']);
 
-    $empty = 'document.querySelector(".fi-ta-views-empty").offsetParent !== null';
+    $empty = 'document.querySelector(".fi-view-switcher .fi-menu-empty").offsetParent !== null';
 
     loginViaBrowser($this->user)
         ->assertPathIs("/app/{$this->workspace->slug}")

@@ -120,12 +120,12 @@
                 </div>
 
                 @if ($hidden === [])
-                    <p class="fi-view-settings-note">
+                    <p class="fi-menu-empty fi-view-settings-note">
                         <x-filament::icon icon="lucide-check" />
                         {{ __('filament/panel.tables.views.all_attributes_in_view') }}
                     </p>
                 @else
-                    <p class="fi-view-settings-note" x-cloak x-show="addItems().length === 0">
+                    <p class="fi-menu-empty fi-view-settings-note" x-cloak x-show="addItems().length === 0">
                         {{ __('filament/panel.tables.views.no_attribute_matches') }}
                     </p>
                 @endif
