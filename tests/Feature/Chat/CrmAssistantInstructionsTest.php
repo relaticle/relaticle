@@ -1012,13 +1012,15 @@ it('marks setup mode inside the onboarding block only when asked to', function (
 });
 
 it('emits the onboarding block with setup_mode even when the workspace has no use case', function (): void {
+    $plugin = 'https://chatgpt.com/apps/relaticle';
+    config()->set('chat.chatgpt_plugin_url', $plugin);
+
     $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
     $agent = resolve(CrmAssistant::class)->withWorkspace($workspace)->withSetupMode(true);
 
     $prompt = __('onboarding/setup.assistant_prompt');
 
     $connector = URL::getMcpUrl();
-    $plugin = config('chat.chatgpt_plugin_url');
 
     expect($agent->instructions())->toContain("<onboarding>\nrecords: none\nmailbox: not_connected\nmembers: 1\nassistant_prompt: \"{$prompt}\"\nconnector_url: {$connector}\nchatgpt_plugin: {$plugin}\nsetup_mode: true\n</onboarding>");
 });
