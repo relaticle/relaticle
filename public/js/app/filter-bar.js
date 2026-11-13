@@ -250,15 +250,23 @@
                     }
 
                     this.sent = serialized
+
+                    try {
+                        await this.write(() => this.$wire.setFilterRules(rules))
+                    } finally {
+                        this.reconcile()
+                    }
+                },
+
+                async write(call) {
                     this.inflight++
                     this.markBusy()
 
                     try {
-                        await this.$wire.setFilterRules(rules)
+                        return await call()
                     } finally {
                         this.inflight--
                         this.markBusy()
-                        this.reconcile()
                     }
                 },
 
@@ -461,7 +469,7 @@
 
                 async addDeleted() {
                     this.close(false)
-                    await this.$wire.setDeletedRecordsFilter('included')
+                    await this.write(() => this.$wire.setDeletedRecordsFilter('included'))
                     this.read()
                     this.open = { id: 'deleted', part: 'val' }
                     this.opener = null
@@ -473,12 +481,12 @@
 
                 async setDeleted(mode) {
                     this.close(true)
-                    await this.$wire.setDeletedRecordsFilter(mode)
+                    await this.write(() => this.$wire.setDeletedRecordsFilter(mode))
                 },
 
                 async removeDeleted() {
                     this.close(false)
-                    await this.$wire.setDeletedRecordsFilter(null)
+                    await this.write(() => this.$wire.setDeletedRecordsFilter(null))
                     this.$nextTick(() => root.querySelector('[data-filter-add]')?.focus())
                 },
 
@@ -584,22 +592,22 @@
                 async applySorts(sorts) {
                     this.sorts = sorts.map((sort) => ({ ...sort, label: this.sortable.find((option) => option.key === sort.column)?.label ?? sort.column }))
 
-                    await this.$wire.setFilterBarSorts(sorts.map(({ column, direction }) => ({ column, direction })))
+                    await this.write(() => this.$wire.setFilterBarSorts(sorts.map(({ column, direction }) => ({ column, direction }))))
                 },
 
                 async groupBy(group) {
                     const flipped = this.grouping?.id === group.id && this.grouping.direction === 'asc' ? 'desc' : 'asc'
 
-                    await this.$wire.setFilterBarGrouping(group.id, flipped)
+                    await this.write(() => this.$wire.setFilterBarGrouping(group.id, flipped))
                 },
 
                 async flipGrouping() {
-                    await this.$wire.setFilterBarGrouping(this.grouping.id, this.grouping.direction === 'asc' ? 'desc' : 'asc')
+                    await this.write(() => this.$wire.setFilterBarGrouping(this.grouping.id, this.grouping.direction === 'asc' ? 'desc' : 'asc'))
                 },
 
                 async clearGrouping() {
                     this.close(true)
-                    await this.$wire.setFilterBarGrouping(null, null)
+                    await this.write(() => this.$wire.setFilterBarGrouping(null, null))
                 },
 
                 addChip(field) {

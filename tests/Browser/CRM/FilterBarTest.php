@@ -120,6 +120,21 @@ it('marks the table busy while a filter change is in flight and clears it when t
     $page->assertNoJavaScriptErrors();
 });
 
+it('marks the table busy while a sort change from the bar is in flight and clears it when the response lands', function (): void {
+    $page = ($this->open)();
+    expect(companyRows($page, 3))->toBeTrue();
+
+    $page->script('window.fetch = ((original) => (input, init) => String(init?.body).includes("setFilterBarSorts") ? new Promise((resolve) => setTimeout(resolve, 1500)).then(() => original(input, init)) : original(input, init))(window.fetch)');
+
+    $busy = 'document.querySelector(".fi-ta").getAttribute("aria-busy") === "true" && document.querySelector(".fi-ta").classList.contains("fi-filter-busy")';
+
+    $page->click('[data-filter-sort]')
+        ->click('[data-sort-column][data-column="name"]')
+        ->assertScript(filterBarWaitFor($busy), true)
+        ->assertScript(filterBarWaitFor('!document.querySelector(".fi-ta").hasAttribute("aria-busy") && !document.querySelector(".fi-ta").classList.contains("fi-filter-busy")'), true)
+        ->assertNoJavaScriptErrors();
+});
+
 it('names a chip after an attribute whose name holds a replacement pattern', function (): void {
     resolve(CreateCustomField::class)->execute($this->user, ['entity_type' => 'company', 'name' => 'Cost $& total', 'code' => 'cost_total', 'type' => 'text']);
 
