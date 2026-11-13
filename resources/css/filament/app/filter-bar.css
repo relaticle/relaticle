@@ -123,7 +123,7 @@ button.fi-filter-seg {
 }
 
 .fi-filter-seg.fi-placeholder {
-    @apply font-normal text-gray-400 dark:text-gray-500;
+    @apply font-normal text-gray-500 dark:text-gray-400;
 }
 
 .fi-filter-more {
@@ -172,7 +172,7 @@ button.fi-filter-seg {
 }
 
 .fi-filter-hint {
-    @apply px-2 pt-1.5 pb-0.5 text-xs whitespace-normal text-gray-400 dark:text-gray-500;
+    @apply px-2 pt-1.5 pb-0.5 text-xs whitespace-normal text-gray-500 dark:text-gray-400;
 }
 
 .fi-filter-sorts {
