@@ -150,7 +150,7 @@ return [
                 'opportunities' => 'Opportunities',
                 'companies' => 'Companies',
                 'company' => 'Company',
-                'contact' => 'Point of contact',
+                'contact' => 'Point of Contact',
                 'stale_days' => 'No activity for',
             ],
             'conditions' => [
