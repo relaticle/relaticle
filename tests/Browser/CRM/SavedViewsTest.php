@@ -129,6 +129,32 @@ it('keeps the view list in step with the search box after Escape', function (): 
         ->assertNoJavaScriptErrors();
 });
 
+it('reopens the switcher with an empty search and the remaining views after deleting a found view', function (): void {
+    foreach (['Hot leads', 'Cold leads', 'Renewals'] as $name) {
+        SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => $name]);
+    }
+
+    $visibleRows = '[...document.querySelectorAll(".fi-view-switcher .fi-ta-views-row")].filter((row) => row.offsetParent !== null).map((row) => row.dataset.viewName)';
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->type('.fi-ta-views-search input', 'hot')
+        ->assertScript($visibleRows, ['hot leads']);
+
+    $page->hover('.fi-ta-views-row:has([title="Hot leads"])')->click('[aria-label="Actions for Hot leads"]');
+    $page->script('[...document.querySelectorAll(".fi-ta-views-row-menu .fi-dropdown-list-item")].find((item) => item.offsetParent !== null && item.textContent.trim() === "Delete view").click()');
+    $page->assertSee('Delete "Hot leads"?')
+        ->click('.fi-modal.fi-modal-open [type="submit"]')
+        ->assertScript(savedViewsWaitFor('document.querySelector(".fi-modal.fi-modal-open") === null'), true)
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->assertScript('document.querySelector(".fi-ta-views-search input").value', '')
+        ->assertScript($visibleRows, ['all companies', 'cold leads', 'renewals'])
+        ->assertNoJavaScriptErrors();
+});
+
 it('closes a view confirmation from its close button on a phone, where the switcher is a sheet', function (): void {
     $view = SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => 'Hot leads']);
 
