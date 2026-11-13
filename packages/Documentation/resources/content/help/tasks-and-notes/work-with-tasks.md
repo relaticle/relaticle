@@ -2,7 +2,7 @@
 title: Work with tasks
 description: Create tasks with status, priority, due dates, and assignees, then keep on top of them with filters and digests.
 order: 1
-updated: "2026-10-05"
+updated: "2026-11-13"
 related: [help/tasks-and-notes/use-the-task-board, help/records/company-records, help/custom-fields/edit-the-options-in-a-select-field]
 ---
 
@@ -28,8 +28,9 @@ there arrive already linked to the record.
 
 - The **Home** page shows your next open tasks, ordered by due date, with
   overdue ones in red.
-- On the **Tasks** list, the **Assigned to me** filter cuts the list down to
-  yours, and you can group rows by **Status** or **Priority**.
+- On the **Tasks** list, click **Filter**, pick **Assignees**, then pick your
+  own name, marked **(me)**. You can also group rows by **Status** or
+  **Priority**.
 - Ask Rela; "what's overdue?" works.
 
 ## Stay notified

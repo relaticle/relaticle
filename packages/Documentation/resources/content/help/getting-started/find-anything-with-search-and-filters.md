@@ -2,13 +2,13 @@
 title: Find anything with search and filters
 description: Find instructions for searching Relaticle records and filtering lists of companies, people, opportunities, tasks and notes.
 order: 7
-updated: "2026-11-12"
+updated: "2026-11-13"
 related: [help/getting-started/use-custom-fields, help/getting-started/import-your-existing-data]
 ---
 
-Press **⌘K** (or click the search box in the sidebar) to search across every
-record at once, or use the filter row on any list to narrow down what's
-already in front of you.
+Press **⌘K**, or click the search box in the sidebar, to search across every
+record at once. Use the filter row on any list to narrow down what's already
+in front of you.
 
 1. Click the search box at the top of the sidebar, or press **⌘K**.
 2. Type any part of a name. Results appear grouped by record type:
@@ -49,7 +49,7 @@ Pick **in the past**, **in the next**, or **this** to filter by a period,
 such as the last 30 days or this month. A saved view keeps the period
 relative, so it moves with the calendar. **Today** works the same way.
 
-Fields that hold a member list you first, as your name followed by
+A field that holds members shows you first, as your name followed by
 **(me)**.
 
 ## Show deleted records
@@ -83,10 +83,11 @@ The view at the top is the one a page opens on when you visit it with no link at
 ## If you can't find a field in the filter list
 
 Every custom attribute can be filtered except Textarea, Rich Editor, and Color
-Picker fields. Encrypted fields can't be filtered either, and neither can a
-field that's turned off. A field doesn't need **Visible in List** to be
-filtered. See [Use custom attributes](/help/getting-started/use-custom-fields)
-for every field setting.
+Picker attributes. Encrypted attributes can't be filtered either, and neither
+can an attribute that's turned off. An attribute doesn't need **Visible in
+List** to be filtered. See
+[Use custom attributes](/help/getting-started/use-custom-fields) for every
+attribute setting.
 
 ## Filter through the API, MCP or Rela
 

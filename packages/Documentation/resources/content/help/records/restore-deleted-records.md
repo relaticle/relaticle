@@ -2,7 +2,7 @@
 title: Restore a deleted record
 description: Deleting is reversible. Filter any list to deleted records and restore them; only force delete is final.
 order: 4
-updated: "2026-11-12"
+updated: "2026-11-13"
 related: [help/records/company-records, help/records/export-your-data]
 ---
 
@@ -13,7 +13,8 @@ reserved for the workspace owner and Admins, removes data permanently.
 ## Restore a record
 
 1. Open the record type's list, say **Companies**.
-2. Open the filters and set **Deleted records** to **Only deleted records**.
+2. Click **Filter** and pick **Deleted records** at the bottom of the field list.
+   Click the second part of the chip and choose **only**.
 3. Tick the record, then click **Restore selected** in the bar at the bottom
    of the list.
 

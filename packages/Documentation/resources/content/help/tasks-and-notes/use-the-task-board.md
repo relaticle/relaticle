@@ -2,7 +2,7 @@
 title: Use the task board
 description: A kanban view of your tasks. One column per status, drag to update, with priority and due-date badges.
 order: 2
-updated: "2026-11-12"
+updated: "2026-11-13"
 related: [help/tasks-and-notes/work-with-tasks, help/custom-fields/edit-the-options-in-a-select-field, help/getting-started/track-a-deal-through-the-pipeline]
 ---
 
@@ -12,10 +12,10 @@ top left of the Tasks page, which shows **All tasks**, and choose **Board**.
 
 ## Reading the board
 
-By default, each card shows the task's title, a snippet of its description, a flag badge
-for **Priority**, a **Due Date** badge that turns into "Due Today",
-"Due Tomorrow", or "(Overdue)" as the date approaches, and the assignees'
-avatars. Choose what a card shows under **Visible attributes** in **View settings**.
+By default, each card shows the task's title, a snippet of its description, a
+flag badge for **Priority**, a **Due Date** badge and the assignees' avatars.
+The date badge turns into "Due Today", "Due Tomorrow", or "(Overdue)" as the
+date approaches. Choose what a card shows under **Visible attributes** in **View settings**.
 
 Click **Filter** to narrow the whole board by most attributes. Filter by **Assignees** to see one person's plate. Click **Sort** to order the cards in every column. Open **View settings** and pick **Assignee** under **Lanes** to split the board into a lane per assignee. A **Sort** orders the cards inside each lane too.
 
@@ -36,7 +36,7 @@ Without a sort, cards keep the order you dragged them into. With a sort set, you
 
 Drag a column header left or right to move that status. You can also click
 **View settings** at the top of the board and drag the statuses under **Visible
-columns**, or use **Move up** and **Move down** from a status's menu. Switch a
+columns**. A status's menu there has **Move up** and **Move down** too. Switch a
 status off there to hide its column. Switch on **No Status** to add a first column
 for tasks with no status. The order is saved
 for you alone, so teammates keep theirs. The board also remembers your filters,

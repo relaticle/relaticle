@@ -18,7 +18,7 @@ them; changes apply to the whole workspace immediately.
 |---------|--------------|
 | Visible in List | Adds the attribute as a column on the record type's list page |
 | Visible in View | Shows the attribute on the record's detail page |
-| Toggleable Hidden | Keeps the list column available but hidden until someone enables it from the list's column toggle |
+| Toggleable Hidden | Keeps the list column available but hidden until someone adds it from **View settings**, under **Add attribute to view** |
 
 An attribute that's off in both places still exists on the create/edit form. Use
 this for data you capture but don't need to see day-to-day.

@@ -2,7 +2,7 @@
 title: Track a deal through the pipeline
 description: Move an opportunity through your sales stages, from Prospecting to Closed Won or Lost.
 order: 3
-updated: "2026-11-12"
+updated: "2026-11-13"
 related: [help/getting-started/add-your-first-person, help/getting-started/use-custom-fields]
 ---
 
@@ -34,7 +34,7 @@ and use **Grouped by** to make the columns from another single-choice attribute.
 
 Drag a column header left or right to move that stage. You can also click
 **View settings** at the top of the board and drag the stages under **Visible
-columns**, or use **Move up** and **Move down** from a stage's menu. Switch a
+columns**. A stage's menu there has **Move up** and **Move down** too. Switch a
 stage off there to hide its column. Switch on **No Stage** to add a first column
 for deals with no stage. Dragging a deal into it clears the stage. The order is saved for
 you alone, so teammates keep theirs. It never changes the order in the
