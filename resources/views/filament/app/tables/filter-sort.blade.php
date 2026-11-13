@@ -43,7 +43,7 @@
                     <label class="fi-filter-find">
                         <x-filament::icon icon="lucide-search" />
                         <input
-                            type="text"
+                            type="search"
                             x-model="find"
                             data-filter-find
                             placeholder="{{ __('filament/panel.tables.filters.find_sort') }}"

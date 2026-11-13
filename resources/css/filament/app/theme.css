@@ -2026,6 +2026,23 @@ html.fi-record-stacked .fi-record-layout {
     @apply ms-auto size-menu-icon shrink-0 text-primary-600 dark:text-primary-400;
 }
 
+/* The search row every menu opens with: the filter pickers, the view switcher and View settings. */
+:is(.fi-filter-find, .fi-ta-views-search, .fi-view-settings-search) {
+    @apply flex h-10 shrink-0 items-center border-b border-gray-100 text-gray-400 dark:border-white/5 dark:text-gray-500;
+
+    & > svg {
+        @apply size-menu-icon shrink-0;
+    }
+
+    & input {
+        @apply min-w-0 flex-1 border-0 bg-transparent p-0 text-base text-gray-950 shadow-none ring-0 outline-none placeholder:text-gray-400 focus:ring-0 focus:outline-none sm:text-sm dark:text-white dark:placeholder:text-gray-500;
+
+        &::-webkit-search-cancel-button {
+            @apply hidden appearance-none;
+        }
+    }
+}
+
 /* The one line a menu shows when its search or list matches nothing. */
 :is(.fi-menu-empty, .fi-ta-views-empty, .fi-view-settings-note) {
     @apply px-2 py-1.5 text-sm text-gray-500 dark:text-gray-400;

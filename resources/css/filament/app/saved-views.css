@@ -109,21 +109,9 @@
 }
 
 .fi-ta-views-search {
-    @apply -mt-1 mb-1 flex shrink-0 items-center gap-2 border-b border-gray-100 py-1.5 text-gray-400 dark:border-white/5 dark:text-gray-500;
+    @apply -mt-1 mb-1 gap-2;
     margin-inline: calc(var(--menu-inset) * -1);
     padding-inline: calc(var(--menu-inset) + var(--spacing));
-
-    & .fi-icon {
-        @apply size-menu-icon shrink-0;
-    }
-
-    & input {
-        @apply min-w-0 flex-1 border-0 bg-transparent p-0 text-base text-gray-950 shadow-none outline-none ring-0 placeholder:text-gray-400 focus:ring-0 focus:outline-none sm:text-sm dark:text-white dark:placeholder:text-gray-500;
-    }
-
-    & input::-webkit-search-cancel-button {
-        @apply hidden appearance-none;
-    }
 }
 
 .fi-ta-views-row-menu .fi-dropdown-list-item:disabled {
@@ -170,7 +158,7 @@
 
 /* ps-1 plus the 32px back button puts the chevron over the row icons and the title on the row labels. */
 .fi-view-settings-search {
-    @apply -mx-1 -mt-1 mb-1 flex h-10 shrink-0 items-center border-b border-gray-100 ps-1 pe-2 max-sm:-mx-2 max-sm:ps-3 dark:border-white/5;
+    @apply -mx-1 -mt-1 mb-1 ps-1 pe-2 max-sm:-mx-2 max-sm:ps-3;
 
     & > .fi-icon-btn {
         @apply m-0 size-8 shrink-0;
@@ -179,14 +167,10 @@
             @apply size-menu-icon!;
         }
     }
-}
 
-.fi-view-settings-search-input::-webkit-search-cancel-button {
-    @apply hidden appearance-none;
-}
-
-.fi-view-settings-search-input {
-    @apply min-w-0 flex-1 border-0 bg-transparent p-0 text-base text-gray-950 max-sm:ps-1 sm:text-sm outline-none placeholder:text-gray-400 focus:ring-0 dark:text-white dark:placeholder:text-gray-500;
+    & input {
+        @apply max-sm:ps-1;
+    }
 }
 
 .fi-view-settings-scroll {

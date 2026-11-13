@@ -147,15 +147,7 @@ button.fi-filter-seg {
 }
 
 .fi-filter-find {
-    @apply -mx-1 -mt-1 mb-1 flex shrink-0 items-center gap-2 border-b border-gray-100 px-2 py-1.5 text-gray-400 dark:border-white/5 dark:text-gray-500;
-
-    & svg {
-        @apply size-menu-icon shrink-0;
-    }
-
-    & input {
-        @apply w-full border-0 bg-transparent p-0 text-base text-gray-950 outline-0 ring-0 placeholder:text-gray-400 focus:ring-0 sm:text-sm dark:text-white dark:placeholder:text-gray-500;
-    }
+    @apply -mx-1 -mt-1 mb-1 gap-2 px-2;
 }
 
 .fi-filter-item {

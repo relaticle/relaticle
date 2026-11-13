@@ -186,7 +186,7 @@
                                         <label class="fi-filter-find">
                                             <x-filament::icon icon="lucide-search" />
                                             <input
-                                                type="text"
+                                                type="search"
                                                 x-model="find"
                                                 maxlength="100"
                                                 data-filter-search

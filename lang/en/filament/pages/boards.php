@@ -30,7 +30,7 @@ return [
         'attribute_created_off_card' => ':name created. This type of attribute does not show on a card.',
         'columns_grouped_by_created' => ':name created. The columns are now grouped by it.',
         'add_attribute' => 'Add attribute to view',
-        'search_attributes' => 'Search :entity attributes',
+        'search_attributes' => 'Search :entity attributes…',
         'all_attributes_shown' => 'Every attribute is on the card',
         'no_attribute_matches' => 'No attribute matches',
     ],

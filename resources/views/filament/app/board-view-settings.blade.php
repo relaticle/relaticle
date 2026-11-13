@@ -538,7 +538,6 @@
                     autocomplete="off"
                     placeholder="{{ __('filament/pages/boards.view_settings.search_attributes', ['entity' => $entityLabel]) }}"
                     aria-label="{{ __('filament/pages/boards.view_settings.search_attributes', ['entity' => $entityLabel]) }}"
-                    class="fi-view-settings-search-input"
                     data-view-settings-search
                     x-on:keydown.enter.prevent="pickFirst()"
                     x-on:keydown.arrow-down.prevent="stepAdd(1)"
