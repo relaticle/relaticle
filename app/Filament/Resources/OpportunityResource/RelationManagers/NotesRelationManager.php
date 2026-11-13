@@ -4,17 +4,15 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\OpportunityResource\RelationManagers;
 
+use App\Filament\Actions\LinkedRecordActions;
 use App\Filament\Components\Tables\RelatedRecordColumns;
 use App\Filament\Concerns\CountsRelatedRecords;
 use App\Filament\Resources\NoteResource\Forms\NoteForm;
 use Filament\Actions\ActionGroup;
-use Filament\Actions\AttachAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\DetachAction;
-use Filament\Actions\DetachBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
@@ -41,18 +39,18 @@ final class NotesRelationManager extends RelationManager
             ->columns(RelatedRecordColumns::notes())
             ->headerActions([
                 CreateAction::make()->icon('lucide-plus')->size(Size::Small),
-                AttachAction::make(),
+                LinkedRecordActions::attach(),
             ])
             ->recordActions([
                 ActionGroup::make([
                     EditAction::make(),
-                    DetachAction::make(),
+                    LinkedRecordActions::detach(),
                     DeleteAction::make(),
                 ]),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DetachBulkAction::make(),
+                    LinkedRecordActions::detachBulk(),
                     DeleteBulkAction::make(),
                 ]),
             ]);
