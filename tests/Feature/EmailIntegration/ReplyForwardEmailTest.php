@@ -9,6 +9,7 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Relaticle\EmailIntegration\Actions\SaveEmailDraftAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
@@ -196,6 +197,11 @@ it('inline composer prefills a reply from the selected email and queues it', fun
     expect($reply->status)->toBe(EmailStatus::QUEUED)
         ->and($reply->in_reply_to)->toBe($this->inboundEmail->rfc_message_id);
 });
+
+it('refuses a client that sets the reply target directly', function (): void {
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->set('inReplyToEmailId', $this->inboundEmail->id);
+})->throws(CannotUpdateLockedPropertyException::class);
 
 it('addresses a reply and a reply-all to the Reply-To address instead of the sender', function (): void {
     EmailParticipant::create([

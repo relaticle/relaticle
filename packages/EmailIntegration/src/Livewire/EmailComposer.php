@@ -107,6 +107,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      * it. A forward has a source but must not thread, which is why this is separate
      * from {@see $sourceEmailId}.
      */
+    #[Locked]
     public ?string $inReplyToEmailId = null;
 
     public ?string $replyMode = null;

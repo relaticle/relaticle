@@ -27,6 +27,7 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
+use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Services\EmailInlineImageEmbedder;
 use Relaticle\EmailIntegration\Services\ForwardAttachmentCopyService;
 
@@ -109,18 +110,8 @@ final readonly class SendEmailAction
             strlen((string) $data['body_html']),
         );
 
-        return DB::transaction(function () use ($account, $data, $priority, $scheduledFor, $linkToType, $linkToId, $attachmentPaths, $attachmentAttributes, $attachmentFileNames, $hasDownloadableAttachments): Email {
-            // Scope the reply lookup to the sender's workspace. in_reply_to_email_id arrives
-            // from a client-controlled hidden field and Email has no workspace global scope,
-            // so an unscoped lookup would let a user thread their outbound mail onto
-            // another tenant's email and leak its thread_id / rfc_message_id.
-            /** @var Email|null $inReplyTo */
-            $inReplyTo = isset($data['in_reply_to_email_id'])
-                ? Email::query()
-                    ->where('workspace_id', $account->workspace_id)
-                    ->whereKey($data['in_reply_to_email_id'])
-                    ->first()
-                : null;
+        return DB::transaction(function () use ($user, $account, $data, $priority, $scheduledFor, $linkToType, $linkToId, $attachmentPaths, $attachmentAttributes, $attachmentFileNames, $hasDownloadableAttachments): Email {
+            $inReplyTo = $this->replyTarget($user, $account, $data['in_reply_to_email_id'] ?? null);
 
             /** @var Email $email */
             $email = $account->emails()->chaperone()->create([
@@ -136,7 +127,7 @@ final readonly class SendEmailAction
                 // mailbox that received the original. A reply from a shared
                 // inbox or a different connected account must not pass that
                 // foreign id to the sending mailbox.
-                'thread_id' => $inReplyTo !== null && $inReplyTo->connected_account_id === $account->getKey()
+                'thread_id' => $inReplyTo instanceof Email && $inReplyTo->connected_account_id === $account->getKey()
                     ? $inReplyTo->thread_id
                     : null,
                 'in_reply_to' => $inReplyTo?->rfc_message_id,
@@ -267,5 +258,20 @@ final readonly class SendEmailAction
         }
 
         return null;
+    }
+
+    private function replyTarget(User $user, ConnectedAccount $account, ?string $emailId): ?Email
+    {
+        if ($emailId === null) {
+            return null;
+        }
+
+        $email = Email::query()
+            ->where('workspace_id', $account->workspace_id)
+            ->withGlobalScope('visible', new VisibleEmailScope($user))
+            ->whereKey($emailId)
+            ->first();
+
+        return $email instanceof Email && $user->can('view', $email) ? $email : null;
     }
 }
