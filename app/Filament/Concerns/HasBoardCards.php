@@ -230,7 +230,7 @@ trait HasBoardCards
         $field = $this->cardCustomField($key);
 
         return match (true) {
-            $field instanceof CustomField => CustomFieldType::from($field->type)->icon(),
+            $field instanceof CustomField => $field->typeIcon(),
             $key === 'description' => 'lucide-text-align-start',
             $key === 'checklist' => 'lucide-circle-check',
             default => $this->cardNativeField($key)->icon ?? 'lucide-text-align-start',

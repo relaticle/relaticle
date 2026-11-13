@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Filament\Concerns;
 
 use App\Enums\CrmEntity;
-use App\Enums\CustomFieldType;
 use App\Filament\Components\Tables\ColumnHeaderLabel;
 use App\Filament\Tables\Concerns\CreatesTableAttribute;
 use App\Filament\Tables\Concerns\HasColumnMenu;
@@ -53,7 +52,7 @@ trait HasCustomFieldColumns
 
                 $this->originalTableColumnLabels[$column->getName()] = $field->name;
 
-                return $column->label(fn (): Htmlable => $this->columnHeaderLabel($column->getName(), $field->name, CustomFieldType::tryFrom($field->type)?->icon() ?? $field->typeData->icon));
+                return $column->label(fn (): Htmlable => $this->columnHeaderLabel($column->getName(), $field->name, $field->typeIcon()));
             })
             ->all();
 
