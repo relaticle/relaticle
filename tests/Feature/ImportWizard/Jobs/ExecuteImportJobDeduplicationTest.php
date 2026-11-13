@@ -52,6 +52,8 @@ afterEach(function (): void {
 // --- Intra-Import Dedup Tests ---
 
 it('deduplicates Create rows with same matchable email value', function (): void {
+    Event::except(fn (string $event): bool => str_starts_with($event, 'eloquent.'));
+
     ImportExecutionFixture::readyStore($this, ['Name', 'Email'], [
         ImportExecutionFixture::row(2, ['Name' => 'Lay', 'Email' => 'same@acme.com'], ['match_action' => RowMatchAction::Create->value]),
         ImportExecutionFixture::row(3, ['Name' => 'Ray', 'Email' => 'same@acme.com'], ['match_action' => RowMatchAction::Create->value]),
@@ -76,6 +78,8 @@ it('deduplicates Create rows with same matchable email value', function (): void
 });
 
 it('does not dedup Create rows with different matchable values', function (): void {
+    Event::except(fn (string $event): bool => str_starts_with($event, 'eloquent.'));
+
     ImportExecutionFixture::readyStore($this, ['Name', 'Email'], [
         ImportExecutionFixture::row(2, ['Name' => 'Alice', 'Email' => 'alice@acme.com'], ['match_action' => RowMatchAction::Create->value]),
         ImportExecutionFixture::row(3, ['Name' => 'Bob', 'Email' => 'bob@acme.com'], ['match_action' => RowMatchAction::Create->value]),
@@ -95,6 +99,8 @@ it('does not dedup Create rows with different matchable values', function (): vo
 });
 
 it('deduplicates Create rows with multi-value matchable field', function (): void {
+    Event::except(fn (string $event): bool => str_starts_with($event, 'eloquent.'));
+
     ImportExecutionFixture::readyStore($this, ['Name', 'Email'], [
         ImportExecutionFixture::row(2, ['Name' => 'First', 'Email' => 'shared@acme.com, extra@acme.com'], ['match_action' => RowMatchAction::Create->value]),
         ImportExecutionFixture::row(3, ['Name' => 'Second', 'Email' => 'shared@acme.com'], ['match_action' => RowMatchAction::Create->value]),
@@ -185,6 +191,8 @@ it('creates one linked company for two spellings of a domain in a file', functio
 ]);
 
 it('updates the live record when a deleted record shares its import identity', function (ImportEntityType $entityType, string $fieldCode, string $value, bool $deletedFirst): void {
+    Event::except(fn (string $event): bool => str_starts_with($event, 'eloquent.'));
+
     $modelClass = $entityType->importer((string) $this->workspace->id)->modelClass();
     $field = CustomField::query()->withoutGlobalScopes()
         ->where('tenant_id', $this->workspace->id)
@@ -313,6 +321,8 @@ it('merges multi-choice custom field values during update', function (): void {
 });
 
 it('merges multi-choice custom field values during dedup', function (): void {
+    Event::except(fn (string $event): bool => str_starts_with($event, 'eloquent.'));
+
     $emailField = CustomField::query()
         ->withoutGlobalScopes()
         ->where('tenant_id', $this->workspace->id)

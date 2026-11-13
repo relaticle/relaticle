@@ -95,6 +95,8 @@ it('creates new Company records for rows with match_action=Create', function ():
 });
 
 it('sets custom field values on created records', function (): void {
+    Event::except(fn (string $event): bool => str_starts_with($event, 'eloquent.'));
+
     ImportExecutionFixture::readyStore($this, ['Name', 'Email'], [
         ImportExecutionFixture::row(2, ['Name' => 'John', 'Email' => 'john@test.com'], ['match_action' => RowMatchAction::Create->value]),
     ], [
@@ -125,6 +127,8 @@ it('sets custom field values on created records', function (): void {
 });
 
 it('resolves multiple custom field values via batch JSON query', function (): void {
+    Event::except(fn (string $event): bool => str_starts_with($event, 'eloquent.'));
+
     $emailField = CustomField::query()
         ->withoutGlobalScopes()
         ->where('tenant_id', $this->workspace->id)
@@ -1433,6 +1437,8 @@ it('links rows in later jobs to a company an earlier job auto-created', function
 });
 
 it('does not duplicate a person whose email an earlier job already created', function (): void {
+    Event::except(fn (string $event): bool => str_starts_with($event, 'eloquent.'));
+
     Bus::fake([ExecuteImportJob::class]);
     config()->set('import-wizard.execution_time_box', 0);
 
