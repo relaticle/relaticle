@@ -1920,7 +1920,7 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-board-header-actions {
-        @apply ml-auto flex shrink-0 items-center gap-x-2;
+        @apply ms-auto flex shrink-0 items-center gap-x-2;
     }
 
     .fi-board-bar-row {

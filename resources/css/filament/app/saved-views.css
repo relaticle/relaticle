@@ -66,7 +66,7 @@
     }
 
     & .fi-icon-btn .fi-icon {
-        @apply size-4!;
+        @apply size-menu-icon!;
     }
 }
 
@@ -201,7 +201,7 @@
     @apply flex items-center gap-2 p-2 text-sm text-gray-500 dark:text-gray-400;
 
     & .fi-icon {
-        @apply size-4;
+        @apply size-menu-icon;
     }
 }
 
@@ -239,7 +239,7 @@
     @apply m-0 size-6;
 
     & .fi-icon {
-        @apply size-4!;
+        @apply size-menu-icon!;
     }
 }
 

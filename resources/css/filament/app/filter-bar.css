@@ -188,10 +188,10 @@ button.fi-filter-seg {
 }
 
 :is(.fi-filter-sort-grip, .fi-filter-sort-remove) {
-    @apply flex size-8 shrink-0 items-center justify-center rounded-md text-gray-400 hover:bg-gray-50 hover:text-gray-700 focus-visible:bg-gray-50 focus-visible:outline-0 dark:text-gray-500 dark:hover:bg-white/5 dark:hover:text-gray-200 dark:focus-visible:bg-white/5;
+    @apply flex size-menu-row shrink-0 items-center justify-center rounded-menu-item text-gray-400 hover:bg-gray-50 hover:text-gray-700 focus-visible:bg-gray-50 focus-visible:outline-0 dark:text-gray-500 dark:hover:bg-white/5 dark:hover:text-gray-200 dark:focus-visible:bg-white/5;
 
     & svg {
-        @apply size-4;
+        @apply size-menu-icon;
     }
 }
 
@@ -200,10 +200,10 @@ button.fi-filter-seg {
 }
 
 :is(.fi-filter-sort-select, .fi-filter-sort-add) {
-    @apply flex h-8 min-w-0 items-center gap-2 rounded-lg px-2.5 text-sm whitespace-nowrap ring-1 ring-gray-950/10 hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:outline-0 dark:ring-white/15 dark:hover:bg-white/5 dark:focus-visible:ring-primary-500;
+    @apply flex h-menu-row min-w-0 items-center gap-2 rounded-lg px-2.5 text-sm whitespace-nowrap ring-1 ring-gray-950/10 hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:outline-0 dark:ring-white/15 dark:hover:bg-white/5 dark:focus-visible:ring-primary-500;
 
     & svg {
-        @apply size-4 shrink-0 text-gray-400 dark:text-gray-500;
+        @apply size-menu-icon shrink-0 text-gray-400 dark:text-gray-500;
     }
 }
 
