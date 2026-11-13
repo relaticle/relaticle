@@ -266,7 +266,7 @@ it('lists the viewer once and first as the me entry with their photo and keeps i
     $this->workspace->users()->attach(User::factory()->create(['name' => 'Priya Shah']), ['role' => 'member']);
     $page = openOn($this->user, $this->workspace, 'opportunities?view=all');
     $entries = 'JSON.stringify([...document.querySelectorAll("[data-pop][data-open=true] [data-option]")].map((option) => [option.dataset.option, option.textContent.trim()]))';
-    $settled = fn (): array => json_decode($page->script("new Promise((resolve) => setTimeout(() => resolve({$entries}), 1200))"), true);
+    $settled = fn (): array => json_decode($page->wait(1.2)->script($entries), true);
 
     addChip($page, 'creator', 'is_any_of')->assertPresent(optionButton('@me').' img[src]');
 
@@ -330,11 +330,9 @@ it('never shows one chip lookup results in another chip list', function (): void
         ->click('[data-field="creator"] [data-filter-segment="value"]')
         ->assertPresent(optionButton('@me'));
 
-    $options = <<<'JS'
-        new Promise((resolve) => setTimeout(() => resolve([...document.querySelectorAll('[data-pop][data-open=true] [data-option]')].map((option) => option.textContent.trim())), 1200))
-    JS;
+    $options = "[...document.querySelectorAll('[data-pop][data-open=true] [data-option]')].map((option) => option.textContent.trim())";
 
-    expect($page->script($options))->not->toContain('Globex')->toContain("{$this->user->name} (me)");
+    expect($page->wait(1.2)->script($options))->not->toContain('Globex')->toContain("{$this->user->name} (me)");
     $page->assertNoJavaScriptErrors();
 });
 
