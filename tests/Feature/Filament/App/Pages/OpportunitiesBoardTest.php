@@ -1964,6 +1964,16 @@ it('draws an empty attribute with its label when empty attributes are kept', fun
     expect(TablePreference::query()->sole()->board_state->hideEmpty)->toBeFalse();
 });
 
+it('keeps an empty attribute in its chosen place among the filled ones', function (): void {
+    $opportunity = opportunityInStage($this, 'Gap deal', 'Prospecting');
+    $opportunity->saveCustomFieldValue(WorkspaceCustomField::byCode($this->workspace->getKey(), 'opportunity', 'close_date'), Date::parse('2031-03-04', 'UTC'));
+
+    rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(cardAttributes: ['custom_fields.amount', 'custom_fields.close_date'], hideEmpty: false));
+
+    expect(livewire(OpportunitiesBoard::class)->html())
+        ->toMatch('/fi-sc-text[^>]*>\s*Amount\s*<.*fi-sc-text[^>]*>\s*Empty\s*<.*Mar 4/s');
+});
+
 it('draws a card with its title only when every attribute is removed', function (): void {
     opportunityWithCardValues($this, 'Title only deal');
 

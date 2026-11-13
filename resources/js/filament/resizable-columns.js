@@ -269,6 +269,8 @@
         const enclosing = el.closest?.(selector)
         if (enclosing) tables.add(enclosing)
 
+        if (tables.size === 0) restoreLabelFocus(el)
+
         tables.forEach((table) => {
             delete table.dataset.resizableLayoutLocked
             lockTable(table)
@@ -338,6 +340,10 @@
 
     document.addEventListener('x-modal-opened', () => {
         if (labelFocus) labelFocus.opened = true
+    })
+
+    window.addEventListener('arm-label-focus', ({ detail }) => {
+        labelFocus = { target: () => document.querySelector(detail.selector), opened: false }
     })
 
     function restoreLabelFocus(table) {

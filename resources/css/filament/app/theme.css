@@ -2344,6 +2344,11 @@ html.fi-record-stacked .fi-record-layout {
     }
 }
 
+/* Flowforge wraps every card item, so a labelled row takes its own line through that wrapper. */
+.ff-board .ff-card-flex:not(.ff-card-flex--nowrap) > :has(> .fi-board-card-row) {
+    flex-basis: 100%;
+}
+
 .fi-page:has(.fi-board-header[data-board-card-size='compact']) .ff-board {
     --ff-card-padding: 0.5rem;
 }

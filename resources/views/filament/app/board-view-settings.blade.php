@@ -156,15 +156,17 @@
                     this.add(first.dataset.boardAddItem)
                 }
             },
-            focusAddStart() {
+            focusAddStart(root = this.$root) {
                 const compact = window.matchMedia('(width < 40rem), (pointer: coarse)').matches
 
-                ;(compact ? this.$root.querySelector('[data-board-panel=add] [data-view-settings-back]') : this.$refs.addSearch).focus()
+                ;(compact ? root.querySelector('[data-board-panel=add] [data-view-settings-back]') : root.querySelector('[data-view-settings-search]')).focus()
             },
             async add(key) {
                 if (this.pending.includes(key)) {
                     return
                 }
+
+                const root = this.$root
 
                 this.pending.push(key)
 
@@ -175,7 +177,7 @@
                     this.revision++
                 }
 
-                this.$nextTick(() => this.focusAddStart())
+                this.$nextTick(() => requestAnimationFrame(() => this.focusAddStart(root)))
             },
         }"
     >
@@ -567,7 +569,7 @@
                         role="button"
                         tabindex="0"
                         data-view-settings-create
-                        x-on:click="$wire.mountAction('createTableAttribute'); close()"
+                        x-on:click="$dispatch('arm-label-focus', { selector: '.fi-view-settings-trigger' }); $wire.mountAction('createTableAttribute'); close()"
                     >
                         {{ __('filament/panel.tables.views.create_attribute') }}
                     </x-filament::dropdown.list.item>

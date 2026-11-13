@@ -267,7 +267,6 @@ trait HasBoardCards
         $state = $this->storedBoardState();
         $body = [];
         $inline = [];
-        $empties = [];
 
         foreach ($this->cardAttributeKeys() as $key) {
             $entry = $this->cardEntry($key, $packageEntries->get($key)) ?? $this->cardNativeEntry($key) ?? $this->cardCustomEntry($packageEntries->get($key));
@@ -279,8 +278,8 @@ trait HasBoardCards
             $block = in_array($key, $blocks, true);
 
             if ($state->showLabels) {
-                $body = [...$body, ...$this->flushInlineCardUnits($inline, $empties), $this->cardRow($key, $entry, $block, $state)];
-                [$inline, $empties] = [[], []];
+                $body = [...$body, ...$this->flushInlineCardUnits($inline), $this->cardRow($key, $entry, $block, $state)];
+                $inline = [];
 
                 continue;
             }
@@ -288,20 +287,16 @@ trait HasBoardCards
             $emptyRow = $state->hideEmpty ? null : $this->cardRow($key, null, $block, $state);
 
             if ($block) {
-                $body = [...$body, ...$this->flushInlineCardUnits($inline, $empties), $entry, ...($emptyRow instanceof CardFlex ? [$emptyRow] : [])];
-                [$inline, $empties] = [[], []];
+                $body = [...$body, ...$this->flushInlineCardUnits($inline), $entry, ...($emptyRow instanceof CardFlex ? [$emptyRow] : [])];
+                $inline = [];
 
                 continue;
             }
 
-            $inline[] = $entry;
-
-            if ($emptyRow instanceof CardFlex) {
-                $empties[] = $emptyRow;
-            }
+            $inline = [...$inline, $entry, ...($emptyRow instanceof CardFlex ? [$emptyRow] : [])];
         }
 
-        $body = [...$body, ...$this->flushInlineCardUnits($inline, $empties)];
+        $body = [...$body, ...$this->flushInlineCardUnits($inline)];
 
         if ($state->hideEmpty && ! $state->showLabels) {
             return [...$components, ...$body];
@@ -312,12 +307,11 @@ trait HasBoardCards
 
     /**
      * @param  list<Component>  $units
-     * @param  list<Component>  $empties
      * @return list<Component>
      */
-    private function flushInlineCardUnits(array $units, array $empties): array
+    private function flushInlineCardUnits(array $units): array
     {
-        return [...($units === [] ? [] : [CardFlex::make($units)->align('center')]), ...$empties];
+        return $units === [] ? [] : [CardFlex::make($units)->align('center')];
     }
 
     private function cardRow(string $key, ?Component $entry, bool $block, BoardStateData $state): CardFlex
@@ -335,7 +329,7 @@ trait HasBoardCards
 
         return $block
             ? $row->wrap(false)->align('stretch')->extraAttributes(['class' => 'flex-col! gap-y-0.5'])
-            : $row->align('baseline')->extraAttributes(['class' => 'grid! grid-cols-[calc(var(--spacing)*26)_minmax(0,1fr)] gap-x-2 *:min-w-0']);
+            : $row->align('baseline')->extraAttributes(['class' => 'fi-board-card-row grid! grid-cols-[calc(var(--spacing)*26)_minmax(0,1fr)] gap-x-2 *:min-w-0']);
     }
 
     /**
