@@ -773,7 +773,9 @@ it('keeps a period chip unfinished until its amount fits the unit', function ():
 
     $page = ($this->open)();
     addChip($page, 'custom_fields.renewal', 'in_the_past');
-    $page->assertScript(popVisible(), true)->type(amountInput(), '0');
+    $page->assertScript(popVisible(), true)
+        ->assertAttribute(amountInput(), 'placeholder', '1')
+        ->type(amountInput(), '0');
     $page->assertPresent('[data-filter-chip].fi-pending')
         ->type(amountInput(), '4000')
         ->assertPresent('[data-filter-chip].fi-pending')

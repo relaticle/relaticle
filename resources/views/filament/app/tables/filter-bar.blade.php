@@ -248,7 +248,7 @@
                                             inputmode="numeric"
                                             x-bind:max="unitOf(periodUnit(chip))?.max"
                                             x-bind:value="chip.value?.amount ?? ''"
-                                            placeholder="{{ __('filament/panel.tables.filters.number_value') }}"
+                                            placeholder="1"
                                             aria-label="{{ __('filament/panel.tables.filters.amount') }}"
                                             data-filter-amount
                                             x-on:input="setPeriod(chip, { amount: $event.target.value })"
