@@ -14,9 +14,7 @@ it('renders CompanyResource list page with French labels when locale is fr', fun
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/companies")
+    visitAs($user, "/app/{$workspace->slug}/companies")
         ->assertSee('Entreprises')
         ->assertSee('Importer / Exporter');
 });
@@ -28,9 +26,7 @@ it('renders CompanyResource list page with English labels when locale is en', fu
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/companies")
+    visitAs($user, "/app/{$workspace->slug}/companies")
         ->assertSee('Companies')
         ->assertSee('Import / Export');
 });

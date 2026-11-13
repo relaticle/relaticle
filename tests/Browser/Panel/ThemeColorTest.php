@@ -12,7 +12,7 @@ it('colours the browser bar with the theme picked in the panel, not the system o
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)->assertPathIs("/app/{$workspace->slug}");
+    $page = visitAs($user, "/app/{$workspace->slug}");
 
     $page->script('localStorage.setItem("filament:theme:mode", "dark")');
 

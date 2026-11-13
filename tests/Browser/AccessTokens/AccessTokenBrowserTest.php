@@ -13,8 +13,7 @@ it('copies a newly created access token to the clipboard', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
+    $page = visitAs($user, "/app/{$workspace->slug}")
         ->assertSee('New task')
         ->navigate("/app/{$workspace->slug}/settings/access-tokens")
         ->assertPathIs("/app/{$workspace->slug}/settings/access-tokens")
@@ -56,9 +55,7 @@ it('scrolls a table wider than its card so the row actions stay reachable', func
         'workspace_id' => $workspace->id,
     ]);
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/settings/access-tokens")
+    $page = visitAs($user, "/app/{$workspace->slug}/settings/access-tokens")
         ->resize(1280, 900)
         ->assertSee('Deploy script');
 
@@ -89,10 +86,7 @@ it('keeps a table sheet above the sections that follow it on a phone', function 
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(390, 664)
-        ->navigate("/app/{$workspace->slug}/settings/access-tokens")
+    $page = visitAs($user, "/app/{$workspace->slug}/settings/access-tokens", 390, 664)
         ->assertVisible('.fi-ta-col-manager-dropdown button >> nth=0')
         ->click('.fi-ta-col-manager-dropdown button >> nth=0')
         ->assertVisible('.fi-ta-col-manager-dropdown .fi-dropdown-panel >> nth=0')

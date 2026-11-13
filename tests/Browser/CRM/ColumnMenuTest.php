@@ -24,10 +24,7 @@ beforeEach(function (): void {
 
 function companiesTable(User $user, string $slug): AwaitableWebpage
 {
-    return loginViaBrowser($user)
-        ->assertPathIs("/app/{$slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$slug}/companies")
+    return visitAs($user, "/app/{$slug}/companies", 1440, 900)
         ->assertPresent(columnHeader('created_at').' [data-column-menu-trigger]');
 }
 

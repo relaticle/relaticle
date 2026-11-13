@@ -138,10 +138,7 @@ it('draws every menu with the shared row, icon and corner spec', function (strin
         $steps = str_replace('%option%', $option, $steps);
     }
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/{$path}");
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/{$path}", 1440, 900);
 
     runMenuSteps($page, $steps);
 
@@ -184,10 +181,7 @@ it('draws every menu with the shared row, icon and corner spec', function (strin
 it('draws one keyboard focus ring on a header trigger, the filter button, a chip part and a column header', function (): void {
     $chip = "Livewire.all().find((component) => component.name.includes('ListCompanies')).\$wire.\$call('setFilterRules', [{ field: 'name', condition: 'contains', value: 'chip' }])";
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies");
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900);
 
     $page->script($chip);
     $page->assertPresent('[data-filter-chip] [data-filter-segment="field"]')
@@ -220,10 +214,7 @@ it('draws one keyboard focus ring on a header trigger, the filter button, a chip
 });
 
 it('draws a rule only between the groups a menu shows', function (array $steps, string $panel): void {
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies");
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900);
 
     foreach ($steps as [$action, $selector]) {
         $page->{$action}($selector);
@@ -261,10 +252,7 @@ it('keeps a long menu above the window edge and scrolls only its list', function
         $steps = str_replace('%option%', $option, $steps);
     }
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 320)
-        ->navigate("/app/{$this->workspace->slug}/companies");
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 320);
 
     runMenuSteps($page, $steps);
 
@@ -321,10 +309,7 @@ it('marks the current item with a trailing check and no fill', function (string 
         default => 'companies',
     };
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/{$path}");
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/{$path}", 1440, 900);
 
     if (! in_array($surface, ['views', 'filter group'], true) && ! $onBoard) {
         $page->click($column)->click('[data-column-menu-item="sortAscending"]')->assertPresent('[data-filter-sort-label]');
@@ -437,10 +422,7 @@ it('keeps an item looking hovered while the menu opened from it is open', functi
         'filter more segment' => ['companies', [$chip], '[data-filter-chip] [data-filter-more]', '[data-filter-chip] [data-filter-more]', []],
     };
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/{$path}");
+    $page = visitAs($user, "/app/{$workspace->slug}/{$path}", 1440, 900);
 
     foreach ($prepare as $step) {
         if (str_starts_with($step, 'js:')) {
@@ -467,10 +449,7 @@ it('keeps a board card looking hovered while its menu is open', function (string
 
     $card = "[data-card-id=\"{$record->getKey()}\"]";
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/{$path}")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/{$path}", 1440, 900)
         ->assertVisible($card);
 
     expectHoverHeldWhileOpen($page, $card, "{$card} .ff-card-actions .fi-dropdown-trigger > button", array_map(fn (string $extra): string => "{$card} {$extra}", $extras));
@@ -491,10 +470,7 @@ it('keeps a sidebar chat looking hovered while its menu is open', function (bool
         'updated_at' => now(),
     ]);
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->assertSee('Acme onboarding');
 
     $row = '.fi-sidebar-item:has([aria-label="Chat actions"])';
@@ -507,10 +483,7 @@ it('keeps a list row looking hovered while its relations menu is open', function
     $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
     $note->people()->attach(People::factory()->count(3)->recycle([$this->user, $this->workspace])->create());
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/notes/list")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/notes/list", 1440, 900)
         ->assertVisible('.fi-linked-records-cell-more');
 
     expectHoverHeldWhileOpen($page, '.fi-ta-row', '.fi-linked-records-cell-more', [], $dark);
@@ -526,10 +499,7 @@ it('keeps a composer picker button looking hovered while its menu is open', func
         'last_synced_at' => now(),
     ]));
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/email")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/email", 1440, 900)
         ->click(__('filament/concerns/email-compose.actions.compose.label'))
         ->waitForText(__('filament/emails/composer.title'));
 
@@ -543,10 +513,7 @@ it('keeps pinned cells in step with a row whose popover is open', function (): v
     $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
     $note->people()->attach(People::factory()->count(3)->recycle([$this->user, $this->workspace])->create());
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/notes/list")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/notes/list", 1440, 900)
         ->assertVisible('.fi-linked-records-cell-more')
         ->click('.fi-ta-resizable-header [data-column-menu-trigger] >> nth=0')
         ->click('.fi-ta-column-menu [data-column-menu-item="pin"]')
@@ -559,10 +526,7 @@ it('keeps pinned cells in step with a row whose popover is open', function (): v
 it('leaves a collapse toggle that rests expanded looking the same as when it is collapsed', function (bool $dark): void {
     $company = Company::query()->withoutGlobalScopes()->first();
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies/{$company->getKey()}");
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies/{$company->getKey()}", 1440, 900);
 
     if ($dark) {
         $page->script('document.documentElement.classList.add("dark")');
@@ -597,10 +561,7 @@ it('leaves a collapse toggle that rests expanded looking the same as when it is 
 })->with([false, true]);
 
 it('draws the board view settings with the shared row, icon and corner spec', function (string $path): void {
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/{$path}")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/{$path}", 1440, 900)
         ->click('.fi-view-settings-trigger')
         ->assertVisible('[data-board-view-settings]');
 
@@ -615,10 +576,7 @@ it('draws the board view settings with the shared row, icon and corner spec', fu
 })->with(['tasks/board', 'opportunities/board']);
 
 it('keeps the board view settings above the window edge', function (array $steps, string $list, bool $listScrolls): void {
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 320)
-        ->navigate("/app/{$this->workspace->slug}/opportunities/board");
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/opportunities/board", 1440, 320);
 
     foreach ($steps as $step) {
         $page->click($step);

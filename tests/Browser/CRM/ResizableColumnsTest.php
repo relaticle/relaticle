@@ -92,10 +92,7 @@ beforeEach(function (): void {
 });
 
 it('resizes a column by dragging its edge and keeps the width after a reload', function (): void {
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
 
     $page->assertScript('document.querySelector(".column-resize-handle-bar").tabIndex', -1);
@@ -112,10 +109,7 @@ it('resizes a column by dragging its edge and keeps the width after a reload', f
 });
 
 it('leaves no focus ring behind after a mouse resize', function (): void {
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
 
     $page->click(headerSelector('created_at').' .fi-ta-resizable-label')
@@ -129,10 +123,7 @@ it('leaves no focus ring behind after a mouse resize', function (): void {
 });
 
 it('shows the edge guideline but no pixel width while a column is resized', function (): void {
-    loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->assertVisible(headerSelector('name').' .column-resize-handle-bar')
         ->assertScript(dragFeedbackMidDrag('name'), true)
         ->assertNoJavaScriptErrors();
@@ -181,10 +172,7 @@ function fittedColumnShowsEverything(string $column): string
 }
 
 it('fits a column to its content on double-click', function (): void {
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
 
     $before = $page->script(headerWidth('created_at'));
@@ -218,10 +206,7 @@ function narrowestHeaderState(string $column): string
 }
 
 it('stops narrowing where a long name is ellipsized clear of the resize bar and the next header', function (): void {
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
     $labels = [
         'name' => 'Annual recurring revenue per account',
@@ -259,10 +244,7 @@ it('stops narrowing where a long name is ellipsized clear of the resize bar and 
 it('fits a column so its header name and its widest cell stay in view', function (): void {
     Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Beekeepers International Holdings']);
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
 
     foreach (['name', 'created_at'] as $column) {
@@ -279,10 +261,7 @@ it('keeps resizing after navigating to another table and after sorting', functio
     $savedWidth = sprintf('(() => document.querySelector(`%s`).dataset.resizableWidth)()', headerSelector('name'));
     $oneHandlePerHeader = '(() => [...document.querySelectorAll(`th[x-data^="resizableColumn"]`)].every((th) => th.querySelectorAll(".column-resize-handle-bar").length === 1))()';
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->click("a.fi-sidebar-item-btn[href$='/app/{$this->workspace->slug}/people']")
         ->assertPathIs("/app/{$this->workspace->slug}/people")
         ->assertVisible(headerSelector('name').' .column-resize-handle-bar');
@@ -306,10 +285,7 @@ it('keeps the table head pinned while the rows scroll', function (): void {
 
     $headOffset = '(() => { const container = document.querySelector(".fi-ta-content-ctn"); return Math.abs(Math.round(document.querySelector("thead").getBoundingClientRect().top - container.getBoundingClientRect().top)); })()';
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 700)
-        ->navigate("/app/{$this->workspace->slug}/people")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/people", 1440, 700)
         ->assertVisible(headerSelector('name').' .column-resize-handle-bar');
 
     $page->script('document.querySelector(".fi-ta-content-ctn").scrollTo(0, 600)');
@@ -321,10 +297,7 @@ it('keeps the table head pinned while the rows scroll', function (): void {
 });
 
 it('puts the horizontal scrollbar at the bottom of the screen with few records', function (): void {
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
 
     $page->assertScript(tableAreaBottomGap(), true)
@@ -336,10 +309,7 @@ it('puts the horizontal scrollbar at the bottom of the screen with few records',
 it('puts the horizontal scrollbar at the bottom of the screen with many records and scrolls the rows inside the table', function (): void {
     People::factory()->recycle([$this->user, $this->workspace])->count(60)->create();
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/people")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/people", 1440, 900)
         ->assertVisible(headerSelector('name').' .column-resize-handle-bar');
 
     $page->script('(() => { const select = document.querySelector(".fi-pagination-records-per-page-select:not(.fi-compact) select"); select.value = "50"; select.dispatchEvent(new Event("change", { bubbles: true })); })()');
@@ -355,10 +325,7 @@ it('puts the horizontal scrollbar at the bottom of the screen with many records 
 });
 
 it('keeps the empty state inside the table area', function (): void {
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/tasks");
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/tasks", 1440, 900);
 
     $page->assertScript('(() => { const empty = document.querySelector(".fi-ta-empty-state").getBoundingClientRect(); return empty.height > 200 && empty.bottom <= window.innerHeight + 1; })()', true)
         ->assertScript(pageScrollsVertically(), false)
@@ -366,10 +333,7 @@ it('keeps the empty state inside the table area', function (): void {
 });
 
 it('resizes a column by the dragged amount when the table is narrower than the screen', function (): void {
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(2200, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 2200, 900)
         ->assertVisible(headerSelector('accountOwner.name').' .column-resize-handle-bar');
 
     $before = $page->script(headerWidth('accountOwner.name'));
@@ -383,10 +347,7 @@ it('resizes a column by the dragged amount when the table is narrower than the s
 });
 
 it('keeps a width when the table is sorted straight after the drag', function (): void {
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
 
     $before = $page->script(headerWidth('created_at'));
@@ -402,10 +363,7 @@ it('keeps a width when the table is sorted straight after the drag', function ()
 it('keeps a dragged width after signing in again', function (): void {
     $savedWidth = sprintf('(() => document.querySelector(`%s`).dataset.resizableWidth)()', headerSelector('created_at'));
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
 
     $before = $page->script(headerWidth('created_at'));
@@ -432,10 +390,7 @@ it('keeps a dragged width after signing in again', function (): void {
 it('keeps a dragged width on a column that sets its own width, and the actions column gives up the space', function (): void {
     $actionsWidth = '(() => Math.round(document.querySelector("th.fi-ta-actions-header-cell").getBoundingClientRect().width))()';
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1920, 900)
-        ->navigate("/app/{$this->workspace->slug}/people")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/people", 1920, 900)
         ->assertVisible(headerSelector('custom_fields.emails').' .column-resize-handle-bar');
 
     $before = $page->script(headerWidth('custom_fields.emails'));
@@ -468,10 +423,7 @@ it('rebuilds a table only when its own component morphs', function (): void {
     $isLocked = 'document.querySelector("table.fi-ta-resizable-table").dataset.resizableLayoutLocked === "1"';
     $unlock = 'delete document.querySelector("table.fi-ta-resizable-table").dataset.resizableLayoutLocked';
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
 
     $page->script($unlock);
@@ -485,10 +437,7 @@ it('rebuilds a table only when its own component morphs', function (): void {
 });
 
 it('releases a column at the last pointer position when several moves land in one frame', function (): void {
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
 
     $before = $page->script(headerWidth('created_at'));
@@ -518,10 +467,7 @@ it('ends a text value cut by its column width with an ellipsis', function (): vo
 
     $title = 'document.querySelector("td.fi-ta-cell-title .fi-ta-text-item")';
 
-    loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/tasks")
+    visitAs($this->user, "/app/{$this->workspace->slug}/tasks", 1440, 900)
         ->assertScript("getComputedStyle({$title}).textOverflow === 'ellipsis' && getComputedStyle({$title}).display === 'block'", true)
         ->assertScript("{$title}.scrollWidth > {$title}.clientWidth", true)
         ->assertNoJavaScriptErrors();

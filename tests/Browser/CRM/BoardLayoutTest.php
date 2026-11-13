@@ -45,10 +45,7 @@ it('scrolls a long column inside the board without scrolling the page', function
 
     TenantContextService::setTenantId(null);
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/{$path}")
+    $page = visitAs($user, "/app/{$workspace->slug}/{$path}", 1440, 900)
         ->assertVisible("[data-card-id=\"{$records->first()->getKey()}\"]")
         ->assertNoJavaScriptErrors();
 
@@ -92,10 +89,7 @@ it('puts the badges of a task card below a short description', function (): void
 
     TenantContextService::setTenantId(null);
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/tasks/board")
+    $page = visitAs($user, "/app/{$workspace->slug}/tasks/board", 1440, 900)
         ->assertVisible("[data-card-id=\"{$task->getKey()}\"] .ff-card-flex")
         ->assertNoJavaScriptErrors();
 
@@ -135,9 +129,7 @@ it('shows checklist progress as a sized badge on a task card', function (): void
 
     TenantContextService::setTenantId(null);
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/tasks/board")
+    $page = visitAs($user, "/app/{$workspace->slug}/tasks/board")
         ->assertVisible("[data-card-id=\"{$task->getKey()}\"] [data-checklist-progress]")
         ->assertNoJavaScriptErrors();
 
@@ -171,10 +163,7 @@ it('fills the viewport with a grouped board and lines its headers up with the fl
 
     $headerTop = 'Math.round(document.querySelector(".ff-column-header").getBoundingClientRect().top)';
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/opportunities/board")
+    $page = visitAs($user, "/app/{$workspace->slug}/opportunities/board", 1440, 900)
         ->assertVisible('.ff-columns');
 
     $flatHeaderTop = $page->script($headerTop);
@@ -269,10 +258,7 @@ it('gives cards the same inset and gap in a flat column and in a lane cell', fun
         })();
     JS;
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/{$path}/board")
+    $page = visitAs($user, "/app/{$workspace->slug}/{$path}/board", 1440, 900)
         ->assertVisible('.ff-columns > .ff-column .ff-card >> nth=1')
         ->assertNoJavaScriptErrors();
 
@@ -332,10 +318,7 @@ it('puts one row gap between the title and every row of a default card', functio
 
     $path = $model === Opportunity::class ? 'opportunities' : 'tasks';
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/{$path}/board")
+    $page = visitAs($user, "/app/{$workspace->slug}/{$path}/board", 1440, 900)
         ->assertVisible("[data-card-id=\"{$record->getKey()}\"] .ff-card-body")
         ->assertNoJavaScriptErrors();
 
@@ -471,10 +454,7 @@ it('lets the next board column peek past the first on a 320px phone', function (
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(320, 568)
-        ->navigate("/app/{$workspace->slug}/{$path}")
+    $page = visitAs($user, "/app/{$workspace->slug}/{$path}", 320, 568)
         ->assertVisible('.ff-column >> nth=0')
         ->assertNoJavaScriptErrors();
 
@@ -499,10 +479,7 @@ it('moves a card on a phone by tapping a column in its move to sheet', function 
 
     $card = "[data-card-id=\"{$record->getKey()}\"]";
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(430, 932)
-        ->navigate("/app/{$workspace->slug}/{$path}")
+    visitAs($user, "/app/{$workspace->slug}/{$path}", 430, 932)
         ->click("{$card} .fi-dropdown-trigger")
         ->click(".fi-dropdown-panel[style*='display: block'] .fi-dropdown-list-item:has-text('".__('filament/pages/boards.move_to.label')."')")
         ->assertVisible('.fi-modal-open .fi-modal-window')
@@ -539,10 +516,7 @@ it('swaps the open preview for the next card instead of stacking a second one', 
 
     $openPreviews = 'document.querySelectorAll(".fi-modal-window.fi-record-preview").length';
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/opportunities/board")
+    visitAs($user, "/app/{$workspace->slug}/opportunities/board", 1440, 900)
         ->hover("[data-card-id=\"{$first->getKey()}\"]")
         ->click("[data-card-id=\"{$first->getKey()}\"] .fi-board-card-preview-trigger")
         ->assertSee('Rooftop pilot')
@@ -595,10 +569,7 @@ it('drags a column header to reorder the columns and keeps the order after a rel
     $ids = boardStageOptionIds($model, $fieldCode);
     $expected = [$ids[1], $ids[0], ...array_slice($ids, 2)];
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/{$path}")
+    $page = visitAs($user, "/app/{$workspace->slug}/{$path}", 1440, 900)
         ->assertVisible('.ff-column >> nth=0')
         ->assertScript(BOARD_COLUMN_IDS, $ids);
 
@@ -631,10 +602,7 @@ it('still moves a card between columns after the columns were reordered', functi
     $ids = boardStageOptionIds($model, $fieldCode);
     $card = "[data-card-id=\"{$record->getKey()}\"]";
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/{$path}")
+    $page = visitAs($user, "/app/{$workspace->slug}/{$path}", 1440, 900)
         ->assertVisible($card);
 
     dragWithPointerEvents($page, "[data-column-root=\"{$ids[2]}\"] .ff-column-title", "[data-column-root=\"{$ids[0]}\"] .ff-column-title");
@@ -662,10 +630,7 @@ it('lists the stages in the board view settings and reorders them by dragging a 
     $ids = boardStageOptionIds($model, $fieldCode);
     $expected = [$ids[1], $ids[0], ...array_slice($ids, 2)];
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/{$path}")
+    $page = visitAs($user, "/app/{$workspace->slug}/{$path}", 1440, 900)
         ->assertVisible('.fi-view-settings-trigger')
         ->click('.fi-view-settings-trigger')
         ->assertVisible('[data-board-view-settings]')
@@ -692,10 +657,7 @@ it('moves a stage from its menu, keeps focus on its menu button and disables the
     $item = fn (string $label): string => '[...document.querySelectorAll(".fi-board-stages-row-menu .fi-dropdown-list-item")].find((item) => item.textContent.trim() === "'.$label.'")';
     $trigger = fn (string $id): string => "[data-board-view-settings] [data-stage-id=\"{$id}\"] [data-stage-actions]";
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/{$path}")
+    $page = visitAs($user, "/app/{$workspace->slug}/{$path}", 1440, 900)
         ->click('.fi-view-settings-trigger')
         ->click('[data-board-columns-trigger]');
 
@@ -725,10 +687,7 @@ it('keeps the board view settings usable on a 390px phone', function (string $mo
     $workspace = $user->ownedWorkspaces()->first();
     $ids = boardStageOptionIds($model, $fieldCode);
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(390, 844)
-        ->navigate("/app/{$workspace->slug}/{$path}")
+    $page = visitAs($user, "/app/{$workspace->slug}/{$path}", 390, 844)
         ->click('.fi-view-settings-trigger')
         ->assertVisible('[data-board-view-settings]')
         ->assertScript('(() => { const box = document.querySelector("[data-board-view-settings]").closest(".fi-dropdown-panel").getBoundingClientRect(); return box.left >= 0 && box.right <= innerWidth && box.bottom <= innerHeight; })()', true)
@@ -849,10 +808,7 @@ function openBoard(User $user, string $path, int $width = 1440, string $query = 
 {
     $workspace = $user->ownedWorkspaces()->first();
 
-    return loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize($width, 900)
-        ->navigate("/app/{$workspace->slug}/{$path}{$query}")
+    return visitAs($user, "/app/{$workspace->slug}/{$path}{$query}", $width, 900)
         ->assertVisible('.ff-column >> nth=0');
 }
 

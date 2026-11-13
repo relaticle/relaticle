@@ -26,10 +26,7 @@ it('assigns members from the search panel and keeps the closed field on one row'
     $chips = "[...document.querySelectorAll('{$picker} .fi-linked-records-chips > a')].map((chip) => chip.innerText.trim()).join('|')";
     $editTask = "/app/{$workspace->slug}/tasks?tableAction=edit&tableActionRecord={$task->getKey()}";
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate($editTask)
+    $page = visitAs($user, $editTask, 1440, 900)
         ->waitForText('Assignees')
         ->assertScript("document.querySelector('{$picker} .fi-linked-records-placeholder').textContent.trim()", 'Assign a member')
         ->click("{$picker} .fi-linked-records-field")

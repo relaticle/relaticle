@@ -12,10 +12,7 @@ it('keeps the list Import / Export menu inside the viewport', function (int $wid
 
     $panelFits = '(() => { const r = [...document.querySelectorAll(".fi-header .fi-dropdown-panel")].find((p) => p.getClientRects().length > 0).getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth; })()';
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize($width, $height)
-        ->navigate("/app/{$workspace->slug}/opportunities?view=all")
+    visitAs($user, "/app/{$workspace->slug}/opportunities?view=all", $width, $height)
         ->click('.fi-header button.fi-ac-btn-group:visible')
         ->assertSee(__('filament/resources/opportunity.pages.list.actions.import.label'))
         ->assertScript($panelFits, true)
@@ -33,10 +30,7 @@ it('keeps the list header actions inside the page padding on a phone', function 
 
     $actionsFit = '[...document.querySelectorAll(".fi-header-actions-ctn > *")].every((action) => action.getBoundingClientRect().right <= window.innerWidth - 16)';
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(393, 852)
-        ->navigate("/app/{$workspace->slug}/{$page}")
+    visitAs($user, "/app/{$workspace->slug}/{$page}", 393, 852)
         ->assertScript($actionsFit, true)
         ->assertNoJavaScriptErrors();
 })->with(['opportunities', 'notes?view=cards']);

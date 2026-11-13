@@ -98,10 +98,7 @@ beforeEach(function (): void {
         Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => $name]);
     }
 
-    $this->open = fn (int $width = 1440, int $height = 900): AwaitableWebpage => loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize($width, $height)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $this->open = fn (int $width = 1440, int $height = 900): AwaitableWebpage => visitAs($this->user, "/app/{$this->workspace->slug}/companies", $width, $height)
         ->assertPresent('[data-filter-add]');
 });
 
@@ -451,10 +448,7 @@ it('narrows opportunities with a number chip', function (): void {
         setCustomValue($this->user, Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => $name]), 'opportunity', 'budget', $budget);
     }
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/opportunities?view=all")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/opportunities?view=all", 1440, 900)
         ->assertPresent('[data-filter-add]');
     expect(companyRows($page, 3))->toBeTrue();
 
@@ -593,10 +587,7 @@ it('narrows opportunities with a pipeline checklist and summarises the picks', f
         setCustomValue($this->user, Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => "Deal {$stage}"]), 'opportunity', 'pipeline', optionIdOf($this->user, 'opportunity', 'pipeline', $stage));
     }
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/opportunities?view=all")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/opportunities?view=all", 1440, 900)
         ->assertPresent('[data-filter-add]');
     expect(companyRows($page, 4))->toBeTrue();
 
@@ -640,10 +631,7 @@ it('narrows opportunities by creator with Me pinned first and a teammate after i
     Opportunity::factory()->recycle([$this->user, $this->workspace])->count(2)->create(['creator_id' => $this->user->getKey()]);
     Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Priya deal', 'creator_id' => $teammate->getKey()]);
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/opportunities?view=all")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/opportunities?view=all", 1440, 900)
         ->assertPresent('[data-filter-add]');
     expect(companyRows($page, 3))->toBeTrue();
 
@@ -696,10 +684,7 @@ it('searches the workspace as the member types a company beyond the first page a
         People::factory()->recycle([$this->user, $this->workspace])->create(['name' => "Person of {$name}", 'company_id' => $companies[$name]]);
     }
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/people")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/people", 1440, 900)
         ->assertPresent('[data-filter-add]');
     expect(companyRows($page, 3))->toBeTrue();
 
@@ -719,10 +704,7 @@ it('searches the workspace as the member types a company beyond the first page a
 });
 
 it('never shows one chip lookup results in another chip list', function (): void {
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/opportunities?view=all")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/opportunities?view=all", 1440, 900)
         ->assertPresent('[data-filter-add]');
 
     addChip($page, 'creator', 'is_any_of')
@@ -793,10 +775,7 @@ function amountInput(): string
 
 function openOn(User $user, Workspace $workspace, string $list, int $width = 1440): AwaitableWebpage
 {
-    return loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize($width, 900)
-        ->navigate("/app/{$workspace->slug}/{$list}")
+    return visitAs($user, "/app/{$workspace->slug}/{$list}", $width, 900)
         ->assertPresent('[data-filter-add]');
 }
 

@@ -30,10 +30,7 @@ function phoneCompaniesPage(User $user): mixed
 
     Company::factory()->count(2)->recycle([$user, $workspace])->create();
 
-    return loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(393, 852)
-        ->navigate("/app/{$workspace->slug}/companies");
+    return visitAs($user, "/app/{$workspace->slug}/companies", 393, 852);
 }
 
 it('puts Home, People, Companies and Opportunities in the tab bar', function (): void {
@@ -146,8 +143,7 @@ it('keeps the tab bar off desktop', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
+    visitAs($user, "/app/{$workspace->slug}")
         ->resize(1440, 900)
         ->assertScript("getComputedStyle(document.querySelector('.fi-bottom-nav')).display", 'none')
         ->assertNoJavaScriptErrors();
@@ -176,10 +172,7 @@ it('keeps a sheet opened on a record page above the tab bar', function (): void 
     $person = People::factory()->recycle([$user, $workspace])->create();
     Task::factory()->recycle([$user, $workspace])->create()->people()->attach($person);
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(393, 852)
-        ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}")
+    visitAs($user, "/app/{$workspace->slug}/people/{$person->getKey()}", 393, 852)
         ->click('.fi-record-pane .fi-tabs-item:nth-child(3)')
         ->click('.fi-record-pane .fi-ta-row .fi-ta-actions .fi-dropdown-trigger')
         ->wait(0.5)

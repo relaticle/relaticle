@@ -15,8 +15,7 @@ it('can load the dashboard with chat input', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
+    visitAs($user, "/app/{$workspace->slug}")
         ->assertSourceHas('placeholder="Ask anything..."');
 });
 
@@ -24,8 +23,7 @@ it('uses a white composer surface in light mode', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
+    $page = visitAs($user, "/app/{$workspace->slug}")
         ->assertNoJavaScriptErrors();
 
     $colors = json_decode((string) $page->script(<<<'JS'
@@ -52,8 +50,7 @@ it('keeps paragraphs in the chat composer flush', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
+    $page = visitAs($user, "/app/{$workspace->slug}")
         ->assertNoJavaScriptErrors();
 
     $gap = $page->script(<<<'JS'
@@ -75,8 +72,7 @@ it('shows greeting on the dashboard', function (): void {
     $user = User::factory()->withWorkspace()->create(['timezone' => 'UTC']);
     $workspace = $user->ownedWorkspaces()->first();
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
+    visitAs($user, "/app/{$workspace->slug}")
         ->assertSee('Good');
 });
 
@@ -94,8 +90,7 @@ it('seeds the chat composer from the ask_rela checklist step without sending', f
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
+    $page = visitAs($user, "/app/{$workspace->slug}")
         ->click('[data-step="ask_rela"] a')
         ->assertPathBeginsWith("/app/{$workspace->slug}/chats")
         // TipTap mounts on a tick after navigation, so reading getText()
@@ -132,7 +127,7 @@ it('keeps a task due date inside its row however long the title is', function ()
         'datetime_value' => now()->addDays(3),
     ]);
 
-    $page = loginViaBrowser($user)->assertPathIs("/app/{$workspace->slug}");
+    $page = visitAs($user, "/app/{$workspace->slug}");
 
     foreach ([[1280, 800], [390, 844]] as [$width, $height]) {
         $page->resize($width, $height);

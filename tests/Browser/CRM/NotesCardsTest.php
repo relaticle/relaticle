@@ -14,10 +14,7 @@ it('draws a note card with no row menu or checkbox and opens the note for editin
 
     $card = '.fi-ta-content-grid .fi-ta-record';
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/notes?view=cards")
+    visitAs($user, "/app/{$workspace->slug}/notes?view=cards", 1440, 900)
         ->hover($card)
         ->assertSeeIn($card, 'Renewal call notes')
         ->assertScript("document.querySelectorAll('{$card} .fi-dropdown-trigger, {$card} .fi-ta-record-checkbox').length", 0)

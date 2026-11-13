@@ -36,10 +36,7 @@ it('applies a view from the switcher and shows no discard or save control after 
         'state' => new TableStateData(sort: 'name:desc'),
     ]);
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize($width, $height)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", $width, $height)
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->click('Hot leads')
         ->assertSeeIn('.fi-view-switcher-trigger', 'Hot leads');
@@ -57,10 +54,7 @@ it('reads a view changed in one request back changed after a reload', function (
         'state' => new TableStateData(sort: 'name:desc'),
     ]);
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->click('Hot leads');
 
@@ -81,10 +75,7 @@ it('keeps a tabbed-to chip control inside the strip on a phone', function (): vo
         'state' => new TableStateData(sort: 'name:desc'),
     ]);
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(390, 844)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 390, 844)
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->click('Team pipeline');
     $page->script("Livewire.all().find((component) => component.name.includes('ListCompanies')).\$wire.\$call('setFilterRules', Array.from({ length: 3 }, (_, index) => ({ field: 'name', condition: 'contains', value: 'chip' + index })))");
@@ -114,10 +105,7 @@ it('keeps the view list in step with the search box after Escape', function (): 
 
     $visibleRows = '[...document.querySelectorAll(".fi-view-switcher .fi-ta-views-row")].filter((row) => row.offsetParent !== null).length';
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->type('.fi-ta-views-search input', 'View 3')
         ->assertScript($visibleRows, 1);
@@ -136,10 +124,7 @@ it('reopens the switcher with an empty search and the remaining views after dele
 
     $visibleRows = '[...document.querySelectorAll(".fi-view-switcher .fi-ta-views-row")].filter((row) => row.offsetParent !== null).map((row) => row.dataset.viewName)';
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->type('.fi-ta-views-search input', 'hot')
         ->assertScript($visibleRows, ['hot leads']);
@@ -158,10 +143,7 @@ it('reopens the switcher with an empty search and the remaining views after dele
 it('closes a view confirmation from its close button on a phone, where the switcher is a sheet', function (): void {
     $view = SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => 'Hot leads']);
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(390, 844)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 390, 844)
         ->click('.fi-view-switcher .fi-dropdown-trigger button');
 
     $page->hover('.fi-ta-views-row:has([title="Hot leads"])')->click('[aria-label="Actions for Hot leads"]');
@@ -181,10 +163,7 @@ it('opens each view row menu with that view own options and acts on that view', 
 
     $visibleRowMenuItems = '[...document.querySelectorAll(".fi-ta-views-row-menu .fi-dropdown-list-item")].filter((item) => item.offsetParent !== null).map((item) => item.textContent.trim())';
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->click('.fi-view-switcher .fi-dropdown-trigger button');
 
     $page->hover('.fi-ta-views-row:has([title="Mine"])')->click('[aria-label="Actions for Mine"]');
@@ -219,10 +198,7 @@ it('tells the member when the search matches no view', function (): void {
 
     $empty = 'document.querySelector(".fi-view-switcher .fi-menu-empty").offsetParent !== null';
 
-    loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->assertScript($empty, false)
         ->type('.fi-ta-views-search input', 'Zeta')
@@ -240,10 +216,7 @@ it('keeps a long view name truncated and opens its row menu inside the viewport'
     $viewportWidth = 'document.documentElement.clientWidth';
     $kebab = 'document.querySelector(".fi-ta-views-row [aria-label^=\\"Actions for Quarterly\\"]").getBoundingClientRect()';
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->assertScript("{$row}.querySelector('[title]').scrollWidth > {$row}.querySelector('[title]').clientWidth", true);
 
@@ -263,10 +236,7 @@ it('gives the switcher trigger the full name of a long view', function (): void 
     $name = str_repeat('Renewals ', 9).'end';
     SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => $name]);
 
-    loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->click('.fi-ta-views-row:has([title^="Renewals"]) .fi-dropdown-list-item')
         ->assertScript(savedViewsWaitFor('document.querySelector(".fi-view-switcher-trigger").dataset.activeView === '.json_encode($name)), true)
@@ -281,10 +251,7 @@ it('lands on the list with a saved view applied when it is picked from the board
         'state' => new TableStateData(sort: 'name:desc'),
     ]);
 
-    loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/opportunities/board")
+    visitAs($this->user, "/app/{$this->workspace->slug}/opportunities/board", 1440, 900)
         ->assertSeeIn('.fi-view-switcher-trigger', 'Pipeline')
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->click('Open pipeline')
@@ -300,10 +267,7 @@ it('opens the built-in list from the board even when a view was last applied on 
         'state' => new TableStateData(sort: 'name:desc'),
     ]);
 
-    loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/opportunities?view=all")
+    visitAs($this->user, "/app/{$this->workspace->slug}/opportunities?view=all", 1440, 900)
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->click('Open pipeline')
         ->assertSeeIn('.fi-view-switcher-trigger', 'Open pipeline')
@@ -322,9 +286,7 @@ it('keeps a descending sort when a view sorted that way is picked from an unsort
         'state' => new TableStateData(sort: 'name:desc'),
     ]);
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies")
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->click('Newest names');
 
@@ -354,10 +316,7 @@ function storedViewOrder(User $user, CrmEntity $entity): ?array
 it('shows the search, a tile per kind and the rows in order with the pipeline first on opportunities', function (): void {
     $view = SavedView::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Opportunity, 'name' => 'Open pipeline']);
 
-    loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/opportunities")
+    visitAs($this->user, "/app/{$this->workspace->slug}/opportunities", 1440, 900)
         ->assertPathIs("/app/{$this->workspace->slug}/opportunities/board")
         ->assertSeeIn('.fi-view-switcher-trigger', 'Pipeline')
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
@@ -371,10 +330,7 @@ it('shows the search, a tile per kind and the rows in order with the pipeline fi
 it('opens the list when a member who put the table first visits opportunities', function (): void {
     TablePreference::factory()->for($this->user)->for($this->workspace)->create(['entity' => CrmEntity::Opportunity, 'view_order' => ['list', 'board']]);
 
-    loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/opportunities")
+    visitAs($this->user, "/app/{$this->workspace->slug}/opportunities", 1440, 900)
         ->assertPathIs("/app/{$this->workspace->slug}/opportunities")
         ->assertSeeIn('.fi-view-switcher-trigger', 'All opportunities')
         ->assertNoJavaScriptErrors();
@@ -384,10 +340,7 @@ it('reorders by dragging a row and keeps the order after a reload', function ():
     $alpha = SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => 'Alpha']);
     $beta = SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => 'Beta']);
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->assertScript(switcherKeys(), ['list', $alpha->getKey(), $beta->getKey()]);
 
@@ -408,10 +361,7 @@ it('moves a row from its menu and disables the move that has nowhere to go', fun
 
     $item = fn (string $label): string => '[...document.querySelectorAll(".fi-ta-views-row-menu .fi-dropdown-list-item")].find((item) => item.textContent.trim() === "'.$label.'")';
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->click('.fi-view-switcher .fi-dropdown-trigger button');
 
     $page->hover('.fi-ta-views-row:has([title="Beta"])')->click('[aria-label="Actions for Beta"]');
@@ -438,10 +388,7 @@ it('narrows the rows by name and takes no part in dragging while a query is type
     $visible = '[...document.querySelectorAll(".fi-view-switcher .fi-ta-views-row")].filter((row) => row.offsetParent !== null).map((row) => row.dataset.viewName)';
     $draggable = 'document.querySelectorAll(".fi-ta-views-draggable").length';
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->assertScript($draggable, 4)
         ->type('.fi-ta-views-search input', 'alpha')
@@ -457,10 +404,7 @@ it('narrows the rows by name and takes no part in dragging while a query is type
 });
 
 it('keeps opportunities on the list when the built-in list is reloaded', function (): void {
-    loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/opportunities?view=all")
+    visitAs($this->user, "/app/{$this->workspace->slug}/opportunities?view=all", 1440, 900)
         ->assertPathIs("/app/{$this->workspace->slug}/opportunities")
         ->refresh()
         ->assertPathIs("/app/{$this->workspace->slug}/opportunities")
@@ -469,10 +413,7 @@ it('keeps opportunities on the list when the built-in list is reloaded', functio
 });
 
 it('returns focus to the trigger when Escape closes the switcher', function (): void {
-    loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->keys('.fi-ta-views-search input', 'Escape')
         ->assertScript('document.activeElement === document.querySelector(".fi-view-switcher-trigger")', true)
@@ -482,10 +423,7 @@ it('returns focus to the trigger when Escape closes the switcher', function (): 
 it('keeps the switcher usable as a sheet on a phone', function (): void {
     $alpha = SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => 'Alpha', 'state' => new TableStateData(sort: 'name:desc')]);
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(390, 844)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 390, 844)
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->assertVisible('.fi-ta-views-search input')
         ->assertScript('(() => { const box = document.querySelector(".fi-ta-views-panel").getBoundingClientRect(); return box.left >= 0 && box.right <= document.documentElement.clientWidth && box.bottom <= window.innerHeight; })()', true)
@@ -499,10 +437,7 @@ it('keeps the switcher usable as a sheet on a phone', function (): void {
 it('opens a view with a plain click on its row', function (): void {
     SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => 'Alpha', 'state' => new TableStateData(sort: 'name:desc')]);
 
-    loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->click('.fi-ta-views-row:has([title="Alpha"]) .fi-dropdown-list-item')
         ->assertSeeIn('.fi-view-switcher-trigger', 'Alpha')
@@ -516,10 +451,7 @@ it('keeps a row in its hover look while its menu is open', function (): void {
 
     $background = fn (string $name): string => 'getComputedStyle(document.querySelector(\'.fi-ta-views-row:has([title="'.$name.'"])\')).backgroundColor';
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->click('.fi-view-switcher .fi-dropdown-trigger button');
 
     $page->hover('.fi-ta-views-row:has([title="Beta"])');

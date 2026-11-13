@@ -13,9 +13,7 @@ it('can create a company through the browser', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/companies")
+    visitAs($user, "/app/{$workspace->slug}/companies")
         ->press('New company')
         ->type('[id="mountedActionSchema0.name"]', 'Browser Test Corp')
         ->press('Create')
@@ -30,9 +28,7 @@ it('paints the header action dropdown above the table toolbar', function (): voi
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/companies")
+    $page = visitAs($user, "/app/{$workspace->slug}/companies")
         ->assertSee('Import / Export');
 
     $page->script(<<<'JS'
@@ -66,9 +62,7 @@ it('keeps app page headings in the topbar across navigation and viewport sizes',
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/companies")
+    $page = visitAs($user, "/app/{$workspace->slug}/companies")
         ->assertVisible('[data-page-heading]')
         ->assertSeeIn('[data-page-heading]', 'Companies')
         ->assertMissing('main h1')
@@ -155,10 +149,7 @@ it('keeps the header row and its controls in place when switching between the li
         })();
     JS;
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/opportunities?view=all")
+    $page = visitAs($user, "/app/{$workspace->slug}/opportunities?view=all", 1440, 900)
         ->assertVisible('main .fi-header .fi-view-switcher');
 
     $list = $page->script($headerRow);

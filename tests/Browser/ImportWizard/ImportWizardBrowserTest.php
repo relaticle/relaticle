@@ -16,9 +16,7 @@ it('can navigate the import wizard and upload a CSV file', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/companies/import")
+    visitAs($user, "/app/{$workspace->slug}/companies/import")
         ->assertSeeIn('[data-page-heading]', 'Companies')
         ->assertSeeIn('.fi-topbar-page-title', 'Import')
         ->assertSee('Drop your .CSV file onto this area to upload');
@@ -50,10 +48,7 @@ it('lays the column mapping out one block per CSV column on a phone', function (
     ]);
     ImportExecutionFixture::publish($store);
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(390, 664)
-        ->navigate("/app/{$workspace->slug}/companies/import?import={$import->id}")
+    visitAs($user, "/app/{$workspace->slug}/companies/import?import={$import->id}", 390, 664)
         ->assertSee('MOBILE-AUDIT Acme')
         ->assertScript("[...document.querySelectorAll('[wire\\\\:key^=row-] > .min-w-0')].length === 3")
         ->assertScript("[...document.querySelectorAll('[wire\\\\:key^=row-] > .min-w-0')].every((cell) => cell.scrollWidth <= cell.clientWidth && cell.clientWidth >= 280)", true)

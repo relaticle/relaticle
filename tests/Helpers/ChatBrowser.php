@@ -64,17 +64,9 @@ final class ChatBrowser
         DB::table('agent_conversation_messages')->insert($rows);
     }
 
-    /**
-     * Log in through the real form and land on the workspace dashboard; pass a
-     * conversation id to continue into that chat.
-     */
     public static function logIn(User $user, string $slug, ?string $conversationId = null): AwaitableWebpage
     {
-        $page = loginViaBrowser($user)->assertPathIs("/app/{$slug}");
-
-        return $conversationId === null
-            ? $page
-            : $page->navigate("/app/{$slug}/chats/{$conversationId}");
+        return visitAs($user, $conversationId === null ? "/app/{$slug}" : "/app/{$slug}/chats/{$conversationId}");
     }
 
     /**

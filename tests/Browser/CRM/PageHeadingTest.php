@@ -16,9 +16,7 @@ it('keeps the page heading in the topbar across a topbar re-render', function ()
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/companies");
+    $page = visitAs($user, "/app/{$workspace->slug}/companies");
 
     $page->wait(1);
 
@@ -74,9 +72,7 @@ it('drops the previous page heading when the next page has none', function (): v
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/companies");
+    $page = visitAs($user, "/app/{$workspace->slug}/companies");
 
     $page->wait(1);
 
@@ -102,10 +98,7 @@ it('shows a long record name in full on a phone by cutting the trail to its icon
     $workspace = $user->ownedWorkspaces()->first();
     $opportunity = Opportunity::factory()->recycle([$user, $workspace])->create(['name' => 'Apple Developer Program']);
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(393, 852)
-        ->navigate("/app/{$workspace->slug}/opportunities/{$opportunity->getKey()}");
+    $page = visitAs($user, "/app/{$workspace->slug}/opportunities/{$opportunity->getKey()}", 393, 852);
 
     $heading = json_decode((string) $page->script(<<<'JS'
         (() => {

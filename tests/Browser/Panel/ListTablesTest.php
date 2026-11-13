@@ -56,10 +56,7 @@ it('stacks each list row into a card so no column sits off a phone screen', func
     $workspace = $user->ownedWorkspaces()->first();
     seedListRows($user);
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(390, 844)
-        ->navigate("/app/{$workspace->slug}/{$path}")
+    visitAs($user, "/app/{$workspace->slug}/{$path}", 390, 844)
         ->assertVisible('.fi-ta-row')
         ->assertScript(ROWS_STACKED, true)
         ->assertScript(CELL_LABELS_SHOWN, true)
@@ -84,10 +81,7 @@ it('shows the bulk bar only while a record is selected, and the rows stay put', 
 
     $firstRowTop = 'Math.round(document.querySelector(".fi-ta-row").getBoundingClientRect().top)';
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/companies")
+    $page = visitAs($user, "/app/{$workspace->slug}/companies", 1440, 900)
         ->assertVisible('[data-filter-bar]')
         ->assertMissing('.fi-bulk-bar');
 
@@ -111,10 +105,7 @@ it('moves focus to the select all checkbox when the selection is cleared from th
     $workspace = $user->ownedWorkspaces()->first();
     seedListRows($user);
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/companies")
+    visitAs($user, "/app/{$workspace->slug}/companies", 1440, 900)
         ->click('.fi-ta-record-checkbox')
         ->assertVisible('.fi-bulk-bar')
         ->click('.fi-bulk-bar-selection')
@@ -138,10 +129,7 @@ it('deletes a selected record from the bulk bar\'s More menu, which opens above 
         })();
     JS;
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/companies")
+    visitAs($user, "/app/{$workspace->slug}/companies", 1440, 900)
         ->click('.fi-ta-record-checkbox')
         ->click('.fi-bulk-bar .fi-dropdown-trigger')
         ->assertScript($menuAboveBar, true)
@@ -161,10 +149,7 @@ it('keeps the list table header row on desktop', function (): void {
     $workspace = $user->ownedWorkspaces()->first();
     seedListRows($user);
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/tasks")
+    visitAs($user, "/app/{$workspace->slug}/tasks", 1440, 900)
         ->assertVisible('.fi-ta-header-cell.fi-ta-header-cell-title')
         ->assertScript(CELL_LABELS_SHOWN, false)
         ->assertNoJavaScriptErrors();
@@ -177,9 +162,7 @@ it('keeps a linked company chip inside its cell link', function (): void {
     $workspace = $user->ownedWorkspaces()->first();
     seedListRows($user);
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/people")
+    visitAs($user, "/app/{$workspace->slug}/people")
         ->assertScript('document.querySelector(\'[class~="fi-ta-cell-company.name"] a.fi-ta-col .fi-record-chip\') !== null', true)
         ->assertNoJavaScriptErrors();
 });
@@ -201,10 +184,7 @@ it('keeps a long record name inside its phone card, clear of its checkbox', func
         })();
     JS;
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(320, 568)
-        ->navigate("/app/{$workspace->slug}/companies")
+    visitAs($user, "/app/{$workspace->slug}/companies", 320, 568)
         ->assertVisible('.fi-ta-row')
         ->assertScript($titleClearOfCheckbox, true)
         ->assertNoJavaScriptErrors();
@@ -219,10 +199,7 @@ it('hides a column set visibleFrom sm in a phone card and shows it from sm up', 
 
     $createdAtDisplayed = 'getComputedStyle(document.querySelector(\'.fi-ta-row [class~="fi-ta-cell-created-at"]\')).display !== "none"';
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(390, 844)
-        ->navigate("/app/{$workspace->slug}/companies")
+    $page = visitAs($user, "/app/{$workspace->slug}/companies", 390, 844)
         ->assertVisible('.fi-ta-row')
         ->assertScript($createdAtDisplayed, false);
 
@@ -240,10 +217,7 @@ it('hides a phone card row whose value is empty', function (): void {
 
     $emptyRowShown = 'getComputedStyle(document.querySelector(\'.fi-ta-row [class~="fi-ta-cell-company.name"]\')).display !== "none"';
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(390, 844)
-        ->navigate("/app/{$workspace->slug}/people")
+    visitAs($user, "/app/{$workspace->slug}/people", 390, 844)
         ->assertVisible('.fi-ta-row')
         ->assertScript($emptyRowShown, false)
         ->assertNoJavaScriptErrors();
@@ -265,10 +239,7 @@ it('keeps every filter field option inside the phone filter sheet', function ():
         ]);
     }
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(390, 664)
-        ->navigate("/app/{$workspace->slug}/companies")
+    $page = visitAs($user, "/app/{$workspace->slug}/companies", 390, 664)
         ->assertVisible('.fi-ta-row')
         ->click('[data-filter-add]')
         ->assertVisible('[data-filter-bar] [data-pop-item] >> nth=0')
@@ -315,10 +286,7 @@ it('keeps the bulk bar above the tab bar on a phone while rows are ticked', func
         })();
     JS;
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(390, 664)
-        ->navigate("/app/{$workspace->slug}/companies")
+    $page = visitAs($user, "/app/{$workspace->slug}/companies", 390, 664)
         ->assertVisible('.fi-ta-row >> nth=14');
 
     $page->script('window.scrollTo(0, document.documentElement.scrollHeight)');
@@ -344,10 +312,7 @@ it('keeps the last option of a long choice list inside the phone filter sheet', 
         'options' => array_map(static fn (int $number): array => ['name' => "Tier {$number}"], range(1, 14)),
     ]);
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(390, 664)
-        ->navigate("/app/{$workspace->slug}/companies")
+    $page = visitAs($user, "/app/{$workspace->slug}/companies", 390, 664)
         ->assertVisible('.fi-ta-row')
         ->click('[data-filter-add]')
         ->click('[data-pop-item][data-field="custom_fields.tier"]')
