@@ -455,7 +455,7 @@ html.fi-chat-docked .fi-app-main-wrapper {
 }
 
 .fi-topbar-page-heading {
-    @apply flex min-w-0 max-w-[50vw] items-center gap-x-3 text-sm font-semibold text-gray-950 dark:text-white;
+    @apply flex min-w-0 max-w-[50vw] items-center gap-x-3 text-sm font-semibold text-gray-950 max-sm:max-w-none dark:text-white;
 
     .fi-topbar-page-icon {
         @apply -me-1.5 size-4 shrink-0 text-gray-500 dark:text-gray-400;
@@ -1763,6 +1763,11 @@ html.fi-record-stacked .fi-record-layout {
 
     .fi-record-breadcrumb-icon {
         @apply size-4 shrink-0;
+    }
+
+    /* A phone keeps the icon as the way back so the page title gets the room. */
+    .fi-record-breadcrumb-label {
+        @apply max-sm:sr-only;
     }
 }
 
