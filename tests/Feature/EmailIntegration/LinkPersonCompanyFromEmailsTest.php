@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\People\CreatePeople;
 use App\Actions\People\UpdatePeople;
+use App\Enums\CreationSource;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\People\CreatePeopleTool;
@@ -240,6 +241,67 @@ it('links a company when a work email is added later on the panel', function ():
         'workspace_id' => $this->workspace->id,
         'name' => 'Paneledit',
     ]);
+});
+
+it('keeps a person unlinked when the company is cleared via API', function (): void {
+    Sanctum::actingAs($this->user);
+
+    $this->postJson('/api/v1/people', [
+        'name' => 'Jane',
+        'custom_fields' => ['emails' => ['jane@acme.com']],
+    ])->assertCreated();
+
+    $person = People::query()->withoutGlobalScope(WorkspaceScope::class)->where('name', 'Jane')->firstOrFail();
+
+    expect($person->company_id)->not->toBeNull();
+
+    $this->putJson("/api/v1/people/{$person->id}", ['company_id' => null])->assertOk();
+
+    expect($person->fresh()->company_id)->toBeNull();
+});
+
+it('keeps a person unlinked when the company is cleared on the panel', function (): void {
+    $this->actingAs($this->user);
+    Filament::setTenant($this->workspace);
+
+    livewire(ListPeople::class)
+        ->callAction('create', data: [
+            'name' => 'Panel Jane',
+            'custom_fields' => ['emails' => ['jane@panelco.com']],
+        ])
+        ->assertHasNoActionErrors();
+
+    $person = People::query()->withoutGlobalScope(WorkspaceScope::class)->where('name', 'Panel Jane')->firstOrFail();
+
+    expect($person->company_id)->not->toBeNull();
+
+    livewire(ListPeople::class)
+        ->callAction(TestAction::make('edit')->table($person), data: [
+            'name' => 'Panel Jane',
+            'company_id' => null,
+        ])
+        ->assertHasNoActionErrors();
+
+    expect($person->fresh()->company_id)->toBeNull();
+});
+
+it('records a company auto-created from a panel person as web', function (): void {
+    $this->actingAs($this->user);
+    Filament::setTenant($this->workspace);
+
+    livewire(ListPeople::class)
+        ->callAction('create', data: [
+            'name' => 'Panel Jane',
+            'custom_fields' => ['emails' => ['jane@panelco.com']],
+        ])
+        ->assertHasNoActionErrors();
+
+    $company = Company::query()->withoutGlobalScope(WorkspaceScope::class)
+        ->where('workspace_id', $this->workspace->id)
+        ->where('name', 'Panelco')
+        ->firstOrFail();
+
+    expect($company->creation_source)->toBe(CreationSource::WEB);
 });
 
 it('creates and links a company from a work email on CSV import', function (): void {

@@ -11,6 +11,7 @@ use App\Models\CustomFieldValue;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
+use App\Support\CurrentSource;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Events\QueryExecuted;
@@ -945,6 +946,28 @@ it('records auto-created people and companies and their activity as mailbox sync
     expect($person->creation_source)->toBe(CreationSource::MAILBOX)
         ->and($company->creation_source)->toBe(CreationSource::MAILBOX)
         ->and($sources)->toBe([CreationSource::MAILBOX]);
+});
+
+it('records a company auto-created during a command-bound sync as mailbox', function (): void {
+    $this->workspace->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    $email = makeLinkEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'dana@northwind.io',
+    ]);
+
+    CurrentSource::during(CreationSource::SYSTEM, function () use ($email): void {
+        app(LinkEmailAction::class)->execute($email);
+    });
+
+    $company = Company::query()->where('workspace_id', $this->workspace->id)->where('name', 'Northwind')->firstOrFail();
+
+    expect($company->creation_source)->toBe(CreationSource::MAILBOX);
 });
 
 it('does not auto-create a person for a workspace-blocked address', function (): void {

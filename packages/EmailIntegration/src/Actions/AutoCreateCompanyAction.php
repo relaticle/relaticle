@@ -31,11 +31,9 @@ final readonly class AutoCreateCompanyAction
      * stripped). Distinct hosts such as accounts.printtest.com and
      * ideas.printtest.com do not share a lock.
      */
-    public function execute(string $domain, string $workspaceId): Company
+    public function execute(string $domain, string $workspaceId, CreationSource $source = CreationSource::MAILBOX): Company
     {
         $host = $this->domainMatcher->host($domain);
-
-        $source = CurrentSource::bound() ?? CreationSource::MAILBOX;
 
         return CurrentSource::during($source, fn (): Company => $this->advisoryLock->transactional("auto-create-company:{$workspaceId}:{$host}", function () use ($host, $workspaceId): Company {
             // Only create when the domain is not already in another company. The
@@ -63,21 +61,14 @@ final readonly class AutoCreateCompanyAction
      */
     private function createCompany(string $domain, string $workspaceId): Company
     {
-        return resolve(CurrentWorkspace::class)->within($workspaceId, function () use ($domain, $workspaceId): Company {
-            $company = Company::query()->create([
-                'name' => $this->domainToCompanyName($domain),
-                'workspace_id' => $workspaceId,
-            ]);
-
-            $company->saveCustomFields([
+        return resolve(CurrentWorkspace::class)->within($workspaceId, fn (): Company => Company::query()->create([
+            'name' => $this->domainToCompanyName($domain),
+            'workspace_id' => $workspaceId,
+            'custom_fields' => [
                 CompanyField::DOMAINS->value => [$domain],
                 CompanyField::ICP->value => false,
-            ]);
-
-            $company->touch();
-
-            return $company;
-        });
+            ],
+        ]));
     }
 
     /**

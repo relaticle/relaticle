@@ -9,6 +9,7 @@ use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\People;
 use App\Models\Workspace;
+use App\Support\CurrentSource;
 use App\Support\CurrentWorkspace;
 use App\Support\EmailAddress;
 use Illuminate\Support\Collection;
@@ -24,7 +25,7 @@ final readonly class LinkPersonCompanyFromEmails
 
     public function execute(People $person): void
     {
-        if ($person->company_id !== null) {
+        if ($person->company_id !== null || $person->wasChanged('company_id')) {
             return;
         }
 
@@ -61,7 +62,7 @@ final readonly class LinkPersonCompanyFromEmails
         $company = $this->domainMatcher->firstMatching($workDomain, $workspaceId);
 
         if (! $company instanceof Company && $workspace->auto_create_companies) {
-            $company = $this->autoCreateCompany->execute($workDomain, $workspaceId);
+            $company = $this->autoCreateCompany->execute($workDomain, $workspaceId, CurrentSource::get());
         }
 
         if (! $company instanceof Company) {
