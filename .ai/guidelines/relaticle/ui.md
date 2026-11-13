@@ -10,9 +10,10 @@
   reported done. Tests passing is not sufficient for UI work.
 - agent-browser and the Browser suite both drive Chromium. CI runs WebKit only
   for test files tagged `pest()->group('webkit')`, in the `Browser Tests (WebKit)`
-  job of `.github/workflows/ci.yml`. A defect that only WebKit shows passes every
-  other gate. After the Chromium pass, run the browser tests for the surfaces you
-  changed in WebKit: `php artisan test --compact <files> --browser safari`.
+  job of `.github/workflows/ci.yml`. That job runs on pushes to main and before a
+  release deploy, never on a pull request, where a defect that only WebKit shows
+  passes every gate. After the Chromium pass, run the browser tests for the surfaces
+  you changed in WebKit: `php artisan test --compact <files> --browser safari`.
   Install the engine once per machine with `pnpm exec playwright install webkit`.
 - When WebKit breaks a surface Chromium passes, tag the test file that covers it
   with `pest()->group('webkit')`, so CI keeps checking it in WebKit.

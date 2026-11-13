@@ -514,8 +514,8 @@ months two copies of the same field vocabulary drifted apart.
 ## Quality Checks
 
 The local loop is scoped to the change. GitHub CI (`.github/workflows/ci.yml`) is the
-only full run: it executes lint, rector, PHPStan, type coverage, eight test shards and
-five Browser shards on every push to a pull request. The test and Browser shards run on arm
+only full run: it executes lint, rector, PHPStan, type coverage, nine test shards and
+six Browser shards on every push to a pull request. The test and Browser shards run on arm
 runners, and each of those jobs takes under 3 minutes when runners are free. Runs queue when
 the organization's 20 concurrent jobs are taken.
 
@@ -741,9 +741,11 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
   a scoped run cannot, and for recording a TIA graph. TIA replays a cached pass whenever
   a test's edges are unchanged, so it cannot see time-dependent failures (`travelTo`,
   expiring tokens), `.env` edits, or dynamic dispatch it did not trace while recording.
-- Every main run's `Record Shard Timings` job rebuilds `tests/.pest/shards.json` from the
-  JUnit reports of its test and Browser shards, and the next run's shards restore that
-  recording before Pest splits the suite. A class with no recording yet is dealt round-robin.
+- Every green run's `Record Shard Timings` job rebuilds `tests/.pest/shards.json` from the
+  JUnit reports of its test and Browser shards. The next run restores the newest recording
+  from its own branch, then from main, before Pest splits the suite. A class with no recording
+  yet is dealt round-robin, so a new test class is placed by time from the second green run
+  of its pull request.
   `tests/.pest/shards.json` is only the fallback for a run that finds no recording, so do not
   refresh it with a local `composer test:update-shards`: a laptop's timings skew the split.
   Refresh it with `php bin/shard-timings.php <dir>` over a main run's `junit-*` artifacts.
@@ -768,9 +770,10 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
   reported done. Tests passing is not sufficient for UI work.
 - agent-browser and the Browser suite both drive Chromium. CI runs WebKit only
   for test files tagged `pest()->group('webkit')`, in the `Browser Tests (WebKit)`
-  job of `.github/workflows/ci.yml`. A defect that only WebKit shows passes every
-  other gate. After the Chromium pass, run the browser tests for the surfaces you
-  changed in WebKit: `php artisan test --compact <files> --browser safari`.
+  job of `.github/workflows/ci.yml`. That job runs on pushes to main and before a
+  release deploy, never on a pull request, where a defect that only WebKit shows
+  passes every gate. After the Chromium pass, run the browser tests for the surfaces
+  you changed in WebKit: `php artisan test --compact <files> --browser safari`.
   Install the engine once per machine with `pnpm exec playwright install webkit`.
 - When WebKit breaks a surface Chromium passes, tag the test file that covers it
   with `pest()->group('webkit')`, so CI keeps checking it in WebKit.
