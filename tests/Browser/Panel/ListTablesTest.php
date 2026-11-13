@@ -104,6 +104,25 @@ it('shows the bulk bar only while a record is selected, and the rows stay put', 
         ->assertNoJavaScriptErrors();
 });
 
+it('moves focus to the select all checkbox when the selection is cleared from the bulk bar', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    seedListRows($user);
+
+    loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/companies")
+        ->click('.fi-ta-record-checkbox')
+        ->assertVisible('.fi-bulk-bar')
+        ->click('.fi-bulk-bar-selection')
+        ->assertMissing('.fi-bulk-bar')
+        ->assertScript('document.activeElement === document.querySelector(".fi-ta-table thead .fi-ta-selection-cell input[type=checkbox]")', true)
+        ->assertNoJavaScriptErrors();
+});
+
 it('deletes a selected record from the bulk bar\'s More menu, which opens above the bar', function (): void {
     $this->withVite();
 

@@ -13,7 +13,7 @@
         type="button"
         class="fi-bulk-bar-selection"
         x-bind:aria-label="window.pluralize(@js(__('filament/panel.tables.bulk_bar.selected_count')), getSelectedRecordsCount(), { count: getSelectedRecordsCount() }) + '. ' + @js(__('filament/panel.tables.bulk_bar.clear'))"
-        x-on:click="deselectAllRecords"
+        x-on:click="deselectAllRecords(); $el.closest('.fi-ta')?.querySelector('thead .fi-ta-selection-cell input[type=checkbox]')?.focus()"
     >
         <span
             class="fi-bulk-bar-count"
