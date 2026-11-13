@@ -496,6 +496,17 @@ it('confirms a rename the way it confirms every other view change', function ():
         ->assertNotified('Renamed to "Renewals due"');
 });
 
+it('names the verb on the delete button and the view on the rename dialog', function (): void {
+    $view = viewFor($this->user, ['name' => 'Renewals']);
+    $component = livewire(ListCompanies::class);
+
+    $component->mountAction('deleteSavedView', ['view' => $view->getKey()]);
+    expect($component->instance()->getMountedAction()->getModalSubmitActionLabel())->toBe('Delete');
+
+    $component->unmountAction()->mountAction('renameSavedView', ['view' => $view->getKey()]);
+    expect($component->instance()->getMountedAction()->getModalHeading())->toBe('Rename view');
+});
+
 it('manages a view from its own row without switching to it', function (): void {
     $active = viewFor($this->user, ['name' => 'Hot leads', 'state' => hotLeads()]);
     $other = viewFor($this->user, ['name' => 'Renewals']);
