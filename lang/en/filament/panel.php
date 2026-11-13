@@ -183,7 +183,6 @@ return [
             ],
         ],
         'views' => [
-            'label' => 'Views',
             'switch' => ':name, switch view',
             'name' => 'Name',
             'save' => 'Save',

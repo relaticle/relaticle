@@ -29,7 +29,6 @@ return [
                 'above' => 'Above attribute',
             ],
             'encrypted_help' => 'When enabled, this attribute\'s values will be stored securely using encryption.',
-            'searchable_help' => 'When enabled, this attribute can be used in search queries.',
             'visible_in_list_help' => 'Show this attribute in table list views.',
             'list_toggleable_hidden_hint' => 'When enabled, this attribute will be hidden by default in the list view but can be toggled visible by the user.',
             'visible_in_view_help' => 'Show this attribute in detail view pages.',
