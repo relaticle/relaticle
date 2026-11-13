@@ -22,6 +22,8 @@ use Relaticle\CustomFields\Models\Scopes\TenantScope;
 #[ScopedBy([TenantScope::class])]
 final class CustomFieldValue extends BaseCustomFieldValue
 {
+    public const string LIST_ELEMENTS = "jsonb_array_elements_text(case when jsonb_typeof(json_value::jsonb) = 'array' then json_value::jsonb else '[]'::jsonb end)";
+
     /** @use HasFactory<CustomFieldValueFactory> */
     use HasFactory;
 
@@ -101,7 +103,7 @@ final class CustomFieldValue extends BaseCustomFieldValue
         $column = $field->getValueColumn();
 
         if ($column === 'json_value') {
-            $query->whereRaw("exists (select 1 from jsonb_array_elements_text(case when jsonb_typeof(json_value::jsonb) = 'array' then json_value::jsonb else '[]'::jsonb end) as element where element ilike ?)", [$pattern]);
+            $query->whereRaw('exists (select 1 from '.self::LIST_ELEMENTS.' as element where element ilike ?)', [$pattern]);
 
             return;
         }

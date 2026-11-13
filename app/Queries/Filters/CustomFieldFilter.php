@@ -33,8 +33,6 @@ final readonly class CustomFieldFilter implements Filter
     // The link field type validates each item with max:2048, so a longer operand can never equal a stored value.
     private const int MAX_OPERAND_LENGTH = 2048;
 
-    private const string LIST_ELEMENTS = "jsonb_array_elements_text(case when jsonb_typeof(json_value::jsonb) = 'array' then json_value::jsonb else '[]'::jsonb end)";
-
     private const string RECORD_ELEMENTS = "jsonb_array_elements_text(case jsonb_typeof(json_value::jsonb) when 'array' then json_value::jsonb when 'string' then jsonb_build_array(json_value::jsonb) else '[]'::jsonb end)";
 
     private const string TRIMMED_LOWERED_OPERANDS = 'array(select lower(btrim(operand)) from unnest(?::text[]) as operand)';
@@ -314,7 +312,7 @@ final readonly class CustomFieldFilter implements Filter
     {
         $query->whereHas('customFieldValues', fn (Builder $q): Builder => $q
             ->where('custom_field_id', $field->getKey())
-            ->whereRaw('exists (select 1 from '.self::LIST_ELEMENTS.' as element where element ilike ?)', [$this->likePattern($operator, $operand)]));
+            ->whereRaw('exists (select 1 from '.CustomFieldValue::LIST_ELEMENTS.' as element where element ilike ?)', [$this->likePattern($operator, $operand)]));
     }
 
     private function likePattern(string $operator, string $operand): string
@@ -388,7 +386,7 @@ final readonly class CustomFieldFilter implements Filter
             default => 'element = any(?::text[])',
         };
 
-        $elements = $isRecord ? self::RECORD_ELEMENTS : self::LIST_ELEMENTS;
+        $elements = $isRecord ? self::RECORD_ELEMENTS : CustomFieldValue::LIST_ELEMENTS;
 
         $query->whereRaw("exists (select 1 from {$elements} as element where {$matches})", [$this->textArray($values)]);
     }
@@ -475,7 +473,7 @@ final readonly class CustomFieldFilter implements Filter
 
             $matching = fn (Builder $values): Builder => $values
                 ->where('custom_field_id', $field->getKey())
-                ->whereRaw('exists (select 1 from '.self::LIST_ELEMENTS." as element where {$expression} = any(".self::LOWERED_OPERANDS.'))', [$this->textArray($domains)]);
+                ->whereRaw('exists (select 1 from '.CustomFieldValue::LIST_ELEMENTS." as element where {$expression} = any(".self::LOWERED_OPERANDS.'))', [$this->textArray($domains)]);
 
             match ($operator) {
                 '$in' => $query->whereHas('customFieldValues', $matching),
