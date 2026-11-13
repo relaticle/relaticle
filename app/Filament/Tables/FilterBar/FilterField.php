@@ -9,6 +9,8 @@ use App\Enums\CustomFieldType;
 use App\Enums\FilterCondition;
 use App\Enums\FilterFieldKind;
 use App\Models\CustomField;
+use App\Models\User;
+use App\Queries\Crm\LinkOptionsQuery;
 use App\Support\CustomFields\CustomFieldOptionMap;
 
 final readonly class FilterField
@@ -44,5 +46,29 @@ final readonly class FilterField
             $this->kind->conditions(),
             fn (FilterCondition $condition): bool => array_diff($condition->operators($this->kind), $this->operators) === [],
         ));
+    }
+
+    /** @return list<array{id: string, label: string, image: ?string, icon: ?string, circular: bool}> */
+    public function searchedOptions(User $user, string $search): array
+    {
+        return match ($this->kind) {
+            FilterFieldKind::Member => resolve(LinkOptionsQuery::class)->search($user, null, $search),
+            FilterFieldKind::Relation, FilterFieldKind::Record => $this->related instanceof CrmEntity
+                ? resolve(LinkOptionsQuery::class)->search($user, $this->related, $search)
+                : [],
+            FilterFieldKind::Text, FilterFieldKind::Number, FilterFieldKind::Date, FilterFieldKind::Choice,
+            FilterFieldKind::MultiChoice, FilterFieldKind::Checkbox, FilterFieldKind::MultiText, FilterFieldKind::Inactivity => [],
+        };
+    }
+
+    /** @return list<array{id: string, label: string, color: ?string, image?: ?string, icon?: ?string, circular?: bool}> */
+    public function offeredOptions(User $user): array
+    {
+        return match ($this->kind) {
+            FilterFieldKind::Choice, FilterFieldKind::MultiChoice => $this->options,
+            FilterFieldKind::Member => [[...FilterRuleDisplay::viewer($user)->toArray(), 'color' => null]],
+            FilterFieldKind::Text, FilterFieldKind::Number, FilterFieldKind::Date, FilterFieldKind::Checkbox,
+            FilterFieldKind::MultiText, FilterFieldKind::Relation, FilterFieldKind::Record, FilterFieldKind::Inactivity => [],
+        };
     }
 }

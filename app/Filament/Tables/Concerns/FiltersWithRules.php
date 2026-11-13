@@ -14,7 +14,6 @@ use App\Filament\Tables\FilterBar\FilterFieldCatalog;
 use App\Filament\Tables\FilterBar\FilterRuleDisplay;
 use App\Filament\Tables\FilterBar\FilterRules;
 use App\Models\User;
-use App\Queries\Crm\LinkOptionsQuery;
 use App\Queries\Filters\StaleDaysFilter;
 use App\Support\IconPath;
 use Filament\Facades\Filament;
@@ -72,14 +71,7 @@ trait FiltersWithRules
             return [];
         }
 
-        return match ($definition->kind) {
-            FilterFieldKind::Member => resolve(LinkOptionsQuery::class)->search($user, null, $search),
-            FilterFieldKind::Relation, FilterFieldKind::Record => $definition->related instanceof CrmEntity
-                ? resolve(LinkOptionsQuery::class)->search($user, $definition->related, $search)
-                : [],
-            FilterFieldKind::Text, FilterFieldKind::Number, FilterFieldKind::Date, FilterFieldKind::Choice,
-            FilterFieldKind::MultiChoice, FilterFieldKind::Checkbox, FilterFieldKind::MultiText, FilterFieldKind::Inactivity => [],
-        };
+        return $definition->searchedOptions($user, $search);
     }
 
     /**
@@ -108,7 +100,7 @@ trait FiltersWithRules
                 'icon' => $this->filterFieldIconPath($field->icon),
                 'kind' => $field->kind->value,
                 'limit' => $field->kind === FilterFieldKind::Inactivity ? StaleDaysFilter::MAX_DAYS : null,
-                'options' => $this->filterFieldOptions($field, $user),
+                'options' => $field->offeredOptions($user),
                 'conditions' => array_map(fn (FilterCondition $condition): array => [
                     'value' => $condition->value,
                     'label' => $condition->label(),
@@ -146,19 +138,6 @@ trait FiltersWithRules
         }
 
         return null;
-    }
-
-    /**
-     * @return list<array{id: string, label: string, color: ?string, image?: ?string, icon?: ?string, circular?: bool}>
-     */
-    private function filterFieldOptions(FilterField $field, ?User $user): array
-    {
-        return match ($field->kind) {
-            FilterFieldKind::Choice, FilterFieldKind::MultiChoice => $field->options,
-            FilterFieldKind::Member => $user instanceof User ? [[...FilterRuleDisplay::viewer($user)->toArray(), 'color' => null]] : [],
-            FilterFieldKind::Text, FilterFieldKind::Number, FilterFieldKind::Date, FilterFieldKind::Checkbox,
-            FilterFieldKind::MultiText, FilterFieldKind::Relation, FilterFieldKind::Record, FilterFieldKind::Inactivity => [],
-        };
     }
 
     protected function filterFieldIconPath(string $icon): string
