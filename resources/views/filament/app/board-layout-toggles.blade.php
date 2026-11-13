@@ -13,7 +13,7 @@
                     aria-pressed="{{ $columnWidth === $option ? 'true' : 'false' }}"
                     aria-label="{{ $option->label() }}"
                     x-tooltip="{ content: {{ Js::from($option->label()) }}, theme: $store.theme }"
-                    @if ($columnWidth !== $option) wire:click="setBoardColumnWidth('{{ $option->value }}')" @endif
+                    wire:click="setBoardColumnWidth('{{ $option->value }}')"
                 >
                     <x-filament::icon :icon="$option->icon()" class="size-menu-icon" />
                 </button>
@@ -30,7 +30,7 @@
                 aria-pressed="{{ $cardSize === $option ? 'true' : 'false' }}"
                 aria-label="{{ $option->label() }}"
                 x-tooltip="{ content: {{ Js::from($option->label()) }}, theme: $store.theme }"
-                @if ($cardSize !== $option) wire:click="setBoardCardSize('{{ $option->value }}')" @endif
+                wire:click="setBoardCardSize('{{ $option->value }}')"
             >
                 <x-filament::icon :icon="$option->icon()" class="size-menu-icon" />
             </button>

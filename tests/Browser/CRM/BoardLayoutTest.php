@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\CustomFields\CreateCustomField;
 use App\Data\BoardStateData;
+use App\Enums\BoardColumnWidth;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\CustomFields\TaskField;
@@ -1295,6 +1296,12 @@ it('narrows columns and compacts cards flat and with lanes, every time it is pre
 
     $laneCompact = $page->script($lanes);
     expect($laneCompact['column'])->toBe($narrow['column']);
+    $page->script('(() => { const press = (value) => document.querySelector(`[data-board-column-width-option="${value}"]`).click(); press("narrow"); setTimeout(() => press("wide"), 60); })()');
+    waitForPage($page, fn (): bool => storedBoardState($user, $entity)?->columnWidth === BoardColumnWidth::Wide);
+    expect(storedBoardState($user, $entity)?->columnWidth)->toBe(BoardColumnWidth::Wide);
+    $page->assertScript(boardLayoutIs('boardColumnWidth', 'wide'), true);
+    expect($page->script($flat))->toBe($wide);
+
 
     pressLayout($page, 'column-width', 'wide', 'boardColumnWidth');
     $laneWide = $page->script($lanes);
