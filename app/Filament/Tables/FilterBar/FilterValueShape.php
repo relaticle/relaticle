@@ -17,16 +17,12 @@ final readonly class FilterValueShape
     /** @return string|int|float|list<string>|array{amount?: int, unit: string}|null */
     public static function of(FilterCondition $condition, FilterFieldKind $kind, mixed $value): string|int|float|array|null
     {
-        if ($kind->holdsList()) {
-            return self::list($value);
-        }
-
-        return match ($kind) {
-            FilterFieldKind::Number, FilterFieldKind::Inactivity => self::number($value),
-            FilterFieldKind::Date => $condition->isPeriod() ? self::period($condition, $value) : self::text($value),
-            FilterFieldKind::Text, FilterFieldKind::MultiText => self::text($value),
-            FilterFieldKind::Choice, FilterFieldKind::MultiChoice, FilterFieldKind::Member,
-            FilterFieldKind::Relation, FilterFieldKind::Record, FilterFieldKind::Checkbox => null,
+        return match ($condition->valueShape($kind)) {
+            'list' => self::list($value),
+            'number' => self::number($value),
+            'unit', 'period' => self::period($condition, $value),
+            'text' => self::text($value),
+            default => null,
         };
     }
 
