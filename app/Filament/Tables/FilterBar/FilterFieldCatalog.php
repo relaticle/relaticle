@@ -200,8 +200,22 @@ final readonly class FilterFieldCatalog
             $tags[mb_strtolower($name)] ??= ['id' => $name, 'label' => $name, 'color' => $colored ? self::cssColor($option->settings->color) : null];
         }
 
-        foreach (resolve(StoredTagsQuery::class)->forField($field, self::MAX_TAG_OPTIONS) as $name) {
-            $tags[mb_strtolower($name)] ??= ['id' => $name, 'label' => $name, 'color' => null];
+        return array_values($tags);
+    }
+
+    /** @return list<array{id: string, label: string, color: ?string}> */
+    public static function offeredTagOptions(FilterField $field): array
+    {
+        $tags = [];
+
+        foreach ($field->options as $option) {
+            $tags[mb_strtolower($option['id'])] = $option;
+        }
+
+        if ($field->definition instanceof CustomField) {
+            foreach (resolve(StoredTagsQuery::class)->forField($field->definition, self::MAX_TAG_OPTIONS) as $name) {
+                $tags[mb_strtolower($name)] ??= ['id' => $name, 'label' => $name, 'color' => null];
+            }
         }
 
         return array_slice(array_values($tags), 0, self::MAX_TAG_OPTIONS);

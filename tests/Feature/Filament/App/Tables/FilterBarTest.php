@@ -1220,6 +1220,20 @@ it('reads the distinct stored tags once when the company list renders', function
     expect($tagScans)->toHaveCount(1);
 });
 
+it('searches member options without reading the stored tags of any attribute', function (): void {
+    filterBarField($this->user, 'company', 'labels', CustomFieldType::TAGS_INPUT->value);
+    filterBarRecord($this->user, Company::class, 'Vip', values: ['labels' => ['vip']]);
+    $component = livewire(ListCompanies::class);
+    Once::flush();
+
+    DB::enableQueryLog();
+    $component->instance()->searchFilterOptions('accountOwner', 'a');
+    $tagScans = collect(DB::getQueryLog())->filter(fn (array $log): bool => str_contains($log['query'], 'select distinct on (lower(btrim(element)))'));
+    DB::disableQueryLog();
+
+    expect($tagScans)->toHaveCount(0);
+});
+
 it('keeps the first twenty conditions and drops the rest', function (): void {
     filterBarScenario('companies', $this->user);
     $rule = ['field' => 'name', 'condition' => 'contains', 'value' => 'o'];

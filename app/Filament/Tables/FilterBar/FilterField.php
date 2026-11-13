@@ -71,7 +71,8 @@ final readonly class FilterField
     public function offeredOptions(User $user): array
     {
         return match ($this->kind) {
-            FilterFieldKind::Choice, FilterFieldKind::MultiChoice => $this->options,
+            FilterFieldKind::Choice => $this->options,
+            FilterFieldKind::MultiChoice => $this->type === CustomFieldType::TAGS_INPUT ? FilterFieldCatalog::offeredTagOptions($this) : $this->options,
             FilterFieldKind::Member => [[...FilterRuleDisplay::viewer($user)->toArray(), 'color' => null]],
             FilterFieldKind::Text, FilterFieldKind::Number, FilterFieldKind::Date, FilterFieldKind::Checkbox,
             FilterFieldKind::MultiText, FilterFieldKind::Relation, FilterFieldKind::Record, FilterFieldKind::Inactivity => [],
