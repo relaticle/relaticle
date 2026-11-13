@@ -46,9 +46,13 @@ trait HasCustomFieldColumns
             ->map(function (Column $column) use ($fields): Column {
                 $field = $fields->get($column->getName());
 
-                return $field instanceof CustomField
-                    ? $column->label(fn (): Htmlable => $this->columnHeaderLabel($column->getName(), $field->name, $field->typeData->icon))
-                    : $column;
+                if (! $field instanceof CustomField) {
+                    return $column;
+                }
+
+                $this->originalTableColumnLabels[$column->getName()] = $field->name;
+
+                return $column->label(fn (): Htmlable => $this->columnHeaderLabel($column->getName(), $field->name, $field->typeData->icon));
             })
             ->all();
 
@@ -61,7 +65,7 @@ trait HasCustomFieldColumns
                 continue;
             }
 
-            $this->nativeColumnLabels[$column->getName()] = (string) $label;
+            $this->originalTableColumnLabels[$column->getName()] = (string) $label;
 
             $icon = $column->getName() === $titleColumn ? null : FilterFieldCatalog::columnIcon($column->getName());
 

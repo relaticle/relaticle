@@ -19,9 +19,6 @@ trait HasFilterBar
 {
     use FiltersWithRules;
 
-    /** @var array<string, string> */
-    private array $nativeColumnLabels = [];
-
     private ?string $sortBeforeClientWrite = null;
 
     private bool $clientWroteSort = false;
@@ -41,7 +38,7 @@ trait HasFilterBar
      */
     protected function filterBarColumnLabels(): array
     {
-        return $this->nativeColumnLabels;
+        return [...$this->originalTableColumnLabels, ...$this->tableColumnLabels];
     }
 
     /**

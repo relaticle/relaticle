@@ -47,7 +47,7 @@ final readonly class FilterFieldCatalog
         ]);
 
         return array_map(
-            static fn (FilterField $field): FilterField => ! $field->definition instanceof CustomField && isset($columnLabels[self::columnFor($field->key)])
+            static fn (FilterField $field): FilterField => isset($columnLabels[self::columnFor($field->key)])
                 ? $field->labelled($columnLabels[self::columnFor($field->key)])
                 : $field,
             $fields,
