@@ -23,7 +23,7 @@
                 data-pop-trigger
                 x-bind:class="{ 'fi-set': grouping, 'fi-open': isOpen('group', 'main') }"
                 x-bind:aria-expanded="isOpen('group', 'main').toString()"
-                x-bind:aria-label="grouping ? @js(__('filament/panel.tables.filters.group_set')).replace(':group', grouping.label).replace(':direction', grouping.direction === 'asc' ? @js(__('filament/panel.tables.filters.sort_ascending')) : @js(__('filament/panel.tables.filters.sort_descending'))) : @js(__('filament/panel.tables.filters.group'))"
+                x-bind:aria-label="grouping ? @js(__('filament/panel.tables.filters.group_set')).replace(':group', () => grouping.label).replace(':direction', () => grouping.direction === 'asc' ? @js(__('filament/panel.tables.filters.sort_ascending')) : @js(__('filament/panel.tables.filters.sort_descending'))) : @js(__('filament/panel.tables.filters.group'))"
                 aria-haspopup="menu"
                 x-on:click="toggle('group', 'main', $event)"
             >
@@ -98,7 +98,7 @@
                         x-bind:class="{ 'fi-open': isOpen(chip.id, 'field') }"
                         x-bind:aria-expanded="isOpen(chip.id, 'field').toString()"
                         aria-haspopup="listbox"
-                        x-bind:aria-label="@js(__('filament/panel.tables.filters.change_field_for')).replace(':chip', label(chip))"
+                        x-bind:aria-label="@js(__('filament/panel.tables.filters.change_field_for')).replace(':chip', () => label(chip))"
                         data-pop-trigger
                         x-on:click="toggle(chip.id, 'field', $event)"
                     >
@@ -127,7 +127,7 @@
                     </button>
 
                     <template x-if="isOpen(chip.id, 'cond')">
-                    <div class="fi-filter-pop" x-anchor.bottom-start.offset.6.fixed="$el.parentElement" data-pop data-sheet x-bind:data-open="isOpen(chip.id, 'cond')" role="listbox" x-bind:aria-label="@js(__('filament/panel.tables.filters.conditions_for')).replace(':chip', fieldOf(chip).label)" x-on:keydown="navigate($event)">
+                    <div class="fi-filter-pop" x-anchor.bottom-start.offset.6.fixed="$el.parentElement" data-pop data-sheet x-bind:data-open="isOpen(chip.id, 'cond')" role="listbox" x-bind:aria-label="@js(__('filament/panel.tables.filters.conditions_for')).replace(':chip', () => fieldOf(chip).label)" x-on:keydown="navigate($event)">
                         <template x-for="condition in fieldOf(chip)?.conditions ?? []" x-bind:key="condition.value">
                             <button
                                 type="button"
@@ -180,7 +180,7 @@
 
 
                         <template x-if="isOpen(chip.id, 'val')">
-                        <div class="fi-filter-pop" x-anchor.bottom-start.offset.6.fixed="$el.parentElement" data-pop data-sheet x-bind:data-open="isOpen(chip.id, 'val')" role="dialog" x-bind:aria-label="@js(__('filament/panel.tables.filters.value_for')).replace(':chip', label(chip))" x-on:keydown="navigate($event)">
+                        <div class="fi-filter-pop" x-anchor.bottom-start.offset.6.fixed="$el.parentElement" data-pop data-sheet x-bind:data-open="isOpen(chip.id, 'val')" role="dialog" x-bind:aria-label="@js(__('filament/panel.tables.filters.value_for')).replace(':chip', () => label(chip))" x-on:keydown="navigate($event)">
                             <template x-if="isListEditor(chip)">
                                 <div class="fi-filter-checklist">
                                     <template x-if="showSearch(chip)">
@@ -198,7 +198,7 @@
                                             />
                                         </label>
                                     </template>
-                                    <div class="fi-filter-options" role="listbox" aria-multiselectable="true" x-bind:aria-label="@js(__('filament/panel.tables.filters.value_for')).replace(':chip', label(chip))">
+                                    <div class="fi-filter-options" role="listbox" aria-multiselectable="true" x-bind:aria-label="@js(__('filament/panel.tables.filters.value_for')).replace(':chip', () => label(chip))">
                                         <template x-for="option in listItems(chip)" x-bind:key="option.id">
                                             <button
                                                 type="button"
@@ -320,7 +320,7 @@
                         x-bind:class="{ 'fi-open': isOpen(chip.id, 'more') }"
                         x-bind:aria-expanded="isOpen(chip.id, 'more').toString()"
                         aria-haspopup="menu"
-                        x-bind:aria-label="@js(__('filament/panel.tables.filters.more_for')).replace(':chip', label(chip))"
+                        x-bind:aria-label="@js(__('filament/panel.tables.filters.more_for')).replace(':chip', () => label(chip))"
                         data-pop-trigger
                         x-on:click="toggle(chip.id, 'more', $event)"
                     >
@@ -328,7 +328,7 @@
                     </button>
 
                     <template x-if="isOpen(chip.id, 'more')">
-                    <div class="fi-filter-pop" x-anchor.bottom-end.offset.6.fixed="$el.parentElement" data-pop data-sheet x-bind:data-open="isOpen(chip.id, 'more')" role="menu" x-bind:aria-label="@js(__('filament/panel.tables.filters.menu_for')).replace(':chip', label(chip))" x-on:keydown="navigate($event)">
+                    <div class="fi-filter-pop" x-anchor.bottom-end.offset.6.fixed="$el.parentElement" data-pop data-sheet x-bind:data-open="isOpen(chip.id, 'more')" role="menu" x-bind:aria-label="@js(__('filament/panel.tables.filters.menu_for')).replace(':chip', () => label(chip))" x-on:keydown="navigate($event)">
                         <button type="button" tabindex="0" role="menuitem" class="fi-filter-item fi-danger" data-pop-item data-filter-remove x-on:click="remove(chip)">
                             <x-filament::icon icon="lucide-trash-2" />
                             {{ __('filament/panel.tables.filters.remove') }}
@@ -340,7 +340,7 @@
         </template>
 
         <template x-if="deleted">
-            <div class="fi-filter-chip" role="group" data-filter-chip data-filter-deleted x-bind:aria-label="@js(__('filament/panel.tables.filters.deleted_mode_for')).replace(':mode', deleted === 'only' ? @js(__('filament/panel.tables.filters.deleted_only')) : @js(__('filament/panel.tables.filters.deleted_included')))">
+            <div class="fi-filter-chip" role="group" data-filter-chip data-filter-deleted x-bind:aria-label="@js(__('filament/panel.tables.filters.deleted_mode_for')).replace(':mode', () => deleted === 'only' ? @js(__('filament/panel.tables.filters.deleted_only')) : @js(__('filament/panel.tables.filters.deleted_included')))">
                 <span class="fi-filter-seg fi-filter-field">
                     <x-filament::icon icon="lucide-trash-2" />
                     <span>{{ __('filament/panel.tables.filters.deleted_records') }}</span>

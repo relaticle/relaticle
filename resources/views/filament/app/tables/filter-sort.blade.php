@@ -20,7 +20,7 @@
             <span class="fi-filter-sorted inline-flex min-w-0 gap-1 max-sm:hidden" data-filter-sort-label>
                 <span class="fi-filter-muted">{{ __('filament/panel.tables.filters.sorted_by') }}</span>
                 <span class="fi-filter-sorted-column" x-text="sorts[0].label"></span>
-                <span class="fi-filter-muted" x-show="sorts.length > 1" x-text="@js(__('filament/panel.tables.filters.sort_more')).replace(':count', sorts.length - 1)" data-filter-sort-more></span>
+                <span class="fi-filter-muted" x-show="sorts.length > 1" x-text="@js(__('filament/panel.tables.filters.sort_more')).replace(':count', () => sorts.length - 1)" data-filter-sort-more></span>
             </span>
         </template>
     </button>
@@ -87,7 +87,7 @@
                                     x-sort:handle
                                     data-pop-item
                                     data-sort-grip
-                                    x-bind:aria-label="@js(__('filament/panel.tables.filters.sort_move')).replace(':column', sort.label)"
+                                    x-bind:aria-label="@js(__('filament/panel.tables.filters.sort_move')).replace(':column', () => sort.label)"
                                     x-on:keydown.arrow-up.stop.prevent="moveSort(sort.column, -1)"
                                     x-on:keydown.arrow-down.stop.prevent="moveSort(sort.column, 1)"
                                 >
@@ -99,7 +99,7 @@
                                     class="fi-filter-sort-select fi-filter-sort-field"
                                     data-pop-item
                                     data-sort-field
-                                    x-bind:aria-label="@js(__('filament/panel.tables.filters.sort_field')).replace(':column', sort.label)"
+                                    x-bind:aria-label="@js(__('filament/panel.tables.filters.sort_field')).replace(':column', () => sort.label)"
                                     x-on:click="chooseSort(sort.column)"
                                 >
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path x-bind:d="sortIcon(sort.column)"></path></svg>
@@ -112,7 +112,7 @@
                                     class="fi-filter-sort-select fi-filter-sort-direction"
                                     data-pop-item
                                     data-sort-direction
-                                    x-bind:aria-label="@js(__('filament/panel.tables.filters.sort_direction')).replace(':column', sort.label).replace(':direction', sort.direction === 'asc' ? @js(__('filament/panel.tables.filters.sort_ascending')) : @js(__('filament/panel.tables.filters.sort_descending')))"
+                                    x-bind:aria-label="@js(__('filament/panel.tables.filters.sort_direction')).replace(':column', () => sort.label).replace(':direction', () => sort.direction === 'asc' ? @js(__('filament/panel.tables.filters.sort_ascending')) : @js(__('filament/panel.tables.filters.sort_descending')))"
                                     x-on:click="flipSortAt(sort.column)"
                                 >
                                     <x-filament::icon icon="lucide-arrow-up-narrow-wide" x-show="sort.direction === 'asc'" />
@@ -125,7 +125,7 @@
                                     class="fi-filter-sort-remove"
                                     data-pop-item
                                     data-sort-remove
-                                    x-bind:aria-label="@js(__('filament/panel.tables.filters.sort_remove')).replace(':column', sort.label)"
+                                    x-bind:aria-label="@js(__('filament/panel.tables.filters.sort_remove')).replace(':column', () => sort.label)"
                                     x-on:click="removeSort(sort.column)"
                                 >
                                     <x-filament::icon icon="lucide-x" />

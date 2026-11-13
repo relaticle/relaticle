@@ -10,7 +10,7 @@
             x-on:keydown.enter.prevent="pickFirst()"
         />
     </label>
-    <div role="listbox" x-bind:aria-label="@js($label){{ $forChip ? ".replace(':chip', label(chip))" : '' }}">
+    <div role="listbox" x-bind:aria-label="@js($label){{ $forChip ? ".replace(':chip', () => label(chip))" : '' }}">
         <template x-for="field in matchingFields()" x-bind:key="field.key">
             <button
                 type="button"

@@ -120,6 +120,17 @@ it('marks the table busy while a filter change is in flight and clears it when t
     $page->assertNoJavaScriptErrors();
 });
 
+it('names a chip after an attribute whose name holds a replacement pattern', function (): void {
+    resolve(CreateCustomField::class)->execute($this->user, ['entity_type' => 'company', 'name' => 'Cost $& total', 'code' => 'cost_total', 'type' => 'text']);
+
+    $page = ($this->open)();
+    addChip($page, 'custom_fields.cost_total', 'contains')->type(valueInput(), 'x');
+
+    $page->assertScript('document.querySelector("[data-filter-more]").getAttribute("aria-label").includes("Cost $& total")', true)
+        ->assertScript('document.querySelector("[data-filter-chip]").getAttribute("aria-label").includes("Cost $& total")', true)
+        ->assertNoJavaScriptErrors();
+});
+
 it('draws a dashed sort and a dashed filter button when no filter is set', function (): void {
     ($this->open)()
         ->assertSeeIn('[data-filter-bar]', 'Sort')

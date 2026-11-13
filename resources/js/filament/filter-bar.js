@@ -492,9 +492,9 @@
                     }
 
                     return (this.sorts.length > 1 ? more : one)
-                        .replace(':column', first.label)
-                        .replace(':direction', first.direction === 'asc' ? ascending : descending)
-                        .replace(':count', this.sorts.length - 1)
+                        .replace(':column', () => first.label)
+                        .replace(':direction', () => (first.direction === 'asc' ? ascending : descending))
+                        .replace(':count', () => this.sorts.length - 1)
                 },
 
                 choosingSort() {
