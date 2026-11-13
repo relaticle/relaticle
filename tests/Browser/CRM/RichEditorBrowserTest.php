@@ -23,9 +23,7 @@ it('hides the heading toolbar when the caret has no text selection', function ()
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/notes")
+    $page = visitAs($user, "/app/{$workspace->slug}/notes?view=cards")
         ->press('New note')
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
         ->assertNoJavaScriptErrors();
@@ -60,9 +58,7 @@ it('converts selected body text to a heading from the floating toolbar', functio
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/notes")
+    $page = visitAs($user, "/app/{$workspace->slug}/notes?view=cards")
         ->press('New note')
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
         ->assertNoJavaScriptErrors();
@@ -90,9 +86,7 @@ it('changes a selected heading to another level from the floating toolbar', func
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/notes")
+    $page = visitAs($user, "/app/{$workspace->slug}/notes?view=cards")
         ->press('New note')
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
         ->assertNoJavaScriptErrors();
@@ -120,9 +114,7 @@ it('returns a selected heading to body text from the floating toolbar', function
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/notes")
+    $page = visitAs($user, "/app/{$workspace->slug}/notes?view=cards")
         ->press('New note')
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
         ->assertNoJavaScriptErrors();
@@ -150,9 +142,7 @@ it('persists a heading created from selected body text', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/notes")
+    $page = visitAs($user, "/app/{$workspace->slug}/notes?view=cards")
         ->press('New note')
         ->type('[id="mountedActionSchema0.title"]', 'Quarterly plan')
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
@@ -191,9 +181,7 @@ it('stops a detached text style dropdown from rewriting its trigger', function (
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/notes")
+    $page = visitAs($user, "/app/{$workspace->slug}/notes?view=cards")
         ->press('New note')
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
         ->assertNoJavaScriptErrors();
@@ -244,9 +232,7 @@ it('stops positioning an open text style menu once the floating toolbar re-rende
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/notes")
+    $page = visitAs($user, "/app/{$workspace->slug}/notes?view=cards")
         ->press('New note')
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
         ->assertNoJavaScriptErrors();
@@ -295,9 +281,7 @@ it('fits the selection toolbar inside a mobile viewport in both themes', functio
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/notes")
+    $page = visitAs($user, "/app/{$workspace->slug}/notes?view=cards")
         ->press('New note')
         ->resize(1440, 900)
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
@@ -383,9 +367,7 @@ it('spaces paragraphs apart in the note editor', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/notes")
+    $page = visitAs($user, "/app/{$workspace->slug}/notes?view=cards")
         ->press('New note')
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
         ->assertNoJavaScriptErrors();
@@ -411,9 +393,7 @@ it('opens the slash menu in the top layer, above the task modal', function (): v
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/tasks")
+    $page = visitAs($user, "/app/{$workspace->slug}/tasks")
         ->press('New task')
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
         ->click('.fi-fo-rich-editor-seamless .ProseMirror')
@@ -448,9 +428,7 @@ it('builds, ticks and saves a checklist in a task description', function (): voi
         })();
     JS;
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/tasks")
+    $page = visitAs($user, "/app/{$workspace->slug}/tasks")
         ->press('New task')
         ->type('[id="mountedActionSchema0.title"]', 'Prepare the offsite')
         ->assertVisible($editor)
@@ -513,9 +491,7 @@ it('keeps the slash placeholder off a saved plain-text description', function ()
         'text_value' => 'Prepare and send the final proposal to Tim',
     ]);
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/tasks")
+    $page = visitAs($user, "/app/{$workspace->slug}/tasks")
         ->click('Send proposal to Tim')
         ->assertVisible('.fi-modal-window .ProseMirror')
         ->assertNoJavaScriptErrors();
@@ -531,9 +507,7 @@ it('shows the slash placeholder in an empty editor', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/notes")
+    $page = visitAs($user, "/app/{$workspace->slug}/notes?view=cards")
         ->press('New note')
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
         ->assertNoJavaScriptErrors();
@@ -545,10 +519,7 @@ it('lets a slash menu item be chosen inside a modal', function (int $width, int 
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize($width, $height)
-        ->navigate("/app/{$workspace->slug}/notes")
+    $page = visitAs($user, "/app/{$workspace->slug}/notes?view=cards", $width, $height)
         ->press('New note')
         ->assertVisible('.fi-modal-window .ProseMirror')
         ->click('.fi-modal-window .ProseMirror')

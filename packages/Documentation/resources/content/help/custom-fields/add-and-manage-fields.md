@@ -1,59 +1,59 @@
 ---
-title: Add, edit, and archive fields
-description: Create fields on the Custom Fields page, reorder them, retire them safely, and understand system fields.
+title: Add, edit, and archive attributes
+description: Create attributes on the Custom attributes page, reorder them, retire them safely, and understand system attributes.
 order: 2
-updated: "2026-10-05"
+updated: "2026-11-10"
 related: [help/custom-fields/field-types-you-can-add, help/custom-fields/control-where-a-field-appears, help/getting-started/use-custom-fields]
 ---
 
-Fields are managed on the **Custom Fields** page: click your workspace name at
-the top of the sidebar and choose **Custom Fields**. Only the workspace owner
-and Admins see this page. Everyone else uses the fields; owners and Admins
+Attributes are managed on the **Custom attributes** page: click your workspace name at
+the top of the sidebar and choose **Custom attributes**. Only the workspace owner
+and Admins see this page. Everyone else uses the attributes; owners and Admins
 shape them.
 
 The page shows one tab per record type (Companies, People, Opportunities,
-Tasks, Notes) with a count badge, and the fields of the selected type in a
-table you can search with **Search fields...**.
+Tasks, Notes) with a count badge, and the attributes of the selected type in a
+table you can search with **Search attributes...**.
 
-![The Custom Fields page on the Opportunities tab, showing Amount, Close Date, and Stage with System badges plus a custom Deal Source field](/help-assets/custom-fields/add-and-manage-fields-1.png)
+![The Custom attributes page on the Opportunities tab, showing Amount, Close Date, and Stage with System badges plus a custom Deal Source attribute](/help-assets/custom-fields/add-and-manage-fields-1.png)
 
-## Add a field
+## Add an attribute
 
 1. Pick the record type's tab.
-2. Click **Add Field**.
+2. Click **Add attribute**.
 3. Choose the **Type**. This is permanent, so check
-   [Field types you can add](/help/custom-fields/field-types-you-can-add)
+   [Attribute types you can add](/help/custom-fields/field-types-you-can-add)
    first.
 4. Name it (names must be unique per record type).
 5. For choice types, add the **Options**.
-6. Adjust the **Settings** toggles (where the field shows up, whether it's
-   searchable) and save.
+6. Adjust the **Settings** toggles (where the attribute shows up, whether it's
+   encrypted) and save.
 
-The field appears on the record form, the record page, and (if you enabled
+The attribute appears on the record form, the record page, and (if you enabled
 it) the list view immediately, for everyone in the workspace. It's also
 instantly usable by Rela and the CSV import, with no extra setup.
 
 ## Edit and reorder
 
-Click a field's row to rename it, change its options, or adjust its settings,
+Click an attribute's row to rename it, change its options, or adjust its settings,
 everything except the type. Drag the handle at the start of each row to
-reorder fields; forms and record pages follow the order you set.
+reorder attributes; forms and record pages follow the order you set.
 
 ## Archive instead of deleting
 
-**Deactivate** moves a field to the collapsible **Archived** group at the
+**Deactivate** moves an attribute to the collapsible **Archived** group at the
 bottom of the table. It disappears from forms and lists, but every stored
-value is kept. **Activate** brings the field and its data straight back.
-This is the safe way to retire a field you might need again, and the way to
-hide a field from Rela.
+value is kept. **Activate** brings the attribute and its data straight back.
+This is the safe way to retire an attribute you might need again, and the way to
+hide an attribute from Rela.
 
-**Delete** is only available on a field that is already archived, and it is
-destructive: the field, its options, and **all values stored on your
+**Delete** is only available on an attribute that is already archived, and it is
+destructive: the attribute, its options, and **all values stored on your
 records** are removed permanently. Relaticle asks you to confirm first.
 
-## System fields
+## System attributes
 
-Fields with a **System** badge are the ones Relaticle itself relies on: a
+Attributes with a **System** badge are the ones Relaticle itself relies on: a
 person's Emails, a company's Domains, an opportunity's Amount, Close Date and
 Stage, a task's Status and Priority, a note's Body. You can't rename, retype,
 archive, or delete them, but you can still edit their settings, and for the

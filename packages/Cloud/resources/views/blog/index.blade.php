@@ -7,7 +7,7 @@
     $description = match (true) {
         isset($category) => __('Read Relaticle articles in :name on self-hosting, MCP and the code behind an open-source CRM.', ['name' => $category->name]),
         isset($tag) => __('Read Relaticle posts tagged :name about using an open-source CRM, from setup to working with records.', ['name' => $tag->name]),
-        default => __('Read Relaticle guides, comparisons and engineering posts on self-hosting, MCP, custom fields and moving CRM records.'),
+        default => __('Read Relaticle guides, comparisons and engineering posts on self-hosting, MCP, custom attributes and moving CRM records.'),
     };
 
     // Listings paginate, so page 2+ must self-canonicalise or a post reachable only
@@ -51,7 +51,7 @@
                     {{ __('Posts tagged') }} <span class="font-medium text-gray-950 dark:text-white">#{{ $tag->name }}</span>
                     &middot; <a href="{{ route('blog.index') }}" class="{{ $linkClass }}">{{ __('All posts') }}</a>
                 @else
-                    {{ __('Deep dives into self-hosting, MCP, custom fields and the code behind Relaticle.') }}
+                    {{ __('Deep dives into self-hosting, MCP, custom attributes and the code behind Relaticle.') }}
                 @endif
             </p>
         </x-slot:aside>

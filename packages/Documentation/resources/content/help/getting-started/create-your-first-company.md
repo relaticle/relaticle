@@ -25,5 +25,5 @@ people who work there, log a task, or leave a note. Those live on the
 ## If you don't see the fields you expect
 
 Your team may have added or removed fields for companies. Ask a workspace
-admin. Fields configured on the **Custom Fields** page show up on the create
+admin. Attributes configured on the **Custom attributes** page show up on the create
 form automatically.

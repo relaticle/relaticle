@@ -1,6 +1,6 @@
 ---
 title: MCP Server
-description: Read the reference for Relaticle's MCP server, with OAuth and personal access token setup, custom field access and direct writes.
+description: Read the reference for Relaticle's MCP server, with OAuth and personal access token setup, custom attribute access and direct writes.
 order: 2
 updated: "2026-11-09"
 ---
@@ -19,7 +19,7 @@ With the Relaticle MCP server, your AI assistant can:
 - **Update existing records** -- rename a company, reassign a task
 - **Delete records** you no longer need
 - **Attach or detach** tasks and notes to companies, people, and opportunities
-- **Read entity schemas** to understand your custom fields
+- **Read entity schemas** to understand your custom attributes
 - **Get a CRM overview** with record counts and recent activity
 
 Writes made over MCP apply immediately. The approval card belongs to the assistant built into Relaticle, and an MCP client relies on its own confirmation prompts. Email tools exist for a connection that was given email access. Meetings are not exposed. A sent email is the one write that does not apply immediately: it is held first and its user can cancel it, in Relaticle or through the agent that sent it.
@@ -175,11 +175,11 @@ The server provides 50 tools. They cover account context, cross-entity discovery
 
 | Tool | Description |
 |------|-------------|
-| `get-crm-schema-tool` | Get the active schema, custom fields, filters, and relationships for one entity type |
+| `get-crm-schema-tool` | Get the active schema, custom attributes, filters, and relationships for one entity type |
 | `get-crm-summary-tool` | Get record counts, pipeline totals by stage, and task due status in your timezone |
 | `aggregate-opportunities-tool` | Group opportunity counts and amounts by stage or company, with optional date bounds |
 | `list-activity-tool` | List recent CRM changes with actors, record links, and field-level differences. A deleted account shows as `Former member` |
-| `list-custom-fields-tool` | List active and inactive custom-field definitions, including choice options |
+| `list-custom-fields-tool` | List active and inactive custom attribute (custom field) definitions, including choice options |
 
 ### Companies
 
@@ -268,7 +268,7 @@ Uploads stay pending for 24 hours. Saving a record whose rich-editor body embeds
 
 Entity list tools take `filter`, `sort`, `include`, `per_page` (default 15, maximum 25) and `page`. `sort` is an object with `field` and `direction` (`asc` or `desc`). `include` is a list of singular relationships or relationship counts. A list tool refuses any other argument. To find records by words across every entity, use the `search` tool.
 
-`sort` takes a native field or a custom field that holds one value. A field that holds a list, such as email, phone, link or tags, cannot be sorted.
+`sort` takes a native field or a custom attribute that holds one value. A field that holds a list, such as email, phone, link or tags, cannot be sorted.
 
 List responses include `page`, `per_page`, `total`, `has_more`, and `next_page`. Create and update tools accept `custom_fields` as key-value pairs. A write stores a phone in E.164 form, a domain as a bare host, and a date-time as its UTC instant.
 
@@ -284,12 +284,12 @@ Every key in a filter is one of these:
 | `$eq`, `$in`, `$contains` and the other operators | A test on the field or relation around it |
 | A native field such as `name` or `created_at` | A condition on one of the record's own columns |
 | A relation such as `company` or `assignees` | A condition on linked records |
-| `custom_fields` | Conditions on your custom fields, keyed by field code |
+| `custom_fields` | Conditions on your custom attributes, keyed by field code |
 | A sub-field such as `domain` | One part of an email or link value |
 
 A key that starts with `$` is a keyword. Every other key is a name. There is no shorthand: `{"stage": "Won"}` is an error, and so is an operator without its `$`.
 
-Native fields and relations sit at the top level. Custom fields sit under `custom_fields`, so a custom field coded `name` never collides with the native `name`.
+Native fields and relations sit at the top level. Custom attributes sit under `custom_fields`, so a custom attribute coded `name` never collides with the native `name`.
 
 #### Native fields and relations
 
@@ -327,14 +327,15 @@ Native fields take the operators of the field type they match. `$is_empty` takes
 | Field type | Operators |
 |---|---|
 | Single choice (select, radio, toggle buttons), `creation_source` | `$eq`, `$in`, `$not_in`, `$is_empty` |
-| Multi choice (multi select, checkbox list), tags, email, phone, link, domain | `$has_any`, `$has_none`, `$is_empty` |
-| Text | `$eq`, `$contains`, `$is_empty` |
+| Multi choice (multi select, checkbox list), tags, record | `$has_any`, `$has_none`, `$is_empty` |
+| Email, phone, link, domain | `$has_any`, `$has_none`, `$contains`, `$starts_with`, `$ends_with`, `$is_empty` |
+| Text | `$eq`, `$contains`, `$starts_with`, `$ends_with`, `$is_empty` |
 | Number, currency, date, date and time | `$eq`, `$gt`, `$gte`, `$lt`, `$lte`, `$is_empty` |
 | Checkbox, toggle | `$eq`, `$is_empty` |
 
 Email and link fields also take a `domain` sub-field with `$in` and `$not_in`. It matches the domain of each value, so `{"domain": {"$in": ["canva.com"]}}` finds every address at `canva.com`. A domain is a bare host. A path, user or port is an error.
 
-Record, text area, rich text and color fields take no filter. Neither does an encrypted or inactive field.
+Text area, rich text and color fields take no filter. Neither does an encrypted or inactive field.
 
 #### How values match
 
@@ -343,7 +344,10 @@ Record, text area, rich text and color fields take no filter. Neither does an en
 - Domain values match as a bare host or a full URL, with or without `www.`, so `https://www.acme.com/about` finds `acme.com`.
 - Phone values match in any format. A phone operand needs a country code, such as `+1 415 555 0100`. An operand without one returns the error `phone_number needs a country code, for example +1 415 555 0100.`
 - Tags match the exact stored value.
+- A record field takes the IDs of the records it links to.
+- `$contains`, `$starts_with` and `$ends_with` ignore letter case. On a field that holds several values, they match when any value matches. They compare the operand as typed against the value as stored. A phone is stored as `+14155550100`, with an extension as `;ext=12` and no spaces, so `+1415` matches and `+1 415` does not. A link keeps a scheme only when one was typed, so `https://acme` matches `https://acme.com/team` and `acme` does not. A domain is stored as a bare host, without a scheme or `www.`.
 - `$not_in` and `$has_none` also match records where the field is empty.
+- A record field link to a deleted record counts as no link.
 
 #### Limits
 
@@ -363,7 +367,7 @@ Opportunities worth at least 10,000 that sit in Proposal/Price Quote or Negotiat
 }
 ```
 
-Opportunities at companies with the `icp` toggle on. `company` is a relation, so its node holds conditions on the company, including its custom fields.
+Opportunities at companies with the `icp` toggle on. `company` is a relation, so its node holds conditions on the company, including its custom attributes.
 
 ```json
 {"company": {"custom_fields": {"icp": {"$eq": true}}}}
@@ -382,12 +386,12 @@ Stage labels and field codes belong to your workspace. Call `get-crm-schema-tool
 `get-crm-schema-tool` returns `filterable_fields` for one entity type. It holds three parts:
 
 - Each native field and relation by name, with its `type`, `operators` and an `example`. Relations add the related `entity`. `creation_source` adds its `values`. Relations, member relations, `stale_days` and `assigned_to_me` add an `operand` that states what they accept.
-- `types` maps each custom field type present in your workspace to its `operators`, its `matching` rule and any `sub_fields`. A type whose values you type freely also carries an `example`, and a choice type carries it on the field instead.
-- `custom_fields` lists each filterable custom field by code, with its `name` and `type`. A choice field also carries its `options` and an `example` built from them.
+- `types` maps each custom attribute type present in your workspace to its `operators`, its `matching` rule, its `partial_matching` rule where it has one, and any `sub_fields`. A type whose values you type freely also carries an `example`, and a choice type carries it on the field instead.
+- `custom_fields` lists each filterable custom attribute by code, with its `name` and `type`. A choice field also carries its `options` and an `example` built from them.
 
 #### Filter errors
 
-An invalid filter returns an error that names the part to fix. For example, an unknown custom field code returns `"stagee" is not a filterable custom field on opportunity. Available: amount, close_date, stage.` A bare operator returns `Operators start with $. Use $eq.`
+An invalid filter returns an error that names the part to fix. For example, an unknown custom attribute code returns `"stagee" is not a filterable custom attribute (custom field) on opportunity. Available: amount, close_date, stage.` A bare operator returns `Operators start with $. Use $eq.`
 
 The flat names of the earlier filter no longer exist. Inside `filter`, keys such as `search`, `created_after`, `company_id` and `assignee_ids` return an error that names the replacement, for example `company_id was replaced. Use company (or companies) with $in.` The same names sent beside `filter` return that error too.
 
@@ -395,17 +399,17 @@ The flat names of the earlier filter no longer exist. Inside `filter`, keys such
 
 ## Schema Resources
 
-The server exposes five schema resources that describe each entity's fields, including any custom fields your workspace has configured, plus a summary resource with record counts:
+The server exposes five schema resources that describe each entity's fields, including any custom attributes your workspace has configured, plus a summary resource with record counts:
 
 | Resource URI | Description |
 |---|---|
-| `relaticle://schema/company` | Company fields and custom fields |
-| `relaticle://schema/people` | People fields and custom fields |
-| `relaticle://schema/opportunity` | Opportunity fields and custom fields |
-| `relaticle://schema/task` | Task fields and custom fields |
-| `relaticle://schema/note` | Note fields and custom fields |
+| `relaticle://schema/company` | Company fields and custom attributes |
+| `relaticle://schema/people` | People fields and custom attributes |
+| `relaticle://schema/opportunity` | Opportunity fields and custom attributes |
+| `relaticle://schema/task` | Task fields and custom attributes |
+| `relaticle://schema/note` | Note fields and custom attributes |
 
-Resource support varies by MCP client. Use `get-crm-schema-tool` before a custom-field write when your client does not expose resources automatically.
+Resource support varies by MCP client. Use `get-crm-schema-tool` before a custom attribute (custom field) write when your client does not expose resources automatically.
 
 ---
 
@@ -443,9 +447,9 @@ The MCP server scopes all data to the workspace associated with your token. Make
 
 Verify the MCP URL is correct: `https://mcp.relaticle.com`.
 
-### Custom Fields Not Showing
+### Custom Attributes Not Showing
 
-Custom fields are workspace-specific. If you don't see them, confirm they're configured for your workspace in **Settings > Custom Fields**. Then call `get-crm-schema-tool` for the entity type.
+Custom attributes are workspace-specific. If you don't see them, confirm they're configured for your workspace in **Settings > Custom attributes**. Then call `get-crm-schema-tool` for the entity type.
 
 ### Rate Limiting
 

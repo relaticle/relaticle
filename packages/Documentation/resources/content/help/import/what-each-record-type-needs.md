@@ -14,7 +14,7 @@ mapping, and a working example CSV.
 
 - `name` (required)
 - `account_owner_email`: a team member's email, to assign ownership
-- Custom fields with the `custom_fields_` prefix
+- Custom attributes with the `custom_fields_` prefix
 
 ```
 name,account_owner_email,custom_fields_industry,custom_fields_domains
@@ -27,7 +27,7 @@ Companies match existing records by **domain** or **Record ID**. See
 ## People
 
 - `name` (required)
-- Custom fields with the `custom_fields_` prefix
+- Custom attributes with the `custom_fields_` prefix
 - **Company** relationship: link each person to a company by Record ID,
   Domain, or Name
 
@@ -44,7 +44,7 @@ Name** always creates a new company instead.
 ## Opportunities
 
 - `name` (required)
-- Custom fields (amount, stage, close date, and so on)
+- Custom attributes (amount, stage, close date, and so on)
 - **Company** relationship: by Record ID, Domain, or Name
 - **Contact** relationship: by Record ID, Email, Phone, or Name
 

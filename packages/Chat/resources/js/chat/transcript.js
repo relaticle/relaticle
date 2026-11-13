@@ -455,9 +455,9 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     },
 
     // Only columns THIS build named are ours to translate, and the map is
-    // keyed by block type so a workspace's own custom field can share a key with
+    // keyed by block type so a workspace's own custom attribute can share a key with
     // one of ours without inheriting our label: a records_table's non-core
-    // columns are custom fields, named by the workspace in the workspace's own words,
+    // columns are custom attributes, named by the workspace in the workspace's own words,
     // while an activity table's columns are all ours.
     blockColumnLabel(block, column) {
         return blockColumnLabels[block?.type]?.[column?.key] ?? (column?.label || '');

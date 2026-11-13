@@ -1,0 +1,19 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Actions\Views;
+
+use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
+
+final readonly class PlaceBoardCard
+{
+    public function execute(User $user, Model $card, string $positionAttribute, string $position): void
+    {
+        abort_unless($user->can('update', $card), 403);
+
+        $card->setAttribute($positionAttribute, $position);
+        $card->saveQuietly();
+    }
+}

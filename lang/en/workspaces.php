@@ -183,7 +183,7 @@ return [
     'tabs' => [
         'general' => 'General',
         'members' => 'Members',
-        'custom_fields' => 'Custom Fields',
+        'custom_fields' => 'Custom attributes',
         'email' => 'Email and Calendar',
         'import_history' => 'Import History',
         'activity' => 'Activity',
@@ -228,8 +228,8 @@ return [
             'opportunity' => 'Opportunity',
             'task' => 'Task',
             'note' => 'Note',
-            'custom_field' => 'Custom field',
-            'custom_field_option' => 'Custom field option',
+            'custom_field' => 'Custom attribute',
+            'custom_field_option' => 'Custom attribute option',
             'import' => 'Import',
         ],
         'import_counts' => [
@@ -268,7 +268,7 @@ return [
         ],
         'admin' => [
             'label' => 'Admin',
-            'description' => 'Manages members, custom fields, and email settings. Can delete records permanently',
+            'description' => 'Manages members, custom attributes, and email settings. Can delete records permanently',
         ],
         'member' => [
             'label' => 'Member',
@@ -297,7 +297,7 @@ return [
             'promote_admin' => ['label' => 'Promote someone to Admin'],
         ],
         'fields' => [
-            'manage' => ['label' => 'Manage custom fields'],
+            'manage' => ['label' => 'Manage custom attributes'],
         ],
         'billing' => [
             'manage' => ['label' => 'Manage billing'],
@@ -311,9 +311,6 @@ return [
         ],
         'activity' => [
             'view' => ['label' => 'View the activity log'],
-        ],
-        'layouts' => [
-            'manage' => ['label' => 'Edit and delete table layouts shared with the workspace'],
         ],
     ],
 

@@ -23,10 +23,7 @@ it('links, unlinks and saves records from the keyboard without leaving the searc
     $options = "[...document.querySelectorAll('.fi-linked-records [role=option]')].map((option) => option.innerText.replace(/\\s+/g, ' ').trim()).join('|')";
     $chips = "[...document.querySelectorAll('.fi-linked-records-chips > a')].map((chip) => chip.innerText.trim()).join('|')";
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/notes?tableAction=edit&tableActionRecord={$note->getKey()}")
+    $page = visitAs($user, "/app/{$workspace->slug}/notes?tableAction=edit&tableActionRecord={$note->getKey()}", 1440, 900)
         ->waitForText('Relations')
         ->click('.fi-linked-records-trigger')
         ->assertScript("document.activeElement === document.querySelector('{$search}')", true)
@@ -72,10 +69,7 @@ it('keeps the panel open and the search box focused while records are linked and
     $stillOpen = "document.querySelector('.fi-linked-records-panel')._x_isShown && document.activeElement === document.querySelector('{$search}')";
     $chips = "[...document.querySelectorAll('.fi-linked-records-selected .fi-linked-records-chip')].map((chip) => chip.innerText.trim()).join('|')";
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/notes?tableAction=edit&tableActionRecord={$note->getKey()}")
+    visitAs($user, "/app/{$workspace->slug}/notes?tableAction=edit&tableActionRecord={$note->getKey()}", 1440, 900)
         ->waitForText('Relations')
         ->click('.fi-linked-records-field')
         ->assertScript("document.querySelectorAll('.fi-linked-records [role=option]').length", 2)
@@ -132,10 +126,7 @@ it('keeps the closed field on one row, counts what does not fit and links each c
         })();
     JS;
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/notes?tableAction=edit&tableActionRecord={$note->getKey()}")
+    $page = visitAs($user, "/app/{$workspace->slug}/notes?tableAction=edit&tableActionRecord={$note->getKey()}", 1440, 900)
         ->waitForText('Relations')
         ->assertScript("document.querySelector('.fi-linked-records-count').textContent.startsWith('+')", true)
         ->assertNoJavaScriptErrors();

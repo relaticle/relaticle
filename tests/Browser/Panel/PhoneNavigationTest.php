@@ -16,7 +16,9 @@ mutates(AppServiceProvider::class);
 
 const OPEN_SHEET = "[...document.querySelectorAll('.fi-dropdown-panel[x-ref=panel]')].find((panel) => panel.style.display === 'block')";
 
-const ROW_MENU_TRIGGER = '.fi-ta-row:first-of-type .fi-ta-actions .fi-dropdown-trigger';
+const BULK_MORE_TRIGGER = '.fi-bulk-bar .fi-dropdown-trigger';
+
+const FIRST_ROW_CHECKBOX = '.fi-ta-row:first-of-type .fi-ta-record-checkbox';
 
 const MODAL_SPANS_SCREEN = "(() => { const r = document.querySelector('.fi-modal-open .fi-modal-window').getBoundingClientRect(); return r.left === 0 && Math.round(r.right) === innerWidth; })()";
 
@@ -28,10 +30,7 @@ function phoneCompaniesPage(User $user): mixed
 
     Company::factory()->count(2)->recycle([$user, $workspace])->create();
 
-    return loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(393, 852)
-        ->navigate("/app/{$workspace->slug}/companies");
+    return visitAs($user, "/app/{$workspace->slug}/companies", 393, 852);
 }
 
 it('puts Home, People, Companies and Opportunities in the tab bar', function (): void {
@@ -144,20 +143,20 @@ it('keeps the tab bar off desktop', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
+    visitAs($user, "/app/{$workspace->slug}")
         ->resize(1440, 900)
         ->assertScript("getComputedStyle(document.querySelector('.fi-bottom-nav')).display", 'none')
         ->assertNoJavaScriptErrors();
 });
 
-it('opens a row menu as a sheet along the bottom edge of a phone', function (): void {
+it('opens the bulk bar\'s More menu as a sheet along the bottom edge of a phone', function (): void {
     $this->withVite();
 
     $user = User::factory()->withWorkspace()->create();
 
     phoneCompaniesPage($user)
-        ->click(ROW_MENU_TRIGGER)
+        ->click(FIRST_ROW_CHECKBOX)
+        ->click(BULK_MORE_TRIGGER)
         ->wait(0.5)
         ->assertScript('(() => { const r = '.OPEN_SHEET.'.getBoundingClientRect(); return r.left === 0 && r.right === innerWidth && Math.round(r.bottom) === innerHeight; })()', true)
         ->assertScript(SHEET_HOLDS_BOTTOM_EDGE, true)
@@ -173,10 +172,7 @@ it('keeps a sheet opened on a record page above the tab bar', function (): void 
     $person = People::factory()->recycle([$user, $workspace])->create();
     Task::factory()->recycle([$user, $workspace])->create()->people()->attach($person);
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(393, 852)
-        ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}")
+    visitAs($user, "/app/{$workspace->slug}/people/{$person->getKey()}", 393, 852)
         ->click('.fi-record-pane .fi-tabs-item:nth-child(3)')
         ->click('.fi-record-pane .fi-ta-row .fi-ta-actions .fi-dropdown-trigger')
         ->wait(0.5)
@@ -191,7 +187,8 @@ it('closes the sheet on a tap outside it without opening the record underneath',
     $workspace = $user->ownedWorkspaces()->first();
 
     phoneCompaniesPage($user)
-        ->click(ROW_MENU_TRIGGER)
+        ->click(FIRST_ROW_CHECKBOX)
+        ->click(BULK_MORE_TRIGGER)
         ->assertScript(OPEN_SHEET.' !== undefined', true)
         ->click('.fi-ta-row:nth-of-type(2) a.fi-ta-col >> nth=0')
         ->wait(0.5)
@@ -207,7 +204,8 @@ it('docks a confirmation dialog to the bottom edge of a phone, edge to edge on a
 
     phoneCompaniesPage($user)
         ->resize(480, 852)
-        ->click(ROW_MENU_TRIGGER)
+        ->click(FIRST_ROW_CHECKBOX)
+        ->click(BULK_MORE_TRIGGER)
         ->click(".fi-dropdown-panel[style*='display: block'] .fi-dropdown-list-item:last-child")
         ->assertVisible('.fi-modal-open .fi-modal-window')
         ->wait(0.5)

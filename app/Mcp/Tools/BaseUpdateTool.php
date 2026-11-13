@@ -60,7 +60,7 @@ abstract class BaseUpdateTool extends Tool
             ['id' => $schema->string()->description("The {$label} ID to update.")->required()],
             $this->entitySchema($schema),
             [
-                'custom_fields' => $schema->object()->description('Custom field values as key-value pairs. IMPORTANT: You MUST first read the crm-schema resource to discover valid field codes for this entity type. Unknown field codes will be rejected. Use exact field codes from the schema (e.g. "job_title", not "jobTitle").'),
+                'custom_fields' => $schema->object()->description('Custom attribute (custom field) values as key-value pairs. IMPORTANT: You MUST first read the crm-schema resource to discover valid field codes for this entity type. Unknown field codes will be rejected. Use exact field codes from the schema (e.g. "job_title", not "jobTitle").'),
             ],
         );
     }

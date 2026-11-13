@@ -10,7 +10,7 @@ This Privacy Policy explains how Relaticle ("we", "us", "our") collects, uses, a
 
 - **Account information:** Name, email address, and password (hashed)
 - **Profile data:** Avatar, workspace name, and role
-- **CRM data:** Companies, people, opportunities, tasks, notes, and custom fields you create
+- **CRM data:** Companies, people, opportunities, tasks, notes, and custom attributes you create
 - **Usage data:** Login timestamps, feature usage, and error reports
 - **Acquisition data:** An approved source and campaign category, landing-page category, and associated signup, setup, checkout, and payment milestones
 - **Technical data:** IP address, browser type, and device information
@@ -124,7 +124,7 @@ Relaticle enforces workspace and token scope on every tool request.
 - Companies, people, opportunities, tasks, and notes.
 - Record identifiers and canonical record URLs.
 - Contact details.
-- Custom-field definitions, options, and values.
+- Custom attribute definitions, options, and values.
 - Relationships between records.
 - Opportunity stages and amounts.
 - Activity actors, field changes, and timestamps.

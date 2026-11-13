@@ -235,6 +235,18 @@ it('refuses a setting the field type does not take', function (): void {
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
 });
 
+it('refuses the retired searchable setting', function (): void {
+    $decoded = proposeCustomFields($this->convId, [
+        'entity_type' => 'company',
+        'name' => 'Region',
+        'type' => 'text',
+        'settings' => ['searchable' => true],
+    ]);
+
+    expect($decoded['error'])->toContain('does not accept: searchable')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
 it('refuses a currency the panel does not offer', function (): void {
     $decoded = proposeCustomFields($this->convId, [
         'entity_type' => 'opportunity',
@@ -620,7 +632,7 @@ it('proposes fields across two entities as one batch approved item by item', fun
     expect($decoded['data']['_batch'])->toBeTrue()
         ->and($decoded)->not->toHaveKey('skipped_records')
         ->and($pending->action_data['records'])->toHaveCount(3)
-        ->and($pending->display_data['summary'])->toBe('Create 3 custom fields')
+        ->and($pending->display_data['summary'])->toBe('Create 3 custom attributes')
         ->and($pending->display_data['items'][2]['summary'])->toBe('Create "Tier" (Select) on people with options: Gold, Silver');
 
     $service = resolve(PendingActionService::class);
@@ -744,7 +756,7 @@ it('skips the fields that would cross the per-entity cap', function (): void {
     expect($decoded['data']['_batch'])->toBeTrue()
         ->and(array_column($pending->action_data['records'], 'name'))->toBe(['Region', 'Industry'])
         ->and($decoded['skipped_records'])->toBe([
-            ['record' => 'Segment', 'reason' => "Cannot create more than {$cap} custom fields for entity type \"company\"."],
+            ['record' => 'Segment', 'reason' => "Cannot create more than {$cap} custom attributes for entity type \"company\"."],
         ]);
 
     $service = resolve(PendingActionService::class);

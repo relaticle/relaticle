@@ -2,7 +2,7 @@
 title: Track a deal through the pipeline
 description: Move an opportunity through your sales stages, from Prospecting to Closed Won or Lost.
 order: 3
-updated: "2026-11-08"
+updated: "2026-11-13"
 related: [help/getting-started/add-your-first-person, help/getting-started/use-custom-fields]
 ---
 
@@ -20,19 +20,32 @@ column as the deal advances, right through to Closed Won or Closed Lost.
 
 ## See your pipeline
 
-Open the view menu at the top left of the Opportunities page, which shows
-**List**, and choose **Board**. Every
+Open **Opportunities**. The page opens on **Pipeline**, the board. If it opens
+on another view, use the view menu at the top left and choose **Pipeline**. Every
 stage (Prospecting, Qualification, Needs Analysis, Value Proposition, Id.
 Decision Makers, Perception Analysis, Proposal/Price Quote,
-Negotiation/Review, Closed Won, and Closed Lost) appears as a column, with
-each deal shown as a card underneath it.
+Negotiation/Review, Closed Won, and Closed Lost) appears as a column by
+default, with each deal shown as a card underneath it. Open **View settings**
+and use **Grouped by** to make the columns from another single-choice attribute.
 
 ![The Opportunities board with deals grouped into Prospecting, Qualification, Needs Analysis, and Value Proposition columns](/help-assets/getting-started/track-a-deal-through-the-pipeline-1.png)
+
+## Put the stages in your own order
+
+Drag a column header left or right to move that stage. You can also click
+**View settings** at the top of the board and drag the stages under **Visible
+columns**. A stage's menu there has **Move up** and **Move down** too. Switch a
+stage off there to hide its column. Switch on **No Stage** to add a first column
+for deals with no stage. Dragging a deal into it clears the stage. The order is saved for
+you alone, so teammates keep theirs. It never changes the order in the
+**Stage** field's settings, which stays the starting order for everyone. A
+stage added later joins the end of your order.
 
 ## Move a deal forward
 
 Drag a deal's card from its current column into the column for its next
 stage. The change saves as soon as you drop it, with no need to open the record.
+With a **Sort** set, you can still drag a card to another column but not reorder it by hand.
 
 You can also change a deal's stage from its own record: open it, click
 **Edit**, choose a new **Stage**, and click **Save changes**.
@@ -40,8 +53,8 @@ You can also change a deal's stage from its own record: open it, click
 ## If the stage names don't match your sales process, then edit them
 
 Stage is a field like any other. Click your workspace name at the top of the
-sidebar, click **Custom Fields**, select the **Opportunities** tab, and open
+sidebar, click **Custom attributes**, select the **Opportunities** tab, and open
 **Stage** from its **Actions** menu. You can rename stages, recolor them,
 reorder them, or add new ones. See
-[Use custom fields](/help/getting-started/use-custom-fields) for how field
+[Use custom attributes](/help/getting-started/use-custom-fields) for how field
 settings work.

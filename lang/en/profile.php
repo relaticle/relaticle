@@ -175,8 +175,6 @@ return [
 
     'security' => 'Security',
 
-    'edit_profile' => 'Edit Profile',
-
     'scheduled_deletion_interstitial' => [
         'heading' => 'Your account is scheduled for deletion',
         'details' => [

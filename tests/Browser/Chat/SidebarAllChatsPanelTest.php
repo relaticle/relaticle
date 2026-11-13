@@ -69,8 +69,7 @@ it('opens the all-chats flyout from the sidebar trigger and lists chats', functi
     }
     DB::table('agent_conversations')->insert($rows);
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
+    $page = visitAs($user, "/app/{$workspace->slug}")
         ->assertSourceHas('aria-label="Open all chats"');
 
     openAllChatsFromSidebar($page);
@@ -105,8 +104,7 @@ it('navigates to a chat when clicked from the panel', function (): void {
     }
     DB::table('agent_conversations')->insert($rows);
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}");
+    $page = visitAs($user, "/app/{$workspace->slug}");
 
     openAllChatsFromSidebar($page);
 
@@ -132,8 +130,7 @@ it('does not restore an open flyout when the browser goes back', function (): vo
     }
     DB::table('agent_conversations')->insert($rows);
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}");
+    $page = visitAs($user, "/app/{$workspace->slug}");
 
     openAllChatsFromSidebar($page);
 

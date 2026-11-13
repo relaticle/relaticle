@@ -643,7 +643,7 @@ describe('unknown custom field key rejection', function () {
                 'name' => 'Unknown Key Company',
                 'custom_fields' => ['jobTitle' => 'VP of Engineering'],
             ])
-            ->assertHasErrors(['Unknown custom field keys: jobTitle']);
+            ->assertHasErrors(['Unknown custom attribute (custom field) keys: jobTitle']);
     });
 
     it('rejects unknown custom field key on update', function (): void {
@@ -654,7 +654,7 @@ describe('unknown custom field key rejection', function () {
                 'id' => $company->id,
                 'custom_fields' => ['nonexistent' => 'some value'],
             ])
-            ->assertHasErrors(['Unknown custom field keys: nonexistent']);
+            ->assertHasErrors(['Unknown custom attribute (custom field) keys: nonexistent']);
     });
 
     it('rejects unknown key while accepting valid key in same request', function (): void {
@@ -666,7 +666,7 @@ describe('unknown custom field key rejection', function () {
                     'invalid_field' => 'bad value',
                 ],
             ])
-            ->assertHasErrors(['Unknown custom field keys: invalid_field']);
+            ->assertHasErrors(['Unknown custom attribute (custom field) keys: invalid_field']);
     });
 });
 

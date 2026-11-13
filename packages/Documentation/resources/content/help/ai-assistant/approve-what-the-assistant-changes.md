@@ -30,7 +30,7 @@ shows the old value struck through next to the new one. From there you can:
 - **Discard**. Nothing is written.
 
 The assistant can set any field you could set on the record's own form,
-including your workspace's custom fields, and every one appears on the card
+including your workspace's custom attributes, and every one appears on the card
 for review.
 
 ## When someone changed the record meanwhile
@@ -88,7 +88,7 @@ button too: **Send invitation**. Approving a plan never sends it.
 
 ## Who can propose what
 
-The assistant acts with your permissions. Creating and editing custom field
+The assistant acts with your permissions. Creating and editing custom attribute
 definitions from chat is owner-and-Admin territory, exactly like the
-**Custom Fields** page itself. For everyone else the assistant explains and
+**Custom attributes** page itself. For everyone else the assistant explains and
 links there instead.

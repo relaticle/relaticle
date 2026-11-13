@@ -6,6 +6,7 @@ namespace App\Filament\Resources\CompanyResource\Pages;
 
 use App\Filament\Actions\ImportExportActionGroup;
 use App\Filament\Concerns\HasCustomFieldColumns;
+use App\Filament\Concerns\HasViewSwitcher;
 use App\Filament\Exports\CompanyExporter;
 use App\Filament\Resources\CompanyResource;
 use App\Models\Company;
@@ -21,6 +22,7 @@ use Relaticle\ImportWizard\Filament\Pages\ImportCompanies;
 final class ListCompanies extends ListRecords
 {
     use HasCustomFieldColumns;
+    use HasViewSwitcher;
 
     /** @var class-string<CompanyResource> */
     protected static string $resource = CompanyResource::class;

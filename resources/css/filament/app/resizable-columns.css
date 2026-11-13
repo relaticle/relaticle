@@ -77,6 +77,12 @@
     @apply border-r-gray-400 dark:border-r-gray-500;
 }
 
+@media (hover: hover) {
+    .fi-ta-resizable-table thead th.fi-ta-resizable-header:has([data-column-menu-trigger][aria-expanded='true']) {
+        @apply border-r-gray-400 dark:border-r-gray-500;
+    }
+}
+
 .fi-ta-resizable-table thead th.fi-ta-resizable-header:has(.column-resize-handle-bar:hover),
 .fi-ta-resizable-table thead th.fi-ta-resizable-header:has(.column-resize-handle-bar.active) {
     @apply border-r-primary-500;
@@ -89,6 +95,12 @@
 
 .fi-ta-resizable-table thead th.fi-ta-resizable-header:hover .column-resize-handle-bar::before {
     @apply w-0.5 bg-gray-400 dark:bg-gray-500;
+}
+
+@media (hover: hover) {
+    .fi-ta-resizable-table thead th.fi-ta-resizable-header:has([data-column-menu-trigger][aria-expanded='true']) .column-resize-handle-bar::before {
+        @apply w-0.5 bg-gray-400 dark:bg-gray-500;
+    }
 }
 
 /* A finger cannot hover, so touch screens always show where a column resizes. */
@@ -111,10 +123,6 @@
     @apply pointer-events-none absolute top-0 z-15 -ml-px hidden w-0.5 bg-primary-500;
 }
 
-.column-resize-badge {
-    @apply pointer-events-none fixed z-61 hidden -translate-x-1/2 translate-y-[calc(-100%-10px)] rounded-sm bg-primary-500 px-1.5 py-0.75 text-[length:var(--text-micro)] leading-none font-semibold whitespace-nowrap text-white shadow-sm;
-}
-
 body.resizing-column,
 body.resizing-column * {
     @apply cursor-col-resize!;
@@ -124,49 +132,42 @@ body.resizing-column {
     @apply select-none;
 }
 
-/* A movable header is dragged by pressing anywhere on it but its controls. Its name keeps the
-   pointer cursor, because a click there still sorts. */
-.fi-ta-resizable-header:has(> .fi-ta-column-handle):not([data-column-pinned="1"]) {
+/* A movable header is dragged by pressing anywhere on it but its grip. A click without a drag opens
+   the column menu. */
+.fi-ta-resizable-header:not([data-column-pinned="1"]) {
     @apply cursor-move select-none;
 }
 
 /* Filament stretches the sort button across the cell; sized to its name, the rest of the header
-   is free to grab. */
+   is free to grab. Sorting lives in the filter row, so the button only opens the column menu. */
 .fi-ta-resizable-header .fi-ta-header-cell-sort-btn {
-    @apply inline-flex w-auto max-w-full cursor-pointer;
+    @apply inline-flex w-auto max-w-full cursor-pointer rounded-sm;
+
+    & > :is(.fi-icon, .fi-loading-indicator) {
+        @apply hidden;
+    }
 }
 
-/* The options button sits at the header's right edge, left of the resize handle, and its space
-   is reserved so the label never runs under it. */
-.fi-ta-resizable-header:has(> .fi-ta-column-handle) > .fi-ta-resizable-label {
-    @apply pr-6;
-    /* `overflow` clips at the padding edge, so a narrow column would draw its label under the handle. */
-    clip-path: inset(0 1.5rem 0 0);
+.fi-ta-resizable-header > .fi-ta-resizable-label[data-column-menu-trigger] {
+    @apply cursor-pointer rounded-sm;
 }
 
-.fi-ta-column-handle {
-    @apply absolute top-1/2 right-2 z-11 grid size-5 -translate-y-1/2 cursor-pointer place-items-center rounded-sm border-0 bg-transparent p-0 text-gray-400 focus-visible:outline-2 focus-visible:outline-primary-500;
-}
+/* A pinned column does not move, so its header shows a lock after the name. Lucide's lock, drawn
+   through a mask so it takes the text colour. */
+th[data-column-pinned="1"] > .fi-ta-resizable-label::after {
+    @apply ms-1.5 inline-block size-3.5 bg-current align-middle text-gray-400 mask-(--column-lock-icon) mask-contain mask-center mask-no-repeat content-[''];
 
-/* Lucide's ellipsis-vertical, drawn through a mask so it takes the button's text colour. */
-.fi-ta-column-handle {
-    --column-handle-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='1'/%3E%3Ccircle cx='12' cy='5' r='1'/%3E%3Ccircle cx='12' cy='19' r='1'/%3E%3C/svg%3E");
-}
-
-.fi-ta-column-handle::before {
-    @apply size-4 bg-current mask-(--column-handle-icon) mask-contain mask-center mask-no-repeat content-[''];
-}
-
-.fi-ta-column-handle:hover,
-.fi-ta-column-handle:focus-visible,
-.fi-ta-column-handle[aria-expanded="true"] {
-    @apply bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200;
+    --column-lock-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='11' x='3' y='11' rx='2' ry='2'/%3E%3Cpath d='M7 11V7a5 5 0 0 1 10 0v4'/%3E%3C/svg%3E");
 }
 
 /* Fixed, so the scrolling table cannot clip it. The script places it from the trigger.
    Filament transitions `display`, which keeps a closed menu on screen for the duration. */
-.fi-dropdown-panel.fi-ta-column-menu {
+.fi-dropdown-panel:is(.fi-ta-column-menu, .fi-view-settings-row-menu) {
     @apply fixed z-60 w-56 transition-none;
+}
+
+.fi-ta-column-menu [role="menuitemradio"] .fi-dropdown-list-item-label {
+    @apply flex items-center justify-between gap-2;
 }
 
 /* The dragged column's slot stays empty and travels with the drop position. */
@@ -203,17 +204,6 @@ body.reordering-column .column-resize-handle-bar::before {
     @apply w-0!;
 }
 
-/* A pinned column does not move, so its header shows a lock in place of the grip, always. */
-th[data-column-pinned="1"] > .fi-ta-column-handle {
-    cursor: pointer;
-    opacity: 1;
-}
-
-/* Lucide's lock. */
-th[data-column-pinned="1"] > .fi-ta-column-handle {
-    --column-handle-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='11' x='3' y='11' rx='2' ry='2'/%3E%3Cpath d='M7 11V7a5 5 0 0 1 10 0v4'/%3E%3C/svg%3E");
-}
-
 /* The script sets each pinned cell's `left` and the table class. */
 .fi-ta-has-pinned.fi-ta-resizable-table :is(th, td):is([data-column-pinned="1"], .fi-ta-selection-cell) {
     position: sticky;
@@ -238,16 +228,69 @@ th[data-column-pinned="1"] > .fi-ta-column-handle {
     @apply bg-(--surface-table-head-bg);
 }
 
-.fi-ta-has-pinned[data-scrolled-x] [data-column-pinned-last] {
-    @apply shadow-[6px_0_8px_-4px] shadow-black/12 dark:shadow-black/50;
+@media (hover: hover) {
+    .fi-ta-has-pinned .fi-ta-row.fi-clickable:has([aria-expanded='true']) > :is([data-column-pinned="1"], .fi-ta-selection-cell) {
+        @apply bg-(--surface-table-head-bg);
+    }
 }
 
-/* A pinned column keeps its place, so the column manager offers no way to move it. */
-.fi-ta-col-manager-items > [data-column-pinned] :is(.fi-ta-col-manager-reorder-handle, .fi-ta-col-manager-reorder-controls) {
-    @apply hidden;
+.fi-ta-has-pinned[data-scrolled-x] [data-column-pinned-last] {
+    @apply shadow-[6px_0_8px_-4px] shadow-black/12 dark:shadow-black/50;
 }
 
 /* Filament's text item is a line-clamp box, which never draws an ellipsis, so a value cut by a fixed width needs a block. */
 .fi-ta-resizable-table td .fi-ta-text-item:not(.fi-wrapped, .fi-ta-text-has-line-clamp, :is(.fi-wrapped, .fi-ta-text-has-line-clamp) *) {
     @apply sm:block sm:truncate;
+}
+
+/* The five list pages fill the screen below the topbar, so the table scrolls inside itself and its horizontal
+   scrollbar sits at the bottom edge. Phones keep page scroll, where the table stacks into cards. */
+@media (width >= 40rem) {
+    .fi-app-layout .fi-main:has(.fi-ta-fill-screen) {
+        @apply h-full;
+    }
+
+    .fi-page:has(> .fi-ta-fill-screen) {
+        @apply h-full;
+
+        .fi-page-header-main-ctn {
+            @apply h-full gap-y-0 py-0;
+        }
+
+        .fi-page-main {
+            @apply min-h-0 flex-1;
+        }
+
+        :is(.fi-page-content, .fi-grid, .fi-grid-col, .fi-sc-component, .fi-ta, .fi-ta-ctn):not(.fi-modal *) {
+            @apply h-full min-h-0;
+        }
+
+        :is(.fi-page-content, .fi-grid) {
+            @apply grid-rows-[minmax(0,1fr)];
+        }
+
+        .fi-ta-main:not(.fi-modal *) {
+            @apply flex min-h-0 flex-col;
+        }
+
+        .fi-ta-main > :is(.fi-ta-header-ctn, .fi-pagination, .fi-ta-filters-below-content) {
+            @apply shrink-0;
+        }
+
+        .fi-ta-content-ctn:not(.fi-modal *) {
+            @apply min-h-0 flex-1 overscroll-contain;
+        }
+
+        .fi-ta-content-ctn:not(.fi-modal *) thead {
+            @apply sticky top-0;
+
+            &[data-sticky-header] {
+                animation: none;
+            }
+        }
+
+        .fi-ta-empty-state:not(.fi-modal *) {
+            @apply flex min-h-0 flex-1 flex-col justify-center;
+        }
+    }
 }

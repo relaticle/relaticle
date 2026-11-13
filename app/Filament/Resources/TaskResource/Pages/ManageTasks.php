@@ -4,24 +4,17 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\TaskResource\Pages;
 
-use App\Filament\Actions\CreateTaskAction;
-use App\Filament\Actions\ImportExportActionGroup;
 use App\Filament\Concerns\HasCustomFieldColumns;
 use App\Filament\Concerns\HasViewSwitcher;
 use App\Filament\Concerns\KeepsOpenTaskInUrl;
-use App\Filament\Exports\TaskExporter;
 use App\Filament\Resources\TaskResource;
 use App\Models\Task;
-use Filament\Actions\Action;
 use Filament\Actions\EditAction;
-use Filament\Actions\ExportAction;
 use Filament\Actions\ViewAction;
 use Filament\Resources\Pages\ManageRecords;
-use Filament\Support\Enums\Size;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\On;
 use Override;
-use Relaticle\ImportWizard\Filament\Pages\ImportTasks;
 
 final class ManageTasks extends ManageRecords
 {
@@ -55,17 +48,7 @@ final class ManageTasks extends ManageRecords
     #[Override]
     protected function getHeaderActions(): array
     {
-        return [
-            ImportExportActionGroup::make([
-                Action::make('import')
-                    ->label(__('filament/resources/task.pages.list.actions.import.label'))
-                    ->icon('lucide-upload')
-                    ->url(ImportTasks::getUrl())
-                    ->visible(ImportTasks::canAccess(...)),
-                ExportAction::make()->exporter(TaskExporter::class)->authorize('exportAny', Task::class),
-            ])->label(__('filament/resources/task.pages.list.actions.import_export.label')),
-            CreateTaskAction::make()->icon('lucide-plus')->size(Size::Small)->slideOver(),
-        ];
+        return TaskResource::collectionActions();
     }
 
     #[On('ai-write-completed')]

@@ -38,7 +38,7 @@ enum ProposalEntity: string
             self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete => 'Email Draft',
             self::EmailCancel, self::EmailReschedule, self::EmailRetry => 'Email',
             self::WorkspaceInvitation => 'Teammate',
-            self::CustomField => 'Custom Field',
+            self::CustomField => 'Custom Attribute',
             self::SampleData => 'Sample Data',
             self::WebAccess => 'Web Search',
         };

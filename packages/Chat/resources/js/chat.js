@@ -44,7 +44,7 @@ const RECORD_CHIP_URL = /^\/r\/([a-z_]+)\/[\w-]+$/
 const RECORD_CHIP_ICONS = window.RECORD_CHIP_ICONS ?? {}
 
 // A proposal card also leads with an icon for what it changes, and that can be
-// more than a record: a custom field has an icon and no `/r/` page to chip.
+// more than a record: a custom attribute has an icon and no `/r/` page to chip.
 const PROPOSAL_ICONS = window.PROPOSAL_ICONS ?? RECORD_CHIP_ICONS
 
 // A chip is a single-line pill, so a line break inside the label would split it

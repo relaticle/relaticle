@@ -98,7 +98,7 @@ final readonly class ValidCustomFields implements ValidationRule
 
         $unknownList = implode(', ', $unknownKeys);
 
-        $fail("Unknown custom field keys: {$unknownList}.");
+        $fail("Unknown custom attribute (custom field) keys: {$unknownList}.");
     }
 
     /**

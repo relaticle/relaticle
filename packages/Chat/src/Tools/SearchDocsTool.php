@@ -63,6 +63,12 @@ final readonly class SearchDocsTool implements Tool
         'why', 'will', 'with', 'would', 'you', 'your',
     ];
 
+    /** @var array<string, string> */
+    private const array RETIRED_WORDS = [
+        'field' => 'attribute',
+        'fields' => 'attributes',
+    ];
+
     public function __construct(
         private BuildSearchIndex $index,
         private DocsRepository $docs,
@@ -73,7 +79,7 @@ final readonly class SearchDocsTool implements Tool
         return 'Search Relaticle\'s own product documentation, both the help center and the developer guides, '
             .'and get back the matching sections plus a link to each. Covers connecting external AI assistants '
             .'and MCP clients (Claude, ChatGPT, Cursor, Codex), access tokens, the REST API, self-hosting, '
-            .'billing and plans, AI credits, imports, exports, custom fields, and every in-app feature. '
+            .'billing and plans, AI credits, imports, exports, custom attributes (custom fields), and every in-app feature. '
             .'Call this for any "how do I", "can Relaticle", or setup question instead of replying that you '
             .'only handle CRM data or have no information.';
     }
@@ -342,8 +348,15 @@ final readonly class SearchDocsTool implements Tool
     {
         $words = preg_split('/[^\p{L}\p{N}.]+/u', mb_strtolower(trim($query)), -1, PREG_SPLIT_NO_EMPTY) ?: [];
 
+        $words = array_map(fn (string $word): string => trim($word, '.'), $words);
+        $words = array_map(
+            fn (string $word, int $index): string => ($words[$index - 1] ?? null) === 'custom' ? (self::RETIRED_WORDS[$word] ?? $word) : $word,
+            $words,
+            array_keys($words),
+        );
+
         $terms = array_filter(
-            array_map(fn (string $word): string => trim($word, '.'), $words),
+            $words,
             fn (string $word): bool => mb_strlen($word) >= self::MIN_TERM_LENGTH
                 && ! in_array($word, self::STOP_WORDS, true),
         );

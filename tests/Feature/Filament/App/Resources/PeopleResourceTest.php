@@ -7,6 +7,7 @@ use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\MeetingsRelationManager;
+use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\People;
 use App\Models\User;
@@ -91,15 +92,38 @@ it('can sort `:dataset` column', function (string $column): void {
         ->assertCanSeeTableRecords($records->sortByDesc($sortingKey), inOrder: true);
 })->with(['company.name', 'creator.name', 'created_at', 'updated_at', 'deleted_at']);
 
-it('can search `:dataset` column', function (string $column): void {
+it('narrows the list with a contains rule on its name', function (): void {
     $records = People::factory(3)->recycle([$this->user, $this->workspace])->create();
-    $search = data_get($records->first(), $column);
+    $value = $records->first()->name;
 
     livewire(ListPeople::class)
-        ->searchTable($search instanceof BackedEnum ? $search->value : $search)
-        ->assertCanSeeTableRecords($records->filter(fn (Model $record) => data_get($record, $column) === $search))
-        ->assertCanNotSeeTableRecords($records->filter(fn (Model $record) => data_get($record, $column) !== $search));
-})->with(['name', 'company.name', 'creator.name']);
+        ->call('setFilterRules', [['field' => 'name', 'condition' => 'contains', 'value' => $value]])
+        ->assertCanSeeTableRecords($records->filter(fn (Model $record): bool => $record->name === $value))
+        ->assertCanNotSeeTableRecords($records->filter(fn (Model $record): bool => $record->name !== $value));
+});
+
+it('narrows the list to the people of a company', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $inside = People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $company->getKey()]);
+    $outside = People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => null]);
+
+    livewire(ListPeople::class)
+        ->call('setFilterRules', [['field' => 'company', 'condition' => 'is_any_of', 'value' => [$company->getKey()]]])
+        ->assertCanSeeTableRecords([$inside])
+        ->assertCanNotSeeTableRecords([$outside]);
+});
+
+it('narrows the list by creator to the records one member holds', function (): void {
+    $colleague = User::factory()->create(['current_workspace_id' => $this->workspace->getKey()]);
+    $this->workspace->users()->attach($colleague, ['role' => 'member']);
+    $mine = People::factory()->recycle([$this->user, $this->workspace])->create(['creator_id' => $this->user->getKey()]);
+    $theirs = People::factory()->recycle([$this->user, $this->workspace])->create(['creator_id' => $colleague->getKey()]);
+
+    livewire(ListPeople::class)
+        ->call('setFilterRules', [['field' => 'creator', 'condition' => 'is_any_of', 'value' => [$colleague->getKey()]]])
+        ->assertCanSeeTableRecords([$theirs])
+        ->assertCanNotSeeTableRecords([$mine]);
+});
 
 it('cannot display trashed records by default', function (): void {
     $records = People::factory()->count(4)->recycle([$this->user, $this->workspace])->create();
@@ -151,8 +175,8 @@ it('can create a person', function (): void {
 it('can edit a person', function (): void {
     $record = People::factory()->recycle([$this->user, $this->workspace])->create();
 
-    livewire(ListPeople::class)
-        ->callAction(TestAction::make('edit')->table($record), data: [
+    livewire(ViewPeople::class, ['record' => $record->getKey()])
+        ->callAction(TestAction::make('edit')->schemaComponent('recordActions', schema: 'infolist'), data: [
             'name' => 'Updated Person',
         ])
         ->assertHasNoActionErrors();
@@ -160,13 +184,12 @@ it('can edit a person', function (): void {
     expect($record->refresh()->name)->toBe('Updated Person');
 });
 
-it('can delete a person', function (): void {
+it('offers delete for a person in the bulk bar, not on its row', function (): void {
     $record = People::factory()->recycle([$this->user, $this->workspace])->create();
 
     livewire(ListPeople::class)
-        ->callAction(TestAction::make('delete')->table($record));
-
-    $this->assertSoftDeleted($record);
+        ->assertActionDoesNotExist(TestAction::make('delete')->table($record))
+        ->assertActionExists(TestAction::make('delete')->table()->bulk());
 });
 
 function personWithEmails(User $user, string $name, array $emails, bool $trashed = false): People
@@ -192,7 +215,8 @@ it('restores a deleted person whose email is still free', function (): void {
 
     livewire(ListPeople::class)
         ->filterTable('trashed', false)
-        ->callAction(TestAction::make('restore')->table($person));
+        ->selectTableRecords([$person])
+        ->callAction([['name' => 'restore', 'context' => ['table' => true, 'bulk' => true]]]);
 
     expect($person->fresh()->trashed())->toBeFalse();
 });
@@ -203,12 +227,13 @@ it('refuses to restore a deleted person whose email another person now holds', f
 
     livewire(ListPeople::class)
         ->filterTable('trashed', false)
-        ->callAction(TestAction::make('restore')->table($person))
+        ->selectTableRecords([$person])
+        ->callAction([['name' => 'restore', 'context' => ['table' => true, 'bulk' => true]]])
         ->assertNotified(
             Notification::make()
-                ->danger()
-                ->title('Grace Hopper can\'t be restored')
-                ->body('grace@navy.mil in Emails now belongs to Grace Returns. Change or remove it there, then restore.'),
+                ->warning()
+                ->title('1 record wasn\'t restored')
+                ->body('Grace Hopper: grace@navy.mil in Emails now belongs to Grace Returns.'),
         );
 
     expect($person->fresh()->trashed())->toBeTrue();
@@ -245,7 +270,7 @@ it('validates name is required on create', function (): void {
 it('has `:dataset` filter', function (string $filter): void {
     livewire(ListPeople::class)
         ->assertTableFilterExists($filter);
-})->with(['creation_source', 'trashed']);
+})->with(['conditions', 'trashed']);
 
 it('sets creator_id and workspace_id via observer when creating a person', function (): void {
     livewire(ListPeople::class)

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Opportunity;
 use App\Models\User;
 
 /**
@@ -15,9 +16,7 @@ it('keeps the page heading in the topbar across a topbar re-render', function ()
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/companies");
+    $page = visitAs($user, "/app/{$workspace->slug}/companies");
 
     $page->wait(1);
 
@@ -73,9 +72,7 @@ it('drops the previous page heading when the next page has none', function (): v
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/companies");
+    $page = visitAs($user, "/app/{$workspace->slug}/companies");
 
     $page->wait(1);
 
@@ -92,4 +89,34 @@ it('drops the previous page heading when the next page has none', function (): v
 
     expect($page->script('window.location.pathname'))->toBe("/app/{$workspace->slug}")
         ->and($heading())->toBe('NONE', 'the dashboard inherited the previous page title');
+});
+
+it('shows a long record name in full on a phone by cutting the trail to its icon', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $opportunity = Opportunity::factory()->recycle([$user, $workspace])->create(['name' => 'Apple Developer Program']);
+
+    $page = visitAs($user, "/app/{$workspace->slug}/opportunities/{$opportunity->getKey()}", 393, 852);
+
+    $heading = json_decode((string) $page->script(<<<'JS'
+        (() => {
+            const heading = document.querySelector('.fi-topbar-start [data-page-heading]');
+            const title = heading.querySelector('.fi-topbar-page-title');
+            const trail = heading.querySelector('.fi-record-breadcrumb-link');
+    
+            return JSON.stringify({
+                titleCut: title.scrollWidth > title.clientWidth,
+                trailWidth: Math.round(trail.getBoundingClientRect().width),
+                trailName: trail.textContent.trim(),
+            });
+        })();
+    JS), true);
+
+    expect($heading)->toBe(['titleCut' => false, 'trailWidth' => 28, 'trailName' => 'Opportunities']);
+
+    $page->resize(1440, 900);
+
+    expect($page->script("Math.round(document.querySelector('[data-page-heading] .fi-record-breadcrumb-link').getBoundingClientRect().width) > 28"))->toBeTrue();
 });

@@ -33,7 +33,7 @@ final readonly class CreateCustomField
         abort_unless(
             $user->hasWorkspaceCapability($user->currentWorkspace?->getKey(), WorkspaceCapability::FieldsManage),
             403,
-            'Only workspace owners and admins can manage custom field definitions.',
+            'Only workspace owners and admins can manage custom attribute definitions.',
         );
 
         $workspaceId = $user->currentWorkspace->getKey();

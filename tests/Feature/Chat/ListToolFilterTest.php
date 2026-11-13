@@ -75,6 +75,54 @@ it('applies a filter when searching for the literal term "0" instead of returnin
     expect($rows)->toHaveCount(1);
 });
 
+it('applies a partial text match through the list tool', function (string $operator, string $operand, array $expected): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+
+    foreach (['Acme Renewal', 'Globex Pilot'] as $name) {
+        Company::factory()->for($user->currentWorkspace)->create(['name' => $name]);
+    }
+
+    $rows = listToolRows(new ListCompaniesTool()->handle(new Request(['filter' => ['name' => [$operator => $operand]]])));
+
+    expect(Arr::pluck($rows, 'attributes.name'))->toBe($expected);
+})->with([
+    'starts with' => ['$starts_with', 'acme', ['Acme Renewal']],
+    'starts with nothing' => ['$starts_with', 'Pilot', []],
+    'ends with' => ['$ends_with', 'PILOT', ['Globex Pilot']],
+    'ends with nothing' => ['$ends_with', 'Globex', []],
+]);
+
+it('applies a partial match on a multi-value field through the list tool', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+    $emails = WorkspaceCustomField::byCode($user->currentWorkspace->getKey(), 'people', 'emails');
+
+    foreach (['Two Inboxes' => ['first@acme.com', 'second@globex.com'], 'One Inbox' => ['only@initech.com']] as $name => $addresses) {
+        People::factory()->for($user->currentWorkspace)->create(['name' => $name])->saveCustomFieldValue($emails, $addresses);
+    }
+
+    $rows = listToolRows(new ListPeopleTool()->handle(new Request(['filter' => ['custom_fields' => ['emails' => ['$contains' => 'GLOBEX']]]])));
+
+    expect(Arr::pluck($rows, 'attributes.name'))->toBe(['Two Inboxes']);
+});
+
+it('filters a list tool by a record custom field', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+    $partner = resolve(CreateCustomField::class)->execute($user, ['entity_type' => 'opportunity', 'name' => 'Partner', 'code' => 'partner', 'type' => 'record', 'lookup_type' => 'company']);
+    $acme = Company::factory()->for($user->currentWorkspace)->create(['name' => 'Acme']);
+    $globex = Company::factory()->for($user->currentWorkspace)->create(['name' => 'Globex']);
+
+    foreach (['With Acme' => $acme, 'With Globex' => $globex] as $name => $company) {
+        Opportunity::factory()->for($user->currentWorkspace)->create(['name' => $name])->saveCustomFieldValue($partner, [$company->getKey()]);
+    }
+
+    $rows = listToolRows(new ListOpportunitiesTool()->handle(new Request(['filter' => ['custom_fields' => ['partner' => ['$has_any' => [$globex->getKey()]]]]])));
+
+    expect(Arr::pluck($rows, 'attributes.name'))->toBe(['With Globex']);
+});
+
 it('serves an empty page for a page number no list can reach', function (mixed $page): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
@@ -226,7 +274,7 @@ it('rejects an unknown custom field code instead of silently returning everythin
     ])), true);
 
     expect($result)->toHaveKey('error')
-        ->and($result['error'])->toContain('not a filterable custom field');
+        ->and($result['error'])->toContain('not a filterable custom attribute');
 });
 
 it('rejects an unknown option label instead of silently returning everything', function (): void {
@@ -341,7 +389,7 @@ it('stops offering a custom field for filtering once it is deactivated', functio
     ])), true);
 
     expect($result)->toHaveKey('error')
-        ->and($result['error'])->toContain('not a filterable custom field');
+        ->and($result['error'])->toContain('not a filterable custom attribute');
 });
 
 it('can filter by an option added to an existing custom field', function (): void {

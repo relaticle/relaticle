@@ -11,6 +11,7 @@ use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\SavedView;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
@@ -39,7 +40,7 @@ it('describes an empty list in one line', function (): void {
     livewire(ManageNotes::class)
         ->assertSee('Notes you add appear here.');
 
-    livewire(NotesCards::class)
+    openCards()
         ->assertSee('Notes you add appear here.');
 });
 
@@ -81,15 +82,27 @@ it('can sort `:dataset` column', function (string $column): void {
         ->assertCanSeeTableRecords($records->sortByDesc($sortingKey), inOrder: true);
 })->with(['creator.name', 'deleted_at', 'created_at', 'updated_at']);
 
-it('can search `:dataset` column', function (string $column): void {
+it('narrows the list with a contains rule on its title', function (): void {
     $records = Note::factory(3)->recycle([$this->user, $this->workspace])->create();
-    $search = data_get($records->first(), $column);
+    $value = $records->first()->title;
 
     livewire(ManageNotes::class)
-        ->searchTable($search instanceof BackedEnum ? $search->value : $search)
-        ->assertCanSeeTableRecords($records->filter(fn (Model $record) => data_get($record, $column) === $search))
-        ->assertCanNotSeeTableRecords($records->filter(fn (Model $record) => data_get($record, $column) !== $search));
-})->with(['title', 'creator.name']);
+        ->call('setFilterRules', [['field' => 'title', 'condition' => 'contains', 'value' => $value]])
+        ->assertCanSeeTableRecords($records->filter(fn (Model $record): bool => $record->title === $value))
+        ->assertCanNotSeeTableRecords($records->filter(fn (Model $record): bool => $record->title !== $value));
+});
+
+it('narrows the list by creator to the records one member holds', function (): void {
+    $colleague = User::factory()->create(['current_workspace_id' => $this->workspace->getKey()]);
+    $this->workspace->users()->attach($colleague, ['role' => 'member']);
+    $mine = Note::factory()->recycle([$this->user, $this->workspace])->create(['creator_id' => $this->user->getKey()]);
+    $theirs = Note::factory()->recycle([$this->user, $this->workspace])->create(['creator_id' => $colleague->getKey()]);
+
+    livewire(ManageNotes::class)
+        ->call('setFilterRules', [['field' => 'creator', 'condition' => 'is_any_of', 'value' => [$colleague->getKey()]]])
+        ->assertCanSeeTableRecords([$theirs])
+        ->assertCanNotSeeTableRecords([$mine]);
+});
 
 it('cannot display trashed records by default', function (): void {
     $records = Note::factory()->count(4)->recycle([$this->user, $this->workspace])->create();
@@ -199,13 +212,12 @@ it('rejects a record from another workspace in the relations picker', function (
     expect($note->companies()->count())->toBe(0);
 });
 
-it('can delete a note', function (): void {
+it('offers delete for a note in the bulk bar, not on its row', function (): void {
     $record = Note::factory()->recycle([$this->user, $this->workspace])->create();
 
     livewire(ManageNotes::class)
-        ->callAction(TestAction::make('delete')->table($record));
-
-    $this->assertSoftDeleted($record);
+        ->assertActionDoesNotExist(TestAction::make('delete')->table($record))
+        ->assertActionExists(TestAction::make('delete')->table()->bulk());
 });
 
 it('validates title is required on create', function (): void {
@@ -219,7 +231,7 @@ it('validates title is required on create', function (): void {
 it('has `:dataset` filter', function (string $filter): void {
     livewire(ManageNotes::class)
         ->assertTableFilterExists($filter);
-})->with(['creation_source', 'trashed']);
+})->with(['conditions', 'trashed']);
 
 it('sets creator_id and workspace_id via observer when creating a note', function (): void {
     livewire(ManageNotes::class)
@@ -376,7 +388,7 @@ it('groups note cards by when they were created and counts each group', function
     $note('Written in March', '2026-03-25 09:00:00');
     $note('Written last year', '2025-06-01 09:00:00');
 
-    livewire(NotesCards::class)
+    openCards()
         ->assertOk()
         ->assertSeeHtmlInOrder([
             'Created today <span class="fi-ta-group-count">1</span>',
@@ -399,7 +411,7 @@ it('shows the note body on a card as plain text', function (): void {
     ]);
     Note::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Empty note']);
 
-    livewire(NotesCards::class)
+    openCards()
         ->assertSee('Agreed on pricing. Follow up Friday.')
         ->assertSee('This note has no content.')
         ->assertSee($this->user->name);
@@ -409,7 +421,7 @@ it('searches note cards by title and recounts the group', function (): void {
     $match = Note::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Renewal terms']);
     $other = Note::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Kickoff agenda']);
 
-    livewire(NotesCards::class)
+    openCards()
         ->assertSeeHtml('Created today <span class="fi-ta-group-count">2</span>')
         ->searchTable('Renewal')
         ->assertCanSeeTableRecords([$match])
@@ -420,21 +432,22 @@ it('searches note cards by title and recounts the group', function (): void {
 it('edits a note from its card', function (): void {
     $record = Note::factory()->recycle([$this->user, $this->workspace])->create();
 
-    livewire(NotesCards::class)
+    openCards()
         ->callAction(TestAction::make('edit')->table($record), data: ['title' => 'Edited from a card'])
         ->assertHasNoActionErrors();
 
     expect($record->refresh()->title)->toBe('Edited from a card');
 });
 
-it('opens notes on the cards view and links it to the list', function (string $page): void {
-    livewire($page)
-        ->assertSeeHtml('href="'.NoteResource::getUrl('index').'"')
-        ->assertSeeHtml('href="'.NoteResource::getUrl('list').'"');
-})->with([ManageNotes::class, NotesCards::class]);
+it('links the cards view from the list and the list from the cards view', function (): void {
+    livewire(ManageNotes::class)->assertSeeHtml('href="'.NoteResource::getUrl('index', ['view' => 'cards']).'"');
+    openCards()
+        ->assertSeeHtml('href="'.NoteResource::getUrl('index', ['view' => 'cards']).'"')
+        ->assertSeeHtml('href="'.NoteResource::getUrl('list', ['view' => SavedView::BUILT_IN_LIST_LINK]).'"');
+});
 
 it('serves the cards view at the notes index and the table at the list route', function (): void {
-    $this->get(NoteResource::getUrl('index'))->assertSeeLivewire(NotesCards::class);
+    $this->get(NoteResource::getUrl('index', ['view' => 'cards']))->assertSeeLivewire(NotesCards::class);
     $this->get(NoteResource::getUrl('list'))->assertSeeLivewire(ManageNotes::class);
 });
 
@@ -443,7 +456,7 @@ it('shows the first linked record on a card and counts the rest', function (): v
     $note->people()->attach(People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Priya Raman']));
     $note->companies()->attach(Company::factory()->count(2)->recycle([$this->user, $this->workspace])->create());
 
-    livewire(NotesCards::class)
+    openCards()
         ->assertSee('Priya Raman')
         ->assertSeeHtml('<span class="fi-note-card-more">+2</span>');
 });
@@ -452,7 +465,7 @@ it('marks a deleted note on its card', function (): void {
     Note::factory()->recycle([$this->user, $this->workspace])->create();
     $trashed = Note::factory()->trashed()->recycle([$this->user, $this->workspace])->create();
 
-    livewire(NotesCards::class)
+    openCards()
         ->assertDontSeeHtml('fi-note-card-deleted-badge')
         ->filterTable('trashed', true)
         ->assertCanSeeTableRecords([$trashed])
@@ -462,7 +475,7 @@ it('marks a deleted note on its card', function (): void {
 it('shows 24 note cards on a page', function (): void {
     $records = Note::factory(25)->recycle([$this->user, $this->workspace])->create();
 
-    livewire(NotesCards::class)
+    openCards()
         ->assertCanSeeTableRecords($records->take(24))
         ->assertCanNotSeeTableRecords($records->skip(24));
 });
@@ -470,23 +483,13 @@ it('shows 24 note cards on a page', function (): void {
 it('offers a per page choice on note cards only once there is more than one page', function (): void {
     Note::factory(24)->recycle([$this->user, $this->workspace])->create();
 
-    livewire(NotesCards::class)
+    openCards()
         ->assertDontSeeHtml('fi-pagination-records-per-page-select');
 
     Note::factory()->recycle([$this->user, $this->workspace])->create();
 
-    $component = livewire(NotesCards::class)
+    $component = openCards()
         ->assertSeeHtml('fi-pagination-records-per-page-select');
 
     expect($component->instance()->getTable()->getPaginationPageOptions())->toBe([24, 48, 96]);
-});
-
-it('points the navigation link at the view the user opened last', function (): void {
-    livewire(ManageNotes::class)->assertOk();
-
-    expect(NoteResource::getNavigationUrl())->toBe(NoteResource::getUrl('list'));
-
-    livewire(NotesCards::class)->assertOk();
-
-    expect(NoteResource::getNavigationUrl())->toBe(NoteResource::getUrl('index'));
 });

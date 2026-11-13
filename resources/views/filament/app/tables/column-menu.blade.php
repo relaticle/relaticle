@@ -4,6 +4,7 @@
     x-on:resize.window="close(false)"
     x-on:scroll.window.capture="close(false)"
     x-on:livewire:navigating.window="close(false)"
+    x-on:column-menu-close.window="close(false)"
     class="contents" wire:ignore wire:key="{{ $this->getId() }}.table.column-menu">
     <div
         x-init="panel = $el"
@@ -11,16 +12,38 @@
         aria-label="{{ __('filament/panel.tables.column_menu.options') }}"
         x-cloak
         x-bind:class="{ 'hidden': column === null }"
-        x-bind:style="{ top: `${top}px`, right: `${right}px` }"
+        x-bind:style="{ top: `${top}px`, left: `${left}px` }"
         x-on:keydown.escape.prevent.stop="close(true)"
         x-on:keydown.arrow-down.prevent="step(1)"
         x-on:keydown.arrow-up.prevent="step(-1)"
         x-on:keydown.home.prevent="items()[0]?.focus()"
         x-on:keydown.end.prevent="items().at(-1)?.focus()"
-        x-on:focusout="$event.relatedTarget && ! $el.contains($event.relatedTarget) && ! $event.relatedTarget.closest('.fi-ta-column-handle') && close(false)"
-        x-on:click.outside="$event.target.closest('.fi-ta-column-handle') || close(false)"
+        x-on:focusout="focusLeft($event)"
+        x-on:click.outside="$event.target.closest('.column-resize-handle-bar') || ! $event.target.closest('thead th[x-data^=resizableColumn]') ? close(false) : null"
         class="fi-dropdown-panel fi-ta-column-menu"
     >
+        <div class="fi-dropdown-list" x-show="sortable">
+            <x-filament::dropdown.list.item
+                icon="lucide-arrow-up-narrow-wide"
+                role="menuitemradio"
+                data-column-menu-item="sortAscending"
+                x-bind:aria-checked="(sorted === 'asc').toString()"
+                x-on:click="sortBy('asc')"
+            >
+                {{ __('filament/panel.tables.column_menu.sort_ascending') }}
+                <x-filament::icon icon="lucide-check" class="fi-menu-check" x-show="sorted === 'asc'" />
+            </x-filament::dropdown.list.item>
+            <x-filament::dropdown.list.item
+                icon="lucide-arrow-down-wide-narrow"
+                role="menuitemradio"
+                data-column-menu-item="sortDescending"
+                x-bind:aria-checked="(sorted === 'desc').toString()"
+                x-on:click="sortBy('desc')"
+            >
+                {{ __('filament/panel.tables.column_menu.sort_descending') }}
+                <x-filament::icon icon="lucide-check" class="fi-menu-check" x-show="sorted === 'desc'" />
+            </x-filament::dropdown.list.item>
+        </div>
         <div class="fi-dropdown-list" x-show="movable">
             <x-filament::dropdown.list.item
                 icon="lucide-arrow-left"
@@ -28,7 +51,7 @@
                 x-bind:disabled="! canMoveLeft"
                 x-bind:aria-disabled="(! canMoveLeft).toString()"
                 x-bind:class="{ 'fi-disabled': ! canMoveLeft }"
-                x-on:click="choose(() => $wire.moveTableColumn(column, before.left), column)"
+                x-on:click="refresh() && canMoveLeft && choose(() => $wire.moveTableColumn(column, before.left), column)"
             >
                 {{ __('filament/panel.tables.column_menu.move_left') }}
             </x-filament::dropdown.list.item>
@@ -38,7 +61,7 @@
                 x-bind:disabled="! canMoveRight"
                 x-bind:aria-disabled="(! canMoveRight).toString()"
                 x-bind:class="{ 'fi-disabled': ! canMoveRight }"
-                x-on:click="choose(() => $wire.moveTableColumn(column, before.right), column)"
+                x-on:click="refresh() && canMoveRight && choose(() => $wire.moveTableColumn(column, before.right), column)"
             >
                 {{ __('filament/panel.tables.column_menu.move_right') }}
             </x-filament::dropdown.list.item>
@@ -63,9 +86,9 @@
         </div>
         <div class="fi-dropdown-list">
             <x-filament::dropdown.list.item
-                icon="lucide-pencil"
+                icon="lucide-tag"
                 data-column-menu-item="editLabel"
-                x-on:click="choose(() => $wire.mountAction('editTableColumnLabel', { column }), null)"
+                x-on:click="editLabel()"
             >
                 {{ __('filament/panel.tables.column_menu.edit_label') }}
             </x-filament::dropdown.list.item>
@@ -73,7 +96,7 @@
                 icon="lucide-eye-off"
                 data-column-menu-item="hide"
                 x-show="hideable"
-                x-on:click="choose(() => $wire.hideTableColumn(column), neighbour)"
+                x-on:click="refresh() && choose(() => $wire.hideTableColumn(column), neighbour)"
             >
                 {{ __('filament/panel.tables.column_menu.hide') }}
             </x-filament::dropdown.list.item>

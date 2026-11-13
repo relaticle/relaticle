@@ -27,7 +27,7 @@ final readonly class PeopleUpsertController
     #[ResponseFromApiResource(PeopleResource::class, People::class, status: 201)]
     #[Response(['message' => 'More than one record holds this emails value. Merge the duplicates, then retry.', 'matches' => ['01jz8x0m6v1b4n7q2r5t8w9y3a', '01jz8x0m6v1b4n7q2r5t8w9y3b']], 409, 'More than one person holds the matched value, so nothing was written. `matches` lists up to 25 of their IDs.')]
     #[BodyParam('match', 'object', 'The unique field and value that identify an existing person.', required: true, example: ['field' => 'emails', 'value' => 'grace@navy.mil'])]
-    #[BodyParam('match.field', 'string', 'Code of a custom field marked unique, such as `emails`.', required: true, example: 'emails')]
+    #[BodyParam('match.field', 'string', 'Code of a custom attribute (custom field) marked unique, such as `emails`.', required: true, example: 'emails')]
     #[BodyParam('match.value', 'string', 'Value to look for. Matched case-insensitively, and inside multi-value fields.', required: true, example: 'grace@navy.mil')]
     #[BodyParam('name', 'string', required: true, example: 'Grace Hopper')]
     #[BodyParam('company_id', 'string', required: false, example: null)]

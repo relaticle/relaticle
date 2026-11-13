@@ -21,10 +21,7 @@ function railWidth(): string
 }
 
 it('resizes the details rail from its edge, keeps the width across record types, and resets on double click', function (): void {
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies/{$this->company->getKey()}")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies/{$this->company->getKey()}", 1440, 900)
         ->assertScript(railWidth(), 384)
         ->keys('.fi-record-rail-resize-handle', ['ArrowRight', 'ArrowRight'])
         ->assertScript(railWidth(), 416)
@@ -42,8 +39,7 @@ it('resizes the details rail from its edge, keeps the width across record types,
 });
 
 it('keeps the work pane at its minimum width and hides the handle once the rail stacks', function (): void {
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}")
         ->resize(1280, 900);
 
     $page->script('localStorage.setItem("sidebar-width", "360"); localStorage.setItem("record-rail-width", "560")');
@@ -57,8 +53,7 @@ it('keeps the work pane at its minimum width and hides the handle once the rail 
 });
 
 it('jumps to the rail bounds with Home and End and ignores a stored width outside them', function (): void {
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}")
         ->resize(1440, 900);
 
     $page->script('localStorage.setItem("record-rail-width", "9999")');

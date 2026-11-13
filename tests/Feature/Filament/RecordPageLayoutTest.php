@@ -57,6 +57,8 @@ beforeEach(function (): void {
     $this->workspace = $this->user->currentWorkspace;
     Filament::setTenant($this->workspace);
     TenantContextService::setTenantId($this->workspace->getKey());
+
+    openOpportunitiesOnTheList($this->user, $this->workspace);
 });
 
 function railAction(string $name): TestAction

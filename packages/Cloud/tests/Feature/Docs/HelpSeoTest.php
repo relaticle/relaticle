@@ -77,7 +77,7 @@ it('serves a section-level search index', function (): void {
 
     expect($headingRecord['anchor'])->toBe('if-you-dont-see-the-fields-you-expect')
         ->and($headingRecord['path'])->toBe('help/getting-started/create-your-first-company')
-        ->and($headingRecord['content'])->toContain('Custom Fields');
+        ->and($headingRecord['content'])->toContain('Custom attributes');
 });
 
 it('indexes the developer guides alongside help, with a link and a crumb per record', function (): void {

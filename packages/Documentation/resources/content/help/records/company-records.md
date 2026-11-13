@@ -2,7 +2,7 @@
 title: Company records
 description: What lives on a company, from owner and domains to the auto-fetched logo and the tabs for people, tasks, and notes.
 order: 1
-updated: "2026-11-08"
+updated: "2026-11-12"
 related: [help/records/people-records, help/getting-started/create-your-first-company, help/records/see-who-changed-a-record]
 ---
 
@@ -15,11 +15,11 @@ Only the name is required. Everything else can arrive later.
 - **Name**: required, and the only built-in column.
 - **Account Owner**: the teammate responsible; pick anyone in the workspace.
 - **ICP**: a toggle for "matches our ideal customer profile", handy as a
-  board and list filter.
+  list filter.
 - **Domains**: one or more web domains. Domains are unique across companies,
   which is what lets the CSV import match rows to existing companies.
 - **LinkedIn**: the company's profile URL.
-- Plus every custom field your workspace has added for companies.
+- Plus every custom attribute your workspace has added for companies.
 
 **The logo takes care of itself.** When a company has a domain and no logo
 yet, Relaticle fetches the site's icon in the background and keeps it.
@@ -52,13 +52,12 @@ and **Delete record**.
 ## The list
 
 **Companies** in the sidebar lists every company with sortable columns for
-owner, creator, and dates, plus a column for each custom field marked
+owner, creator, and dates, plus a column for each custom attribute marked
 visible in lists. Filter by **Creation Source** (the app, an import, the API,
 or Rela, whichever created the record) or show
 **Deleted records** to [restore one](/help/records/restore-deleted-records).
 Header buttons cover **New company** and **Import / Export**.
 
 You can also look at a company without leaving the list. Hover its row and
-click the preview button beside the name, or pick **Open preview** from the
-row menu. The company opens in a side panel with the same tabs. The arrows step to the
+click the preview button beside the name. The company opens in a side panel with the same tabs. The arrows step to the
 previous or next company, and the expand button opens the full page.

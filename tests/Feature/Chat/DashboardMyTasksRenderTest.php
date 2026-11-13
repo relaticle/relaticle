@@ -8,6 +8,7 @@ use App\Actions\Task\UpdateTask;
 use App\Features\OnboardSeed;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Resources\TaskResource;
+use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Models\CustomFieldValue;
 use App\Models\Task;
 use App\Models\User;
@@ -19,6 +20,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
+use Livewire\Livewire;
 
 mutates(CompleteTask::class, Dashboard::class, NotifyTaskAssignees::class, UpdateTask::class);
 
@@ -344,4 +346,28 @@ it('writes the Done option of the task workspace, not the ambient tenant, when t
 
     expect($written->tenant_id)->toBe($other->currentWorkspace->getKey())
         ->and($written->string_value)->toBe($doneOfTaskWorkspace);
+});
+
+it('links my tasks to the task list narrowed to the tasks assigned to the member', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $mine = Task::factory()->for($workspace)->create(['title' => 'Mine']);
+    $mine->assignees()->attach($user);
+    $theirs = Task::factory()->for($workspace)->create(['title' => 'Theirs']);
+
+    $this->actingAs($user);
+    Filament::setTenant($workspace);
+    Filament::setCurrentPanel(Filament::getPanel('app'));
+    Filament::bootCurrentPanel();
+
+    $link = livewire(Dashboard::class)->instance()->getTasksIndexUrl();
+    parse_str((string) parse_url($link, PHP_URL_QUERY), $query);
+
+    expect($query)->toHaveKey('filters')->not->toHaveKey('tableFilters');
+
+    Livewire::withQueryParams($query)->test(ManageTasks::class)
+        ->assertCanSeeTableRecords([$mine])
+        ->assertCanNotSeeTableRecords([$theirs]);
+
+    $this->get($link)->assertSuccessful();
 });

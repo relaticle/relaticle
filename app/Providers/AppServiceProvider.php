@@ -48,6 +48,7 @@ use App\Support\CustomFields\CustomFieldSchemaCache;
 use App\Support\CustomFields\RecordNameResolver;
 use App\Support\CustomFields\RestoreConflictMessage;
 use App\Support\CustomFields\WorkspaceCustomFields;
+use App\Support\CustomFieldSettingsSchema;
 use App\Support\Http\RequestAbility;
 use App\Support\Impersonation\ImpersonationSessionHandler;
 use App\Support\Impersonation\Impersonator;
@@ -62,13 +63,13 @@ use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Jobs\ExportCompletion;
-use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Auth\Notifications\NoticeOfEmailChangeRequest;
 use Filament\Auth\Notifications\ResetPassword;
 use Filament\Auth\Notifications\VerifyEmail;
 use Filament\Auth\Notifications\VerifyEmailChange;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Toggle;
 use Filament\Livewire\Notifications;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Section;
@@ -736,6 +737,14 @@ final class AppServiceProvider extends ServiceProvider
         ]);
 
         $this->configureCustomFieldSchemaInvalidation();
+        $this->hideRetiredCustomFieldSettings();
+    }
+
+    private function hideRetiredCustomFieldSettings(): void
+    {
+        $retired = array_map(fn (string $key): string => 'settings.'.$key, CustomFieldSettingsSchema::RETIRED);
+
+        Toggle::configureUsing(fn (Toggle $toggle): Toggle => in_array($toggle->getName(), $retired, true) ? $toggle->hidden() : $toggle);
     }
 
     /**
@@ -783,22 +792,6 @@ final class AppServiceProvider extends ServiceProvider
         ExportColumn::configureUsing(fn (ExportColumn $column): ExportColumn => $column->preventFormulaInjection());
 
         Section::configureUsing(fn (Section $section): Section => $section->compact());
-
-        RestoreAction::configureUsing(fn (RestoreAction $action): RestoreAction => $action->before(function (RestoreAction $action, Model $record): void {
-            $conflict = resolve(RestoreConflictMessage::class)->for($record, $action->getRecordTitle(...));
-
-            if ($conflict === null) {
-                return;
-            }
-
-            Notification::make()
-                ->danger()
-                ->title(__('filament/panel.restore_blocked.title', ['record' => $action->getRecordTitle($record)]))
-                ->body(__('filament/panel.restore_blocked.fix', ['conflict' => $conflict]))
-                ->send();
-
-            $action->cancel();
-        }));
 
         RestoreBulkAction::configureUsing(fn (RestoreBulkAction $action): RestoreBulkAction => $action->before(function (RestoreBulkAction $action, Collection $records): void {
             $conflicts = $records
@@ -876,14 +869,16 @@ final class AppServiceProvider extends ServiceProvider
             Js::make('payload-guard', resource_path('js/filament/payload-guard.js')),
             Js::make('linked-records-picker', resource_path('js/filament/linked-records-picker.js')),
             Js::make('resizable-columns', resource_path('js/filament/resizable-columns.js')),
+            Js::make('board-stage-order', resource_path('js/filament/board-stage-order.js')),
+            Js::make('filter-bar', resource_path('js/filament/filter-bar.js')),
             Js::make('sheet-backdrop', resource_path('js/filament/sheet-backdrop.js')),
         ]);
 
         FilamentAsset::registerScriptData([
             'payloadTooLarge' => __('filament/panel.payload_too_large'),
+            'boardStageOrderFailed' => __('filament/pages/boards.stage_order_failed'),
             'resizeColumnLabel' => __('filament/panel.tables.resize_column'),
             'resizeColumnHint' => __('filament/panel.tables.resize_column_hint'),
-            'columnOptionsFor' => __('filament/panel.tables.column_menu.options_for'),
             'defaultColumnWidth' => ResizableColumns::DEFAULT_COLUMN_WIDTH,
             'checklistItemLabel' => __('filament/rich-editor.checklist.item'),
             'checklistEmptyItemLabel' => __('filament/rich-editor.checklist.empty_item'),

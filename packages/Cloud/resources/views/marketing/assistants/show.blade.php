@@ -32,7 +32,7 @@
 
     $fit = [
         [__('A named list, not a lead funnel'), __('Import your target companies from a CSV, or have :name add them as you work. Each company keeps its people, opportunities, tasks and notes together.', ['name' => $name])],
-        [__('Fields that fit your deals'), __('Add custom fields for the dates, criteria and stages your deals turn on. :name reads and sets them by name, option labels included.', ['name' => $name])],
+        [__('Attributes that fit your deals'), __('Add custom attributes for the dates, criteria and stages your deals turn on. :name reads and sets them by name, option labels included.', ['name' => $name])],
         [__('One price for the whole team'), __('Unlimited users on one flat price. Nothing changes on the bill when a second person joins the deal.')],
     ];
 
@@ -50,7 +50,7 @@
     $faqs = [
         [
             __('Does Relaticle work with :name?', ['name' => $name]),
-            __('Yes. :name connects to the Relaticle MCP server with OAuth. It can search, create, update and delete companies, people, opportunities, tasks and notes in the workspace you pick, custom fields included.', ['name' => $name]),
+            __('Yes. :name connects to the Relaticle MCP server with OAuth. It can search, create, update and delete companies, people, opportunities, tasks and notes in the workspace you pick, custom attributes included.', ['name' => $name]),
         ],
         [
             __('Can :name change my records without asking me?', ['name' => $name]),

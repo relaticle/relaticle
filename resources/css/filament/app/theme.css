@@ -6,7 +6,9 @@
 @import '../../../../packages/EmailIntegration/resources/css/email-integration.css';
 
 @import './resizable-columns.css';
-@import './table-layouts.css';
+@import './saved-views.css';
+@import './filter-bar.css';
+@import './bulk-bar.css';
 
 @plugin "@tailwindcss/typography";
 
@@ -156,7 +158,7 @@ html.fi:has(body.fi-panel-app :is(.fi-app-layout, .fi-settings-layout)),
 }
 
 .fi-sidebar-notifications-btn {
-    @apply relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-gray-500 shadow-xs ring-1 ring-gray-950/10 transition hover:bg-gray-50 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:bg-white/5 dark:text-gray-400 dark:ring-white/10 dark:hover:bg-white/10 dark:hover:text-gray-200;
+    @apply relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-gray-500 shadow-xs ring-1 ring-gray-950/10 transition hover:bg-gray-50 hover:text-gray-700 [@media(hover:hover)]:aria-expanded:bg-gray-50 [@media(hover:hover)]:aria-expanded:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:bg-white/5 dark:text-gray-400 dark:ring-white/10 dark:hover:bg-white/10 dark:hover:text-gray-200 dark:[@media(hover:hover)]:aria-expanded:bg-white/10 dark:[@media(hover:hover)]:aria-expanded:text-gray-200;
 
     .fi-icon {
         @apply h-4 w-4;
@@ -374,6 +376,18 @@ html.fi-chat-docked .fi-app-main-wrapper {
         }
     }
 
+    @media (hover: hover) {
+        &:not(.fi-active):has(> .fi-dropdown [aria-expanded='true']) .fi-sidebar-item-btn {
+            .fi-sidebar-item-label {
+                @apply text-gray-950 dark:text-white;
+            }
+
+            .fi-sidebar-item-icon {
+                @apply text-gray-700 dark:text-gray-200;
+            }
+        }
+    }
+
     .fi-sidebar-item-grouped-border {
         width: calc(var(--spacing) * 4);
         height: calc(var(--spacing) * 4);
@@ -441,7 +455,7 @@ html.fi-chat-docked .fi-app-main-wrapper {
 }
 
 .fi-topbar-page-heading {
-    @apply flex min-w-0 max-w-[50vw] items-center gap-x-3 text-sm font-semibold text-gray-950 dark:text-white;
+    @apply flex min-w-0 max-w-[50vw] items-center gap-x-3 text-sm font-semibold text-gray-950 max-sm:max-w-none dark:text-white;
 
     .fi-topbar-page-icon {
         @apply -me-1.5 size-4 shrink-0 text-gray-500 dark:text-gray-400;
@@ -458,10 +472,6 @@ html.fi-chat-docked .fi-app-main-wrapper {
 
 .fi-header-page-heading-only {
     display: contents;
-}
-
-.fi-board-header .fi-header-heading {
-    display: none;
 }
 
 @media (width < 64rem) {
@@ -666,6 +676,36 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
 
     &:not(.fi-color) {
         @apply text-gray-700 shadow-none ring-gray-950/10 dark:text-gray-200 dark:ring-white/10;
+    }
+}
+
+@media (hover: hover) {
+    .fi-dropdown-trigger > .fi-btn[aria-expanded='true']:where(:not(.fi-disabled):not([disabled])) {
+        &:not(.fi-outlined):not(.fi-color) {
+            @apply bg-gray-50 dark:bg-white/10;
+        }
+
+        &:not(.fi-outlined).fi-color:not(label):not([aria-pressed]) {
+            @apply bg-(--hover-bg) text-(--hover-text) dark:bg-(--dark-hover-bg) dark:text-(--dark-hover-text);
+        }
+
+        &.fi-outlined:not(.fi-color) {
+            @apply bg-gray-400/10;
+        }
+
+        &.fi-outlined.fi-color {
+            @apply bg-color-500/10 dark:bg-color-600/10;
+        }
+    }
+
+    :where(.fi-dropdown-trigger) > .fi-icon-btn:where([aria-expanded='true']:not(.fi-disabled):not([disabled])) {
+        &:not(.fi-color) {
+            @apply text-gray-600 dark:text-gray-400;
+        }
+
+        &.fi-color {
+            @apply text-(--hover-text) dark:text-(--dark-hover-text);
+        }
     }
 }
 
@@ -911,7 +951,13 @@ a.fi-linked-records-chip {
 .fi-ta-row .fi-ac-icon-btn-group,
 .ff-card-actions .fi-ac-icon-btn-group,
 .ff-column-header .fi-icon-btn {
-    @apply text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200;
+    @apply text-gray-400 hover:text-gray-700 [@media(hover:hover)]:aria-expanded:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200 dark:[@media(hover:hover)]:aria-expanded:text-gray-200;
+}
+
+@media (hover: hover) {
+    .fi-ta-row.fi-clickable:has([aria-expanded='true']) {
+        @apply bg-gray-50 dark:bg-white/5;
+    }
 }
 
 .fi-ta-text:not(.fi-inline),
@@ -1061,9 +1107,25 @@ a.fi-linked-records-chip {
     @apply opacity-100;
 }
 
+@media (hover: hover) {
+    .fi-ta-row:has([aria-expanded='true']) .fi-record-preview-trigger,
+    .ff-card:has([aria-expanded='true']) .fi-board-card-preview-trigger {
+        @apply opacity-100;
+    }
+}
+
 /* The trigger sits beside the card menu, so its schema slot takes no room in the card body. */
 .ff-card-body :is(.fi-grid-col:has(> .fi-sc-component > .fi-board-card-preview-trigger), .fi-sc-component:has(> .fi-board-card-preview-trigger)) {
     @apply contents;
+}
+
+/* Flowforge lifts the card on :hover only. */
+@media (hover: hover) {
+    .ff-card:has([aria-expanded='true']) {
+        box-shadow:
+            0 0 0 1px var(--_card-ring),
+            var(--_card-shadow-hover);
+    }
 }
 
 .fi-ta-row.fi-record-previewing {
@@ -1702,6 +1764,11 @@ html.fi-record-stacked .fi-record-layout {
     .fi-record-breadcrumb-icon {
         @apply size-4 shrink-0;
     }
+
+    /* A phone keeps the icon as the way back so the page title gets the room. */
+    .fi-record-breadcrumb-label {
+        @apply max-sm:sr-only;
+    }
 }
 
 .fi-record-breadcrumb-separator {
@@ -1721,7 +1788,6 @@ html.fi-record-stacked .fi-record-layout {
 /* Toolbar fields are flat and 2rem tall, the height of a small button, so a row shares one height. */
 .fi-resource-list-records-page:not(.fi-page-has-sub-navigation),
 .fi-edge-to-edge-page,
-.fi-board-header,
 .fi-record-pane {
     .fi-ta-grouping-settings-fields .fi-input-wrp {
         @apply h-8 shadow-none ring-gray-950/10 dark:ring-white/10;
@@ -1801,6 +1867,16 @@ html.fi-record-stacked .fi-record-layout {
         .fi-ta-pagination {
             @apply px-4 lg:px-6;
         }
+
+        /* A short list ends mid-page and still needs a line under it. The -1px tucks that line under the
+           footer's own border when the rows fill the page, so the two never stack. */
+        .fi-ta-table tbody tr:last-child td {
+            @apply border-b border-gray-200/60 dark:border-white/5;
+        }
+
+        .fi-ta-content-ctn {
+            @apply -mb-px;
+        }
     }
 }
 
@@ -1836,81 +1912,35 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-board-header {
-        @apply flex items-center gap-x-4 border-b border-gray-200/60 bg-white px-4 py-3 lg:px-6 dark:border-white/10 dark:bg-gray-900;
+        @apply bg-white dark:bg-gray-900;
+    }
 
-        /* Filament floors table toolbar items at 36px, which would make this row taller than the list's. */
-        & .fi-ta-header-toolbar > * {
-            @apply min-h-0;
-        }
+    .fi-board-header-row {
+        @apply flex items-center gap-x-4 border-b border-gray-200/60 px-4 py-3 lg:px-6 dark:border-white/10;
+    }
 
-        /* Contents puts the clear filters button on the toolbar line, right after the filter trigger. */
-        & > .ff-header {
-            @apply contents;
-        }
+    .fi-board-header-actions {
+        @apply ms-auto flex shrink-0 items-center gap-x-2;
+    }
 
-        & > .ff-header > .ff-header-row {
-            @apply min-w-0 flex-1;
-        }
+    .fi-board-bar-row {
+        @apply flex items-center gap-x-3 border-b border-gray-200/60 pe-4 lg:pe-6 dark:border-white/10;
 
-        /* The package reserves this slot for a heading the topbar already shows. */
-        & > div:not(.fi-view-switcher) > .ff-header-row > :first-child:not(:has(.ff-header-subheading)) {
-            @apply hidden;
-        }
-
-        & > div:not(.fi-view-switcher) > .ff-header-row,
-        & > div:not(.fi-view-switcher) > .ff-header-row > :last-child {
-            @apply flex-nowrap;
-        }
-
-        & > div:not(.fi-view-switcher) > .ff-header-row > :last-child {
-            @apply min-w-0 flex-1 flex-row-reverse justify-between gap-x-3;
-        }
-
-        .fi-ta-search-field {
-            @apply me-auto min-w-0 shrink;
-        }
-
-        /* The row is reversed, so a lower order sits further right: the filter keeps the edge. */
-        .fi-ta-filters-dropdown,
-        .fi-ta-filters-modal {
-            @apply -order-1;
+        & > .fi-filter-bar {
+            @apply min-w-0 flex-1 border-b-0 pe-0;
         }
     }
 
-    /* Below sm the trigger is an icon button; give it the same box as the toolbar's gray buttons. */
-    .fi-board-header .fi-ta-filters-dropdown > .fi-dropdown-trigger .fi-icon-btn {
-        @apply m-0 bg-white text-gray-700 ring-1 ring-gray-950/10 hover:bg-gray-50 dark:bg-white/5 dark:text-gray-200 dark:ring-white/10 dark:hover:bg-white/10;
+    .fi-board-layout-toggles {
+        @apply flex shrink-0 items-center gap-x-2;
     }
 
-    /* The clear button is a sibling of the toolbar row, so the active trigger and it join into one pill. */
-    &:has(.fi-board-filter-clear) .fi-ta-filters-dropdown > .fi-dropdown-trigger :is(.fi-btn, .fi-icon-btn) {
-        @apply rounded-e-none bg-primary-50 text-primary-700 ring-primary-200 hover:bg-primary-100 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-400/30 dark:hover:bg-primary-500/20;
-
-        .fi-icon {
-            @apply text-primary-500 dark:text-primary-400;
-        }
+    .fi-board-layout-group {
+        @apply inline-flex h-7 items-center rounded-lg bg-gray-50 p-0.5 ring-1 ring-gray-950/10 dark:bg-gray-900 dark:ring-white/15;
     }
 
-    .fi-board-header .fi-ta-filters-dropdown > .fi-dropdown-trigger .fi-btn-badge-ctn {
-        @apply static translate-none bg-transparent;
-    }
-
-    .fi-board-header .fi-ta-filters-dropdown > .fi-dropdown-trigger .fi-icon-btn-badge-ctn {
-        @apply rounded-full;
-    }
-
-    .fi-board-header .fi-ta-filters-dropdown > .fi-dropdown-trigger :is(.fi-btn-badge-ctn, .fi-icon-btn-badge-ctn) {
-        .fi-badge {
-            @apply min-w-[1.125rem] justify-center rounded-full bg-primary-600 px-1.5 text-white ring-0 dark:bg-primary-500 dark:text-white;
-        }
-    }
-
-    .fi-board-filter-clear {
-        @apply -ms-[calc(1rem-1px)] flex h-8 items-center rounded-e-lg bg-primary-50 px-2 text-primary-500 ring-1 ring-primary-200 transition hover:bg-primary-100 hover:text-primary-700 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-400/30 dark:hover:bg-primary-500/20;
-    }
-
-    .fi-board-filter-clear-icon {
-        @apply size-4;
+    .fi-board-layout-option {
+        @apply inline-flex size-6 cursor-pointer items-center justify-center rounded-md text-gray-500 transition-colors hover:text-gray-700 aria-pressed:bg-white aria-pressed:text-gray-900 aria-pressed:shadow-sm dark:text-gray-400 dark:hover:text-gray-200 dark:aria-pressed:bg-gray-700 dark:aria-pressed:text-white;
     }
 
     .fi-page-main {
@@ -1954,11 +1984,11 @@ html.fi-record-stacked .fi-record-layout {
 /* The table toolbar sits at z-index 21 (resizable-columns.css), above Filament's default panel at 20,
    so a page-header or row menu would open behind it. 22 clears the toolbar and stays under the topbar (30). */
 .fi-dropdown-panel {
-    @apply z-[22] rounded-xl p-1;
+    @apply z-[22] rounded-menu p-1;
 }
 
 .fi-dropdown-list {
-    @apply flex flex-col gap-0.5 p-0;
+    @apply flex flex-col gap-0 p-0;
 }
 
 /* The rule between lists is Filament's panel `divide-y`; a border here would draw a second one. */
@@ -1970,12 +2000,70 @@ html.fi-record-stacked .fi-record-layout {
     @apply pt-1;
 }
 
+/* `x-show` hides a group with an inline style, which `:first-child` and `:last-child` still count. */
+:where(.fi-dropdown-panel > :not(:has(~ :not([style*='display: none'])))) {
+    @apply border-b-0;
+}
+
+.fi-dropdown-list:not(:has(~ :not([style*='display: none']))) {
+    @apply pb-0;
+}
+
+.fi-dropdown-list:not(:not([style*='display: none']) ~ *) {
+    @apply pt-0;
+}
+
 .fi-dropdown-list-item {
-    @apply flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm;
+    @apply flex min-h-menu-row w-full items-center gap-2 rounded-menu-item px-2 py-1.5 text-sm;
 }
 
 .fi-dropdown-list-item .fi-icon {
-    @apply size-5 shrink-0;
+    @apply size-menu-icon shrink-0;
+}
+
+/* A menu marks its current item with this check alone. A fill on a row means hover or keyboard focus. */
+.fi-menu-check {
+    @apply ms-auto size-menu-icon shrink-0 text-primary-600 dark:text-primary-400;
+}
+
+/* One keyboard focus ring for every control on the filter bar, the view controls and the column headers. */
+:is(
+    .fi-view-switcher .fi-dropdown-trigger > button,
+    .fi-view-settings-trigger,
+    .fi-filter-ghost,
+    button.fi-filter-seg,
+    .fi-filter-sort-select,
+    .fi-filter-sort-add,
+    .fi-ta-resizable-header > .fi-ta-resizable-label[data-column-menu-trigger],
+    .fi-ta-resizable-header .fi-ta-header-cell-sort-btn,
+    .fi-view-settings-row .fi-icon-btn,
+    .fi-ta-views-row-actions .fi-icon-btn,
+    .fi-bulk-bar-selection,
+    .fi-board-layout-option
+):focus-visible {
+    @apply outline-2 outline-solid outline-primary-500;
+}
+
+/* The search row every menu opens with: the filter pickers, the view switcher and View settings. */
+:is(.fi-filter-find, .fi-ta-views-search, .fi-view-settings-search) {
+    @apply flex h-10 shrink-0 items-center border-b border-gray-100 text-gray-400 dark:border-white/5 dark:text-gray-500;
+
+    & > svg {
+        @apply size-menu-icon shrink-0;
+    }
+
+    & input {
+        @apply min-w-0 flex-1 border-0 bg-transparent p-0 text-base text-gray-950 shadow-none ring-0 outline-none placeholder:text-gray-400 focus:ring-0 focus:outline-none sm:text-sm dark:text-white dark:placeholder:text-gray-500;
+
+        &::-webkit-search-cancel-button {
+            @apply hidden appearance-none;
+        }
+    }
+}
+
+/* The one line a menu shows when its search or list matches nothing. */
+.fi-menu-empty {
+    @apply px-2 py-1.5 text-sm text-gray-500 dark:text-gray-400;
 }
 
 .fi-dropdown-list-item-label {
@@ -2058,7 +2146,13 @@ html.fi-record-stacked .fi-record-layout {
 }
 
 .fi-tenant-menu-trigger {
-    @apply rounded-lg py-1;
+    @apply rounded-lg py-1 [@media(hover:hover)]:aria-expanded:bg-gray-100 dark:[@media(hover:hover)]:aria-expanded:bg-white/5;
+
+    @media (hover: hover) {
+        &[aria-expanded='true'] .fi-icon {
+            @apply text-gray-500 dark:text-gray-400;
+        }
+    }
 
     .fi-tenant-avatar {
         @apply rounded-md w-6 h-6;
@@ -2241,10 +2335,81 @@ html.fi-record-stacked .fi-record-layout {
     --ff-card-bg: var(--surface-block-bg);
     --ff-card-ring: var(--surface-block-border);
     --ff-gap: 0.75rem;
+    --ff-inset: 0.75rem;
+    --ff-card-gap: 0.5rem;
+    --ff-card-label: 6.5rem;
+    --ff-card-padding: 0.75rem;
 
     @media (width < 40rem) {
         --ff-column-width: min(300px, calc(100vw - 3.5rem));
     }
+}
+
+.ff-board :is(.ff-cards, .ff-cell) {
+    padding: var(--ff-inset);
+}
+
+.ff-board :is(.ff-cards, .ff-cell-cards) {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ff-card-gap);
+}
+
+.ff-board .ff-card {
+    margin-bottom: 0;
+}
+
+.ff-board .ff-column-header {
+    padding-inline: var(--ff-inset);
+}
+
+.ff-board .ff-add-row {
+    padding-inline: var(--ff-card-padding);
+}
+
+.ff-board .ff-cell {
+    min-height: 3.5rem;
+}
+
+.ff-board .ff-cell-cards {
+    min-height: 0;
+}
+
+.ff-board .ff-lane-header {
+    padding-top: var(--ff-inset);
+    padding-inline-start: calc(var(--ff-inset) + 0.25rem);
+}
+
+/* The schema's own 1.5rem gap is not a row gap; its entries take the card body's gap instead. */
+.ff-board .ff-card-body > .fi-sc {
+    display: contents;
+}
+
+.fi-page:has(.fi-board-header[data-board-column-width='narrow']) .ff-board {
+    @media (width >= 40rem) {
+        --ff-column-width: 15rem;
+        --ff-card-label: 4.5rem;
+    }
+}
+
+/* Flowforge wraps every card item, so a labelled row takes its own line through that wrapper. */
+.ff-board .ff-card-flex:not(.ff-card-flex--nowrap) > :has(> .fi-board-card-row) {
+    flex-basis: 100%;
+}
+
+.ff-board .fi-board-card-row {
+    display: grid;
+    grid-template-columns: var(--ff-card-label) minmax(0, 1fr);
+    column-gap: 0.5rem;
+    align-items: center;
+
+    & > * {
+        min-width: 0;
+    }
+}
+
+.fi-page:has(.fi-board-header[data-board-card-size='compact']) .ff-board {
+    --ff-card-padding: 0.5rem;
 }
 
 .dark .ff-board {
@@ -2659,7 +2824,7 @@ html.fi-record-stacked .fi-record-layout {
 /* Floating UI writes position inline, hence !important; min-width outranks every fi-width-* cap. Menus inside
    the sidebar or a dialog stay anchored to their trigger. A hand-placed menu opts in with data-sheet. */
 :is(.fi-dropdown-panel[x-ref='panel']:not(.fi-sidebar *, .fi-modal *), [data-sheet]) {
-    @apply max-sm:fixed! max-sm:inset-x-0! max-sm:top-auto! max-sm:bottom-0! max-sm:z-40 max-sm:max-h-[80dvh] max-sm:min-w-full max-sm:overflow-y-auto max-sm:overscroll-contain max-sm:rounded-b-none max-sm:rounded-t-2xl max-sm:border-x-0 max-sm:border-b-0 max-sm:px-2 max-sm:pt-3 max-sm:pb-[max(0.5rem,env(safe-area-inset-bottom))] max-sm:transition-[opacity,translate] max-sm:duration-200;
+    @apply max-sm:fixed! max-sm:inset-x-0! max-sm:top-auto! max-sm:bottom-0! max-sm:z-40 max-sm:max-h-[80dvh]! max-sm:min-w-full max-sm:overflow-y-auto max-sm:overscroll-contain max-sm:rounded-b-none max-sm:rounded-t-2xl max-sm:border-x-0 max-sm:border-b-0 max-sm:px-2 max-sm:pt-3 max-sm:pb-[max(0.5rem,env(safe-area-inset-bottom))] max-sm:transition-[opacity,translate] max-sm:duration-200;
     @apply max-sm:shadow-[0_0_0_100vmax_rgb(3_7_18/0.5)] max-sm:dark:ring-white/20;
 
     &.fi-opacity-0 {
@@ -2689,11 +2854,6 @@ html.fi-record-stacked .fi-record-layout {
    level 0, so both bars stop sticking and leave the stacking order, keeping their space so nothing shifts. */
 .fi-app-main-wrapper:has(> .fi-layout :is(.fi-dropdown-panel[x-ref='panel'][style*='display: block'], .fi-modal.fi-modal-open)) > :is(.fi-topbar-ctn, .fi-bottom-nav) {
     @apply max-sm:static max-sm:z-auto;
-}
-
-/* With rows ticked, the toolbar holding the bulk actions trigger follows the scroll, as the rows are far from it. */
-.fi-ta-ctn:not(.fi-modal *):has(.fi-ta-record-checkbox:checked) .fi-ta-header-ctn {
-    @apply max-sm:sticky max-sm:top-[calc(var(--topbar-height)+env(safe-area-inset-top))] max-sm:border-b max-sm:border-gray-200/60 max-sm:bg-white dark:max-sm:border-white/10 dark:max-sm:bg-gray-900;
 }
 
 /* A stacked row's actions cell must outrank the table header. */

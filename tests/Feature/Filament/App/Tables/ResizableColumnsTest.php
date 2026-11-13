@@ -58,7 +58,7 @@ function withColumnToggled(Testable $component, string $column, bool $isToggled)
 }
 
 it('marks every column resizable', function (string $page): void {
-    $component = livewire($page);
+    $component = openList($page);
 
     foreach (array_keys($component->instance()->getTable()->getColumns()) as $column) {
         expect(headerAttributes($component, $column)['x-data'])->toStartWith("resizableColumn('{$column}'");
@@ -66,17 +66,17 @@ it('marks every column resizable', function (string $page): void {
 })->with('list pages');
 
 it('gives a column an exact default width', function (string $page): void {
-    $attributes = headerAttributes($component = livewire($page), titleColumnOf($component));
+    $attributes = headerAttributes($component = openList($page), titleColumnOf($component));
 
     expect($attributes['data-resizable-width'])->toBe('180')
         ->and($attributes['style'])->toBe('min-width: 180px; width: 180px; max-width: 180px');
 })->with('list pages');
 
 it('keeps a width across visits', function (string $page): void {
-    livewire($page)->call('updateResizableColumnWidth', 'created_at', '300');
+    openList($page)->call('updateResizableColumnWidth', 'created_at', '300');
     session()->flush();
 
-    $component = livewire($page);
+    $component = openList($page);
 
     expect($component->instance()->tableColumnWidths)->toBe(['created_at' => 300])
         ->and(headerAttributes($component, 'created_at')['data-resizable-width'])->toBe('300');
@@ -155,7 +155,7 @@ it('keeps a pixel width the column sets itself', function (string $width): void 
 })->with(['240px', '240']);
 
 it('marks only the title column as the card heading, also after it is moved', function (string $page): void {
-    $component = livewire($page);
+    $component = openList($page);
     $title = titleColumnOf($component);
     $other = collect(array_keys($component->instance()->getTable()->getColumns()))->first(fn (string $name): bool => $name !== $title);
     $titleColumns = fn (): array => collect($component->instance()->getTable()->getColumns())

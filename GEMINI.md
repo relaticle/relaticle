@@ -283,6 +283,7 @@ One word per business concept. The model class owns the word, and code, tests an
 | A business the workspace tracks | company (`App\Models\Company`) | account as the record's name |
 | A human the workspace tracks | person, people (`App\Models\People`) | contact as the record's name |
 | A sale in progress | opportunity (`App\Models\Opportunity`) | deal as a label or as the record's name |
+| A property a record carries beyond the built-in ones | custom attribute | custom field in published copy |
 
 `team` survives in three places. Jetstream's own contract and event names keep it
 (`AddsTeamMembers`, `TeamMemberAdded`). `teammate` is a person, not the tenant. A company's
@@ -307,6 +308,14 @@ use of the retired `editor` role key. It fails a bare `Contact` or `Deal` label 
 source. It fails `contacts` and `a contact` in published copy: `lang/`, `resources/views/`,
 `resources/js/` and each package's `resources/`. The gate reads no other form of the two
 words, so a reviewer does.
+
+`custom field` survives in code, the REST API (`custom_fields`), MCP tool names, help page slugs
+and the relaticle/custom-fields package. Everywhere a person reads it, the word is `custom
+attribute`. A tool description and the `CrmAssistant` prompt keep the old word as a synonym on
+the same line, so a model maps the user's word to the right tool. `tests/Arch/ConventionsTest.php`
+fails `custom field` in published copy: `lang/`, `resources/views/`, `resources/js/` and each
+package's `resources/` and `lang/`. The five files that test lists by name are exempt, because
+they carry the old word as a synonym or name the package.
 
 `account` names the sign-in and a connected mailbox, never a company. The company's
 "Account Owner" field keeps the word, and so does its `account_owner_id` column. No test can
@@ -505,8 +514,8 @@ months two copies of the same field vocabulary drifted apart.
 ## Quality Checks
 
 The local loop is scoped to the change. GitHub CI (`.github/workflows/ci.yml`) is the
-only full run: it executes lint, rector, PHPStan, type coverage, eight test shards and
-five Browser shards on every push to a pull request. The test and Browser shards run on arm
+only full run: it executes lint, rector, PHPStan, type coverage, nine test shards and
+eight Browser shards on every push to a pull request. The test and Browser shards run on arm
 runners, and each of those jobs takes under 3 minutes when runners are free. Runs queue when
 the organization's 20 concurrent jobs are taken.
 
@@ -732,9 +741,11 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
   a scoped run cannot, and for recording a TIA graph. TIA replays a cached pass whenever
   a test's edges are unchanged, so it cannot see time-dependent failures (`travelTo`,
   expiring tokens), `.env` edits, or dynamic dispatch it did not trace while recording.
-- Every main run's `Record Shard Timings` job rebuilds `tests/.pest/shards.json` from the
-  JUnit reports of its test and Browser shards, and the next run's shards restore that
-  recording before Pest splits the suite. A class with no recording yet is dealt round-robin.
+- Every run's `Record Shard Timings` job rebuilds `tests/.pest/shards.json` from the JUnit
+  reports of its test and Browser shards, red shards included. A cancelled run records nothing.
+  The next run restores the newest recording from its own branch, then from main, before Pest
+  splits the suite. A class with no recording yet is dealt round-robin, so a new test class is
+  placed by time from the second run of its pull request.
   `tests/.pest/shards.json` is only the fallback for a run that finds no recording, so do not
   refresh it with a local `composer test:update-shards`: a laptop's timings skew the split.
   Refresh it with `php bin/shard-timings.php <dir>` over a main run's `junit-*` artifacts.
@@ -744,6 +755,42 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
   workflow never runs it. The nightly `rela-evals.yml` workflow does, one job per model, and
   uploads `storage/evals/*.json`. Committed baselines live in `tests/Evals/baselines/`, and its
   README lists each one.
+
+## Keeping the suite fast
+
+Every job of a pull request's `Tests` run finishes in under 3 minutes. A job takes its setup,
+about 35s for a test shard and 75s for a Browser shard, plus its slowest lane. CI splits the
+suite by class over nine test shards of four processes and eight Browser shards of three, and a
+class runs in one process. One 379s class once held its shard at 451s while the other shards
+finished in 150s.
+
+- A test class stays under 130s in CI and a Browser class under 90s. The `Record Shard Timings`
+  job fails a class past that: `php bin/shard-timings.php --over-budget`. Split the file. Move
+  tests to a second file in the same directory and keep every name. `FilterBarTest` became four
+  files that way.
+- Helpers that two test files share are plain functions in `tests/Helpers/functions/`, and a
+  dataset they share sits in a `Datasets` directory beside the tests. Pest loads both at boot. A
+  function declared in two test files is a fatal error in any run that loads both.
+- A Browser test signs in with `visitAs($user, $path, $width, $height)`, which acts as the user
+  and opens the page at that size. The login form cost 0.71s a test in CI, 510s over the suite.
+  `tests/Arch/ConventionsTest.php` fails a file under `tests/Browser` that calls
+  `loginViaBrowser()`, outside `Auth`, `Onboarding` and the files that test lists.
+- The browser plugin retries every page call in one-second attempts until its 30s timeout
+  (`AwaitableWebpage::__call`). A `script()` whose promise takes over a second never finishes
+  inside an attempt, so it runs about thirty times and returns 30 seconds late. Wait in PHP, then
+  read: `$page->wait(1.2)->script($read)`. Two tests in
+  `tests/Browser/CRM/FilterBarChipTypesTest.php` ran 64s and 34s before that change and 6s and 3s
+  after. No test reads for this, so the class budget is what catches it.
+- Every dataset case of a page test mounts the page again: about 0.6s in a test shard and 3s in
+  a Browser shard. Give a case its own row when its failure needs its own name. Otherwise loop
+  inside one test. No test reads for this.
+- A static that outlives the application is reset in `Tests\TestCase::createApplication()`.
+  Livewire's back-button cache flag is the example: a component that threw left it set, and the
+  next test's response carried no-cache headers. Run the `ProposalPlanCardTest` case that refuses
+  a client-set editing target before `tests/Feature/Media/PrivateDiskTest.php` in one process,
+  and the second fails without the reset.
+- To find where a slow run went, download its `junit-*` artifacts and sum `time` per class. The
+  shard that holds the largest class is the slow one. A job's step timings show its setup.
 
 === .ai/relaticle/ui rules ===
 
@@ -759,9 +806,10 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
   reported done. Tests passing is not sufficient for UI work.
 - agent-browser and the Browser suite both drive Chromium. CI runs WebKit only
   for test files tagged `pest()->group('webkit')`, in the `Browser Tests (WebKit)`
-  job of `.github/workflows/ci.yml`. A defect that only WebKit shows passes every
-  other gate. After the Chromium pass, run the browser tests for the surfaces you
-  changed in WebKit: `php artisan test --compact <files> --browser safari`.
+  job of `.github/workflows/ci.yml`. That job runs on pushes to main and before a
+  release deploy, never on a pull request, where a defect that only WebKit shows
+  passes every gate. After the Chromium pass, run the browser tests for the surfaces
+  you changed in WebKit: `php artisan test --compact <files> --browser safari`.
   Install the engine once per machine with `pnpm exec playwright install webkit`.
 - When WebKit breaks a surface Chromium passes, tag the test file that covers it
   with `pest()->group('webkit')`, so CI keeps checking it in WebKit.
@@ -805,6 +853,23 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
 - With Cloud present, the app and sysadmin panels load `packages/Cloud/resources/css/filament/{app,admin}/theme.css` in place
   of the core themes. Each imports its core theme and adds Cloud's `@source` directories. A class added to a Cloud billing view
   or sysadmin page reaches CSS only through them, and `packages/Cloud/tests/Feature/AppPanelThemeTest.php` pins the swap.
+
+## Menus
+
+- Every menu in the panels draws from five tokens in `resources/css/theme.css`: `menu-row` (32px rows),
+  `menu-icon` (16px icons), `menu-max` (the 28rem height cap), `menu` (10px panel corners) and `menu-item`
+  (6px row corners). The stock Filament
+  dropdown takes them in `resources/css/filament/app/theme.css`, and the filter bar, Views and View settings use them
+  as `h-menu-row`, `size-menu-icon`, `rounded-menu` and `rounded-menu-item`.
+- A custom menu uses those utilities and never a raw height, icon size or radius. A phone sheet keeps its taller rows.
+  `tests/Browser/Panel/MenusTest.php` opens Views, View settings, the filter picker, Import / Export and a column menu,
+  and fails when a row, an icon or a corner leaves the spec. A new menu joins its dataset.
+- A menu stops at `menu-max` (28rem) or 16px above the window edge, whichever comes first, and only its list scrolls.
+  A Filament dropdown gets the room from its `size` prop. The filter bar measures it on open into `--menu-room`. The same
+  test fails a menu that runs past the window at 320px tall.
+- A menu marks its current item with `fi-menu-check`, a 16px check at the row's end, and never with a fill or a text
+  color. A fill on a row means hover or keyboard focus. The same test fails a current row that is filled, recolored or
+  missing its check in Views, the sort chooser and a column menu.
 
 ## Scripts
 

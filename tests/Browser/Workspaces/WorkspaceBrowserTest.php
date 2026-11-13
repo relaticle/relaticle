@@ -12,9 +12,7 @@ it('can create a new workspace through the browser', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate('/app/new')
+    visitAs($user, '/app/new')
         ->assertSee('Create your workspace')
         ->assertDontSee('Your name')
         ->type('[id="form.name"]', 'Second Workspace')
@@ -45,10 +43,7 @@ it('fits every role column of the compare roles table on a phone', function (int
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize($width, 700)
-        ->navigate("/app/{$workspace->slug}/workspace/members")
+    visitAs($user, "/app/{$workspace->slug}/workspace/members", $width, 700)
         ->press('Invite workspace members')
         ->press('Compare roles')
         ->assertPresent('[data-role-matrix]')

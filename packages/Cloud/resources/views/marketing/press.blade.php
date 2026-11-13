@@ -9,7 +9,7 @@
     $screenshots = [
         ['id' => 'pipeline', 'title' => __('Sales pipeline'), 'alt' => __('Relaticle opportunities board grouped by pipeline stage')],
         ['id' => 'companies', 'title' => __('Companies'), 'alt' => __('Relaticle companies list with account owners, ICP status, and website domains')],
-        ['id' => 'custom-fields', 'title' => __('Custom fields'), 'alt' => __('Relaticle custom field settings for opportunities')],
+        ['id' => 'custom-fields', 'title' => __('Custom attributes'), 'alt' => __('Relaticle custom attribute settings for opportunities')],
     ];
     $socialClass = 'inline-flex min-h-11 items-center gap-2 rounded-sm text-primary-700 focus-visible:outline-2 focus-visible:outline-primary dark:text-primary-300';
     $downloadClass = 'inline-flex min-h-11 items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 transition hover:border-primary-300 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-primary-400 dark:hover:text-primary-300';

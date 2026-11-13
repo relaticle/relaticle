@@ -21,6 +21,8 @@ beforeEach(function () {
     $this->actingAs($this->user);
     $this->workspace = $this->user->currentWorkspace;
     Filament::setTenant($this->workspace);
+
+    openOpportunitiesOnTheList($this->user, $this->workspace);
 });
 
 it('can render the index page', function (): void {
@@ -88,15 +90,27 @@ it('can sort `:dataset` column', function (string $column): void {
         ->assertCanSeeTableRecords($records->sortByDesc($sortingKey), inOrder: true);
 })->with(['creator.name', 'deleted_at', 'created_at', 'updated_at']);
 
-it('can search `:dataset` column', function (string $column): void {
+it('narrows the list with a contains rule on its name', function (): void {
     $records = Opportunity::factory(3)->recycle([$this->user, $this->workspace])->create();
-    $search = data_get($records->first(), $column);
+    $value = $records->first()->name;
 
     livewire(ListOpportunities::class)
-        ->searchTable($search instanceof BackedEnum ? $search->value : $search)
-        ->assertCanSeeTableRecords($records->filter(fn (Model $record) => data_get($record, $column) === $search))
-        ->assertCanNotSeeTableRecords($records->filter(fn (Model $record) => data_get($record, $column) !== $search));
-})->with(['name', 'creator.name']);
+        ->call('setFilterRules', [['field' => 'name', 'condition' => 'contains', 'value' => $value]])
+        ->assertCanSeeTableRecords($records->filter(fn (Model $record): bool => $record->name === $value))
+        ->assertCanNotSeeTableRecords($records->filter(fn (Model $record): bool => $record->name !== $value));
+});
+
+it('narrows the list by creator to the records one member holds', function (): void {
+    $colleague = User::factory()->create(['current_workspace_id' => $this->workspace->getKey()]);
+    $this->workspace->users()->attach($colleague, ['role' => 'member']);
+    $mine = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['creator_id' => $this->user->getKey()]);
+    $theirs = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['creator_id' => $colleague->getKey()]);
+
+    livewire(ListOpportunities::class)
+        ->call('setFilterRules', [['field' => 'creator', 'condition' => 'is_any_of', 'value' => [$colleague->getKey()]]])
+        ->assertCanSeeTableRecords([$theirs])
+        ->assertCanNotSeeTableRecords([$mine]);
+});
 
 it('cannot display trashed records by default', function (): void {
     $records = Opportunity::factory()->count(4)->recycle([$this->user, $this->workspace])->create();
@@ -148,8 +162,9 @@ it('can create an opportunity', function (): void {
 it('labels the contact select point of contact in the `:dataset` modal', function (string $action): void {
     $record = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
 
-    $page = livewire(ListOpportunities::class)
-        ->mountAction($action === 'edit' ? TestAction::make('edit')->table($record) : $action)
+    $page = ($action === 'edit'
+        ? livewire(ViewOpportunity::class, ['record' => $record->getKey()])->mountAction(TestAction::make('edit')->schemaComponent('recordActions', schema: 'infolist'))
+        : livewire(ListOpportunities::class)->mountAction($action))
         ->instance();
 
     expect($page->getSchema($page->getMountedActionSchemaName())->toHtml())->toContain('Point of Contact');
@@ -158,8 +173,8 @@ it('labels the contact select point of contact in the `:dataset` modal', functio
 it('can edit an opportunity', function (): void {
     $record = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
 
-    livewire(ListOpportunities::class)
-        ->callAction(TestAction::make('edit')->table($record), data: [
+    livewire(ViewOpportunity::class, ['record' => $record->getKey()])
+        ->callAction(TestAction::make('edit')->schemaComponent('recordActions', schema: 'infolist'), data: [
             'name' => 'Updated Opportunity',
         ])
         ->assertHasNoActionErrors();
@@ -178,8 +193,8 @@ it('saves an opportunity whose amount has more decimals than the amount field no
         ->sole();
     $amount->update(['settings' => [...$amount->settings->toArray(), 'additional' => [...$amount->settings->additional, 'decimal_places' => 0]]]);
 
-    livewire(ListOpportunities::class)
-        ->callAction(TestAction::make('edit')->table($record), data: [
+    livewire(ViewOpportunity::class, ['record' => $record->getKey()])
+        ->callAction(TestAction::make('edit')->schemaComponent('recordActions', schema: 'infolist'), data: [
             'name' => 'Renamed Opportunity',
         ])
         ->assertHasNoActionErrors();
@@ -190,13 +205,12 @@ it('saves an opportunity whose amount has more decimals than the amount field no
         ->and($record->getCustomFieldValue($amount))->toBe(999.75);
 });
 
-it('can delete an opportunity', function (): void {
+it('offers delete for a opportunity in the bulk bar, not on its row', function (): void {
     $record = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
 
     livewire(ListOpportunities::class)
-        ->callAction(TestAction::make('delete')->table($record));
-
-    $this->assertSoftDeleted($record);
+        ->assertActionDoesNotExist(TestAction::make('delete')->table($record))
+        ->assertActionExists(TestAction::make('delete')->table()->bulk());
 });
 
 it('validates name is required on create', function (): void {
@@ -210,7 +224,7 @@ it('validates name is required on create', function (): void {
 it('has `:dataset` filter', function (string $filter): void {
     livewire(ListOpportunities::class)
         ->assertTableFilterExists($filter);
-})->with(['creation_source', 'trashed']);
+})->with(['conditions', 'trashed']);
 
 it('sets creator_id and workspace_id via observer when creating an opportunity', function (): void {
     livewire(ListOpportunities::class)

@@ -14,6 +14,7 @@
     $afterActions = \Filament\Support\Facades\FilamentView::renderHook(\Filament\View\PanelsRenderHook::PAGE_HEADER_ACTIONS_AFTER, scopes: $this->getRenderHookScopes());
     $headingStart = $isAppPanel && method_exists($this, 'getHeadingStart') ? $this->getHeadingStart() : null;
     $viewSwitcher = $isAppPanel && method_exists($this, 'getViewSwitcher') ? $this->getViewSwitcher() : null;
+    $viewSettings = $isAppPanel && method_exists($this, 'getViewSettings') ? $this->getViewSettings() : null;
     $hasInlineHeaderContent = $breadcrumbs
         || filled($beforeHeading)
         || (! $isAppPanel && filled($heading))
@@ -52,7 +53,12 @@
 
             {{ $afterHeading }}
 
-            {{ $viewSwitcher }}
+            @if (filled($viewSwitcher))
+                <div class="fi-view-controls">
+                    {{ $viewSwitcher }}
+                    {{ $viewSettings }}
+                </div>
+            @endif
 
             @if (filled($subheading))
                 <p @class(['fi-header-subheading', 'mt-0!' => $isAppPanel])>
