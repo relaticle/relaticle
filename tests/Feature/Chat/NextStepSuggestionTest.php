@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Enums\CreationSource;
+use App\Models\Company;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -334,6 +336,7 @@ it('never calls the model when suggestions are switched off', function (): void 
 
 it('dispatches the suggester at the end of a turn with what the turn produced', function (): void {
     Queue::fake();
+    Company::factory()->create(['workspace_id' => $this->workspace->getKey(), 'name' => 'Acme Corp', 'creation_source' => CreationSource::WEB]);
     CrmAssistant::fake(['Acme Corp has two open deals worth $30,000.']);
 
     (new ProcessChatMessage(

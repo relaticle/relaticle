@@ -46,6 +46,17 @@ final readonly class SetupOptions
         ]));
     }
 
+    /**
+     * @return list<SetupOption>
+     */
+    public function besideTheAsk(User $user, Workspace $workspace): array
+    {
+        return array_values(array_filter([
+            $this->link($user, $workspace, 'upload_file', 'import_people', 'lucide-upload'),
+            $this->prompt('connect_assistant', 'lucide-plug'),
+        ]));
+    }
+
     private function companiesArrivedToday(User $user, Workspace $workspace): bool
     {
         return array_any(

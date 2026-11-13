@@ -656,7 +656,7 @@ PROMPT;
             }
         }
 
-        if ($this->awaitsFirstRecord($this->workspace)) {
+        if ($this->awaitsFirstRecord()) {
             $lines[] = 'records: none';
         }
 
@@ -679,15 +679,16 @@ PROMPT;
         return "\n\n<onboarding>\n".implode("\n", $lines)."\n</onboarding>";
     }
 
-    private function awaitsFirstRecord(Workspace $workspace): bool
+    public function awaitsFirstRecord(): bool
     {
         $mayCreate = $this->currentUser === null
             || in_array(WorkspaceCapability::RecordsCreate->value, $this->currentUser['capabilities'], true);
 
         return $mayCreate
+            && $this->workspace instanceof Workspace
             && ($this->setupMode || $this->opensConversation)
-            && $workspace->isInSetupWindow()
-            && ! resolve(WorkspaceActivationFacts::class)->hasNonSampleRecord($workspace);
+            && $this->workspace->isInSetupWindow()
+            && ! resolve(WorkspaceActivationFacts::class)->hasNonSampleRecord($this->workspace);
     }
 
     /** @return list<string> */

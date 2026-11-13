@@ -353,7 +353,7 @@ final class ProcessChatMessage implements ShouldQueue
                 return;
             }
 
-            $response->then(function (StreamedAgentResponse $streamedResponse) use ($creditService, $startedAt): void {
+            $response->then(function (StreamedAgentResponse $streamedResponse) use ($agent, $creditService, $startedAt): void {
                 $refundedBlankTurn = $this->settleBlankTurn($streamedResponse, $creditService);
 
                 // input_tokens stays the UNCACHED remainder, with the cache legs next
@@ -379,7 +379,7 @@ final class ProcessChatMessage implements ShouldQueue
                 $this->persistUserMeta($streamedResponse->userMessageId);
                 $this->materializeAssistantDocument($streamedResponse, $startedAt);
                 $this->maybeTitleFromTurn($streamedResponse);
-                $this->suggestNextSteps($streamedResponse);
+                $this->suggestNextSteps($streamedResponse, $agent->awaitsFirstRecord());
 
                 // Both rows are persisted by now (RememberConversation's own
                 // then() ran before this one), so a reload can rebuild the turn
@@ -1099,7 +1099,7 @@ final class ProcessChatMessage implements ShouldQueue
      * its reply. That is the moment suggestions are worth the most: the record
      * was just written and what follows it is genuinely open.
      */
-    private function suggestNextSteps(StreamedAgentResponse $streamedResponse): void
+    private function suggestNextSteps(StreamedAgentResponse $streamedResponse, bool $askedForFirstRecord): void
     {
         $reply = AssistantText::finalReply($streamedResponse->text, $this->textAfterLastToolCall, $this->sawToolCall);
 
@@ -1119,6 +1119,12 @@ final class ProcessChatMessage implements ShouldQueue
 
         if ($this->offersSetupOptions()) {
             $this->offerSetupOptions($messageId);
+
+            return;
+        }
+
+        if ($askedForFirstRecord && $this->origin->isTyped()) {
+            $this->offerWaysInBesideTheAsk($messageId);
 
             return;
         }
@@ -1146,8 +1152,27 @@ final class ProcessChatMessage implements ShouldQueue
 
     private function offerSetupOptions(string $messageId): void
     {
-        $options = resolve(SetupOptions::class)->for($this->user, $this->workspace);
+        $this->recordSetupOptions($messageId, resolve(SetupOptions::class)->for($this->user, $this->workspace));
+    }
 
+    // The ask needs a typed name, so a model-written chip beside it only costs a turn.
+    private function offerWaysInBesideTheAsk(string $messageId): void
+    {
+        if (! config('chat.next_steps.enabled', true) || ! $this->isSetupConversation()) {
+            return;
+        }
+
+        $this->recordSetupOptions($messageId, array_values(array_filter(
+            resolve(SetupOptions::class)->besideTheAsk($this->user, $this->workspace),
+            fn (SetupOption $option): bool => $option->id !== $this->nextStep,
+        )));
+    }
+
+    /**
+     * @param  list<SetupOption>  $options
+     */
+    private function recordSetupOptions(string $messageId, array $options): void
+    {
         if ($options === []) {
             return;
         }

@@ -285,8 +285,9 @@ it('writes the company pick on the data arrived turn', function (CreationSource 
     Queue::assertNotPushed(SuggestNextSteps::class);
 })->with([CreationSource::IMPORT, CreationSource::MAILBOX]);
 
-it('keeps suggested next steps for a typed turn in the setup chat', function (?string $nextStep): void {
+it('keeps suggested next steps for a typed turn in the setup chat once the workspace holds a record', function (?string $nextStep): void {
     suggestNextStepsFake();
+    Company::factory()->create(['workspace_id' => $this->workspace->getKey(), 'creation_source' => CreationSource::CHAT]);
     CrmAssistant::fake(['Tell me who you work with.']);
 
     runSetupTurn($this->user, $this->workspace->fresh(), nextStep: $nextStep);
@@ -298,6 +299,53 @@ it('keeps suggested next steps for a typed turn in the setup chat', function (?s
     'sent by a setup button' => ['add_client'],
 ]);
 
+it('writes only the ways in that need no typed name under a reply that asks for a company', function (?string $nextStep, array $ids): void {
+    suggestNextStepsFake();
+    CrmAssistant::fake(['Which company do you work with right now?']);
+
+    runSetupTurn($this->user, $this->workspace->fresh(), nextStep: $nextStep);
+
+    expect(array_column(lastAssistantNextSteps($this->workspace->setupConversation->id), 'id'))->toBe($ids);
+    Queue::assertNotPushed(SuggestNextSteps::class);
+})->with([
+    'typed by hand' => [null, ['upload_file', 'connect_assistant']],
+    'sent by add a client' => ['add_client', ['upload_file', 'connect_assistant']],
+    'sent by the connect option' => ['connect_assistant', ['upload_file']],
+]);
+
+it('writes no chips under the ask on the turn that opens an ordinary conversation, and suggests again on the next', function (): void {
+    suggestNextStepsFake();
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $this->user->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
+        'title' => 'ordinary',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    CrmAssistant::fake(['Which company do you work with right now?', 'Sure.']);
+
+    $turn = fn () => (new ProcessChatMessage(
+        user: $this->user,
+        workspace: $this->workspace->fresh(),
+        message: 'hello',
+        conversationId: $conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'id' => 'claude-sonnet-5', 'source' => 'auto'],
+        turnId: (string) Str::ulid(),
+    ))->handle(resolve(CreditService::class));
+
+    $turn();
+
+    expect(lastAssistantNextSteps($conversationId))->toBeNull();
+    Queue::assertNotPushed(SuggestNextSteps::class);
+
+    $turn();
+
+    Queue::assertPushed(SuggestNextSteps::class, 1);
+});
+
 it('writes no setup buttons when next steps are switched off', function (): void {
     suggestNextStepsFake();
     config()->set('chat.next_steps.enabled', false);
@@ -308,8 +356,9 @@ it('writes no setup buttons when next steps are switched off', function (): void
     expect(lastAssistantNextSteps($this->workspace->setupConversation->id))->toBeNull();
 });
 
-it('keeps suggesting next steps in an ordinary conversation', function (): void {
+it('keeps suggesting next steps in an ordinary conversation of a workspace that holds a record', function (): void {
     Queue::fake();
+    Company::factory()->create(['workspace_id' => $this->workspace->getKey(), 'creation_source' => CreationSource::CHAT]);
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
