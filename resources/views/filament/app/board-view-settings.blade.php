@@ -428,7 +428,7 @@
                     data-view-settings-back
                     x-on:click="closePanel()"
                 />
-                <p class="fi-board-panel-title" id="board-column-field-heading">{{ __('filament/pages/boards.view_settings.grouped_by_heading') }}</p>
+                <p class="fi-board-panel-title" id="board-column-field-heading">{{ __('filament/pages/boards.view_settings.grouped_by') }}</p>
             </div>
 
             <div class="fi-view-settings-scroll">

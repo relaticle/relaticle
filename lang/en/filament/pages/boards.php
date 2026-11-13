@@ -15,7 +15,6 @@ return [
         'panel' => 'Board view settings',
         'stage_actions' => 'Actions for :stage',
         'grouped_by' => 'Grouped by',
-        'grouped_by_heading' => 'Group columns by',
         'lanes' => 'Lanes',
         'no_lanes' => 'No lanes',
         'no_lanes_short' => 'None',
