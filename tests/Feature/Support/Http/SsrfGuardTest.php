@@ -69,6 +69,15 @@ test('rejects shared, translated and reserved ranges filter_var calls public', f
     'ipv4-compatible metadata' => ['[::a9fe:a9fe]'],
     'deprecated site-local' => ['[fec0::1]'],
     'orchidv2' => ['[2001:20::1]'],
+    'siit translated loopback' => ['[::ffff:0:7f00:1]'],
+    'siit translated rfc1918' => ['[::ffff:0:a00:1]'],
+    'siit translated metadata' => ['[::ffff:0:a9fe:a9fe]'],
+    'ipv6 multicast' => ['[ff02::1]'],
+    'discard-only prefix' => ['[100::1]'],
+    'ipv6 benchmarking' => ['[2001:2::1]'],
+    'orchidv1' => ['[2001:10::1]'],
+    'segment routing sids' => ['[5f00::1]'],
+    'documentation 3fff' => ['[3fff::1]'],
 ]);
 
 test('rejects hostnames that resolve to private addresses', function (): void {

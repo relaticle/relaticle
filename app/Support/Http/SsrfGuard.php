@@ -38,7 +38,14 @@ final readonly class SsrfGuard
         '2001:20::/28',
         '2001:db8::/32',
         '::/96',
+        '::ffff:0:0:0/96',
+        '100::/64',
+        '2001:2::/48',
+        '2001:10::/28',
+        '3fff::/20',
+        '5f00::/16',
         'fec0::/10',
+        'ff00::/8',
     ];
 
     public static function isAllowed(string $url): bool
