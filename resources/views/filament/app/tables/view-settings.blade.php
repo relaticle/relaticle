@@ -10,7 +10,7 @@
     </x-slot>
 
     <div class="fi-view-settings-panel" x-data="viewSettingsColumns" x-on:resize.window="closeMenu(false)" x-on:scroll.window.capture="closeMenu(false)" x-on:livewire:navigating.window="closeMenu(false)" data-view-settings role="group" x-on:dropdown-escape="adding && ($event.preventDefault(), closeAdd())" aria-label="{{ __('filament/panel.tables.views.view_settings_panel') }}">
-        <div class="fi-view-settings-view" x-show="! adding">
+        <div class="fi-view-settings-view" x-show="! adding" x-on:keydown.arrow-down.prevent="stepList(1)" x-on:keydown.arrow-up.prevent="stepList(-1)">
             <div class="fi-view-settings-scroll">
                 <div
                     x-sortable

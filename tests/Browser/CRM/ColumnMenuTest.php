@@ -535,6 +535,27 @@ it('reaches every row menu from the keyboard and returns focus to the trigger on
         ->assertNoJavaScriptErrors();
 });
 
+it('focuses the first row when view settings opens from the keyboard and steps with the arrow keys', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
+
+    $page->keys('.fi-view-settings-trigger', 'Enter')->assertVisible('.fi-view-settings-panel');
+    $first = 'document.activeElement === document.querySelector(".fi-view-settings-row [data-view-settings-menu]")';
+    waitUntil($page, $first);
+
+    $page->keys(':focus', 'ArrowDown');
+    waitUntil($page, 'document.activeElement.matches("[data-view-settings-menu]") && document.activeElement !== document.querySelector(".fi-view-settings-row [data-view-settings-menu]")');
+
+    $page->keys(':focus', 'ArrowUp');
+    waitUntil($page, $first);
+
+    $page->keys(':focus', 'ArrowUp');
+    waitUntil($page, 'document.activeElement.matches("[data-view-settings-add]")');
+
+    $page->keys(':focus', 'Escape');
+    waitUntil($page, 'document.activeElement === document.querySelector(".fi-view-settings-trigger")')
+        ->assertNoJavaScriptErrors();
+});
+
 it('reaches add attribute from the keyboard', function (): void {
     $page = sortedCompaniesTable($this);
     $page->keys('.fi-view-settings-trigger', 'Tab');

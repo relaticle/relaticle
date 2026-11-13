@@ -25,6 +25,12 @@
         if (dragGuideline) dragGuideline.style.display = 'none'
     }
 
+    function stepFocus(items, delta) {
+        const index = items.indexOf(document.activeElement)
+
+        items[(index + delta + items.length) % items.length]?.focus()
+    }
+
     // `.fi-ta-content-ctn` scrolls horizontally, which defeats `position: sticky` on the header,
     // and a scroll listener lags the compositor. A scroll-driven animation pins it instead.
     const stickyHeadersSupported =
@@ -751,9 +757,7 @@
             },
 
             step(delta) {
-                const items = this.items()
-                const index = items.indexOf(document.activeElement)
-                items[(index + delta + items.length) % items.length]?.focus()
+                stepFocus(this.items(), delta)
             },
 
             close(returnFocus) {
@@ -811,7 +815,13 @@
                     panel = this.$el
 
                     // The dropdown reopens on the list, whatever the member left open.
-                    panel.closest('.fi-dropdown-panel')?.addEventListener('dropdown-opened', () => this.resetAdd())
+                    panel.closest('.fi-dropdown-panel')?.addEventListener('dropdown-opened', (event) => {
+                        this.resetAdd()
+
+                        if (event.detail.shouldAutofocus) {
+                            this.$nextTick(() => this.listControls()[0]?.focus())
+                        }
+                    })
 
                     // A pinned column keeps its place, so nothing is dropped across one.
                     this.$nextTick(() => panel.querySelector('.fi-view-settings-list')?.sortable?.option('onMove', (event) => !event.related.hasAttribute('data-column-pinned')))
@@ -863,10 +873,15 @@
                 },
 
                 step(delta) {
-                    const items = this.menuItems()
-                    const index = items.indexOf(document.activeElement)
+                    stepFocus(this.menuItems(), delta)
+                },
 
-                    items[(index + delta + items.length) % items.length]?.focus()
+                listControls() {
+                    return [...panel.querySelectorAll('[data-view-settings-menu], [data-view-settings-add]')].filter((control) => control.offsetParent !== null)
+                },
+
+                stepList(delta) {
+                    stepFocus(this.listControls(), delta)
                 },
 
                 focusLeft(event) {
