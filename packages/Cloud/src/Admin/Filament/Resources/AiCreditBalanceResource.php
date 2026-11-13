@@ -31,6 +31,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Support\Facades\Gate;
 use Override;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditService;
@@ -286,7 +287,7 @@ final class AiCreditBalanceResource extends Resource
             ->authorize('update')
             ->requiresConfirmation()
             ->modalHeading(__('cloud::admin.credit_balances.reset_heading'))
-            ->modalDescription(fn (AiCreditBalance $record): string => 'Wipes credits_used and grants the allowance for the chosen plan. Starts a fresh monthly period.'
+            ->modalDescription(fn (AiCreditBalance $record): string => "Wipes credits_used and grants the plan's full allowance. Starts a fresh monthly period."
                 .(($record->workspace->subscription()?->valid() ?? false)
                     ? ' WARNING: this workspace has an active Stripe subscription. Webhook sync re-asserts the subscribed plan over a Free, Pro or Scale grant. To bill Enterprise, use Start managed plan on the workspace page instead.'
                     : '')
@@ -294,18 +295,15 @@ final class AiCreditBalanceResource extends Resource
                     ? ' WARNING: this workspace has a paid Enterprise subscription. Webhook sync restores that plan over a Free grant. Cancel the subscription in Stripe first.'
                     : ''))
             ->schema([
-                Select::make('plan')
-                    ->options(self::planOptions())
-                    ->required(),
+                self::planSelect()
+                    ->default(fn (AiCreditBalance $record): string => $record->workspace->plan->value),
             ])
             ->action(function (array $data, AiCreditBalance $record, ResetCreditPeriod $reset): void {
-                $plan = Plan::from((string) $data['plan']);
-
-                $reset->execute(self::administrator(), $plan, [$record->workspace]);
+                $reset->execute(self::administrator(), self::chosenPlan($data), [$record->workspace]);
 
                 Notification::make()
                     ->title(__('cloud::admin.credit_balances.period_reset'))
-                    ->body("Granted {$plan->credits()} credits.")
+                    ->body("Granted {$record->workspace->refresh()->plan->credits()} credits.")
                     ->success()
                     ->send();
             });
@@ -321,23 +319,39 @@ final class AiCreditBalanceResource extends Resource
             ->requiresConfirmation()
             ->modalHeading(__('cloud::admin.credit_balances.reset_selected_heading'))
             ->schema([
-                Select::make('plan')
-                    ->options(self::planOptions())
-                    ->required(),
+                self::planSelect(),
             ])
             ->action(function (array $data, EloquentCollection $records, ResetCreditPeriod $reset): void {
-                $plan = Plan::from((string) $data['plan']);
+                $plan = self::chosenPlan($data);
                 $count = $records->count();
 
                 $reset->execute(self::administrator(), $plan, $records->pluck('workspace'));
 
                 Notification::make()
                     ->title(__('cloud::admin.credit_balances.periods_reset'))
-                    ->body("Granted {$plan->credits()} credits to {$count} workspaces.")
+                    ->body($plan instanceof Plan
+                        ? "Granted {$plan->credits()} credits to {$count} workspaces."
+                        : "Granted each of {$count} workspaces its current plan's credits.")
                     ->success()
                     ->send();
             })
             ->deselectRecordsAfterCompletion();
+    }
+
+    private static function planSelect(): Select
+    {
+        return Select::make('plan')
+            ->options(self::planOptions())
+            ->visible(fn (): bool => Gate::forUser(self::administrator())->allows('manageManagedPlan', Workspace::class))
+            ->required();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private static function chosenPlan(array $data): ?Plan
+    {
+        return filled($data['plan'] ?? null) ? Plan::from((string) $data['plan']) : null;
     }
 
     private static function administrator(): SystemAdministrator

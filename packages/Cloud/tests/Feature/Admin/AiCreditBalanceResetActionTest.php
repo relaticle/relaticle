@@ -11,9 +11,12 @@ use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
+use Relaticle\Cloud\Admin\Actions\ResetCreditPeriod;
 use Relaticle\Cloud\Admin\Filament\Resources\AiCreditBalanceResource;
 use Relaticle\Cloud\Admin\Filament\Resources\AiCreditBalanceResource\Pages\ListAiCreditBalances;
+use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 mutates(AiCreditBalanceResource::class);
 mutates(CreditService::class);
@@ -159,3 +162,72 @@ it('cancels an inactivity countdown when the reset grants a paid plan, and keeps
     'inactivity, free' => [DeletionReason::Inactivity, 'free', false],
     'requested, pro' => [DeletionReason::Requested, 'pro', false],
 ]);
+
+it('lets a super administrator grant a plan through the reset action', function (): void {
+    withHostedBilling();
+
+    $workspace = Workspace::factory()->create(['plan' => Plan::Free]);
+
+    resolve(ResetCreditPeriod::class)->execute($this->admin, Plan::Enterprise, [$workspace]);
+
+    expect($workspace->fresh()->plan)->toBe(Plan::Enterprise);
+});
+
+it('lets a plain administrator reset credits on the current plan but not choose a plan', function (): void {
+    withHostedBilling();
+
+    $administrator = SystemAdministrator::factory()->create(['role' => SystemAdministratorRole::Administrator]);
+    $this->actingAs($administrator, 'sysadmin');
+
+    $workspace = Workspace::factory()->create(['plan' => Plan::Free, 'trial_ends_at' => null, 'pro_trial_used_at' => now()->subDay()]);
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->delete();
+    $balance = AiCreditBalance::factory()->create(['workspace_id' => $workspace->getKey(), 'credits_remaining' => 3, 'credits_used' => 47]);
+
+    livewire(ListAiCreditBalances::class)
+        ->mountAction(TestAction::make('resetPeriod')->table($balance))
+        ->assertMountedActionModalDontSee('Enterprise')
+        ->callMountedAction()
+        ->assertHasNoActionErrors();
+
+    livewire(ListAiCreditBalances::class)
+        ->callAction(TestAction::make('resetPeriod')->table($balance), data: ['plan' => 'enterprise']);
+
+    expect($workspace->fresh()->plan)->toBe(Plan::Free)
+        ->and($balance->refresh()->credits_used)->toBe(0)
+        ->and($balance->credits_remaining)->toBe(Plan::Free->credits());
+});
+
+it('lets a plain administrator bulk reset credits without changing any plan', function (): void {
+    withHostedBilling();
+
+    $administrator = SystemAdministrator::factory()->create(['role' => SystemAdministratorRole::Administrator]);
+    $this->actingAs($administrator, 'sysadmin');
+
+    $free = Workspace::factory()->create(['plan' => Plan::Free]);
+    $pro = Workspace::factory()->create(['plan' => Plan::Pro]);
+    AiCreditBalance::query()->whereIn('workspace_id', [$free->getKey(), $pro->getKey()])->delete();
+    $freeBalance = AiCreditBalance::factory()->create(['workspace_id' => $free->getKey(), 'credits_used' => 10]);
+    $proBalance = AiCreditBalance::factory()->create(['workspace_id' => $pro->getKey(), 'credits_used' => 10]);
+
+    livewire(ListAiCreditBalances::class)
+        ->selectTableRecords([$freeBalance->getKey(), $proBalance->getKey()])
+        ->callAction(TestAction::make('resetPeriod')->table()->bulk(), data: ['plan' => 'enterprise'])
+        ->assertHasNoActionErrors();
+
+    expect($free->fresh()->plan)->toBe(Plan::Free)
+        ->and($pro->fresh()->plan)->toBe(Plan::Pro)
+        ->and($freeBalance->refresh()->credits_remaining)->toBe(Plan::Free->credits())
+        ->and($proBalance->refresh()->credits_remaining)->toBe(Plan::Pro->credits());
+});
+
+it('rejects a plan grant from a plain administrator in the reset action class', function (): void {
+    withHostedBilling();
+
+    $administrator = SystemAdministrator::factory()->create(['role' => SystemAdministratorRole::Administrator]);
+    $workspace = Workspace::factory()->create(['plan' => Plan::Free]);
+
+    expect(fn () => resolve(ResetCreditPeriod::class)->execute($administrator, Plan::Enterprise, [$workspace]))
+        ->toThrow(HttpException::class);
+
+    expect($workspace->fresh()->plan)->toBe(Plan::Free);
+});
