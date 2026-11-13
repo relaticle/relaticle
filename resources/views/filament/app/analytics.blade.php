@@ -4,7 +4,7 @@
         $analyticsEventNames = [
             'signup', 'workspace_created', 'signup_started', 'email_verified', 'login_completed', 'setup_completed', 'contact_submitted', 'checkout_started',
             'google_auth_started', 'microsoft_auth_started',
-            'signup_refused_email', 'signup_refused_password', 'signup_refused_challenge', 'signup_refused_challenge_blocked', 'signup_refused_tor', 'signup_refused_throttled', 'signup_refused_existing_account',
+            'signup_refused_email', 'signup_refused_password', 'signup_refused_challenge', 'signup_refused_challenge_blocked', 'signup_refused_tor', 'signup_refused_ceiling', 'signup_refused_throttled', 'signup_refused_existing_account',
         ];
         foreach ($analyticsEventNames as $analyticsEvent) {
             $operation = session()->pull('fathom.track_'.$analyticsEvent);
