@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Support\SentryEventScrubber;
 use Relaticle\EmailIntegration\Jobs\StoreEmailJob;
 use Relaticle\EmailIntegration\Jobs\StoreMeetingJob;
 
@@ -39,6 +40,13 @@ return [
 
     // @see: https://docs.sentry.io/platforms/php/guides/laravel/configuration/options/#send-default-pii
     'send_default_pii' => env('SENTRY_SEND_DEFAULT_PII', false),
+
+    'max_request_body_size' => 'none',
+
+    // Callable strings, never closures: the image runs config:cache.
+    'before_send' => SentryEventScrubber::class.'::scrub',
+
+    'before_send_transaction' => SentryEventScrubber::class.'::scrub',
 
     // @see: https://docs.sentry.io/platforms/php/guides/laravel/configuration/options/#ignore-exceptions
     // 'ignore_exceptions' => [],
