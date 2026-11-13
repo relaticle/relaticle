@@ -56,14 +56,15 @@ final readonly class FilterField
     /** @return list<array{id: string, label: string, image: ?string, icon: ?string, circular: bool}> */
     public function searchedOptions(User $user, string $search): array
     {
-        return match ($this->kind) {
-            FilterFieldKind::Member => resolve(LinkOptionsQuery::class)->search($user, null, $search),
-            FilterFieldKind::Relation, FilterFieldKind::Record => $this->related instanceof CrmEntity
-                ? resolve(LinkOptionsQuery::class)->search($user, $this->related, $search)
-                : [],
-            FilterFieldKind::Text, FilterFieldKind::Number, FilterFieldKind::Date, FilterFieldKind::Choice,
-            FilterFieldKind::MultiChoice, FilterFieldKind::Checkbox, FilterFieldKind::MultiText, FilterFieldKind::Inactivity => [],
-        };
+        if (! $this->kind->holdsRecordIds()) {
+            return [];
+        }
+
+        if ($this->kind !== FilterFieldKind::Member && ! $this->related instanceof CrmEntity) {
+            return [];
+        }
+
+        return resolve(LinkOptionsQuery::class)->search($user, $this->related, $search);
     }
 
     /** @return list<array{id: string, label: string, color: ?string, image?: ?string, icon?: ?string, circular?: bool}> */
