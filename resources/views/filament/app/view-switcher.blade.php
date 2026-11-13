@@ -25,7 +25,7 @@
     <div
         class="fi-ta-views-panel"
         x-on:keydown.escape.window="focusTriggerOnEscape()"
-        x-init="$el.closest('.fi-dropdown-panel')?.addEventListener('dropdown-opened', () => { query = ''; window.matchMedia('(width >= 40rem) and (pointer: fine)').matches && $refs.search.focus() })"
+        x-init="$el.closest('.fi-dropdown-panel')?.addEventListener('dropdown-opened', () => { query = ''; window.avoidsSearchFocus() || $refs.search.focus() })"
         x-data="{
             query: '',
             rowView: null,

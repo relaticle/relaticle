@@ -414,9 +414,7 @@
                         return
                     }
 
-                    // On a touch screen a focused search box zooms the page and the keyboard covers the sheet.
-                    const compact = window.matchMedia('(width < 40rem), (pointer: coarse)').matches
-                    const input = pop.querySelector(compact ? 'input:not([data-filter-find], [data-filter-search])' : 'input')
+                    const input = pop.querySelector(window.avoidsSearchFocus() ? 'input:not([data-filter-find], [data-filter-search])' : 'input')
 
                     const target =
                         input ?? pop.querySelector('[aria-selected="true"], [aria-checked="true"]') ?? pop.querySelector('[data-pop-item]')

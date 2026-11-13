@@ -31,6 +31,9 @@
         items[(index + delta + items.length) % items.length]?.focus()
     }
 
+    // On a touch screen or a narrow window a focused search box zooms the page and the keyboard covers the menu.
+    window.avoidsSearchFocus = () => window.matchMedia('(width < 40rem), (pointer: coarse)').matches
+
     // The add panel of View settings, for the table's list and the board's card attributes.
     window.viewSettingsAddPanel = ({ root, items, key, back, pick }) => ({
         query: '',
@@ -76,10 +79,7 @@
         },
 
         focusAddStart(scope = root(this)) {
-            // On a touch screen a keyboard would cover the list after every pick, so focus stays on the back arrow.
-            const compact = window.matchMedia('(width < 40rem), (pointer: coarse)').matches
-
-            ;(compact ? scope.querySelector(back) : scope.querySelector('[data-view-settings-search]')).focus()
+            scope.querySelector(window.avoidsSearchFocus() ? back : '[data-view-settings-search]').focus()
         },
     })
 
