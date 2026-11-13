@@ -1368,6 +1368,19 @@ it('applies the first view on every bare visit, not only the first of a session'
         ->and(Livewire::withQueryParams(['view' => $other->getKey()])->test(ListCompanies::class)->get('activeSavedViewId'))->toBe($other->getKey());
 });
 
+it('keeps a view created on the built-in list link active and saves the next change into it', function (): void {
+    $component = openList(ListCompanies::class)
+        ->callAction('saveSavedViewAs', ['name' => 'Hot leads'])
+        ->assertHasNoActionErrors();
+
+    $view = SavedView::query()->withoutGlobalScopes()->sole();
+
+    $component->call('sortTable', 'name', 'asc');
+
+    expect($component->get('activeSavedViewId'))->toBe($view->getKey())
+        ->and($view->fresh()->state->sort)->toBe('name:asc');
+});
+
 it('points the sidebar at the index whatever page the member opened last', function (string $resource, string $board): void {
     $this->get($resource::getUrl($board))->assertOk();
 

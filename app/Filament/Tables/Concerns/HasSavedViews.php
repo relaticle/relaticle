@@ -50,6 +50,7 @@ trait HasSavedViews
         }
 
         $this->activeSavedViewId = $view->getKey();
+        $this->requestedSavedViewId = null;
         $this->markSavedViewApplied();
     }
 
