@@ -11,6 +11,7 @@ use App\Enums\FilterKind;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Queries\Crm\StoredTagsQuery;
 use App\Queries\CustomFieldFilterSchema;
 use App\Queries\EntityFilters;
@@ -37,12 +38,12 @@ final readonly class FilterFieldCatalog
      */
     public static function for(CrmEntity $entity, User $user, array $columnLabels = []): array
     {
-        $workspaceId = $user->currentWorkspace->getKey();
+        $workspace = $user->currentWorkspace;
 
         // once() keys on its used variables, and one user object can switch workspace within a request.
         return once(fn (): array => [
             ...self::nativeFields($entity, $columnLabels),
-            ...self::customFields($entity, $user, $workspaceId),
+            ...self::customFields($entity, $workspace),
         ]);
     }
 
@@ -137,15 +138,15 @@ final readonly class FilterFieldCatalog
     }
 
     /** @return array<string, FilterField> */
-    private static function customFields(CrmEntity $entity, User $user, int|string $workspaceId): array
+    private static function customFields(CrmEntity $entity, Workspace $workspace): array
     {
         $fields = [];
 
-        foreach (resolve(WorkspaceCustomFields::class)->forEntity($user->currentWorkspace, $entity->value) as $field) {
+        foreach (resolve(WorkspaceCustomFields::class)->forEntity($workspace, $entity->value) as $field) {
             $type = CustomFieldType::tryFrom($field->type);
             $kind = $type?->filterFieldKind();
 
-            if ($type === null || $kind === null || (string) $field->tenant_id !== (string) $workspaceId || ! CustomFieldFilterSchema::isFilterable($field)) {
+            if ($type === null || $kind === null || ! CustomFieldFilterSchema::isFilterable($field)) {
                 continue;
             }
 
