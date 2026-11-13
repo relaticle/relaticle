@@ -22,12 +22,14 @@ use App\Mcp\Tools\Email\CancelEmailTool;
 use App\Mcp\Tools\Email\CreateEmailDraftTool;
 use App\Mcp\Tools\Email\DeleteEmailDraftTool;
 use App\Mcp\Tools\Email\GetEmailTool;
+use App\Mcp\Tools\Email\LinkEmailsTool;
 use App\Mcp\Tools\Email\ListEmailAccountsTool;
 use App\Mcp\Tools\Email\ListEmailsTool;
 use App\Mcp\Tools\Email\RescheduleEmailTool;
 use App\Mcp\Tools\Email\RetryEmailTool;
 use App\Mcp\Tools\Email\SendEmailDraftTool;
 use App\Mcp\Tools\Email\SendEmailTool;
+use App\Mcp\Tools\Email\UnlinkEmailsTool;
 use App\Mcp\Tools\Email\UpdateEmailDraftTool;
 use App\Mcp\Tools\FetchTool;
 use App\Mcp\Tools\GetCrmSchemaTool;
@@ -146,6 +148,8 @@ $toolContracts = [
     CancelEmailTool::class => ['title' => 'Cancel Email', 'name' => 'cancel-email-tool', 'annotations' => $deleteAnnotations],
     RescheduleEmailTool::class => ['title' => 'Reschedule Email', 'name' => 'reschedule-email-tool', 'annotations' => $updateAnnotations],
     RetryEmailTool::class => ['title' => 'Retry Email', 'name' => 'retry-email-tool', 'annotations' => $sendAnnotations],
+    LinkEmailsTool::class => ['title' => 'Link Emails', 'name' => 'link-emails-tool', 'annotations' => $attachAnnotations],
+    UnlinkEmailsTool::class => ['title' => 'Unlink Emails', 'name' => 'unlink-emails-tool', 'annotations' => $detachAnnotations],
 ];
 
 mutates(...array_merge(
@@ -169,7 +173,7 @@ it('publishes the exact explicit title and stable technical name for every regis
     $registeredTools = new ReflectionClass(RelaticleServer::class)
         ->getDefaultProperties()['tools'];
 
-    expect($registeredTools)->toBeArray()->toHaveCount(50);
+    expect($registeredTools)->toBeArray()->toHaveCount(52);
     expect($registeredTools)->toEqualCanonicalizing(array_keys($toolContracts));
 
     foreach ($registeredTools as $toolClass) {
@@ -191,7 +195,7 @@ it('declares an output schema on every registered tool', function (): void {
     $tools = new ReflectionClass(RelaticleServer::class)
         ->getDefaultProperties()['tools'];
 
-    expect($tools)->toBeArray()->toHaveCount(50);
+    expect($tools)->toBeArray()->toHaveCount(52);
 
     foreach ($tools as $toolClass) {
         $definition = resolve($toolClass)->toArray();

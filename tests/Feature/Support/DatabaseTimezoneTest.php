@@ -30,3 +30,7 @@ it('keeps the database clock and the php clock on the same wall time', function 
 
     expect(abs(now()->diffInSeconds($databaseNow)))->toBeLessThan(60);
 });
+
+it('turns off postgres jit on the default connection so short queries skip plan compilation', function (): void {
+    expect(DB::selectOne('show jit')->jit)->toBe('off');
+});

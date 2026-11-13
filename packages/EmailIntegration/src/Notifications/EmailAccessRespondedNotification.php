@@ -71,7 +71,7 @@ final class EmailAccessRespondedNotification extends InboxNotification
 
         return $mail->action(
             __(self::LANG.($notifiable->can('viewBody', $email) ? '.mail.action_view' : '.mail.action_open')),
-            $email->appUrlFor($notifiable),
+            $email->appUrl(),
         );
     }
 

@@ -869,6 +869,7 @@ final class AppServiceProvider extends ServiceProvider
             Js::make('linked-records-picker', resource_path('js/filament/linked-records-picker.js')),
             Js::make('resizable-columns', resource_path('js/filament/resizable-columns.js')),
             Js::make('sheet-backdrop', resource_path('js/filament/sheet-backdrop.js')),
+            Js::make('shortcuts', resource_path('js/filament/shortcuts.js')),
         ]);
 
         FilamentAsset::registerScriptData([

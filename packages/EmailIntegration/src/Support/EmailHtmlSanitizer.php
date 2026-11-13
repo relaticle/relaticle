@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Support;
 
+use Dom\HTMLDocument;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizer;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizerConfig;
@@ -68,7 +69,49 @@ final readonly class EmailHtmlSanitizer
             return null;
         }
 
-        return self::wrapPreviewDocument($clean);
+        return self::wrapPreviewDocument($clean, self::paintsOwnBackground($clean));
+    }
+
+    private static function paintsOwnBackground(string $html): bool
+    {
+        $document = HTMLDocument::createFromString('<!doctype html>'.$html, LIBXML_NOERROR);
+
+        foreach ($document->querySelectorAll('[bgcolor]') as $node) {
+            if (self::paintsSomething((string) $node->getAttribute('bgcolor'))) {
+                return true;
+            }
+        }
+
+        foreach ($document->querySelectorAll('[style]') as $node) {
+            preg_match_all('/(?<![\w-])background(?:-color|-image)?\s*:([^;]*)/i', (string) $node->getAttribute('style'), $values);
+
+            foreach ($values[1] as $value) {
+                if (self::paintsSomething($value)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static function paintsSomething(string $value): bool
+    {
+        $value = str_replace('!important', '', mb_strtolower($value));
+
+        if (str_contains($value, 'url(') || str_contains($value, 'gradient(')) {
+            return true;
+        }
+
+        // White is the page the dark reader already replaces, so pasted white spans keep a reply dark.
+        $value = (string) preg_replace([
+            '/(?:rgba|hsla)\((?:[^,)]*,){3}\s*(?:0(?:\.0*)?|\.0+)%?\s*\)/',
+            '/(?:rgba?|hsla?)\([^)\/]*\/\s*(?:0(?:\.0*)?|\.0+)%?\s*\)/',
+            '/rgba?\(\s*255\s*,?\s*255\s*,?\s*255\s*(?:[,\/]\s*[\d.]+%?\s*)?\)/',
+        ], ' ', $value);
+        $neutral = '/^(?:transparent|none|inherit|initial|unset|white|#fff|#ffffff|repeat|repeat-x|repeat-y|no-repeat|scroll|fixed|local|left|right|top|bottom|center|-?[\d.]+[a-z%]*)$/';
+
+        return array_any(preg_split('/[\s,\/]+/', trim($value), flags: PREG_SPLIT_NO_EMPTY) ?: [], fn (string $token): bool => preg_match($neutral, $token) !== 1);
     }
 
     /**
@@ -101,36 +144,39 @@ final readonly class EmailHtmlSanitizer
         }, $html) ?? $html;
     }
 
-    private static function wrapPreviewDocument(string $html): string
+    private static function wrapPreviewDocument(string $html, bool $ownColors): string
     {
-        return <<<'HTML'
+        $rootClass = $ownColors ? ' class="email-own-colors"' : '';
+
+        return <<<HTML
 <!doctype html>
-<html>
+<html{$rootClass}>
 <head>
 <meta charset="utf-8">
 <meta name="color-scheme" content="light dark">
 <style>
 :root { color-scheme: light dark; background: #ffffff; }
 html, body { margin: 0; background: #ffffff; color: #111827; }
-body {
-    box-sizing: border-box;
-    padding: 0;
-    overflow-wrap: anywhere;
+:where(body) {
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
 }
+body { box-sizing: border-box; padding: 16px; overflow-wrap: anywhere; }
 img, video { max-width: 100%; height: auto; }
 table { max-width: 100%; }
 pre { white-space: pre-wrap; }
-@media (prefers-color-scheme: dark) {
-    :root { background: transparent; }
-    html, body { background: transparent !important; color: #f3f4f6 !important; }
-    body, table, tbody, thead, tfoot, tr, td, th, div, p, span, section, article, main, blockquote, li {
-        background-color: transparent !important;
-        border-color: #4b5563 !important;
-        color: #f3f4f6 !important;
-    }
-    a { color: #93c5fd !important; }
-    [bgcolor] { background-color: transparent !important; }
+/* The frame canvas follows the root's used color-scheme, so it must match the app's theme too.
+   Mail that paints its own background keeps it on a light page, as Apple Mail and HEY do. */
+:root[data-theme="light"], :root.email-own-colors { color-scheme: light; }
+:root[data-theme="dark"]:not(.email-own-colors) { color-scheme: dark; background: transparent; }
+:root[data-theme="dark"]:not(.email-own-colors) body { background: transparent !important; color: #f3f4f6 !important; }
+:root[data-theme="dark"]:not(.email-own-colors) body * {
+    background-color: transparent !important;
+    border-color: #4b5563 !important;
+    color: #f3f4f6 !important;
 }
+:root[data-theme="dark"]:not(.email-own-colors) :is(a, a *) { color: #93c5fd !important; }
 </style>
 </head>
 <body>

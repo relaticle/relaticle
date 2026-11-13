@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 use App\Models\User;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Enums\MailboxHealth;
 use Relaticle\EmailIntegration\Enums\SyncErrorReason;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
-mutates(EmailAccountsPage::class, ConnectedAccount::class);
+mutates(EmailAccountsPage::class, ConnectedAccount::class, MailboxHealth::class);
 
 it('explains a mailbox whose google workspace has gmail switched off', function (string $theme): void {
     $user = User::factory()->withWorkspace()->create();
@@ -32,4 +33,29 @@ it('explains a mailbox whose google workspace has gmail switched off', function 
         ->assertNoJavaScriptErrors();
 
     $page->screenshot(filename: "email-account-sync-error-{$theme}");
+})->with(['inLightMode', 'inDarkMode']);
+
+it('warns about a mailbox that needs reconnecting on the emails page without overflowing a phone', function (string $theme): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->health(MailboxHealth::ReauthRequired)->create([
+        'user_id' => $user->id,
+        'workspace_id' => $workspace->id,
+        'email_address' => 'olivia.hartley-whitmore@acme-holdings.example',
+        'status' => EmailAccountStatus::REAUTH_REQUIRED,
+    ]));
+    $banner = '[data-mailbox-health="reauth_required"]';
+
+    $page = loginViaBrowser($user, $theme)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/email")
+        ->assertVisible($banner)
+        ->assertAttribute("{$banner} a", 'href', EmailAccountsPage::getUrl(panel: 'app', tenant: $workspace))
+        ->assertSeeIn("{$banner} a", __('filament/pages/email-accounts.actions.reconnect'))
+        ->resize(390, 844)
+        ->assertVisible($banner)
+        ->assertScript('document.documentElement.scrollWidth <= document.documentElement.clientWidth', true)
+        ->assertNoJavaScriptErrors();
+
+    $page->screenshot(filename: "mailbox-health-banner-{$theme}");
 })->with(['inLightMode', 'inDarkMode']);

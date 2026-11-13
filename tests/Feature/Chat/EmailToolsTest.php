@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\WorkspaceRole;
+use App\Models\Company;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
@@ -23,6 +24,7 @@ use Relaticle\Chat\Enums\EmailReach;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\AiCreditBalance;
@@ -34,20 +36,24 @@ use Relaticle\Chat\Tools\Email\CancelEmailTool;
 use Relaticle\Chat\Tools\Email\CreateEmailDraftTool;
 use Relaticle\Chat\Tools\Email\DeleteEmailDraftTool;
 use Relaticle\Chat\Tools\Email\GetEmailTool;
+use Relaticle\Chat\Tools\Email\LinkEmailsTool;
 use Relaticle\Chat\Tools\Email\ListEmailAccountsTool;
 use Relaticle\Chat\Tools\Email\ListEmailsTool;
 use Relaticle\Chat\Tools\Email\RescheduleEmailTool;
 use Relaticle\Chat\Tools\Email\RetryEmailTool;
 use Relaticle\Chat\Tools\Email\SendEmailDraftTool;
 use Relaticle\Chat\Tools\Email\SendEmailTool;
+use Relaticle\Chat\Tools\Email\UnlinkEmailsTool;
 use Relaticle\Chat\Tools\Email\UpdateEmailDraftTool;
 use Relaticle\Chat\Tools\Task\CreateTaskTool;
+use Relaticle\EmailIntegration\Actions\LinkAssistantEmail;
 use Relaticle\EmailIntegration\Actions\PrepareAgentEmail;
 use Relaticle\EmailIntegration\Actions\PrepareAgentEmailDraft;
 use Relaticle\EmailIntegration\Actions\QueueAgentEmailAction;
 use Relaticle\EmailIntegration\Actions\SaveAgentEmailDraft;
 use Relaticle\EmailIntegration\Actions\SaveAssistantEmailDraft;
 use Relaticle\EmailIntegration\Actions\SendAssistantEmail;
+use Relaticle\EmailIntegration\Actions\UnlinkAssistantEmail;
 use Relaticle\EmailIntegration\Data\AgentConnection;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
@@ -60,12 +66,13 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailBody;
+use Relaticle\EmailIntegration\Models\EmailLinkSuppression;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(SendEmailDraftTool::class, UpdateEmailDraftTool::class, DeleteEmailDraftTool::class, CancelEmailTool::class, RescheduleEmailTool::class, RetryEmailTool::class, ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class, SaveAssistantEmailDraft::class, SaveAgentEmailDraft::class, PrepareAgentEmailDraft::class, SendEmailTool::class, SendAssistantEmail::class, PrepareAgentEmail::class);
+mutates(SendEmailDraftTool::class, UpdateEmailDraftTool::class, DeleteEmailDraftTool::class, CancelEmailTool::class, RescheduleEmailTool::class, RetryEmailTool::class, ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class, SaveAssistantEmailDraft::class, SaveAgentEmailDraft::class, PrepareAgentEmailDraft::class, SendEmailTool::class, SendAssistantEmail::class, PrepareAgentEmail::class, LinkEmailsTool::class, UnlinkEmailsTool::class, LinkAssistantEmail::class, UnlinkAssistantEmail::class);
 
 beforeEach(function (): void {
     $this->viewer = User::factory()->withWorkspace()->create();
@@ -85,7 +92,9 @@ beforeEach(function (): void {
         'user_id' => $this->coworker->id,
     ]));
 
-    $this->emailFrom = function (User $owner, array $attributes = [], string $sender = 'client@acme.test'): Email {
+    $this->anchor = Company::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    $this->emailFrom = function (User $owner, array $attributes = [], string $sender = 'client@acme.test', bool $linked = true): Email {
         $email = Email::factory()->create([
             'workspace_id' => $this->workspace->id,
             'user_id' => $owner->id,
@@ -100,6 +109,10 @@ beforeEach(function (): void {
             'name' => 'Acme Client',
             'role' => EmailParticipantRole::FROM,
         ]);
+
+        if ($linked && $owner->is($this->coworker)) {
+            $this->anchor->emails()->attach($email->id);
+        }
 
         return $email;
     };
@@ -136,6 +149,7 @@ it('shows the assistant the signed-in user own email in full', function (): void
         ->and($result['items'][0]['access'])->toBe('full')
         ->and($result['items'][0]['subject'])->toBe('Renewal terms')
         ->and($result['items'][0]['snippet'])->toBe('Here is the draft contract')
+        ->and($result['items'][0]['url'])->toBe(route('email.open', $email))
         ->and($result['items'][0]['participants'][0])->toBe(['role' => 'from', 'name' => 'Acme Client', 'email' => 'client@acme.test']);
 });
 
@@ -516,7 +530,7 @@ it('lists only the mailboxes the signed-in user connected in this workspace, def
 });
 
 it('offers the email tools only when a mailbox can send', function (): void {
-    $emailTools = [ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class, SendEmailTool::class];
+    $emailTools = [ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class, SendEmailTool::class, LinkEmailsTool::class, UnlinkEmailsTool::class];
 
     expect(chatEmailToolClasses(EmailReach::Ready))->toContain(...$emailTools)
         ->and(array_intersect($emailTools, chatEmailToolClasses(EmailReach::NoMailbox)))->toBe([])
@@ -2040,4 +2054,101 @@ describe('a saved draft or a queued email', function (): void {
         expect($task->fresh()->status)->toBe(PendingActionStatus::Approved)
             ->and($step->fresh()->status)->toBe(PendingActionStatus::Pending);
     })->with([SendEmailDraftTool::class, CancelEmailTool::class]);
+});
+
+it('keeps a teammate email no record links to away from the assistant', function (): void {
+    $linked = ($this->emailFrom)($this->coworker, ['privacy_tier' => EmailPrivacyTier::FULL]);
+    $unlinked = ($this->emailFrom)($this->coworker, ['privacy_tier' => EmailPrivacyTier::FULL], linked: false);
+
+    expect(array_column(chatEmailTool($this->viewer, ListEmailsTool::class)['items'], 'id'))->toBe([$linked->id])
+        ->and(chatEmailTool($this->viewer, GetEmailTool::class, ['id' => $unlinked->id]))->toBe(['error' => 'Email not found.'])
+        ->and(chatEmailTool($this->coworker, ListEmailsTool::class)['items'])->toHaveCount(2);
+});
+
+describe('linking email to records', function (): void {
+    it('links an email to a record only once the card is approved', function (): void {
+        $email = ($this->emailFrom)($this->viewer);
+        $company = Company::factory()->create(['workspace_id' => $this->workspace->id]);
+
+        $proposal = proposeChatEmails($this->viewer, LinkEmailsTool::class, [['email_id' => $email->id, 'record_type' => 'company', 'record_id' => $company->id]]);
+
+        expect($company->emails()->count())->toBe(0);
+
+        resolve(PendingActionService::class)->approve(pendingChatEmail($proposal), $this->viewer);
+
+        expect($company->emails()->wherePivot('link_source', 'manual')->pluck('emails.id')->all())->toBe([$email->id]);
+    });
+
+    it('unlinks an email from a record and keeps it off once the card is approved', function (): void {
+        $email = ($this->emailFrom)($this->viewer);
+        $company = Company::factory()->create(['workspace_id' => $this->workspace->id]);
+        $company->emails()->attach($email->id);
+
+        $proposal = proposeChatEmails($this->viewer, UnlinkEmailsTool::class, [['email_id' => $email->id, 'record_type' => 'company', 'record_id' => $company->id]]);
+
+        expect(collect($proposal['display']['fields'])->pluck('value', 'label')['Scope'])->toBe('Your copies of this conversation, and copies shared with you in full. Later syncs keep your mail off this record too.')
+            ->and(ProposalEntity::EmailUnlink->needsOwnApproval())->toBeFalse();
+
+        resolve(PendingActionService::class)->approve(pendingChatEmail($proposal), $this->viewer);
+
+        expect($company->emails()->count())->toBe(0)
+            ->and(EmailLinkSuppression::query()->where('email_id', $email->id)->where('emailable_id', $company->id)->exists())->toBeTrue();
+    });
+
+    it('approves a link step with the rest of its plan', function (): void {
+        $this->actingAs($this->viewer);
+        Filament::setTenant($this->workspace);
+        Queue::fake();
+        $email = ($this->emailFrom)($this->viewer);
+        $company = Company::factory()->create(['workspace_id' => $this->workspace->id]);
+        $conversationId = chatEmailConversation($this->viewer);
+        $turnId = (string) Str::ulid();
+        $task = proposeChatPlanTask($this->viewer, $conversationId, $turnId, 'Call Lena');
+        $step = pendingChatEmail(proposeChatEmails($this->viewer, LinkEmailsTool::class, [['email_id' => $email->id, 'record_type' => 'company', 'record_id' => $company->id]], $conversationId, $turnId));
+
+        openChatEmailDock($task)->call('approveAll')->assertHasNoErrors();
+
+        expect($step->fresh()->status)->toBe(PendingActionStatus::Approved)
+            ->and($company->emails()->pluck('emails.id')->all())->toBe([$email->id]);
+    });
+
+    it('refuses the approval of a link to a teammate email the user sees below full', function (): void {
+        $email = ($this->emailFrom)($this->coworker, ['privacy_tier' => EmailPrivacyTier::SUBJECT]);
+        $company = Company::factory()->create(['workspace_id' => $this->workspace->id]);
+        $proposal = proposeChatEmails($this->viewer, LinkEmailsTool::class, [['email_id' => $email->id, 'record_type' => 'company', 'record_id' => $company->id]]);
+
+        expect(fn (): mixed => resolve(PendingActionService::class)->approve(pendingChatEmail($proposal), $this->viewer))
+            ->toThrow(ValidationException::class, 'Only people who hold this conversation');
+
+        expect($company->emails()->count())->toBe(0);
+    });
+
+    it('answers not found for a private teammate email and proposes nothing', function (): void {
+        $private = ($this->emailFrom)($this->coworker, ['privacy_tier' => EmailPrivacyTier::PRIVATE]);
+
+        $result = proposeChatEmails($this->viewer, LinkEmailsTool::class, [['email_id' => $private->id, 'record_type' => 'company', 'record_id' => $this->anchor->id]]);
+
+        expect($result['error'])->toContain('No email you can see has that ID')
+            ->and(PendingAction::query()->count())->toBe(0);
+    });
+
+    it('refuses a record from another workspace and proposes nothing', function (): void {
+        $email = ($this->emailFrom)($this->viewer);
+        $foreign = Company::factory()->create(['workspace_id' => Workspace::factory()->create()->id]);
+
+        $result = proposeChatEmails($this->viewer, LinkEmailsTool::class, [['email_id' => $email->id, 'record_type' => 'company', 'record_id' => $foreign->id]]);
+
+        expect($result['error'])->toContain('No company, person or opportunity in this workspace')
+            ->and(PendingAction::query()->count())->toBe(0);
+    });
+
+    it('refuses a task as the record to link', function (): void {
+        $email = ($this->emailFrom)($this->viewer);
+        $task = Task::factory()->create(['workspace_id' => $this->workspace->id]);
+
+        $result = proposeChatEmails($this->viewer, LinkEmailsTool::class, [['email_id' => $email->id, 'record_type' => 'task', 'record_id' => $task->id]]);
+
+        expect($result['error'])->toContain('No company, person or opportunity in this workspace')
+            ->and(PendingAction::query()->count())->toBe(0);
+    });
 });

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\Notifications\NotificationReason;
+use App\Features\EmailConversations;
 use App\Livewire\App\AppDatabaseNotifications;
 use App\Models\User;
 use App\Models\Workspace;
@@ -12,6 +13,8 @@ use Filament\Facades\Filament;
 use Illuminate\Notifications\SendQueuedNotifications;
 use Illuminate\Support\Facades\Notification as NotificationFacade;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
+use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Relaticle\EmailIntegration\Actions\CancelQueuedEmailAction;
 use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
@@ -543,4 +546,77 @@ describe('EmailSendHeldNotification', function (): void {
         expect($this->owner->notifications()->count())->toBe(1);
         Queue::assertNotPushed(SendQueuedNotifications::class);
     });
+});
+
+it('hands the bell to the page reader instead of opening a second one', function (): void {
+    Feature::for($this->workspace)->activate(EmailConversations::class);
+    $email = handlerConversationEmail($this);
+
+    Livewire::withQueryParams(['email' => $email->getKey()])
+        ->test(EmailAccessNotificationHandler::class, ['hostsReader' => true])
+        ->assertDontSeeHtml('fi-email-reader-drawer')
+        ->call('selectEmail', $email->getKey())
+        ->assertDispatched('email:open', emailId: $email->getKey())
+        ->assertSet('hostsReader', true)
+        ->assertDontSeeHtml('fi-email-reader-drawer')
+        ->assertDontSeeHtml('fi-email-reader-panel');
+});
+
+it('opens the bell email in the drawer on a page without a reader', function (): void {
+    Feature::for($this->workspace)->activate(EmailConversations::class);
+    $email = handlerConversationEmail($this);
+
+    Livewire::test(EmailAccessNotificationHandler::class)
+        ->call('selectEmail', $email->getKey())
+        ->assertNotDispatched('email:open')
+        ->assertSet('selectedEmailId', $email->getKey())
+        ->assertSeeHtml('fi-email-reader-drawer')
+        ->assertDontSeeHtml('fi-email-reader-panel')
+        ->assertSee('Kickoff agenda');
+});
+
+it('shows the not available line when a link names mail the viewer cannot see on a page without a reader', function (): void {
+    Feature::for($this->workspace)->activate(EmailConversations::class);
+
+    Livewire::withQueryParams(['email' => (string) Str::ulid()])
+        ->test(EmailAccessNotificationHandler::class)
+        ->assertSee(__('filament/pages/email-inbox.drawer.not_available'))
+        ->call('deselectEmail')
+        ->assertDontSeeHtml('fi-email-reader-drawer');
+});
+
+function handlerConversationEmail(object $test): Email
+{
+    return Email::factory()->create([
+        'workspace_id' => $test->workspace->id,
+        'user_id' => $test->owner->id,
+        'connected_account_id' => $test->account->getKey(),
+        'conversation_key' => 'conv-bell',
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'subject' => 'Kickoff agenda',
+        'sent_at' => now(),
+    ]);
+}
+
+it('reloads a record page through the resolver when the bell opens an email there', function (): void {
+    Feature::for($this->workspace)->activate(EmailConversations::class);
+    $email = handlerConversationEmail($this);
+
+    Livewire::test(EmailAccessNotificationHandler::class, ['hostsReader' => true, 'readerOnRecordPage' => true])
+        ->call('selectEmail', $email->getKey())
+        ->assertNotDispatched('email:open')
+        ->assertRedirect(route('email.open', $email->getKey()))
+        ->assertDontSeeHtml('fi-email-reader-drawer');
+});
+
+it('shows the not available line in the bell drawer for mail no conversation holds yet', function (): void {
+    Feature::for($this->workspace)->activate(EmailConversations::class);
+    $email = handlerConversationEmail($this);
+    $email->forceFill(['conversation_key' => null])->saveQuietly();
+
+    Livewire::test(EmailAccessNotificationHandler::class)
+        ->call('selectEmail', $email->getKey())
+        ->assertSee(__('filament/pages/email-inbox.drawer.not_available'))
+        ->assertDontSee('Kickoff agenda');
 });

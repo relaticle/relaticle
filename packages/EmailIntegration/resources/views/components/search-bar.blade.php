@@ -11,6 +11,7 @@
         </div>
         <input
             wire:model.live.debounce.300ms="search"
+            x-on:keydown.escape="if ($el.value !== '') { $event.preventDefault(); $event.stopPropagation(); $el.value = ''; $wire.set('search', '') }"
             type="text"
             placeholder="{{ __('filament/pages/email-inbox.search.placeholder') }}"
             class="h-9 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 py-0 pl-9 pr-3 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:border-primary-500 dark:focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"

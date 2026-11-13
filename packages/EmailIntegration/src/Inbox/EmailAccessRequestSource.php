@@ -41,7 +41,7 @@ final readonly class EmailAccessRequestSource implements RequestSource
             ->with(['requester', 'email.workspace', 'email.participants'])
             ->latest()
             ->get()
-            ->map(fn (EmailAccessRequest $request): InboxRequest => $this->present($request, $user));
+            ->map(fn (EmailAccessRequest $request): InboxRequest => $this->present($request));
     }
 
     public function find(User $user, Workspace $workspace, string $requestId): ?InboxRequest
@@ -55,7 +55,7 @@ final readonly class EmailAccessRequestSource implements RequestSource
             ->whereKey($requestId)
             ->first();
 
-        return $request instanceof EmailAccessRequest ? $this->present($request, $user) : null;
+        return $request instanceof EmailAccessRequest ? $this->present($request) : null;
     }
 
     public function countPendingFor(User $user, Workspace $workspace): int
@@ -98,7 +98,7 @@ final readonly class EmailAccessRequestSource implements RequestSource
         return $this->owned($user, $workspace)->whereKey($requestId)->firstOrFail();
     }
 
-    private function present(EmailAccessRequest $request, User $owner): InboxRequest
+    private function present(EmailAccessRequest $request): InboxRequest
     {
         $email = $request->email;
         $requester = $request->requester;
@@ -113,7 +113,7 @@ final readonly class EmailAccessRequestSource implements RequestSource
             requester: $requester,
             createdAt: CarbonImmutable::instance($request->created_at),
             expiresAt: $request->deadline(),
-            url: $email?->appUrlFor($owner),
+            url: $email?->appUrl(),
         );
     }
 }

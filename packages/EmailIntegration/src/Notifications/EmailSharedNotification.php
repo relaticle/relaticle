@@ -93,7 +93,7 @@ final class EmailSharedNotification extends InboxNotification
 
         return $mail->action(
             __(self::LANG.($canRead ? '.mail.action_view' : '.mail.action_open')),
-            $this->email->appUrlFor($notifiable),
+            $this->email->appUrl(),
         );
     }
 
@@ -126,7 +126,7 @@ final class EmailSharedNotification extends InboxNotification
                 Action::make('viewEmail')
                     ->button()
                     ->label(__(self::LANG.'.actions.view'))
-                    ->url($email->appUrl(openReader: true))
+                    ->url($email->appUrl())
                     ->markAsRead(),
             ]);
         }

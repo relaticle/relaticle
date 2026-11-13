@@ -33,6 +33,8 @@ final class PestTiaRuntime
         'public/web-app-manifest-*.png' => 'tests/Feature/Filament/PanelWebAppMetaTest.php',
         'phpstan*.neon' => 'tests/Arch',
         'phpunit*.xml' => 'tests/Arch',
+        'public/js/app/*.js' => 'tests/Arch',
+        'resources/js/filament/*.js' => 'tests/Arch',
     ];
 
     /** @var list<string> */

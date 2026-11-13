@@ -47,7 +47,7 @@ final readonly class VisibleEmailsQuery
     public static function filterRules(): array
     {
         return [
-            'search' => ['sometimes', 'string', 'min:2', 'max:200'],
+            'search' => ['sometimes', 'string', 'min:'.EmailSearchService::MIN_TEXT_LENGTH, 'max:'.EmailSearchService::MAX_LENGTH],
             'record_type' => ['required_with:record_id', 'string', Rule::in(self::recordTypes())],
             'record_id' => ['required_with:record_type', 'string', 'max:64'],
             'direction' => ['sometimes', 'string', Rule::enum(EmailDirection::class)],
@@ -83,6 +83,7 @@ final readonly class VisibleEmailsQuery
 
         return $this->preferredCopies
             ->restrictToVisiblePreferredCopies($query, $viewer)
+            ->withRecordLinkState()
             ->with(['participants', 'shares'])
             ->latest('sent_at')
             ->orderByDesc('id')
@@ -117,6 +118,7 @@ final readonly class VisibleEmailsQuery
     {
         return $query
             ->withGlobalScope('visible', new VisibleEmailScope($viewer))
+            ->withRecordLinkState()
             ->with(['participants', 'shares', 'body', 'attachments'])
             ->whereKey($id)
             ->first();

@@ -27,6 +27,7 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
+use Relaticle\EmailIntegration\Services\ConversationKeyResolver;
 use Relaticle\EmailIntegration\Services\EmailInlineImageEmbedder;
 use Relaticle\EmailIntegration\Services\ForwardAttachmentCopyService;
 
@@ -35,6 +36,7 @@ final readonly class SendEmailAction
     public function __construct(
         private EmailInlineImageEmbedder $inlineImageEmbedder,
         private ForwardAttachmentCopyService $attachments,
+        private ConversationKeyResolver $resolver,
     ) {}
 
     /**
@@ -110,17 +112,7 @@ final readonly class SendEmailAction
         );
 
         return DB::transaction(function () use ($account, $data, $priority, $scheduledFor, $linkToType, $linkToId, $attachmentPaths, $attachmentAttributes, $attachmentFileNames, $hasDownloadableAttachments): Email {
-            // Scope the reply lookup to the sender's workspace. in_reply_to_email_id arrives
-            // from a client-controlled hidden field and Email has no workspace global scope,
-            // so an unscoped lookup would let a user thread their outbound mail onto
-            // another tenant's email and leak its thread_id / rfc_message_id.
-            /** @var Email|null $inReplyTo */
-            $inReplyTo = isset($data['in_reply_to_email_id'])
-                ? Email::query()
-                    ->where('workspace_id', $account->workspace_id)
-                    ->whereKey($data['in_reply_to_email_id'])
-                    ->first()
-                : null;
+            $inReplyTo = $this->lockedParent($account, $data['in_reply_to_email_id'] ?? null);
 
             /** @var Email $email */
             $email = $account->emails()->chaperone()->create([
@@ -136,7 +128,7 @@ final readonly class SendEmailAction
                 // mailbox that received the original. A reply from a shared
                 // inbox or a different connected account must not pass that
                 // foreign id to the sending mailbox.
-                'thread_id' => $inReplyTo !== null && $inReplyTo->connected_account_id === $account->getKey()
+                'thread_id' => $inReplyTo instanceof Email && $inReplyTo->connected_account_id === $account->getKey()
                     ? $inReplyTo->thread_id
                     : null,
                 'in_reply_to' => $inReplyTo?->rfc_message_id,
@@ -155,29 +147,15 @@ final readonly class SendEmailAction
                 'attempts' => 0,
             ]);
 
+            $email->updateQuietly(['conversation_key' => $inReplyTo->conversation_key ?? $this->resolver->resolveStored($email)]);
+
             EmailBody::query()->create([
                 'email_id' => $email->getKey(),
                 'body_html' => $data['body_html'],
                 'body_text' => PlainText::paragraphsFromHtml((string) $data['body_html']),
             ]);
 
-            EmailParticipant::query()->create([
-                'email_id' => $email->getKey(),
-                'email_address' => $account->email_address,
-                'name' => $account->display_name,
-                'role' => 'from',
-            ]);
-
-            foreach (['to', 'cc', 'bcc'] as $role) {
-                foreach ($data[$role] ?? [] as $recipient) {
-                    EmailParticipant::query()->create([
-                        'email_id' => $email->getKey(),
-                        'email_address' => $recipient['email'],
-                        'name' => $recipient['name'] ?? null,
-                        'role' => $role,
-                    ]);
-                }
-            }
+            $this->storeParticipants($email, $account, $data);
 
             $this->storeAttachments($email, $attachmentPaths, $attachmentFileNames, $attachmentAttributes);
 
@@ -197,6 +175,49 @@ final readonly class SendEmailAction
 
             return $email;
         });
+    }
+
+    private function lockedParent(ConnectedAccount $account, ?string $parentId): ?Email
+    {
+        // Shared with other writers, exclusive in MergeConversations, so the parent's key is never absorbed mid-merge.
+        DB::select('select pg_advisory_xact_lock_shared(hashtext(?))', [$account->workspace_id]);
+
+        if ($parentId === null) {
+            return null;
+        }
+
+        // Scope the reply lookup to the sender's workspace. in_reply_to_email_id arrives
+        // from a client-controlled hidden field and Email has no workspace global scope,
+        // so an unscoped lookup would let a user thread their outbound mail onto
+        // another tenant's email and leak its thread_id / rfc_message_id.
+        return Email::query()
+            ->where('workspace_id', $account->workspace_id)
+            ->whereKey($parentId)
+            ->first();
+    }
+
+    /**
+     * @param  array{to: array<array{email: string, name: ?string}>, cc?: array<array{email: string, name: ?string}>, bcc?: array<array{email: string, name: ?string}>}  $data
+     */
+    private function storeParticipants(Email $email, ConnectedAccount $account, array $data): void
+    {
+        EmailParticipant::query()->create([
+            'email_id' => $email->getKey(),
+            'email_address' => $account->email_address,
+            'name' => $account->display_name,
+            'role' => 'from',
+        ]);
+
+        foreach (['to', 'cc', 'bcc'] as $role) {
+            foreach ($data[$role] ?? [] as $recipient) {
+                EmailParticipant::query()->create([
+                    'email_id' => $email->getKey(),
+                    'email_address' => $recipient['email'],
+                    'name' => $recipient['name'] ?? null,
+                    'role' => $role,
+                ]);
+            }
+        }
     }
 
     /**

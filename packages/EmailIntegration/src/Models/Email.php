@@ -4,16 +4,18 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Models;
 
-use App\Filament\Pages\Dashboard;
 use App\Models\Company;
 use App\Models\Concerns\HasWorkspace;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Closure;
 use Database\Factories\EmailFactory;
 use Filament\Support\Facades\FilamentTimezone;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
@@ -28,6 +30,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Facades\DB;
+use Relaticle\EmailIntegration\Enums\AutomatedReason;
 use Relaticle\EmailIntegration\Enums\EmailCategory;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -51,6 +56,9 @@ use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
  * @property string|null $provider_message_id
  * @property string|null $thread_id
  * @property string|null $in_reply_to
+ * @property string|null $references
+ * @property string|null $conversation_key
+ * @property AutomatedReason|null $automated_reason
  * @property string $subject
  * @property string|null $snippet
  * @property CarbonInterface|null $sent_at
@@ -82,6 +90,9 @@ use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
     'provider_message_id',
     'thread_id',
     'in_reply_to',
+    'references',
+    'conversation_key',
+    'automated_reason',
     'subject',
     'snippet',
     'sent_at',
@@ -100,12 +111,18 @@ use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
     'linked_at',
     'priority',
 ])]
+#[Hidden(['subject_search', 'body_search'])]
 final class Email extends Model
 {
     /**
      * @use HasFactory<EmailFactory>
      */
     use HasFactory, HasUlids, HasWorkspace, SoftDeletes;
+
+    public const int OPPORTUNITY_WINDOW_DAYS = 30;
+
+    // The two-key lock form never meets the one-key workspace and thread locks sync and merges take.
+    public const int CONVERSATION_LOCK_CLASS = 7341;
 
     protected static function newFactory(): EmailFactory
     {
@@ -192,6 +209,155 @@ final class Email extends Model
         return $query->withExists(['reads as is_read' => fn (Builder $readQuery): Builder => $readQuery->where('user_id', $userId)]);
     }
 
+    /**
+     * @param  Builder<Email>  $query
+     * @return Builder<Email>
+     */
+    #[Scope]
+    protected function withRecordLinkState(Builder $query): Builder
+    {
+        if ($query->getQuery()->columns === null) {
+            $query->select(self::listColumns());
+        }
+
+        return $query->selectRaw('exists (select 1 from emailables where emailables.email_id = emails.id) as is_linked_to_record');
+    }
+
+    /**
+     * @param  Builder<Email>  $query
+     * @return Builder<Email>
+     */
+    #[Scope]
+    protected function onRecord(Builder $query, Company|People|Opportunity $record): Builder
+    {
+        if (! $record instanceof Opportunity) {
+            return $query->onRecords($record->getMorphClass(), [(string) $record->getKey()]);
+        }
+
+        // An opportunity also shows its company's and its point of contact's mail inside its window; a pin shows whatever its date.
+        $windowStart = $record->created_at?->subDays(self::OPPORTUNITY_WINDOW_DAYS);
+        $closeDate = $record->closeDate();
+        $windowEnd = $closeDate instanceof CarbonImmutable && $closeDate->isPast() ? $closeDate->addDays(self::OPPORTUNITY_WINDOW_DAYS)->endOfDay() : null;
+        $linked = array_filter([
+            $record->getMorphClass() => $record->getKey(),
+            (new Company)->getMorphClass() => $record->company_id,
+            (new People)->getMorphClass() => $record->contact_id,
+        ]);
+
+        return $query
+            ->where(fn (Builder $mail): Builder => $mail
+                ->whereExists(fn (QueryBuilder $pin): QueryBuilder => $this->linksOf($pin, $query)
+                    ->where('emailables.emailable_type', $record->getMorphClass())
+                    ->where('emailables.emailable_id', $record->getKey())
+                    ->where('emailables.link_source', 'manual'))
+                ->orWhere(fn (Builder $windowed): Builder => $windowed
+                    ->when($windowStart, fn (Builder $after, CarbonInterface $start): Builder => $after->where($query->qualifyColumn('sent_at'), '>=', $start))
+                    ->when($windowEnd, fn (Builder $before, CarbonImmutable $end): Builder => $before->where($query->qualifyColumn('sent_at'), '<=', $end))
+                    ->whereExists(fn (QueryBuilder $link): QueryBuilder => $this->linksOf($link, $query)
+                        ->where(function (QueryBuilder $records) use ($linked): void {
+                            foreach ($linked as $type => $id) {
+                                $records->orWhere(fn (QueryBuilder $one): QueryBuilder => $one
+                                    ->where('emailables.emailable_type', $type)
+                                    ->where('emailables.emailable_id', $id));
+                            }
+                        }))))
+            ->where(fn (Builder $unsuppressed): QueryBuilder => $this->withoutSuppressions($unsuppressed->getQuery(), $query, fn (QueryBuilder $suppression): QueryBuilder => $suppression
+                ->where('email_link_suppressions.emailable_type', $record->getMorphClass())
+                ->where('email_link_suppressions.emailable_id', $record->getKey())));
+    }
+
+    /**
+     * Stored links to any of the records that no user removed from that copy.
+     *
+     * @param  Builder<Email>  $query
+     * @param  QueryBuilder|list<string>  $recordIds
+     * @return Builder<Email>
+     */
+    #[Scope]
+    protected function onRecords(Builder $query, string $morphType, QueryBuilder|array $recordIds): Builder
+    {
+        return $query->whereExists(fn (QueryBuilder $link): QueryBuilder => $this->linksOf($link, $query)
+            ->where('emailables.emailable_type', $morphType)
+            ->whereIn('emailables.emailable_id', $recordIds));
+    }
+
+    /** @param  Builder<Email>  $query */
+    private function linksOf(QueryBuilder $link, Builder $query): QueryBuilder
+    {
+        return $link->from('emailables')
+            ->whereColumn('emailables.email_id', $query->qualifyColumn('id'))
+            ->where(fn (QueryBuilder $unsuppressed): QueryBuilder => $this->withoutSuppressions($unsuppressed, $query, fn (QueryBuilder $suppression): QueryBuilder => $suppression
+                ->whereColumn('email_link_suppressions.emailable_type', 'emailables.emailable_type')
+                ->whereColumn('email_link_suppressions.emailable_id', 'emailables.emailable_id')));
+    }
+
+    /**
+     * No suppression hides the record on this copy: none on the copy itself, and none on another copy of the
+     * conversation the same user holds unless that user pinned the record on one of their copies. Another member's
+     * unlink never hides it. One probe over both cases, each branch reading the unique key on `email_id`.
+     *
+     * @param  Builder<Email>  $query
+     * @param  Closure(QueryBuilder): QueryBuilder  $forRecord
+     */
+    private function withoutSuppressions(QueryBuilder $target, Builder $query, Closure $forRecord): QueryBuilder
+    {
+        $onThisCopy = EmailLinkSuppression::query()
+            ->whereColumn('email_link_suppressions.email_id', $query->qualifyColumn('id'))
+            ->toBase()
+            ->selectRaw('1');
+        $onHeldCopies = EmailLinkSuppression::query()
+            ->join('emails as held', 'held.id', '=', 'email_link_suppressions.email_id')
+            ->whereColumn('held.workspace_id', $query->qualifyColumn('workspace_id'))
+            ->whereColumn('held.conversation_key', $query->qualifyColumn('conversation_key'))
+            ->whereColumn('held.user_id', $query->qualifyColumn('user_id'))
+            ->whereColumn('held.id', '<>', $query->qualifyColumn('id'))
+            ->whereColumn('email_link_suppressions.workspace_id', $query->qualifyColumn('workspace_id'))
+            ->inForce()
+            ->toBase()
+            ->selectRaw('1');
+
+        // One correlated NOT EXISTS keeps the planner's row estimate; two halve it and it stops walking conversations in order.
+        return $target->whereNotExists(fn (QueryBuilder $suppressed): QueryBuilder => $suppressed
+            ->fromSub($forRecord($onThisCopy)->unionAll($forRecord($onHeldCopies)), 'suppressions')
+            ->selectRaw('1'));
+    }
+
+    // Manual linking and sync linking take this first in their transactions, so neither reads the other's half-written links.
+    public function lockConversation(): void
+    {
+        if (blank($this->conversation_key)) {
+            return;
+        }
+
+        $this->takeConversationLock((string) $this->conversation_key);
+
+        $current = self::query()->withoutGlobalScopes()->whereKey($this->getKey())->value('conversation_key');
+
+        if (is_string($current) && $current !== $this->conversation_key) {
+            $this->takeConversationLock($current);
+            $this->conversation_key = $current;
+            $this->syncOriginalAttribute('conversation_key');
+        }
+    }
+
+    public function takeConversationLock(string $conversationKey): void
+    {
+        DB::select('select pg_advisory_xact_lock(?, hashtext(?))', [self::CONVERSATION_LOCK_CLASS, $this->workspace_id.':'.$conversationKey]);
+    }
+
+    /**
+     * Every column but the search vectors, which hold the body's words and up to 64 KB a row.
+     *
+     * @return list<string>
+     */
+    public static function listColumns(): array
+    {
+        $email = new self;
+        $columns = [$email->getKeyName(), ...$email->getFillable(), 'created_at', 'updated_at', 'deleted_at'];
+
+        return array_values(array_map($email->qualifyColumn(...), $columns));
+    }
+
     // Relations
 
     /**
@@ -274,6 +440,13 @@ final class Email extends Model
         }
 
         return $label;
+    }
+
+    public function systemCategory(): ?EmailCategory
+    {
+        $label = $this->categoryLabel();
+
+        return $label instanceof EmailLabel ? EmailCategory::from($label->label) : null;
     }
 
     /**
@@ -459,18 +632,22 @@ final class Email extends Model
         return filled($this->subject) ? $this->subject : __('filament/pages/email-inbox.subject.none');
     }
 
-    public function appUrlFor(User $viewer): string
+    public function appUrl(): string
     {
-        return $this->appUrl($viewer->can('viewBody', $this));
+        return route('email.open', $this);
     }
 
-    public function appUrl(bool $openReader): string
+    public function isLinkedToRecord(): bool
     {
-        return Dashboard::getUrl(
-            $openReader ? ['email' => $this->getKey()] : [],
-            panel: 'app',
-            tenant: $this->workspace,
-        );
+        if (array_key_exists('is_linked_to_record', $this->attributes)) {
+            return (bool) $this->attributes['is_linked_to_record'];
+        }
+
+        if ($this->relationLoaded('pivot')) {
+            return true;
+        }
+
+        return DB::table('emailables')->where('email_id', $this->getKey())->exists();
     }
 
     public function hasPendingAccessRequestFrom(User $viewer): bool
@@ -479,6 +656,14 @@ final class Email extends Model
             ->where('requester_id', $viewer->getKey())
             ->open()
             ->exists();
+    }
+
+    /**
+     * @return HasMany<EmailLinkSuppression, $this>
+     */
+    public function linkSuppressions(): HasMany
+    {
+        return $this->hasMany(EmailLinkSuppression::class);
     }
 
     /**
@@ -548,6 +733,7 @@ final class Email extends Model
             'attempts' => 'integer',
             'linked_at' => 'datetime',
             'priority' => EmailPriority::class,
+            'automated_reason' => AutomatedReason::class,
         ];
     }
 }

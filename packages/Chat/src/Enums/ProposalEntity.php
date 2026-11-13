@@ -21,6 +21,8 @@ enum ProposalEntity: string
     case EmailCancel = 'email_cancels';
     case EmailReschedule = 'email_reschedules';
     case EmailRetry = 'email_retries';
+    case EmailLink = 'email_links';
+    case EmailUnlink = 'email_unlinks';
     case WorkspaceInvitation = 'workspace_invitations';
     case CustomField = 'custom_field';
     case SampleData = 'sample_data';
@@ -37,6 +39,7 @@ enum ProposalEntity: string
             self::Email => 'Email',
             self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete => 'Email Draft',
             self::EmailCancel, self::EmailReschedule, self::EmailRetry => 'Email',
+            self::EmailLink, self::EmailUnlink => 'Email Link',
             self::WorkspaceInvitation => 'Teammate',
             self::CustomField => 'Custom Field',
             self::SampleData => 'Sample Data',
@@ -52,7 +55,7 @@ enum ProposalEntity: string
             self::Opportunity => CrmEntity::Opportunity->titleColumn(),
             self::Task => CrmEntity::Task->titleColumn(),
             self::Note => CrmEntity::Note->titleColumn(),
-            self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry => 'subject',
+            self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::EmailLink, self::EmailUnlink => 'subject',
             self::WorkspaceInvitation => 'email',
             self::CustomField, self::SampleData => 'name',
             self::WebAccess => 'query',
@@ -64,7 +67,7 @@ enum ProposalEntity: string
         return match ($this) {
             self::Company, self::People, self::Opportunity, self::CustomField, self::SampleData => 'Name',
             self::Task, self::Note => 'Title',
-            self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry => 'Subject',
+            self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::EmailLink, self::EmailUnlink => 'Subject',
             self::WorkspaceInvitation => 'Email',
             self::WebAccess => 'Search',
         };
@@ -76,7 +79,7 @@ enum ProposalEntity: string
         return match ($this) {
             self::Company => [$this->titleKey(), 'account_owner_id'],
             self::WorkspaceInvitation => [$this->titleKey(), 'role'],
-            self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::CustomField, self::SampleData, self::WebAccess => [$this->titleKey()],
+            self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::EmailLink, self::EmailUnlink, self::CustomField, self::SampleData, self::WebAccess => [$this->titleKey()],
         };
     }
 
@@ -88,7 +91,7 @@ enum ProposalEntity: string
     public function isIndivisible(): bool
     {
         return match ($this) {
-            self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WebAccess => true,
+            self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::EmailLink, self::EmailUnlink, self::WebAccess => true,
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::WorkspaceInvitation, self::CustomField, self::SampleData => false,
         };
     }
@@ -97,7 +100,7 @@ enum ProposalEntity: string
     {
         return match ($this) {
             self::Email, self::EmailDraftSend, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::WebAccess => true,
-            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::EmailDraft, self::EmailDraftDelete, self::CustomField, self::SampleData => false,
+            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::EmailDraft, self::EmailDraftDelete, self::EmailLink, self::EmailUnlink, self::CustomField, self::SampleData => false,
         };
     }
 
@@ -105,7 +108,7 @@ enum ProposalEntity: string
     {
         return match ($this) {
             self::Email, self::EmailDraftSend, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation => false,
-            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::EmailDraft, self::EmailDraftDelete, self::CustomField, self::SampleData, self::WebAccess => true,
+            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::EmailDraft, self::EmailDraftDelete, self::EmailLink, self::EmailUnlink, self::CustomField, self::SampleData, self::WebAccess => true,
         };
     }
 
@@ -119,7 +122,7 @@ enum ProposalEntity: string
         return match ($this) {
             self::WorkspaceInvitation => "Invite \"{$title}\"",
             self::WebAccess => "Search the web for \"{$title}\"",
-            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::CustomField, self::SampleData => Str::ucfirst($this->verb(PendingActionOperation::Create)).' '.Str::lower($this->singularName())." \"{$title}\"",
+            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::EmailLink, self::EmailUnlink, self::CustomField, self::SampleData => Str::ucfirst($this->verb(PendingActionOperation::Create)).' '.Str::lower($this->singularName())." \"{$title}\"",
         };
     }
 
@@ -133,6 +136,8 @@ enum ProposalEntity: string
             self::EmailCancel => __('Cancel email'),
             self::EmailReschedule => __('Reschedule'),
             self::EmailRetry => __('Send again'),
+            self::EmailLink => __('Link'),
+            self::EmailUnlink => __('Unlink'),
             self::WorkspaceInvitation => trans_choice('Send invitation|Send :count invitations', $count, ['count' => $count]),
             self::WebAccess => __('Allow'),
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::CustomField, self::SampleData => $operation->action(),
@@ -143,7 +148,7 @@ enum ProposalEntity: string
     {
         return match ($this) {
             self::EmailDraftDelete => true,
-            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::CustomField, self::SampleData, self::WebAccess => $operation === PendingActionOperation::Delete,
+            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::EmailLink, self::EmailUnlink, self::WorkspaceInvitation, self::CustomField, self::SampleData, self::WebAccess => $operation === PendingActionOperation::Delete,
         };
     }
 
@@ -157,7 +162,7 @@ enum ProposalEntity: string
                 ? __('Delete :count :entities', ['count' => $count, 'entities' => Str::plural(Str::lower($this->singularName()), $count)])
                 : __('Approve'),
             self::EmailDraft => __('Approve'),
-            self::EmailDraftSend, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::WebAccess => $this->action($operation, $count),
+            self::EmailDraftSend, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::EmailLink, self::EmailUnlink, self::WorkspaceInvitation, self::WebAccess => $this->action($operation, $count),
         };
     }
 
@@ -165,7 +170,7 @@ enum ProposalEntity: string
     {
         return match ($this) {
             self::Email, self::EmailDraftSend, self::WorkspaceInvitation => __("Don't send"),
-            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::EmailDraft, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::CustomField, self::SampleData, self::WebAccess => __('Discard'),
+            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::EmailDraft, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::EmailLink, self::EmailUnlink, self::CustomField, self::SampleData, self::WebAccess => __('Discard'),
         };
     }
 
@@ -177,6 +182,8 @@ enum ProposalEntity: string
             self::EmailCancel => __('Then cancel email'),
             self::EmailReschedule => __('Then reschedule email'),
             self::EmailRetry => __('Then send again'),
+            self::EmailLink => __('Then link email'),
+            self::EmailUnlink => __('Then unlink email'),
             self::WorkspaceInvitation => __('Then invite'),
             self::WebAccess => __('Then search the web'),
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::EmailDraft, self::EmailDraftDelete, self::CustomField, self::SampleData => __('Then'),
@@ -193,6 +200,8 @@ enum ProposalEntity: string
             self::EmailCancel => __('Cancelled'),
             self::EmailReschedule => __('Rescheduled'),
             self::EmailRetry => __('Queued again'),
+            self::EmailLink => __('Linked'),
+            self::EmailUnlink => __('Unlinked'),
             self::WorkspaceInvitation => __('Invited'),
             self::WebAccess => __('Web search allowed'),
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::CustomField, self::SampleData => $operation->done(),
@@ -209,6 +218,8 @@ enum ProposalEntity: string
             self::EmailCancel => 'cancel',
             self::EmailReschedule => 'reschedule',
             self::EmailRetry => 'retry',
+            self::EmailLink => 'link',
+            self::EmailUnlink => 'unlink',
             self::WorkspaceInvitation => 'invite',
             self::WebAccess => 'search',
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::CustomField, self::SampleData => $operation->verb(),
@@ -225,6 +236,8 @@ enum ProposalEntity: string
             self::EmailCancel => 'NOT cancelled, so it still goes out',
             self::EmailReschedule => 'NOT rescheduled',
             self::EmailRetry => 'NOT queued again',
+            self::EmailLink => 'NOT linked',
+            self::EmailUnlink => 'NOT unlinked, so it stays on the record',
             self::WorkspaceInvitation => 'NOT invited',
             self::WebAccess => 'NOT allowed, so answer without the web',
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::CustomField, self::SampleData => $operation->notDone(),
@@ -238,6 +251,7 @@ enum ProposalEntity: string
             self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete => 'email draft',
             self::EmailCancel, self::EmailReschedule => 'queued email',
             self::EmailRetry => 'failed email',
+            self::EmailLink, self::EmailUnlink => 'email link',
             self::WorkspaceInvitation => 'teammate',
             self::WebAccess => 'the web for',
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::CustomField, self::SampleData => $this->value,
@@ -253,7 +267,7 @@ enum ProposalEntity: string
                 PendingActionStatus::Rejected => 'DENIED (no web for that request, not a write)',
                 PendingActionStatus::Expired, PendingActionStatus::Superseded => 'EXPIRED (no answer, no web for that request, not a write)',
             },
-            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::CustomField, self::SampleData => $status->promptWord(),
+            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::EmailLink, self::EmailUnlink, self::WorkspaceInvitation, self::CustomField, self::SampleData => $status->promptWord(),
         };
     }
 
@@ -263,7 +277,7 @@ enum ProposalEntity: string
             self::Task => $operation === PendingActionOperation::Create ? __('Created task') : $operation->done(),
             self::Note => $operation === PendingActionOperation::Create ? __('Added note') : $operation->done(),
             self::Email => __('Queued email to'),
-            self::Company, self::People, self::Opportunity, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::CustomField, self::SampleData, self::WebAccess => $this->done($operation),
+            self::Company, self::People, self::Opportunity, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::EmailLink, self::EmailUnlink, self::WorkspaceInvitation, self::CustomField, self::SampleData, self::WebAccess => $this->done($operation),
         };
     }
 
@@ -271,7 +285,7 @@ enum ProposalEntity: string
     {
         return match ($this) {
             self::Email => 'To',
-            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::CustomField, self::SampleData, self::WebAccess => null,
+            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::EmailLink, self::EmailUnlink, self::WorkspaceInvitation, self::CustomField, self::SampleData, self::WebAccess => null,
         };
     }
 
@@ -279,7 +293,7 @@ enum ProposalEntity: string
     {
         return match ($this) {
             self::Email, self::EmailDraftSend, self::WorkspaceInvitation => ProposalOutcome::NotSent,
-            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::EmailDraft, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::CustomField, self::SampleData, self::WebAccess => ProposalOutcome::LeftOut,
+            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::EmailDraft, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::EmailLink, self::EmailUnlink, self::CustomField, self::SampleData, self::WebAccess => ProposalOutcome::LeftOut,
         };
     }
 
@@ -289,7 +303,7 @@ enum ProposalEntity: string
             self::WorkspaceInvitation => $count === 1
                 ? __('Sent :count invitation', ['count' => ':count'])
                 : __('Sent :count invitations', ['count' => ':count']),
-            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::CustomField, self::SampleData, self::WebAccess => __(':verb :count :entities', [
+            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::EmailLink, self::EmailUnlink, self::CustomField, self::SampleData, self::WebAccess => __(':verb :count :entities', [
                 'verb' => $operation->done(),
                 'count' => ':count',
                 'entities' => Str::plural(Str::lower($this->singularName()), $count),

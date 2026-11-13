@@ -13,18 +13,20 @@
              trigger fires composer:open and stays until this component answers. --}}
         x-data="{
             opening: false,
+            shortcut: null,
             init() {
                 $wire.$interceptMessage(({ onFinish }) => onFinish(() => this.opening = false))
+                this.shortcut = this.$store.shortcuts?.register('email-compose', {
+                    scope: 'global',
+                    entries: @js(\Relaticle\EmailIntegration\Enums\EmailShortcut::forStore()),
+                    handlers: { compose: () => $wire.dispatch('composer:open') },
+                })
+            },
+            destroy() {
+                this.$store.shortcuts?.unregister('email-compose', this.shortcut)
             },
         }"
         x-on:composer:open.window="opening = ! $wire.isOpen"
-        x-on:keydown.window="(() => {
-            if ($event.key === 'c'
-                && ! $event.metaKey && ! $event.ctrlKey && ! $event.altKey
-                && ! ['INPUT', 'TEXTAREA', 'SELECT'].includes($event.target.tagName)
-                && ! $event.target.isContentEditable
-            ) { $event.preventDefault(); $wire.dispatch('composer:open') }
-        })()"
     @endif
 >
     @php

@@ -1248,6 +1248,11 @@ html.fi-record-stacked .fi-record-layout {
     & > :last-child {
         @apply min-w-0;
     }
+
+    /* The reader drawer covers the right of the page, so the rail yields its width to the list. */
+    &:has(.fi-email-reader-drawer) > :is(:first-child, :has(> .fi-record-rail-resize-handle)) {
+        @apply record-split:hidden;
+    }
 }
 
 .fi-record-rail {

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Actions;
 
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Data\ConnectAccountData;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Enums\MailboxHealth;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\MailboxHistoryImportService;
 
@@ -15,6 +17,7 @@ final readonly class ConnectAccountAction
     public function __construct(
         private StartMailboxHistoryImportAction $startMailboxHistoryImport,
         private MailboxHistoryImportService $mailboxHistoryImport,
+        private RecordMailboxHealth $recordMailboxHealth,
     ) {}
 
     public function execute(ConnectAccountData $data): ConnectedAccount
@@ -77,6 +80,10 @@ final readonly class ConnectAccountAction
 
             $account = ConnectedAccount::withTrashed()->updateOrCreate($lookup, $values);
 
+            if (! $importStillDraining) {
+                $this->recordHealthAfterConnect($account);
+            }
+
             $needsHistoryImport = ! $importStillDraining
                 && (
                     $account->wasRecentlyCreated
@@ -90,38 +97,10 @@ final readonly class ConnectAccountAction
             }
 
             if ($account->trashed()) {
-                // Disconnect promotes a successor but leaves is_default set while trashed.
-                // Demote before restore so the live-default unique index is not violated.
-                if ($account->is_default) {
-                    $hasOtherDefault = ConnectedAccount::query()
-                        ->where('user_id', $data->userId)
-                        ->where('workspace_id', $data->workspaceId)
-                        ->where('is_default', true)
-                        ->whereKeyNot($account->getKey())
-                        ->exists();
-
-                    if ($hasOtherDefault) {
-                        $account->update(['is_default' => false]);
-                    }
-                }
-
-                $account->restore();
-                $account->update(['history_import_batch_id' => null]);
+                $this->restore($account, $data);
             }
 
-            // The first account a user connects becomes their default. This also
-            // re-promotes a fresh connection when a previous default was removed,
-            // so the user is never left without one.
-            $hasDefault = ConnectedAccount::query()
-                ->where('user_id', $data->userId)
-                ->where('workspace_id', $data->workspaceId)
-                ->where('is_default', true)
-                ->whereKeyNot($account->getKey())
-                ->exists();
-
-            if (! $hasDefault && ! $account->is_default) {
-                $account->update(['is_default' => true]);
-            }
+            $this->makeDefaultWhenNoneIsSet($account, $data);
 
             return $account;
         });
@@ -131,5 +110,58 @@ final readonly class ConnectAccountAction
         }
 
         return $account;
+    }
+
+    // A reconnect cannot lift a billing pause, so it keeps that state and its sent notices.
+    private function recordHealthAfterConnect(ConnectedAccount $account): void
+    {
+        if ($account->health_changed_at === null) {
+            $account->forceFill(['health_changed_at' => now()])->save();
+        }
+
+        $hasHostedAccess = ConnectedAccount::withTrashed()->whereKey($account->getKey())->inWorkspaceWithHostedAccess()->exists();
+
+        $this->recordMailboxHealth->execute($account, $hasHostedAccess ? MailboxHealth::Healthy : MailboxHealth::PausedBilling);
+    }
+
+    // The first account a user connects becomes their default. This also
+    // re-promotes a fresh connection when a previous default was removed.
+    private function makeDefaultWhenNoneIsSet(ConnectedAccount $account, ConnectAccountData $data): void
+    {
+        $hasDefault = ConnectedAccount::query()
+            ->where('user_id', $data->userId)
+            ->where('workspace_id', $data->workspaceId)
+            ->where('is_default', true)
+            ->whereKeyNot($account->getKey())
+            ->exists();
+
+        if (! $hasDefault && ! $account->is_default) {
+            $account->update(['is_default' => true]);
+        }
+    }
+
+    private function restore(ConnectedAccount $account, ConnectAccountData $data): void
+    {
+        // Disconnect promotes a successor but leaves is_default set while trashed.
+        // Demote before restore so the live-default unique index is not violated.
+        if ($account->is_default) {
+            $hasOtherDefault = ConnectedAccount::query()
+                ->where('user_id', $data->userId)
+                ->where('workspace_id', $data->workspaceId)
+                ->where('is_default', true)
+                ->whereKeyNot($account->getKey())
+                ->exists();
+
+            if ($hasOtherDefault) {
+                $account->update(['is_default' => false]);
+            }
+        }
+
+        $account->restore();
+        $account->update(['history_import_batch_id' => null]);
+
+        Artisan::queue('email:backfill-conversations', ['--force' => true, '--workspace' => $account->workspace_id])
+            ->onQueue('imports')
+            ->afterCommit();
     }
 }

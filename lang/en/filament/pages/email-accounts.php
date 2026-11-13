@@ -116,6 +116,23 @@ return [
         'disconnected' => 'Disconnected',
         'reauth_required' => 'Reconnect needed',
     ],
+    'health' => [
+        'labels' => [
+            'healthy' => 'Healthy',
+            'stale' => 'Not syncing',
+            'reauth_required' => 'Reconnect needed',
+            'error' => 'Sync issue',
+            'paused_billing' => 'Paused',
+        ],
+        'banner' => [
+            'stale' => ':mailbox stopped syncing. Its last sync was :ago. Reconnect it to bring in new mail.',
+            'stale_never' => ':mailbox stopped syncing. Reconnect it to bring in new mail.',
+            'reauth_required' => 'Relaticle lost access to :mailbox. Reconnect it to keep mail syncing.',
+            'error' => 'Mail sync for :mailbox keeps failing. Reconnect it to bring in new mail.',
+            'paused_billing' => 'Mail sync for :mailbox is paused until billing is resumed.',
+            'billing_action' => 'View billing',
+        ],
+    ],
     'history_import' => [
         'processed' => ':processed of :total processed',
         'successful_jobs' => ':count imported successfully',

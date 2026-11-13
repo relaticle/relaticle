@@ -106,6 +106,9 @@ return [
              * differs per environment and silently writes local wall-clock into UTC columns.
              */
             'timezone' => 'UTC',
+
+            // JIT compiles plans for seconds; the app's queries run in milliseconds.
+            'server_options' => ['jit' => env('DB_JIT', 'off')],
         ],
 
         'sqlsrv' => [
