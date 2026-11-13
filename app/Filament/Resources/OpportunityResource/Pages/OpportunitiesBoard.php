@@ -6,7 +6,6 @@ namespace App\Filament\Resources\OpportunityResource\Pages;
 
 use App\Actions\Opportunity\UpdateOpportunity;
 use App\Contracts\OrdersBoardStages;
-use App\Data\BoardStateData;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\OpportunityField as OpportunityCustomField;
 use App\Filament\Actions\MoveCardAction;
@@ -24,7 +23,6 @@ use App\Filament\Tables\FilterBar\ConditionsFilter;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Opportunity;
-use App\Models\User;
 use App\Models\Workspace;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
@@ -39,14 +37,11 @@ use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentTimezone;
 use Filament\Tables\Enums\FiltersLayout;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Gate;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\Flowforge\Board;
 use Relaticle\Flowforge\Components\CardFlex;
-use Relaticle\Flowforge\Exceptions\CardMoveRejectedException;
 use Relaticle\Flowforge\Grouping;
 use Relaticle\Flowforge\Lane;
 use Relaticle\Flowforge\Modern\BoardResourcePage;
@@ -205,23 +200,6 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
         ];
     }
 
-    protected function authorizeCardMove(Model $card, string $targetColumnId, ?string $toLaneId = null): void
-    {
-        $this->refuseReorderWhileSorted($card, $targetColumnId, $toLaneId);
-
-        if (Gate::denies('update', $card)) {
-            throw CardMoveRejectedException::because(__('filament/pages/boards.move_denied'));
-        }
-    }
-
-    protected function persistCardMove(Model $card, mixed $columnValue, string $position): void
-    {
-        $card->update([$this->getBoard()->getPositionIdentifierAttribute() => $position]);
-
-        /** @var Opportunity $card */
-        $card->saveCustomFieldValue($this->boardColumnField(), $this->columnValueFor((string) $columnValue));
-    }
-
     private function cardCreation(): CreateAction
     {
         return CreateAction::make('addCard')
@@ -257,12 +235,6 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
                 $record,
                 ['company_id' => $to->getName() === Grouping::EMPTY_LANE ? null : $to->getName()],
             ));
-    }
-
-    private function currentUser(): User
-    {
-        /** @var User */
-        return Auth::guard('web')->user();
     }
 
     private function quickCreateForm(Schema $schema): Schema
@@ -325,27 +297,9 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
     /**
      * @param  array<string, mixed>  $data
      */
-    private function createCard(array $data, CreateAction $action): Opportunity
+    protected function createBoardRecord(Workspace $workspace, array $data): Opportunity
     {
-        $columnId = $action->getArguments()['column'] ?? null;
-
-        abort_unless(blank($columnId) || $this->ownsColumn((string) $columnId), 422);
-
-        /** @var Workspace $currentWorkspace */
-        $currentWorkspace = Auth::guard('web')->user()->currentWorkspace;
-
-        /** @var Opportunity $opportunity */
-        $opportunity = $currentWorkspace->opportunities()->create($data);
-
-        if (filled($columnId)) {
-            if ($columnId !== BoardStateData::NO_VALUE_COLUMN) {
-                $opportunity->saveCustomFieldValue($this->boardColumnField(), $columnId);
-            }
-
-            $this->placeNewCard($opportunity, $columnId);
-        }
-
-        return $opportunity;
+        return $workspace->opportunities()->create($data);
     }
 
     private static function stageCustomField(): ?CustomField

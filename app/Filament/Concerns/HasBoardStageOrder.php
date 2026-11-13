@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Concerns;
 
+use App\Actions\Views\MoveBoardCard;
 use App\Actions\Views\PlaceBoardCard;
 use App\Actions\Views\ReorderBoardStages;
 use App\Actions\Views\SaveBoardState;
@@ -16,6 +17,8 @@ use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\CustomFieldValue;
 use App\Models\SavedView;
+use App\Models\User;
+use App\Models\Workspace;
 use App\Queries\Views\BoardColumnFieldsQuery;
 use Closure;
 use Filament\Actions\Action;
@@ -28,10 +31,13 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\HtmlString;
 use LogicException;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 use Relaticle\Flowforge\Column;
+use Relaticle\Flowforge\Exceptions\CardMoveRejectedException;
 
 trait HasBoardStageOrder
 {
@@ -364,6 +370,57 @@ trait HasBoardStageOrder
         resolve(PlaceBoardCard::class)->execute($this->viewSwitcherUser(), $card, (float) $this->getBoardPositionInColumn($columnId, $edge));
     }
 
+    protected function authorizeCardMove(Model $card, string $targetColumnId, ?string $toLaneId = null): void
+    {
+        $this->refuseReorderWhileSorted($card, $targetColumnId, $toLaneId);
+
+        if (Gate::denies('update', $card)) {
+            throw CardMoveRejectedException::because(__('filament/pages/boards.move_denied'));
+        }
+    }
+
+    protected function persistCardMove(Model $card, mixed $columnValue, string $position): void
+    {
+        abort_unless($card instanceof HasCustomFields, 422);
+
+        resolve(MoveBoardCard::class)->execute(
+            $this->currentUser(),
+            $card,
+            $this->getBoard()->getPositionIdentifierAttribute(),
+            $position,
+            $this->boardColumnField(),
+            $this->columnValueFor((string) $columnValue),
+        );
+    }
+
+    protected function currentUser(): User
+    {
+        /** @var User */
+        return Auth::guard('web')->user();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    protected function createCard(array $data, CreateAction $action): Model&HasCustomFields
+    {
+        $columnId = $action->getArguments()['column'] ?? null;
+
+        abort_unless(blank($columnId) || $this->ownsColumn((string) $columnId), 422);
+
+        $card = $this->createBoardRecord($this->currentUser()->currentWorkspace, $data);
+
+        if (filled($columnId)) {
+            if ($columnId !== BoardStateData::NO_VALUE_COLUMN) {
+                $card->saveCustomFieldValue($this->boardColumnField(), $columnId);
+            }
+
+            $this->placeNewCard($card, $columnId);
+        }
+
+        return $card;
+    }
+
     private function fillWithFirstVisibleColumn(?Schema $schema): void
     {
         if (! $schema instanceof Schema) {
@@ -398,6 +455,13 @@ trait HasBoardStageOrder
     }
 
     abstract protected function defaultBoardColumnField(): ?CustomField;
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    abstract protected function createBoardRecord(Workspace $workspace, array $data): Model&HasCustomFields;
+
+    abstract protected function refuseReorderWhileSorted(Model $card, string $targetColumnId, ?string $toLaneId = null): void;
 
     /**
      * @return array<string, mixed>

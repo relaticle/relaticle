@@ -6,7 +6,6 @@ namespace App\Filament\Resources\TaskResource\Pages;
 
 use App\Actions\Task\UpdateTask;
 use App\Contracts\OrdersBoardStages;
-use App\Data\BoardStateData;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\TaskField as TaskCustomField;
 use App\Filament\Actions\CreateTaskAction;
@@ -40,13 +39,11 @@ use Filament\Tables\Enums\FiltersLayout;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Relaticle\Flowforge\Board;
-use Relaticle\Flowforge\Exceptions\CardMoveRejectedException;
 use Relaticle\Flowforge\Grouping;
 use Relaticle\Flowforge\Lane;
 use Relaticle\Flowforge\Modern\BoardResourcePage;
@@ -266,23 +263,6 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
         ];
     }
 
-    protected function authorizeCardMove(Model $card, string $targetColumnId, ?string $toLaneId = null): void
-    {
-        $this->refuseReorderWhileSorted($card, $targetColumnId, $toLaneId);
-
-        if (Gate::denies('update', $card)) {
-            throw CardMoveRejectedException::because(__('filament/pages/boards.move_denied'));
-        }
-    }
-
-    protected function persistCardMove(Model $card, mixed $columnValue, string $position): void
-    {
-        $card->update([$this->getBoard()->getPositionIdentifierAttribute() => $position]);
-
-        /** @var Task $card */
-        $card->saveCustomFieldValue($this->boardColumnField(), $this->columnValueFor((string) $columnValue));
-    }
-
     /**
      * Format a due date value for badge display.
      *
@@ -358,36 +338,12 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
         resolve(UpdateTask::class)->execute($this->currentUser(), $record, ['assignee_ids' => $assigneeIds]);
     }
 
-    private function currentUser(): User
-    {
-        /** @var User */
-        return Auth::guard('web')->user();
-    }
-
     /**
      * @param  array<string, mixed>  $data
      */
-    private function createCard(array $data, CreateTaskAction $action): Task
+    protected function createBoardRecord(Workspace $workspace, array $data): Task
     {
-        $columnId = $action->getArguments()['column'] ?? null;
-
-        abort_unless(blank($columnId) || $this->ownsColumn((string) $columnId), 422);
-
-        /** @var Workspace $currentWorkspace */
-        $currentWorkspace = Auth::guard('web')->user()->currentWorkspace;
-
-        /** @var Task $task */
-        $task = $currentWorkspace->tasks()->create($data);
-
-        if (filled($columnId)) {
-            if ($columnId !== BoardStateData::NO_VALUE_COLUMN) {
-                $task->saveCustomFieldValue($this->boardColumnField(), $columnId);
-            }
-
-            $this->placeNewCard($task, $columnId);
-        }
-
-        return $task;
+        return $workspace->tasks()->create($data);
     }
 
     private function descriptionCustomField(): ?CustomField
