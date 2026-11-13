@@ -483,14 +483,14 @@ it('leaves the hand order of a column untouched by moves made while sorted', fun
     opportunitiesToSort($this);
     $mover = opportunityInStage($this, 'Mover', 'Qualification');
     $prospecting = (string) $this->stageField->options->firstWhere('name', 'Prospecting')->getKey();
-    $before = Opportunity::query()->whereIn('name', ['Bravo', 'Charlie', 'Alpha'])->pluck('order_column', 'name')->map(fn ($value): float => (float) $value)->all();
+    $before = Opportunity::query()->whereIn('name', ['Bravo', 'Charlie', 'Alpha'])->orderBy('name')->pluck('order_column', 'name')->map(fn ($value): float => (float) $value)->all();
 
     $component = livewire(OpportunitiesBoard::class)
         ->call('setFilterBarSorts', [['column' => 'created_at', 'direction' => 'desc']])
         ->call('moveCard', (string) $mover->id, $prospecting)
         ->call('setFilterBarSorts', []);
 
-    $after = Opportunity::query()->whereIn('name', ['Bravo', 'Charlie', 'Alpha'])->pluck('order_column', 'name')->map(fn ($value): float => (float) $value)->all();
+    $after = Opportunity::query()->whereIn('name', ['Bravo', 'Charlie', 'Alpha'])->orderBy('name')->pluck('order_column', 'name')->map(fn ($value): float => (float) $value)->all();
 
     expect($after)->toBe($before)
         ->and(opportunityStageNames($component, 'Prospecting'))->toBe(['Mover', 'Bravo', 'Charlie', 'Alpha']);

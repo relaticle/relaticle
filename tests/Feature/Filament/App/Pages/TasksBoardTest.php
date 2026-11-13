@@ -918,7 +918,7 @@ it('leaves the hand order of a column untouched by moves made while sorted', fun
     tasksToSort($this);
     $mover = taskInStatus($this, 'Mover', 'In progress');
     $todo = (string) $this->statusField->options->firstWhere('name', 'To do')->getKey();
-    $positions = fn (): array => Task::query()->whereIn('title', ['Bravo', 'Charlie', 'Alpha'])->pluck('order_column', 'title')->map(fn ($value): float => (float) $value)->all();
+    $positions = fn (): array => Task::query()->whereIn('title', ['Bravo', 'Charlie', 'Alpha'])->orderBy('title')->pluck('order_column', 'title')->map(fn ($value): float => (float) $value)->all();
     $before = $positions();
 
     $component = livewire(TasksBoard::class)
