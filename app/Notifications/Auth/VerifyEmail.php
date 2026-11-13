@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace App\Notifications\Auth;
 
 use Filament\Auth\Notifications\VerifyEmail as FilamentVerifyEmail;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Tries;
 
 #[Tries(3)]
 #[Backoff(60, 300)]
-final class VerifyEmail extends FilamentVerifyEmail
+final class VerifyEmail extends FilamentVerifyEmail implements ShouldBeEncrypted
 {
     /**
      * @param  mixed  $notifiable
