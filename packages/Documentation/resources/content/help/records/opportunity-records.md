@@ -37,8 +37,8 @@ Open **View settings** to shape the board. Under **Grouped by**, pick another
 single-choice attribute to make the columns. Under **Visible columns**, switch a
 column off to hide it. Drag a column header, or drag the list in **Visible
 columns**, to put the columns in your own order. Switch on **No Stage** to add a first column for deals with no stage.
-Under **Lanes**, pick **Company** to split the board into a lane per company. While lanes
-are shown, the bar offers no **Sort** and cards stay in hand order.
+Under **Lanes**, pick **Company** to split the board into a lane per company. A **Sort**
+orders the cards inside each lane too.
 
 Under **Visible attributes**, choose what each card shows, reorder it, and add
 more with **Add attribute to view**. **Show attribute labels** and **Hide empty

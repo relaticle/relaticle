@@ -349,7 +349,7 @@ trait HasBoardViews
                 array_keys($this->activeBoardSorts()),
                 $this->activeBoardSorts(),
             ),
-            'sortable' => $this->lanesShown() ? [] : array_map(
+            'sortable' => array_map(
                 fn (string $key, array $field): array => ['key' => $key, ...$field],
                 array_keys($fields),
                 $fields,
@@ -389,12 +389,7 @@ trait HasBoardViews
      */
     private function activeBoardSorts(): array
     {
-        return $this->lanesShown() ? [] : array_intersect_key(SortList::parse($this->boardSort), $this->boardSortableFields());
-    }
-
-    protected function lanesShown(): bool
-    {
-        return $this->getBoard()->getActiveGrouping() !== null;
+        return array_intersect_key(SortList::parse($this->boardSort), $this->boardSortableFields());
     }
 
     public function setFilterBarSorts(mixed $sorts = []): void
@@ -474,11 +469,11 @@ trait HasBoardViews
         return $card?->getKey();
     }
 
-    protected function refuseReorderWhileSorted(Model $card, string $targetColumnId): void
+    protected function refuseReorderWhileSorted(Model $card, string $targetColumnId, ?string $toLaneId = null): void
     {
         $sorts = $this->activeBoardSorts();
 
-        if ($sorts === [] || $this->getBoard()->getRecordColumnId($card) !== $targetColumnId) {
+        if ($sorts === [] || $toLaneId !== null || $this->getBoard()->getRecordColumnId($card) !== $targetColumnId) {
             return;
         }
 

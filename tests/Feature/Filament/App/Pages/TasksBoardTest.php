@@ -775,25 +775,98 @@ it('reads the sort from the url and ignores a garbage one', function (): void {
     }
 });
 
-it('keeps the hand order and offers no sort while lanes are shown', function (): void {
-    tasksToSort($this);
-    Task::query()->get()->each(fn (Task $task) => $task->assignees()->attach($this->user));
+/**
+ * @return array{User, User}
+ */
+function tasksInAssigneeLanes(object $test): array
+{
+    tasksToSort($test);
+    $other = User::factory()->create();
+    $test->workspace->users()->attach($other, ['role' => 'member']);
+    Task::query()->get()->each(fn (Task $task) => $task->assignees()->attach($test->user));
+    $dueDate = WorkspaceCustomField::byCode($test->workspace->getKey(), 'task', 'due_date');
+
+    foreach ([
+        ['Foxtrot', Date::parse('2026-01-04'), '2026-03-04', 1000],
+        ['Delta', Date::parse('2026-01-06'), '2026-03-06', 2000],
+        ['Echo', Date::parse('2026-01-05'), '2026-03-05', 3000],
+    ] as [$title, $createdAt, $due, $position]) {
+        $task = taskInStatus($test, $title, 'To do');
+        $task->forceFill(['created_at' => $createdAt, 'order_column' => $position])->saveQuietly();
+        $task->saveCustomFieldValue($dueDate, $due);
+        $task->assignees()->attach($other);
+    }
+
+    return [$test->user, $other];
+}
+
+function taskLaneTitles(Testable $component, User $assignee): array
+{
+    $board = $component->instance()->getBoard();
+    $lane = collect($board->getLanes($board->getActiveGrouping()))->first(fn (Lane $lane): bool => $lane->getName() === (string) $assignee->getKey());
+
+    return $board->getLaneRecords($lane, 50)->pluck('title')->all();
+}
+
+it('keeps the hand order in lane cells while no sort is set', function (): void {
+    [$first, $second] = tasksInAssigneeLanes($this);
+
+    $component = livewire(TasksBoard::class)->call('setBoardGrouping', 'assignee');
+
+    expect(taskLaneTitles($component, $first))->toBe(['Bravo', 'Charlie', 'Alpha'])
+        ->and(taskLaneTitles($component, $second))->toBe(['Foxtrot', 'Delta', 'Echo']);
+});
+
+it('orders the cards of each lane cell by the sort from the bar', function (string $column, string $direction, array $firstLane, array $secondLane): void {
+    [$first, $second] = tasksInAssigneeLanes($this);
+
+    $component = livewire(TasksBoard::class)
+        ->call('setBoardGrouping', 'assignee')
+        ->call('setFilterBarSorts', [['column' => $column, 'direction' => $direction]]);
+
+    expect(taskLaneTitles($component, $first))->toBe($firstLane)
+        ->and(taskLaneTitles($component, $second))->toBe($secondLane);
+})->with([
+    'newest first' => ['created_at', 'desc', ['Charlie', 'Alpha', 'Bravo'], ['Delta', 'Echo', 'Foxtrot']],
+    'title a to z' => ['title', 'asc', ['Alpha', 'Bravo', 'Charlie'], ['Delta', 'Echo', 'Foxtrot']],
+    'title z to a' => ['title', 'desc', ['Charlie', 'Bravo', 'Alpha'], ['Foxtrot', 'Echo', 'Delta']],
+    'latest due date first' => ['custom_fields.due_date', 'desc', ['Bravo', 'Alpha', 'Charlie'], ['Delta', 'Echo', 'Foxtrot']],
+    'earliest due date first' => ['custom_fields.due_date', 'asc', ['Charlie', 'Alpha', 'Bravo'], ['Foxtrot', 'Echo', 'Delta']],
+]);
+
+it('offers the bar a sort while lanes are shown and keeps it when lanes go away', function (): void {
+    tasksInAssigneeLanes($this);
 
     $component = livewire(TasksBoard::class)
         ->call('setFilterBarSorts', [['column' => 'title', 'direction' => 'asc']])
         ->call('setBoardGrouping', 'assignee');
 
-    $board = $component->instance()->getBoard();
-    $lane = collect($board->getLanes($board->getActiveGrouping()))->first(fn (Lane $lane): bool => $lane->getName() === (string) $this->user->getKey());
-
-    expect($component->instance()->getFilterBarData()['sortable'])->toBe([])
-        ->and($component->get('boardSort'))->toBe('title:asc')
-        ->and($board->getLaneRecords($lane, 50)->pluck('title')->all())->toBe(['Bravo', 'Charlie', 'Alpha']);
+    expect($component->instance()->getFilterBarData()['sortable'])->not->toBe([])
+        ->and($component->instance()->getFilterBarData()['sorts'])->toHaveCount(1)
+        ->and($component->get('boardSort'))->toBe('title:asc');
 
     $component->call('setBoardGrouping', null);
 
-    expect(taskStatusTitles($component, 'To do'))->toBe(['Alpha', 'Bravo', 'Charlie']);
+    expect(taskStatusTitles($component, 'To do'))->toBe(['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot']);
 });
+
+it('moves a card to another assignee lane while sorted', function (string $status): void {
+    $this->withoutDefer();
+
+    [$first, $second] = tasksInAssigneeLanes($this);
+    $card = Task::query()->where('title', 'Bravo')->firstOrFail();
+    $column = (string) $this->statusField->options->firstWhere('name', $status)->getKey();
+
+    $component = livewire(TasksBoard::class)
+        ->call('setBoardGrouping', 'assignee')
+        ->call('setFilterBarSorts', [['column' => 'title', 'direction' => 'asc']])
+        ->call('moveCard', (string) $card->id, $column, null, null, (string) $first->id, (string) $second->id)
+        ->assertDispatched('kanban-card-moved');
+
+    expect($card->assignees()->pluck('users.id')->all())->toBe([$second->id])
+        ->and(taskLaneTitles($component, $second))->toContain('Bravo')
+        ->and(taskLaneTitles($component, $first))->not->toContain('Bravo');
+})->with(['the same status' => 'To do', 'another status' => 'In progress']);
 
 it('refuses a drop inside the same column while sorted', function (): void {
     tasksToSort($this);

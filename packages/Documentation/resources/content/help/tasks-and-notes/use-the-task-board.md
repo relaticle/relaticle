@@ -17,7 +17,7 @@ for **Priority**, a **Due Date** badge that turns into "Due Today",
 "Due Tomorrow", or "(Overdue)" as the date approaches, and the assignees'
 avatars. Choose what a card shows under **Visible attributes** in **View settings**.
 
-Click **Filter** to narrow the whole board by most attributes. Filter by **Assignees** to see one person's plate. Click **Sort** to order the cards in every column. Open **View settings** and pick **Assignee** under **Lanes** to split the board into a lane per assignee. While lanes are shown, the bar offers no **Sort** and cards stay in hand order.
+Click **Filter** to narrow the whole board by most attributes. Filter by **Assignees** to see one person's plate. Click **Sort** to order the cards in every column. Open **View settings** and pick **Assignee** under **Lanes** to split the board into a lane per assignee. A **Sort** orders the cards inside each lane too.
 
 Without a sort, cards keep the order you dragged them into. With a sort set, you can still drag a card to another column but not reorder it by hand. The two buttons at the end of the filter row switch the columns between narrow and wide and the cards between compact and full.
 

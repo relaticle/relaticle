@@ -207,7 +207,7 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
 
     protected function authorizeCardMove(Model $card, string $targetColumnId, ?string $toLaneId = null): void
     {
-        $this->refuseReorderWhileSorted($card, $targetColumnId);
+        $this->refuseReorderWhileSorted($card, $targetColumnId, $toLaneId);
 
         if (Gate::denies('update', $card)) {
             throw CardMoveRejectedException::because(__('filament/pages/boards.move_denied'));
