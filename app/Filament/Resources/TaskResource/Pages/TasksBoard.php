@@ -310,6 +310,7 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
         return Grouping::make('assignee')
             ->label(__('filament/pages/boards.tasks.groupings.assignee'))
             ->lanes(fn (Builder $boardQuery): array => User::query()
+                ->select('users.id', 'users.name', 'users.profile_photo_path')
                 ->memberOf($this->currentUser()->currentWorkspace)
                 ->whereIn('users.id', DB::table('task_user')->whereIn('task_id', (clone $boardQuery)->select('tasks.id'))->select('user_id'))
                 ->orderBy('name')

@@ -219,6 +219,7 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
         return Grouping::make('company')
             ->label(__('filament/pages/boards.opportunities.groupings.company'))
             ->lanes(fn (Builder $boardQuery): array => Company::query()
+                ->select('companies.id', 'companies.name')
                 ->whereIn('companies.id', (clone $boardQuery)->select('opportunities.company_id'))
                 ->orderBy('name')
                 ->get()
