@@ -69,7 +69,7 @@ final class WorkspaceInvitation extends Model
         $rawToken = Str::random(40);
 
         $this->token = hash('sha256', $rawToken);
-        $this->expires_at = now()->addDays((int) config('jetstream.invitation_expiry_days', 7));
+        $this->expires_at = now()->addDays((int) config('jetstream.invitation_expiry_days', 2));
 
         return $rawToken;
     }

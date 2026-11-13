@@ -73,7 +73,7 @@ how long the invite has left. Its actions menu offers:
 - **Resend** the email.
 - **Revoke** the invitation.
 
-An invite lasts 7 days. After that the row reads **Invite expired**, and
+An invite lasts 48 hours. After that the row reads **Invite expired**, and
 **Resend** issues a fresh one.
 
 ![The Members list showing an invited email marked Invite pending above the people who have joined](/help-assets/workspace/manage-members-and-roles-1.png)

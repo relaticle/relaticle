@@ -84,12 +84,12 @@ return [
     | Invitation Expiry
     |--------------------------------------------------------------------------
     |
-    | This value determines how many days a workspace invitation link remains valid.
+    | This value determines how many days a workspace invitation remains valid. Accepting it at sign-up also confirms the invited email, so keep it at 48 hours or less.
     | After this period, the invitation is considered expired and the invitee
     | must request a new invitation from the workspace owner.
     |
     */
 
-    'invitation_expiry_days' => 7,
+    'invitation_expiry_days' => 2,
 
 ];
