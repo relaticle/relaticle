@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Observers;
 
+use App\Actions\Onboarding\ScheduleAssistantArrivalTurn;
 use App\Jobs\FetchFaviconForCompany;
 use App\Models\Company;
 use App\Observers\Concerns\TagsFirstCrmData;
@@ -13,9 +14,12 @@ final readonly class CompanyObserver
 {
     use TagsFirstCrmData;
 
+    public function __construct(private ScheduleAssistantArrivalTurn $scheduleAssistantArrival) {}
+
     public function created(Company $company): void
     {
         $this->tagFirstCrmDataIfNeeded($company);
+        $this->scheduleAssistantArrival->execute($company);
     }
 
     public function saved(Company $company): void

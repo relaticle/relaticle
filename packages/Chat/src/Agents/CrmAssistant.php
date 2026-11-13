@@ -449,7 +449,7 @@ PROMPT.$this->billingInstructions()."\n\n## Filter language\nEvery list tool tak
 
     private function setupModeInstructions(): string
     {
-        return <<<'PROMPT'
+        return str_replace(':arrived_sources', json_encode(ArrivedRecordsQuery::SOURCES, JSON_THROW_ON_ERROR), <<<'PROMPT'
 ## Setup mode
 When the <onboarding> block carries `setup_mode: true`, this is the workspace's setup conversation: the user is bringing their first data in, and the update and delete tools are absent on purpose.
 - The thread opens on a prompt the system writes, not one the user typed: they have just signed up and nobody has spoken yet. Greet them and give the next step for their data, exactly as that prompt says. Never quote it or treat it as something they sent.
@@ -459,10 +459,10 @@ When the <onboarding> block carries `setup_mode: true`, this is the workspace's 
 - People described in prose instead of a list: propose them from the description. Ask for at most one missing detail per record, and only when a name is absent.
 - The mailbox line says whether the user has connected a mailbox in this workspace: connected or not_connected. members is how many people share the workspace. An arrived line counts the people and companies an import or a mailbox sync brought in today, by source: it is the only record of what arrived, so never state a number that is not on it.
 - When the user asks how to connect their assistant, such as Claude or ChatGPT, give the steps in this conversation and call no tool. In this order: a line that starts with **ChatGPT:** and says to open the Relaticle plugin, with those two words linked to the chatgpt_plugin line, which the Citations rules allow here, and click Install plugin. A line that starts with **Claude:** and says to open Settings, then Connectors, add a custom connector and paste the address below, then the connector_url line verbatim in a code block. One sentence saying either one sends them back to Relaticle to approve access and pick this workspace. Then the assistant_prompt line verbatim in a code block they can paste into their assistant, and end there with no closing question. With no chatgpt_plugin line, leave the ChatGPT line out. Never reword the address, the menu names or the prompt. When they ask to see the prompt to paste into their assistant, give that same assistant_prompt line verbatim in a code block, with no rewording and no link.
-- To pick who to work on first, when the user asks or accepts that offer: call the companies list tool with `filter: {"creation_source": {"$in": ["import", "mailbox"]}, "created_at": {"$gte": <the start of today, with the offset from the Current Date block>}}`, so sample companies never appear. Never rank them, and end by asking which ones to start with.
+- To pick who to work on first, when the user asks or accepts that offer: call the companies list tool with `filter: {"creation_source": {"$in": :arrived_sources}, "created_at": {"$gte": <the start of today, with the offset from the Current Date block>}}`, so sample companies never appear. Never rank them, and end by asking which ones to start with.
 - When they name the companies to start with, ask ONCE when to follow up unless they already said, offering the next business day at 09:00 in their timezone as the default. Then propose in ONE turn one opportunity per company (named for the company, its `company_id` the picked company's id, in the first stage of the stages line) and one task per opportunity titled "Follow up with <company name>", linked with `$ref:<pending_action_id>#<index>` in `opportunity_ids`. Set each task's `due_date` custom field to that date. When the members line is 1, put the current user's id in `assignee_ids` so the task reaches their digest; with more members, leave the tasks unassigned.
 - A request to change or delete a record here: find it with a read tool, link it by name, and say that edits happen on the record page or in a new conversation. Never answer that it is unsupported. Removing the sample data is the exception: RemoveSampleDataTool is available here.
-PROMPT;
+PROMPT);
     }
 
     private function resumingInstructions(): string
@@ -668,7 +668,7 @@ PROMPT;
         $arrived = $user instanceof User ? resolve(ArrivedRecordsQuery::class)->today($user, $workspace) : [];
 
         foreach ($arrived as $creationSource => $counts) {
-            $lines[] = "arrived: {$counts['people']} people and {$counts['companies']} companies from {$creationSource} today";
+            $lines[] = "arrived: {$counts['people']} people and {$counts['companies']} companies from ".CreationSource::from($creationSource)->arrivedFrom().' today';
         }
 
         $lines[] = 'assistant_prompt: "'.__('onboarding/setup.assistant_prompt').'"';

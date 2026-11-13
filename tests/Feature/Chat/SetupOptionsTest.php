@@ -110,6 +110,7 @@ it('offers the company pick once companies arrived today', function (bool $mailb
 })->with([
     'no mailbox, import' => [false, CreationSource::IMPORT],
     'no mailbox, mailbox records' => [false, CreationSource::MAILBOX],
+    'no mailbox, assistant records' => [false, CreationSource::MCP],
     'mailbox, import' => [true, CreationSource::IMPORT],
     'mailbox, mailbox records' => [true, CreationSource::MAILBOX],
 ]);

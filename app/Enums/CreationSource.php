@@ -93,6 +93,11 @@ enum CreationSource: string implements HasColor, HasLabel
         };
     }
 
+    public function arrivedFrom(): string
+    {
+        return $this === self::MCP ? 'your connected assistant' : $this->value;
+    }
+
     public function getLabel(): string
     {
         return match ($this) {

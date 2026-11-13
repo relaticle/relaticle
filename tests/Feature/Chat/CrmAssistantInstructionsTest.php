@@ -681,7 +681,7 @@ it('tells rela to list only the companies that arrived and let the user pick', f
     $instructions = resolve(CrmAssistant::class)->staticInstructions();
 
     expect($instructions)
-        ->toContain('"creation_source": {"$in": ["import", "mailbox"]}')
+        ->toContain('"creation_source": {"$in": ["import","mailbox","mcp"]}')
         ->toContain('so sample companies never appear')
         ->toContain('Never rank them')
         ->toContain('one opportunity per company')
@@ -692,6 +692,15 @@ it('tells rela to list only the companies that arrived and let the user pick', f
 it('lets rela state the counts on the arrived line without a tool call', function (): void {
     expect(resolve(CrmAssistant::class)->staticInstructions())
         ->toContain('The one exception is the arrived line of the onboarding block: you may state its counts without a tool call.');
+});
+
+it('names records an assistant created as arriving from the connected assistant', function (): void {
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+
+    Company::factory()->create(['workspace_id' => $workspace->getKey(), 'creation_source' => CreationSource::MCP]);
+
+    expect(setupAgent($workspace)->dynamicInstructions())
+        ->toContain("arrived: 0 people and 1 companies from your connected assistant today\n");
 });
 
 it('offers the company pick only when companies arrived', function (): void {

@@ -14,7 +14,8 @@ use Carbon\CarbonImmutable;
 
 final readonly class ArrivedRecordsQuery
 {
-    private const array SOURCES = [CreationSource::IMPORT->value, CreationSource::MAILBOX->value];
+    /** @var list<string> */
+    public const array SOURCES = [CreationSource::IMPORT->value, CreationSource::MAILBOX->value, CreationSource::MCP->value];
 
     /** @return array<string, array{people: int, companies: int}> */
     public function today(User $user, Workspace $workspace): array

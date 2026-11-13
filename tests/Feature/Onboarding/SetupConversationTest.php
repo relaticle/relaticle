@@ -508,6 +508,48 @@ it('opens a data arrived turn when the mailbox history import completes', functi
     assertDataArrivedPushed(1);
 });
 
+it('schedules one data arrived turn ten minutes after an assistant creates its first record', function (): void {
+    Queue::fake([OpenDataArrivedTurn::class]);
+    $this->travelTo('2026-11-13 10:00:00');
+    $user = User::factory()->create();
+    $workspace = setupWorkspaceWithGreeting($user);
+
+    Company::factory()->count(2)->create(['workspace_id' => $workspace->getKey(), 'creator_id' => null, 'creation_source' => CreationSource::MCP]);
+    People::factory()->create(['workspace_id' => $workspace->getKey(), 'creator_id' => null, 'creation_source' => CreationSource::MCP]);
+
+    $jobs = Queue::pushed(OpenDataArrivedTurn::class);
+
+    expect($jobs)->toHaveCount(1)
+        ->and($jobs->first()->delay)->toEqual(now()->addMinutes(10));
+});
+
+it('schedules no data arrived turn for a record outside the setup window or made by hand', function (CreationSource $source, int $daysOld): void {
+    Queue::fake([OpenDataArrivedTurn::class]);
+    $user = User::factory()->create();
+    $workspace = setupWorkspaceWithGreeting($user);
+    $workspace->forceFill(['created_at' => now()->subDays($daysOld)])->save();
+
+    Company::factory()->create(['workspace_id' => $workspace->getKey(), 'creator_id' => null, 'creation_source' => $source]);
+
+    Queue::assertNotPushed(OpenDataArrivedTurn::class);
+})->with([
+    'an assistant on day 15' => [CreationSource::MCP, 15],
+    'the web form on day 1' => [CreationSource::WEB, 1],
+    'the api on day 1' => [CreationSource::API, 1],
+]);
+
+it('opens one data arrived turn for what an assistant brought in', function (): void {
+    Queue::fake([ProcessChatMessage::class]);
+    $user = User::factory()->create();
+    $workspace = setupWorkspaceWithGreeting($user);
+
+    Company::factory()->count(2)->create(['workspace_id' => $workspace->getKey(), 'creator_id' => null, 'creation_source' => CreationSource::MCP]);
+    endRunningTurn($workspace);
+    People::factory()->create(['workspace_id' => $workspace->getKey(), 'creator_id' => null, 'creation_source' => CreationSource::MCP]);
+
+    assertDataArrivedPushed(1);
+});
+
 it('opens no data arrived turn for a mailbox that imported nothing', function (): void {
     Queue::fake([ProcessChatMessage::class]);
     $user = User::factory()->create();
