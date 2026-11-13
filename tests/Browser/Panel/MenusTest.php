@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Pest\Browser\Api\AwaitableWebpage;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Tests\Helpers\WorkspaceCustomField;
 
 function menuMetrics(string $panel, string $rows, string $icons): string
 {
@@ -62,6 +63,37 @@ function addBoardChoiceField(User $user): void
     ]);
 }
 
+const CHIP_RULES = "js:Livewire.all().find((component) => component.name.includes('ListCompanies')).\$wire.\$call('setFilterRules', [{ field: 'name', condition: 'contains', value: 'chip' }])";
+
+const REGION_CHIP_RULES = "js:Livewire.all().find((component) => component.name.includes('ListCompanies')).\$wire.\$call('setFilterRules', [{ field: 'custom_fields.region', condition: 'is_any_of', value: ['%option%'] }])";
+
+const DELETED_CHIP = "js:Livewire.all().find((component) => component.name.includes('ListCompanies')).\$wire.\$call('setDeletedRecordsFilter', 'included')";
+
+function addCompanyRegionField(User $user): void
+{
+    resolve(CreateCustomField::class)->execute($user, [
+        'entity_type' => 'company',
+        'name' => 'Region',
+        'code' => 'region',
+        'type' => 'select',
+        'options' => array_map(static fn (int $number): array => ['name' => "Region {$number}"], range(1, 14)),
+    ]);
+}
+
+function runMenuSteps(AwaitableWebpage $page, array $steps): void
+{
+    foreach ($steps as $step) {
+        if (str_starts_with($step, 'js:')) {
+            $page->script(substr($step, 3));
+            $page->wait(0.5);
+
+            continue;
+        }
+
+        $page->click($step);
+    }
+}
+
 function menuRoom(string $panel, string $list): string
 {
     return <<<JS
@@ -95,9 +127,15 @@ beforeEach(function (): void {
     }
 });
 
-it('draws every menu with the shared row, icon and corner spec', function (string $open, string $panel, string $rows, string $icons, string $path = 'companies', array $steps = []): void {
+it('draws every menu with the shared row, icon and corner spec', function (string $open, string $panel, string $rows, string $icons, string $path = 'companies', array $steps = [], array $differs = [], bool $region = false): void {
     if ($path === 'opportunities/board') {
         addBoardChoiceField($this->user);
+    }
+
+    if ($region) {
+        addCompanyRegionField($this->user);
+        $option = (string) WorkspaceCustomField::byCode($this->workspace->getKey(), 'company', 'region')->options->first()->getKey();
+        $steps = str_replace('%option%', $option, $steps);
     }
 
     $page = loginViaBrowser($this->user)
@@ -105,9 +143,7 @@ it('draws every menu with the shared row, icon and corner spec', function (strin
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/{$path}");
 
-    foreach ($steps as $step) {
-        $page->click($step);
-    }
+    runMenuSteps($page, $steps);
 
     $page->click($open)->assertVisible($panel);
 
@@ -117,6 +153,7 @@ it('draws every menu with the shared row, icon and corner spec', function (strin
         'icons' => [16],
         'panelRadius' => '10px',
         'rowRadius' => ['6px'],
+        ...$differs,
     ]);
     $page->assertNoJavaScriptErrors();
 })->with([
@@ -134,6 +171,14 @@ it('draws every menu with the shared row, icon and corner spec', function (strin
     'board add attribute' => ['[data-board-add-attribute]', '[data-board-view-settings]', '[data-board-panel="add"] .fi-dropdown-list-item', '[data-board-panel="add"] .fi-dropdown-list-item > svg', 'opportunities/board', ['.fi-view-settings-trigger']],
     'board attribute row menu' => ['[data-board-view-settings] [data-attribute-actions] >> nth=0', '.fi-board-stages-row-menu', '.fi-dropdown-list-item', '.fi-dropdown-list-item > svg', 'opportunities/board', ['.fi-view-settings-trigger']],
     'board import and export' => ['.fi-board-header-actions button.fi-ac-btn-group:visible', '.fi-board-header-actions .fi-dropdown-panel:not([style*="display: none"])', '.fi-dropdown-list-item', '.fi-dropdown-list-item > svg', 'opportunities/board'],
+    'filter chip condition menu' => ['[data-filter-chip] [data-filter-segment="condition"]', '[data-filter-chip] .fi-filter-pop', '.fi-filter-item', '.fi-filter-item > svg', 'companies', [CHIP_RULES]],
+    'filter chip value checklist' => ['[data-filter-chip] [data-filter-segment="value"]', '[data-filter-chip] .fi-filter-pop', '.fi-filter-item', '.fi-filter-box', 'companies', [REGION_CHIP_RULES], ['icons' => [14]], true],
+    'filter group menu' => ['[data-filter-group]', '.fi-filter-pop', '.fi-filter-item', '.fi-filter-item > svg', 'tasks'],
+    'filter chip kebab' => ['[data-filter-chip] [data-filter-more]', '[data-filter-chip] .fi-filter-pop', '.fi-filter-item', '.fi-filter-item > svg', 'companies', [CHIP_RULES], ['pitch' => []]],
+    'filter deleted mode' => ['[data-deleted-mode-trigger]', '[data-filter-deleted] .fi-filter-pop', '.fi-filter-item', '.fi-filter-item > svg', 'companies', [DELETED_CHIP]],
+    'views row menu' => ['.fi-ta-views-row[data-view-kind=list] [data-view-actions]', '.fi-ta-views-row-menu', '.fi-dropdown-list-item', '.fi-dropdown-list-item > svg', 'companies', ['.fi-view-switcher .fi-dropdown-trigger button']],
+    'view settings row menu' => ['[data-view-settings-menu] >> nth=0', '.fi-view-settings-row-menu', '.fi-dropdown-list-item', '.fi-dropdown-list-item > svg', 'companies', ['.fi-view-settings-trigger'], ['pitch' => []]],
+    'board stage row menu' => ['[data-stage-actions] >> nth=0', '.fi-board-stages-row-menu', '.fi-dropdown-list-item', '.fi-dropdown-list-item > svg', 'opportunities/board', ['.fi-view-settings-trigger', '[data-board-columns-trigger]']],
 ]);
 
 it('draws one keyboard focus ring on a header trigger, the filter button, a chip part and a column header', function (): void {
@@ -205,17 +250,25 @@ it('draws a rule only between the groups a menu shows', function (array $steps, 
     ], '.fi-ta-column-menu'],
 ]);
 
-it('keeps a long menu above the window edge and scrolls only its list', function (string $open, string $panel, string $list): void {
+it('keeps a long menu above the window edge and scrolls only its list', function (string $open, string $panel, string $list, array $steps = [], bool $region = false): void {
     foreach (range(1, 8) as $index) {
         SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => "Pipeline {$index}"]);
+    }
+
+    if ($region) {
+        addCompanyRegionField($this->user);
+        $option = (string) WorkspaceCustomField::byCode($this->workspace->getKey(), 'company', 'region')->options->first()->getKey();
+        $steps = str_replace('%option%', $option, $steps);
     }
 
     $page = loginViaBrowser($this->user)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 320)
-        ->navigate("/app/{$this->workspace->slug}/companies")
-        ->click($open)
-        ->assertVisible($panel);
+        ->navigate("/app/{$this->workspace->slug}/companies");
+
+    runMenuSteps($page, $steps);
+
+    $page->click($open)->assertVisible($panel);
 
     expect($page->script(menuRoom($panel, $list)))->toBe([
         'height' => true,
@@ -228,6 +281,7 @@ it('keeps a long menu above the window edge and scrolls only its list', function
     'views' => ['.fi-view-switcher .fi-dropdown-trigger button', '.fi-ta-views-panel', '.fi-ta-views-scroll'],
     'view settings' => ['.fi-view-settings-trigger', '.fi-view-settings-panel', '.fi-view-settings-scroll'],
     'filter field picker' => ['[data-filter-add]', '.fi-filter-pop-picker', '[role=listbox]'],
+    'filter chip value checklist' => ['[data-filter-chip] [data-filter-segment="value"]', '[data-filter-chip] .fi-filter-pop', '.fi-filter-options', [REGION_CHIP_RULES], true],
 ]);
 
 function currentItem(string $current, string $other): string
@@ -261,12 +315,18 @@ it('marks the current item with a trailing check and no fill', function (string 
         addBoardChoiceField($this->user);
     }
 
+    $path = match (true) {
+        $onBoard => 'opportunities/board',
+        $surface === 'filter group' => 'tasks',
+        default => 'companies',
+    };
+
     $page = loginViaBrowser($this->user)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/".($onBoard ? 'opportunities/board' : 'companies'));
+        ->navigate("/app/{$this->workspace->slug}/{$path}");
 
-    if ($surface !== 'views' && ! $onBoard) {
+    if (! in_array($surface, ['views', 'filter group'], true) && ! $onBoard) {
         $page->click($column)->click('[data-column-menu-item="sortAscending"]')->assertPresent('[data-filter-sort-label]');
     }
 
@@ -276,6 +336,7 @@ it('marks the current item with a trailing check and no fill', function (string 
         'column header' => ['.fi-ta-column-menu [aria-checked="true"]', '.fi-ta-column-menu [aria-checked="false"]'],
         'board grouped by' => ['[data-board-column-field][aria-checked="true"]', '[data-board-column-field][aria-checked="false"]'],
         'board lanes' => ['[data-board-grouping][aria-checked="true"]', '[data-board-grouping][aria-checked="false"]'],
+        'filter group' => ['[data-group-option][aria-checked="true"]', '[data-group-option][aria-checked="false"]'],
     };
 
     match ($surface) {
@@ -284,6 +345,7 @@ it('marks the current item with a trailing check and no fill', function (string 
         'column header' => $page->click($column),
         'board grouped by' => $page->click('.fi-view-settings-trigger')->click('[data-board-column-field-trigger]'),
         'board lanes' => $page->click('.fi-view-settings-trigger')->click('[data-board-lanes-trigger]'),
+        'filter group' => $page->click('[data-filter-group]')->click('[data-group="priority_group"]'),
     };
 
     $page->hover('.fi-sidebar-nav .fi-sidebar-item-btn >> nth=0');
@@ -296,7 +358,7 @@ it('marks the current item with a trailing check and no fill', function (string 
         'otherCheck' => false,
     ]);
     $page->assertNoJavaScriptErrors();
-})->with(['views', 'sort chooser', 'column header', 'board grouped by', 'board lanes']);
+})->with(['views', 'sort chooser', 'column header', 'board grouped by', 'board lanes', 'filter group']);
 
 function holdLook(array $targets, string $trigger): string
 {

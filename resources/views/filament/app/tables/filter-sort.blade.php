@@ -39,7 +39,7 @@
             x-on:keydown="navigate($event)"
         >
             <template x-if="choosingSort()">
-                <div>
+                <div class="fi-filter-searchable">
                     <label class="fi-filter-find">
                         <x-filament::icon icon="lucide-search" />
                         <input

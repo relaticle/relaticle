@@ -135,10 +135,10 @@ button.fi-filter-seg {
 }
 
 .fi-filter-pop {
-    @apply fixed z-30 max-h-[min(var(--spacing-menu-max),var(--menu-room,100dvh))] min-w-52 cursor-default overflow-y-auto rounded-menu bg-white p-1 font-normal text-gray-950 shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-900 dark:text-white dark:ring-white/10;
+    @apply fixed z-30 flex max-h-[min(var(--spacing-menu-max),var(--menu-room,100dvh))] min-w-52 cursor-default flex-col overflow-y-auto rounded-menu bg-white p-1 font-normal text-gray-950 shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-900 dark:text-white dark:ring-white/10;
 
     &.fi-filter-pop-picker {
-        @apply flex min-w-70 flex-col;
+        @apply min-w-70;
 
         & > [role='listbox'] {
             @apply min-h-0 overflow-y-auto overscroll-contain;
@@ -257,8 +257,12 @@ body.sorting * {
     @apply -mx-1 my-1 h-px bg-gray-100 dark:bg-white/5;
 }
 
+.fi-filter-searchable {
+    @apply flex min-h-0 flex-col;
+}
+
 .fi-filter-options {
-    @apply max-h-64 overflow-y-auto overscroll-contain;
+    @apply min-h-0 overflow-y-auto overscroll-contain;
 }
 
 .fi-filter-label {
@@ -336,10 +340,6 @@ body.sorting * {
 }
 
 @media (width < 40rem) {
-    .fi-filter-options {
-        max-height: min(16rem, 45dvh);
-    }
-
     .fi-filter-pop {
         @apply min-w-full;
     }
