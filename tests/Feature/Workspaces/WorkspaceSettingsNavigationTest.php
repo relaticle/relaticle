@@ -9,7 +9,9 @@ use App\Filament\Pages\EditWorkspace;
 use App\Filament\Pages\Workspace\ActivityLog;
 use App\Filament\Pages\Workspace\CustomFields;
 use App\Filament\Pages\Workspace\Members;
+use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\CustomFieldValue;
 use App\Models\User;
 use App\Providers\Filament\AppPanelProvider;
 use App\Services\NoBilling;
@@ -17,6 +19,7 @@ use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Navigation\NavigationItem;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Features\SupportTesting\Testable;
 use Relaticle\Cloud\Billing\StripeBilling;
@@ -203,6 +206,68 @@ test('the custom fields form refuses the domain type and still creates a text fi
         ->pluck('type', 'name');
 
     expect($created->all())->toBe(['Plain probe' => 'text']);
+});
+
+function mountFieldsTableThenDemoteAdmin(object $test): array
+{
+    $admin = User::factory()->create(['current_workspace_id' => $test->workspace->getKey()]);
+    $test->workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
+    $test->actingAs($admin);
+    Filament::setTenant($test->workspace);
+
+    $field = CustomField::factory()->create([
+        'tenant_id' => $test->workspace->getKey(),
+        'entity_type' => 'company',
+        'type' => 'text',
+        'code' => 'demotion_probe',
+        'name' => 'Demotion probe',
+        'sort_order' => 5,
+    ]);
+    $company = Company::factory()->recycle([$test->user, $test->workspace])->create();
+    $value = CustomFieldValue::query()->create([
+        'id' => (string) Str::ulid(),
+        'entity_type' => 'company',
+        'entity_id' => $company->getKey(),
+        'custom_field_id' => $field->getKey(),
+        'tenant_id' => $test->workspace->getKey(),
+        'text_value' => 'kept',
+    ]);
+
+    $table = livewire(ManageFieldsTable::class, ['entityType' => 'company']);
+
+    $test->workspace->users()->updateExistingPivot($admin->id, ['role' => WorkspaceRole::Viewer->value]);
+    $admin->unsetRelation('workspaces');
+    $admin->refresh();
+    Filament::setTenant($test->workspace);
+
+    livewire(CustomFields::class)->assertForbidden();
+
+    return [$table, $field, $value];
+}
+
+test('an admin demoted after mounting the fields table cannot delete a field definition', function (): void {
+    [$table, $field, $value] = mountFieldsTableThenDemoteAdmin($this);
+
+    $table->call('mountAction', 'deleteField', ['fieldId' => $field->getKey()])->assertForbidden();
+
+    expect(CustomField::query()->whereKey($field->getKey())->exists())->toBeTrue()
+        ->and(CustomFieldValue::query()->whereKey($value->getKey())->exists())->toBeTrue();
+});
+
+test('an admin demoted after mounting the fields table cannot edit a field definition', function (): void {
+    [$table, $field] = mountFieldsTableThenDemoteAdmin($this);
+
+    $table->call('mountAction', 'editField', ['fieldId' => $field->getKey()])->assertForbidden();
+
+    expect($field->fresh()->name)->toBe('Demotion probe');
+});
+
+test('an admin demoted after mounting the fields table cannot reorder field definitions', function (): void {
+    [$table, $field] = mountFieldsTableThenDemoteAdmin($this);
+
+    $table->call('updateFieldsOrder', [$field->getKey()])->assertForbidden();
+
+    expect($field->fresh()->sort_order)->toBe(5);
 });
 
 test('the custom fields table renders a field name as text, never as markup', function (string $name, string $escaped): void {
