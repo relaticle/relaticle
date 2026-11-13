@@ -166,7 +166,7 @@ th[data-column-pinned="1"] > .fi-ta-resizable-label::after {
 
 /* Fixed, so the scrolling table cannot clip it. The script places it from the trigger.
    Filament transitions `display`, which keeps a closed menu on screen for the duration. */
-.fi-dropdown-panel.fi-ta-column-menu {
+.fi-dropdown-panel:is(.fi-ta-column-menu, .fi-view-settings-row-menu) {
     @apply fixed z-60 w-56 transition-none;
 }
 
