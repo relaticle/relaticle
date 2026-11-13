@@ -31,6 +31,58 @@
         items[(index + delta + items.length) % items.length]?.focus()
     }
 
+    // The add panel of View settings, for the table's list and the board's card attributes.
+    window.viewSettingsAddPanel = ({ root, items, key, back, pick }) => ({
+        query: '',
+        pending: [],
+        revision: 0,
+
+        matches(text) {
+            return text.toLowerCase().includes(this.query.trim().toLowerCase())
+        },
+
+        isCandidate(item) {
+            this.revision
+
+            return !this.pending.includes(item.dataset[key]) && this.matches(item.dataset.text)
+        },
+
+        addItems() {
+            return [...root(this).querySelectorAll(items)].filter((item) => this.isCandidate(item))
+        },
+
+        stepAdd(delta) {
+            const scope = root(this)
+            const rows = [...this.addItems(), ...scope.querySelectorAll('[data-view-settings-create]')]
+
+            if (rows.length === 0) return
+
+            const index = rows.indexOf(document.activeElement)
+            const next = index === -1 ? (delta > 0 ? 0 : rows.length - 1) : index + delta
+
+            if (next < 0) {
+                scope.querySelector('[data-view-settings-search]').focus()
+            } else {
+                rows[Math.min(next, rows.length - 1)].focus()
+            }
+        },
+
+        pickFirst() {
+            if (this.pending.length > 0) return
+
+            const first = this.addItems()[0]
+
+            if (first) this[pick](first.dataset[key])
+        },
+
+        focusAddStart(scope = root(this)) {
+            // On a touch screen a keyboard would cover the list after every pick, so focus stays on the back arrow.
+            const compact = window.matchMedia('(width < 40rem), (pointer: coarse)').matches
+
+            ;(compact ? scope.querySelector(back) : scope.querySelector('[data-view-settings-search]')).focus()
+        },
+    })
+
     // `.fi-ta-content-ctn` scrolls horizontally, which defeats `position: sticky` on the header,
     // and a scroll listener lags the compositor. A scroll-driven animation pins it instead.
     const stickyHeadersSupported =
@@ -800,10 +852,14 @@
             let panel
 
             return {
+                ...window.viewSettingsAddPanel({
+                    root: () => panel,
+                    items: '[data-view-settings-add-item]',
+                    key: 'attribute',
+                    back: '[data-view-settings-back]',
+                    pick: 'show',
+                }),
                 adding: false,
-                query: '',
-                pending: [],
-                revision: 0,
                 menu: null,
                 locked: false,
                 placed: false,
@@ -930,13 +986,6 @@
                     this.$nextTick(() => requestAnimationFrame(() => this.focusAddStart()))
                 },
 
-                focusAddStart() {
-                    // On a touch screen a keyboard would cover the list after every pick, so focus stays on the back arrow.
-                    const compact = window.matchMedia('(width < 40rem), (pointer: coarse)').matches
-
-                    ;(compact ? panel.querySelector('[data-view-settings-back]') : this.searchInput()).focus()
-                },
-
                 closeAdd() {
                     this.resetAdd()
                     this.$nextTick(() => requestAnimationFrame(() => panel.querySelector('[data-view-settings-add]').focus()))
@@ -945,47 +994,6 @@
                 resetAdd() {
                     this.adding = false
                     this.query = ''
-                },
-
-                searchInput() {
-                    return panel.querySelector('[data-view-settings-search]')
-                },
-
-                matches(text) {
-                    return text.toLowerCase().includes(this.query.trim().toLowerCase())
-                },
-
-                isCandidate(item) {
-                    this.revision
-
-                    return !this.pending.includes(item.dataset.attribute) && this.matches(item.dataset.text)
-                },
-
-                addItems() {
-                    return [...panel.querySelectorAll('[data-view-settings-add-item]')].filter((item) => this.isCandidate(item))
-                },
-
-                stepAdd(delta) {
-                    const items = [...this.addItems(), ...panel.querySelectorAll('[data-view-settings-create]')]
-
-                    if (items.length === 0) return
-
-                    const index = items.indexOf(document.activeElement)
-                    const next = index === -1 ? (delta > 0 ? 0 : items.length - 1) : index + delta
-
-                    if (next < 0) {
-                        this.searchInput().focus()
-                    } else {
-                        items[Math.min(next, items.length - 1)].focus()
-                    }
-                },
-
-                pickFirst() {
-                    if (this.pending.length > 0) return
-
-                    const first = this.addItems()[0]
-
-                    if (first) this.show(first.dataset.attribute)
                 },
 
                 async show(name) {

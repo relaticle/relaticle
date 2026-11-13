@@ -19,167 +19,7 @@
         aria-label="{{ __('filament/pages/boards.view_settings.panel') }}"
         x-on:dropdown-escape="rowMenuShown() ? ($event.preventDefault(), closeRowMenu(), escapeRowMenu()) : panel !== 'main' && ($event.preventDefault(), closePanel())"
         x-init="$el.closest('.fi-dropdown-panel')?.addEventListener('dropdown-opened', () => (panel = 'main', query = ''))"
-        x-data="{
-            panel: 'main',
-            openPanel(name) {
-                this.panel = name
-                this.$nextTick(() => requestAnimationFrame(() => {
-                    const view = this.$root.querySelector(`[data-board-panel='${name}']`)
-
-                    if (name === 'add') {
-                        return this.focusAddStart()
-                    }
-
-                    ;(view.querySelector('[aria-checked=true]') ?? view.querySelector('[data-view-settings-back]'))?.focus()
-                }))
-            },
-            closePanel() {
-                const name = this.panel
-
-                this.panel = 'main'
-                this.query = ''
-                this.$nextTick(() => requestAnimationFrame(() => this.$root.querySelector(`[data-panel-trigger='${name}']`)?.focus()))
-            },
-            syncSwitch(wrapper) {
-                const toggle = wrapper.querySelector('[data-visible]')
-
-                if (toggle) {
-                    window.Alpine.$data(toggle).state = toggle.dataset.visible === 'true'
-                }
-            },
-            kinds: {
-                stage: { list: 'list', row: '[data-stage-id]', key: 'stageId', trigger: '[data-stage-actions]' },
-                attribute: { list: 'attributeList', row: '[data-card-attribute]', key: 'cardAttribute', trigger: '[data-attribute-actions]' },
-            },
-            query: '',
-            pending: [],
-            revision: 0,
-            rowStage: null,
-            rowTrigger: null,
-            rows(kind) {
-                return [...this.$refs[this.kinds[kind].list].querySelectorAll(this.kinds[kind].row)]
-            },
-            ids(kind) {
-                return this.rows(kind).map((row) => row.dataset[this.kinds[kind].key])
-            },
-            reorder(kind) {
-                return kind === 'stage' ? this.$wire.reorderBoardStages(this.ids(kind)) : this.$wire.reorderCardAttributes(this.ids(kind))
-            },
-            move(kind, id, step) {
-                const rows = this.rows(kind)
-                const index = rows.findIndex((row) => row.dataset[this.kinds[kind].key] === id)
-                const target = rows[index + step]
-
-                if (! target) {
-                    return
-                }
-
-                step < 0 ? target.before(rows[index]) : target.after(rows[index])
-                const saved = this.reorder(kind)
-                const focusRow = () => rows[index].querySelector(this.kinds[kind].trigger)?.focus()
-
-                this.closeRowMenu()
-                this.$nextTick(focusRow)
-                saved.then(focusRow, focusRow)
-            },
-            remove(id) {
-                const rows = this.rows('attribute')
-                const index = rows.findIndex((row) => row.dataset.cardAttribute === id)
-                const neighbour = rows[index + 1] ?? rows[index - 1]
-                const focusNext = () => (neighbour?.isConnected ? neighbour.querySelector(this.kinds.attribute.trigger) : this.$root.querySelector('[data-panel-trigger=add]'))?.focus()
-                const saved = this.$wire.removeCardAttribute(id)
-
-                this.closeRowMenu()
-                saved.then(() => this.$nextTick(focusNext), focusNext)
-            },
-            closeRowMenu() {
-                window.Alpine.$data(this.$refs.rowMenu.querySelector('.fi-dropdown')).close()
-            },
-            rowMenuShown() {
-                return !! document.querySelector('.fi-board-stages-row-menu')?._x_isShown
-            },
-            escapeRowMenu() {
-                this.$nextTick(() => requestAnimationFrame(() => this.rowTrigger?.focus()))
-            },
-            openRowMenu(trigger, event, kind, id) {
-                this.rowTrigger = trigger
-
-                const panel = document.querySelector('.fi-board-stages-row-menu')
-
-                if (panel._x_isShown && panel.trigger === trigger) {
-                    return
-                }
-
-                const ids = this.ids(kind)
-
-                this.rowStage = { kind, id, isFirst: ids[0] === id, isLast: ids.at(-1) === id }
-
-                setTimeout(() => {
-                    panel.open(trigger)
-
-                    if (event.detail === 0) {
-                        this.$nextTick(() => [...panel.querySelectorAll('.fi-dropdown-list-item')].find((item) => item.offsetParent !== null && ! item.disabled)?.focus())
-                    }
-                })
-            },
-            matches(text) {
-                return text.toLowerCase().includes(this.query.trim().toLowerCase())
-            },
-            isCandidate(item) {
-                this.revision
-
-                return ! this.pending.includes(item.dataset.boardAddItem) && this.matches(item.dataset.text)
-            },
-            addItems() {
-                return [...this.$root.querySelectorAll('[data-board-add-item]')].filter((item) => this.isCandidate(item))
-            },
-            stepAdd(delta) {
-                const items = [...this.addItems(), ...(this.$refs.createRow?.querySelectorAll('.fi-dropdown-list-item') ?? [])]
-
-                if (items.length === 0) {
-                    return
-                }
-
-                const index = items.indexOf(document.activeElement)
-                const next = index === -1 ? (delta > 0 ? 0 : items.length - 1) : index + delta
-
-                if (next < 0) {
-                    this.$refs.addSearch.focus()
-                } else {
-                    items[Math.min(next, items.length - 1)].focus()
-                }
-            },
-            pickFirst() {
-                const first = this.pending.length === 0 ? this.addItems()[0] : null
-
-                if (first) {
-                    this.add(first.dataset.boardAddItem)
-                }
-            },
-            focusAddStart(root = this.$root) {
-                const compact = window.matchMedia('(width < 40rem), (pointer: coarse)').matches
-
-                ;(compact ? root.querySelector('[data-board-panel=add] [data-view-settings-back]') : root.querySelector('[data-view-settings-search]')).focus()
-            },
-            async add(key) {
-                if (this.pending.includes(key)) {
-                    return
-                }
-
-                const root = this.$root
-
-                this.pending.push(key)
-
-                try {
-                    await this.$wire.addCardAttribute(key)
-                } finally {
-                    this.pending = this.pending.filter((pending) => pending !== key)
-                    this.revision++
-                }
-
-                this.$nextTick(() => requestAnimationFrame(() => this.focusAddStart(root)))
-            },
-        }"
+        x-data="boardViewSettings"
     >
         <div class="fi-view-settings-view fi-board-main-view" x-show="panel === 'main'">
             <div class="fi-dropdown-list shrink-0">
@@ -533,7 +373,6 @@
                 />
                 <input
                     type="search"
-                    x-ref="addSearch"
                     x-model="query"
                     autocomplete="off"
                     placeholder="{{ __('filament/pages/boards.view_settings.search_attributes', ['entity' => $entityLabel]) }}"
@@ -576,7 +415,7 @@
             </div>
 
             @if ($canCreateAttribute)
-                <div class="fi-dropdown-list fi-view-settings-footer" x-ref="createRow" x-on:keydown.arrow-down.prevent="stepAdd(1)" x-on:keydown.arrow-up.prevent="stepAdd(-1)">
+                <div class="fi-dropdown-list fi-view-settings-footer" x-on:keydown.arrow-down.prevent="stepAdd(1)" x-on:keydown.arrow-up.prevent="stepAdd(-1)">
                     <x-filament::dropdown.list.item
                         icon="lucide-plus"
                         role="button"
