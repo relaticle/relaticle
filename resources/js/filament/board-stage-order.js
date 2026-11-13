@@ -2,6 +2,8 @@
 // finds its containers by the documented ff-* classes and re-binds when a morph replaces one.
 
 document.addEventListener('alpine:init', () => {
+    window.Alpine.magic('dragAnimation', () => (duration = 150) => (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : duration))
+
     window.Alpine.data('boardStageOrder', () => ({
         observer: null,
         frame: null,
@@ -41,8 +43,6 @@ document.addEventListener('alpine:init', () => {
         },
 
         bind(page) {
-            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
             page.querySelectorAll('.ff-columns, .ff-lanes-heads').forEach((container) => {
                 if (window.Sortable.get(container)) {
                     return
@@ -64,7 +64,7 @@ document.addEventListener('alpine:init', () => {
                     chosenClass: 'ff-column-chosen',
                     delay: 200,
                     delayOnTouchOnly: true,
-                    animation: reduceMotion ? 0 : 200,
+                    animation: this.$dragAnimation(200),
                     scrollSensitivity: 100,
                     scrollSpeed: 15,
                     forceAutoScrollFallback: true,

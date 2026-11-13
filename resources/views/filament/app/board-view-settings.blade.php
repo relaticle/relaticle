@@ -267,7 +267,7 @@
             <p class="fi-board-section-heading" id="board-card-attributes-heading">{{ __('filament/pages/boards.view_settings.visible_attributes') }}</p>
 
             <div class="fi-view-settings-scroll fi-board-attributes-scroll">
-                <div class="fi-ta-views-list" x-ref="attributeList" role="group" aria-labelledby="board-card-attributes-heading" x-sort="reorder('attribute')" x-sort:config="{ draggable: '.fi-ta-views-draggable', filter: '.fi-ta-views-row-actions', preventOnFilter: false, delay: 200, delayOnTouchOnly: true, animation: 150 }">
+                <div class="fi-ta-views-list" x-ref="attributeList" role="group" aria-labelledby="board-card-attributes-heading" x-sort="reorder('attribute')" x-sort:config="{ draggable: '.fi-ta-views-draggable', filter: '.fi-ta-views-row-actions', preventOnFilter: false, delay: 200, delayOnTouchOnly: true, animation: $dragAnimation() }">
                     @foreach ($cardAttributes as $attribute)
                         <div
                             class="fi-ta-views-row fi-ta-views-draggable fi-board-stage-row"
@@ -358,7 +358,7 @@
 
                 <hr class="fi-board-stage-divider" />
 
-                <div class="fi-ta-views-list" x-ref="list" x-sort="reorder('stage')" x-sort:config="{ draggable: '.fi-ta-views-draggable', filter: '.fi-ta-views-row-actions, .fi-board-stage-switch', preventOnFilter: false, delay: 200, delayOnTouchOnly: true, animation: 150 }">
+                <div class="fi-ta-views-list" x-ref="list" x-sort="reorder('stage')" x-sort:config="{ draggable: '.fi-ta-views-draggable', filter: '.fi-ta-views-row-actions, .fi-board-stage-switch', preventOnFilter: false, delay: 200, delayOnTouchOnly: true, animation: $dragAnimation() }">
                     @foreach ($columns as $column)
                         @php
                             $dotColor = ColorResolver::resolve($column['color']);

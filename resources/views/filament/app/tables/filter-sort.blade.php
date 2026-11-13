@@ -76,7 +76,7 @@
 
             <template x-if="! choosingSort()">
                 <div class="fi-filter-sorts">
-                    <div class="fi-filter-sort-list" x-sort="reorderSort($key, $position)" x-sort:config="{ animation: 150 }">
+                    <div class="fi-filter-sort-list" x-sort="reorderSort($key, $position)" x-sort:config="{ animation: $dragAnimation() }">
                         <template x-for="sort in sorts" x-bind:key="sort.column">
                             <div class="fi-filter-sort-row" x-sort:item="sort.column" data-sort-row x-bind:data-column="sort.column">
                                 <button

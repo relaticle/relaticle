@@ -16,7 +16,7 @@
                     x-sortable
                     x-on:end.stop="reorder($event)"
                     x-on:pointerdown="$event.target.closest('[data-view-settings-menu]') || closeMenu(false)"
-                    data-sortable-animation-duration="150"
+                    x-bind:data-sortable-animation-duration="$dragAnimation()"
                     class="fi-view-settings-list"
                 >
                     @foreach ($shown as $column)
