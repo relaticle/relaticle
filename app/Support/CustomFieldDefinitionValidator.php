@@ -36,6 +36,8 @@ use Relaticle\CustomFields\Facades\Entities;
  */
 final readonly class CustomFieldDefinitionValidator
 {
+    public const int NAME_MAX_LENGTH = 50;
+
     /**
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
@@ -55,7 +57,7 @@ final readonly class CustomFieldDefinitionValidator
         $validated = Validator::make(self::normalize($data), [
             'entity_type' => ['required', Rule::in(CrmEntity::morphAliases()), self::withinFieldCap($tenantId, $entityType, $proposedAlongside)],
             'type' => ['required', Rule::in($creatableTypes)],
-            'name' => ['required', 'string', 'max:50', self::uniqueNameIgnoringCase(
+            'name' => ['required', 'string', 'max:'.self::NAME_MAX_LENGTH, self::uniqueNameIgnoringCase(
                 $tenantId,
                 $entityType,
                 fn (): string => "A field named \":input\" already exists on {$entityType}. Field names must be unique per entity. Pick a different name, or update the existing field instead.",
@@ -69,7 +71,7 @@ final readonly class CustomFieldDefinitionValidator
             'entity_type.in' => 'Invalid entity type ":input". Must be one of: '.implode(', ', CrmEntity::morphAliases()).'.',
             'type.in' => 'Field type ":input" cannot be created. Allowed types: '.implode(', ', $creatableTypes).'.',
             'name.required' => 'A field name is required.',
-            'name.max' => 'Field names must be 50 characters or fewer.',
+            'name.max' => 'Field names must be '.self::NAME_MAX_LENGTH.' characters or fewer.',
             'code.max' => 'Field codes must be 50 characters or fewer.',
             'code.alpha_dash' => 'Field codes may only contain letters, numbers, dashes, and underscores.',
             'code.unique' => "A field with code \":input\" already exists on {$entityType}. Omit the code to auto-generate a unique one, or pick a different code.",
@@ -132,7 +134,7 @@ final readonly class CustomFieldDefinitionValidator
 
         $validated = Validator::make($data, [
             'name' => [
-                'sometimes', 'string', 'max:50',
+                'sometimes', 'string', 'max:'.self::NAME_MAX_LENGTH,
                 self::uniqueNameIgnoringCase(
                     $user->currentWorkspace->getKey(),
                     $entityType,
@@ -144,7 +146,7 @@ final readonly class CustomFieldDefinitionValidator
             'settings' => ['sometimes', 'array'],
             ...$prefixedSettingRules,
         ], [
-            'name.max' => 'Field names must be 50 characters or fewer.',
+            'name.max' => 'Field names must be '.self::NAME_MAX_LENGTH.' characters or fewer.',
             ...CustomFieldSettingsSchema::messages(),
         ], array_combine(array_keys($prefixedSettingRules), array_keys($settingRules)))->validate();
 

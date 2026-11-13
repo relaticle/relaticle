@@ -28,8 +28,6 @@ use Relaticle\CustomFields\Facades\Entities;
 
 trait CreatesTableAttribute
 {
-    public const int ATTRIBUTE_NAME_MAX_LENGTH = 50;
-
     abstract protected function attributeEntity(): CrmEntity;
 
     abstract protected function attributeCreated(CustomField $field): void;
@@ -72,7 +70,7 @@ trait CreatesTableAttribute
             TextInput::make('name')
                 ->label(__('filament/panel.tables.views.attribute_name'))
                 ->required()
-                ->maxLength(self::ATTRIBUTE_NAME_MAX_LENGTH)
+                ->maxLength(CustomFieldDefinitionValidator::NAME_MAX_LENGTH)
                 ->autofocus(),
             Select::make('type')
                 ->label(__('filament/panel.tables.views.attribute_type'))
