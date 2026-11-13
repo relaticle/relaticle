@@ -105,6 +105,21 @@ beforeEach(function (): void {
         ->assertPresent('[data-filter-add]');
 });
 
+it('marks the table busy while a filter change is in flight and clears it when the response lands', function (): void {
+    $page = ($this->open)();
+    expect(companyRows($page, 3))->toBeTrue();
+
+    $page->script('window.fetch = ((original) => (input, init) => String(init?.body).includes("setFilterRules") ? new Promise((resolve) => setTimeout(resolve, 1500)).then(() => original(input, init)) : original(input, init))(window.fetch)');
+
+    $busy = 'document.querySelector(".fi-ta").getAttribute("aria-busy") === "true" && document.querySelector(".fi-ta").classList.contains("fi-filter-busy")';
+
+    addChip($page, 'name', 'contains')->type(valueInput(), 'acme');
+    $page->assertScript(filterBarWaitFor($busy), true)
+        ->assertScript(filterBarWaitFor('!document.querySelector(".fi-ta").hasAttribute("aria-busy") && !document.querySelector(".fi-ta").classList.contains("fi-filter-busy")'), true);
+    expect(companyRows($page, 1))->toBeTrue();
+    $page->assertNoJavaScriptErrors();
+});
+
 it('draws a dashed sort and a dashed filter button when no filter is set', function (): void {
     ($this->open)()
         ->assertSeeIn('[data-filter-bar]', 'Sort')

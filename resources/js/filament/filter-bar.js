@@ -251,13 +251,23 @@
 
                     this.sent = serialized
                     this.inflight++
+                    this.markBusy()
 
                     try {
                         await this.$wire.setFilterRules(rules)
                     } finally {
                         this.inflight--
+                        this.markBusy()
                         this.reconcile()
                     }
+                },
+
+                markBusy() {
+                    const host = root.closest('.fi-ta, .fi-page-header-main-ctn')
+                    const busy = this.inflight > 0
+
+                    host?.classList.toggle('fi-filter-busy', busy)
+                    busy ? host?.setAttribute('aria-busy', 'true') : host?.removeAttribute('aria-busy')
                 },
 
                 schedulePush() {

@@ -405,3 +405,7 @@ body.sorting * {
         @apply static z-auto;
     }
 }
+
+.fi-filter-busy :is(.fi-ta-content-ctn, .fi-ta-selection-indicator, .fi-pagination, .fi-page-main) {
+    @apply opacity-50 transition-opacity delay-100 duration-150 motion-reduce:transition-none;
+}
