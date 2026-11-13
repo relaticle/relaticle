@@ -10,6 +10,7 @@ use App\Enums\CreationSource;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
+use App\Enums\WorkspaceCapability;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\Opportunity;
@@ -216,6 +217,8 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
      */
     public bool $setupMode = false;
 
+    public bool $opensConversation = false;
+
     public MessageOrigin $origin = MessageOrigin::Typed;
 
     public ?string $modelLabel = null;
@@ -268,6 +271,13 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
     public function withSetupMode(bool $setupMode): self
     {
         $this->setupMode = $setupMode;
+
+        return $this;
+    }
+
+    public function withOpeningTurn(bool $opensConversation): self
+    {
+        $this->opensConversation = $opensConversation;
 
         return $this;
     }
@@ -421,7 +431,7 @@ Some actions cannot be performed here but ARE available elsewhere in the workspa
 - Managing existing workspace members (changing a role, removing someone) -> "workspace_members", when their capabilities include `members.manage`.
 - When the user lacks the capability a page needs, do not call GuideToPageTool for it. A tool that answers with a role error is telling you the truth. In both cases explain it, say a workspace owner or admin can do it, and do not link to any page.
 GuideToPageTool returns a page URL (not a record id). You MAY render that URL as a markdown link, e.g. "You can manage those in [Custom Fields settings](URL)."
-PROMPT."\n\n".$this->setupModeInstructions()."\n\n".<<<'PROMPT'
+PROMPT."\n\n".$this->setupModeInstructions()."\n\n".$this->firstRecordInstructions()."\n\n".<<<'PROMPT'
 ## Formatting
 - Use markdown for rich text formatting
 - Never write a markdown table of records except the sanctioned join table above: read results that render as a block, and proposals, already list every record (the no-block tools in Rule 3 get a short list, never a table)
@@ -457,13 +467,23 @@ When the <onboarding> block carries `setup_mode: true`, this is the workspace's 
 - A paste that names a stage the stages line lacks: propose the missing stages with SetCustomFieldOptionsTool in the same turn, after the records. List every current stage too, so none is removed.
 - More than 25 rows, or the user mentions a CSV file they have not attached: call GuideToPageTool with the matching "import_*" destination, give that link, and propose the first 25 rows. When an attached CSV preview carries an import link for that record type, give that link instead (see Citations).
 - People described in prose instead of a list: propose them from the description. Ask for at most one missing detail per record, and only when a name is absent.
-- A typed message that names no company and no person, while the records line says none: answer it first. A question about the product gets its answer in one short paragraph of plain sentences, with no list and no bold labels unless they asked for steps. A question about what you can do, and anything else, gets two sentences at most, and never the list of ways to bring data in. Then end with ONE question that asks for one company they work with right now, and say its name alone is enough. That question is the turn's only closing offer, so offer nothing else beside it. When their next message is a name, propose that company at once. This does not apply when the answer is an import link, a link to connect their mailbox, or the steps to connect their assistant: those end as their own rules say.
-- The records line says whether the workspace holds any record besides samples: none or some. The mailbox line says whether the user has connected a mailbox in this workspace: connected or not_connected. members is how many people share the workspace. An arrived line counts the people and companies an import or a mailbox sync brought in today, by source: it is the only record of what arrived, so never state a number that is not on it.
+- The mailbox line says whether the user has connected a mailbox in this workspace: connected or not_connected. members is how many people share the workspace. An arrived line counts the people and companies an import or a mailbox sync brought in today, by source: it is the only record of what arrived, so never state a number that is not on it.
 - When the user asks how to connect their assistant, such as Claude or ChatGPT, give the steps in this conversation and call no tool. In this order: a line that starts with **ChatGPT:** and says to open the Relaticle plugin, with those two words linked to the chatgpt_plugin line, which the Citations rules allow here, and click Install plugin. A line that starts with **Claude:** and says to open Settings, then Connectors, add a custom connector and paste the address below, then the connector_url line verbatim in a code block. One sentence saying either one sends them back to Relaticle to approve access and pick this workspace. Then the assistant_prompt line verbatim in a code block they can paste into their assistant, and end there with no closing question. With no chatgpt_plugin line, leave the ChatGPT line out. Never reword the address, the menu names or the prompt. When they ask to see the prompt to paste into their assistant, give that same assistant_prompt line verbatim in a code block, with no rewording and no link.
 - To pick who to work on first, when the user asks or accepts that offer: call the companies list tool with `filter: {"creation_source": {"$in": :arrived_sources}, "created_at": {"$gte": <the start of today, with the offset from the Current Date block>}}`, so sample companies never appear. Never rank them, and end by asking which ones to start with.
 - When they name the companies to start with, ask ONCE when to follow up unless they already said, offering the next business day at 09:00 in their timezone as the default. Then propose in ONE turn one opportunity per company (named for the company, its `company_id` the picked company's id, in the first stage of the stages line) and one task per opportunity titled "Follow up with <company name>", linked with `$ref:<pending_action_id>#<index>` in `opportunity_ids`. Set each task's `due_date` custom field to that date. When the members line is 1, put the current user's id in `assignee_ids` so the task reaches their digest; with more members, leave the tasks unassigned.
 - A request to change or delete a record here: find it with a read tool, link it by name, and say that edits happen on the record page or in a new conversation. Never answer that it is unsupported. Removing the sample data is the exception: RemoveSampleDataTool is available here.
 PROMPT);
+    }
+
+    private function firstRecordInstructions(): string
+    {
+        return <<<'PROMPT'
+## First record
+A `records: none` line in the <onboarding> block means the workspace is in its first 14 days and holds no record besides samples. It applies only to a message the user typed.
+- A typed message that names no company and no person: answer it first. A request to see or count records still runs its read tool and says what it found. A question about the product gets its answer in one short paragraph of plain sentences, with no list and no bold labels unless they asked for steps. A question about what you can do, and anything else, gets two sentences at most, and never the list of ways to bring data in.
+- Then end with ONE question that asks for one company they work with right now, and say its name alone is enough. That question is the turn's only closing offer, so offer nothing else beside it. When their next message is a name, propose that company at once.
+- This does not apply when the turn ends on a proposal, or when the answer is an import link, a link to connect their mailbox, or the steps to connect their assistant: those end as their own rules say.
+PROMPT;
     }
 
     private function resumingInstructions(): string
@@ -636,6 +656,10 @@ PROMPT;
             }
         }
 
+        if ($this->awaitsFirstRecord($this->workspace)) {
+            $lines[] = 'records: none';
+        }
+
         if ($this->setupMode) {
             $referral = $this->workspace->onboarding_referral_source;
 
@@ -655,15 +679,24 @@ PROMPT;
         return "\n\n<onboarding>\n".implode("\n", $lines)."\n</onboarding>";
     }
 
+    private function awaitsFirstRecord(Workspace $workspace): bool
+    {
+        $mayCreate = $this->currentUser === null
+            || in_array(WorkspaceCapability::RecordsCreate->value, $this->currentUser['capabilities'], true);
+
+        return $mayCreate
+            && ($this->setupMode || $this->opensConversation)
+            && $workspace->isInSetupWindow()
+            && ! resolve(WorkspaceActivationFacts::class)->hasNonSampleRecord($workspace);
+    }
+
     /** @return list<string> */
     private function setupDataLines(Workspace $workspace): array
     {
         $user = $this->conversationUser;
-        $facts = resolve(WorkspaceActivationFacts::class);
-        $connected = $user instanceof User && $facts->hasConnectedMailbox($user, $workspace);
+        $connected = $user instanceof User && resolve(WorkspaceActivationFacts::class)->hasConnectedMailbox($user, $workspace);
 
         $lines = [
-            'records: '.($facts->hasNonSampleRecord($workspace) ? 'some' : 'none'),
             'mailbox: '.($connected ? 'connected' : 'not_connected'),
             'members: '.(1 + $workspace->users()->count()),
         ];

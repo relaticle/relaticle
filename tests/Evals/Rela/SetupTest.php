@@ -63,6 +63,37 @@ it('proposes the company when the owner answers the ask with a bare name', funct
         ->toHaveToolCalls(['CreateCompanyTool' => fn (array $arguments): bool => count($arguments['records'] ?? []) === 1]);
 });
 
+it('asks for one company on the turn that opens an ordinary chat in an empty workspace', function (): void {
+    $w = EvalWorkspace::seed();
+    Prior::noRecords($w);
+
+    expect((new RelaTurn($w))(...))
+        ->prompt('hi')
+        ->not->toMatch('/"name":"(Create|Update|Delete)/')
+        ->toPassScorer(new TextMatches('/(compan|client)[^?]*\bwork(ing)? with\b[^?]*\??[^?]*$/i'))
+        ->toPassScorer(new OneClosingQuestionAtMost);
+});
+
+it('runs the read before the company ask in an empty workspace', function (): void {
+    $w = EvalWorkspace::seed();
+    Prior::noRecords($w);
+
+    expect((new RelaTurn($w))(...))
+        ->prompt('show me my pipeline')
+        ->toHaveToolCalls(['ListOpportunitiesTool' => []])
+        ->toPassScorer(new TextMatches('/(compan|client)[^?]*\bwork(ing)? with\b[^?]*\??[^?]*$/i'));
+});
+
+it('does not ask for a company in an empty workspace past its first 14 days', function (): void {
+    $w = EvalWorkspace::seed();
+    Prior::noRecords($w);
+    $w->workspace->forceFill(['created_at' => now()->subDays(15)])->save();
+
+    expect((new RelaTurn($w))(...))
+        ->prompt('what can you do?')
+        ->toPassScorer(new TextMatches('/^(?!.*(compan|client)[^?]*\bwork(ing)? with\b[^?]*\??[^?]*$).+/is'));
+});
+
 it('answers an owner who brings a file about the file, without the company ask', function (): void {
     $w = EvalWorkspace::seed();
 

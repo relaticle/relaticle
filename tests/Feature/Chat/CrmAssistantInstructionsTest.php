@@ -694,7 +694,7 @@ it('lets rela state the counts on the arrived line without a tool call', functio
         ->toContain('The one exception is the arrived line of the onboarding block: you may state its counts without a tool call.');
 });
 
-it('tells rela whether the workspace holds a record besides samples', function (CreationSource $source, string $line): void {
+it('tells rela a new workspace holds no record besides samples', function (CreationSource $source, bool $awaits): void {
     $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
 
     expect(setupAgent($workspace)->dynamicInstructions())->toContain("records: none\n");
@@ -702,20 +702,48 @@ it('tells rela whether the workspace holds a record besides samples', function (
     Company::factory()->create(['workspace_id' => $workspace->getKey(), 'creation_source' => $source]);
     resolve(WorkspaceActivationFacts::class)->forget($workspace);
 
-    expect(setupAgent($workspace)->dynamicInstructions())->toContain($line);
+    expect(str_contains(setupAgent($workspace)->dynamicInstructions(), 'records: none'))->toBe($awaits);
 })->with([
-    'a sample' => [CreationSource::SAMPLE, "records: none\n"],
-    'a mailbox record' => [CreationSource::MAILBOX, "records: some\n"],
-    'a record made in chat' => [CreationSource::CHAT, "records: some\n"],
+    'a sample' => [CreationSource::SAMPLE, true],
+    'a mailbox record' => [CreationSource::MAILBOX, false],
+    'a record made in chat' => [CreationSource::CHAT, false],
 ]);
 
-it('has rela ask for one company when a typed message names no record in an empty workspace', function (): void {
+it('stops saying so once the workspace is past its first 14 days', function (int $daysOld, bool $awaits): void {
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+    $workspace->forceFill(['created_at' => now()->subDays($daysOld)->addMinute()])->save();
+
+    expect(str_contains(setupAgent($workspace)->dynamicInstructions(), 'records: none'))->toBe($awaits);
+})->with([
+    'the last minute of day 14' => [14, true],
+    'day 15' => [15, false],
+]);
+
+it('says so outside the setup chat only on the turn that opens a conversation', function (bool $opens): void {
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+    $agent = resolve(CrmAssistant::class)->withWorkspace($workspace)->withOpeningTurn($opens);
+
+    expect(str_contains($agent->dynamicInstructions(), "<onboarding>\nrecords: none\n</onboarding>"))->toBe($opens);
+})->with([true, false]);
+
+it('never says so to a member who cannot create records', function (): void {
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+    $agent = resolve(CrmAssistant::class)->withWorkspace($workspace)->withOpeningTurn(true);
+
+    $viewer = ['name' => 'Vik', 'id' => '1', 'role' => 'Viewer', 'capabilities' => [WorkspaceCapability::RecordsView->value]];
+    $member = [...$viewer, 'role' => 'Member', 'capabilities' => [WorkspaceCapability::RecordsCreate->value]];
+
+    expect($agent->withCurrentUser($viewer)->dynamicInstructions())->not->toContain('records: none')
+        ->and($agent->withCurrentUser($member)->dynamicInstructions())->toContain('records: none');
+});
+
+it('has rela ask for one company when a typed message names no record in a new workspace', function (): void {
     expect(resolve(CrmAssistant::class)->staticInstructions())
-        ->toContain('The records line says whether the workspace holds any record besides samples: none or some.')
-        ->toContain('A typed message that names no company and no person, while the records line says none: answer it first.')
+        ->toContain("## First record\nA `records: none` line in the <onboarding> block means the workspace is in its first 14 days and holds no record besides samples.")
+        ->toContain('A typed message that names no company and no person: answer it first. A request to see or count records still runs its read tool and says what it found.')
         ->toContain('Then end with ONE question that asks for one company they work with right now, and say its name alone is enough.')
         ->toContain('When their next message is a name, propose that company at once.')
-        ->toContain('This does not apply when the answer is an import link, a link to connect their mailbox, or the steps to connect their assistant');
+        ->toContain('This does not apply when the turn ends on a proposal, or when the answer is an import link, a link to connect their mailbox, or the steps to connect their assistant');
 });
 
 it('names records an assistant created as arriving from the connected assistant', function (): void {

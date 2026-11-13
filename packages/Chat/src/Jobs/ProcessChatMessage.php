@@ -52,6 +52,7 @@ use Relaticle\Chat\Events\ConversationResolved;
 use Relaticle\Chat\Events\PendingActionsSuperseded;
 use Relaticle\Chat\Exceptions\ProviderStreamRejectedException;
 use Relaticle\Chat\Models\AgentConversation;
+use Relaticle\Chat\Models\AgentConversationMessage;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\AiModelResolver;
 use Relaticle\Chat\Services\CreditService;
@@ -229,7 +230,7 @@ final class ProcessChatMessage implements ShouldQueue
             $agent->continue($this->conversationId, as: $this->user);
             $agent->withUserTimezone($this->user->timezone);
             $agent->withWorkspace($this->workspace);
-            $agent->withSetupMode($this->isSetupConversation());
+            $agent->withSetupMode($this->isSetupConversation())->withOpeningTurn($this->opensConversation());
             $agent->withTurnOrigin($this->origin);
             $agent->withCurrentUser([
                 'name' => $this->user->name,
@@ -1218,6 +1219,16 @@ final class ProcessChatMessage implements ShouldQueue
         if (in_array($this->origin, [MessageOrigin::Resume, MessageOrigin::Greeting], true) && $this->isSetupConversation()) {
             resolve(StartDataArrivedTurn::class)->execute($this->workspace);
         }
+    }
+
+    private function opensConversation(): bool
+    {
+        return $this->origin->isTyped()
+            && $this->workspace->isInSetupWindow()
+            && ! AgentConversationMessage::query()
+                ->where('conversation_id', $this->conversationId)
+                ->where('role', 'assistant')
+                ->exists();
     }
 
     private function isSetupConversation(): bool

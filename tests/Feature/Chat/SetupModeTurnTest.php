@@ -84,6 +84,37 @@ it('runs an ordinary conversation without setup mode', function (): void {
     CrmAssistant::assertPrompted(fn ($prompt): bool => $prompt->agent->setupMode === false);
 });
 
+it('tells rela a new workspace has no records on the turn that opens an ordinary conversation, and not on the next', function (): void {
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $this->user->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
+        'title' => 'ordinary',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    CrmAssistant::fake(['Which company do you work with?', 'Sure.']);
+
+    runTurn($this->user, $this->workspace, $conversationId);
+    runTurn($this->user, $this->workspace, $conversationId);
+
+    CrmAssistant::assertPrompted(fn ($prompt): bool => str_contains($prompt->agent->dynamicInstructions(), "records: none\n"));
+    CrmAssistant::assertPrompted(fn ($prompt): bool => ! str_contains($prompt->agent->dynamicInstructions(), "records: none\n"));
+});
+
+it('keeps telling rela so on every turn of the setup conversation', function (): void {
+    CrmAssistant::fake(['Which company do you work with?', 'Sure.']);
+
+    runTurn($this->user, $this->workspace, $this->workspace->setupConversation->id);
+    runTurn($this->user, $this->workspace, $this->workspace->setupConversation->id);
+
+    CrmAssistant::assertPrompted(fn ($prompt): bool => str_contains($prompt->agent->dynamicInstructions(), "records: none\n"));
+    CrmAssistant::assertNotPrompted(fn ($prompt): bool => ! str_contains($prompt->agent->dynamicInstructions(), "records: none\n"));
+});
+
 it('drops setup mode when the flag is off', function (): void {
     $conversationId = $this->workspace->setupConversation->id;
     Feature::define(SetupConversation::class, false);
