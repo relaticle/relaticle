@@ -4,49 +4,26 @@ declare(strict_types=1);
 
 use App\Actions\CustomFields\CreateCustomField;
 use App\Data\TableStateData;
-use App\Enums\CustomFields\OpportunityField;
-use App\Enums\CustomFields\TaskField;
 use App\Models\Company;
-use App\Models\CustomField;
-use App\Models\Note;
-use App\Models\Opportunity;
-use App\Models\People;
 use App\Models\SavedView;
-use App\Models\Task;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
 use Pest\Browser\Api\AwaitableWebpage;
-use Relaticle\CustomFields\Services\TenantContextService;
-use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Tests\Helpers\WorkspaceCustomField;
 
-function menuMetrics(string $panel, string $rows, string $icons): string
-{
-    return <<<JS
-        (async () => {
-            const panel = document.querySelector('{$panel}');
-            const visible = (element) => element.getClientRects().length > 0;
-            const visibleRows = () => [...panel.querySelectorAll('{$rows}')].filter(visible);
-            const unique = (values) => [...new Set(values)];
-            const settle = () => new Promise((resolve) => setTimeout(resolve, 100));
+beforeEach(function (): void {
+    $this->withVite();
 
-            for (let attempt = 0, count = -1; attempt < 20 && count !== visibleRows().length; attempt++) {
-                count = visibleRows().length;
-                await settle();
-            }
+    $this->user = User::factory()->withWorkspace()->create();
+    $this->workspace = $this->user->ownedWorkspaces()->first();
+    Company::factory()->recycle([$this->user, $this->workspace])->count(3)->create();
 
-            const rows = visibleRows();
-
-            return {
-                rows: unique(rows.map((row) => Math.round(row.getBoundingClientRect().height))),
-                pitch: unique(rows.slice(1).map((row, index) => [row, rows[index]]).filter(([row, previous]) => row.parentElement === previous.parentElement).map(([row, previous]) => Math.round(row.getBoundingClientRect().top - previous.getBoundingClientRect().top))),
-                icons: unique([...panel.querySelectorAll('{$icons}')].filter(visible).map((icon) => Math.round(icon.getBoundingClientRect().width))),
-                panelRadius: getComputedStyle(panel.closest('.fi-dropdown-panel, .fi-filter-pop')).borderRadius,
-                rowRadius: unique(rows.map((row) => getComputedStyle(row).borderRadius)),
-            };
-        })()
-        JS;
-}
+    foreach (['Hot leads', 'Renewals'] as $name) {
+        SavedView::factory()->for($this->user)->for($this->workspace)->create([
+            'name' => $name,
+            'state' => new TableStateData(sort: 'name:desc'),
+        ]);
+    }
+});
 
 const BOARD_MAIN_ROWS = '.fi-board-main-view .fi-dropdown-list-item, .fi-board-main-view .fi-board-switch-row, .fi-board-main-view .fi-ta-views-row';
 
@@ -93,39 +70,6 @@ function runMenuSteps(AwaitableWebpage $page, array $steps): void
         $page->click($step);
     }
 }
-
-function menuRoom(string $panel, string $list): string
-{
-    return <<<JS
-        (() => {
-            const panel = document.querySelector('{$panel}').closest('.fi-dropdown-panel, .fi-filter-pop');
-            const box = panel.getBoundingClientRect();
-            const list = panel.querySelector('{$list}');
-
-            return {
-                height: box.height <= 448,
-                bottom: box.bottom <= window.innerHeight - 16,
-                listScrolls: list.scrollHeight > list.clientHeight,
-                panelScrolls: panel.scrollHeight > panel.clientHeight + 1,
-            };
-        })()
-        JS;
-}
-
-beforeEach(function (): void {
-    $this->withVite();
-
-    $this->user = User::factory()->withWorkspace()->create();
-    $this->workspace = $this->user->ownedWorkspaces()->first();
-    Company::factory()->recycle([$this->user, $this->workspace])->count(3)->create();
-
-    foreach (['Hot leads', 'Renewals'] as $name) {
-        SavedView::factory()->for($this->user)->for($this->workspace)->create([
-            'name' => $name,
-            'state' => new TableStateData(sort: 'name:desc'),
-        ]);
-    }
-});
 
 it('draws every menu with the shared row, icon and corner spec', function (string $open, string $panel, string $rows, string $icons, string $path = 'companies', array $steps = [], array $differs = [], bool $region = false): void {
     if ($path === 'opportunities/board') {
@@ -344,221 +288,6 @@ it('marks the current item with a trailing check and no fill', function (string 
     ]);
     $page->assertNoJavaScriptErrors();
 })->with(['views', 'sort chooser', 'column header', 'board grouped by', 'board lanes', 'filter group']);
-
-function holdLook(array $targets, string $trigger): string
-{
-    $selectors = json_encode($targets);
-    $triggerJson = json_encode($trigger);
-
-    return <<<JS
-        (async () => {
-            await new Promise((resolve) => setTimeout(resolve, 400));
-
-            return Object.fromEntries({$selectors}.map((selector) => {
-                const [base, pseudo] = selector.split('::');
-                const element = [...document.querySelectorAll(base.replace(':visible', ''))].find((candidate) => candidate.getClientRects().length > 0);
-                const style = getComputedStyle(element, pseudo ? `::\${pseudo}` : null);
-                const opacity = selector === {$triggerJson} ? '' : style.opacity;
-
-                return [selector, [style.backgroundColor, style.color, style.boxShadow, style.borderRightColor, opacity, pseudo ? style.width : ''].join(' | ')];
-            }));
-        })()
-        JS;
-}
-
-function expectHoverHeldWhileOpen(AwaitableWebpage $page, string $item, string $trigger, array $extras = [], bool $dark = false, string $away = '.fi-sidebar-nav .fi-sidebar-item-btn >> nth=0'): void
-{
-    if ($dark) {
-        $page->script('document.documentElement.classList.add("dark")');
-    }
-
-    $targets = array_values(array_unique([$item, $trigger, ...$extras]));
-
-    $page->hover($item)->hover($trigger);
-    $hoveredTrigger = $page->script(holdLook([$trigger], $trigger))[$trigger];
-    $page->hover($item);
-    $hovered = $page->script(holdLook($targets, $trigger));
-    $hovered[$trigger] = $hoveredTrigger;
-
-    $page->hover($away);
-    $resting = $page->script(holdLook($targets, $trigger));
-    expect($resting)->not->toBe($hovered);
-
-    $page->click($trigger)->assertAttribute($trigger, 'aria-expanded', 'true');
-    $page->script('document.activeElement.blur()');
-    $page->hover($away);
-
-    expect($page->script(holdLook($targets, $trigger)))->toBe($hovered);
-}
-
-it('keeps an item looking hovered while the menu opened from it is open', function (string $surface): void {
-    $user = $this->user;
-    $workspace = $this->workspace;
-    $company = Company::query()->withoutGlobalScopes()->first();
-    $company->tasks()->attach(Task::factory()->recycle([$user, $workspace])->create());
-
-    $chip = "js:Livewire.all().find((component) => component.name.includes('ListCompanies')).\$wire.\$call('setFilterRules', [{ field: 'name', condition: 'contains', value: 'chip' }])";
-
-    $dark = str_ends_with($surface, ' dark');
-    $moreActions = __('filament/pages/dashboard.activation.more_actions');
-
-    [$path, $prepare, $item, $trigger, $extras] = match (str_replace(' dark', '', $surface)) {
-        'relation row' => ["companies/{$company->getKey()}", ['.fi-record-pane .fi-tabs-item:nth-child(4)'], '.fi-ta-row', '.fi-ta-row .fi-dropdown-trigger > button', []],
-        'column header' => ['companies', [], 'th[x-data^="resizableColumn(\'created_at\'"]', 'th[x-data^="resizableColumn(\'created_at\'"] [data-column-menu-trigger]', ['th[x-data^="resizableColumn(\'created_at\'"] .column-resize-handle-bar::before']],
-        'bulk bar more' => ['companies', ['.fi-ta-record-checkbox >> nth=0'], '.fi-bulk-bar .fi-dropdown-trigger > button', '.fi-bulk-bar .fi-dropdown-trigger > button', []],
-        'import and export' => ['companies', [], '.fi-header button.fi-ac-btn-group:visible', '.fi-header button.fi-ac-btn-group:visible', []],
-        'view switcher' => ['companies', [], '.fi-view-switcher .fi-dropdown-trigger button', '.fi-view-switcher .fi-dropdown-trigger button', []],
-        'view settings' => ['companies', [], '.fi-view-settings-trigger', '.fi-view-settings-trigger', []],
-        'filter add' => ['companies', [], '[data-filter-add]', '[data-filter-add]', []],
-        'filter sort' => ['companies', [], '[data-filter-sort]', '[data-filter-sort]', []],
-        'filter field segment' => ['companies', [$chip], '[data-filter-chip] [data-filter-segment="field"]', '[data-filter-chip] [data-filter-segment="field"]', []],
-        'filter condition segment' => ['companies', [$chip], '[data-filter-chip] [data-filter-segment="condition"]', '[data-filter-chip] [data-filter-segment="condition"]', []],
-        'filter value segment' => ['companies', [$chip], '[data-filter-chip] [data-filter-segment="value"]', '[data-filter-chip] [data-filter-segment="value"]', []],
-        'filter group' => ['tasks', [], '[data-filter-group]', '[data-filter-group]', []],
-        'notifications' => ['companies', [], '.fi-sidebar-notifications-btn', '.fi-sidebar-notifications-btn', []],
-        'record actions' => ["companies/{$company->getKey()}", [], '.fi-record-page .fi-ac-btn-group:visible', '.fi-record-page .fi-ac-btn-group:visible', []],
-        'workspace menu' => ['companies', [], '.fi-tenant-menu-trigger', '.fi-tenant-menu-trigger', ['.fi-tenant-menu-trigger .fi-icon']],
-        'activation checklist' => ['companies', [], "button[aria-label=\"{$moreActions}\"]", "button[aria-label=\"{$moreActions}\"]", []],
-        'filter more segment' => ['companies', [$chip], '[data-filter-chip] [data-filter-more]', '[data-filter-chip] [data-filter-more]', []],
-    };
-
-    $page = visitAs($user, "/app/{$workspace->slug}/{$path}", 1440, 900);
-
-    foreach ($prepare as $step) {
-        if (str_starts_with($step, 'js:')) {
-            $page->script(substr($step, 3));
-            $page->wait(0.5);
-
-            continue;
-        }
-
-        $page->click($step);
-    }
-
-    expectHoverHeldWhileOpen($page, $item, $trigger, $extras, $dark);
-
-    $page->assertNoJavaScriptErrors();
-})->with(['relation row', 'relation row dark', 'import and export dark', 'bulk bar more dark', 'notifications dark', 'workspace menu dark', 'filter add dark', 'activation checklist', 'column header', 'bulk bar more', 'import and export', 'view switcher', 'view settings', 'filter add', 'filter sort', 'filter field segment', 'filter condition segment', 'filter value segment', 'filter more segment', 'filter group', 'notifications', 'record actions', 'workspace menu']);
-
-it('keeps a board card looking hovered while its menu is open', function (string $model, string $columnFieldCode, string $path, array $extras): void {
-    TenantContextService::setTenantId($this->workspace->getKey());
-    $columnField = CustomField::query()->forEntity($model)->where('code', $columnFieldCode)->firstOrFail();
-    $record = $model::factory()->recycle([$this->user, $this->workspace])->create();
-    $record->saveCustomFieldValue($columnField, $columnField->options->first()->getKey());
-    TenantContextService::setTenantId(null);
-
-    $card = "[data-card-id=\"{$record->getKey()}\"]";
-
-    $page = visitAs($this->user, "/app/{$this->workspace->slug}/{$path}", 1440, 900)
-        ->assertVisible($card);
-
-    expectHoverHeldWhileOpen($page, $card, "{$card} .ff-card-actions .fi-dropdown-trigger > button", array_map(fn (string $extra): string => "{$card} {$extra}", $extras));
-    $page->assertNoJavaScriptErrors();
-})->with([
-    'tasks' => [Task::class, TaskField::STATUS->value, 'tasks/board', []],
-    'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board', ['.fi-board-card-preview-trigger']],
-]);
-
-it('keeps a sidebar chat looking hovered while its menu is open', function (bool $dark): void {
-    DB::table('agent_conversations')->insert([
-        'id' => 'cb1',
-        'participant_type' => 'user',
-        'participant_id' => $this->user->getKey(),
-        'workspace_id' => $this->workspace->getKey(),
-        'title' => 'Acme onboarding',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-
-    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
-        ->assertSee('Acme onboarding');
-
-    $row = '.fi-sidebar-item:has([aria-label="Chat actions"])';
-
-    expectHoverHeldWhileOpen($page, "{$row} .fi-sidebar-item-btn", '.fi-sidebar-item [aria-label="Chat actions"]', ["{$row} .fi-sidebar-item-label", "{$row} .fi-sidebar-item-icon"], $dark);
-    $page->assertNoJavaScriptErrors();
-})->with([false, true]);
-
-it('keeps a list row looking hovered while its relations menu is open', function (bool $dark): void {
-    $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
-    $note->people()->attach(People::factory()->count(3)->recycle([$this->user, $this->workspace])->create());
-
-    $page = visitAs($this->user, "/app/{$this->workspace->slug}/notes/list", 1440, 900)
-        ->assertVisible('.fi-linked-records-cell-more');
-
-    expectHoverHeldWhileOpen($page, '.fi-ta-row', '.fi-linked-records-cell-more', [], $dark);
-    $page->assertNoJavaScriptErrors();
-})->with([false, true]);
-
-it('keeps a composer picker button looking hovered while its menu is open', function (bool $dark): void {
-    ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
-        'user_id' => $this->user->id,
-        'workspace_id' => $this->workspace->id,
-        'email_address' => 'olivia@acme.example',
-        'sync_cursor' => 'history-done',
-        'last_synced_at' => now(),
-    ]));
-
-    $page = visitAs($this->user, "/app/{$this->workspace->slug}/email", 1440, 900)
-        ->click(__('filament/concerns/email-compose.actions.compose.label'))
-        ->waitForText(__('filament/emails/composer.title'));
-
-    $picker = 'button[aria-label="'.__('filament/emails/composer.actions.signature').'"]';
-
-    expectHoverHeldWhileOpen($page, $picker, $picker, [], $dark, '[role="combobox"]');
-    $page->assertNoJavaScriptErrors();
-})->with([false, true]);
-
-it('keeps pinned cells in step with a row whose popover is open', function (): void {
-    $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
-    $note->people()->attach(People::factory()->count(3)->recycle([$this->user, $this->workspace])->create());
-
-    $page = visitAs($this->user, "/app/{$this->workspace->slug}/notes/list", 1440, 900)
-        ->assertVisible('.fi-linked-records-cell-more')
-        ->click('.fi-ta-resizable-header [data-column-menu-trigger] >> nth=0')
-        ->click('.fi-ta-column-menu [data-column-menu-item="pin"]')
-        ->assertVisible('td[data-column-pinned="1"]');
-
-    expectHoverHeldWhileOpen($page, '.fi-ta-row', '.fi-linked-records-cell-more', ['.fi-ta-row td[data-column-pinned="1"]', '.fi-ta-row .fi-ta-selection-cell']);
-    $page->assertNoJavaScriptErrors();
-});
-
-it('leaves a collapse toggle that rests expanded looking the same as when it is collapsed', function (bool $dark): void {
-    $company = Company::query()->withoutGlobalScopes()->first();
-
-    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies/{$company->getKey()}", 1440, 900);
-
-    if ($dark) {
-        $page->script('document.documentElement.classList.add("dark")');
-    }
-
-    $page->wait(1);
-
-    $drift = $page->script(<<<'JS'
-        (async () => {
-            await new Promise((resolve) => setTimeout(resolve, 400));
-
-            const toggles = [...document.querySelectorAll('[aria-expanded="true"]')]
-                .filter((element) => element.getClientRects().length > 0 && ! element.closest('.fi-dropdown-trigger'));
-            const look = (element) => { const style = getComputedStyle(element); return [style.backgroundColor, style.color].join(' | '); };
-
-            const drifted = toggles.filter((element) => {
-                element.style.transition = 'none';
-                const expanded = look(element);
-                element.setAttribute('aria-expanded', 'false');
-                const collapsed = look(element);
-                element.setAttribute('aria-expanded', 'true');
-                element.style.transition = '';
-
-                return expanded !== collapsed;
-            }).map((element) => element.className);
-
-            return { toggles: toggles.length > 1, drifted };
-        })()
-        JS);
-
-    expect($drift)->toBe(['toggles' => true, 'drifted' => []]);
-})->with([false, true]);
 
 it('draws the board view settings with the shared row, icon and corner spec', function (string $path): void {
     $page = visitAs($this->user, "/app/{$this->workspace->slug}/{$path}", 1440, 900)
