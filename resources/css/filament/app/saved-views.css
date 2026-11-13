@@ -50,10 +50,6 @@
     @apply flex flex-col;
 }
 
-.fi-ta-views-empty {
-    @apply px-2 py-3 text-sm text-gray-500 dark:text-gray-400;
-}
-
 .fi-ta-views-row-actions {
     @apply flex shrink-0 items-center gap-0.5 pe-1;
 
@@ -198,7 +194,7 @@
 }
 
 .fi-view-settings-note {
-    @apply flex items-center gap-2 p-2 text-sm text-gray-500 dark:text-gray-400;
+    @apply flex items-center gap-2;
 
     & .fi-icon {
         @apply size-menu-icon;

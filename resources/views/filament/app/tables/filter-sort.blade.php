@@ -69,7 +69,7 @@
                                 <x-filament::icon icon="lucide-check" class="fi-menu-check" x-show="column.key === sortTarget" />
                             </button>
                         </template>
-                        <p class="fi-filter-hint" x-show="sortChoices().length === 0">{{ __('filament/panel.tables.filters.no_field') }}</p>
+                        <p class="fi-menu-empty" x-show="sortChoices().length === 0">{{ __('filament/panel.tables.filters.no_field') }}</p>
                     </div>
                 </div>
             </template>

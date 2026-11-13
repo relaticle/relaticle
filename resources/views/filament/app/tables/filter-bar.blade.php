@@ -218,7 +218,7 @@
                                                 <span class="fi-filter-label" x-text="option.label"></span>
                                             </button>
                                         </template>
-                                        <p class="fi-filter-hint" x-show="listItems(chip).length === 0 && ! searching" x-text="@js(__('filament/panel.tables.filters.no_options'))"></p>
+                                        <p class="fi-menu-empty" x-show="listItems(chip).length === 0 && ! searching" x-text="@js(__('filament/panel.tables.filters.no_options'))"></p>
                                     </div>
                                 </div>
                             </template>

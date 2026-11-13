@@ -2026,6 +2026,11 @@ html.fi-record-stacked .fi-record-layout {
     @apply ms-auto size-menu-icon shrink-0 text-primary-600 dark:text-primary-400;
 }
 
+/* The one line a menu shows when its search or list matches nothing. */
+:is(.fi-menu-empty, .fi-ta-views-empty, .fi-view-settings-note) {
+    @apply px-2 py-1.5 text-sm text-gray-500 dark:text-gray-400;
+}
+
 .fi-dropdown-list-item-label {
     @apply min-w-0 flex-1 text-start;
 }

@@ -41,9 +41,9 @@
                 </button>
             </div>
         </template>
-        <p class="fi-filter-hint" x-show="matchingFields().length === 0 && ! canAddDeleted(@js(__('filament/panel.tables.filters.deleted_records')))">{{ __('filament/panel.tables.filters.no_field') }}</p>
+        <p class="fi-menu-empty" x-show="matchingFields().length === 0 && ! canAddDeleted(@js(__('filament/panel.tables.filters.deleted_records')))">{{ __('filament/panel.tables.filters.no_field') }}</p>
 @else
-        <p class="fi-filter-hint" x-show="matchingFields().length === 0">{{ __('filament/panel.tables.filters.no_field') }}</p>
+        <p class="fi-menu-empty" x-show="matchingFields().length === 0">{{ __('filament/panel.tables.filters.no_field') }}</p>
 @endunless
     </div>
 </div>
