@@ -502,14 +502,19 @@ it('styles inline code and tables in a reply with the chat prose classes', funct
             const code = bubble.querySelector('p code');
             const blockCode = bubble.querySelector('pre code');
             const prose = code.closest('.prose');
-
-            return JSON.stringify({
+            const styles = {
                 codeBefore: getComputedStyle(code, '::before').content,
                 codeBackground: getComputedStyle(code).backgroundColor,
                 firstChildMarginTop: getComputedStyle(prose.firstElementChild).marginTop,
                 cellPaddingLeft: getComputedStyle(bubble.querySelector('td')).paddingLeft,
                 blockCodeBackground: getComputedStyle(blockCode).backgroundColor,
-            });
+            };
+
+            document.documentElement.classList.add('dark');
+            styles.darkBlockBackground = getComputedStyle(blockCode.closest('pre')).backgroundColor;
+            styles.darkPageBackground = getComputedStyle(document.body).backgroundColor;
+
+            return JSON.stringify(styles);
         })();
     JS), true, 512, JSON_THROW_ON_ERROR);
 
@@ -517,7 +522,8 @@ it('styles inline code and tables in a reply with the chat prose classes', funct
         ->and($styles['codeBackground'])->not->toBe('rgba(0, 0, 0, 0)')
         ->and($styles['firstChildMarginTop'])->toBe('0px')
         ->and($styles['cellPaddingLeft'])->toBe('8px')
-        ->and($styles['blockCodeBackground'])->toBe('rgba(0, 0, 0, 0)');
+        ->and($styles['blockCodeBackground'])->toBe('rgba(0, 0, 0, 0)')
+        ->and($styles['darkBlockBackground'])->not->toBe($styles['darkPageBackground']);
 });
 
 /**
