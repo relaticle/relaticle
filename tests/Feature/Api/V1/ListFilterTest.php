@@ -24,6 +24,7 @@ use App\Queries\FilterTree;
 use App\Queries\Operand;
 use App\Queries\TreeAllowedFilter;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use Tests\Helpers\WorkspaceCustomField;
@@ -145,6 +146,21 @@ it('reads a bare date on a custom date-time field as the whole day', function ()
         ->and($due('$gte', '2026-01-01'))->toBe($on('2026-01-01T00:00:00', '2026-01-01T09:00:00', '2026-01-01T23:59:59', '2026-01-02T00:00:00'))
         ->and($due('$gt', '2026-01-01'))->toBe($on('2026-01-02T00:00:00'))
         ->and($due('$lte', '2026-01-01T09:00:00'))->toBe($on('2025-12-31T23:59:00', '2026-01-01T00:00:00', '2026-01-01T09:00:00'));
+});
+
+it('reads both bounds of a custom attribute range from one value row', function (): void {
+    $ids = collect(['2025-12-31T23:59:00Z', '2026-01-01T09:00:00Z', '2026-01-02T00:00:00Z'])
+        ->mapWithKeys(fn (string $due): array => [$due => $this->postJson('/api/v1/tasks', ['title' => "Due {$due}", 'custom_fields' => ['due_date' => $due]])->assertCreated()->json('data.id')]);
+    $range = ['custom_fields' => ['due_date' => ['$gte' => '2026-01-01T00:00:00Z', '$lt' => '2026-01-02T00:00:00Z']]];
+
+    DB::enableQueryLog();
+    $found = listIds($this, 'tasks', $range);
+    $statements = collect(DB::getQueryLog())->pluck('query')->filter(fn (string $sql): bool => str_contains($sql, 'from "tasks"') && str_contains($sql, 'custom_field_values'));
+    DB::disableQueryLog();
+
+    expect($found)->toBe([$ids['2026-01-01T09:00:00Z']])
+        ->and($statements)->not->toBeEmpty()
+        ->and($statements->every(fn (string $sql): bool => substr_count($sql, 'exists (') === 1))->toBeTrue();
 });
 
 it('filters creation_source with $in and $not_in', function (): void {

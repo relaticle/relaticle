@@ -93,32 +93,68 @@ final readonly class CustomFieldFilter implements Filter
         );
 
         foreach ($value as $fieldCode => $operators) {
-            $field = $fields[$fieldCode];
-            $valueColumn = $field->getValueColumn();
-            $supportedOperators = CustomFieldFilterSchema::operatorsForType($field->type);
-
-            if (! is_array($operators) || $operators === []) {
-                throw FilterErrors::at((string) $fieldCode, __('validation.filter.operator_object', ['name' => $fieldCode, 'operator' => array_key_first($supportedOperators)]));
-            }
-
-            $entry = $options[$fieldCode] ?? null;
-
-            foreach ($operators as $operator => $operand) {
-                $this->assertSupported($fieldCode, (string) $operator, $supportedOperators);
-
-                if ($operator === 'domain') {
-                    $this->applyDomain($query, $field, $operand, $supportedOperators['domain']['properties']);
-
-                    continue;
-                }
-
-                $operand = $this->recordIds($field, $operator, $this->normalizeOperand($fieldCode, $operator, $operand, $supportedOperators[$operator], $entry !== null));
-                $operand = $this->resolveOptions($fieldCode, $operator, $entry, $operand);
-                $operand = $this->spellings($field, $operator, $operand);
-
-                $this->applyCondition($query, $field, $valueColumn, $operator, $operand);
-            }
+            $this->applyField($query, $fields[$fieldCode], $operators, $options[$fieldCode] ?? null);
         }
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     * @param  array{ids: array<string, list<string>>, labels: list<string>}|null  $entry
+     */
+    private function applyField(Builder $query, CustomField $field, mixed $operators, ?array $entry): void
+    {
+        $fieldCode = $field->code;
+        $valueColumn = $field->getValueColumn();
+        $supportedOperators = CustomFieldFilterSchema::operatorsForType($field->type);
+
+        if (! is_array($operators) || $operators === []) {
+            throw FilterErrors::at($fieldCode, __('validation.filter.operator_object', ['name' => $fieldCode, 'operator' => array_key_first($supportedOperators)]));
+        }
+
+        $comparisons = [];
+
+        foreach ($operators as $operator => $operand) {
+            $this->assertSupported($fieldCode, (string) $operator, $supportedOperators);
+
+            if ($operator === 'domain') {
+                $this->applyDomain($query, $field, $operand, $supportedOperators['domain']['properties']);
+
+                continue;
+            }
+
+            $operand = $this->recordIds($field, $operator, $this->normalizeOperand($fieldCode, $operator, $operand, $supportedOperators[$operator], $entry !== null));
+            $operand = $this->resolveOptions($fieldCode, $operator, $entry, $operand);
+            $operand = $this->spellings($field, $operator, $operand);
+
+            if (array_key_exists($operator, CustomFieldFilterSchema::COMPARISONS)) {
+                $comparisons[$operator] = $operand;
+
+                continue;
+            }
+
+            $this->applyCondition($query, $field, $valueColumn, $operator, $operand);
+        }
+
+        if ($comparisons !== []) {
+            $this->applyComparisons($query, $field, $valueColumn, $comparisons);
+        }
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     * @param  array<string, mixed>  $comparisons
+     */
+    private function applyComparisons(Builder $query, CustomField $field, string $valueColumn, array $comparisons): void
+    {
+        $query->whereHas('customFieldValues', function (Builder $q) use ($field, $valueColumn, $comparisons): void {
+            $q->where('custom_field_id', $field->getKey());
+
+            foreach ($comparisons as $operator => $operand) {
+                $this->coversTheWholeDay($field, $operand)
+                    ? $this->wholeDay($q, $valueColumn, $operator, $operand)
+                    : $q->where($valueColumn, CustomFieldFilterSchema::COMPARISONS[$operator], $operand);
+            }
+        });
     }
 
     /**
@@ -253,9 +289,6 @@ final readonly class CustomFieldFilter implements Filter
                 $q->where('custom_field_id', $field->getKey());
 
                 match ($operator) {
-                    '$eq', '$gt', '$gte', '$lt', '$lte' => $this->coversTheWholeDay($field, $operand)
-                        ? $this->wholeDay($q, $valueColumn, $operator, $operand)
-                        : $q->where($valueColumn, CustomFieldFilterSchema::COMPARISONS[$operator], $operand),
                     '$in' => $q->whereIn($valueColumn, $operand),
                     '$has_any' => $this->containsAny($q, $field, $operand),
                     default => throw new \LogicException("Unsupported custom field filter operator [{$operator}]."),
