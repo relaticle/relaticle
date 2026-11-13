@@ -88,7 +88,7 @@
     }
 
     & > .fi-dropdown-list {
-        @apply mt-1 border-t border-gray-100 pt-1 dark:border-white/10;
+        @apply mt-1 border-t border-gray-100 pt-1 dark:border-white/5;
     }
 }
 
@@ -113,7 +113,7 @@
 }
 
 .fi-ta-views-search {
-    @apply -mt-1 mb-1 flex shrink-0 items-center gap-2 border-b border-gray-100 py-1.5 text-gray-400 dark:border-white/10 dark:text-gray-500;
+    @apply -mt-1 mb-1 flex shrink-0 items-center gap-2 border-b border-gray-100 py-1.5 text-gray-400 dark:border-white/5 dark:text-gray-500;
     margin-inline: calc(var(--menu-inset) * -1);
     padding-inline: calc(var(--menu-inset) + var(--spacing));
 
@@ -165,7 +165,7 @@
 }
 
 .fi-view-settings-footer {
-    @apply mt-1 shrink-0 border-t border-gray-100 pt-1 dark:border-white/10;
+    @apply mt-1 shrink-0 border-t border-gray-100 pt-1 dark:border-white/5;
 }
 
 .fi-view-settings-view {
@@ -174,7 +174,7 @@
 
 /* ps-1 plus the 32px back button puts the chevron over the row icons and the title on the row labels. */
 .fi-view-settings-search {
-    @apply -mx-1 -mt-1 mb-1 flex h-10 shrink-0 items-center border-b border-gray-100 ps-1 pe-2 max-sm:-mx-2 max-sm:ps-3 dark:border-white/10;
+    @apply -mx-1 -mt-1 mb-1 flex h-10 shrink-0 items-center border-b border-gray-100 ps-1 pe-2 max-sm:-mx-2 max-sm:ps-3 dark:border-white/5;
 
     & > .fi-icon-btn {
         @apply m-0 size-8 shrink-0;
@@ -264,7 +264,7 @@
 }
 
 .fi-view-settings-row-menu .fi-dropdown-list + .fi-dropdown-list {
-    @apply mt-1 border-t border-gray-100 pt-1 dark:border-white/10;
+    @apply mt-1 border-t border-gray-100 pt-1 dark:border-white/5;
 }
 
 .fi-view-settings-add {
@@ -345,7 +345,7 @@
 }
 
 .fi-board-section-heading {
-    @apply mt-1 shrink-0 border-t border-gray-100 pb-1 pt-2 text-xs font-medium text-gray-500 dark:border-white/10 dark:text-gray-400;
+    @apply mt-1 shrink-0 border-t border-gray-100 pb-1 pt-2 text-xs font-medium text-gray-500 dark:border-white/5 dark:text-gray-400;
 
     :is(.fi-ta-views-panel, .fi-view-settings-panel) & {
         padding-inline: calc(var(--menu-inset) + var(--spacing) * 2);
@@ -369,7 +369,7 @@
 }
 
 .fi-board-stage-divider {
-    @apply my-1 border-gray-950/5 dark:border-white/10;
+    @apply my-1 border-gray-100 dark:border-white/5;
     margin-inline: calc(var(--menu-inset) * -1);
 }
 
@@ -387,7 +387,7 @@
 }
 
 .fi-board-stages-row-menu .fi-dropdown-list + .fi-dropdown-list {
-    @apply mt-1 border-t border-gray-100 pt-1 dark:border-white/10;
+    @apply mt-1 border-t border-gray-100 pt-1 dark:border-white/5;
 }
 
 .fi-board-stages-row-menu .fi-dropdown-list-item:disabled {
