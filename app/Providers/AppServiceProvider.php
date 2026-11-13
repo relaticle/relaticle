@@ -15,6 +15,7 @@ use App\Filament\CustomFields\DateTimeFieldType;
 use App\Filament\CustomFields\DomainFieldType;
 use App\Filament\CustomFields\RichEditorFieldType;
 use App\Filament\Tables\ResizableColumns;
+use App\Http\Middleware\PreventRequestForgery;
 use App\Http\Middleware\ReadAcrossWorkspaces;
 use App\Http\Responses\LoginResponse;
 use App\Jobs\CompleteExport;
@@ -85,6 +86,7 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\DevCommands;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery as BasePreventRequestForgery;
 use Illuminate\Http\Request;
 use Illuminate\Log\Context\Repository as ContextRepository;
 use Illuminate\Notifications\Channels\DatabaseChannel;
@@ -137,8 +139,7 @@ final class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         Date::use(CarbonImmutable::class);
-        $this->app->bind(\Filament\Auth\Http\Responses\Contracts\LoginResponse::class, LoginResponse::class);
-        $this->app->bind(\Filament\Actions\Exports\Models\Export::class, Export::class);
+        $this->registerVendorOverrides();
         $this->registerNotificationBindings();
         $this->registerSelfHostedDefaults();
 
@@ -201,6 +202,13 @@ final class AppServiceProvider extends ServiceProvider
                 renderAnchors: false,
                 extensions: [TableExtension::class],
             ));
+    }
+
+    private function registerVendorOverrides(): void
+    {
+        $this->app->bind(\Filament\Auth\Http\Responses\Contracts\LoginResponse::class, LoginResponse::class);
+        $this->app->bind(\Filament\Actions\Exports\Models\Export::class, Export::class);
+        $this->app->bind(BasePreventRequestForgery::class, PreventRequestForgery::class);
     }
 
     private function registerNotificationBindings(): void
