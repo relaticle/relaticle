@@ -299,8 +299,8 @@ it('tells self-hosters their installs do not meter AI credits and keeps the Clou
 
     expect($windows)->not->toBeEmpty()
         ->and($windows->contains(fn (string $answer): bool => str_contains($answer, 'Self-hosted installs do not meter AI credits')
-            && str_contains($answer, number_format(Plan::Pro->credits()))
-            && str_contains($answer, Workspace::PRO_TRIAL_DAYS.'-day')))->toBeTrue('the FAQ answer must say self-hosted is unmetered and keep the Pro credits and trial length')
+            && str_contains($answer, 'trial with '.number_format(Plan::trialCredits()).' credits')
+            && str_contains($answer, Workspace::PRO_TRIAL_DAYS.'-day')))->toBeTrue('the FAQ answer must say self-hosted is unmetered and keep the trial credits and trial length')
         ->and($html)->not->toContain('does not disable credit metering')
         ->and($html)->not->toContain('brand-new Cloud signup gets exactly the same one')
         ->and($html)->not->toContain("\u{2014}");
@@ -566,6 +566,11 @@ it('keeps the plans help article in step with the pricing page', function (): vo
         expect($pricing)->toContain($fact)
             ->and($article)->toContain($fact);
     }
+
+    $trialCredits = number_format(Plan::trialCredits());
+
+    expect($pricing)->toContain("Cloud Pro trial with {$trialCredits} credits")
+        ->and($article)->toContain("{$trialCredits} AI credits");
 });
 
 it('keeps the credits help article in step with each plan allowance', function (): void {
@@ -575,7 +580,8 @@ it('keeps the credits help article in step with each plan allowance', function (
         ->keyBy(fn (array $cells): string => $cells[0]);
 
     expect($rows->all())->toBe([
-        'Cloud Pro and its trial' => ['Cloud Pro and its trial', number_format(Plan::Pro->credits()), (string) Plan::Pro->rateLimit()],
+        'Cloud Pro' => ['Cloud Pro', number_format(Plan::Pro->credits()), (string) Plan::Pro->rateLimit()],
+        'Cloud Pro trial' => ['Cloud Pro trial', number_format(Plan::trialCredits()), (string) Plan::Pro->rateLimit()],
         'Cloud Scale' => ['Cloud Scale', number_format(Plan::Scale->credits()), (string) Plan::Scale->rateLimit()],
         'Enterprise' => ['Enterprise', 'Agreed with your team', 'Agreed with your team'],
         'Self-hosted' => ['Self-hosted', 'Not metered', config('chat.rate_limit_per_minute').', set by CHAT_RATE_LIMIT_PER_MINUTE (0 for no limit)'],

@@ -180,6 +180,45 @@ it('upgrades the workspace to Pro and grants the allowance when the subscription
         ->and($balance->credits_used)->toBe(0);
 });
 
+it('grants the plan allowance when a workspace subscribes during its trial', function (): void {
+    withHostedBilling();
+
+    $workspace = stripeBillingWorkspace();
+    resolve(StartProTrial::class)->execute($workspace->owner, $workspace);
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created', [
+        'status' => 'trialing',
+        'trial_end' => $workspace->refresh()->trial_ends_at?->getTimestamp(),
+    ]))->assertSuccessful();
+
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
+
+    expect($workspace->refresh()->plan)->toBe(Plan::Pro)
+        ->and($balance->credits_remaining)->toBe(Plan::Pro->credits());
+});
+
+it('keeps the usage of a workspace that subscribed during its trial when the webhook is replayed', function (): void {
+    withHostedBilling();
+
+    $workspace = stripeBillingWorkspace();
+    resolve(StartProTrial::class)->execute($workspace->owner, $workspace);
+
+    $trialing = ['status' => 'trialing', 'trial_end' => $workspace->refresh()->trial_ends_at?->getTimestamp()];
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created', $trialing))->assertSuccessful();
+
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->update([
+        'credits_remaining' => Plan::Pro->credits() - 5,
+        'credits_used' => 5,
+    ]);
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'updated', $trialing))->assertSuccessful();
+
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
+
+    expect($balance->credits_remaining)->toBe(Plan::Pro->credits() - 5)
+        ->and($balance->credits_used)->toBe(5);
+});
+
 it('does not re-reset usage when the same webhook is replayed', function (): void {
     withHostedBilling();
 

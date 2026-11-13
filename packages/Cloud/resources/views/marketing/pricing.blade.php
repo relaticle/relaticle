@@ -76,8 +76,8 @@
 
         if ($billingActive) {
             $selfHostedCreditAnswer .= ' '.__(
-                'On Relaticle Cloud, new workspaces start a :days-day Cloud Pro trial with :proCredits credits. Hosted access pauses when the trial ends without a subscription.',
-                ['days' => $trialDays, 'proCredits' => $proCredits]
+                'On Relaticle Cloud, new workspaces start a :days-day Cloud Pro trial with :trialCredits credits. Hosted access pauses when the trial ends without a subscription.',
+                ['days' => $trialDays, 'trialCredits' => number_format(\App\Enums\Plan::trialCredits())]
             );
 
             $hostedPriceCell = __('$:yearlyPerMonth/mo per workspace ($:yearly billed yearly, or $:monthly/mo billed monthly)', [

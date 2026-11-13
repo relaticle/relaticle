@@ -56,7 +56,8 @@ it('starts a pro trial for an eligible owner', function (): void {
         ->and($workspace->refresh()->plan)->toBe(Plan::Pro)
         ->and($workspace->trial_ends_at?->isSameDay(now()->addDays(14)))->toBeTrue()
         ->and($workspace->pro_trial_used_at)->not->toBeNull()
-        ->and($balance->credits_remaining)->toBe(Plan::Pro->credits());
+        ->and($balance->credits_remaining)->toBe(Plan::trialCredits())
+        ->and($balance->credits_remaining)->toBeLessThan(Plan::Pro->credits());
 });
 
 it('starts a separate trial for each workspace the user creates', function (): void {

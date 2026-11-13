@@ -841,7 +841,7 @@ it('automatically starts one 14-day Cloud Pro trial after hosted onboarding', fu
         ->and($workspace->onGenericTrial())->toBeTrue()
         ->and($workspace->trial_ends_at?->isSameDay(now()->addDays(14)))->toBeTrue()
         ->and($workspace->pro_trial_used_at)->not->toBeNull()
-        ->and($balance->credits_remaining)->toBe(Plan::Pro->credits());
+        ->and($balance->credits_remaining)->toBe(Plan::trialCredits());
 });
 
 it('starts a fresh trial for each additional hosted workspace', function (): void {

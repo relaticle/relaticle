@@ -32,7 +32,8 @@ The final cost settles after the answer completes.
 
 | Plan | Credits per month | Messages per minute |
 |------|-------------------|---------------------|
-| Cloud Pro and its trial | 2,000 | 30 |
+| Cloud Pro | 2,000 | 30 |
+| Cloud Pro trial | 300 | 30 |
 | Cloud Scale | 5,000 | 60 |
 | Enterprise | Agreed with your team | Agreed with your team |
 | Self-hosted | Not metered | 60, set by `CHAT_RATE_LIMIT_PER_MINUTE` (0 for no limit) |

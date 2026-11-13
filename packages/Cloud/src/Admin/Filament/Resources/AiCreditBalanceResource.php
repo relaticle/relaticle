@@ -298,12 +298,12 @@ final class AiCreditBalanceResource extends Resource
                 self::planSelect()
                     ->default(fn (AiCreditBalance $record): string => $record->workspace->plan->value),
             ])
-            ->action(function (array $data, AiCreditBalance $record, ResetCreditPeriod $reset): void {
+            ->action(function (array $data, AiCreditBalance $record, ResetCreditPeriod $reset, CreditService $credits): void {
                 $reset->execute(self::administrator(), self::chosenPlan($data), [$record->workspace]);
 
                 Notification::make()
                     ->title(__('cloud::admin.credit_balances.period_reset'))
-                    ->body("Granted {$record->workspace->refresh()->plan->credits()} credits.")
+                    ->body("Granted {$credits->allowanceFor($record->workspace->refresh())} credits.")
                     ->success()
                     ->send();
             });

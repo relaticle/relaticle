@@ -637,6 +637,18 @@ it('shows trialing state with subscribe CTA', function (): void {
         ->assertSee(__('cloud::billing.subscribe.button'));
 });
 
+it('meters a running trial against the trial allowance', function (): void {
+    withHostedBilling();
+
+    [$user, $workspace] = billingPageOwner();
+    $workspace->forceFill(['hosted_free_grandfathered_at' => null])->save();
+    resolve(StartProTrial::class)->execute($user, $workspace);
+
+    livewire(Billing::class)
+        ->assertSeeHtml('/ '.number_format(Plan::trialCredits()))
+        ->assertDontSeeHtml('/ '.number_format(Plan::Pro->credits()));
+});
+
 it('shows manage state for an active subscription', function (): void {
     withHostedBilling();
 
