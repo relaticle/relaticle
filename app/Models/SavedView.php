@@ -91,10 +91,7 @@ final class SavedView extends Model
     #[Scope]
     protected function named(Builder $query, User $user, string $workspaceId, CrmEntity $entity, string $name): void
     {
-        $query->withoutGlobalScope(WorkspaceScope::class)
-            ->where('workspace_id', $workspaceId)
-            ->where('entity', $entity)
-            ->whereBelongsTo($user)
+        $query->visibleTo($user, $workspaceId, $entity)
             ->whereRaw('lower(name) = lower(?)', [trim($name)]);
     }
 }
