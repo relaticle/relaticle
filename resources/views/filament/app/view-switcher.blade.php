@@ -135,7 +135,7 @@
                                 size="sm"
                                 :label="__('filament/panel.tables.views.actions', ['name' => $entry['label']])"
                                 data-view-actions
-                                x-on:click="openRowMenu($el, $event, {{ Js::from(['key' => $entry['key'], 'isView' => $canApply && $entry['kind'] === 'view', 'canUpdate' => $entry['canUpdate'], 'createdLabel' => $entry['createdLabel']]) }})"
+                                x-on:click="openRowMenu($el, $event, {{ Js::from(['key' => $entry['key'], 'isView' => $canApply && $entry['kind'] === 'view', 'createdLabel' => $entry['createdLabel']]) }})"
                             />
                         </div>
                     </div>
@@ -163,7 +163,7 @@
 
                 @if ($canApply)
                     <x-filament::dropdown.list x-show="rowView?.isView">
-                        <x-filament::dropdown.list.item icon="lucide-pencil" x-show="rowView?.canUpdate" x-on:click="$wire.mountAction('renameSavedView', { view: rowView.key })">
+                        <x-filament::dropdown.list.item icon="lucide-pencil" x-on:click="$wire.mountAction('renameSavedView', { view: rowView.key })">
                             {{ __('filament/panel.tables.views.rename') }}
                         </x-filament::dropdown.list.item>
 
@@ -172,7 +172,7 @@
                         </x-filament::dropdown.list.item>
                     </x-filament::dropdown.list>
 
-                    <x-filament::dropdown.list x-show="rowView?.isView && rowView?.canUpdate">
+                    <x-filament::dropdown.list x-show="rowView?.isView">
                         <x-filament::dropdown.list.item icon="lucide-trash-2" color="danger" x-on:click="$wire.mountAction('deleteSavedView', { view: rowView.key })">
                             {{ __('filament/panel.tables.views.delete') }}
                         </x-filament::dropdown.list.item>

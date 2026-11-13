@@ -314,7 +314,7 @@ trait HasViewSwitcher
 
     /**
      * @param  array<string, array{name: string, url: string, active: bool, label: string}>  $pages
-     * @return list<array{key: string, kind: string, layout: string, action: ?string, label: string, icon: string, tone: string, url: string, active: bool, canUpdate: bool, createdLabel: array<array-key, mixed>|string|null}>
+     * @return list<array{key: string, kind: string, layout: string, action: ?string, label: string, icon: string, tone: string, url: string, active: bool, createdLabel: array<array-key, mixed>|string|null}>
      */
     private function viewSwitcherEntries(array $pages): array
     {
@@ -334,13 +334,11 @@ trait HasViewSwitcher
                 'tone' => self::VIEW_TONES[$kind],
                 'url' => $this->viewSwitcherEntryUrl($kind, $page),
                 'active' => $page['active'] && (! in_array($kind, ['list', 'board'], true) || $activeId === null || ! $views->contains('id', $activeId)),
-                'canUpdate' => false,
                 'createdLabel' => null,
             ];
         }
 
         $zone = FilamentTimezone::get();
-        $user = $this->viewSwitcherUser();
 
         foreach ($views as $view) {
             $date = $view->created_at?->setTimezone($zone)->translatedFormat('M j, Y');
@@ -358,7 +356,6 @@ trait HasViewSwitcher
                 'tone' => self::VIEW_TONES[$layout],
                 'url' => static::getResource()::getUrl($pages[$layout]['name'], ['view' => $view->getKey()]),
                 'active' => $view->getKey() === $activeId,
-                'canUpdate' => $user->can('update', $view),
                 'createdLabel' => __('filament/panel.tables.views.created_on', ['date' => $date]),
             ];
         }

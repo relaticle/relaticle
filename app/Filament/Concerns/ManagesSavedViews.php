@@ -84,11 +84,6 @@ trait ManagesSavedViews
             ->get($this->savedViewUser(), $this->savedViewWorkspace(), $this->savedViewEntity());
     }
 
-    protected function canUpdateSavedView(SavedView $view): bool
-    {
-        return $this->savedViewUser()->can('update', $view);
-    }
-
     public function duplicateSavedView(string $viewId): void
     {
         $view = $this->getVisibleSavedViews()->find($viewId);
@@ -151,7 +146,7 @@ trait ManagesSavedViews
             ->modalHeading(__('filament/panel.tables.views.rename'))
             ->modalWidth('md')
             ->modalSubmitActionLabel(__('filament/panel.tables.views.save'))
-            ->visible(fn (array $arguments): bool => $this->canUpdateArgumentSavedView($arguments))
+            ->visible(fn (array $arguments): bool => $this->argumentSavedView($arguments) instanceof SavedView)
             ->fillForm(fn (array $arguments): array => ['name' => $this->argumentSavedView($arguments)?->name])
             ->schema([$this->savedViewNameInput()])
             ->action(function (array $arguments, array $data, Schema $schema): void {
@@ -177,7 +172,7 @@ trait ManagesSavedViews
             ->requiresConfirmation()
             ->modalHeading(fn (array $arguments): string => __('filament/panel.tables.views.delete_heading', ['name' => $this->argumentSavedView($arguments)?->name]))
             ->modalDescription(__('filament/panel.tables.views.delete_description'))
-            ->visible(fn (array $arguments): bool => $this->canUpdateArgumentSavedView($arguments))
+            ->visible(fn (array $arguments): bool => $this->argumentSavedView($arguments) instanceof SavedView)
             ->action(function (array $arguments): void {
                 $view = $this->requireArgumentSavedView($arguments);
 
@@ -209,16 +204,6 @@ trait ManagesSavedViews
     private function requireArgumentSavedView(array $arguments): SavedView
     {
         return $this->argumentSavedView($arguments) ?? abort(404);
-    }
-
-    /**
-     * @param  array<string, mixed>  $arguments
-     */
-    private function canUpdateArgumentSavedView(array $arguments): bool
-    {
-        $view = $this->argumentSavedView($arguments);
-
-        return $view instanceof SavedView && $this->canUpdateSavedView($view);
     }
 
     private function vanishedMountedSavedViewId(): ?string
