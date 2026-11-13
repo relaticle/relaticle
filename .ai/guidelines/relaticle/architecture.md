@@ -310,9 +310,9 @@ words, so a reviewer does.
 and the relaticle/custom-fields package. Everywhere a person reads it, the word is `custom
 attribute`. A tool description and the `CrmAssistant` prompt keep the old word as a synonym on
 the same line, so a model maps the user's word to the right tool. `tests/Arch/ConventionsTest.php`
-fails `custom field` in published copy (`lang/`, `resources/views/`, `resources/js/`, each
-package's `resources/` and `lang/`) unless the line also says `custom attribute`. The
-contributing guide names the package and is the one file exempt.
+fails `custom field` in published copy: `lang/`, `resources/views/`, `resources/js/` and each
+package's `resources/` and `lang/`. The five files that test lists by name are exempt, because
+they carry the old word as a synonym or name the package.
 
 `account` names the sign-in and a connected mailbox, never a company. The company's
 "Account Owner" field keeps the word, and so does its `account_owner_id` column. No test can

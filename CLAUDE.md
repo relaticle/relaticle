@@ -313,9 +313,9 @@ words, so a reviewer does.
 and the relaticle/custom-fields package. Everywhere a person reads it, the word is `custom
 attribute`. A tool description and the `CrmAssistant` prompt keep the old word as a synonym on
 the same line, so a model maps the user's word to the right tool. `tests/Arch/ConventionsTest.php`
-fails `custom field` in published copy (`lang/`, `resources/views/`, `resources/js/`, each
-package's `resources/` and `lang/`) unless the line also says `custom attribute`. The
-contributing guide names the package and is the one file exempt.
+fails `custom field` in published copy: `lang/`, `resources/views/`, `resources/js/` and each
+package's `resources/` and `lang/`. The five files that test lists by name are exempt, because
+they carry the old word as a synonym or name the package.
 
 `account` names the sign-in and a connected mailbox, never a company. The company's
 "Account Owner" field keeps the word, and so does its `account_owner_id` column. No test can
@@ -817,8 +817,9 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
 
 ## Menus
 
-- Every menu in the panels draws from four tokens in `resources/css/theme.css`: `menu-row` (32px rows),
-  `menu-icon` (16px icons), `menu` (10px panel corners) and `menu-item` (6px row corners). The stock Filament
+- Every menu in the panels draws from five tokens in `resources/css/theme.css`: `menu-row` (32px rows),
+  `menu-icon` (16px icons), `menu-max` (the 28rem height cap), `menu` (10px panel corners) and `menu-item`
+  (6px row corners). The stock Filament
   dropdown takes them in `resources/css/filament/app/theme.css`, and the filter bar, Views and View settings use them
   as `h-menu-row`, `size-menu-icon`, `rounded-menu` and `rounded-menu-item`.
 - A custom menu uses those utilities and never a raw height, icon size or radius. A phone sheet keeps its taller rows.
