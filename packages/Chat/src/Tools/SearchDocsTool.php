@@ -63,11 +63,7 @@ final readonly class SearchDocsTool implements Tool
         'why', 'will', 'with', 'would', 'you', 'your',
     ];
 
-    /**
-     * Copy retired "custom field" for "custom attribute"; members still type it. A built-in field stays a field.
-     *
-     * @var array<string, string>
-     */
+    /** @var array<string, string> */
     private const array RETIRED_WORDS = [
         'field' => 'attribute',
         'fields' => 'attributes',
