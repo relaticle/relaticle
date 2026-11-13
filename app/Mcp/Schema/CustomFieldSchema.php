@@ -9,6 +9,7 @@ use App\Enums\CustomFields\TaskField;
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
+use App\Models\CustomFieldRelationship;
 use App\Models\User;
 use App\Queries\CustomFieldFilterSchema;
 use App\Queries\EntityFilters;
@@ -17,7 +18,6 @@ use App\Support\CustomFields\CustomFieldOptionMap;
 use App\Support\CustomFields\CustomFieldSchemaCache;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Relaticle\CustomFields\Services\ValidationService;
 use stdClass;
 
 /**
@@ -63,7 +63,8 @@ final readonly class CustomFieldSchema
                 ->where('entity_type', $entity->value)
                 ->active()
                 ->select('id', 'entity_type', 'code', 'name', 'type', 'validation_rules')
-                ->with(['options:id,custom_field_id,name'])
+                ->with(['options:id,custom_field_id,name,settings'])
+                ->withRelationshipDefinition()
                 ->get();
 
             return $this->format($fields);
@@ -96,22 +97,30 @@ final readonly class CustomFieldSchema
                 continue;
             }
 
-            // validation_rules casts to ['required' => true], so a ['name' => 'required']
-            // scan matches nothing and tells every agent no field was ever required.
-            $required = resolve(ValidationService::class)->isRequired($field);
+            $required = $field->isRequired();
 
             $entry = [
                 'name' => $field->name,
                 'type' => $field->type,
                 'required' => $required,
-                'input_format' => $this->inputFormat($field, $type),
-                'example' => $type->example(),
             ];
+
+            $definition = $field->relationshipDefinition();
+
+            if ($definition instanceof CustomFieldRelationship) {
+                $result[$field->code] = [...$entry, ...$this->linkVocabulary($field, $definition)];
+
+                continue;
+            }
+
+            $entry['input_format'] = $this->inputFormat($field, $type);
+            $entry['example'] = $type->example();
 
             if ($type->isChoice() && $field->options->isNotEmpty()) {
                 $entry['options'] = $field->options->map(fn (CustomFieldOption $option): array => [
                     'id' => $option->id,
                     'label' => $option->name,
+                    'category' => $option->settings->category?->value,
                 ])->all();
             }
 
@@ -119,6 +128,33 @@ final readonly class CustomFieldSchema
         }
 
         return $result;
+    }
+
+    /** @return array<string, mixed> */
+    private function linkVocabulary(CustomField $field, CustomFieldRelationship $definition): array
+    {
+        $farFieldId = $definition->farEnd($field)->fieldId;
+
+        $farField = $farFieldId === null || (string) $farFieldId === (string) $field->getKey()
+            ? null
+            : CustomField::query()->withoutGlobalScopes()->find($farFieldId);
+
+        return [
+            'input_format' => $field->allowsMultipleRecords()
+                ? 'array of record IDs'
+                : 'array holding at most one record ID',
+            'example' => ['01JJXYZ123ABC456DEF789GHI'],
+            'target_entity' => $definition->farEnd($field)->entityType,
+            'multiple' => $field->allowsMultipleRecords(),
+            'relationship' => [
+                'code' => $definition->code,
+                'cardinality' => $definition->cardinality->value,
+                'symmetric' => $definition->is_symmetric,
+                'from_entity' => $definition->from_entity_type,
+                'to_entity' => $definition->to_entity_type,
+                'other_end_field' => $farField?->code,
+            ],
+        ];
     }
 
     private function inputFormat(CustomField $field, CustomFieldType $type): string

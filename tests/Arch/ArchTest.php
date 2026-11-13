@@ -480,6 +480,8 @@ foreach (['App\Filament', 'App\Livewire', 'Relaticle\Chat\Livewire', 'Relaticle\
             'App\Livewire\App\AccessTokens\ManageOAuthConnectors',
             'App\Livewire\App\Profile\ManageMfa',
             'App\Livewire\App\Workspaces\WorkspaceMembers',
+            // One recursive CTE walks the link ledger; no Eloquent relation expresses it.
+            'Relaticle\Chat\Tools\GetRelatedRecordsTool',
         ]);
 }
 
@@ -489,13 +491,17 @@ foreach (['App', 'Relaticle\ImportWizard', 'Relaticle\OnboardSeed', 'Relaticle\D
         ->not
         ->toUse([
             'Relaticle\CustomFields\Models\CustomField',
+            'Relaticle\CustomFields\Models\CustomFieldLink',
             'Relaticle\CustomFields\Models\CustomFieldOption',
+            'Relaticle\CustomFields\Models\CustomFieldRelationship',
             'Relaticle\CustomFields\Models\CustomFieldSection',
             'Relaticle\CustomFields\Models\CustomFieldValue',
         ])
         ->ignoring([
             'App\Models\CustomField',
+            'App\Models\CustomFieldLink',
             'App\Models\CustomFieldOption',
+            'App\Models\CustomFieldRelationship',
             'App\Models\CustomFieldSection',
             'App\Models\CustomFieldValue',
             'App\Filament\CustomFields\DomainFieldType',

@@ -6,13 +6,16 @@ use App\Features\OnboardSeed;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldSection;
+use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Support\ChecklistHtml;
+use App\Support\CurrentWorkspace;
 use App\Support\PlainText;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\CustomFields\Services\TenantContextService;
+use Tests\Helpers\RecordFieldFixture;
 
 mutates(CustomFieldsDisplayFormatter::class, PlainText::class);
 
@@ -193,6 +196,7 @@ it('returns an empty array when no custom_fields are submitted', function (): vo
 
 it('renders a record custom field on the proposal card as the record name, not its id', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
+    resolve(CurrentWorkspace::class)->set($user->currentWorkspace);
     $company = Company::factory()->create(['workspace_id' => $user->currentWorkspace->getKey(), 'name' => 'Globex']);
 
     $section = CustomFieldSection::query()->create([
@@ -212,11 +216,12 @@ it('renders a record custom field on the proposal card as the record name, not i
         'code' => 'linked_company',
         'name' => 'Linked Company',
         'type' => 'record',
-        'lookup_type' => 'company',
         'sort_order' => 1,
         'active' => true,
         'validation_rules' => [],
     ]);
+
+    RecordFieldFixture::pointAt($field, 'company');
 
     TenantContextService::setTenantId($user->currentWorkspace->getKey());
 
@@ -234,6 +239,7 @@ it('renders a record custom field on the proposal card as the record name, not i
 
 it('names the record on a stored record card, not its id', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
+    resolve(CurrentWorkspace::class)->set($user->currentWorkspace);
     $company = Company::factory()->create(['workspace_id' => $user->currentWorkspace->getKey(), 'name' => 'Initech']);
 
     $section = CustomFieldSection::query()->create([
@@ -253,11 +259,12 @@ it('names the record on a stored record card, not its id', function (): void {
         'code' => 'linked_company',
         'name' => 'Linked Company',
         'type' => 'record',
-        'lookup_type' => 'company',
         'sort_order' => 1,
         'active' => true,
         'validation_rules' => [],
     ]);
+
+    RecordFieldFixture::pointAt($field, 'company');
 
     $task = Task::factory()->create(['workspace_id' => $user->currentWorkspace->getKey()]);
     $task->saveCustomFieldValue($field, [$company->getKey()]);
@@ -266,7 +273,9 @@ it('names the record on a stored record card, not its id', function (): void {
 
     try {
         $rows = resolve(CustomFieldsDisplayFormatter::class)->formatStored(
-            $task->fresh('customFieldValues.customField.options'),
+            // The formatter renders links from loaded relations, the same way the read
+            // tools prime them, so the record arrives with its edges in memory.
+            $task->fresh(['customFieldValues.customField.options', 'outgoingLinks.toEntity', 'incomingLinks.fromEntity']),
             [$field->fresh('options')],
             200,
             $user->effectiveTimezone(),
@@ -278,4 +287,32 @@ it('names the record on a stored record card, not its id', function (): void {
     expect($rows)->toHaveCount(1)
         ->and($rows[0]['value'])->toBe('Initech')
         ->and($rows[0]['values'])->toBe(['Initech']);
+});
+
+it('names both sides of a paired relationship field on an update proposal, never their ids', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    resolve(CurrentWorkspace::class)->set($workspace);
+    $current = Company::factory()->create(['workspace_id' => $workspace->getKey(), 'name' => 'Hooli']);
+    $proposed = Company::factory()->create(['workspace_id' => $workspace->getKey(), 'name' => 'Pied Piper']);
+
+    [$employers] = RecordFieldFixture::paired($workspace, 'people', 'company', 'employers', 'staff');
+
+    $person = People::factory()->create(['workspace_id' => $workspace->getKey()]);
+    $person->update(['custom_fields' => [$employers->code => [$current->getKey()]]]);
+
+    try {
+        $rows = resolve(CustomFieldsDisplayFormatter::class)
+            ->format($user, 'people', [$employers->code => [$proposed->getKey()]], $person->fresh());
+    } finally {
+        TenantContextService::setTenantId(null);
+    }
+
+    expect($rows)->toHaveCount(1)
+        ->and($rows[0])->toMatchArray([
+            'old' => 'Hooli',
+            'new' => 'Pied Piper',
+            'values' => ['Pied Piper'],
+            'type' => 'badges',
+        ]);
 });

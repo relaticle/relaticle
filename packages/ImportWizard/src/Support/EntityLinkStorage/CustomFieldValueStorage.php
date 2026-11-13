@@ -8,10 +8,10 @@ use Illuminate\Database\Eloquent\Model;
 use Relaticle\ImportWizard\Data\EntityLink;
 
 /**
- * Storage strategy for Record-type custom field values.
+ * Storage strategy for the custom fields that link records.
  *
- * Sets the custom field value attribute on the model (custom_fields_xxx).
- * The model's custom fields handling will persist to custom_field_values table.
+ * Sets the custom field attribute on the model (custom_fields_xxx). The importer writes
+ * it to the link ledger after the record is saved.
  */
 final class CustomFieldValueStorage implements EntityLinkStorageInterface
 {
@@ -26,14 +26,12 @@ final class CustomFieldValueStorage implements EntityLinkStorageInterface
             return $data;
         }
 
-        $attributeKey = 'custom_fields_'.$link->customFieldCode;
-
-        // Record custom fields support single ID
-        $id = $resolvedIds[0] ?? null;
-
-        if ($id !== null) {
-            $data[$attributeKey] = $id;
-        }
+        // A link field holds as many records as its cardinality allows, so a column that
+        // resolved several keeps them all; a single-valued field keeps the first, which is
+        // the one the row named first.
+        $data['custom_fields_'.$link->customFieldCode] = $link->allowMultiple
+            ? array_values($resolvedIds)
+            : [$resolvedIds[0]];
 
         return $data;
     }

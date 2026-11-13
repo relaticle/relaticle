@@ -21,7 +21,9 @@ use App\Jobs\CompleteExport;
 use App\Livewire\FilamentNotifications;
 use App\Models\ActivityLog\Activity as ActivityModel;
 use App\Models\CustomField;
+use App\Models\CustomFieldLink;
 use App\Models\CustomFieldOption;
+use App\Models\CustomFieldRelationship;
 use App\Models\CustomFieldSection;
 use App\Models\CustomFieldValue;
 use App\Models\Export;
@@ -146,19 +148,7 @@ final class AppServiceProvider extends ServiceProvider
         // Cashier's own routes verify signatures only when a secret is set; the billing package registers a verified webhook.
         Cashier::ignoreRoutes();
 
-        // One batch_uuid per request/job, lazily generated and forgotten between
-        // them. It is the key the activity timeline groups a single save's rows on.
-        $this->app->scoped(RequestActivityBatch::class);
-        $this->app->scoped(CurrentImport::class);
-        $this->app->scoped(CurrentWorkspace::class);
-
-        // Caches creation-source facts per workspace for the lifetime of a
-        // request/job, scoped so a queue worker resets it between jobs.
-        $this->app->scoped(WorkspaceActivationFacts::class);
-
-        $this->app->scoped(RecordNameResolver::class);
-        $this->app->scoped(MediaLookup::class);
-        $this->app->scoped(WorkspaceCustomFields::class);
+        $this->registerPerRequestCaches();
 
         // spatie/laravel-onboard binds OnboardingSteps as a SINGLETON, which
         // makes every workspace share one OnboardingStep instance. Its complete()
@@ -707,6 +697,8 @@ final class AppServiceProvider extends ServiceProvider
         CustomFields::useSectionModel(CustomFieldSection::class);
         CustomFields::useOptionModel(CustomFieldOption::class);
         CustomFields::useValueModel(CustomFieldValue::class);
+        CustomFields::useRelationshipModel(CustomFieldRelationship::class);
+        CustomFields::useLinkModel(CustomFieldLink::class);
 
         // Replaces the package's definitions so custom-field dates read the same as the
         // native columns beside them: `date-time` swaps the table column, which otherwise
@@ -891,5 +883,23 @@ final class AppServiceProvider extends ServiceProvider
             'schedule:work',
         );
         DevCommands::except('reverb', 'queue');
+    }
+
+    // Scoped, so a queue worker never carries another job's workspace, batch or field lookups.
+    private function registerPerRequestCaches(): void
+    {
+        // One batch_uuid per request/job, lazily generated and forgotten between
+        // them. It is the key the activity timeline groups a single save's rows on.
+        $this->app->scoped(RequestActivityBatch::class);
+        $this->app->scoped(CurrentImport::class);
+        $this->app->scoped(CurrentWorkspace::class);
+
+        // Caches creation-source facts per workspace for the lifetime of a
+        // request/job, scoped so a queue worker resets it between jobs.
+        $this->app->scoped(WorkspaceActivationFacts::class);
+
+        $this->app->scoped(RecordNameResolver::class);
+        $this->app->scoped(MediaLookup::class);
+        $this->app->scoped(WorkspaceCustomFields::class);
     }
 }

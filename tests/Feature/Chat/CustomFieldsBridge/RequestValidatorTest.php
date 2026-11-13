@@ -9,6 +9,7 @@ use App\Models\CustomFieldSection;
 use App\Models\User;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
+use Tests\Helpers\RecordFieldFixture;
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
@@ -211,11 +212,12 @@ it('names the field code in a rule validation error, not only the field label', 
         'code' => 'linked_company',
         'name' => 'Linked Company',
         'type' => 'record',
-        'lookup_type' => 'company',
         'sort_order' => 1,
         'active' => true,
         'validation_rules' => [],
     ]);
+
+    RecordFieldFixture::pointAt($field, 'company');
 
     $result = resolve(CustomFieldsRequestValidator::class)
         ->validate($user, 'task', [$field->code => [$foreign->getKey()]]);
@@ -223,4 +225,15 @@ it('names the field code in a rule validation error, not only the field label', 
     expect($result->error)
         ->toContain("custom_fields.{$field->code}")
         ->toContain($foreign->getKey());
+});
+
+it('rejects an option label carrying its bracketed category', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+
+    $validator = resolve(CustomFieldsRequestValidator::class);
+
+    expect($validator->validate($user, 'task', ['status' => 'Done [completed]'])->error)
+        ->toContain('Done [completed]')
+        ->and($validator->validate($user, 'task', ['status' => 'Done'])->error)
+        ->toBeNull();
 });

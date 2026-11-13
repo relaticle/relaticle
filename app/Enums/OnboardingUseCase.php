@@ -6,6 +6,7 @@ namespace App\Enums;
 
 use App\Enums\CustomFields\OpportunityField;
 use Filament\Support\Contracts\HasLabel;
+use Relaticle\CustomFields\Enums\OptionCategory;
 
 enum OnboardingUseCase: string implements HasLabel
 {
@@ -78,6 +79,40 @@ enum OnboardingUseCase: string implements HasLabel
                 'Passed' => '#6b7280',
             ],
             self::Sales, self::Marketing, self::Other => null,
+        };
+    }
+
+    /** @return array<string, OptionCategory> */
+    public function stageCategories(): array
+    {
+        return match ($this) {
+            self::CustomerSuccess => [
+                'Onboarding' => OptionCategory::Unstarted,
+                'Active' => OptionCategory::Started,
+                'Renewal due' => OptionCategory::Started,
+                'At risk' => OptionCategory::Started,
+                'Renewed' => OptionCategory::Completed,
+                'Churned' => OptionCategory::Cancelled,
+            ],
+            self::Recruiting => [
+                'Sourced' => OptionCategory::Unstarted,
+                'Applied' => OptionCategory::Started,
+                'Screen' => OptionCategory::Started,
+                'Interview' => OptionCategory::Started,
+                'Offer' => OptionCategory::Started,
+                'Hired' => OptionCategory::Completed,
+                'Declined' => OptionCategory::Cancelled,
+            ],
+            self::Fundraising, self::Investing => [
+                'Target' => OptionCategory::Unstarted,
+                'Intro' => OptionCategory::Started,
+                'First meeting' => OptionCategory::Started,
+                'Partner meeting' => OptionCategory::Started,
+                'Term sheet' => OptionCategory::Started,
+                'Closed' => OptionCategory::Completed,
+                'Passed' => OptionCategory::Cancelled,
+            ],
+            self::Sales, self::Marketing, self::Other => OpportunityField::STAGE->getOptionCategories() ?? [],
         };
     }
 

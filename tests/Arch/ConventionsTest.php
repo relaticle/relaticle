@@ -16,6 +16,7 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Notifications\Notification;
 use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Tries;
+use Relaticle\CustomFields\Enums\CustomFieldsFeature;
 
 /**
  * Guards documented conventions that pest-arch and PHPStan cannot express.
@@ -1399,6 +1400,24 @@ it('keeps every Tailwind source on disk, and every core one inside the Docker fr
             'Self-hosted images would ship CSS that differs from production (.ai/guidelines/relaticle/ui.md). '.
             'The cloud package ships its own stylesheet, which the image never builds, so only core stylesheets must stay inside the frontend stage and none may name the cloud package: '.implode(', ', $problems),
         );
+});
+
+it('names every custom fields feature flag in the config, on or off', function (): void {
+    $config = (string) file_get_contents(dirname(__DIR__, 2).'/config/custom-fields.php');
+
+    preg_match("/'features' => FeatureConfigurator::configure\(\)(.+?)\),\n\n/s", $config, $block);
+    preg_match_all('/CustomFieldsFeature::([A-Z_]+)/', $block[1] ?? '', $named);
+
+    $unnamed = array_values(array_diff(
+        array_map(static fn (CustomFieldsFeature $feature): string => $feature->name, CustomFieldsFeature::cases()),
+        $named[1],
+    ));
+
+    expect($unnamed)->toBe(
+        [],
+        'An unnamed flag takes the package default, so a package release can switch it on unseen. '.
+        'Name it in the enable() or disable() list of config/custom-fields.php: '.implode(', ', $unnamed),
+    );
 });
 
 it('builds scripts with Vite, never with a bin script or a committed dist bundle', function (): void {

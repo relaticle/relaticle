@@ -9,6 +9,7 @@ use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Support\CustomFields\WorkspaceCustomFields;
 use Filament\Infolists\Components\Entry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Component;
@@ -110,7 +111,8 @@ final readonly class RecordDetails
     {
         $customFields = CustomFields::infolist()->withoutSections()->forModel($record);
 
-        $customFieldIcons = $customFields->getFields()
+        $customFieldIcons = resolve(WorkspaceCustomFields::class)
+            ->forEntity((string) $record->getAttribute('workspace_id'), $record->getMorphClass())
             ->mapWithKeys(fn (CustomField $field): array => [$field->getFieldName() => CustomFieldType::tryFrom($field->type)?->icon()]);
 
         return collect($nativeEntries)

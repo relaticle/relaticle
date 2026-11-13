@@ -44,7 +44,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
-use Relaticle\CustomFields\Contracts\ValueResolvers;
+use Relaticle\CustomFields\Contracts\ValueResolverInterface;
 
 final class TaskResource extends Resource
 {
@@ -89,8 +89,8 @@ final class TaskResource extends Resource
     {
         /** @var Collection<string, CustomField> $customFields */
         $customFields = CustomField::query()->with('options')->whereIn('code', ['status', 'priority'])->get()->keyBy('code');
-        /** @var ValueResolvers $valueResolver */
-        $valueResolver = resolve(ValueResolvers::class);
+        /** @var ValueResolverInterface $valueResolver */
+        $valueResolver = resolve(ValueResolverInterface::class);
 
         return $table
             ->emptyStateDescription(EmptyListDescription::unlessFiltered(__('filament/resources/task.empty_state.description')))
@@ -212,7 +212,7 @@ final class TaskResource extends Resource
     /**
      * @param  Collection<string, CustomField>  $customFields
      */
-    private static function makeCustomFieldGroup(string $fieldCode, Collection $customFields, ValueResolvers $valueResolver): Group
+    private static function makeCustomFieldGroup(string $fieldCode, Collection $customFields, ValueResolverInterface $valueResolver): Group
     {
         $field = $customFields[$fieldCode];
         $label = ucfirst($fieldCode);

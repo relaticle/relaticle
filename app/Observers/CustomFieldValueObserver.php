@@ -10,6 +10,7 @@ use App\Support\ActivityLog\CustomFieldChangeLog;
 use App\Support\Media\UploadClaims;
 use Illuminate\Database\Eloquent\Model;
 use Relaticle\CustomFields\Models\CustomField;
+use Relaticle\CustomFields\Models\CustomFieldRelationship;
 
 final readonly class CustomFieldValueObserver
 {
@@ -49,11 +50,19 @@ final readonly class CustomFieldValueObserver
 
     public function created(CustomFieldValue $value): void
     {
-        $this->log($value, null);
+        if ($this->readsLinks($value)) {
+            return;
+        }
+
+        $this->log($value, old: null);
     }
 
     public function updated(CustomFieldValue $value): void
     {
+        if ($this->readsLinks($value)) {
+            return;
+        }
+
         $column = CustomFieldValue::getValueColumn($value->customField->type);
 
         if (! $value->wasChanged($column)) {
@@ -61,6 +70,13 @@ final readonly class CustomFieldValueObserver
         }
 
         $this->log($value, $value->getOriginal($column));
+    }
+
+    // LogLinkChangeListener logs a link field for both records. A value row left on one is
+    // pre-migration residue, and logging it would double the entry.
+    private function readsLinks(CustomFieldValue $value): bool
+    {
+        return $value->customField->relationshipDefinition() instanceof CustomFieldRelationship;
     }
 
     private function log(CustomFieldValue $value, mixed $old): void

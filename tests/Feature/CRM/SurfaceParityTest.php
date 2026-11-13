@@ -34,7 +34,6 @@ use App\Mcp\Tools\People\ListPeopleTool as McpListPeople;
 use App\Mcp\Tools\Task\CreateTaskTool as McpCreateTask;
 use App\Mcp\Tools\Task\GetTaskTool as McpGetTask;
 use App\Mcp\Tools\Task\ListTasksTool as McpListTasks;
-use App\Models\CustomField;
 use App\Models\Opportunity;
 use App\Models\User;
 use App\Queries\CustomFieldFilterSchema;
@@ -69,6 +68,7 @@ use Relaticle\Chat\Tools\Task\ListTasksTool as ChatListTasks;
 use Spatie\QueryBuilder\AllowedFilter;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Helpers\FilterDescription;
+use Tests\Helpers\RecordFieldFixture;
 
 mutates(FilterVocabulary::class);
 
@@ -399,7 +399,7 @@ it('states the custom_fields rule and the choice rule once on every surface that
         ->and(substr_count($usage, EntityFilters::CUSTOM_FIELDS_RULE))->toBe(1)
         ->and(substr_count(FilterDescription::of($chatTool), $choiceRule))->toBe(1)
         ->and(substr_count($usage, $choiceRule))->toBe(1)
-        ->and($choiceRule)->toBe('Checkbox-list, radio, toggle-buttons, select and multi-select values take an option label or ID.');
+        ->and($choiceRule)->toBe('Checkbox-list, radio, toggle-buttons, select, status and multi-select values take an option label or ID.');
 })->with(array_map(fn (array $row): array => [$row[0], $row[6], $row[7], $row[8]], crmSurfaces()));
 
 it('publishes filter examples the list query accepts on every surface', function (CrmEntity $entity, string $chatTool, string $schemaResource, string $mcpTool): void {
@@ -424,18 +424,7 @@ it('publishes filter examples the list query accepts on every surface', function
         ]);
     }
 
-    CustomField::query()->create([
-        'tenant_id' => $user->currentWorkspace->getKey(),
-        'entity_type' => $entity->value,
-        'code' => 'probe_lookup',
-        'name' => 'Probe lookup',
-        'type' => 'select',
-        'lookup_type' => 'company',
-        'sort_order' => 0,
-        'validation_rules' => [],
-        'active' => true,
-        'system_defined' => false,
-    ]);
+    RecordFieldFixture::record($user->currentWorkspace, $entity->value, 'company', 'probe_lookup', name: 'Probe lookup');
 
     $vocabulary = resolve(FilterVocabulary::class)->for($user, $entity);
     $customFields = $vocabulary['custom_fields'];
@@ -487,7 +476,7 @@ it('publishes filter examples the list query accepts on every surface', function
         ->and($types['select'])->not->toHaveKey('example')
         ->and($customFields['probe_a']['example'])->toBe(['$in' => ['Alpha']])
         ->and($customFields['probe_b']['example'])->toBe(['$in' => ['Gamma']])
-        ->and($customFields['probe_lookup']['example'])->toBe(CustomFieldType::SELECT->filterExample());
+        ->and($customFields['probe_lookup']['example'])->toBe(CustomFieldType::RECORD->filterExample());
 
     foreach ($texts as $text) {
         foreach (jsonFragments($text) as $fragment) {

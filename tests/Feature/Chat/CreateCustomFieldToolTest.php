@@ -17,6 +17,8 @@ use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Tools\CustomField\CreateCustomFieldTool;
+use Relaticle\CustomFields\Enums\OptionCategory;
+use Relaticle\CustomFields\Enums\RelationshipCardinality;
 use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
 use Relaticle\CustomFields\Services\TenantContextService;
 
@@ -263,7 +265,8 @@ it('creates a record field linked to the requested record type', function (): vo
     $field = approveSoleFieldProposal($pending, $this->owner);
 
     expect($field->type)->toBe('record')
-        ->and($field->lookup_type)->toBe('company');
+        ->and($field->relationshipDefinition()?->to_entity_type)->toBe('company')
+        ->and($field->relationshipDefinition()?->cardinality)->toBe(RelationshipCardinality::ManyToOne);
 });
 
 it('refuses a record field without a lookup type', function (): void {
@@ -796,3 +799,55 @@ function approveSoleFieldProposal(PendingAction $pending, User $owner): CustomFi
         ->where('name', $pending->action_data['name'])
         ->sole();
 }
+
+it('creates a status field with its options', function (): void {
+    $decoded = proposeCustomFields($this->convId, [
+        'entity_type' => 'task',
+        'name' => 'Workflow',
+        'type' => 'status',
+        'options' => [['name' => 'Open', 'category' => 'unstarted'], ['name' => 'Shipped', 'category' => 'completed']],
+    ]);
+
+    expect($decoded)->not->toHaveKey('error');
+
+    $pending = PendingAction::query()->where('conversation_id', $this->convId)->firstOrFail();
+
+    resolve(PendingActionService::class)->approve($pending, $this->owner);
+
+    $field = CustomField::query()
+        ->withoutGlobalScope(CustomFieldsActivableScope::class)
+        ->where('tenant_id', $this->workspace->getKey())
+        ->where('entity_type', 'task')
+        ->where('name', 'Workflow')
+        ->firstOrFail();
+
+    TenantContextService::setTenantId($this->workspace->getKey());
+
+    expect($field->type)->toBe('status')
+        ->and(CustomFieldOption::query()->where('custom_field_id', $field->getKey())->pluck('name')->sort()->values()->all())
+        ->toBe(['Open', 'Shipped'])
+        ->and($field->optionIdsIn(OptionCategory::Completed))
+        ->toBe([(string) $field->options->firstWhere('name', 'Shipped')->getKey()]);
+});
+
+it('refuses a status field with no completed option', function (): void {
+    $decoded = proposeCustomFields($this->convId, [
+        'entity_type' => 'task',
+        'name' => 'Workflow',
+        'type' => 'status',
+        'options' => [['name' => 'Open', 'category' => 'unstarted'], ['name' => 'Shipped', 'category' => 'started']],
+    ]);
+
+    expect($decoded['error'])->toContain('A status field needs at least one option in the Completed category.')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->exists())->toBeFalse();
+});
+
+it('rejects a status field with no options', function (): void {
+    $decoded = proposeCustomFields($this->convId, [
+        'entity_type' => 'task',
+        'name' => 'Workflow',
+        'type' => 'status',
+    ]);
+
+    expect($decoded)->toHaveKey('error');
+});

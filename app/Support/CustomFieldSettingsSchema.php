@@ -13,13 +13,14 @@ use Relaticle\CustomFields\Data\FieldTypeData;
 use Relaticle\CustomFields\Data\Settings\CurrencyFieldSettingsData;
 use Relaticle\CustomFields\Enums\CustomFieldsFeature;
 use Relaticle\CustomFields\Enums\DescriptionPosition;
+use Relaticle\CustomFields\Enums\FieldCapability;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\CustomFields\FeatureSystem\FeatureManager;
 use Relaticle\CustomFields\Support\CurrencyProvider;
 
 final readonly class CustomFieldSettingsSchema
 {
-    private const array OPTION_COLOR_TYPES = ['select', 'multi_select', 'tags-input'];
+    private const array OPTION_COLOR_TYPES = ['select', 'multi-select', 'status', 'tags-input'];
 
     private const array CURRENCY_DISPLAY_TYPES = ['symbol', 'code'];
 
@@ -63,7 +64,7 @@ final readonly class CustomFieldSettingsSchema
             $rules['list_toggleable_hidden'] = ['boolean'];
         }
 
-        if ($type?->searchable === true && ! $field->settings->encrypted) {
+        if ($type?->supports(FieldCapability::Searchable) === true && ! $field->settings->encrypted) {
             $rules['searchable'] = ['boolean'];
         }
 
@@ -71,15 +72,15 @@ final readonly class CustomFieldSettingsSchema
             $rules['enable_option_colors'] = ['boolean'];
         }
 
-        if (FeatureManager::isEnabled(CustomFieldsFeature::FIELD_MULTI_VALUE) && $type?->supportsMultiValue === true) {
+        if (FeatureManager::isEnabled(CustomFieldsFeature::FIELD_MULTI_VALUE) && $type?->supports(FieldCapability::SupportsMultiValue) === true) {
             $rules['allow_multiple'] = ['boolean'];
 
-            if (! $type->requiresLookupType && (bool) $resulting['allow_multiple']) {
+            if (! $type->supports(FieldCapability::RequiresRelationship) && (bool) $resulting['allow_multiple']) {
                 $rules['max_values'] = ['integer', 'min:'.self::MIN_MAX_VALUES, 'max:'.self::MAX_MAX_VALUES];
             }
         }
 
-        if (FeatureManager::isEnabled(CustomFieldsFeature::FIELD_UNIQUE_VALUE) && $type?->supportsUniqueConstraint === true && ! $field->isSystemDefined()) {
+        if (FeatureManager::isEnabled(CustomFieldsFeature::FIELD_UNIQUE_VALUE) && $type?->supports(FieldCapability::SupportsUniqueConstraint) === true && ! $field->isSystemDefined()) {
             $rules['unique_per_entity_type'] = ['boolean'];
         }
 

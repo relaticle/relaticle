@@ -90,12 +90,15 @@ final class EntityLinkValidator
             return $results;
         }
 
-        $resolved = $this->resolver->batchResolve($link, $matcher, $toValidate);
+        $lookupsByValue = array_combine($toValidate, array_map(fn (string $value): array => $link->lookupValues($matcher, $value), $toValidate));
+        $resolved = $this->resolver->batchResolve($link, $matcher, array_values(array_unique(array_merge(...array_values($lookupsByValue)))));
 
-        foreach ($toValidate as $value) {
-            $results[$value] = $resolved[$value] !== null
+        foreach ($lookupsByValue as $value => $lookups) {
+            $unresolved = array_find($lookups, fn (string $lookup): bool => $resolved[$lookup] === null);
+
+            $results[$value] = $unresolved === null
                 ? null
-                : $this->buildErrorMessage($link, $matcher, $value);
+                : $this->buildErrorMessage($link, $matcher, $unresolved);
         }
 
         return $results;

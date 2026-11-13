@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Jetstream\CreateWorkspace as CreateWorkspaceAction;
 use App\Actions\Onboarding\ApplyStagePreset;
 use App\Actions\Onboarding\SaveOnboardingUseCase;
+use App\Enums\CustomFields\OpportunityField;
 use App\Enums\CustomFields\TaskField;
 use App\Enums\OnboardingUseCase;
 use App\Features\OnboardSeed;
@@ -26,6 +27,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
 use Laravel\Pennant\Feature;
+use Relaticle\CustomFields\Enums\OptionCategory;
 use Relaticle\OnboardSeed\OnboardSeedManager;
 
 mutates(CreateWorkspace::class, SetupWorkspace::class, RunsUseCaseStep::class, RunsInviteStep::class, CreateWorkspaceAction::class, SaveOnboardingUseCase::class, ApplyStagePreset::class, OnboardSeedManager::class, CreateWorkspaceCustomFields::class, OnboardingUseCase::class);
@@ -340,6 +342,29 @@ it('creates the stage preset for the chosen use case', function (OnboardingUseCa
     'investing shares the fundraising list' => [OnboardingUseCase::Investing, ['Target', 'Intro', 'First meeting', 'Partner meeting', 'Term sheet', 'Closed', 'Passed']],
 ]);
 
+it('marks the won and lost stages of each preset', function (OnboardingUseCase $useCase, string $won, string $lost): void {
+    $user = User::factory()->create();
+
+    onboardWorkspace($user, ['name' => "Categorised {$useCase->value}"], [
+        'onboarding_use_case' => $useCase->value,
+        'onboarding_context' => [array_key_first($useCase->getSubOptions())],
+    ]);
+
+    $stageField = CustomField::withoutGlobalScopes()
+        ->where('tenant_id', $user->fresh()->personalWorkspace()->id)
+        ->forEntity(Opportunity::class)
+        ->where('code', 'stage')
+        ->sole();
+
+    expect($stageField->optionsInCategory(OptionCategory::Completed)->pluck('name')->all())->toBe([$won])
+        ->and($stageField->optionsInCategory(OptionCategory::Cancelled)->pluck('name')->all())->toBe([$lost])
+        ->and($stageField->optionsInCategory(OptionCategory::Unstarted))->toHaveCount(1);
+})->with([
+    'customer success' => [OnboardingUseCase::CustomerSuccess, 'Renewed', 'Churned'],
+    'recruiting' => [OnboardingUseCase::Recruiting, 'Hired', 'Declined'],
+    'fundraising' => [OnboardingUseCase::Fundraising, 'Closed', 'Passed'],
+]);
+
 it('colours the preset stages', function (): void {
     $user = User::factory()->create();
 
@@ -475,3 +500,57 @@ it('seeds every demo opportunity at a stage that exists in the preset', function
     'investing' => OnboardingUseCase::Investing,
     'other' => OnboardingUseCase::Other,
 ]);
+
+it('categorises every seeded status and stage option', function (): void {
+    $workspace = Workspace::factory()->create(['personal_workspace' => false]);
+
+    $categories = fn (string $modelClass, string $code): array => CustomField::withoutGlobalScopes()
+        ->where('tenant_id', $workspace->id)
+        ->forEntity($modelClass)
+        ->where('code', $code)
+        ->sole()
+        ->options()
+        ->withoutGlobalScopes()
+        ->orderBy('sort_order')
+        ->get()
+        ->mapWithKeys(fn (CustomFieldOption $option): array => [$option->name => $option->settings->category])
+        ->all();
+
+    expect($categories(Task::class, TaskField::STATUS->value))->toBe([
+        'To do' => OptionCategory::Unstarted,
+        'In progress' => OptionCategory::Started,
+        'Done' => OptionCategory::Completed,
+    ])
+        ->and($categories(Task::class, TaskField::PRIORITY->value))->toBe([
+            'Low' => null,
+            'Medium' => null,
+            'High' => null,
+        ])
+        ->and($categories(Opportunity::class, OpportunityField::STAGE->value))->toBe([
+            'Prospecting' => OptionCategory::Unstarted,
+            'Qualification' => OptionCategory::Started,
+            'Needs Analysis' => OptionCategory::Started,
+            'Value Proposition' => OptionCategory::Started,
+            'Id. Decision Makers' => OptionCategory::Started,
+            'Perception Analysis' => OptionCategory::Started,
+            'Proposal/Price Quote' => OptionCategory::Started,
+            'Negotiation/Review' => OptionCategory::Started,
+            'Closed Won' => OptionCategory::Completed,
+            'Closed Lost' => OptionCategory::Cancelled,
+        ]);
+});
+
+it('keeps the seeded option colours alongside the category', function (): void {
+    $workspace = Workspace::factory()->create(['personal_workspace' => false]);
+
+    $status = CustomField::withoutGlobalScopes()
+        ->where('tenant_id', $workspace->id)
+        ->forEntity(Task::class)
+        ->where('code', TaskField::STATUS->value)
+        ->sole();
+
+    $done = $status->optionsInCategory(OptionCategory::Completed)->sole();
+
+    expect($done->name)->toBe('Done')
+        ->and($done->settings->color)->toBe('#2A9764');
+});

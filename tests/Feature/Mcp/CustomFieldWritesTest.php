@@ -17,14 +17,15 @@ use App\Mcp\Tools\Task\UpdateTaskTool;
 use App\Mcp\Tools\UploadFileTool;
 use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\CustomFieldLink;
 use App\Models\CustomFieldOption;
 use App\Models\Note;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Rules\OwnedLookupRecords;
 use App\Rules\ValidCustomFields;
 use App\Support\ChecklistHtml;
+use App\Support\CurrentWorkspace;
 use App\Support\CustomFields\CustomFieldInput;
 use App\Support\CustomFields\CustomFieldOptionMap;
 use App\Support\CustomFields\RecordNameResolver;
@@ -33,12 +34,14 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
+use Relaticle\CustomFields\Enums\WriteSource;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Tests\Helpers\LegacyCompanyDomains;
+use Tests\Helpers\RecordFieldFixture;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(BaseCreateTool::class, BaseUpdateTool::class, ChecklistHtml::class, CustomFieldInput::class, CustomFieldOptionMap::class, OwnedLookupRecords::class, ValidCustomFields::class, RecordNameResolver::class, FormatsCustomFields::class);
+mutates(BaseCreateTool::class, BaseUpdateTool::class, ChecklistHtml::class, CustomFieldInput::class, CustomFieldOptionMap::class, ValidCustomFields::class, RecordNameResolver::class, FormatsCustomFields::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();
@@ -49,6 +52,7 @@ beforeEach(function (): void {
         ->where('code', 'status')
         ->firstOrFail();
     TenantContextService::setTenantId($this->workspace->getKey());
+    resolve(CurrentWorkspace::class)->set($this->workspace);
 });
 
 afterEach(function (): void {
@@ -225,7 +229,7 @@ it('clears a multi-select field sent an empty string', function (): void {
         ->tool(UpdateTaskTool::class, ['id' => $task->getKey(), 'custom_fields' => ['markets' => '']])
         ->assertOk();
 
-    expect($task->fresh('customFieldValues.customField.options')->getCustomFieldValue($field))->toBeNull();
+    expect(blank($task->fresh('customFieldValues.customField.options')->getCustomFieldValue($field)))->toBeTrue();
 });
 
 it('stores markdown for a rich editor field as html', function (): void {
@@ -289,18 +293,19 @@ it('escapes inline html inside markdown', function (): void {
 });
 
 it('rejects a record id from another workspace', function (): void {
-    CustomField::query()->create([
+    $recordField1 = CustomField::query()->create([
         'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'task',
         'code' => 'related_company',
         'name' => 'Related Company',
         'type' => 'record',
-        'lookup_type' => 'company',
         'sort_order' => 91,
         'validation_rules' => [],
         'active' => true,
         'system_defined' => false,
     ]);
+
+    RecordFieldFixture::pointAt($recordField1, 'company');
     $otherWorkspace = User::factory()->withPersonalWorkspace()->create()->personalWorkspace();
     $foreign = Company::factory()->create(['workspace_id' => $otherWorkspace->getKey()]);
 
@@ -317,12 +322,13 @@ it('accepts a record id from the caller workspace', function (): void {
         'code' => 'related_company',
         'name' => 'Related Company',
         'type' => 'record',
-        'lookup_type' => 'company',
         'sort_order' => 91,
         'validation_rules' => [],
         'active' => true,
         'system_defined' => false,
     ]);
+
+    RecordFieldFixture::pointAt($field, 'company');
     $own = Company::factory()->create(['workspace_id' => $this->workspace->getKey()]);
 
     RelaticleServer::actingAs($this->user)
@@ -333,18 +339,19 @@ it('accepts a record id from the caller workspace', function (): void {
 });
 
 it('rejects a soft-deleted record id from the caller workspace', function (): void {
-    CustomField::query()->create([
+    $recordField2 = CustomField::query()->create([
         'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'task',
         'code' => 'related_company',
         'name' => 'Related Company',
         'type' => 'record',
-        'lookup_type' => 'company',
         'sort_order' => 91,
         'validation_rules' => [],
         'active' => true,
         'system_defined' => false,
     ]);
+
+    RecordFieldFixture::pointAt($recordField2, 'company');
     $trashed = Company::factory()->create(['workspace_id' => $this->workspace->getKey()]);
     $trashed->delete();
 
@@ -355,18 +362,19 @@ it('rejects a soft-deleted record id from the caller workspace', function (): vo
 });
 
 it('rejects a nested value in a record field', function (): void {
-    CustomField::query()->create([
+    $recordField3 = CustomField::query()->create([
         'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'task',
         'code' => 'related_company',
         'name' => 'Related Company',
         'type' => 'record',
-        'lookup_type' => 'company',
         'sort_order' => 91,
         'validation_rules' => [],
         'active' => true,
         'system_defined' => false,
     ]);
+
+    RecordFieldFixture::pointAt($recordField3, 'company');
 
     RelaticleServer::actingAs($this->user)
         ->tool(CreateTaskTool::class, ['title' => 'Nested record', 'custom_fields' => ['related_company' => [['id' => 'x']]]])
@@ -381,12 +389,13 @@ it('returns record values as id and name pairs', function (): void {
         'code' => 'related_company',
         'name' => 'Related Company',
         'type' => 'record',
-        'lookup_type' => 'company',
         'sort_order' => 91,
         'validation_rules' => [],
         'active' => true,
         'system_defined' => false,
     ]);
+
+    RecordFieldFixture::pointAt($field, 'company');
     $company = Company::factory()->create(['workspace_id' => $this->workspace->getKey(), 'name' => 'Globex']);
     $task = Task::factory()->create(['workspace_id' => $this->workspace->getKey()]);
     $task->saveCustomFieldValue($field, [$company->getKey()]);
@@ -404,12 +413,13 @@ it('lists tasks with record names in one workspace-scoped query per lookup type'
         'code' => 'related_company',
         'name' => 'Related Company',
         'type' => 'record',
-        'lookup_type' => 'company',
         'sort_order' => 91,
         'validation_rules' => [],
         'active' => true,
         'system_defined' => false,
     ]);
+
+    RecordFieldFixture::pointAt($field, 'company');
     $companies = Company::factory()->count(5)->create(['workspace_id' => $this->workspace->getKey()]);
     foreach ($companies as $company) {
         Task::factory()->create(['workspace_id' => $this->workspace->getKey()])->saveCustomFieldValue($field, [$company->getKey()]);
@@ -430,16 +440,27 @@ it('reads a foreign-workspace record value as a null name', function (): void {
         'code' => 'related_company',
         'name' => 'Related Company',
         'type' => 'record',
-        'lookup_type' => 'company',
         'sort_order' => 91,
         'validation_rules' => [],
         'active' => true,
         'system_defined' => false,
     ]);
+
+    RecordFieldFixture::pointAt($field, 'company');
     $otherWorkspace = User::factory()->withPersonalWorkspace()->create()->personalWorkspace();
     $foreign = Company::factory()->create(['workspace_id' => $otherWorkspace->getKey(), 'name' => 'Initech']);
     $task = Task::factory()->create(['workspace_id' => $this->workspace->getKey()]);
-    $task->saveCustomFieldValue($field, [$foreign->getKey()]);
+    CustomFieldLink::query()->create([
+        'tenant_id' => $this->workspace->getKey(),
+        'relationship_id' => $field->relationshipDefinition()->getKey(),
+        'from_entity_type' => 'task',
+        'from_entity_id' => $task->getKey(),
+        'to_entity_type' => 'company',
+        'to_entity_id' => $foreign->getKey(),
+        'sort_order' => 0,
+        'active_from' => now(),
+        'source' => WriteSource::Migration,
+    ]);
 
     $response = RelaticleServer::actingAs($this->user)
         ->tool(GetTaskTool::class, ['id' => $task->getKey()])
@@ -456,12 +477,13 @@ it('resolves a record field with several own-workspace ids in one workspace-scop
         'code' => 'related_company',
         'name' => 'Related Company',
         'type' => 'record',
-        'lookup_type' => 'company',
         'sort_order' => 91,
         'validation_rules' => [],
         'active' => true,
         'system_defined' => false,
     ]);
+
+    RecordFieldFixture::pointAt($field, 'company');
     $companies = Company::factory()->count(3)->create(['workspace_id' => $this->workspace->getKey()]);
     $task = Task::factory()->create(['workspace_id' => $this->workspace->getKey()]);
     $task->saveCustomFieldValue($field, $companies->pluck('id')->all());
@@ -483,17 +505,19 @@ it('resolves a dangling record reference without one query per row', function ()
         'code' => 'related_company',
         'name' => 'Related Company',
         'type' => 'record',
-        'lookup_type' => 'company',
         'sort_order' => 91,
         'validation_rules' => [],
         'active' => true,
         'system_defined' => false,
     ]);
+
+    RecordFieldFixture::pointAt($field, 'company');
     $trashed = Company::factory()->create(['workspace_id' => $this->workspace->getKey()]);
-    $trashed->delete();
     foreach (range(1, 3) as $ignored) {
         Task::factory()->create(['workspace_id' => $this->workspace->getKey()])->saveCustomFieldValue($field, [$trashed->getKey()]);
     }
+
+    $trashed->delete();
 
     DB::enableQueryLog();
     DB::flushQueryLog();
@@ -504,18 +528,19 @@ it('resolves a dangling record reference without one query per row', function ()
 });
 
 it('rejects a record field whose lookup type is not a CRM entity', function (): void {
-    CustomField::query()->create([
+    $recordField4 = CustomField::query()->create([
         'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'task',
         'code' => 'owning_workspace',
         'name' => 'Owning Workspace',
         'type' => 'record',
-        'lookup_type' => 'workspace',
         'sort_order' => 60,
         'validation_rules' => [],
         'active' => true,
         'system_defined' => false,
     ]);
+
+    RecordFieldFixture::pointAt($recordField4, 'workspace');
 
     RelaticleServer::actingAs($this->user)
         ->tool(CreateTaskTool::class, ['title' => 'Bad lookup', 'custom_fields' => ['owning_workspace' => [$this->workspace->getKey()]]])
@@ -531,12 +556,15 @@ it('sets then clears a value for every writable custom field type', function (st
         'code' => 'probe',
         'name' => 'Probe',
         'type' => $type,
-        'lookup_type' => $type === 'record' ? 'company' : null,
         'sort_order' => 70,
         'validation_rules' => [],
         'active' => true,
         'system_defined' => false,
     ]);
+
+    if ($type === 'record') {
+        RecordFieldFixture::pointAt($field, 'company');
+    }
 
     if (in_array($type, ['select', 'radio', 'toggle-buttons', 'multi-select', 'checkbox-list'], true)) {
         CustomFieldOption::query()->create(['tenant_id' => $this->workspace->getKey(), 'custom_field_id' => $field->getKey(), 'name' => 'Gold', 'sort_order' => 1]);
@@ -571,7 +599,7 @@ it('sets then clears a value for every writable custom field type', function (st
         ->tool(UpdateTaskTool::class, ['id' => $task->getKey(), 'custom_fields' => ['probe' => null]])
         ->assertOk();
 
-    expect($task->fresh('customFieldValues.customField.options')->getCustomFieldValue($field))->toBeNull();
+    expect(blank($task->fresh('customFieldValues.customField.options')->getCustomFieldValue($field)))->toBeTrue();
 })->with([
     'text' => ['text', 'Acme renewal', 'Acme renewal'],
     'textarea' => ['textarea', "line one\nline two", "line one\nline two"],
