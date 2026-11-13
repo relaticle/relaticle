@@ -84,7 +84,7 @@
     @apply flex max-h-menu-max min-h-0 flex-col;
 
     & .fi-dropdown-list-item {
-        @apply hover:bg-gray-100 focus-visible:bg-gray-100 dark:hover:bg-white/5 dark:focus-visible:bg-white/5;
+        @apply hover:bg-gray-50 focus-visible:bg-gray-50 dark:hover:bg-white/5 dark:focus-visible:bg-white/5;
     }
 
     & > .fi-dropdown-list {
@@ -160,7 +160,7 @@
     @apply flex max-h-menu-max min-h-0 flex-col;
 
     & .fi-dropdown-list-item {
-        @apply hover:bg-gray-100 focus-visible:bg-gray-100 dark:hover:bg-white/5 dark:focus-visible:bg-white/5;
+        @apply hover:bg-gray-50 focus-visible:bg-gray-50 dark:hover:bg-white/5 dark:focus-visible:bg-white/5;
     }
 }
 
@@ -215,7 +215,7 @@
     &:hover,
     &:has(:focus-visible),
     &:has([aria-expanded='true']) {
-        @apply bg-gray-100 dark:bg-white/5;
+        @apply bg-gray-50 dark:bg-white/5;
     }
 }
 
@@ -325,7 +325,7 @@
 }
 
 .fi-board-switch-row {
-    @apply flex min-h-menu-row cursor-pointer items-center gap-2 rounded-menu-item ps-2 pe-1 text-sm text-gray-950 hover:bg-gray-100 dark:text-white dark:hover:bg-white/5;
+    @apply flex min-h-menu-row cursor-pointer items-center gap-2 rounded-menu-item ps-2 pe-1 text-sm text-gray-950 hover:bg-gray-50 dark:text-white dark:hover:bg-white/5;
 
     & > .fi-icon {
         @apply size-menu-icon shrink-0 text-gray-400 dark:text-gray-500;
