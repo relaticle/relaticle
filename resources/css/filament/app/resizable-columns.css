@@ -141,7 +141,7 @@ body.resizing-column {
 /* Filament stretches the sort button across the cell; sized to its name, the rest of the header
    is free to grab. Sorting lives in the filter row, so the button only opens the column menu. */
 .fi-ta-resizable-header .fi-ta-header-cell-sort-btn {
-    @apply inline-flex w-auto max-w-full cursor-pointer;
+    @apply inline-flex w-auto max-w-full cursor-pointer rounded-sm;
 
     & > :is(.fi-icon, .fi-loading-indicator) {
         @apply hidden;
@@ -150,10 +150,6 @@ body.resizing-column {
 
 .fi-ta-resizable-header > .fi-ta-resizable-label[data-column-menu-trigger] {
     @apply cursor-pointer rounded-sm;
-}
-
-.fi-ta-resizable-header .fi-ta-header-cell-sort-btn:focus-visible {
-    @apply rounded-sm;
 }
 
 /* A pinned column does not move, so its header shows a lock after the name. Lucide's lock, drawn
