@@ -16,7 +16,7 @@ return [
                 'App\Filament\Actions\ConfirmIdentityAction::setUp' => 88,
                 'App\Filament\Resources\TaskResource\Pages\TasksBoard::board' => 69,
                 'App\Livewire\App\Workspaces\InviteWorkspaceMembers::manageInviteLinkAction' => 84,
-                'App\Mcp\Tools\BaseListTool::handle' => 89,
+                'App\Mcp\Tools\BaseListTool::handle' => 79,
                 'App\Mcp\Tools\BaseShowTool::handle' => 119,
                 'App\Mcp\Tools\ListActivityTool::handle' => 66,
                 'App\Mcp\Tools\ListCustomFieldsTool::handle' => 64,

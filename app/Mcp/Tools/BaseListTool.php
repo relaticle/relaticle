@@ -10,6 +10,7 @@ use App\Mcp\Schema\CustomFieldSchema;
 use App\Mcp\Tools\Concerns\BoundsToManyIncludes;
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
+use App\Mcp\Tools\Concerns\LinksRecords;
 use App\Mcp\Tools\Concerns\SerializesRelatedModels;
 use App\Models\User;
 use App\Queries\CustomFieldFilterSchema;
@@ -18,6 +19,7 @@ use App\Queries\FilterErrors;
 use App\Queries\FilterTree;
 use Closure;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -34,6 +36,7 @@ abstract class BaseListTool extends Tool
     use BoundsToManyIncludes;
     use ChecksTokenAbility;
     use HasReadOnlyToolAnnotations;
+    use LinksRecords;
     use SerializesRelatedModels;
 
     private const int MAX_PER_PAGE = 25;
@@ -133,6 +136,8 @@ abstract class BaseListTool extends Tool
                 continue;
             }
 
+            $this->linkRecord($items[$index], $model, $user);
+
             foreach ($model->getRelations() as $relation => $relatedData) {
                 if ($relation === 'customFieldValues') {
                     continue;
@@ -144,19 +149,26 @@ abstract class BaseListTool extends Tool
             }
         }
 
-        $response = ['items' => $items];
+        return Response::structured(['items' => $items, ...$this->pageOf($results)]);
+    }
 
-        if ($results instanceof LengthAwarePaginator) {
-            $response = array_merge($response, [
-                'page' => $results->currentPage(),
-                'per_page' => $results->perPage(),
-                'total' => $results->total(),
-                'has_more' => $results->hasMorePages(),
-                'next_page' => $results->hasMorePages() ? $results->currentPage() + 1 : null,
-            ]);
+    /**
+     * @param  CursorPaginator<int, Model>|LengthAwarePaginator<int, Model>  $results
+     * @return array{page?: int, per_page?: int, total?: int, has_more?: bool, next_page?: int|null}
+     */
+    private function pageOf(CursorPaginator|LengthAwarePaginator $results): array
+    {
+        if (! $results instanceof LengthAwarePaginator) {
+            return [];
         }
 
-        return Response::structured($response);
+        return [
+            'page' => $results->currentPage(),
+            'per_page' => $results->perPage(),
+            'total' => $results->total(),
+            'has_more' => $results->hasMorePages(),
+            'next_page' => $results->hasMorePages() ? $results->currentPage() + 1 : null,
+        ];
     }
 
     private function objectRule(): Closure

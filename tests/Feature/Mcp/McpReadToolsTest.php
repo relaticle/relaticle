@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Company\UpdateCompany;
 use App\Enums\CreationSource;
+use App\Enums\CrmEntity;
 use App\Enums\WorkspaceRole;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\AggregateOpportunitiesTool;
@@ -21,12 +22,14 @@ use App\Models\ActivityLog\Activity;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
+use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Queries\Crm\CrmSummaryQuery;
 use App\Queries\Opportunities\OpportunityAggregatesQuery;
+use App\Support\CanonicalRecordUrl;
 use App\Support\CurrentSource;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Testing\Fluent\AssertableJson;
@@ -250,6 +253,28 @@ it('rejects page numbers that could overflow database offsets', function (string
     ListCompaniesTool::class,
     ListActivityTool::class,
     ListCustomFieldsTool::class,
+]);
+
+it('links every listed record to its page in the app', function (string $toolClass, string $modelClass, CrmEntity $entity): void {
+    $record = $modelClass::factory()->recycle([$this->user, $this->workspace])->create();
+    $url = resolve(CanonicalRecordUrl::class)->buildOrFail($entity, (string) $record->getKey(), $this->workspace);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool($toolClass, ['filter' => ['created_at' => ['$gte' => $record->created_at->toDateString()]], 'per_page' => 25])
+        ->assertOk()
+        ->assertStructuredContent(function (AssertableJson $json) use ($record, $url): void {
+            $listed = collect($json->toArray()['items'])->firstWhere('id', $record->getKey());
+
+            expect($listed['url'] ?? null)->toBe($url);
+
+            $json->etc();
+        });
+})->with([
+    'company' => [ListCompaniesTool::class, Company::class, CrmEntity::Company],
+    'person' => [ListPeopleTool::class, People::class, CrmEntity::People],
+    'opportunity' => [ListOpportunitiesTool::class, Opportunity::class, CrmEntity::Opportunity],
+    'task' => [ListTasksTool::class, Task::class, CrmEntity::Task],
+    'note' => [ListNotesTool::class, Note::class, CrmEntity::Note],
 ]);
 
 it('publishes one filter object and no flat filter params on every list tool', function (string $toolClass): void {

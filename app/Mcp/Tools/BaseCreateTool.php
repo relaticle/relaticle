@@ -6,6 +6,7 @@ namespace App\Mcp\Tools;
 
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasExplicitToolAnnotations;
+use App\Mcp\Tools\Concerns\LinksRecords;
 use App\Models\User;
 use App\Rules\ValidCustomFields;
 use App\Support\CustomFields\CustomFieldInput;
@@ -20,6 +21,7 @@ abstract class BaseCreateTool extends Tool
 {
     use ChecksTokenAbility;
     use HasExplicitToolAnnotations;
+    use LinksRecords;
 
     protected function destructiveHint(): bool
     {
@@ -89,7 +91,7 @@ abstract class BaseCreateTool extends Tool
         $resourceClass = $this->resourceClass();
 
         $payload = (array) json_decode(
-            new $resourceClass($model->loadMissing('customFieldValues.customField.options'))->toJson(),
+            $this->linkedRecordJson(new $resourceClass($model->loadMissing('customFieldValues.customField.options')), $model, $user),
             flags: JSON_THROW_ON_ERROR,
         );
 
