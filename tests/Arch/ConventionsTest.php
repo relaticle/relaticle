@@ -197,6 +197,36 @@ it('keeps migrations out of the test suite', function (): void {
     );
 });
 
+it('signs browser tests in with visitAs outside the tests about signing in', function (): void {
+    $root = dirname(__DIR__, 2);
+
+    $keepTheLoginForm = [
+        'tests/Browser/CRM/ResizableColumnsTest.php',
+        'tests/Browser/EmailIntegration/AccessRequestOpenEmailBrowserTest.php',
+        'tests/Browser/EmailIntegration/ComposerRecipientsBrowserTest.php',
+        'tests/Browser/EmailIntegration/EmailAccountSyncErrorBrowserTest.php',
+        'tests/Browser/EmailIntegration/MailboxImportNotificationBrowserTest.php',
+        'tests/Browser/EmailIntegration/MailboxImportProgressBrowserTest.php',
+    ];
+
+    $callers = array_values(array_filter(
+        phpFilesUnder([$root.'/tests/Browser']),
+        fn (string $path): bool => ! str_starts_with($path, 'tests/Browser/Auth/')
+            && ! str_starts_with($path, 'tests/Browser/Onboarding/')
+            && str_contains((string) file_get_contents($root.'/'.$path), 'loginViaBrowser('),
+    ));
+
+    sort($callers);
+
+    expect(array_values(array_diff($callers, $keepTheLoginForm)))->toBe(
+        [],
+        'A browser test signs in with visitAs() (.ai/guidelines/relaticle/testing.md). The login form costs every test 0.71s in CI. Replace loginViaBrowser() in: '.implode(', ', array_diff($callers, $keepTheLoginForm)),
+    )->and(array_values(array_diff($keepTheLoginForm, $callers)))->toBe(
+        [],
+        'The login form list only shrinks. Remove the files that no longer call loginViaBrowser(): '.implode(', ', array_diff($keepTheLoginForm, $callers)),
+    );
+});
+
 it('keeps compiled agent guidelines in sync with their .ai sources', function (): void {
     $root = dirname(__DIR__, 2);
 

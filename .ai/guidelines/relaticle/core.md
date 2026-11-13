@@ -84,7 +84,7 @@ months two copies of the same field vocabulary drifted apart.
 
 The local loop is scoped to the change. GitHub CI (`.github/workflows/ci.yml`) is the
 only full run: it executes lint, rector, PHPStan, type coverage, nine test shards and
-six Browser shards on every push to a pull request. The test and Browser shards run on arm
+eight Browser shards on every push to a pull request. The test and Browser shards run on arm
 runners, and each of those jobs takes under 3 minutes when runners are free. Runs queue when
 the organization's 20 concurrent jobs are taken.
 

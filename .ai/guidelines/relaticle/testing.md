@@ -86,11 +86,11 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
   a scoped run cannot, and for recording a TIA graph. TIA replays a cached pass whenever
   a test's edges are unchanged, so it cannot see time-dependent failures (`travelTo`,
   expiring tokens), `.env` edits, or dynamic dispatch it did not trace while recording.
-- Every green run's `Record Shard Timings` job rebuilds `tests/.pest/shards.json` from the
-  JUnit reports of its test and Browser shards. The next run restores the newest recording
-  from its own branch, then from main, before Pest splits the suite. A class with no recording
-  yet is dealt round-robin, so a new test class is placed by time from the second green run
-  of its pull request.
+- Every run's `Record Shard Timings` job rebuilds `tests/.pest/shards.json` from the JUnit
+  reports of its test and Browser shards, red shards included. A cancelled run records nothing.
+  The next run restores the newest recording from its own branch, then from main, before Pest
+  splits the suite. A class with no recording yet is dealt round-robin, so a new test class is
+  placed by time from the second run of its pull request.
   `tests/.pest/shards.json` is only the fallback for a run that finds no recording, so do not
   refresh it with a local `composer test:update-shards`: a laptop's timings skew the split.
   Refresh it with `php bin/shard-timings.php <dir>` over a main run's `junit-*` artifacts.
@@ -100,3 +100,39 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
   workflow never runs it. The nightly `rela-evals.yml` workflow does, one job per model, and
   uploads `storage/evals/*.json`. Committed baselines live in `tests/Evals/baselines/`, and its
   README lists each one.
+
+## Keeping the suite fast
+
+Every job of a pull request's `Tests` run finishes in under 3 minutes. A job takes its setup,
+about 35s for a test shard and 75s for a Browser shard, plus its slowest lane. CI splits the
+suite by class over nine test shards of four processes and eight Browser shards of three, and a
+class runs in one process. One 379s class once held its shard at 451s while the other shards
+finished in 150s.
+
+- A test class stays under 130s in CI and a Browser class under 90s. The `Record Shard Timings`
+  job fails a class past that: `php bin/shard-timings.php --over-budget`. Split the file. Move
+  tests to a second file in the same directory and keep every name. `FilterBarTest` became four
+  files that way.
+- Helpers that two test files share are plain functions in `tests/Helpers/functions/`, and a
+  dataset they share sits in a `Datasets` directory beside the tests. Pest loads both at boot. A
+  function declared in two test files is a fatal error in any run that loads both.
+- A Browser test signs in with `visitAs($user, $path, $width, $height)`, which acts as the user
+  and opens the page at that size. The login form cost 0.71s a test in CI, 510s over the suite.
+  `tests/Arch/ConventionsTest.php` fails a file under `tests/Browser` that calls
+  `loginViaBrowser()`, outside `Auth`, `Onboarding` and the files that test lists.
+- The browser plugin retries every page call in one-second attempts until its 30s timeout
+  (`AwaitableWebpage::__call`). A `script()` whose promise takes over a second never finishes
+  inside an attempt, so it runs about thirty times and returns 30 seconds late. Wait in PHP, then
+  read: `$page->wait(1.2)->script($read)`. Two tests in
+  `tests/Browser/CRM/FilterBarChipTypesTest.php` ran 64s and 34s before that change and 6s and 3s
+  after. No test reads for this, so the class budget is what catches it.
+- Every dataset case of a page test mounts the page again: about 0.6s in a test shard and 3s in
+  a Browser shard. Give a case its own row when its failure needs its own name. Otherwise loop
+  inside one test. No test reads for this.
+- A static that outlives the application is reset in `Tests\TestCase::createApplication()`.
+  Livewire's back-button cache flag is the example: a component that threw left it set, and the
+  next test's response carried no-cache headers. Run the `ProposalPlanCardTest` case that refuses
+  a client-set editing target before `tests/Feature/Media/PrivateDiskTest.php` in one process,
+  and the second fails without the reset.
+- To find where a slow run went, download its `junit-*` artifacts and sum `time` per class. The
+  shard that holds the largest class is the slow one. A job's step timings show its setup.
