@@ -33,6 +33,8 @@ use Relaticle\Flowforge\Components\CardFlex;
 
 trait HasBoardCards
 {
+    private const array CARD_RELATIONS = ['company' => 'company.media', 'contact' => 'contact', 'creator' => 'creator', 'assignees' => 'assignees'];
+
     /** @var list<string>|null */
     private ?array $cardAttributeKeyList = null;
 
@@ -208,9 +210,7 @@ trait HasBoardCards
             return [];
         }
 
-        $loads = ['company' => 'company.media', 'contact' => 'contact', 'creator' => 'creator', 'assignees' => 'assignees'];
-
-        return array_values(array_intersect_key($loads, array_flip($this->cardAttributeKeys())));
+        return array_values(array_intersect_key(self::CARD_RELATIONS, array_flip($this->cardAttributeKeys())));
     }
 
     protected function cardAttributeLabel(string $key): string
@@ -428,7 +428,7 @@ trait HasBoardCards
         return match (true) {
             $field instanceof CustomField && $record instanceof HasCustomFields => blank($record->getCustomFieldValue($field)),
             $key === 'created_at', $key === 'updated_at' => false,
-            in_array($key, ['company', 'contact', 'creator', 'assignees'], true) => blank($record->getRelationValue($key)),
+            array_key_exists($key, self::CARD_RELATIONS) => blank($record->getRelationValue($key)),
             default => $this->derivedCardAttributeIsEmpty($record, $key),
         };
     }
