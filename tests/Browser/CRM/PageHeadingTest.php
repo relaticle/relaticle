@@ -100,7 +100,7 @@ it('shows a long record name in full on a phone by cutting the trail to its icon
 
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
-    $opportunity = Opportunity::factory()->recycle([$user, $workspace])->create(['name' => 'Apple Developer Partnership']);
+    $opportunity = Opportunity::factory()->recycle([$user, $workspace])->create(['name' => 'Apple Developer Program']);
 
     $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")
