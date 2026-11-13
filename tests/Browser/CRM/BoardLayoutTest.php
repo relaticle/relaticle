@@ -978,10 +978,9 @@ it('puts the columns back and says so when the order cannot be saved', function 
     $page->script('window.fetch = ((original) => (input, init) => String(init?.body).includes("reorderBoardStages") ? Promise.resolve(new Response("{}", { status: 500 })) : original(input, init))(window.fetch)');
 
     dragWithPointerEvents($page, boardHeaderTitle($ids[0]), boardHeaderTitle($ids[1]));
-    $page->wait(2);
 
-    $page->assertScript(BOARD_COLUMN_IDS, $ids)
-        ->assertScript('[...document.querySelectorAll(".fi-no-notification")].some((notification) => notification.textContent.includes('.json_encode(__('filament/pages/boards.stage_order_failed')).'))', true);
+    $page->assertScript(boardWaitFor('[...document.querySelectorAll(".fi-no-notification")].some((notification) => notification.textContent.includes('.json_encode(__('filament/pages/boards.stage_order_failed')).'))'), true)
+        ->assertScript(BOARD_COLUMN_IDS, $ids);
 
     expect(storedStageOrder($user, $entity))->toBeNull();
 })->with('stage order boards');
