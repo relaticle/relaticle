@@ -1205,6 +1205,18 @@ it('keeps the same rule on a free text tags field without looking its values up'
         ->and($component->get('tableFilters.conditions.rules'))->toBe($rules);
 });
 
+it('reads the distinct stored tags once when the company list renders', function (): void {
+    filterBarField($this->user, 'company', 'labels', CustomFieldType::TAGS_INPUT->value);
+    filterBarRecord($this->user, Company::class, 'Vip', values: ['labels' => ['vip']]);
+
+    DB::enableQueryLog();
+    livewire(ListCompanies::class);
+    $tagScans = collect(DB::getQueryLog())->filter(fn (array $log): bool => str_contains($log['query'], 'select distinct on (lower(btrim(element)))'));
+    DB::disableQueryLog();
+
+    expect($tagScans)->toHaveCount(1);
+});
+
 it('keeps the first twenty conditions and drops the rest', function (): void {
     filterBarScenario('companies', $this->user);
     $rule = ['field' => 'name', 'condition' => 'contains', 'value' => 'o'];

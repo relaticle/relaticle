@@ -32,6 +32,11 @@ final readonly class FilterField
         public ?CustomField $definition = null,
     ) {}
 
+    public function labelled(string $label): self
+    {
+        return new self($this->key, $this->entity, $label, $this->icon, $this->kind, $this->related, $this->options, $this->operators, $this->type, $this->definition);
+    }
+
     public function picksFromOptions(): bool
     {
         return $this->definition instanceof CustomField

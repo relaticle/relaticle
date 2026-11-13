@@ -41,10 +41,17 @@ final readonly class FilterFieldCatalog
         $workspace = $user->currentWorkspace;
 
         // once() keys on its used variables, and one user object can switch workspace within a request.
-        return once(fn (): array => [
-            ...self::nativeFields($entity, $columnLabels),
+        $fields = once(fn (): array => [
+            ...self::nativeFields($entity),
             ...self::customFields($entity, $workspace),
         ]);
+
+        return array_map(
+            static fn (FilterField $field): FilterField => ! $field->definition instanceof CustomField && isset($columnLabels[self::columnFor($field->key)])
+                ? $field->labelled($columnLabels[self::columnFor($field->key)])
+                : $field,
+            $fields,
+        );
     }
 
     public static function columnFor(string $key): string
@@ -71,11 +78,8 @@ final readonly class FilterFieldCatalog
         };
     }
 
-    /**
-     * @param  array<string, string>  $columnLabels
-     * @return array<string, FilterField>
-     */
-    private static function nativeFields(CrmEntity $entity, array $columnLabels): array
+    /** @return array<string, FilterField> */
+    private static function nativeFields(CrmEntity $entity): array
     {
         $fields = [];
 
@@ -89,7 +93,7 @@ final readonly class FilterFieldCatalog
             $fields[$key] = new FilterField(
                 key: $key,
                 entity: $entity,
-                label: $columnLabels[self::columnFor($key)] ?? self::fallbackLabel($entity, $key),
+                label: self::fallbackLabel($entity, $key),
                 icon: self::nativeIcon($key, $definition),
                 kind: $kind,
                 related: $definition->related,
