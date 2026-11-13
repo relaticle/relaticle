@@ -232,7 +232,7 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
                 fn (Builder $query): Builder => $query->whereNull('opportunities.company_id'),
             )
             ->moveUsing(fn (Opportunity $record, Lane $to): Opportunity => resolve(UpdateOpportunity::class)->execute(
-                $this->currentUser(),
+                $this->viewSwitcherUser(),
                 $record,
                 ['company_id' => $to->getName() === Grouping::EMPTY_LANE ? null : $to->getName()],
             ));

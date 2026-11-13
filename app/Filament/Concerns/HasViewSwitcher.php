@@ -203,7 +203,7 @@ trait HasViewSwitcher
             && CrmEntity::tryFromModel($model::query()->getModel()) instanceof CrmEntity;
     }
 
-    private function viewSwitcherUser(): User
+    protected function viewSwitcherUser(): User
     {
         /** @var User */
         return auth()->user();

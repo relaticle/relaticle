@@ -17,7 +17,6 @@ use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\CustomFieldValue;
 use App\Models\SavedView;
-use App\Models\User;
 use App\Models\Workspace;
 use App\Queries\Views\BoardColumnFieldsQuery;
 use Closure;
@@ -31,7 +30,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\HtmlString;
 use LogicException;
@@ -384,19 +382,13 @@ trait HasBoardStageOrder
         abort_unless($card instanceof HasCustomFields, 422);
 
         resolve(MoveBoardCard::class)->execute(
-            $this->currentUser(),
+            $this->viewSwitcherUser(),
             $card,
             $this->getBoard()->getPositionIdentifierAttribute(),
             $position,
             $this->boardColumnField(),
             $this->columnValueFor((string) $columnValue),
         );
-    }
-
-    protected function currentUser(): User
-    {
-        /** @var User */
-        return Auth::guard('web')->user();
     }
 
     /**
@@ -408,7 +400,7 @@ trait HasBoardStageOrder
 
         abort_unless(blank($columnId) || $this->ownsColumn((string) $columnId), 422);
 
-        $card = $this->createBoardRecord($this->currentUser()->currentWorkspace, $data);
+        $card = $this->createBoardRecord($this->viewSwitcherUser()->currentWorkspace, $data);
 
         if (filled($columnId)) {
             if ($columnId !== BoardStateData::NO_VALUE_COLUMN) {
