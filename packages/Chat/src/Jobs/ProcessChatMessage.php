@@ -158,16 +158,13 @@ final class ProcessChatMessage implements ShouldQueue
         $this->workspace->refresh();
 
         if (! resolve(Entitlements::class)->allowsAccess($this->workspace)) {
-            $creditService->refundReservation(
-                $this->workspace,
-                resolutionKey: $this->resolutionKey(),
-                conversationId: $this->conversationId,
-            );
-            $this->broadcastSafely(new ChatStreamFailed(
-                conversationId: $this->conversationId,
-                message: __('billing.access.paused_chat'),
-            ));
-            $this->abandonTurn();
+            $this->refuseTurn($creditService, __('billing.access.paused_chat'));
+
+            return;
+        }
+
+        if (! $this->userStillBelongsToWorkspace()) {
+            $this->refuseTurn($creditService, __('You are no longer a member of this workspace, so the assistant stopped.'));
 
             return;
         }
@@ -603,6 +600,26 @@ final class ProcessChatMessage implements ShouldQueue
             claimKey: $this->claimKey ?? null,
             nextStep: $this->nextStep ?? null,
         ));
+    }
+
+    private function refuseTurn(CreditService $creditService, string $message): void
+    {
+        $creditService->refundReservation(
+            $this->workspace,
+            resolutionKey: $this->resolutionKey(),
+            conversationId: $this->conversationId,
+        );
+        $this->broadcastSafely(new ChatStreamFailed(
+            conversationId: $this->conversationId,
+            message: $message,
+        ));
+        $this->abandonTurn();
+    }
+
+    private function userStillBelongsToWorkspace(): bool
+    {
+        return (string) $this->workspace->user_id === (string) $this->user->getKey()
+            || $this->workspace->users()->whereKey($this->user->getKey())->exists();
     }
 
     private function abandonTurn(): void
