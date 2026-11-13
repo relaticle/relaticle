@@ -360,6 +360,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('app:purge-pending-uploads')->hourly()->withoutOverlapping()->onOneServer();
         $schedule->command('queue:prune-batches --hours=24')->daily()->onOneServer();
         $schedule->command('invitations:cleanup')->daily()->onOneServer();
+        $schedule->command('users:prune-unclaimed')->daily()->onOneServer();
         $schedule->command('activitylog:clean --force')->daily()->onOneServer();
         $schedule->command('activitylog:clean '.Activity::SIGNUP_LOG.' --days=90 --force')->daily()->onOneServer();
         $schedule->command('model:prune', ['--model' => [Notification::class]])->daily()->onOneServer();
