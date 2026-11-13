@@ -1940,7 +1940,7 @@ html.fi-record-stacked .fi-record-layout {
     }
 
     .fi-board-layout-option {
-        @apply inline-flex size-6 cursor-pointer items-center justify-center rounded-md text-gray-500 transition-colors hover:text-gray-700 focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:outline-none aria-pressed:bg-white aria-pressed:text-gray-900 aria-pressed:shadow-sm dark:text-gray-400 dark:hover:text-gray-200 dark:focus-visible:ring-primary-400 dark:aria-pressed:bg-gray-700 dark:aria-pressed:text-white;
+        @apply inline-flex size-6 cursor-pointer items-center justify-center rounded-md text-gray-500 transition-colors hover:text-gray-700 aria-pressed:bg-white aria-pressed:text-gray-900 aria-pressed:shadow-sm dark:text-gray-400 dark:hover:text-gray-200 dark:aria-pressed:bg-gray-700 dark:aria-pressed:text-white;
     }
 
     .fi-page-main {
@@ -2024,6 +2024,24 @@ html.fi-record-stacked .fi-record-layout {
 /* A menu marks its current item with this check alone. A fill on a row means hover or keyboard focus. */
 .fi-menu-check {
     @apply ms-auto size-menu-icon shrink-0 text-primary-600 dark:text-primary-400;
+}
+
+/* One keyboard focus ring for every control on the filter bar, the view controls and the column headers. */
+:is(
+    .fi-view-switcher .fi-dropdown-trigger > button,
+    .fi-view-settings-trigger,
+    .fi-filter-ghost,
+    button.fi-filter-seg,
+    .fi-filter-sort-select,
+    .fi-filter-sort-add,
+    .fi-ta-resizable-header > .fi-ta-resizable-label[data-column-menu-trigger],
+    .fi-ta-resizable-header .fi-ta-header-cell-sort-btn,
+    .fi-view-settings-row .fi-icon-btn,
+    .fi-ta-views-row-actions .fi-icon-btn,
+    .fi-bulk-bar-selection,
+    .fi-board-layout-option
+):focus-visible {
+    @apply outline-2 outline-solid outline-primary-500;
 }
 
 /* The search row every menu opens with: the filter pickers, the view switcher and View settings. */

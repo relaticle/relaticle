@@ -149,11 +149,11 @@ body.resizing-column {
 }
 
 .fi-ta-resizable-header > .fi-ta-resizable-label[data-column-menu-trigger] {
-    @apply cursor-pointer rounded-sm focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-primary-500;
+    @apply cursor-pointer rounded-sm;
 }
 
 .fi-ta-resizable-header .fi-ta-header-cell-sort-btn:focus-visible {
-    @apply rounded-sm outline-2 outline-solid outline-primary-500;
+    @apply rounded-sm;
 }
 
 /* A pinned column does not move, so its header shows a lock after the name. Lucide's lock, drawn

@@ -136,6 +136,44 @@ it('draws every menu with the shared row, icon and corner spec', function (strin
     'board import and export' => ['.fi-board-header-actions button.fi-ac-btn-group:visible', '.fi-board-header-actions .fi-dropdown-panel:not([style*="display: none"])', '.fi-dropdown-list-item', '.fi-dropdown-list-item > svg', 'opportunities/board'],
 ]);
 
+it('draws one keyboard focus ring on a header trigger, the filter button, a chip part and a column header', function (): void {
+    $chip = "Livewire.all().find((component) => component.name.includes('ListCompanies')).\$wire.\$call('setFilterRules', [{ field: 'name', condition: 'contains', value: 'chip' }])";
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies");
+
+    $page->script($chip);
+    $page->assertPresent('[data-filter-chip] [data-filter-segment="field"]')
+        ->keys('.fi-view-settings-trigger', 'Tab');
+
+    $rings = $page->script(<<<'JS'
+        (() => {
+            const controls = [
+                '.fi-view-switcher .fi-dropdown-trigger > button',
+                '.fi-view-settings-trigger',
+                '[data-filter-add]',
+                '[data-filter-sort]',
+                '[data-filter-chip] [data-filter-segment="field"]',
+                'th[x-data^="resizableColumn(\'created_at\'"] [data-column-menu-trigger]',
+            ];
+
+            return controls.map((selector) => {
+                const element = document.querySelector(selector);
+                element.focus();
+                const style = getComputedStyle(element);
+
+                return [element.matches(':focus-visible'), style.outlineStyle, style.outlineWidth, style.outlineColor].join(' | ');
+            });
+        })()
+        JS);
+
+    expect(array_unique($rings))->toHaveCount(1);
+    expect($rings[0])->toStartWith('true | solid | 2px | ');
+    $page->assertNoJavaScriptErrors();
+});
+
 it('draws a rule only between the groups a menu shows', function (array $steps, string $panel): void {
     $page = loginViaBrowser($this->user)
         ->assertPathIs("/app/{$this->workspace->slug}")

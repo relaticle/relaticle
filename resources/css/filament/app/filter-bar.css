@@ -192,7 +192,7 @@ button.fi-filter-seg {
 }
 
 :is(.fi-filter-sort-select, .fi-filter-sort-add) {
-    @apply flex h-menu-row min-w-0 items-center gap-2 rounded-lg px-2.5 text-sm whitespace-nowrap ring-1 ring-gray-950/10 hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:outline-0 dark:ring-white/15 dark:hover:bg-white/5 dark:focus-visible:ring-primary-500;
+    @apply flex h-menu-row min-w-0 items-center gap-2 rounded-lg px-2.5 text-sm whitespace-nowrap ring-1 ring-gray-950/10 hover:bg-gray-50 dark:ring-white/15 dark:hover:bg-white/5;
 
     & svg {
         @apply size-menu-icon shrink-0 text-gray-400 dark:text-gray-500;
