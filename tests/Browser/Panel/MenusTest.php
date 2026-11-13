@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\CustomFields\CreateCustomField;
 use App\Data\TableStateData;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\CustomFields\TaskField;
@@ -46,6 +47,21 @@ function menuMetrics(string $panel, string $rows, string $icons): string
         JS;
 }
 
+const BOARD_MAIN_ROWS = '.fi-board-main-view .fi-dropdown-list-item, .fi-board-main-view .fi-board-switch-row, .fi-board-main-view .fi-ta-views-row';
+
+const BOARD_MAIN_ICONS = '.fi-board-main-view .fi-dropdown-list-item > svg, .fi-board-main-view .fi-board-switch-row > svg, .fi-board-main-view .fi-board-stage-grip svg, .fi-board-main-view .fi-board-stage-mark svg, .fi-board-main-view .fi-ta-views-row-actions svg';
+
+function addBoardChoiceField(User $user): void
+{
+    resolve(CreateCustomField::class)->execute($user, [
+        'entity_type' => 'opportunity',
+        'name' => 'Region',
+        'code' => 'region',
+        'type' => 'select',
+        'options' => [['name' => 'Americas'], ['name' => 'Europe']],
+    ]);
+}
+
 function menuRoom(string $panel, string $list): string
 {
     return <<<JS
@@ -79,13 +95,21 @@ beforeEach(function (): void {
     }
 });
 
-it('draws every menu with the shared row, icon and corner spec', function (string $open, string $panel, string $rows, string $icons): void {
+it('draws every menu with the shared row, icon and corner spec', function (string $open, string $panel, string $rows, string $icons, string $path = 'companies', array $steps = []): void {
+    if ($path === 'opportunities/board') {
+        addBoardChoiceField($this->user);
+    }
+
     $page = loginViaBrowser($this->user)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
-        ->click($open)
-        ->assertVisible($panel);
+        ->navigate("/app/{$this->workspace->slug}/{$path}");
+
+    foreach ($steps as $step) {
+        $page->click($step);
+    }
+
+    $page->click($open)->assertVisible($panel);
 
     expect($page->script(menuMetrics($panel, $rows, $icons)))->toBe([
         'rows' => [32],
@@ -101,6 +125,15 @@ it('draws every menu with the shared row, icon and corner spec', function (strin
     'filter field picker' => ['[data-filter-add]', '.fi-filter-pop-picker', '.fi-filter-item', '.fi-filter-item > svg'],
     'import and export' => ['.fi-header button.fi-ac-btn-group:visible', '.fi-header .fi-dropdown-panel:not([style*="display: none"])', '.fi-dropdown-list-item', '.fi-dropdown-list-item > svg'],
     'column header' => ["th[x-data^=\"resizableColumn('created_at'\"] [data-column-menu-trigger]", '.fi-ta-column-menu', '.fi-dropdown-list-item', '.fi-dropdown-list-item > svg'],
+    'board filter field picker' => ['[data-filter-add]', '.fi-filter-pop-picker', '.fi-filter-item', '.fi-filter-item > svg', 'opportunities/board'],
+    'board sort menu' => ['[data-filter-sort]', '[data-sort-pop]', '.fi-filter-item', '.fi-filter-item > svg', 'opportunities/board'],
+    'board view settings' => ['.fi-view-settings-trigger', '[data-board-view-settings]', BOARD_MAIN_ROWS, BOARD_MAIN_ICONS, 'opportunities/board'],
+    'board grouped by' => ['[data-board-column-field-trigger]', '[data-board-view-settings]', '[data-board-panel="grouping"] .fi-dropdown-list-item', '[data-board-panel="grouping"] .fi-dropdown-list-item > svg', 'opportunities/board', ['.fi-view-settings-trigger']],
+    'board visible columns' => ['[data-board-columns-trigger]', '[data-board-view-settings]', '[data-board-panel="columns"] .fi-ta-views-row', '[data-board-panel="columns"] .fi-board-stage-row svg', 'opportunities/board', ['.fi-view-settings-trigger']],
+    'board lanes' => ['[data-board-lanes-trigger]', '[data-board-view-settings]', '[data-board-panel="lanes"] .fi-dropdown-list-item', '[data-board-panel="lanes"] .fi-dropdown-list-item > svg', 'opportunities/board', ['.fi-view-settings-trigger']],
+    'board add attribute' => ['[data-board-add-attribute]', '[data-board-view-settings]', '[data-board-panel="add"] .fi-dropdown-list-item', '[data-board-panel="add"] .fi-dropdown-list-item > svg', 'opportunities/board', ['.fi-view-settings-trigger']],
+    'board attribute row menu' => ['[data-board-view-settings] [data-attribute-actions] >> nth=0', '.fi-board-stages-row-menu', '.fi-dropdown-list-item', '.fi-dropdown-list-item > svg', 'opportunities/board', ['.fi-view-settings-trigger']],
+    'board import and export' => ['.fi-board-header-actions button.fi-ac-btn-group:visible', '.fi-board-header-actions .fi-dropdown-panel:not([style*="display: none"])', '.fi-dropdown-list-item', '.fi-dropdown-list-item > svg', 'opportunities/board'],
 ]);
 
 it('draws a rule only between the groups a menu shows', function (array $steps, string $panel): void {
@@ -184,13 +217,18 @@ function currentItem(string $current, string $other): string
 
 it('marks the current item with a trailing check and no fill', function (string $surface): void {
     $column = "th[x-data^=\"resizableColumn('created_at'\"] [data-column-menu-trigger]";
+    $onBoard = str_starts_with($surface, 'board ');
+
+    if ($onBoard) {
+        addBoardChoiceField($this->user);
+    }
 
     $page = loginViaBrowser($this->user)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies");
+        ->navigate("/app/{$this->workspace->slug}/".($onBoard ? 'opportunities/board' : 'companies'));
 
-    if ($surface !== 'views') {
+    if ($surface !== 'views' && ! $onBoard) {
         $page->click($column)->click('[data-column-menu-item="sortAscending"]')->assertPresent('[data-filter-sort-label]');
     }
 
@@ -198,12 +236,16 @@ it('marks the current item with a trailing check and no fill', function (string 
         'views' => ['.fi-ta-views-row:has([aria-current])', '.fi-ta-views-row:not(:has([aria-current]))'],
         'sort chooser' => ['[data-sort-pop] .fi-filter-item[aria-selected="true"]', '[data-sort-pop] .fi-filter-item[aria-selected="false"]'],
         'column header' => ['.fi-ta-column-menu [aria-checked="true"]', '.fi-ta-column-menu [aria-checked="false"]'],
+        'board grouped by' => ['[data-board-column-field][aria-checked="true"]', '[data-board-column-field][aria-checked="false"]'],
+        'board lanes' => ['[data-board-grouping][aria-checked="true"]', '[data-board-grouping][aria-checked="false"]'],
     };
 
     match ($surface) {
         'views' => $page->click('.fi-view-switcher .fi-dropdown-trigger button'),
         'sort chooser' => $page->click('[data-filter-sort]')->click('[data-sort-field]'),
         'column header' => $page->click($column),
+        'board grouped by' => $page->click('.fi-view-settings-trigger')->click('[data-board-column-field-trigger]'),
+        'board lanes' => $page->click('.fi-view-settings-trigger')->click('[data-board-lanes-trigger]'),
     };
 
     $page->hover('.fi-sidebar-nav .fi-sidebar-item-btn >> nth=0');
@@ -216,7 +258,7 @@ it('marks the current item with a trailing check and no fill', function (string 
         'otherCheck' => false,
     ]);
     $page->assertNoJavaScriptErrors();
-})->with(['views', 'sort chooser', 'column header']);
+})->with(['views', 'sort chooser', 'column header', 'board grouped by', 'board lanes']);
 
 function holdLook(array $targets, string $trigger): string
 {
@@ -472,19 +514,26 @@ it('draws the board view settings with the shared row, icon and corner spec', fu
     $page->assertNoJavaScriptErrors();
 })->with(['tasks/board', 'opportunities/board']);
 
-it('keeps the board view settings above the window edge and scrolls only its list', function (): void {
+it('keeps the board view settings above the window edge', function (array $steps, string $list, bool $listScrolls): void {
     $page = loginViaBrowser($this->user)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 320)
-        ->navigate("/app/{$this->workspace->slug}/opportunities/board")
-        ->click('.fi-view-settings-trigger')
-        ->assertVisible('[data-board-view-settings]');
+        ->navigate("/app/{$this->workspace->slug}/opportunities/board");
 
-    expect($page->script(menuRoom('[data-board-view-settings]', '.fi-ta-views-scroll')))->toBe([
+    foreach ($steps as $step) {
+        $page->click($step);
+    }
+
+    $page->assertVisible('[data-board-view-settings]');
+
+    expect($page->script(menuRoom('[data-board-view-settings]', $list)))->toBe([
         'height' => true,
         'bottom' => true,
-        'listScrolls' => true,
+        'listScrolls' => $listScrolls,
         'panelScrolls' => false,
     ]);
     $page->assertNoJavaScriptErrors();
-});
+})->with([
+    'main panel' => [['.fi-view-settings-trigger'], '.fi-board-attributes-scroll', true],
+    'add attribute panel' => [['.fi-view-settings-trigger', '[data-board-add-attribute]'], '[data-board-panel="add"] .fi-view-settings-scroll', true],
+]);

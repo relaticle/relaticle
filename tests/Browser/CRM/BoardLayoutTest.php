@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Actions\CustomFields\CreateCustomField;
+use App\Data\BoardStateData;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\CustomFields\TaskField;
@@ -11,6 +13,7 @@ use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Opportunity;
+use App\Models\SavedView;
 use App\Models\TablePreference;
 use App\Models\Task;
 use App\Models\User;
@@ -59,11 +62,12 @@ it('scrolls a long column inside the board without scrolling the page', function
                 pageScrolls: layout.scrollHeight > layout.clientHeight,
                 columnScrolls: scroller !== undefined && scroller.scrollHeight > scroller.clientHeight,
                 gapBelowCards: Math.round(tray.getBoundingClientRect().bottom - scroller.getBoundingClientRect().bottom),
+                thumbRoom: parseFloat(getComputedStyle(scroller).paddingRight),
             };
         })();
     JS;
 
-    expect($page->script($overflow))->toBe(['pageScrolls' => false, 'columnScrolls' => true, 'gapBelowCards' => 0]);
+    expect($page->script($overflow))->toEqual(['pageScrolls' => false, 'columnScrolls' => true, 'gapBelowCards' => 0, 'thumbRoom' => 12]);
 })->with([
     'tasks' => [Task::class, TaskField::STATUS->value, TaskField::DUE_DATE->value, 'tasks/board'],
     'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, OpportunityField::CLOSE_DATE->value, 'opportunities/board'],
@@ -273,7 +277,9 @@ it('gives cards the same inset and gap in a flat column and in a lane cell', fun
 
     $column = $page->script($flat);
 
-    expect($column['right'])->toBe($column['left'])
+    expect($column['left'])->toEqual(12)
+        ->and($column['gap'])->toEqual(8)
+        ->and($column['right'])->toBe($column['left'])
         ->and($column['top'])->toBe($column['left'])
         ->and($column['headerLeft'])->toBe(0)
         ->and($column['headerRight'])->toBe(0)
@@ -357,6 +363,79 @@ it('puts one row gap between the title and every row of a default card', functio
 })->with([
     'tasks' => [Task::class, TaskField::STATUS->value],
     'opportunities' => [Opportunity::class, OpportunityField::STAGE->value],
+]);
+
+it('gives an empty attribute its own line and labelled rows one gap', function (string $model, string $columnFieldCode, string $path, CrmEntity $entity): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    TenantContextService::setTenantId($workspace->getKey());
+
+    $columnField = CustomField::query()->forEntity($model)->where('code', $columnFieldCode)->firstOrFail();
+
+    if ($model === Opportunity::class) {
+        $company = Company::factory()->recycle([$user, $workspace])->create();
+        $record = Opportunity::factory()->recycle([$user, $workspace])->create(['company_id' => $company->getKey()]);
+        $amount = CustomField::query()->forEntity($model)->where('code', OpportunityField::AMOUNT->value)->firstOrFail();
+        $record->saveCustomFieldValue($amount, 5000);
+    } else {
+        $record = Task::factory()->recycle([$user, $workspace])->create();
+        $priority = CustomField::query()->forEntity($model)->where('code', TaskField::PRIORITY->value)->firstOrFail();
+        $record->saveCustomFieldValue($priority, $priority->options->first()->getKey());
+        $record->assignees()->attach($user);
+    }
+
+    $record->saveCustomFieldValue($columnField, $columnField->options->first()->getKey());
+
+    TenantContextService::setTenantId(null);
+
+    $card = "[data-card-id=\"{$record->getKey()}\"]";
+    $page = openBoard($user, $path)->assertVisible($card);
+
+    $page->click('.fi-view-settings-trigger')->click('[data-board-view-settings] [data-board-hide-empty]');
+    waitForPage($page, fn (): bool => storedBoardState($user, $entity)?->hideEmpty === false);
+    $page->assertScript(boardWaitFor("document.querySelector('{$card} .fi-board-card-row') !== null"), true);
+
+    $spare = $page->script(<<<JS
+        (() => {
+            const body = document.querySelector('{$card} .ff-card-body');
+            const style = getComputedStyle(body);
+            const inner = body.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+
+            return [...body.querySelectorAll('.fi-board-card-row')]
+                .map((row) => row.getBoundingClientRect())
+                .filter((box) => box.height > 0)
+                .map((box) => Math.round(inner - box.width));
+        })();
+    JS);
+
+    expect($spare)->not->toBeEmpty()->and(array_unique($spare))->toBe([0]);
+
+    $page->click('[data-board-view-settings] [data-board-show-labels]');
+    waitForPage($page, fn (): bool => storedBoardState($user, $entity)?->showLabels === true);
+    $page->assertScript(boardWaitFor("document.querySelector('{$card} .ff-card-flex.gap-y-2')?.children.length > 1"), true);
+
+    $rows = $page->script(<<<JS
+        (() => {
+            const list = document.querySelector('{$card} .ff-card-flex.gap-y-2');
+            const boxes = [...list.children].map((row) => row.getBoundingClientRect()).filter((box) => box.height > 0);
+
+            return {
+                rowGap: parseFloat(getComputedStyle(list).rowGap),
+                gaps: boxes.slice(1).map((box, index) => Math.round((box.top - boxes[index].bottom) * 10) / 10),
+            };
+        })();
+    JS);
+
+    expect($rows['rowGap'])->toEqual(8)
+        ->and($rows['gaps'])->not->toBeEmpty()
+        ->and(array_unique($rows['gaps']))->toEqual([8]);
+    $page->assertNoJavaScriptErrors();
+})->with([
+    'tasks' => [Task::class, TaskField::STATUS->value, 'tasks/board', CrmEntity::Task],
+    'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board', CrmEntity::Opportunity],
 ]);
 
 it('lets the next board column peek past the first on a 320px phone', function (string $path): void {
@@ -946,4 +1025,489 @@ it('returns focus to the stage menu button when Escape closes its row menu', fun
 })->with([
     'tasks' => [Task::class, TaskField::STATUS->value, 'tasks/board'],
     'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board'],
+]);
+
+function boardCardCount(mixed $page, int $count): bool
+{
+    return $page->script("(async () => { for (let attempt = 0; attempt < 80; attempt++) { if (document.querySelectorAll('.ff-card').length === {$count}) { return true; } await new Promise((resolve) => setTimeout(resolve, 100)); } return false; })()");
+}
+
+it('filters a board from the bar, saves it as a view and finds it again from the list', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    TenantContextService::setTenantId($workspace->getKey());
+
+    $stage = CustomField::query()->forEntity(Opportunity::class)->where('code', OpportunityField::STAGE->value)->firstOrFail();
+    $acme = Company::factory()->recycle([$user, $workspace])->create(['name' => 'Acme Robotics']);
+    $globex = Company::factory()->recycle([$user, $workspace])->create(['name' => 'Globex']);
+
+    foreach ([['Acme rollout', $acme], ['Globex rollout', $globex]] as [$name, $company]) {
+        Opportunity::factory()->recycle([$user, $workspace])->create(['name' => $name, 'company_id' => $company->getKey()])
+            ->saveCustomFieldValue($stage, $stage->options->first()->getKey());
+    }
+
+    TenantContextService::setTenantId(null);
+
+    $page = openBoard($user, 'opportunities/board');
+    expect(boardCardCount($page, 2))->toBeTrue();
+
+    $page->click('[data-filter-add]')
+        ->click('[data-pop-item][data-field="company"]')
+        ->click('[data-pop]:not([style*="display: none"]) [data-condition="is_any_of"]')
+        ->click("[data-pop]:not([style*=\"display: none\"]) [data-option=\"{$acme->getKey()}\"]");
+    expect(boardCardCount($page, 1))->toBeTrue();
+    $page->assertSee('Acme rollout')->assertDontSee('Globex rollout')->assertSeeIn('[data-filter-chip] [data-filter-segment="value"]', 'Acme Robotics');
+
+    $page->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->click('.fi-ta-views-save-current')
+        ->type('.fi-modal-window input[type="text"]', 'Acme pipeline')
+        ->click('.fi-modal-footer-actions button[type="submit"]')
+        ->assertSeeIn('.fi-view-switcher-trigger', 'Acme pipeline');
+
+    $page->navigate("/app/{$workspace->slug}/opportunities")
+        ->click('.fi-view-switcher .fi-dropdown-trigger button')
+        ->click('.fi-ta-views-row:has-text("Acme pipeline") .fi-dropdown-list-item')
+        ->assertPathIs("/app/{$workspace->slug}/opportunities/board")
+        ->assertVisible('.ff-column >> nth=0')
+        ->assertSeeIn('[data-filter-chip] [data-filter-segment="value"]', 'Acme Robotics');
+    expect(boardCardCount($page, 1))->toBeTrue();
+    $page->assertSee('Acme rollout')->assertNoJavaScriptErrors();
+
+    expect(SavedView::query()->withoutGlobalScopes()->where('name', 'Acme pipeline')->count())->toBe(1);
+});
+
+dataset('choice boards', [
+    'tasks' => [Task::class, 'task', TaskField::STATUS->value, TaskField::PRIORITY->value, 'tasks/board', CrmEntity::Task],
+    'opportunities' => [Opportunity::class, 'opportunity', OpportunityField::STAGE->value, 'region', 'opportunities/board', CrmEntity::Opportunity],
+]);
+
+function ensureOtherChoiceField(User $user, string $entity, string $code): void
+{
+    if ($code === 'region') {
+        resolve(CreateCustomField::class)->execute($user, [
+            'entity_type' => $entity,
+            'name' => 'Region',
+            'code' => 'region',
+            'type' => 'select',
+            'options' => [['name' => 'Americas'], ['name' => 'Europe'], ['name' => 'Asia'], ['name' => 'Africa']],
+        ]);
+    }
+}
+
+function openViewSettingsPanel(mixed $page, string $trigger): void
+{
+    $page->click('.fi-view-settings-trigger')->assertVisible('[data-board-view-settings]')->click($trigger);
+}
+
+function closeViewSettings(mixed $page): void
+{
+    $page->click('.fi-topbar-page-title')
+        ->assertScript(boardWaitFor('! document.querySelector("[data-board-view-settings]").checkVisibility()'), true);
+}
+
+function waitForBoardColumns(mixed $page, array $expected): void
+{
+    $page->assertScript(BOARD_COLUMN_IDS, $expected);
+}
+
+it('groups a board by another attribute, hides a column, drags a header and shows the column in its old slot', function (string $model, string $entity, string $stageCode, string $otherCode, string $path): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    ensureOtherChoiceField($user, $entity, $otherCode);
+
+    $stageIds = boardStageOptionIds($model, $stageCode);
+    $ids = boardStageOptionIds($model, $otherCode);
+    $hidden = $ids[1];
+    $afterHide = array_values(array_diff($ids, [$hidden]));
+    $afterDrag = [$afterHide[1], $afterHide[0], ...array_slice($afterHide, 2)];
+    $afterShow = [$afterHide[1], $hidden, $afterHide[0], ...array_slice($afterHide, 2)];
+
+    $page = openBoard($user, $path);
+    waitForBoardColumns($page, $stageIds);
+
+    openViewSettingsPanel($page, '[data-board-column-field-trigger]');
+    $page->click("[data-board-column-field=\"{$otherCode}\"]");
+    waitForBoardColumns($page, $ids);
+    $page->assertScript('document.querySelector("[data-board-column-field=\"'.$otherCode.'\"]").getAttribute("aria-checked")', 'true');
+
+    $page->click('[data-board-panel="grouping"] [data-view-settings-back]')->click('[data-board-columns-trigger]');
+    $page->click("[data-board-view-settings] [data-stage-id=\"{$hidden}\"] [data-board-column-toggle]");
+    waitForBoardColumns($page, $afterHide);
+
+    closeViewSettings($page);
+
+    dragWithPointerEvents($page, boardHeaderTitle($afterHide[1]), boardHeaderTitle($afterHide[0]));
+    waitForBoardColumns($page, $afterDrag);
+
+    $page->click('.fi-view-settings-trigger')->click('[data-board-columns-trigger]')
+        ->click("[data-board-view-settings] [data-stage-id=\"{$hidden}\"] [data-board-column-toggle]");
+    waitForBoardColumns($page, $afterShow);
+
+    $page->navigate("/app/{$user->ownedWorkspaces()->first()->slug}/{$path}")->assertVisible('.ff-column >> nth=0');
+    waitForBoardColumns($page, $afterShow);
+    $page->assertNoJavaScriptErrors();
+})->with('choice boards');
+
+function storedBoardState(User $user, CrmEntity $entity): ?BoardStateData
+{
+    return TablePreference::query()->withoutGlobalScopes()->whereBelongsTo($user)->where('entity', $entity)->first()?->board_state;
+}
+
+function waitForPage(mixed $page, Closure $done): void
+{
+    for ($attempt = 0; $attempt < 50 && ! $done(); $attempt++) {
+        $page->wait(0.1);
+    }
+}
+
+function settingsPanel(): string
+{
+    return 'window.Alpine.$data(document.querySelector("[data-board-view-settings]")).panel';
+}
+
+const BOARD_ATTRIBUTE_KEYS = '[...document.querySelectorAll("[data-board-view-settings] [data-card-attribute]")].map((row) => row.dataset.cardAttribute)';
+
+function pickRowMenuItem(mixed $page, string $trigger, string $label): void
+{
+    $page->click($trigger)->wait(0.5);
+    $page->script('[...document.querySelectorAll(".fi-board-stages-row-menu .fi-dropdown-list-item")].find((item) => item.textContent.trim() === "'.$label.'").click()');
+}
+
+function dragSettingsRow(mixed $page, string $from, string $to): void
+{
+    $page->wait(0.5);
+    $page->page()->locator($from)->dragTo($page->page()->locator($to), ['steps' => 10]);
+}
+
+it('keeps a view settings panel open on the same panel after a switch, a move up and a dragged row', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $ids = boardStageOptionIds($model, $fieldCode);
+    $last = last($ids);
+
+    $page = openBoard($user, $path)->click('.fi-view-settings-trigger')->click('[data-board-columns-trigger]');
+    $page->assertScript(settingsPanel(), 'columns');
+
+    $page->click("[data-board-view-settings] [data-stage-id=\"{$last}\"] [data-board-column-toggle]");
+    waitForBoardColumns($page, array_slice($ids, 0, -1));
+    $page->assertScript(settingsPanel(), 'columns');
+
+    pickRowMenuItem($page, "[data-board-view-settings] [data-stage-id=\"{$ids[1]}\"] [data-stage-actions]", 'Move up');
+    waitForStoredStageOrder($page, $user, $entity, [$ids[1], $ids[0], ...array_slice($ids, 2)]);
+    $page->wait(0.5)->assertScript(settingsPanel(), 'columns')->assertScript(BOARD_STAGE_ROW_IDS, [$ids[1], $ids[0], ...array_slice($ids, 2)]);
+
+    $page->assertScript('(async () => { const bound = () => Object.keys(document.querySelector("[data-board-view-settings] .fi-ta-views-list")).some((key) => key.startsWith("Sortable")); for (let attempt = 0; ! bound() && attempt < 50; attempt++) { await new Promise((resolve) => setTimeout(resolve, 100)); } return bound(); })()', true);
+    dragSettingsRow($page, "[data-board-view-settings] [data-stage-id=\"{$ids[0]}\"] .fi-board-stage", "[data-board-view-settings] [data-stage-id=\"{$ids[1]}\"] .fi-board-stage");
+    waitForStoredStageOrder($page, $user, $entity, $ids);
+    $page->wait(0.5)->assertScript(settingsPanel(), 'columns')->assertScript(BOARD_STAGE_ROW_IDS, $ids);
+
+    $page->click('[data-board-panel="columns"] [data-view-settings-back]')->assertScript(settingsPanel(), 'main');
+    $before = $page->script(BOARD_ATTRIBUTE_KEYS);
+    expect(count($before))->toBeGreaterThan(2);
+
+    $page->click('[data-board-view-settings] [data-board-hide-empty]')->wait(1)->assertScript(settingsPanel(), 'main');
+
+    pickRowMenuItem($page, '[data-board-view-settings] [data-card-attribute]:nth-child(2) [data-attribute-actions]', 'Move up');
+    $swapped = [$before[1], $before[0], ...array_slice($before, 2)];
+    waitForPage($page, fn (): bool => storedBoardState($user, $entity)?->cardAttributes === $swapped);
+    expect(storedBoardState($user, $entity)->cardAttributes)->toBe($swapped);
+    $page->wait(0.5)->assertScript(settingsPanel(), 'main')->assertScript(BOARD_ATTRIBUTE_KEYS, $swapped);
+
+    dragSettingsRow($page, '[data-board-view-settings] [data-card-attribute]:nth-child(1) .fi-board-stage', '[data-board-view-settings] [data-card-attribute]:nth-child(2) .fi-board-stage');
+    waitForPage($page, fn (): bool => storedBoardState($user, $entity)?->cardAttributes === $before);
+    expect(storedBoardState($user, $entity)->cardAttributes)->toBe($before);
+    $page->wait(0.5)->assertScript(settingsPanel(), 'main')->assertNoJavaScriptErrors();
+})->with('stage order boards');
+
+function boardLayoutIs(string $attribute, string $value): string
+{
+    return "(async () => { for (let attempt = 0; attempt < 50; attempt++) { if (document.querySelector('.fi-board-header').dataset.{$attribute} === '{$value}') { return true; } await new Promise((resolve) => setTimeout(resolve, 100)); } return false; })()";
+}
+
+function boardSize(string $column, string $card): string
+{
+    return "(async () => { await new Promise((resolve) => setTimeout(resolve, 300)); return { column: Math.round(document.querySelector('{$column}').getBoundingClientRect().width), card: Math.round(document.querySelector('{$card}').getBoundingClientRect().height) }; })()";
+}
+
+function pressLayout(mixed $page, string $kind, string $option, string $attribute): void
+{
+    $page->click("[data-board-{$kind}-option=\"{$option}\"]")
+        ->assertScript(boardLayoutIs($attribute, $option), true)
+        ->assertScript("document.querySelector('[data-board-{$kind}-option=\"{$option}\"]').getAttribute('aria-pressed')", 'true');
+}
+
+it('narrows columns and compacts cards flat and with lanes, every time it is pressed, and keeps phones wide', function (string $model, string $fieldCode, string $path, CrmEntity $entity, string $groupBy): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    TenantContextService::setTenantId($workspace->getKey());
+
+    $field = CustomField::query()->forEntity($model)->where('code', $fieldCode)->firstOrFail();
+    $company = Company::factory()->recycle([$user, $workspace])->create();
+    $record = $model::factory()->recycle([$user, $workspace])->create($model === Opportunity::class ? ['company_id' => $company->getKey()] : []);
+    $record->saveCustomFieldValue($field, $field->options->first()->getKey());
+
+    if ($record instanceof Task) {
+        $record->assignees()->attach($user);
+    }
+
+    TenantContextService::setTenantId(null);
+
+    $flat = boardSize('.ff-columns > .ff-column', '.ff-column .ff-card');
+    $lanes = boardSize('.ff-lanes-heads > .ff-column', '.ff-cell .ff-card');
+
+    $page = openBoard($user, $path, 390);
+    $phone = $page->script($flat);
+
+    $page->resize(1440, 900)->assertVisible('.ff-card');
+    $wide = $page->script($flat);
+
+    pressLayout($page, 'column-width', 'narrow', 'boardColumnWidth');
+    $narrow = $page->script($flat);
+    expect($narrow['column'])->toBeLessThan($wide['column']);
+
+    pressLayout($page, 'column-width', 'wide', 'boardColumnWidth');
+    expect($page->script($flat))->toBe($wide);
+
+    pressLayout($page, 'column-width', 'narrow', 'boardColumnWidth');
+    expect($page->script($flat))->toBe($narrow);
+
+    pressLayout($page, 'card-size', 'compact', 'boardCardSize');
+    $compact = $page->script($flat);
+    expect($compact['card'])->toBeLessThan($narrow['card'])->and($compact['column'])->toBe($narrow['column']);
+
+    pressLayout($page, 'card-size', 'full', 'boardCardSize');
+    expect($page->script($flat))->toBe($narrow);
+
+    pressLayout($page, 'card-size', 'compact', 'boardCardSize');
+    expect($page->script($flat))->toBe($compact);
+
+    openViewSettingsPanel($page, '[data-board-lanes-trigger]');
+    $page->click("[data-board-grouping=\"{$groupBy}\"]")->assertVisible('.ff-lanes-heads');
+    closeViewSettings($page);
+
+    $laneCompact = $page->script($lanes);
+    expect($laneCompact['column'])->toBe($narrow['column']);
+
+    pressLayout($page, 'column-width', 'wide', 'boardColumnWidth');
+    $laneWide = $page->script($lanes);
+    expect($laneWide['column'])->toBe($wide['column']);
+
+    pressLayout($page, 'column-width', 'narrow', 'boardColumnWidth');
+    expect($page->script($lanes))->toBe($laneCompact);
+
+    pressLayout($page, 'card-size', 'full', 'boardCardSize');
+    expect($page->script($lanes)['card'])->toBeGreaterThan($laneCompact['card']);
+
+    $page->resize(390, 844)->navigate("/app/{$workspace->slug}/{$path}")->assertVisible('.ff-column >> nth=0');
+    $page->assertScript(boardLayoutIs('boardColumnWidth', 'narrow'), true);
+    expect($page->script('Math.round(document.querySelector(".ff-lanes-heads > .ff-column, .ff-columns > .ff-column").getBoundingClientRect().width)'))->toBe($phone['column']);
+    expect($page->script('Math.round(document.querySelectorAll(".ff-lanes-heads > .ff-column, .ff-columns > .ff-column")[1].getBoundingClientRect().left)'))->toBeLessThan(390);
+    $page->assertNoJavaScriptErrors();
+})->with([
+    'tasks' => [Task::class, TaskField::STATUS->value, 'tasks/board', CrmEntity::Task, 'assignee'],
+    'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board', CrmEntity::Opportunity, 'company'],
+]);
+
+function boardColumnValue(Task|Opportunity $record, CustomField $field): mixed
+{
+    return $record->fresh()->customFieldValues()->where('custom_field_id', $field->getKey())->value($field->getValueColumn());
+}
+
+function waitForColumnValue(mixed $page, Task|Opportunity $record, CustomField $field, mixed $expected): void
+{
+    waitForPage($page, fn (): bool => boardColumnValue($record, $field) === $expected);
+    expect(boardColumnValue($record, $field))->toBe($expected);
+}
+
+it('shows the no value column from the first row, ringed in grey, takes cards in and out and cannot be dragged', function (string $model, string $fieldCode, string $path, CrmEntity $entity, string $groupBy): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    TenantContextService::setTenantId($workspace->getKey());
+
+    $field = CustomField::query()->forEntity($model)->where('code', $fieldCode)->firstOrFail();
+    $company = Company::factory()->recycle([$user, $workspace])->create();
+    $record = $model::factory()->recycle([$user, $workspace])->create($model === Opportunity::class ? ['company_id' => $company->getKey()] : []);
+    $record->saveCustomFieldValue($field, $field->options->first()->getKey());
+
+    if ($record instanceof Task) {
+        $record->assignees()->attach($user);
+    }
+
+    TenantContextService::setTenantId(null);
+
+    $ids = boardStageOptionIds($model, $fieldCode);
+    $none = '__none__';
+    $card = "[data-card-id=\"{$record->getKey()}\"]";
+
+    $page = openBoard($user, $path)->assertVisible($card);
+    waitForBoardColumns($page, $ids);
+
+    openViewSettingsPanel($page, '[data-board-columns-trigger]');
+    $page->assertScript('document.querySelector("[data-board-no-value-toggle]") === document.querySelector("[data-board-panel=columns] .fi-ta-views-row")', true)
+        ->click('[data-board-no-value-toggle] [data-board-column-toggle]');
+    waitForBoardColumns($page, [$none, ...$ids]);
+    closeViewSettings($page);
+
+    $ring = $page->script("(() => { const ring = getComputedStyle(document.querySelector('[data-column-root=\"{$none}\"] .ff-column-heading'), '::before'); return { width: Math.round(parseFloat(ring.width)), ringed: parseFloat(ring.borderTopWidth) >= 1 && parseFloat(ring.borderTopWidth) <= 1.5, style: ring.borderTopStyle, fill: ring.backgroundColor, grey: ring.borderTopColor !== getComputedStyle(document.querySelector('.ff-column-title')).color }; })()");
+    expect($ring)->toBe(['width' => 8, 'ringed' => true, 'style' => 'solid', 'fill' => 'rgba(0, 0, 0, 0)', 'grey' => true]);
+
+    dragWithPointerEvents($page, boardHeaderTitle($none), boardHeaderTitle($ids[1]));
+    $page->wait(1);
+    waitForBoardColumns($page, [$none, ...$ids]);
+    expect(storedBoardState($user, $entity)?->stageOrder ?? [])->toBe([]);
+
+    dragCard($page, $card, "[data-column-root=\"{$none}\"] .ff-cards");
+    waitForColumnValue($page, $record, $field, null);
+    $page->assertScript("document.querySelector('{$card}').closest('[data-column-root]').dataset.columnRoot", $none);
+
+    dragCard($page, $card, "[data-column-root=\"{$ids[1]}\"] .ff-cards");
+    waitForColumnValue($page, $record, $field, $ids[1]);
+
+    openViewSettingsPanel($page, '[data-board-lanes-trigger]');
+    $page->click("[data-board-grouping=\"{$groupBy}\"]")->assertVisible('.ff-lanes-heads');
+    closeViewSettings($page);
+
+    $lane = $page->script("document.querySelector('{$card}').closest('[data-lane-id]').dataset.laneId");
+    $cell = fn (string $columnId): string => ".ff-cell:has([data-column-id=\"{$columnId}\"][data-lane-id=\"{$lane}\"])";
+
+    dragCard($page, $card, $cell($none));
+    waitForColumnValue($page, $record, $field, null);
+    $page->assertScript("document.querySelector('{$card}').closest('[data-column-id]').dataset.columnId", $none);
+
+    dragCard($page, $card, $cell($ids[0]));
+    waitForColumnValue($page, $record, $field, $ids[0]);
+
+    dragWithPointerEvents($page, boardHeaderTitle($none, '.ff-lanes-heads'), boardHeaderTitle($ids[1], '.ff-lanes-heads'));
+    $page->wait(1)->assertScript('[...document.querySelectorAll(".ff-lanes-heads > .ff-column")].map((column) => column.dataset.columnRoot)', [$none, ...$ids])
+        ->assertNoJavaScriptErrors();
+})->with([
+    'tasks' => [Task::class, TaskField::STATUS->value, 'tasks/board', CrmEntity::Task, 'assignee'],
+    'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board', CrmEntity::Opportunity, 'company'],
+]);
+
+it('creates a card from the header at the bottom of the first visible column', function (string $model, string $fieldCode, string $path, string $titleColumn): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    TenantContextService::setTenantId($workspace->getKey());
+
+    $field = CustomField::query()->forEntity($model)->where('code', $fieldCode)->firstOrFail();
+    $ids = boardStageOptionIds($model, $fieldCode);
+
+    foreach (['Existing one' => 1000, 'Existing two' => 2000] as $title => $position) {
+        $model::factory()->recycle([$user, $workspace])->create([$titleColumn => $title, 'order_column' => $position])
+            ->saveCustomFieldValue($field, $field->options->get(1)->getKey());
+    }
+
+    TenantContextService::setTenantId(null);
+
+    $page = openBoard($user, $path);
+    expect(boardCardCount($page, 2))->toBeTrue();
+
+    openViewSettingsPanel($page, '[data-board-columns-trigger]');
+    $page->click("[data-board-view-settings] [data-stage-id=\"{$ids[0]}\"] [data-board-column-toggle]");
+    waitForBoardColumns($page, array_slice($ids, 1));
+    closeViewSettings($page);
+
+    $page->click('.fi-board-header-actions button:has-text("New")')
+        ->assertVisible('.fi-modal-window')
+        ->type('.fi-modal-window input[type="text"] >> nth=0', 'Brand new card')
+        ->click('.fi-modal-footer-actions button[type="submit"]');
+
+    expect(boardCardCount($page, 3))->toBeTrue();
+    $page->assertScript("[...document.querySelectorAll('[data-column-root=\"{$ids[1]}\"] .ff-card')].map((card) => card.textContent.includes('Brand new card'))", [false, false, true])
+        ->assertNoJavaScriptErrors();
+})->with([
+    'tasks' => [Task::class, TaskField::STATUS->value, 'tasks/board', 'title'],
+    'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board', 'name'],
+]);
+
+function boardWaitFor(string $condition): string
+{
+    return "(async () => { for (let attempt = 0; attempt < 50; attempt++) { if ({$condition}) { return true; } await new Promise((resolve) => setTimeout(resolve, 100)); } return false; })()";
+}
+
+function cardTextBefore(string $card, string $first, string $second): string
+{
+    return "(() => { const walker = document.createTreeWalker(document.querySelector('{$card} .ff-card-body'), NodeFilter.SHOW_TEXT); const nodes = []; while (walker.nextNode()) { nodes.push(walker.currentNode); } const [a, b] = ['{$first}', '{$second}'].map((text) => nodes.find((node) => node.textContent.includes(text))); return !! a && !! b && !! (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING); })()";
+}
+
+it('adds an attribute to the card, reorders two with a drag of the handle and removes one', function (string $model, string $fieldCode, string $path, CrmEntity $entity, string $markerKey): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create(['name' => 'Olivia Hart']);
+    $workspace = $user->ownedWorkspaces()->first();
+
+    TenantContextService::setTenantId($workspace->getKey());
+
+    $field = CustomField::query()->forEntity($model)->where('code', $fieldCode)->firstOrFail();
+
+    if ($model === Opportunity::class) {
+        $company = Company::factory()->recycle([$user, $workspace])->create(['name' => 'Northwind Traders']);
+        $record = Opportunity::factory()->recycle([$user, $workspace])->create(['company_id' => $company->getKey(), 'creator_id' => $user->getKey()]);
+        $marker = 'Northwind Traders';
+    } else {
+        $priority = CustomField::query()->forEntity($model)->where('code', TaskField::PRIORITY->value)->firstOrFail();
+        $record = Task::factory()->recycle([$user, $workspace])->create(['creator_id' => $user->getKey()]);
+        $record->saveCustomFieldValue($priority, $priority->options->first()->getKey());
+        $marker = $priority->options->first()->name;
+    }
+
+    $record->saveCustomFieldValue($field, $field->options->first()->getKey());
+
+    TenantContextService::setTenantId(null);
+
+    $card = "[data-card-id=\"{$record->getKey()}\"]";
+    $creator = 'Olivia Hart';
+
+    $page = openBoard($user, $path)->assertVisible($card);
+    $page->assertSeeIn($card, $marker)->assertDontSeeIn($card, $creator);
+
+    openViewSettingsPanel($page, '[data-board-add-attribute]');
+    $page->click('[data-board-add-item="creator"]')->assertScript(boardWaitFor("document.querySelector('{$card}').textContent.includes('{$creator}')"), true);
+    $page->assertScript(cardTextBefore($card, $marker, $creator), true);
+
+    $page->click('[data-board-panel="add"] [data-view-settings-back]');
+    $keys = $page->script(BOARD_ATTRIBUTE_KEYS);
+    expect(last($keys))->toBe('creator');
+
+    $order = $keys;
+
+    for ($at = count($order) - 1; $at > array_search($markerKey, $keys, true); $at--) {
+        dragSettingsRow($page, '[data-board-view-settings] [data-card-attribute="creator"] .fi-board-stage-grip', "[data-board-view-settings] [data-card-attribute=\"{$order[$at - 1]}\"] .fi-board-stage");
+        [$order[$at - 1], $order[$at]] = [$order[$at], $order[$at - 1]];
+        waitForPage($page, fn (): bool => storedBoardState($user, $entity)?->cardAttributes === $order);
+        expect(storedBoardState($user, $entity)->cardAttributes)->toBe($order);
+    }
+
+    $page->assertScript(boardWaitFor(cardTextBefore($card, $creator, $marker)), true);
+
+    pickRowMenuItem($page, "[data-board-view-settings] [data-card-attribute=\"{$markerKey}\"] [data-attribute-actions]", __('filament/pages/boards.view_settings.remove_attribute'));
+    $page->assertScript(boardWaitFor("! document.querySelector('{$card}').textContent.includes('{$marker}')"), true)
+        ->assertScript('document.querySelectorAll("[data-board-view-settings] [data-card-attribute=\"'.$markerKey.'\"]").length', 0)
+        ->assertSeeIn($card, $creator);
+    expect(storedBoardState($user, $entity)->cardAttributes)->not->toContain($markerKey);
+
+    $page->click('[data-board-add-attribute]')->click('[data-view-settings-create]')->assertVisible('.fi-modal-window');
+    $page->assertScript(boardWaitFor('document.activeElement?.closest(".fi-modal-window") !== null'), true)
+        ->keys('.fi-modal-window input[type="text"] >> nth=0', 'Escape');
+    $page->assertScript(boardWaitFor('! document.querySelector(".fi-modal-open")'), true)
+        ->assertScript(boardWaitFor('document.activeElement === document.querySelector(".fi-view-settings-trigger")'), true)
+        ->assertNoJavaScriptErrors();
+})->with([
+    'tasks' => [Task::class, TaskField::STATUS->value, 'tasks/board', CrmEntity::Task, 'custom_fields.priority'],
+    'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board', CrmEntity::Opportunity, 'company'],
 ]);
