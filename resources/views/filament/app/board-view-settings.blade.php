@@ -452,6 +452,20 @@
                     @endforeach
                 </div>
             </div>
+
+            @if ($canCreateAttribute)
+                <div class="fi-dropdown-list fi-view-settings-footer">
+                    <x-filament::dropdown.list.item
+                        icon="lucide-plus"
+                        role="button"
+                        tabindex="0"
+                        data-board-create-column-field
+                        x-on:click="$wire.mountAction('createColumnAttribute'); close()"
+                    >
+                        {{ __('filament/panel.tables.views.create_attribute') }}
+                    </x-filament::dropdown.list.item>
+                </div>
+            @endif
         </div>
 
         <div class="fi-view-settings-view" x-show="panel === 'lanes'" x-cloak data-board-panel="lanes">

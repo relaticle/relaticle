@@ -11,6 +11,7 @@ use App\Enums\WorkspaceCapability;
 use App\Models\CustomField;
 use App\Models\User;
 use App\Support\CustomFieldDefinitionValidator;
+use Closure;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -35,15 +36,23 @@ trait CreatesTableAttribute
 
     public function createTableAttributeAction(): Action
     {
-        return Action::make('createTableAttribute')
+        return $this->attributeAction('createTableAttribute', null, $this->attributeCreated(...));
+    }
+
+    /**
+     * @param  Closure(CustomField): void  $created
+     */
+    protected function attributeAction(string $name, ?CustomFieldType $type, Closure $created): Action
+    {
+        return Action::make($name)
             ->label(__('filament/panel.tables.views.create_attribute'))
             ->modalHeading(__('filament/panel.tables.views.create_attribute'))
             ->modalWidth('md')
             ->modalSubmitActionLabel(__('filament/panel.tables.views.create_attribute_submit'))
             ->authorize(fn (): bool => $this->canCreateTableAttribute())
             ->mountUsing(fn (Schema $schema): Schema => $schema->fill())
-            ->schema(fn (): array => $this->tableAttributeFields())
-            ->action(fn (array $data, Schema $schema) => $this->createTableAttribute($data, $schema));
+            ->schema(fn (): array => $this->tableAttributeFields($type))
+            ->action(fn (array $data, Schema $schema) => $created($this->createTableAttribute($type instanceof CustomFieldType ? [...$data, 'type' => $type->value] : $data, $schema)));
     }
 
     protected function canCreateTableAttribute(): bool
@@ -57,7 +66,7 @@ trait CreatesTableAttribute
     /**
      * @return list<Select|TextInput|Repeater>
      */
-    private function tableAttributeFields(): array
+    private function tableAttributeFields(?CustomFieldType $type): array
     {
         return [
             TextInput::make('name')
@@ -70,7 +79,8 @@ trait CreatesTableAttribute
                 ->options($this->tableAttributeTypeOptions())
                 ->allowHtml()
                 ->native(false)
-                ->default(CustomFieldType::TEXT->value)
+                ->default(($type ?? CustomFieldType::TEXT)->value)
+                ->disabled($type instanceof CustomFieldType)
                 ->required()
                 ->selectablePlaceholder(false)
                 ->position('bottom')
@@ -81,13 +91,13 @@ trait CreatesTableAttribute
                 ->addActionLabel(__('filament/panel.tables.views.attribute_add_option'))
                 ->minItems(1)
                 ->maxItems(CustomFieldDefinitionValidator::maxOptions())
-                ->visible(fn (Get $get): bool => in_array($get('type'), CreateCustomField::CHOICE_TYPES, true)),
+                ->visible(fn (Get $get): bool => in_array($type->value ?? $get('type'), CreateCustomField::CHOICE_TYPES, true)),
             Select::make('lookup_type')
                 ->label(__('filament/panel.tables.views.attribute_lookup'))
                 ->options(Entities::getLookupOptions())
                 ->native(false)
                 ->required()
-                ->visible(fn (Get $get): bool => $this->typeRequiresLookup((string) $get('type'))),
+                ->visible(fn (Get $get): bool => $this->typeRequiresLookup((string) ($type->value ?? $get('type')))),
         ];
     }
 
@@ -122,18 +132,16 @@ trait CreatesTableAttribute
     /**
      * @param  array<string, mixed>  $data
      */
-    private function createTableAttribute(array $data, Schema $schema): void
+    private function createTableAttribute(array $data, Schema $schema): CustomField
     {
         try {
-            $field = resolve(CreateCustomField::class)->execute($this->attributeCreator(), [
+            return resolve(CreateCustomField::class)->execute($this->attributeCreator(), [
                 ...$this->tableAttributePayload($data),
                 'entity_type' => $this->attributeEntity()->value,
             ]);
         } catch (ValidationException $exception) {
             throw ValidationException::withMessages($this->tableAttributeErrors($exception, $schema, $data));
         }
-
-        $this->attributeCreated($field);
     }
 
     /**

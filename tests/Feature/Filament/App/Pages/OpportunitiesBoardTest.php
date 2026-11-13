@@ -2285,6 +2285,47 @@ it('creates a rich text attribute from the board without putting it on the card'
         ->and($stored)->not->toContain('custom_fields.deal_notes');
 });
 
+it('creates a select attribute from grouped by and groups the columns by it', function (): void {
+    opportunityInStage($this, 'Untiered deal', 'Prospecting');
+
+    livewire(OpportunitiesBoard::class)
+        ->assertSeeHtml('data-board-create-column-field')
+        ->mountAction('createColumnAttribute')
+        ->assertSchemaStateSet(['type' => 'select'])
+        ->assertFormFieldDisabled('type')
+        ->fillForm(['name' => 'Tier', 'options' => [['name' => 'Gold'], ['name' => 'Silver']]])
+        ->callMountedAction()
+        ->assertHasNoActionErrors()
+        ->assertNotified('Tier created. The columns are now grouped by it.')
+        ->assertSeeHtml('data-column-id="'.CustomFieldOption::query()->where('name', 'Gold')->sole()->getKey().'"')
+        ->assertSeeHtml('data-column-id="'.BoardStateData::NO_VALUE_COLUMN.'"')
+        ->assertSee('Untiered deal');
+
+    $tier = CustomField::query()->where('entity_type', 'opportunity')->where('name', 'Tier')->sole();
+    $state = TablePreference::query()->sole()->board_state;
+
+    expect($tier->type)->toBe('select')
+        ->and($state->columnField)->toBe($tier->code)
+        ->and($state->noValueColumns)->toBe([$tier->code]);
+});
+
+it('creates a select attribute from grouped by whatever type the form sends', function (): void {
+    livewire(OpportunitiesBoard::class)
+        ->callAction('createColumnAttribute', data: ['name' => 'Lead score', 'type' => 'text', 'options' => [['name' => 'Hot']]])
+        ->assertHasNoActionErrors();
+
+    expect(CustomField::query()->where('entity_type', 'opportunity')->where('name', 'Lead score')->sole()->type)->toBe('select');
+});
+
+it('refuses a grouped by attribute without options', function (): void {
+    livewire(OpportunitiesBoard::class)
+        ->callAction('createColumnAttribute', data: ['name' => 'Tier', 'options' => []])
+        ->assertHasActionErrors(['options']);
+
+    expect(CustomField::query()->where('name', 'Tier')->exists())->toBeFalse()
+        ->and(TablePreference::query()->first()?->board_state->columnField)->toBeNull();
+});
+
 it('offers a viewer the card settings but no create row', function (): void {
     $viewer = User::factory()->create();
     $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
@@ -2296,6 +2337,8 @@ it('offers a viewer the card settings but no create row', function (): void {
         ->assertDontSeeHtml('data-view-settings-create')
         ->assertActionHidden('createTableAttribute')
         ->assertDontSeeHtml('createTableAttribute')
+        ->assertActionHidden('createColumnAttribute')
+        ->assertDontSeeHtml('data-board-create-column-field')
         ->call('setCardLabels', true);
 
     expect(TablePreference::query()->sole()->board_state->showLabels)->toBeTrue();

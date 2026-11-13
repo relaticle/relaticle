@@ -21,6 +21,7 @@ use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
+use Filament\Notifications\Notification;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
@@ -103,6 +104,17 @@ trait HasBoardStageOrder
         }
 
         $this->boardStateWritten($saved);
+    }
+
+    public function createColumnAttributeAction(): Action
+    {
+        return $this->attributeAction('createColumnAttribute', CustomFieldType::SELECT, function (CustomField $field): void {
+            $this->boardColumnFieldList = null;
+            $this->setBoardColumnField($field->code);
+            $this->setBoardColumnVisible(BoardStateData::NO_VALUE_COLUMN, true);
+
+            Notification::make()->success()->title(__('filament/pages/boards.view_settings.columns_grouped_by_created', ['name' => e($field->name)]))->send();
+        });
     }
 
     public function setBoardColumnWidth(mixed $width = null): void
