@@ -128,7 +128,7 @@ function livewire(string $component, array $params = []): Testable
 }
 
 /**
- * @return Collection<int, array<string, mixed>>
+ * @param  class-string  $page
  */
 function openList(string $page): Testable
 {
@@ -145,6 +145,9 @@ function openOpportunitiesOnTheList(User $user, Workspace $workspace): void
     TablePreference::factory()->for($user)->for($workspace)->create(['entity' => CrmEntity::Opportunity, 'view_order' => ['list', 'board']]);
 }
 
+/**
+ * @return Collection<int, array<string, mixed>>
+ */
 function flashedNotifications(): Collection
 {
     $mailbox = resolve(NotificationMailbox::class);

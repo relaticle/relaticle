@@ -1379,7 +1379,7 @@ it('stores only the fields of a rule and the value its condition takes', functio
     ]);
 });
 
-it('writes healed rules through setFilterRules and clears the bar with clearFilterBar', function (): void {
+it('stores only the valid rules a client sends and clears every chip on request', function (): void {
     $good = ['field' => 'name', 'condition' => 'contains', 'value' => 'glo'];
     filterBarScenario('companies', $this->user);
 
