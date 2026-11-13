@@ -17,7 +17,7 @@
         <x-filament::icon icon="lucide-arrow-down-wide-narrow" x-show="sorts[0]?.direction === 'desc'" />
         <template x-if="sorts.length === 0"><span class="max-sm:hidden">{{ __('filament/panel.tables.filters.sort') }}</span></template>
         <template x-if="sorts.length > 0">
-            <span class="fi-filter-sorted inline-flex min-w-0 gap-1 max-sm:hidden" data-filter-sort-label>
+            <span class="inline-flex min-w-0 gap-1 max-sm:hidden" data-filter-sort-label>
                 <span class="fi-filter-muted">{{ __('filament/panel.tables.filters.sorted_by') }}</span>
                 <span class="fi-filter-sorted-column" x-text="sorts[0].label"></span>
                 <span class="fi-filter-muted" x-show="sorts.length > 1" x-text="@js(__('filament/panel.tables.filters.sort_more')).replace(':count', () => sorts.length - 1)" data-filter-sort-more></span>
@@ -61,7 +61,6 @@
                                 data-pop-item
                                 data-sort-column
                                 x-bind:data-column="column.key"
-                                x-bind:class="{ 'fi-on': column.key === sortTarget }"
                                 x-bind:aria-selected="(column.key === sortTarget).toString()"
                                 x-on:click="pickSort(column)"
                             >

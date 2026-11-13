@@ -20,7 +20,6 @@
                 data-pop-item
                 x-bind:data-field="field.key"
 @if ($forChip)
-                x-bind:class="{ 'fi-on': field.key === chip.field }"
                 x-bind:aria-selected="(field.key === chip.field).toString()"
 @endif
                 x-on:click="pickField(field)"

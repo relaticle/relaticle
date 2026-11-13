@@ -397,11 +397,11 @@ body.sorting * {
 
 /* The toolbar is a stacking context at z-21, which would trap a sheet under the tab bar. */
 @media (width < 40rem) {
-    :is(.fi-ta-ctn, .fi-ta-header-ctn):not(.fi-modal *):has([data-filter-bar] [data-sheet]:not([style*='display: none'])) {
+    :is(.fi-ta-ctn, .fi-ta-header-ctn):not(.fi-modal *):has([data-filter-bar] [data-sheet]) {
         @apply z-40;
     }
 
-    .fi-app-main-wrapper:has(> .fi-layout [data-filter-bar] [data-sheet]:not([style*='display: none'])) > :is(.fi-topbar-ctn, .fi-bottom-nav) {
+    .fi-app-main-wrapper:has(> .fi-layout [data-filter-bar] [data-sheet]) > :is(.fi-topbar-ctn, .fi-bottom-nav) {
         @apply static z-auto;
     }
 }

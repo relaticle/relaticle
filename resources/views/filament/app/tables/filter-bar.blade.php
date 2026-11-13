@@ -45,7 +45,6 @@
                             data-pop-item
                             data-group-option
                             x-bind:data-group="group.id"
-                            x-bind:class="{ 'fi-on': grouping?.id === group.id }"
                             x-bind:aria-checked="(grouping?.id === group.id).toString()"
                             x-on:click="groupBy(group)"
                         >
@@ -136,7 +135,6 @@
                                 class="fi-filter-item"
                                 data-pop-item
                                 x-bind:data-condition="condition.value"
-                                x-bind:class="{ 'fi-on': condition.value === chip.condition }"
                                 x-bind:aria-selected="(condition.value === chip.condition).toString()"
                                 x-on:click="pickCondition(chip, condition)"
                             >
@@ -276,7 +274,6 @@
                                                 class="fi-filter-item"
                                                 data-pop-item
                                                 x-bind:data-unit="unit.value"
-                                                x-bind:class="{ 'fi-on': chip.value?.unit === unit.value }"
                                                 x-bind:aria-selected="(chip.value?.unit === unit.value).toString()"
                                                 x-on:click="pickUnit(chip, unit)"
                                             >
@@ -365,11 +362,11 @@
 
                     <template x-if="isOpen('deleted', 'val')">
                     <div class="fi-filter-pop" x-anchor.bottom-start.offset.6.fixed="$el.parentElement" data-pop data-sheet x-bind:data-open="isOpen('deleted', 'val')" role="menu" aria-label="{{ __('filament/panel.tables.filters.deleted_records') }}" x-on:keydown="navigate($event)">
-                        <button type="button" tabindex="0" role="menuitemradio" class="fi-filter-item" data-pop-item data-deleted-mode="included" x-bind:class="{ 'fi-on': deleted === 'included' }" x-bind:aria-checked="(deleted === 'included').toString()" x-on:click="setDeleted('included')">
+                        <button type="button" tabindex="0" role="menuitemradio" class="fi-filter-item" data-pop-item data-deleted-mode="included" x-bind:aria-checked="(deleted === 'included').toString()" x-on:click="setDeleted('included')">
                             <span>{{ __('filament/panel.tables.filters.deleted_included') }}</span>
                             <x-filament::icon icon="lucide-check" class="fi-menu-check" x-show="deleted === 'included'" />
                         </button>
-                        <button type="button" tabindex="0" role="menuitemradio" class="fi-filter-item" data-pop-item data-deleted-mode="only" x-bind:class="{ 'fi-on': deleted === 'only' }" x-bind:aria-checked="(deleted === 'only').toString()" x-on:click="setDeleted('only')">
+                        <button type="button" tabindex="0" role="menuitemradio" class="fi-filter-item" data-pop-item data-deleted-mode="only" x-bind:aria-checked="(deleted === 'only').toString()" x-on:click="setDeleted('only')">
                             <span>{{ __('filament/panel.tables.filters.deleted_only') }}</span>
                             <x-filament::icon icon="lucide-check" class="fi-menu-check" x-show="deleted === 'only'" />
                         </button>
