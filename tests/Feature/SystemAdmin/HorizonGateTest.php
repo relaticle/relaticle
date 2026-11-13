@@ -95,16 +95,25 @@ it('denies a configured verified user without a second factor', function (): voi
     expect(Gate::forUser($user)->allows('viewHorizon'))->toBeFalse();
 });
 
-it('allows a configured verified user who has a passkey', function (): void {
+it('denies a configured verified user who has a passkey but no authenticator app', function (): void {
     config()->set('relaticle.horizon.admin_emails', ['ops@self-hosted.test']);
 
     $user = User::factory()->create(['email' => 'ops@self-hosted.test']);
     givePasskey($user);
 
+    expect(Gate::forUser($user)->allows('viewHorizon'))->toBeFalse();
+});
+
+it('allows a configured verified user who has a passkey and an authenticator app', function (): void {
+    config()->set('relaticle.horizon.admin_emails', ['ops@self-hosted.test']);
+
+    $user = User::factory()->withConfirmedMfa()->create(['email' => 'ops@self-hosted.test']);
+    givePasskey($user);
+
     expect(Gate::forUser($user)->allows('viewHorizon'))->toBeTrue();
 });
 
-it('denies a configured user whose two-factor setup is unconfirmed and who has no passkey', function (): void {
+it('denies a configured user whose two-factor setup is unconfirmed', function (): void {
     config()->set('relaticle.horizon.admin_emails', ['ops@self-hosted.test']);
 
     $user = User::factory()->withConfirmedMfa()->create([
