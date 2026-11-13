@@ -96,8 +96,26 @@
     @apply min-h-0 flex-1 overflow-y-auto;
 }
 
+/* The menu panel's own padding, which a phone sheet doubles. */
+:is(.fi-ta-views-panel, .fi-view-settings-panel) {
+    --menu-inset: var(--spacing);
+
+    @media (width < 40rem) {
+        --menu-inset: calc(var(--spacing) * 2);
+    }
+}
+
+/* Each part gives the panel padding back, so its rule reaches the panel's edges. A scroll box does too, or it would clip the rule. */
+:is(.fi-ta-views-panel, .fi-view-settings-panel) :is(.fi-board-main-view, .fi-ta-views-scroll, .fi-view-settings-scroll, .fi-view-settings-footer, .fi-board-section-heading),
+.fi-ta-views-panel > .fi-dropdown-list {
+    margin-inline: calc(var(--menu-inset) * -1);
+    padding-inline: var(--menu-inset);
+}
+
 .fi-ta-views-search {
-    @apply -mx-1 -mt-1 mb-1 flex shrink-0 items-center gap-2 border-b border-gray-100 px-2 py-1.5 text-gray-400 dark:border-white/10 dark:text-gray-500;
+    @apply -mt-1 mb-1 flex shrink-0 items-center gap-2 border-b border-gray-100 py-1.5 text-gray-400 dark:border-white/10 dark:text-gray-500;
+    margin-inline: calc(var(--menu-inset) * -1);
+    padding-inline: calc(var(--menu-inset) + var(--spacing));
 
     & .fi-icon {
         @apply size-menu-icon shrink-0;
@@ -327,7 +345,11 @@
 }
 
 .fi-board-section-heading {
-    @apply mt-1 shrink-0 border-t border-gray-100 px-2 pb-1 pt-2 text-xs font-medium text-gray-500 dark:border-white/10 dark:text-gray-400;
+    @apply mt-1 shrink-0 border-t border-gray-100 pb-1 pt-2 text-xs font-medium text-gray-500 dark:border-white/10 dark:text-gray-400;
+
+    :is(.fi-ta-views-panel, .fi-view-settings-panel) & {
+        padding-inline: calc(var(--menu-inset) + var(--spacing) * 2);
+    }
 }
 
 .fi-board-stage-dot {
@@ -348,6 +370,7 @@
 
 .fi-board-stage-divider {
     @apply my-1 border-gray-950/5 dark:border-white/10;
+    margin-inline: calc(var(--menu-inset) * -1);
 }
 
 [data-column-root='__none__'] .ff-column-heading::before {
