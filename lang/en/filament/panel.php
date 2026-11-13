@@ -224,7 +224,6 @@ return [
             'duplicated' => '":name" created',
             'delete' => 'Delete view',
             'delete_heading' => 'Delete ":name"?',
-            'delete_submit' => 'Delete',
             'delete_description' => 'The view is removed. Your table keeps what it shows now.',
             'created' => '":name" saved as a new view',
             'created_on' => 'Created on :date',

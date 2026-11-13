@@ -172,7 +172,7 @@ trait ManagesSavedViews
             ->requiresConfirmation()
             ->modalHeading(fn (array $arguments): string => __('filament/panel.tables.views.delete_heading', ['name' => $this->argumentSavedView($arguments)?->name]))
             ->modalDescription(__('filament/panel.tables.views.delete_description'))
-            ->modalSubmitActionLabel(__('filament/panel.tables.views.delete_submit'))
+            ->modalSubmitActionLabel(__('filament-actions::delete.single.modal.actions.delete.label'))
             ->visible(fn (array $arguments): bool => $this->argumentSavedView($arguments) instanceof SavedView)
             ->action(function (array $arguments): void {
                 $view = $this->requireArgumentSavedView($arguments);
