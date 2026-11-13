@@ -13,7 +13,9 @@ use App\Models\Passport\AuthCode;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Passport\WorkspaceBearerTokenResponse;
+use Defuse\Crypto\Crypto;
 use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
+use Illuminate\Encryption\Encrypter;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Passport\Client;
@@ -449,7 +451,7 @@ it('rejects an MCP request when a Passport token has no workspace_id', function 
     // resolveWorkspace() returned null. The exact failure mode depends on how
     // SetApiWorkspaceContext handles a null workspace (read its handle() method).
     // The contract: not a 200 OK. Most likely 403 or 422.
-    expect($response->status())->not->toBe(200);
+    expect($response->getStatusCode())->not->toBe(200);
 });
 
 it('still honors a Sanctum personal access token with its own workspace_id', function (): void {
@@ -1203,4 +1205,56 @@ it('keeps the email tools away from a connector while the email feature is off',
 
     expect(listedTools($tokens['access_token']))->not->toContain('list-emails-tool')
         ->not->toContain('get-email-tool');
+});
+
+it('answers every bad refresh token with the same body and no hint', function (): void {
+    $tokens = completeOauthFlow($this->user, $this->client, $this->personalWorkspace);
+    $otherClient = Client::query()->forceCreate([
+        'id' => (string) Str::uuid(),
+        'name' => 'Other MCP Client',
+        'redirect_uris' => ['https://example.com/callback'],
+        'grant_types' => ['authorization_code', 'refresh_token'],
+        'revoked' => false,
+        'owner_type' => $this->user->getMorphClass(),
+        'owner_id' => $this->user->getKey(),
+    ]);
+    $stored = DB::table('oauth_refresh_tokens')->sole();
+    $expiredToken = Crypto::encryptWithPassword((string) json_encode([
+        'client_id' => $this->client->getKey(),
+        'refresh_token_id' => $stored->id,
+        'access_token_id' => $stored->access_token_id,
+        'scopes' => ['mcp:use'],
+        'user_id' => $this->user->getKey(),
+        'expire_time' => time() - 60,
+    ]), Passport::tokenEncryptionKey(resolve(Encrypter::class)));
+    $refresh = fn (Client $client, string $token) => $this->postJson('/oauth/token', [
+        'grant_type' => 'refresh_token',
+        'client_id' => $client->getKey(),
+        'refresh_token' => $token,
+    ]);
+
+    $tampered = $refresh($this->client, strrev($tokens['refresh_token']));
+    $foreign = $refresh($otherClient, $tokens['refresh_token']);
+    $expired = $refresh($this->client, $expiredToken);
+    DB::table('oauth_refresh_tokens')->update(['revoked' => true]);
+    $revoked = $refresh($this->client, $tokens['refresh_token']);
+
+    foreach ([$tampered, $foreign, $expired, $revoked] as $response) {
+        $response->assertStatus(400)->assertExactJson([
+            'error' => 'invalid_grant',
+            'error_description' => 'The refresh token is invalid.',
+        ]);
+    }
+});
+
+it('keeps the error and description but drops the hint on a malformed token request', function (): void {
+    $this->postJson('/oauth/token', [
+        'grant_type' => 'refresh_token',
+        'client_id' => $this->client->getKey(),
+    ])
+        ->assertStatus(400)
+        ->assertExactJson([
+            'error' => 'invalid_request',
+            'error_description' => 'The request is missing a required parameter, includes an invalid parameter value, includes a parameter more than once, or is otherwise malformed.',
+        ]);
 });
