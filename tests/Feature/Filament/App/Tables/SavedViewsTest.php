@@ -2264,3 +2264,14 @@ it('opens a list view created from a board with the default columns and writes n
         ->and($component->get('tableFilters.conditions.rules'))->toHaveCount(1)
         ->and($writes)->toBe(0);
 });
+
+it('reads the member table preference once when a list renders', function (): void {
+    $reads = 0;
+    DB::listen(function (QueryExecuted $query) use (&$reads): void {
+        $reads += preg_match('/^select .* from "table_preferences"/', $query->sql);
+    });
+
+    livewire(ListCompanies::class)->assertOk();
+
+    expect($reads)->toBe(1);
+});

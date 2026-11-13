@@ -12,9 +12,10 @@ use App\Enums\CrmEntity;
 use App\Enums\SavedViewType;
 use App\Filament\Resources\NoteResource\Pages\NotesCards;
 use App\Models\SavedView;
+use App\Models\TablePreference;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Queries\Views\ViewOrderQuery;
+use App\Queries\Views\StoredTablePreferenceQuery;
 use App\Queries\Views\VisibleSavedViewsQuery;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
@@ -41,6 +42,10 @@ trait HasViewSwitcher
 
     /** @var array<string, list<string>> */
     private array $viewOrderCache = [];
+
+    private ?TablePreference $storedTablePreference = null;
+
+    private bool $hasLoadedTablePreference = false;
 
     public function mountHasViewSwitcher(): void
     {
@@ -79,7 +84,8 @@ trait HasViewSwitcher
             return;
         }
 
-        resolve(ReorderViews::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), $known);
+        $this->storedTablePreference = resolve(ReorderViews::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), $known);
+        $this->hasLoadedTablePreference = true;
         $this->viewOrderCache = [];
     }
 
@@ -111,13 +117,40 @@ trait HasViewSwitcher
         $kinds = array_keys($this->viewSwitcherPages());
         $views = $this->viewSwitcherSavedViews();
 
-        return $this->viewOrderCache[implode(',', [...$kinds, ...$views->modelKeys()])] ??= resolve(ViewOrderQuery::class)->get(
-            $this->viewSwitcherUser(),
-            $this->viewSwitcherWorkspace(),
-            $this->viewSwitcherEntity(),
-            $kinds,
-            $views,
-        );
+        return $this->viewOrderCache[implode(',', [...$kinds, ...$views->modelKeys()])] ??= $this->orderViews($kinds, $views);
+    }
+
+    /**
+     * @param  list<string>  $kinds
+     * @param  Collection<int, SavedView>  $views
+     * @return list<string>
+     */
+    private function orderViews(array $kinds, Collection $views): array
+    {
+        $natural = [
+            ...array_filter($this->viewSwitcherEntity()->builtInViews(), static fn (string $kind): bool => in_array($kind, $kinds, true)),
+            ...$views->sortBy([['created_at', 'asc'], ['id', 'asc']])->map(static fn (SavedView $view): string => (string) $view->getKey())->values()->all(),
+        ];
+        $stored = $this->storedTablePreference()->view_order ?? [];
+
+        return array_values(array_unique([...array_intersect($stored, $natural), ...$natural]));
+    }
+
+    protected function storedTablePreference(): ?TablePreference
+    {
+        if (! $this->hasLoadedTablePreference) {
+            $this->hasLoadedTablePreference = true;
+            $this->storedTablePreference = resolve(StoredTablePreferenceQuery::class)
+                ->get($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity());
+        }
+
+        return $this->storedTablePreference;
+    }
+
+    protected function forgetStoredTablePreference(): void
+    {
+        $this->hasLoadedTablePreference = false;
+        $this->viewOrderCache = [];
     }
 
     protected function isBareArrival(): bool

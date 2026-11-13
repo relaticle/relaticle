@@ -11,7 +11,6 @@ use App\Filament\Tables\FilterBar\SortList;
 use App\Models\SavedView;
 use App\Models\TablePreference;
 use App\Providers\Filament\AppPanelProvider;
-use App\Queries\Views\StoredTablePreferenceQuery;
 use Illuminate\Support\Arr;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
@@ -33,10 +32,6 @@ trait PersistsTableState
     public ?string $tableThenSorts = null;
 
     private ?TableStateData $initialTableState = null;
-
-    private ?TablePreference $storedTablePreference = null;
-
-    private bool $hasLoadedTablePreference = false;
 
     private bool $seededFromSavedView = false;
 
@@ -210,17 +205,6 @@ trait PersistsTableState
             ?? throw new LogicException("{$model} is not a CRM entity, so its table state cannot be remembered.");
     }
 
-    private function storedTablePreference(): ?TablePreference
-    {
-        if (! $this->hasLoadedTablePreference) {
-            $this->hasLoadedTablePreference = true;
-            $this->storedTablePreference = resolve(StoredTablePreferenceQuery::class)
-                ->get($this->savedViewUser(), $this->savedViewWorkspace(), $this->tableEntity());
-        }
-
-        return $this->storedTablePreference;
-    }
-
     private function initialTableState(): TableStateData
     {
         if ($this->initialTableState instanceof TableStateData) {
@@ -273,7 +257,7 @@ trait PersistsTableState
 
     private function parkedOwnTable(): ?TableStateData
     {
-        $this->hasLoadedTablePreference = false;
+        $this->forgetStoredTablePreference();
         $preference = $this->storedTablePreference();
 
         if (! $preference instanceof TablePreference) {
