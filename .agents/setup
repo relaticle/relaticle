@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Provisions an Amp orb (Debian 12): PHP 8.5, PostgreSQL 17, Redis, dependencies,
+# Provisions an Amp orb (Debian 12 or 13): PHP 8.5, PostgreSQL 17, Redis, dependencies,
 # a seeded dev database, a testing database and a frontend build.
 # Idempotent: Amp reruns it on a stale snapshot, so every step checks first.
 
@@ -33,16 +33,16 @@ for package in "${SYSTEM_PACKAGES[@]}"; do
 done
 if ((${#missing[@]} > 0)); then
     sudo install -d -m 0755 /etc/apt/keyrings
-    if [[ ! -f /etc/apt/sources.list.d/php.list ]]; then
+    # Written on every run: an orb that moved Debian releases keeps lists naming the old codename.
+    CODENAME=$(. /etc/os-release && echo "$VERSION_CODENAME")
+    [[ -f /etc/apt/keyrings/sury-php.gpg ]] ||
         curl -fsSL https://packages.sury.org/php/apt.gpg | sudo tee /etc/apt/keyrings/sury-php.gpg >/dev/null
-        echo "deb [signed-by=/etc/apt/keyrings/sury-php.gpg] https://packages.sury.org/php/ bookworm main" |
-            sudo tee /etc/apt/sources.list.d/php.list >/dev/null
-    fi
-    if [[ ! -f /etc/apt/sources.list.d/pgdg.list ]]; then
+    echo "deb [signed-by=/etc/apt/keyrings/sury-php.gpg] https://packages.sury.org/php/ ${CODENAME} main" |
+        sudo tee /etc/apt/sources.list.d/php.list >/dev/null
+    [[ -f /etc/apt/keyrings/pgdg.gpg ]] ||
         curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor --yes -o /etc/apt/keyrings/pgdg.gpg
-        echo "deb [signed-by=/etc/apt/keyrings/pgdg.gpg] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" |
-            sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
-    fi
+    echo "deb [signed-by=/etc/apt/keyrings/pgdg.gpg] https://apt.postgresql.org/pub/repos/apt ${CODENAME}-pgdg main" |
+        sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
     sudo apt-get update -qq
     sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends "${missing[@]}"
 fi
