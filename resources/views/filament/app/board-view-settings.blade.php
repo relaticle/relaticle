@@ -18,7 +18,6 @@
         role="group"
         aria-label="{{ __('filament/pages/boards.view_settings.panel') }}"
         x-on:dropdown-escape="rowMenuShown() ? ($event.preventDefault(), closeRowMenu(), escapeRowMenu()) : panel !== 'main' && ($event.preventDefault(), closePanel())"
-        x-init="$el.closest('.fi-dropdown-panel')?.addEventListener('dropdown-opened', () => (panel = 'main', query = ''))"
         x-data="boardViewSettings"
     >
         <div class="fi-view-settings-view fi-board-main-view" x-show="panel === 'main'">

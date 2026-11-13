@@ -1,10 +1,7 @@
-// Board pieces: the View settings panel, the drag animation every sortable list shares, and the
-// column drag by header. The package renders the columns, so that finds its containers by the
-// documented ff-* classes and re-binds when a morph replaces one.
+// Board pieces: the View settings panel and the column drag by header. The package renders the
+// columns, so the drag finds its containers by the documented ff-* classes and re-binds after a morph.
 
 document.addEventListener('alpine:init', () => {
-    window.Alpine.magic('dragAnimation', () => (duration = 150) => (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : duration))
-
     window.Alpine.data('boardViewSettings', () => ({
         ...window.viewSettingsAddPanel({
             root: (component) => component.$root,
@@ -14,6 +11,12 @@ document.addEventListener('alpine:init', () => {
             pick: 'add',
         }),
         panel: 'main',
+        init() {
+            this.$root.closest('.fi-dropdown-panel')?.addEventListener('dropdown-opened', () => {
+                this.panel = 'main'
+                this.query = ''
+            })
+        },
         openPanel(name) {
             this.panel = name
             this.$nextTick(() => requestAnimationFrame(() => {

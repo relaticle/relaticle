@@ -721,6 +721,10 @@
         document.addEventListener('keydown', onKey)
     }
 
+    function registerDragAnimation() {
+        window.Alpine.magic('dragAnimation', () => (duration = 150) => (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : duration))
+    }
+
     function registerColumnMenu() {
         window.Alpine.data('tableColumnMenu', () => ({
             column: null,
@@ -1250,10 +1254,12 @@
     document.addEventListener('livewire:init', () => window.Livewire.hook('morphed', rebuildResizableTablesAfterMorph))
 
     if (window.Alpine && window.Alpine.version) {
+        registerDragAnimation()
         registerResizableColumn()
         registerColumnMenu()
         registerViewSettings()
     } else {
+        document.addEventListener('alpine:init', registerDragAnimation)
         document.addEventListener('alpine:init', registerResizableColumn)
         document.addEventListener('alpine:init', registerColumnMenu)
         document.addEventListener('alpine:init', registerViewSettings)
